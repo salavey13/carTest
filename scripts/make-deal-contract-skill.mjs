@@ -75,9 +75,10 @@ import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { htmlToDocxElements } from '../lib/htmlToDocx.mjs';
 import { buildRentalContractVariables } from '../app/lib/rental-contract-vars.ts';
 
-// Note: OCR skill uses shared contract builder for canonical pricing.
-// Full calculator integration (multi-day tiers, hourly balloons) deferred
-// due to .mjs/.ts import complexity - would require build step or conversion to .ts.
+// Pricing: Uses shared buildRentalContractVariables for base calculation.
+// Full tiered pricing calculator (3h/6h/12h tiers, multi-day discounts) lives in
+// app/franchize/lib/pricing-calculator.ts but is NOT used here - the script
+// calculates simple hourly/daily rates. Override with --subtotal flag if needed.
 
 // ── CLI helpers ──────────────────────────────────────────────────────────
 function arg(name, fallback = '') { const i = process.argv.indexOf(`--${name}`); return i>=0 ? (process.argv[i+1]||'') : fallback; }
