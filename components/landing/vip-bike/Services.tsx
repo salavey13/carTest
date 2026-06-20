@@ -78,28 +78,28 @@ const SERVICES = [
   {
     id: "rent",
     title: "АРЕНДА",
-    description: "Почасовой и посуточный тариф. Без обязательств. Чистая поездка.",
+    description: "Почасовой и посуточный прокат",
     icon: BrutalistIcons.rent,
     href: CATALOG_HREF,
   },
   {
     id: "sale",
     title: "ПОКУПКА",
-    description: "Байк в собственность. Полная гарантия. Напрямую от источника.",
+    description: "Байк в собственность с гарантией",
     icon: BrutalistIcons.sale,
     href: `${CATALOG_HREF}?sale=true`,
   },
   {
     id: "configurator",
-    title: "СБОРКА",
-    description: "Кастом под твои характеристики. Твой байк. Твой путь.",
+    title: "КОНФИГУРАТОР",
+    description: "Собери свой электро",
     icon: BrutalistIcons.configurator,
     href: CONFIGURATOR_HREF,
   },
   {
     id: "map",
     title: "КАРТА",
-    description: "Отслеживание флота в реальном времени. Что доступно прямо сейчас.",
+    description: "Доступные байки в реальном времени",
     icon: BrutalistIcons.map,
     href: MAP_HREF,
   },
@@ -127,13 +127,13 @@ export function Services() {
             className="text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tighter mb-4"
             style={{ color: "#E0E0E0" }}
           >
-            Услуги
+            Сервисы
           </h2>
           <p
             className="text-sm uppercase tracking-widest"
             style={{ color: "#FF4500" }}
           >
-            Чем можем помочь
+            Что мы предлагаем
           </p>
         </div>
 

@@ -21,7 +21,6 @@ import {
   Hero,
   SocialBanner,
   BikeShowcase,
-  TheCrew,
   Services,
   MemberStories,
   HowItWorks,
@@ -30,15 +29,15 @@ import {
 } from "@/components/landing/vip-bike";
 
 export const metadata = {
-  title: "VIP BIKE ELECTRO — Аренда электробайков в Нижнем Новгороде",
+  title: "VIP BIKE ELECTRO — Аренда электробайков и мотоциклов в Нижнем Новгороде",
   description:
-    "Хардкорная аренда электробайков и эндуро. От 6 000 ₽/сутки. Электро без категории А, шлем в комплекте, забронируй в боте за 2 минуты.",
+    "Премиальный прокат электробайков и ICE мотоциклов. От 6 000 ₽/сутки. Электро по правам B, шлем в комплекте, забронируй в боте за 2 минуты.",
   keywords:
-    "аренда электробайка, электробайк Нижний Новгород, аренда эндуро, VIP Bike, мотоцикл аренда",
+    "аренда электробайка, электробайк Нижний Новгород, аренда мотоцикла, аренда эндуро, VIP Bike",
   openGraph: {
-    title: "VIP BIKE ELECTRO — Аренда электробайков в Нижнем Новгороде",
+    title: "VIP BIKE ELECTRO — Аренда электробайков и мотоциклов в Нижнем Новгороде",
     description:
-      "Хардкорная аренда электробайков и эндуро. От 6 000 ₽/сутки. Электро без категории А, шлем в комплекте.",
+      "Премиальный прокат электробайков и ICE мотоциклов. От 6 000 ₽/сутки. Электро по правам B, шлем в комплекте.",
     type: "website",
     locale: "ru_RU",
   },
@@ -50,7 +49,6 @@ export default function VipBikeElectroPage() {
       <Hero />
       <SocialBanner />
       <BikeShowcase />
-      <TheCrew />
       <Services />
       <MemberStories />
       <HowItWorks />

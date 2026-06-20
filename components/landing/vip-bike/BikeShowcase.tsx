@@ -104,7 +104,7 @@ export function BikeShowcase() {
   });
 
   const filterButtons: { key: FilterType; label: string }[] = [
-    { key: "all", label: "Весь арсенал" },
+    { key: "all", label: "Все" },
     { key: "adrenaline", label: "Адреналин" },
     { key: "cruising", label: "Круизинг" },
     { key: "enduro", label: "Эндуро" },
@@ -132,13 +132,13 @@ export function BikeShowcase() {
             className="text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tighter mb-4"
             style={{ color: "#E0E0E0" }}
           >
-            Флот
+            Каталог
           </h2>
           <p
             className="text-sm uppercase tracking-widest mb-8"
             style={{ color: "#FF4500" }}
           >
-            Выбери свою дисциплину
+            Выбери стиль поездки
           </p>
 
           {/* Filter buttons */}
@@ -277,7 +277,7 @@ export function BikeShowcase() {
               color: "#050505",
             }}
           >
-            Смотреть весь флот
+            Весь каталог
           </Link>
         </div>
       </div>

@@ -8,7 +8,7 @@ const SOCIAL_LINKS = [
     id: "vk",
     label: "VK",
     href: "https://vk.com/vip_bike",
-    description: "Паблик",
+    description: "Группа",
   },
   {
     id: "instagram",
@@ -20,11 +20,11 @@ const SOCIAL_LINKS = [
     id: "telegram-bot",
     label: "БОТ",
     href: "https://t.me/oneBikePlsBot",
-    description: "Мгновенная бронь",
+    description: "Бронь",
   },
   {
     id: "telegram-contact",
-    label: "ОПЕРАТОР",
+    label: "ТЕЛЕГРАМ",
     href: "https://t.me/I_O_S_NN",
     description: "@I_O_S_NN",
   },
@@ -75,10 +75,10 @@ export function SocialBanner() {
             className="text-4xl md:text-5xl font-black uppercase tracking-tighter mb-3"
             style={{ color: "#E0E0E0" }}
           >
-            Связь
+            Соцсети
           </h2>
           <p className="text-sm uppercase tracking-widest" style={{ color: "#FF4500" }}>
-            Присоединяйся к сообществу
+            Присоединяйся
           </p>
         </div>
 
