@@ -11,8 +11,8 @@ const BOT_HREF = "https://t.me/oneBikePlsBot";
 const CONTACT_INFO = {
   phone: "+7 9200-789-888",
   phoneHref: "tel:+79200789888",
-  address: "Nizhny Novgorod, Komsoomolskaya 2",
-  hours: "10:00 — 22:00 (Daily)",
+  address: "Н. Новгород, пл. Комсомольская 2",
+  hours: "10:00 — 22:00 (ежедневно)",
 };
 
 export function Footer() {
@@ -38,9 +38,9 @@ export function Footer() {
               <span style={{ color: "#FF4500" }}>ELECTRO</span>
             </h3>
             <p className="text-sm leading-relaxed" style={{ color: "#666" }}>
-              Premium electro bike rental.
+              Премиальная аренда электробайков.
               <br />
-              No bullshit. Just ride.
+              Никакой ерунды. Просто кати.
             </p>
           </div>
 
@@ -50,7 +50,7 @@ export function Footer() {
               className="text-sm font-black uppercase tracking-widest mb-4"
               style={{ color: "#FF4500" }}
             >
-              Contact
+              Контакты
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
@@ -73,7 +73,7 @@ export function Footer() {
               className="text-sm font-black uppercase tracking-widest mb-4"
               style={{ color: "#FF4500" }}
             >
-              Navigate
+              Навигация
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
@@ -82,7 +82,7 @@ export function Footer() {
                   className="hover:text-white transition-colors"
                   style={{ color: "#666" }}
                 >
-                  FLEET
+                  ФЛОТ
                 </Link>
               </li>
               <li>
@@ -91,7 +91,7 @@ export function Footer() {
                   className="hover:text-white transition-colors"
                   style={{ color: "#666" }}
                 >
-                  CONFIGURATOR
+                  КОНФИГУРАТОР
                 </Link>
               </li>
               <li>
@@ -100,7 +100,7 @@ export function Footer() {
                   className="hover:text-white transition-colors"
                   style={{ color: "#666" }}
                 >
-                  MAP
+                  КАРТА
                 </Link>
               </li>
             </ul>
@@ -124,7 +124,7 @@ export function Footer() {
                 borderColor: "#FF4500",
               }}
             >
-              BOT
+              БОТ
             </a>
             <a
               href={OPERATOR_HREF}
@@ -137,7 +137,7 @@ export function Footer() {
                 borderColor: "#111",
               }}
             >
-              OPERATOR
+              ОПЕРАТОР
             </a>
           </div>
         </div>

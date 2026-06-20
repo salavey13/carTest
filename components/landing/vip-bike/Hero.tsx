@@ -40,14 +40,28 @@ export function Hero() {
       {/* Content */}
       <div className="relative z-10 container mx-auto px-4 py-12">
         <div className="max-w-6xl mx-auto">
+          {/* Location badge */}
+          <div className="mb-6">
+            <span
+              className="inline-block px-4 py-2 text-xs font-black uppercase tracking-widest"
+              style={{
+                backgroundColor: "rgba(255, 69, 0, 0.15)",
+                color: "#FF4500",
+                border: "1px solid #FF4500",
+              }}
+            >
+              Нижний Новгород // пл. Комсомольская 2
+            </span>
+          </div>
+
           {/* Title - BRUTALIST */}
           <h1
             className="text-6xl md:text-8xl lg:text-9xl font-black uppercase tracking-tighter mb-4"
             style={{ color: "#E0E0E0", lineHeight: "0.85" }}
           >
-            DOMINATE
+            ДОМИНИРУЙ
             <br />
-            <span style={{ color: "#FF4500" }}>THE STREETS</span>
+            <span style={{ color: "#FF4500" }}>НА СТРЕТАХ</span>
           </h1>
 
           {/* Tagline */}
@@ -55,9 +69,9 @@ export function Hero() {
             className="text-xl md:text-2xl uppercase tracking-widest mb-12 max-w-2xl"
             style={{ color: "#E0E0E0", fontWeight: "600" }}
           >
-            Premium Electro Bike Rental
+            Профессиональная аренда электробайков и эндуро
             <br />
-            Nizhny Novgorod
+            Нижний Новгород
           </p>
 
           {/* CTA Buttons - Sharp edges */}
@@ -71,7 +85,7 @@ export function Hero() {
                 border: "none",
               }}
             >
-              View Fleet
+              Выбрать аппарат
             </Link>
             <Link
               href={BOT_HREF}
@@ -82,12 +96,12 @@ export function Hero() {
                 border: "2px solid #FF4500",
               }}
             >
-              Book Now
+              Забронировать
             </Link>
           </div>
 
           {/* Pricing badge - Sharp edges */}
-          <div>
+          <div className="flex flex-wrap gap-3">
             <span
               className="inline-block px-6 py-3 text-sm font-black uppercase tracking-wider"
               style={{
@@ -95,7 +109,27 @@ export function Hero() {
                 color: "#050505",
               }}
             >
-              From 6,000 ₽/day
+              От 6 000 ₽/сутки
+            </span>
+            <span
+              className="inline-block px-6 py-3 text-sm font-black uppercase tracking-wider"
+              style={{
+                backgroundColor: "transparent",
+                color: "#E0E0E0",
+                border: "2px solid #333",
+              }}
+            >
+              Электро без кат. А
+            </span>
+            <span
+              className="inline-block px-6 py-3 text-sm font-black uppercase tracking-wider"
+              style={{
+                backgroundColor: "transparent",
+                color: "#E0E0E0",
+                border: "2px solid #333",
+              }}
+            >
+              Экипировка включена
             </span>
           </div>
         </div>
@@ -108,7 +142,7 @@ export function Hero() {
           style={{ color: "#FF4500" }}
         >
           <span className="text-xs font-black uppercase tracking-widest">
-            Scroll
+            Листай вниз
           </span>
           <div className="w-px h-12 bg-[#FF4500]" />
         </div>

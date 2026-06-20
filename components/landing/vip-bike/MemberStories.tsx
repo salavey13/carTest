@@ -6,20 +6,20 @@
 const STORIES = [
   {
     id: "story-1",
-    quote: "Best electric bike experience in Nizhny. The Falcon GT is a beast.",
-    author: "ALEX K.",
+    quote: "Лучший опыт электробайка в Нижнем. Falcon GT — зверь.",
+    author: "АЛЕКСЕЙ К.",
     ride: "Falcon GT 2025",
   },
   {
     id: "story-2",
-    quote: "No paperwork bullshit. Just show up, ride, leave. That's how it should be.",
-    author: "DMITRY M.",
+    quote: "Никакой бюрократии. Приехал, покатался, уехал. Так и должно быть.",
+    author: "ДМИТРИЙ М.",
     ride: "Sequence Zero",
   },
   {
     id: "story-3",
-    quote: "Tried the Surge V for 3 hours. Bought one the next week. Enough said.",
-    author: "SERGEI V.",
+    quote: "Взял Surge V на 3 часа. На следующей неделе купил свой. Достаточно сказано.",
+    author: "СЕРГЕЙ В.",
     ride: "Y-Volt Surge V",
   },
 ];
@@ -46,13 +46,13 @@ export function MemberStories() {
             className="text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tighter mb-4"
             style={{ color: "#E0E0E0" }}
           >
-            Witness
+            Отзывы
           </h2>
           <p
             className="text-sm uppercase tracking-widest"
             style={{ color: "#FF4500" }}
           >
-            What riders say
+            Что говорят райдеры
           </p>
         </div>
 

@@ -7,22 +7,22 @@ const CREW_MEMBERS = [
   {
     id: "ios",
     name: "IOS",
-    role: "FOUNDER",
-    bio: "Built the fleet from scratch. Knows every bolt.",
+    role: "ОСНОВАТЕЛЬ",
+    bio: "Собрал флот с нуля. Знает каждый болт.",
     telegram: "I_O_S_NN",
   },
   {
     id: "mechanic",
-    name: "THE MECHANIC",
-    role: "TECH LEAD",
-    bio: "If it breaks, he fixes it. If it doesn't, he makes it faster.",
+    name: "МЕХАНИК",
+    role: "ТЕХЛИД",
+    bio: "Если ломается — чинит. Если работает — делает быстрее.",
     telegram: "I_O_S_NN",
   },
   {
     id: "operator",
-    name: "THE OPERATOR",
-    role: "SUPPORT",
-    bio: "Your first point of contact. Fast, efficient, no bullshit.",
+    name: "ОПЕРАТОР",
+    role: "ПОДДЕРЖКА",
+    bio: "Твоя первая точка контакта. Быстро. Эффективно. Без лишних вопросов.",
     telegram: "I_O_S_NN",
   },
 ];
@@ -49,13 +49,13 @@ export function TheCrew() {
             className="text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tighter mb-4"
             style={{ color: "#E0E0E0" }}
           >
-            The Crew
+            Команда
           </h2>
           <p
             className="text-sm uppercase tracking-widest"
             style={{ color: "#FF4500" }}
           >
-            The people behind the machines
+            Люди за машинами
           </p>
         </div>
 
