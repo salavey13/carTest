@@ -95,15 +95,15 @@ function extractPriceTiers(rawSpecs: Record<string, unknown> | undefined): Price
     tiers.push({ label: "Будний день", price: `${specs.rent_weekday.toLocaleString("ru-RU")} ₽` });
   }
 
-  // Multi-day tiers
+  // Multi-day tiers - these are PER-DAY rates, not total prices
   if (specs.rent_2_4d && specs.rent_2_4d > 0) {
-    tiers.push({ label: "2-4 дня", price: `${specs.rent_2_4d.toLocaleString("ru-RU")} ₽` });
+    tiers.push({ label: "2-4 дня", price: `${specs.rent_2_4d.toLocaleString("ru-RU")} ₽/день` });
   }
   if (specs.rent_5_10d && specs.rent_5_10d > 0) {
-    tiers.push({ label: "5-10 дней", price: `${specs.rent_5_10d.toLocaleString("ru-RU")} ₽` });
+    tiers.push({ label: "5-10 дней", price: `${specs.rent_5_10d.toLocaleString("ru-RU")} ₽/день` });
   }
   if (specs.rent_11_30d && specs.rent_11_30d > 0) {
-    tiers.push({ label: "11-30 дней", price: `${specs.rent_11_30d.toLocaleString("ru-RU")} ₽` });
+    tiers.push({ label: "11-30 дней", price: `${specs.rent_11_30d.toLocaleString("ru-RU")} ₽/день` });
   }
 
   return tiers;
