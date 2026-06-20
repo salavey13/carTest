@@ -104,6 +104,29 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
     [removeLine],
   );
 
+  const handleEdit = useCallback(
+    (lineId: string) => {
+      const line = cartLines.find((l) => l.lineId === lineId);
+      if (!line?.item) return;
+
+      // Store edit context in sessionStorage for catalog page to pick up
+      sessionStorage.setItem(
+        "franchize-edit-cart-line",
+        JSON.stringify({
+          itemId: line.itemId,
+          options: line.options,
+        }),
+      );
+
+      // Remove the line (user will re-add with edited options)
+      removeLine(lineId);
+
+      // Navigate to catalog page
+      router.push(`/franchize/${slug}`);
+    },
+    [cartLines, removeLine, router, slug],
+  );
+
   const isEmpty = cartLines.length === 0 && rawItemCount === 0;
 
   return (
@@ -167,6 +190,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
                       onDecreaseQty={(lineId) => changeLineQty(lineId, -1)}
                       onIncreaseQty={(lineId) => changeLineQty(lineId, 1)}
                       onDelete={handleDelete}
+                      onEdit={handleEdit}
                     />
                   </motion.div>
                 ))}
