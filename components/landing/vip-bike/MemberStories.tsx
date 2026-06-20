@@ -6,7 +6,7 @@
 const STORIES = [
   {
     id: "story-1",
-    quote: "Лучший опыт электробайка в Нижнем. Falcon GT — зверь.",
+    quote: "Взял электро на тест-драйв. Купил через неделю. Falcon GT — зверь.",
     author: "АЛЕКСЕЙ К.",
     ride: "Falcon GT 2025",
   },
@@ -18,7 +18,7 @@ const STORIES = [
   },
   {
     id: "story-3",
-    quote: "Взял Surge V на 3 часа. На следующей неделе купил свой. Достаточно сказано.",
+    quote: "Тест-драйв Surge V на 3 часа. На следующей неделе уже свой. Доволен.",
     author: "СЕРГЕЙ В.",
     ride: "Y-Volt Surge V",
   },
@@ -52,7 +52,7 @@ export function MemberStories() {
             className="text-sm uppercase tracking-widest"
             style={{ color: "#FF4500" }}
           >
-            Что говорят райдеры
+            Что говорят клиенты
           </p>
         </div>
 

@@ -10,23 +10,23 @@ const BOT_HREF = "https://t.me/oneBikePlsBot";
 const STEPS = [
   {
     n: "01",
-    title: "ВЫБОР",
-    desc: "Изучай флот. Смотри спецификации. Выбирай байк.",
+    title: "Выбор",
+    desc: "Открой каталог, посмотри характеристики, выбери байк.",
   },
   {
     n: "02",
-    title: "БРОНЬ",
-    desc: "Telegram-бот. Два клика. Готово. Депозит или документы — на твой выбор.",
+    title: "Бронь",
+    desc: "Telegram-бот. Два клика. Депозит или документы — на выбор.",
   },
   {
     n: "03",
-    title: "ПОЛЁТ",
-    desc: "Приезжай на пл. Комсомольская 2. Подписывай. Кати.",
+    title: "Выдача",
+    desc: "пл. Комсомольская 2. Договор, экипировка, инструкции.",
   },
   {
     n: "04",
-    title: "ВОЗВРАТ",
-    desc: "Верни байк. Получи депозит. Повтори.",
+    title: "Поездка",
+    desc: "Катаешься. Возвращаешь. Получаешь депозит.",
   },
 ];
 
@@ -53,13 +53,13 @@ export function HowItWorks() {
             className="text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tighter mb-4"
             style={{ color: "#E0E0E0" }}
           >
-            Процесс
+            Как это работает
           </h2>
           <p
             className="text-sm uppercase tracking-widest"
             style={{ color: "#FF4500" }}
           >
-            Четыре шага до улицы
+            4 шага до поездки
           </p>
         </div>
 
@@ -120,7 +120,7 @@ export function HowItWorks() {
               color: "#050505",
             }}
           >
-            Начать сейчас
+            Записаться на тест-драйв
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>

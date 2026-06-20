@@ -6,7 +6,6 @@
 export { Hero } from "./Hero";
 export { SocialBanner } from "./SocialBanner";
 export { BikeShowcase } from "./BikeShowcase";
-export { TheCrew } from "./TheCrew";
 export { Services } from "./Services";
 export { MemberStories } from "./MemberStories";
 export { HowItWorks } from "./HowItWorks";

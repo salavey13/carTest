@@ -59,9 +59,9 @@ export function Hero() {
             className="text-6xl md:text-8xl lg:text-9xl font-black uppercase tracking-tighter mb-4"
             style={{ color: "#E0E0E0", lineHeight: "0.85" }}
           >
-            ДОМИНИРУЙ
+            ЭЛЕКТРО
             <br />
-            <span style={{ color: "#FF4500" }}>НА СТРЕТАХ</span>
+            <span style={{ color: "#FF4500" }}>И ICE БАЙКИ</span>
           </h1>
 
           {/* Tagline */}
@@ -69,7 +69,7 @@ export function Hero() {
             className="text-xl md:text-2xl uppercase tracking-widest mb-12 max-w-2xl"
             style={{ color: "#E0E0E0", fontWeight: "600" }}
           >
-            Профессиональная аренда электробайков и эндуро
+            Премиальный прокат электробайков и ICE
             <br />
             Нижний Новгород
           </p>
@@ -85,7 +85,7 @@ export function Hero() {
                 border: "none",
               }}
             >
-              Выбрать аппарат
+              Смотреть каталог
             </Link>
             <Link
               href={BOT_HREF}
@@ -119,7 +119,7 @@ export function Hero() {
                 border: "2px solid #333",
               }}
             >
-              Электро без кат. А
+              Электро и ICE
             </span>
             <span
               className="inline-block px-6 py-3 text-sm font-black uppercase tracking-wider"

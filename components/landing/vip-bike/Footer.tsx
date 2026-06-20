@@ -38,9 +38,8 @@ export function Footer() {
               <span style={{ color: "#FF4500" }}>ELECTRO</span>
             </h3>
             <p className="text-sm leading-relaxed" style={{ color: "#666" }}>
-              Премиальная аренда электробайков.
-              <br />
-              Никакой ерунды. Просто кати.
+              Премиальный прокат электробайков и ICE.<br />
+              Нижний Новгород
             </p>
           </div>
 
@@ -73,7 +72,7 @@ export function Footer() {
               className="text-sm font-black uppercase tracking-widest mb-4"
               style={{ color: "#FF4500" }}
             >
-              Навигация
+              Разделы
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
@@ -82,7 +81,7 @@ export function Footer() {
                   className="hover:text-white transition-colors"
                   style={{ color: "#666" }}
                 >
-                  ФЛОТ
+                  Каталог
                 </Link>
               </li>
               <li>
@@ -91,7 +90,7 @@ export function Footer() {
                   className="hover:text-white transition-colors"
                   style={{ color: "#666" }}
                 >
-                  КОНФИГУРАТОР
+                  Конфигуратор
                 </Link>
               </li>
               <li>
@@ -100,7 +99,7 @@ export function Footer() {
                   className="hover:text-white transition-colors"
                   style={{ color: "#666" }}
                 >
-                  КАРТА
+                  Карта
                 </Link>
               </li>
             </ul>
