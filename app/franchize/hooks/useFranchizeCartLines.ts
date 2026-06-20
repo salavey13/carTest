@@ -58,6 +58,15 @@ function parseDurationDays(rawDuration: string): number {
   return days;
 }
 
+// Parse helmet count from perk string (e.g., "шлем×2" → 2, "стандарт" → 0)
+function parseHelmetCount(perk: string): number {
+  const match = perk.match(/шлем×(\d+)/i);
+  if (!match) return 0;
+  const count = Number(match[1]);
+  return Math.max(0, Math.min(2, Number.isFinite(count) ? count : 0));
+}
+
+
 export type CartFlowType = "rental" | "sale";
 
 export type FranchizeCartLineVM = {
@@ -75,6 +84,16 @@ export type FranchizeCartLineVM = {
   flowType: CartFlowType;
   /** Human-readable price label for display: rental → "X ₽ / день", sale → "Покупка: X ₽" */
   displayPriceLabel: string;
+  /** Price breakdown from shared calculator (for passing to contract builder) */
+  priceBreakdown?: {
+    totalRub: number;
+    basePriceRub: number;
+    helmetRub: number;
+    depositRub: number;
+    savingsRub: number;
+    savingsPercent: number;
+    tier: string;
+  };
   options: {
     package: string;
     duration: string;
@@ -137,6 +156,36 @@ export function useFranchizeCartLines(
         const discountedLineBase = Math.round(lineBase * durationDiscount);
         const effectiveUnitPrice = Math.max(0, Math.round(discountedLineBase / Math.max(1, rentalDays)));
 
+        // Calculate priceBreakdown using shared calculator (when dates are set)
+        let priceBreakdown: FranchizeCartLineVM["priceBreakdown"] = undefined;
+        const helmetCount = parseHelmetCount(line.options.perk);
+        const helmetRub = helmetCount * 1000;
+
+        if (item?.rawSpecs && line.options.rentStartDate && line.options.rentEndDate) {
+          try {
+            const { calculatePrice } = require("@/lib/rental-pricing-calculator");
+            const result = calculatePrice(
+              item.rawSpecs,
+              line.options.rentStartDate,
+              line.options.rentEndDate,
+              "10:00",
+              "10:00",
+              helmetCount
+            );
+            priceBreakdown = {
+              totalRub: discountedLineBase * line.qty + helmetRub,
+              basePriceRub: result.basePriceRub,
+              helmetRub: result.helmetRub,
+              depositRub: result.depositRub,
+              savingsRub: result.savingsRub,
+              savingsPercent: result.savingsPercent,
+              tier: result.tier,
+            };
+          } catch {
+            // Fallback: no priceBreakdown if calculator fails
+          }
+        }
+
         return {
           lineId,
           itemId: line.itemId,
@@ -149,6 +198,7 @@ export function useFranchizeCartLines(
           salePrice: null,
           flowType: "rental" as const,
           displayPriceLabel: item?.rentPriceLabel ?? `${effectiveUnitPrice.toLocaleString("ru-RU")} ₽ / день`,
+          priceBreakdown,
           options: line.options,
         };
       });
