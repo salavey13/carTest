@@ -22,6 +22,7 @@ import {
   SocialBanner,
   BikeShowcase,
   Services,
+  Pricing,
   MemberStories,
   HowItWorks,
   FAQ,
@@ -50,6 +51,7 @@ export default function VipBikeElectroPage() {
       <SocialBanner />
       <BikeShowcase />
       <Services />
+      <Pricing />
       <MemberStories />
       <HowItWorks />
       <FAQ />
