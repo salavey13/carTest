@@ -71,6 +71,8 @@ interface ItemModalProps {
   onAddToCart: () => void | Promise<void>;
   /** Called when "Купить" (buy) CTA is clicked for sale-only flow */
   onBuyItem?: () => void | Promise<void>;
+  /** Shows "С возвращением!" badge for returning users */
+  isReturningUser?: boolean;
 }
 
 const packageOptions = ["Базовый", "Комфорт", "Максимум"];
@@ -533,6 +535,7 @@ export function ItemModal({
   onClose,
   onAddToCart,
   onBuyItem,
+  isReturningUser = false,
 }: ItemModalProps) {
   const isRental = flowType === "rental";
   const modalRef = useRef<HTMLDivElement>(null);
@@ -879,6 +882,11 @@ export function ItemModal({
                 {item.saleAvailable && (
                   <span className="inline-flex rounded-full border border-[var(--item-accent)]/40 bg-[var(--item-accent)]/15 px-2.5 py-1 font-semibold text-[var(--item-accent)]">
                     {isRental ? "Аренда + покупка" : "Доступно к покупке"}
+                  </span>
+                )}
+                {isReturningUser && (
+                  <span className="inline-flex rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 font-semibold text-emerald-300">
+                    С возвращением!
                   </span>
                 )}
               </div>
