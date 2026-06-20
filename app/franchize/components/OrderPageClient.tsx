@@ -404,10 +404,15 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       if (res.data.hasPreviousRentals) {
         setIsReturningUser(true);
         setReturningUserLastRental(res.data.lastRentalDate ?? null);
+
+        // Pre-fill form fields with saved rental secrets (without dirtying form)
+        const { fullName, phone } = res.data.savedData;
+        if (fullName) setValue("recipient", fullName, { shouldDirty: false, shouldValidate: false });
+        if (phone) setValue("phone", phone, { shouldDirty: false, shouldValidate: false });
       }
     };
     void loadRentalSecrets();
-  }, [dbUser?.user_id, slug]);
+  }, [dbUser?.user_id, setValue, slug]);
 
   // Prefill rental dates from cart (if user selected dates in item modal)
   useEffect(() => {
