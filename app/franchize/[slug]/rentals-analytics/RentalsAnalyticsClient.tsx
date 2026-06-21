@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
+import * as XLSX from "xlsx";
 import {
   Calendar,
   ChevronLeft,
@@ -43,10 +44,14 @@ import {
   getRentalDocumentDetails,
   getRentalsDateRange,
   resendRentalContract,
+  getRentalsForExport,
   type RentalDashboardItem,
   type RentalDashboardSummary,
   type RentalDocumentDetail,
 } from "@/app/franchize/server-actions/rentals-dashboard";
+import { useSupabaseRealtime } from "@/app/franchize/hooks/useSupabaseRealtime";
+import { ConnectionStatus } from "./ConnectionStatus";
+import { ExportModal } from "./ExportModal";
 import {
   getAllChecklistStates,
   updateChecklistState,
@@ -219,6 +224,34 @@ export function RentalsAnalyticsClient({
   const [newTodoCategory, setNewTodoCategory] = useState("general");
   const [newTodoPriority, setNewTodoPriority] = useState<"low" | "medium" | "high">("medium");
   const [newTodoAssignedTo, setNewTodoAssignedTo] = useState<string | null>(null);
+
+  // Export state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  // Real-time subscriptions for crew_todos and checklist_state
+  const todosRealtime = useSupabaseRealtime({
+    tableName: "crew_todos",
+    filter: crew.id ? `crew_id=eq.${crew.id}` : undefined,
+    onData: () => {
+      // Reload todos when changes occur
+      void loadTodos();
+    },
+    onError: (error) => {
+      console.error("[RentalsAnalytics] Todos realtime error:", error);
+    },
+  });
+
+  const checklistRealtime = useSupabaseRealtime({
+    tableName: "checklist_state",
+    onData: () => {
+      // Reload checklist when changes occur
+      void loadChecklistStates();
+    },
+    onError: (error) => {
+      console.error("[RentalsAnalytics] Checklist realtime error:", error);
+    },
+  });
 
   const slug = initialSlug?.trim() || "vip-bike";
   const surface = crewPaletteForSurface(crew.theme);
@@ -537,17 +570,6 @@ export function RentalsAnalyticsClient({
     }
   }, [verificationFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (dbUser?.user_id && !loading) {
-        void loadRentals(selectedDate, true);
-      }
-    }, 30_000);
-
-    return () => clearInterval(interval);
-  }, [dbUser?.user_id, selectedDate, loadRentals, loading]);
-
   // Resend contract handler
   const handleResendContract = useCallback(async (rental: RentalDashboardItem) => {
     if (!dbUser?.user_id || !rental.documentSecret?.doc_sha256) {
@@ -619,6 +641,65 @@ export function RentalsAnalyticsClient({
     setRentalDetails(null);
   }, []);
 
+  // Export handler
+  const handleExport = useCallback(async (startDate: string, endDate: string) => {
+    if (!dbUser?.user_id) return;
+
+    setExporting(true);
+    try {
+      const result = await getRentalsForExport({
+        slug,
+        actorUserId: dbUser.user_id,
+        startDate,
+        endDate,
+      });
+
+      if (!result.success || !result.data) {
+        toast.error(result.error || "Не удалось загрузить данные для экспорта");
+        return;
+      }
+
+      // Convert data to Excel format
+      const exportData = result.data.map((row, index) => ({
+        "#": index + 1,
+        "ID аренды": row.rental_id.slice(0, 8),
+        "Дата создания": formatRussianDate(row.created_at),
+        "Начало аренды": formatRussianDateOnly(row.agreed_start_date),
+        "Конец аренды": formatRussianDateOnly(row.agreed_end_date),
+        "Стоимость": formatRubles(row.total_cost),
+        "Статус": statusConfig[row.status as keyof typeof statusConfig]?.label || row.status,
+        "Оплата": paymentStatusConfig[row.payment_status as keyof typeof paymentStatusConfig]?.label || row.payment_status || "—",
+        "Техника": `${row.vehicle_make} ${row.vehicle_model}`.trim(),
+        "Тип техники": row.vehicle_type,
+        "Клиент": row.user_full_name || row.user_username || `ID: ${row.rental_id.slice(0, 8)}`,
+        "Чеклист": row.checklist_status === "not_started" ? "Не начат" : row.checklist_status,
+        "Чеклист обновлен": formatRussianDate(row.checklist_updated_at),
+        "Задачи ожидают": row.todos_pending,
+        "Задачи в работе": row.todos_in_progress,
+        "Задачи выполнено": row.todos_done,
+        "Документ проверен": row.document_verified ? "Да" : "Нет",
+      }));
+
+      // Create workbook
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Аренды");
+
+      // Generate filename
+      const filename = `rentals-export-${startDate}-to-${endDate}.xlsx`;
+
+      // Download
+      XLSX.writeFile(workbook, filename);
+
+      toast.success("Экспорт завершен");
+    } catch (error) {
+      console.error("[RentalsAnalytics] Export error:", error);
+      toast.error("Ошибка экспорта");
+    } finally {
+      setExporting(false);
+    }
+  }, [dbUser?.user_id, slug]);
+
   // Get status config
   const getStatusConfig = (status: string) => {
     return statusConfig[status as keyof typeof statusConfig] || {
@@ -645,6 +726,11 @@ export function RentalsAnalyticsClient({
     >
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        {/* Connection Status */}
+        <div className="flex items-center gap-3">
+          <ConnectionStatus status={todosRealtime.state.status} />
+          <ConnectionStatus status={checklistRealtime.state.status} />
+        </div>
         <div>
           <p className="text-xs font-medium tracking-wide text-[var(--fr-analytics-accent)]">
             Аналитика аренд
@@ -723,6 +809,18 @@ export function RentalsAnalyticsClient({
             }}
             className="h-9 rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-1 text-sm text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
           />
+
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setShowExportModal(true)}
+            disabled={!dateRange}
+            className="h-9 w-9"
+            title="Экспорт в Excel"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -1585,6 +1683,16 @@ export function RentalsAnalyticsClient({
           </div>
         </div>
       )}
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        onExport={handleExport}
+        minDate={dateRange?.minDate}
+        maxDate={dateRange?.maxDate}
+        defaultDaysBack={7}
+      />
     </div>
   );
 }
