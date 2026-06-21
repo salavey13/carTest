@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'  // NEVER try to render this statically
+export const runtime = 'nodejs'         // Supabase needs Node runtime (not Edge)
+
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { differenceInHours, differenceInDays, startOfDay, endOfDay, subDays, format } from "date-fns";
