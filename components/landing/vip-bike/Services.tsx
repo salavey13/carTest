@@ -2,6 +2,7 @@
  * VIP Bike Electro Landing - Services Section
  * Brutalist, high-end fitness studio aesthetic
  */
+ "use client"
 
 import Link from "next/link";
 

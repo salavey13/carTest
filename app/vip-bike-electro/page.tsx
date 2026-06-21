@@ -16,7 +16,6 @@
  * - FAQ: Q&A
  * - Footer: Contact info
  */
- "use client"
 
 import {
   Hero,

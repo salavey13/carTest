@@ -2,6 +2,7 @@
  * VIP Bike Electro Landing - Social Banner
  * Brutalist, high-end fitness studio aesthetic
  */
+"use client"
 
 const SOCIAL_LINKS = [
   {
