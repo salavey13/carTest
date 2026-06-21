@@ -16,6 +16,9 @@
  * - FAQ: Q&A
  * - Footer: Contact info
  */
+ "use client"
+export const dynamic = 'force-dynamic'  // NEVER try to render this statically
+export const runtime = 'nodejs'         // Supabase needs Node runtime (not Edge)
 
 import {
   Hero,
