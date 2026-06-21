@@ -86,7 +86,7 @@ interface RentalsAnalyticsClientProps {
 
 // Format currency in Russian Rubles
 const formatRubles = (amount: number | null | undefined): string => {
-  if (amount == null) return "—";
+  if (amount == null || !Number.isFinite(amount)) return "—";
   return new Intl.NumberFormat("ru-RU", {
     style: "currency",
     currency: "RUB",
@@ -292,9 +292,12 @@ export function RentalsAnalyticsClient({
 
       if (result.success && result.data) {
         setDateRange(result.data);
+      } else {
+        toast.error(result.error || "Не удалось загрузить диапазон дат");
       }
     } catch (error) {
       console.error("[RentalsAnalytics] Date range error:", error);
+      toast.error("Ошибка загрузки диапазона дат");
     }
   }, [dbUser?.user_id, slug]);
 
@@ -309,9 +312,12 @@ export function RentalsAnalyticsClient({
 
       if (result.success && result.data) {
         setChecklistStates(result.data);
+      } else {
+        toast.error(result.error || "Не удалось загрузить чеклисты");
       }
     } catch (error) {
       console.error("[RentalsAnalytics] Checklist load error:", error);
+      toast.error("Ошибка загрузки чеклистов");
     }
   }, [dbUser?.user_id]);
 
@@ -942,7 +948,7 @@ export function RentalsAnalyticsClient({
                 <option value="unassigned">Не назначен</option>
                 {todoStats.byAssignee.map((assignee) => (
                   <option key={assignee.userId} value={assignee.userId}>
-                    {assignee.userName}
+                    {assignee.userName || assignee.userId.slice(0, 8)}
                   </option>
                 ))}
               </select>
@@ -1165,7 +1171,7 @@ export function RentalsAnalyticsClient({
                 >
                   <UserIcon className="h-3.5 w-3.5 text-[var(--fr-analytics-muted)]" />
                   <span className="font-medium text-[var(--fr-analytics-text)]">
-                    {assignee.userName}
+                    {assignee.userName || assignee.userId.slice(0, 8)}
                   </span>
                   <span className="text-[var(--fr-analytics-muted)]">
                     {assignee.pending + assignee.inProgress}/{assignee.done}

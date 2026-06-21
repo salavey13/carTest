@@ -178,7 +178,11 @@ export async function getCrewTodos(input: {
     }
 
     if (assignedTo && assignedTo !== "all") {
-      query = query.eq("assigned_to", assignedTo);
+      if (assignedTo === "unassigned") {
+        query = query.is("assigned_to", null);
+      } else {
+        query = query.eq("assigned_to", assignedTo);
+      }
     }
 
     if (category && category !== "all") {
