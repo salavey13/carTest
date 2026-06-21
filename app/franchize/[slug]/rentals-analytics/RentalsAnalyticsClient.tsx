@@ -33,7 +33,6 @@ import {
   Plus,
   MoreVertical,
   Trash2,
-  User as UserIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -96,24 +95,17 @@ const formatRubles = (amount: number | null | undefined): string => {
 };
 
 // Format date in Russian format
-const formatRussianDate = (dateStr: string | null): string => {
+const formatRussianDate = (dateStr: string | null, includeTime = true): string => {
   if (!dateStr) return "—";
   try {
-    return format(new Date(dateStr), "dd MMM yyyy, HH:mm", { locale: ru });
+    return format(new Date(dateStr), includeTime ? "dd MMM yyyy, HH:mm" : "dd MMM yyyy", { locale: ru });
   } catch {
     return "—";
   }
 };
 
-// Format date only (no time)
-const formatRussianDateOnly = (dateStr: string | null): string => {
-  if (!dateStr) return "—";
-  try {
-    return format(new Date(dateStr), "dd MMM yyyy", { locale: ru });
-  } catch {
-    return "—";
-  }
-};
+// Format date only (no time) - convenience wrapper
+const formatRussianDateOnly = (dateStr: string | null): string => formatRussianDate(dateStr, false);
 
 // Status badges
 const statusConfig = {
@@ -167,6 +159,21 @@ const paymentStatusConfig = {
     color: "purple",
   },
 };
+
+// Filter configurations (outside component to avoid recreation on each render)
+const VERIFICATION_FILTERS = [
+  { value: "all", label: "Все", icon: FileText },
+  { value: "verified", label: "Проверены", icon: ShieldCheck },
+  { value: "pending", label: "Ожидают", icon: Clock },
+  { value: "revoked", label: "Отозваны", icon: ShieldAlert },
+] as const;
+
+const TODO_STATUS_FILTERS = [
+  { value: "all" as const, label: "Все" },
+  { value: "pending" as const, label: "Ожидают" },
+  { value: "in_progress" as const, label: "В работе" },
+  { value: "done" as const, label: "Выполнено" },
+];
 
 export function RentalsAnalyticsClient({
   initialSlug,
@@ -580,7 +587,7 @@ export function RentalsAnalyticsClient({
   }, [dbUser?.user_id]);
 
   // Navigate date
-  const navigateDate = (days: number) => {
+  const navigateDate = useCallback((days: number) => {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + days);
     const newDateStr = newDate.toISOString().split("T")[0];
@@ -597,20 +604,20 @@ export function RentalsAnalyticsClient({
       "",
       `/franchize/${slug}/rentals-analytics?date=${newDateStr}`,
     );
-  };
+  }, [selectedDate, dateRange, slug]);
 
   // Open rental details modal
-  const openRentalDetails = (rental: RentalDashboardItem) => {
+  const openRentalDetails = useCallback((rental: RentalDashboardItem) => {
     setSelectedRental(rental);
     setRentalDetails(null);
     void loadRentalDetails(rental.rental_id);
-  };
+  }, [loadRentalDetails]);
 
   // Close modal
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setSelectedRental(null);
     setRentalDetails(null);
-  };
+  }, []);
 
   // Get status config
   const getStatusConfig = (status: string) => {
@@ -724,12 +731,7 @@ export function RentalsAnalyticsClient({
         <Filter className="h-4 w-4 text-[var(--fr-analytics-muted)]" />
         <span className="text-sm text-[var(--fr-analytics-muted)]">Фильтр по верификации:</span>
         <div className="flex gap-1">
-          {[
-            { value: "all", label: "Все", icon: FileText },
-            { value: "verified", label: "Проверены", icon: ShieldCheck },
-            { value: "pending", label: "Ожидают", icon: Clock },
-            { value: "revoked", label: "Отозваны", icon: ShieldAlert },
-          ].map((filter) => {
+          {VERIFICATION_FILTERS.map((filter) => {
             const Icon = filter.icon;
             const isActive = verificationFilter === filter.value;
             return (
@@ -916,12 +918,7 @@ export function RentalsAnalyticsClient({
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-[var(--fr-analytics-muted)]">Фильтр:</span>
           <div className="flex gap-1">
-            {[
-              { value: "all" as const, label: "Все" },
-              { value: "pending" as const, label: "Ожидают" },
-              { value: "in_progress" as const, label: "В работе" },
-              { value: "done" as const, label: "Выполнено" },
-            ].map((filter) => (
+            {TODO_STATUS_FILTERS.map((filter) => (
               <button
                 key={filter.value}
                 type="button"
@@ -1120,7 +1117,7 @@ export function RentalsAnalyticsClient({
                             )}
                             {assigneeName && (
                               <span className="flex items-center gap-1 text-xs text-[var(--fr-analytics-muted)]">
-                                <UserIcon className="h-3 w-3" />
+                                <User className="h-3 w-3" />
                                 {assigneeName}
                               </span>
                             )}
@@ -1169,7 +1166,7 @@ export function RentalsAnalyticsClient({
                   key={assignee.userId}
                   className="flex items-center gap-2 rounded-full border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)] px-3 py-1.5 text-xs"
                 >
-                  <UserIcon className="h-3.5 w-3.5 text-[var(--fr-analytics-muted)]" />
+                  <User className="h-3.5 w-3.5 text-[var(--fr-analytics-muted)]" />
                   <span className="font-medium text-[var(--fr-analytics-text)]">
                     {assignee.userName || assignee.userId.slice(0, 8)}
                   </span>
