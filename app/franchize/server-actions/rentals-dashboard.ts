@@ -721,3 +721,190 @@ export async function resendRentalContract(input: {
     };
   }
 }
+
+/**
+ * Get rentals for Excel export with date range.
+ * Returns simplified data suitable for export including rentals, checklist status, and todos.
+ */
+export async function getRentalsForExport(input: {
+  slug: string;
+  actorUserId: string;
+  startDate: string; // ISO date string (YYYY-MM-DD)
+  endDate: string; // ISO date string (YYYY-MM-DD)
+}): Promise<{ success: boolean; data?: Array<{
+  // Rental info
+  rental_id: string;
+  created_at: string;
+  agreed_start_date: string | null;
+  agreed_end_date: string | null;
+  requested_start_date: string | null;
+  requested_end_date: string | null;
+  total_cost: number | null;
+  status: string;
+  payment_status: string | null;
+  // Vehicle info
+  vehicle_make: string;
+  vehicle_model: string;
+  vehicle_type: string;
+  // User info
+  user_full_name: string | null;
+  user_username: string | null;
+  // Checklist status
+  checklist_status: string;
+  checklist_updated_at: string | null;
+  // Todo count (by status)
+  todos_pending: number;
+  todos_in_progress: number;
+  todos_done: number;
+  // Document verification
+  document_verified: boolean;
+}> | null; error?: string }> {
+  try {
+    const parsed = z.object({
+      slug: z.string().trim().min(1),
+      actorUserId: z.string().trim().min(1),
+      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }).safeParse(input);
+
+    if (!parsed.success) {
+      return { success: false, error: "Некорректный запрос." };
+    }
+
+    const { slug, actorUserId, startDate, endDate } = parsed.data;
+
+    // Get crew and verify access
+    const { data: crew, error: crewError } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id")
+      .eq("slug", slug.trim())
+      .maybeSingle();
+
+    if (crewError || !crew) {
+      return { success: false, error: "Экипаж не найден." };
+    }
+
+    // Check access (owner or admin)
+    const isOwner = crew.owner_id === actorUserId;
+    const { data: userRoles } = await supabaseAdmin
+      .from("users")
+      .select("metadata")
+      .eq("user_id", actorUserId)
+      .maybeSingle();
+
+    const userMetadata = userRoles?.metadata as Record<string, unknown> | null;
+    const isAdmin = userMetadata?.role === "admin";
+
+    if (!isOwner && !isAdmin) {
+      return { success: false, error: "Недостаточно прав для экспорта." };
+    }
+
+    // Parse date boundaries (UTC to avoid timezone issues)
+    const startOfDay = new Date(`${startDate}T00:00:00.000Z`).toISOString();
+    const endOfDay = new Date(`${endDate}T23:59:59.999Z`).toISOString();
+
+    // Query rentals for the date range
+    const { data: rentals, error: rentalsError } = await supabaseAdmin
+      .from("rentals")
+      .select(`
+        rental_id,
+        user_id,
+        vehicle_id,
+        status,
+        payment_status,
+        total_cost,
+        agreed_start_date,
+        agreed_end_date,
+        requested_start_date,
+        requested_end_date,
+        created_at,
+        vehicle:cars!inner(id, make, model, type),
+        user:users!rentals_user_id_fkey(user_id, full_name, username)
+      `)
+      .eq("vehicle.crew_id", crew.id)
+      .gte("created_at", startOfDay)
+      .lte("created_at", endOfDay)
+      .order("created_at", { ascending: false });
+
+    if (rentalsError) {
+      console.error("[rentals-export] Query error:", rentalsError);
+      return { success: false, error: rentalsError.message };
+    }
+
+    if (!rentals || rentals.length === 0) {
+      return { success: true, data: [] };
+    }
+
+    // Get checklist states for these rentals (by vehicle_id)
+    const rentalIds = rentals.map(r => r.rental_id);
+    const vehicleIds = [...new Set(rentals.map(r => r.vehicle_id))];
+
+    const { data: checklistStates } = await supabaseAdmin
+      .from("checklist_state")
+      .select("vehicle_id, status, updated_at")
+      .in("vehicle_id", vehicleIds);
+
+    const checklistMap = new Map(checklistStates?.map(c => [c.vehicle_id, c]) || []);
+
+    // Get document verification status for rentals
+    const { data: secrets } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("source_rental_id, verification_status")
+      .in("source_rental_id", rentalIds);
+
+    const verifiedSet = new Set(
+      secrets?.filter(s => s.verification_status === "verified").map(s => s.source_rental_id) || []
+    );
+
+    // Get todo counts by status for this crew
+    const { data: todos } = await supabaseAdmin
+      .from("crew_todos")
+      .select("status")
+      .eq("crew_id", crew.id);
+
+    const todoStats = { pending: 0, in_progress: 0, done: 0 };
+    for (const todo of todos || []) {
+      if (todo.status === "pending") todoStats.pending++;
+      else if (todo.status === "in_progress") todoStats.in_progress++;
+      else if (todo.status === "done") todoStats.done++;
+    }
+
+    // Build export data
+    const exportData = rentals.map((rental: any) => {
+      const vehicle = rental.vehicle as any;
+      const user = rental.user as any;
+      const checklist = checklistMap.get(rental.vehicle_id);
+
+      return {
+        rental_id: rental.rental_id,
+        created_at: rental.created_at,
+        agreed_start_date: rental.agreed_start_date,
+        agreed_end_date: rental.agreed_end_date,
+        requested_start_date: rental.requested_start_date,
+        requested_end_date: rental.requested_end_date,
+        total_cost: rental.total_cost,
+        status: rental.status,
+        payment_status: rental.payment_status,
+        vehicle_make: vehicle?.make || "",
+        vehicle_model: vehicle?.model || "",
+        vehicle_type: vehicle?.type || "",
+        user_full_name: user?.full_name,
+        user_username: user?.username,
+        checklist_status: checklist?.status || "not_started",
+        checklist_updated_at: checklist?.updated_at || null,
+        todos_pending: todoStats.pending,
+        todos_in_progress: todoStats.in_progress,
+        todos_done: todoStats.done,
+        document_verified: verifiedSet.has(rental.rental_id),
+      };
+    });
+
+    return { success: true, data: exportData };
+  } catch (error) {
+    console.error("[rentals-export] Error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
