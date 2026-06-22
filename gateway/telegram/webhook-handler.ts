@@ -512,6 +512,7 @@ async function handleLocationMessage(message: any, options: { preferMapRiders?: 
 }
 
 export async function handleTelegramWebhook(request: Request) {
+  logger.info("[WEBHOOK_HANDLER_ENTRY] handleTelegramWebhook called");
   ensureTelegramSubscriptions();
 
   try {
