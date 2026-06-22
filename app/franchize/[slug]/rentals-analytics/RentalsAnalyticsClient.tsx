@@ -674,6 +674,9 @@ export function RentalsAnalyticsClient({
 
   // Initial load
   useEffect(() => {
+    // Don't do anything while auth is still loading
+    if (authLoading) return;
+
     const actorUserId = getActorUserId();
     if (actorUserId) {
       // Have auth (Telegram or password) - load data
@@ -700,7 +703,7 @@ export function RentalsAnalyticsClient({
         setLoading(false);
       }
     }
-  }, [dbUser?.user_id, getActorUserId, selectedDate, loadRentals, loadDateRange, loadChecklistStates, loadTodos, slug]);
+  }, [authLoading, dbUser?.user_id, getActorUserId, selectedDate, loadRentals, loadDateRange, loadChecklistStates, loadTodos, slug]);
 
   // Reload when verification filter changes
   useEffect(() => {
