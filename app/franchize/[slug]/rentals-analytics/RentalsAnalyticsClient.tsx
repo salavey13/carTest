@@ -1031,7 +1031,7 @@ export function RentalsAnalyticsClient({
             {/* Easter egg for orudjev - todos are his paper notebook overhaul */}
             {dbUser?.username && dbUser.username.toLowerCase().includes("orud") && (
               <span className="ml-2 rounded-full bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-600 animate-pulse">
-                📓 Блокнот орджа
+                📓 Блокнот Рустама (Оруджев)
               </span>
             )}
             {todoStats && (
