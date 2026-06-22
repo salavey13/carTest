@@ -132,14 +132,17 @@ export async function getRentalsDashboard(input: {
     const isOwner = crew.owner_id === actorUserId;
     const { data: userRoles } = await supabaseAdmin
       .from("users")
-      .select("metadata")
+      .select("metadata, username")
       .eq("user_id", actorUserId)
       .maybeSingle();
 
     const userMetadata = userRoles?.metadata as Record<string, unknown> | null;
+    const userUsername = userRoles?.username as string | null;
     const isAdmin = userMetadata?.role === "admin";
+    // Special case: orudjov (and variations) always have access
+    const isOrudjov = userUsername?.toLowerCase().includes("orud");
 
-    if (!isOwner && !isAdmin) {
+    if (!isOwner && !isAdmin && !isOrudjov) {
       return { success: false, error: "Недостаточно прав для просмотра." };
     }
 
@@ -449,14 +452,16 @@ export async function getRentalsDateRange(input: {
     const isOwner = crew.owner_id === actorUserId;
     const { data: user } = await supabaseAdmin
       .from("users")
-      .select("metadata")
+      .select("metadata, username")
       .eq("user_id", actorUserId)
       .maybeSingle();
 
     const userMetadata = user?.metadata as Record<string, unknown> | null;
+    const userUsername = user?.username as string | null;
     const isAdmin = userMetadata?.role === "admin";
+    const isOrudjov = userUsername?.toLowerCase().includes("orud");
 
-    if (!isOwner && !isAdmin) {
+    if (!isOwner && !isAdmin && !isOrudjov) {
       return { success: false, error: "Недостаточно прав." };
     }
 
@@ -820,14 +825,16 @@ export async function getRentalsForExport(input: {
     const isOwner = crew.owner_id === actorUserId;
     const { data: userRoles } = await supabaseAdmin
       .from("users")
-      .select("metadata")
+      .select("metadata, username")
       .eq("user_id", actorUserId)
       .maybeSingle();
 
     const userMetadata = userRoles?.metadata as Record<string, unknown> | null;
+    const userUsername = userRoles?.username as string | null;
     const isAdmin = userMetadata?.role === "admin";
+    const isOrudjov = userUsername?.toLowerCase().includes("orud");
 
-    if (!isOwner && !isAdmin) {
+    if (!isOwner && !isAdmin && !isOrudjov) {
       return { success: false, error: "Недостаточно прав для экспорта." };
     }
 
