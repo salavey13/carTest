@@ -710,9 +710,26 @@ export function RentalsAnalyticsClient({
 
   if (authLoading) return <Loading text="Загружаем данные..." />;
 
+  // Compact mode CSS variables
+  const compactVars = {
+    "--fr-analytics-btn-size": compactMode ? "1.75rem" : "2.25rem",
+    "--fr-analytics-btn-text": compactMode ? "0.75rem" : "0.875rem",
+    "--fr-analytics-icon-size": compactMode ? "0.75rem" : "1rem",
+    "--fr-analytics-icon-sm": compactMode ? "0.5rem" : "0.75rem",
+    "--fr-analytics-text-xs": compactMode ? "0.625rem" : "0.75rem",
+    "--fr-analytics-text-sm": compactMode ? "0.75rem" : "0.875rem",
+    "--fr-analytics-text-base": compactMode ? "1rem" : "1.5rem",
+    "--fr-analytics-text-lg": compactMode ? "1.25rem" : "2rem",
+    "--fr-analytics-gap-sm": compactMode ? "0.25rem" : "0.5rem",
+    "--fr-analytics-gap-md": compactMode ? "0.5rem" : "0.75rem",
+    "--fr-analytics-gap-lg": compactMode ? "0.5rem" : "1rem",
+    "--fr-analytics-padding-sm": compactMode ? "0.5rem" : "0.75rem",
+    "--fr-analytics-padding-md": compactMode ? "0.25rem 0.5rem" : "0.5rem 0.75rem",
+  } as Record<string, string>;
+
   return (
     <div
-      className={`space-y-4 ${compactMode ? "text-xs" : ""}`}
+      className="space-y-4"
       style={{
         ["--fr-analytics-accent" as string]: crew.theme.palette.accentMain,
         ["--fr-analytics-accent-hover" as string]: crew.theme.palette.accentMainHover,
@@ -721,43 +738,45 @@ export function RentalsAnalyticsClient({
         ["--fr-analytics-muted" as string]: crew.theme.palette.textSecondary,
         ["--fr-analytics-bg-card" as string]: crew.theme.palette.bgCard,
         ["--fr-analytics-bg-base" as string]: crew.theme.palette.bgBase,
+        ...compactVars,
       }}
     >
       {/* Header */}
-      <div className={`flex flex-col gap-4 md:flex-row md:items-center md:justify-between ${compactMode ? "gap-2" : ""}`}>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         {/* Connection Status */}
-        <div className={`flex items-center gap-3 ${compactMode ? "gap-1" : ""}`}>
+        <div className="flex items-center" style={{ gap: "var(--fr-analytics-gap-md)" }}>
           <ConnectionStatus status={todosRealtime.state.status} />
           <ConnectionStatus status={checklistRealtime.state.status} />
         </div>
         <div>
-          <p className={`font-medium tracking-wide text-[var(--fr-analytics-accent)] ${compactMode ? "text-[10px]" : "text-xs"}`}>
+          <p className="font-medium tracking-wide text-[var(--fr-analytics-accent)]" style={{ fontSize: "var(--fr-analytics-text-xs)" }}>
             Аналитика аренд
           </p>
-          <h1 className={`mt-2 break-words font-semibold text-[var(--fr-analytics-text)] ${compactMode ? "text-base" : "text-2xl"}`}>
+          <h1 className="mt-2 break-words font-semibold text-[var(--fr-analytics-text)]" style={{ fontSize: "var(--fr-analytics-text-lg)" }}>
             Аренды за день
           </h1>
-          <p className={`mt-1 text-[var(--fr-analytics-muted)] ${compactMode ? "text-[10px] hidden" : "text-sm"}`}>
+          <p className="mt-1 text-[var(--fr-analytics-muted)]" style={{ fontSize: "var(--fr-analytics-text-sm)", display: compactMode ? "none" : "block" }}>
             Просмотр аренд с детальной информацией по документам
           </p>
         </div>
 
         {/* Date Picker */}
-        <div className={`flex items-center gap-2 ${compactMode ? "gap-1" : ""}`}>
+        <div className="flex items-center" style={{ gap: "var(--fr-analytics-gap-md)" }}>
           <Button
             type="button"
             variant="outline"
             size="icon"
             onClick={() => navigateDate(-1)}
             disabled={!dateRange || selectedDate <= dateRange.minDate || loading}
-            className={compactMode ? "h-7 w-7" : "h-9 w-9"}
+            className="h-9 w-9"
+            style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
           >
-            <ChevronLeft className={compactMode ? "h-3 w-3" : "h-4 w-4"} />
+            <ChevronLeft style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
           </Button>
 
-          <div className={`flex items-center rounded-lg border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)] ${compactMode ? "gap-1 px-2 py-1" : "gap-2 px-3 py-2"}`}>
-            <Calendar className={`text-[var(--fr-analytics-muted)] ${compactMode ? "h-3 w-3" : "h-4 w-4"}`} />
-            <span className={`font-medium text-[var(--fr-analytics-text)] ${compactMode ? "text-xs" : "text-sm"}`}>
+          <div className="flex items-center rounded-lg border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)]" style={{ gap: "var(--fr-analytics-gap-sm)", padding: "var(--fr-analytics-padding-md)" }}>
+            <Calendar className="text-[var(--fr-analytics-muted)]" style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
+            <span className="font-medium text-[var(--fr-analytics-text)]" style={{ fontSize: "var(--fr-analytics-text-sm)" }}>
               {formatRussianDateOnly(selectedDate)}
             </span>
           </div>
@@ -768,9 +787,10 @@ export function RentalsAnalyticsClient({
             size="icon"
             onClick={() => navigateDate(1)}
             disabled={!dateRange || selectedDate >= dateRange.maxDate || loading}
-            className={compactMode ? "h-7 w-7" : "h-9 w-9"}
+            className="h-9 w-9"
+            style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
           >
-            <ChevronRight className={compactMode ? "h-3 w-3" : "h-4 w-4"} />
+            <ChevronRight style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
           </Button>
 
           <Button
@@ -787,10 +807,11 @@ export function RentalsAnalyticsClient({
               );
             }}
             disabled={selectedDate === new Date().toISOString().split("T")[0] || loading}
-            className={compactMode ? "h-7 w-7" : "h-9 w-9"}
+            className="h-9 w-9"
+            style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
             title="Сегодня"
           >
-            <RefreshCw className={compactMode ? "h-3 w-3" : "h-4 w-4"} />
+            <RefreshCw style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
           </Button>
 
           <input
@@ -806,7 +827,8 @@ export function RentalsAnalyticsClient({
                 `/franchize/${slug}/rentals-analytics?date=${e.target.value}`,
               );
             }}
-            className={`rounded-md border border-[var(--fr-analytics-border)] bg-transparent text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)] ${compactMode ? "h-7 px-2 py-1 text-xs" : "h-9 px-3 py-1 text-sm"}`}
+            className="rounded-md border border-[var(--fr-analytics-border)] bg-transparent text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)] h-9 px-3 py-1 text-sm"
+            style={{ height: "var(--fr-analytics-btn-size)", fontSize: "var(--fr-analytics-btn-text)", padding: "var(--fr-analytics-padding-sm)" }}
           />
 
           <Button
@@ -815,10 +837,11 @@ export function RentalsAnalyticsClient({
             size="icon"
             onClick={() => setShowExportModal(true)}
             disabled={!dateRange}
-            className={compactMode ? "h-7 w-7" : "h-9 w-9"}
+            className="h-9 w-9"
+            style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
             title="Экспорт в Excel"
           >
-            <Download className={compactMode ? "h-3 w-3" : "h-4 w-4"} />
+            <Download style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
           </Button>
 
           <Button
@@ -826,10 +849,15 @@ export function RentalsAnalyticsClient({
             variant={compactMode ? "default" : "outline"}
             size="icon"
             onClick={() => setCompactMode(!compactMode)}
-            className={compactMode ? "h-7 bg-[var(--fr-analytics-accent)] text-white hover:bg-[var(--fr-analytics-accent-hover)]" : "h-9 w-9"}
+            className="h-9 w-9"
+            style={{
+              width: "var(--fr-analytics-btn-size)",
+              height: "var(--fr-analytics-btn-size)",
+              ...(compactMode ? { backgroundColor: "var(--fr-analytics-accent)", color: "white" } : {})
+            }}
             title={compactMode ? "Обычный режим" : "Компактный режим"}
           >
-            <Monitor className={compactMode ? "h-3 w-3" : "h-4 w-4"} />
+            <Monitor style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
           </Button>
         </div>
       </div>
@@ -863,7 +891,7 @@ export function RentalsAnalyticsClient({
 
       {/* Summary Stats */}
       {summary && (
-        <div className={`grid sm:grid-cols-2 lg:grid-cols-4 ${compactMode ? "gap-2" : "gap-3"}`}>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4" style={{ gap: "var(--fr-analytics-gap-md)" }}>
           <FranchizeOperatorStatCard
             label="Всего аренд"
             value={summary.totalCount}
@@ -888,7 +916,7 @@ export function RentalsAnalyticsClient({
       )}
 
       {/* Checklist Section */}
-      <div className={`grid md:grid-cols-2 ${compactMode ? "gap-2" : "gap-4"}`}>
+      <div className="grid md:grid-cols-2" style={{ gap: "var(--fr-analytics-gap-lg)" }}>
         {/* Выдача Checklist */}
         <FranchizeOperatorPanel>
           <div className="flex items-center justify-between gap-3">
@@ -910,7 +938,7 @@ export function RentalsAnalyticsClient({
               <RotateCcw className={`h-3.5 w-3.5 ${updatingChecklist === "handout" ? "animate-spin" : ""}`} />
             </Button>
           </div>
-          <div className={`space-y-2 ${compactMode ? "mt-2 space-y-1" : "mt-3 space-y-2"}`}>
+          <div className="space-y-2" style={{ marginTop: compactMode ? "var(--fr-analytics-gap-sm)" : "var(--fr-analytics-gap-md)", gap: compactMode ? "var(--fr-analytics-gap-sm)" : "var(--fr-analytics-gap-md)" }}>
             {checklistStates.handout?.items.map((item) => (
               <button
                 key={item.id}
@@ -921,14 +949,15 @@ export function RentalsAnalyticsClient({
                   item.checked
                     ? "border-[var(--fr-analytics-accent)] bg-[var(--fr-analytics-accent)]/10"
                     : "border-[var(--fr-analytics-border)] hover:bg-[var(--fr-analytics-accent)]/5"
-                } ${compactMode ? "gap-1 px-2 py-1 text-xs" : "gap-2 px-3 py-2 text-sm"}`}
+                }`}
+                style={{ gap: "var(--fr-analytics-gap-sm)", padding: "var(--fr-analytics-padding-md)", fontSize: "var(--fr-analytics-text-sm)" }}
               >
                 <div className={`flex shrink-0 items-center justify-center rounded border transition-colors ${
                   item.checked
                     ? "border-[var(--fr-analytics-accent)] bg-[var(--fr-analytics-accent)]"
                     : "border-[var(--fr-analytics-muted)]"
-                } ${compactMode ? "h-3 w-3" : "h-4 w-4"}`}>
-                  {item.checked && <Check className={compactMode ? "h-2 w-2" : "h-3 w-3"} text-white />}
+                }`} style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }}>
+                  {item.checked && <Check style={{ width: "var(--fr-analytics-icon-sm)", height: "var(--fr-analytics-icon-sm)" }} text="white" />}
                 </div>
                 <span className={item.checked ? "text-[var(--fr-analytics-text)]" : "text-[var(--fr-analytics-muted)]"}>
                   {item.text}
@@ -959,7 +988,7 @@ export function RentalsAnalyticsClient({
               <RotateCcw className={`h-3.5 w-3.5 ${updatingChecklist === "return" ? "animate-spin" : ""}`} />
             </Button>
           </div>
-          <div className={`space-y-2 ${compactMode ? "mt-2 space-y-1" : "mt-3 space-y-2"}`}>
+          <div className="space-y-2" style={{ marginTop: compactMode ? "var(--fr-analytics-gap-sm)" : "var(--fr-analytics-gap-md)", gap: compactMode ? "var(--fr-analytics-gap-sm)" : "var(--fr-analytics-gap-md)" }}>
             {checklistStates.return?.items.map((item) => (
               <button
                 key={item.id}
@@ -970,14 +999,15 @@ export function RentalsAnalyticsClient({
                   item.checked
                     ? "border-[var(--fr-analytics-accent)] bg-[var(--fr-analytics-accent)]/10"
                     : "border-[var(--fr-analytics-border)] hover:bg-[var(--fr-analytics-accent)]/5"
-                } ${compactMode ? "gap-1 px-2 py-1 text-xs" : "gap-2 px-3 py-2 text-sm"}`}
+                }`}
+                style={{ gap: "var(--fr-analytics-gap-sm)", padding: "var(--fr-analytics-padding-md)", fontSize: "var(--fr-analytics-text-sm)" }}
               >
                 <div className={`flex shrink-0 items-center justify-center rounded border transition-colors ${
                   item.checked
                     ? "border-[var(--fr-analytics-accent)] bg-[var(--fr-analytics-accent)]"
                     : "border-[var(--fr-analytics-muted)]"
-                } ${compactMode ? "h-3 w-3" : "h-4 w-4"}`}>
-                  {item.checked && <Check className={compactMode ? "h-2 w-2" : "h-3 w-3"} text-white />}
+                }`} style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }}>
+                  {item.checked && <Check style={{ width: "var(--fr-analytics-icon-sm)", height: "var(--fr-analytics-icon-sm)" }} text="white" />}
                 </div>
                 <span className={item.checked ? "text-[var(--fr-analytics-text)]" : "text-[var(--fr-analytics-muted)]"}>
                   {item.text}
