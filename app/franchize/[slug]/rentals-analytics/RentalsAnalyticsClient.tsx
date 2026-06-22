@@ -965,15 +965,6 @@ export function RentalsAnalyticsClient({
                 "Войти"
               )}
             </Button>
-
-            <div className="rounded-lg border p-3 text-center" style={{ borderColor: "var(--fr-analytics-border)" }}>
-              <p className="text-xs" style={{ color: "var(--fr-analytics-muted)" }}>
-                Формат дневного пароля: <code className="rounded bg-[var(--fr-analytics-accent)]/10 px-1.5 py-0.5">vip-bike-ГГГГ-ММ-ДД</code>
-              </p>
-              <p className="mt-1 text-xs" style={{ color: "var(--fr-analytics-muted)" }}>
-                Например: <code className="rounded bg-[var(--fr-analytics-accent)]/10 px-1.5 py-0.5">vip-bike-{new Date().toISOString().split("T")[0]}</code>
-              </p>
-            </div>
           </div>
         </div>
       </div>
