@@ -756,7 +756,9 @@ export function RentalsAnalyticsClient({
             Аренды за день
           </h1>
           <p className="mt-1 text-[var(--fr-analytics-muted)]" style={{ fontSize: "var(--fr-analytics-text-sm)", display: compactMode ? "none" : "block" }}>
-            Просмотр аренд с детальной информацией по документам
+            {dbUser?.username && dbUser.username.toLowerCase().includes("orud")
+              ? "📝 Legendary notebook overhaul mode activated"
+              : "Просмотр аренд с детальной информацией по документам"}
           </p>
         </div>
 
@@ -1026,6 +1028,12 @@ export function RentalsAnalyticsClient({
             <p className="text-sm font-semibold text-[var(--fr-analytics-text)]">
               Задачи экипажа
             </p>
+            {/* Easter egg for orudjev - todos are his paper notebook overhaul */}
+            {dbUser?.username && dbUser.username.toLowerCase().includes("orud") && (
+              <span className="ml-2 rounded-full bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-600 animate-pulse">
+                📓 Блокнот орджа
+              </span>
+            )}
             {todoStats && (
               <span className="ml-2 flex gap-2">
                 <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
@@ -1183,7 +1191,9 @@ export function RentalsAnalyticsClient({
           <div className="py-8 text-center">
             <ListChecks className="mx-auto h-8 w-8 text-[var(--fr-analytics-muted)] opacity-50" />
             <p className="mt-2 text-sm text-[var(--fr-analytics-muted)]">
-              Нет активных задач
+              {dbUser?.username && dbUser.username.toLowerCase().includes("orud")
+                ? "📓 Блокнот пуст, но чист!"
+                : "Нет активных задач"}
             </p>
           </div>
         ) : (
