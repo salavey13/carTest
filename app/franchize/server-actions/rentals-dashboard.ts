@@ -525,7 +525,7 @@ export async function resendRentalContract(input: {
     const { data: crew } = await supabaseAdmin
       .from("crews")
       .select("owner_id, metadata")
-      .eq("id", (rental.vehicle as any).crew_id)
+      .eq("id", rental.vehicle?.crew_id || "")
       .maybeSingle();
 
     const isCrewOwner = crew?.owner_id === actorUserId;
@@ -854,9 +854,9 @@ export async function getRentalsForExport(input: {
     );
 
     // Build export data
-    const exportData = rentals.map((rental: any) => {
-      const vehicle = rental.vehicle as any;
-      const user = rental.user as any;
+    const exportData = rentals.map((rental: RentalDashboardItem) => {
+      const vehicle = rental.vehicle;
+      const user = rental.user;
       const checklist = checklistMap.get(rental.vehicle_id);
 
       return {
