@@ -139,7 +139,12 @@ export async function handleCommand(update: any) {
             || (command.startsWith("/doc@") ? commandMap["/doc"] : undefined);
 
         if (commandFunction) {
-            await commandFunction();
+            logger.info(`[Command Handler] Executing command: ${command}`);
+            try {
+                await commandFunction();
+            } catch (cmdError) {
+                logger.error(`[Command Handler] Error executing command ${command}:`, cmdError);
+            }
         } else {
             // Check if user is in /doc flow (awaiting bike selection or schedule)
             const docHandled = await handleDocText(userIdStr, chatId, text);
