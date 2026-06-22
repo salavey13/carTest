@@ -4,13 +4,13 @@
 
 -- Create analytics_passwords table
 CREATE TABLE IF NOT EXISTS public.analytics_passwords (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
-  crew_id TEXT NOT NULL REFERENCES public.crews(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  crew_id UUID NOT NULL REFERENCES public.crews(id) ON DELETE CASCADE,
   password TEXT NOT NULL,
   created_by TEXT NOT NULL, -- user_id (chat_id) of user who generated
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   expires_at TIMESTAMPTZ NOT NULL, -- Password expires after 24 hours
-  crew_owner_id TEXT NOT NULL, -- owner_id of the crew for auth bypass
+  crew_owner_id TEXT NOT NULL, -- owner_id of the crew for auth bypass (chat_id, stored as TEXT)
   slug TEXT NOT NULL -- crew slug for routing
 );
 
@@ -97,7 +97,7 @@ $$;
 -- Function to validate analytics password and return crew info
 CREATE OR REPLACE FUNCTION public.validate_analytics_password(p_password TEXT)
 RETURNS TABLE(
-  crew_id TEXT,
+  crew_id UUID,
   crew_owner_id TEXT,
   slug TEXT,
   is_valid BOOLEAN
