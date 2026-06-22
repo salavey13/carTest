@@ -11,6 +11,7 @@ import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/lib/supabase-server";
 
 export async function analyticsPassCommand(chatId: number, userId: number, username?: string) {
+  logger.info(`[ANALYTICS_PASS] >>> FUNCTION ENTERED <<< chatId=${chatId}, userId=${userId}, username=${username}`);
   const userIdStr = String(userId);
   logger.info(`[ANALYTICS_PASS] Command triggered by user ${userId} (${username}).`);
 
