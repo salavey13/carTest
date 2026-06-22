@@ -931,7 +931,7 @@ export function RentalsAnalyticsClient({
                     ? "border-[var(--fr-analytics-accent)] bg-[var(--fr-analytics-accent)]"
                     : "border-[var(--fr-analytics-muted)]"
                 } ${compactMode ? "h-3 w-3" : "h-4 w-4"}`}>
-                  {item.checked && <Check className={compactMode ? "h-2 w-2" : "h-3 w-3"} text-white" />}
+                  {item.checked && <Check className={compactMode ? "h-2 w-2" : "h-3 w-3"} text-white />}
                 </div>
                 <span className={item.checked ? "text-[var(--fr-analytics-text)]" : "text-[var(--fr-analytics-muted)]"}>
                   {item.text}
@@ -980,7 +980,7 @@ export function RentalsAnalyticsClient({
                     ? "border-[var(--fr-analytics-accent)] bg-[var(--fr-analytics-accent)]"
                     : "border-[var(--fr-analytics-muted)]"
                 } ${compactMode ? "h-3 w-3" : "h-4 w-4"}`}>
-                  {item.checked && <Check className={compactMode ? "h-2 w-2" : "h-3 w-3"} text-white" />}
+                  {item.checked && <Check className={compactMode ? "h-2 w-2" : "h-3 w-3"} text-white />}
                 </div>
                 <span className={item.checked ? "text-[var(--fr-analytics-text)]" : "text-[var(--fr-analytics-muted)]"}>
                   {item.text}
