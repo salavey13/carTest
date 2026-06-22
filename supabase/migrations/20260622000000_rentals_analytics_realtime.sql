@@ -21,7 +21,9 @@ CREATE TABLE IF NOT EXISTS public.crew_todos (
 -- Enable RLS
 ALTER TABLE public.crew_todos ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "Allow all on crew_todos" ON public.crew_todos
+-- Drop policy if exists, then create it
+DROP POLICY IF EXISTS "Allow all on crew_todos" ON public.crew_todos;
+CREATE POLICY "Allow all on crew_todos" ON public.crew_todos
   FOR ALL USING (true) WITH CHECK (true);
 
 -- Add indexes if they don't exist
@@ -53,8 +55,7 @@ CREATE TRIGGER crew_todos_updated_at
   EXECUTE FUNCTION public.update_crew_todos_updated_at();
 
 -- Now enable realtime for both tables
--- Note: These will fail silently if tables aren't in the publication yet,
--- but we're adding them explicitly here
+-- Note: These will fail silently if tables are already in the publication
 ALTER PUBLICATION supabase_realtime ADD TABLE public.crew_todos;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.checklist_state;
 
