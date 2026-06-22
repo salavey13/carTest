@@ -4,9 +4,10 @@ import type { RealtimeConnectionStatus } from "@/app/franchize/hooks/useSupabase
 
 interface ConnectionStatusProps {
   status: RealtimeConnectionStatus;
+  compact?: boolean;
 }
 
-export function ConnectionStatus({ status }: ConnectionStatusProps) {
+export function ConnectionStatus({ status, compact = false }: ConnectionStatusProps) {
   const statusConfig = {
     connected: {
       color: "bg-emerald-500",
@@ -26,6 +27,25 @@ export function ConnectionStatus({ status }: ConnectionStatusProps) {
   };
 
   const config = statusConfig[status];
+
+  // Compact mode: just the dot with tooltip
+  if (compact) {
+    return (
+      <div
+        className="relative flex items-center justify-center"
+        title={config.label}
+      >
+        <div
+          className={`h-2 w-2 rounded-full ${config.color} ${
+            config.pulse ? "animate-pulse" : ""
+          }`}
+        />
+        {status === "connecting" && (
+          <div className="absolute inset-0 h-2 w-2 rounded-full bg-amber-500/30 animate-ping" />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
