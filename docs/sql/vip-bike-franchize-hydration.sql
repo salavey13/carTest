@@ -200,7 +200,7 @@ set
         'contacts', jsonb_build_object(
           'address', 'пл. Комсомольская 2, Нижний Новгород',
           'phone', '+7 9200-789-888',
-          'email', 'wkymgchewarbuljq@yandex.ru',
+          'email', 'vip_bike@mail.ru',
           'telegram', '@I_O_S_NN',
           'telegramBotUsername', 'oneBikePlsBot',
           'workingHours', '10:00 - 22:00 (ежедневно)',
@@ -404,7 +404,7 @@ set
         ),
         '{bankCity}', '"г. Нижний Новгород"'
       ),
-      '{email}', '"wkymgchewarbuljq@yandex.ru"'
+      '{email}', '"vip_bike@mail.ru"'
     ),
     '{legalAddress}', '"г. Нижний Новгород, пл. Комсомольская 2"'
   ),
