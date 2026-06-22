@@ -482,11 +482,27 @@ export async function getRentalsDateRange(input: {
     }
 
     // Get min/max dates
+    // First, get all car IDs for this crew
+    const { data: crewCars, error: carsError } = await supabaseAdmin
+      .from("cars")
+      .select("id")
+      .eq("crew_id", crew.id);
+
+    if (carsError) {
+      return { success: false, error: carsError.message };
+    }
+
+    if (!crewCars || crewCars.length === 0) {
+      return { success: true, data: null };
+    }
+
+    const carIds = crewCars.map((c) => c.id);
+
+    // Get min date
     const { data, error } = await supabaseAdmin
       .from("rentals")
       .select("created_at")
-      .innerJoin("cars", "rentals.vehicle_id = cars.id")
-      .eq("cars.crew_id", crew.id)
+      .in("vehicle_id", carIds)
       .not("created_at", "is", null)
       .order("created_at", { ascending: true })
       .limit(1);
@@ -505,8 +521,7 @@ export async function getRentalsDateRange(input: {
     const { data: maxData } = await supabaseAdmin
       .from("rentals")
       .select("created_at")
-      .innerJoin("cars", "rentals.vehicle_id = cars.id")
-      .eq("cars.crew_id", crew.id)
+      .in("vehicle_id", carIds)
       .not("created_at", "is", null)
       .order("created_at", { ascending: false })
       .limit(1);
