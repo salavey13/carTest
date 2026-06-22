@@ -21,6 +21,10 @@ CREATE INDEX IF NOT EXISTS idx_analytics_passwords_expires_at ON public.analytic
 -- Enable RLS
 ALTER TABLE public.analytics_passwords ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (for re-running migration)
+DROP POLICY IF EXISTS "Anyone can validate analytics passwords" ON public.analytics_passwords;
+DROP POLICY IF EXISTS "Crew members can create analytics passwords" ON public.analytics_passwords;
+
 -- RLS Policies:
 -- 1. Anyone can read passwords only for validation (no user_id restriction needed)
 -- 2. Only crew members can insert passwords (via TG bot command)
@@ -47,6 +51,10 @@ CREATE POLICY "Crew members can create analytics passwords"
   );
 
 -- Function to generate daily analytics password
+-- Drop first to ensure signature updates correctly
+DROP FUNCTION IF EXISTS public.generate_analytics_password(UUID, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.generate_analytics_password(TEXT, TEXT, TEXT);
+
 CREATE OR REPLACE FUNCTION public.generate_analytics_password(p_crew_id UUID, p_created_by TEXT, p_slug TEXT)
 RETURNS TABLE(password TEXT, expires_at TIMESTAMPTZ)
 LANGUAGE plpgsql
@@ -95,6 +103,8 @@ END;
 $$;
 
 -- Function to validate analytics password and return crew info
+DROP FUNCTION IF EXISTS public.validate_analytics_password(TEXT);
+
 CREATE OR REPLACE FUNCTION public.validate_analytics_password(p_password TEXT)
 RETURNS TABLE(
   crew_id UUID,
