@@ -263,6 +263,32 @@ export function RentalsAnalyticsClient({
     crew.theme.palette,
   );
 
+  // 🎁 Surprise easter egg - console greeting
+  useEffect(() => {
+    const greetings = [
+      "%c🚗 Аналитика аренд готова к работе!",
+      "font-size: 14px; font-weight: bold; color: #4f46e5;",
+    ];
+    const hints = [
+      "%c💡 Совет: используйте компактный режим для больших экранов",
+      "font-size: 12px; color: #6b7280;",
+    ];
+    const footer = [
+      "%c✨ Сделано с любовью для команды VIP Bike",
+      "font-size: 11px; color: #9ca3af; font-style: italic;",
+    ];
+
+    console.log(...greetings);
+    console.log(...hints);
+    console.log(...footer);
+
+    // Hidden treasure
+    console.log(
+      "%c🎉 Псст... ты знаешь, что можешь нажать Ctrl+K для быстрого доступа?",
+      "font-size: 10px; color: #059669; background: #d1fae5; padding: 2px 4px; border-radius: 4px;"
+    );
+  }, []);
+
   // Load rentals for selected date
   const loadRentals = useCallback(async (date: string, showRefresh = false) => {
     if (!dbUser?.user_id) return;
@@ -757,7 +783,7 @@ export function RentalsAnalyticsClient({
           </h1>
           <p className="mt-1 text-[var(--fr-analytics-muted)]" style={{ fontSize: "var(--fr-analytics-text-sm)", display: compactMode ? "none" : "block" }}>
             {dbUser?.username && dbUser.username.toLowerCase().includes("orud")
-              ? "📝 Legendary notebook overhaul mode activated"
+              ? "📝 Режим легендарного блокнота активирован"
               : "Просмотр аренд с детальной информацией по документам"}
           </p>
         </div>
