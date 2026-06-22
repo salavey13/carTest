@@ -378,6 +378,13 @@ export function RentalsAnalyticsClient({
       });
 
       if (!result.success) {
+        // Check if this is an auth error - show password entry UI
+        if (result.error?.includes("прав") || result.error?.includes("доступ")) {
+          // Clear Telegram auth context and show password entry
+          setShowPasswordEntry(true);
+          toast.error("Требуется пароль для доступа");
+          return;
+        }
         toast.error(result.error || "Не удалось загрузить аренды");
         return;
       }
@@ -433,6 +440,11 @@ export function RentalsAnalyticsClient({
       if (result.success && result.data) {
         setDateRange(result.data);
       } else {
+        // Check if this is an auth error - show password entry UI
+        if (result.error?.includes("прав") || result.error?.includes("доступ")) {
+          setShowPasswordEntry(true);
+          return;
+        }
         toast.error(result.error || "Не удалось загрузить диапазон дат");
       }
     } catch (error) {
@@ -964,6 +976,20 @@ export function RentalsAnalyticsClient({
               ) : (
                 "Войти"
               )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                // Clear session storage and reload page
+                sessionStorage.clear();
+                window.location.reload();
+              }}
+              className="w-full text-xs"
+              style={{ color: "var(--fr-analytics-muted)" }}
+            >
+              Сбросить сессию
             </Button>
           </div>
         </div>
