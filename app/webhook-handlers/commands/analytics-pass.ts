@@ -12,9 +12,11 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 
 export async function analyticsPassCommand(chatId: number, userId: number, username?: string) {
   const userIdStr = String(userId);
-  logger.info(`[ANALYTICS_PASS] User ${userId} (${username}) requested analytics password.`);
+  logger.info(`[ANALYTICS_PASS] Command triggered by user ${userId} (${username}).`);
 
   try {
+    logger.info(`[ANALYTICS_PASS] Fetching crew membership for user ${userIdStr}...`);
+
     // Get crew membership for the user
     const { data: memberships, error: memberError } = await supabaseAdmin
       .from("crew_members")
@@ -27,7 +29,12 @@ export async function analyticsPassCommand(chatId: number, userId: number, usern
         )
       `)
       .eq("user_id", userIdStr)
-      .eq("status", "active");
+      .eq("membership_status", "active");
+
+    logger.info(`[ANALYTICS_PASS] Membership query result:`, {
+      memberError,
+      membershipCount: memberships?.length || 0
+    });
 
     if (memberError) {
       logger.error("[ANALYTICS_PASS] Error fetching crew membership:", memberError);
@@ -39,6 +46,7 @@ export async function analyticsPassCommand(chatId: number, userId: number, usern
     }
 
     if (!memberships || memberships.length === 0) {
+      logger.info(`[ANALYTICS_PASS] No active memberships found for user ${userIdStr}`);
       await sendComplexMessage(
         chatId,
         "🔒 *Доступ запрещен*\n\nЭта команда доступна только членам команды VIP Bike. Свяжитесь с администратором для получения доступа."
@@ -77,12 +85,19 @@ export async function analyticsPassCommand(chatId: number, userId: number, usern
         );
       } else {
         // Generate new password
+        logger.info(`[ANALYTICS_PASS] Generating new password for crew ${slug} (${crewId})`);
         const { data: newPassword, error: generateError } = await supabaseAdmin
           .rpc("generate_analytics_password", {
             p_crew_id: crewId,
             p_created_by: userIdStr,
             p_slug: slug,
           });
+
+        logger.info(`[ANALYTICS_PASS] Generate result:`, {
+          generateError,
+          hasData: !!newPassword,
+          dataLength: newPassword?.length
+        });
 
         if (generateError || !newPassword || newPassword.length === 0) {
           logger.error("[ANALYTICS_PASS] Error generating password:", generateError);

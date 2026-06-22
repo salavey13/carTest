@@ -47,7 +47,7 @@ CREATE POLICY "Crew members can create analytics passwords"
   );
 
 -- Function to generate daily analytics password
-CREATE OR REPLACE FUNCTION public.generate_analytics_password(p_crew_id TEXT, p_created_by TEXT, p_slug TEXT)
+CREATE OR REPLACE FUNCTION public.generate_analytics_password(p_crew_id UUID, p_created_by TEXT, p_slug TEXT)
 RETURNS TABLE(password TEXT, expires_at TIMESTAMPTZ)
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -120,7 +120,7 @@ END;
 $$;
 
 -- Grant execute permissions
-GRANT EXECUTE ON FUNCTION public.generate_analytics_password(TEXT, TEXT, TEXT) TO public;
+GRANT EXECUTE ON FUNCTION public.generate_analytics_password(UUID, TEXT, TEXT) TO public;
 GRANT EXECUTE ON FUNCTION public.validate_analytics_password(TEXT) TO public;
 GRANT SELECT ON TABLE public.analytics_passwords TO public;
 GRANT INSERT ON TABLE public.analytics_passwords TO public;
