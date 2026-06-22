@@ -80,7 +80,6 @@ import {
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
 import {
   FranchizeOperatorPanel,
-  FranchizeOperatorStatCard,
 } from "@/app/franchize/components/FranchizeOperatorSurface";
 
 interface RentalsAnalyticsClientProps {
@@ -180,6 +179,31 @@ const TODO_STATUS_FILTERS = [
   { value: "in_progress" as const, label: "В работе" },
   { value: "done" as const, label: "Выполнено" },
 ];
+
+// Custom compact stat card component
+function StatCard({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: React.ReactNode;
+  color?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)] p-3 transition-all hover:shadow-sm">
+      <div className={`flex shrink-0 items-center justify-center rounded-lg ${color || "text-[var(--fr-analytics-accent)]"}`}>
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">{label}</p>
+        <p className="mt-0.5 truncate text-lg font-semibold text-[var(--fr-analytics-text)]">{value}</p>
+      </div>
+    </div>
+  );
+}
 
 export function RentalsAnalyticsClient({
   initialSlug,
@@ -928,28 +952,32 @@ export function RentalsAnalyticsClient({
         </div>
       </div>
 
-      {/* Summary Stats */}
+      {/* Summary Stats - Compact Design */}
       {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4">
-          <FranchizeOperatorStatCard
-            label="Всего"
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard
+            icon={<FileText className="h-4 w-4" />}
+            label="Всего аренд"
             value={summary.totalCount}
-            detail={<FileText className="h-4 w-4 opacity-60" />}
+            color="text-[var(--fr-analytics-accent)]"
           />
-          <FranchizeOperatorStatCard
+          <StatCard
+            icon={<CreditCard className="h-4 w-4" />}
             label="Выручка"
             value={formatRubles(summary.totalRevenue)}
-            detail={<CreditCard className="h-4 w-4 text-emerald-500" />}
+            color="text-emerald-500"
           />
-          <FranchizeOperatorStatCard
-            label="Подтв."
+          <StatCard
+            icon={<CheckCircle2 className="h-4 w-4" />}
+            label="Подтверждённые"
             value={summary.byStatus.confirmed || 0}
-            detail={<CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+            color="text-emerald-500"
           />
-          <FranchizeOperatorStatCard
+          <StatCard
+            icon={<Clock className="h-4 w-4" />}
             label="Активные"
             value={summary.byStatus.active || 0}
-            detail={<Clock className="h-4 w-4 text-blue-500" />}
+            color="text-blue-500"
           />
         </div>
       )}
