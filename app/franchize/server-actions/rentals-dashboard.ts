@@ -999,9 +999,9 @@ export async function getRentalsForExport(input: {
 // ─── Analytics Password Access ─────────────────────────────────────────────────────
 
 /**
- * Temporary password-based access for PC version (no Telegram context).
- * Password maps to crew slug - initially hardcoded for "vip-bike".
- * TODO: Implement dynamic password-to-slug mapping via crew metadata/config table.
+ * Password-based access for analytics (for PC access without Telegram).
+ * Uses the analytics_passwords table for time-based password validation.
+ * Passwords are generated via /analytics-pass Telegram bot command.
  */
 export async function validateAnalyticsPassword(input: {
   password: string;
@@ -1017,35 +1017,32 @@ export async function validateAnalyticsPassword(input: {
 
     const { password } = parsed.data;
 
-    // TEMPORARY: Hardcode "vip-bike" with default password
-    // Password format: "vip-bike-YYYY-MM-DD" for daily passwords
-    // Or "vip-bike-master" for permanent access
-    const VIP_BIKE_SLUG = "vip-bike";
-    const todaysPassword = `${VIP_BIKE_SLUG}-${new Date().toISOString().split("T")[0]}`;
-    const masterPassword = `${VIP_BIKE_SLUG}-master`;
+    // Call the Supabase function to validate password
+    const { data: validationResult, error: validateError } = await supabaseAdmin
+      .rpc("validate_analytics_password", {
+        p_password: password,
+      });
 
-    if (password === todaysPassword || password === masterPassword) {
-      // Get crew ID and owner_id for the slug
-      const { data: crew, error: crewError } = await supabaseAdmin
-        .from("crews")
-        .select("id, slug, owner_id")
-        .eq("slug", VIP_BIKE_SLUG)
-        .maybeSingle();
-
-      if (crewError || !crew) {
-        console.error("[analytics-password] Crew not found for slug:", VIP_BIKE_SLUG);
-        return { success: false, error: "Экипаж не найден." };
-      }
-
-      return {
-        success: true,
-        slug: crew.slug,
-        crewId: crew.id,
-        ownerId: crew.owner_id || undefined,
-      };
+    if (validateError) {
+      console.error("[analytics-password] Validation error:", validateError);
+      return { success: false, error: "Ошибка проверки пароля." };
     }
 
-    return { success: false, error: "Неверный пароль." };
+    if (!validationResult || validationResult.length === 0) {
+      return { success: false, error: "Неверный пароль." };
+    }
+
+    const result = validationResult[0];
+    if (!result.is_valid) {
+      return { success: false, error: "Пароль истёк. Запросите новый через /analytics-pass" };
+    }
+
+    return {
+      success: true,
+      slug: result.slug,
+      crewId: result.crew_id,
+      ownerId: result.crew_owner_id,
+    };
   } catch (error) {
     console.error("[analytics-password] Error:", error);
     return {

@@ -24,6 +24,7 @@ import { shiftCommand } from "./shift";
 import { wbCommand } from "./wb";
 import { codexCommand } from "./codex";
 import { docCommand, handleDocText, handleDocCallback } from "./doc-manual";
+import { analyticsPassCommand } from "./analytics-pass";
 
 import { escapeTelegramMarkdown } from "@/lib/utils"; // Helper для Markdown escape
 
@@ -116,6 +117,7 @@ export async function handleCommand(update: any) {
             "/howto": () => howtoCommand(chatId, userId),
             "/ctx": () => ctxCommand(chatId, userId),
             "/profile": () => profileCommand(chatId, userId, username),
+            "/analytics-pass": () => analyticsPassCommand(chatId, userId, username),
             "/doc": () => {
                 const bestPhotoVariant = update.message?.photo?.length
                     ? [update.message.photo[update.message.photo.length - 1]]
