@@ -12,11 +12,10 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 
 export async function analyticsPassCommand(chatId: number, userId: number, username?: string) {
   logger.info(`[ANALYTICS_PASS] >>> FUNCTION ENTERED <<< chatId=${chatId}, userId=${userId}, username=${username}`);
-  try {
-    const userIdStr = String(userId);
-    logger.info(`[ANALYTICS_PASS] Command triggered by user ${userId} (${username}).`);
+  const userIdStr = String(userId);
 
   try {
+    logger.info(`[ANALYTICS_PASS] Command triggered by user ${userId} (${username}).`);
     logger.info(`[ANALYTICS_PASS] Fetching crew membership for user ${userIdStr}...`);
 
     // Get crew membership for the user
