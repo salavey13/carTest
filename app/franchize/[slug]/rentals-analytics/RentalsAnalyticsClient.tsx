@@ -67,10 +67,10 @@ import {
   updateCrewTodo,
   deleteCrewTodo,
   getCrewTodoStats,
-  DEFAULT_TODO_CATEGORIES,
   type CrewTodo,
   type TodoStatus,
 } from "@/app/franchize/server-actions/crew-todos";
+import { DEFAULT_TODO_CATEGORIES } from "@/app/franchize/server-actions/crew-todos-constants";
 import {
   crewPaletteForSurface,
   focusRingOutlineStyle,
