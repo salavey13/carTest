@@ -284,10 +284,42 @@ export function RentalsAnalyticsClient({
 
     // Hidden treasure
     console.log(
-      "%c🎉 Псст... ты знаешь, что можешь нажать Ctrl+K для быстрого доступа?",
-      "font-size: 10px; color: #059669; background: #d1fae5; padding: 2px 4px; border-radius: 4px;"
+      "%c🎉 Псст... нажми Ctrl+K для секретной функции!",
+      "font-size: 10px; color: #7c3aed; background: #ede9fe; padding: 2px 4px; border-radius: 4px;"
     );
-  }, []);
+
+    // Ctrl+K handler - fun surprise!
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        const surprises = [
+          () => {
+            setCompactMode(!compactMode);
+            toast.success(compactMode ? "🎉 Обычный режим!" : "🎊 Компактный режим!");
+          },
+          () => {
+            const emojis = ["🚗", "🏍️", "🛵", "🚙", "🏎️", "🦾", "⚡", "🔧"];
+            const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+            toast.success(`${randomEmoji} Отличной работы!`);
+          },
+          () => {
+            const messages = [
+              "Ты крут! 😎",
+              "Аренды ждут! 🚀",
+              "Погнали! 💨",
+              "Так держать! 💪",
+              "Молодец! 🌟",
+            ];
+            toast.success(messages[Math.floor(Math.random() * messages.length)]);
+          },
+        ];
+        surprises[Math.floor(Math.random() * surprises.length)]();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [compactMode]);
 
   // Load rentals for selected date
   const loadRentals = useCallback(async (date: string, showRefresh = false) => {
