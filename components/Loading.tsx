@@ -7,6 +7,7 @@ interface LoadingProps {
   variant?: "bike" | "generic" | "system" | "kinetic";
   text?: string;
   className?: string;
+  compact?: boolean;
 }
 
 const LOADER_GIF_URL =
@@ -15,7 +16,25 @@ const LOADER_GIF_URL =
 // Option 4: invert(1) grayscale(0.5) sepia(0.8) saturate(3) contrast(2)
 const bikeGoldFilter = "invert(1) grayscale(0.5) sepia(0.8) saturate(3) contrast(2)";
 
-export function Loading({ text, className }: LoadingProps) {
+export function Loading({ text, className, compact = false }: LoadingProps) {
+  // Compact mode - small spinner for inline loading
+  if (compact) {
+    return (
+      <div className={cn("flex items-center justify-center gap-2 py-4", className)}>
+        <motion.div
+          className="h-5 w-5 rounded-full border-2 border-t-transparent"
+          style={{ borderColor: "#D4AF37", borderTopColor: "transparent" }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        />
+        {text && (
+          <p className="text-xs text-muted-foreground">{text}</p>
+        )}
+      </div>
+    );
+  }
+
+  // Full page loading
   return (
     <div
       className={cn(

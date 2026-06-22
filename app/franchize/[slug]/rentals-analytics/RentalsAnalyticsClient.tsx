@@ -766,7 +766,7 @@ export function RentalsAnalyticsClient({
     };
   };
 
-  if (authLoading) return <Loading text="Загружаем данные..." />;
+  if (authLoading) return <Loading text="Загружаем данные..." compact />;
 
   // Compact mode CSS variables
   const compactVars = {
@@ -800,35 +800,31 @@ export function RentalsAnalyticsClient({
       }}
     >
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        {/* Connection Status */}
-        <div className="flex items-center" style={{ gap: "var(--fr-analytics-gap-md)" }}>
-          <ConnectionStatus status={todosRealtime.state.status} />
-          <ConnectionStatus status={checklistRealtime.state.status} />
-        </div>
-        <div>
-          <p className="font-medium tracking-wide text-[var(--fr-analytics-accent)]" style={{ fontSize: "var(--fr-analytics-text-xs)" }}>
-            Аналитика аренд
-          </p>
-          <h1 className="mt-2 break-words font-semibold text-[var(--fr-analytics-text)]" style={{ fontSize: "var(--fr-analytics-text-lg)" }}>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        {/* Title */}
+        <div className="flex-1">
+          <h1 className="font-semibold text-[var(--fr-analytics-text)]" style={{ fontSize: "var(--fr-analytics-text-base)" }}>
             Аренды за день
           </h1>
-          <p className="mt-1 text-[var(--fr-analytics-muted)]" style={{ fontSize: "var(--fr-analytics-text-sm)", display: compactMode ? "none" : "block" }}>
-            {dbUser?.username && dbUser.username.toLowerCase().includes("orud")
-              ? "📝 Режим легендарного блокнота активирован"
-              : "Просмотр аренд с детальной информацией по документам"}
-          </p>
         </div>
 
-        {/* Date Picker */}
-        <div className="flex items-center" style={{ gap: "var(--fr-analytics-gap-md)" }}>
+        {/* Connection Status - Sticky indicator in corner */}
+        <div className="fixed bottom-4 right-4 z-40 flex items-center gap-1 rounded-full bg-[var(--fr-analytics-bg-card)] border border-[var(--fr-analytics-border)] px-3 py-1.5 shadow-lg">
+          <ConnectionStatus status={todosRealtime.state.status === "connected" && checklistRealtime.state.status === "connected" ? "connected" : "connecting"} compact />
+          <span className="text-[10px] text-[var(--fr-analytics-muted)]">
+            {todosRealtime.state.status === "connected" && checklistRealtime.state.status === "connected" ? "Live" : "Reconnecting..."}
+          </span>
+        </div>
+
+        {/* Date Picker - Compact */}
+        <div className="flex items-center gap-1 md:gap-2">
           <Button
             type="button"
             variant="outline"
             size="icon"
             onClick={() => navigateDate(-1)}
             disabled={!dateRange || selectedDate <= dateRange.minDate || loading}
-            className="h-9 w-9"
+            className="h-8 w-8 md:h-9 md:w-9"
             style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
           >
             <ChevronLeft style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
@@ -847,7 +843,7 @@ export function RentalsAnalyticsClient({
             size="icon"
             onClick={() => navigateDate(1)}
             disabled={!dateRange || selectedDate >= dateRange.maxDate || loading}
-            className="h-9 w-9"
+            className="h-8 w-8 md:h-9 md:w-9"
             style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
           >
             <ChevronRight style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
@@ -867,29 +863,12 @@ export function RentalsAnalyticsClient({
               );
             }}
             disabled={selectedDate === new Date().toISOString().split("T")[0] || loading}
-            className="h-9 w-9"
+            className="h-8 w-8 md:h-9 md:w-9"
             style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
             title="Сегодня"
           >
             <RefreshCw style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
           </Button>
-
-          <input
-            type="date"
-            value={selectedDate}
-            min={dateRange?.minDate}
-            max={dateRange?.maxDate}
-            onChange={(e) => {
-              setSelectedDate(e.target.value);
-              window.history.pushState(
-                {},
-                "",
-                `/franchize/${slug}/rentals-analytics?date=${e.target.value}`,
-              );
-            }}
-            className="rounded-md border border-[var(--fr-analytics-border)] bg-transparent text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)] h-9 px-3 py-1 text-sm"
-            style={{ height: "var(--fr-analytics-btn-size)", fontSize: "var(--fr-analytics-btn-text)", padding: "var(--fr-analytics-padding-sm)" }}
-          />
 
           <Button
             type="button"
@@ -897,7 +876,7 @@ export function RentalsAnalyticsClient({
             size="icon"
             onClick={() => setShowExportModal(true)}
             disabled={!dateRange}
-            className="h-9 w-9"
+            className="h-8 w-8 md:h-9 md:w-9"
             style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
             title="Экспорт в Excel"
           >
@@ -909,7 +888,7 @@ export function RentalsAnalyticsClient({
             variant={compactMode ? "default" : "outline"}
             size="icon"
             onClick={() => setCompactMode(!compactMode)}
-            className="h-9 w-9"
+            className="h-8 w-8 md:h-9 md:w-9"
             style={{
               width: "var(--fr-analytics-btn-size)",
               height: "var(--fr-analytics-btn-size)",
@@ -923,9 +902,8 @@ export function RentalsAnalyticsClient({
       </div>
 
       {/* Verification Status Filter */}
-      <div className="flex items-center gap-2">
-        <Filter className="h-4 w-4 text-[var(--fr-analytics-muted)]" />
-        <span className="text-sm text-[var(--fr-analytics-muted)]">Фильтр по верификации:</span>
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <Filter className="h-4 w-4 shrink-0 text-[var(--fr-analytics-muted)]" />
         <div className="flex gap-1">
           {VERIFICATION_FILTERS.map((filter) => {
             const Icon = filter.icon;
@@ -935,14 +913,15 @@ export function RentalsAnalyticsClient({
                 key={filter.value}
                 type="button"
                 onClick={() => setVerificationFilter(filter.value as typeof verificationFilter)}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
                   isActive
                     ? "bg-[var(--fr-analytics-accent)] text-white"
                     : "bg-transparent text-[var(--fr-analytics-muted)] hover:bg-[var(--fr-analytics-accent)]/10"
                 }`}
+                title={filter.label}
               >
                 <Icon className="h-3.5 w-3.5" />
-                {filter.label}
+                <span className="hidden sm:inline">{filter.label}</span>
               </button>
             );
           })}
@@ -951,9 +930,9 @@ export function RentalsAnalyticsClient({
 
       {/* Summary Stats */}
       {summary && (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4" style={{ gap: "var(--fr-analytics-gap-md)" }}>
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4">
           <FranchizeOperatorStatCard
-            label="Всего аренд"
+            label="Всего"
             value={summary.totalCount}
             detail={<FileText className="h-4 w-4 opacity-60" />}
           />
@@ -963,7 +942,7 @@ export function RentalsAnalyticsClient({
             detail={<CreditCard className="h-4 w-4 text-emerald-500" />}
           />
           <FranchizeOperatorStatCard
-            label="Подтверждённые"
+            label="Подтв."
             value={summary.byStatus.confirmed || 0}
             detail={<CheckCircle2 className="h-4 w-4 text-emerald-500" />}
           />
@@ -1242,9 +1221,7 @@ export function RentalsAnalyticsClient({
 
         {/* Todos List */}
         {loadingTodos ? (
-          <div className="flex items-center justify-center py-8">
-            <Loading text="Загружаем задачи..." />
-          </div>
+          <Loading text="Загружаем задачи..." compact />
         ) : !todos.length ? (
           <div className="py-8 text-center">
             <ListChecks className="mx-auto h-8 w-8 text-[var(--fr-analytics-muted)] opacity-50" />
@@ -1403,9 +1380,7 @@ export function RentalsAnalyticsClient({
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loading text="Загружаем аренды..." />
-          </div>
+          <Loading text="Загружаем аренды..." compact />
         ) : !rentals.length ? (
           <p className="py-12 text-center text-sm text-[var(--fr-analytics-muted)]">
             За этот день аренд нет
