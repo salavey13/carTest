@@ -89,11 +89,11 @@ export async function POST(request: NextRequest) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://your-app.vercel.app";
     const analyticsUrl = `${siteUrl}/franchize/${crew.slug}/rentals-analytics`;
 
-    // Configure SMTP
-    const SMTP_HOST = process.env.SMTP_GMAIL_HOST || "smtp.gmail.com";
-    const SMTP_PORT = Number(process.env.SMTP_GMAIL_PORT) || 587;
-    const SMTP_USER = process.env.SMTP_GMAIL_USER;
-    const SMTP_PASS = process.env.SMTP_GMAIL_PASS;
+    // Configure SMTP (Yandex first, fallback to Gmail)
+    const SMTP_HOST = process.env.SMTP_YANDEX_HOST || process.env.SMTP_GMAIL_HOST || "smtp.yandex.ru";
+    const SMTP_PORT = Number(process.env.SMTP_YANDEX_PORT || process.env.SMTP_GMAIL_PORT) || 465;
+    const SMTP_USER = process.env.SMTP_YANDEX_USER || process.env.SMTP_GMAIL_USER;
+    const SMTP_PASS = process.env.SMTP_YANDEX_PASS || process.env.SMTP_GMAIL_PASS;
     const EMAIL_FROM = process.env.EMAIL_FROM || SMTP_USER;
 
     if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
