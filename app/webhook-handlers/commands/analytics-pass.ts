@@ -12,8 +12,9 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 
 export async function analyticsPassCommand(chatId: number, userId: number, username?: string) {
   logger.info(`[ANALYTICS_PASS] >>> FUNCTION ENTERED <<< chatId=${chatId}, userId=${userId}, username=${username}`);
-  const userIdStr = String(userId);
-  logger.info(`[ANALYTICS_PASS] Command triggered by user ${userId} (${username}).`);
+  try {
+    const userIdStr = String(userId);
+    logger.info(`[ANALYTICS_PASS] Command triggered by user ${userId} (${username}).`);
 
   try {
     logger.info(`[ANALYTICS_PASS] Fetching crew membership for user ${userIdStr}...`);
@@ -125,7 +126,12 @@ export async function analyticsPassCommand(chatId: number, userId: number, usern
     logger.info(`[ANALYTICS_PASS] Password(s) sent to user ${userId}.`);
 
   } catch (error) {
-    logger.error("[ANALYTICS_PASS] Unexpected error:", error);
+    logger.error("[ANALYTICS_PASS] ++++ ERROR CAUGHT ++++", error);
+    logger.error("[ANALYTICS_PASS] Error details:", {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined
+    });
     await sendComplexMessage(
       chatId,
       "🚨 Непредвиденная ошибка. Попробуйте позже."
