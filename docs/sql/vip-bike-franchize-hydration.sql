@@ -200,7 +200,7 @@ set
         'contacts', jsonb_build_object(
           'address', 'пл. Комсомольская 2, Нижний Новгород',
           'phone', '+7 9200-789-888',
-          'email', 'hello@vipbike-rental.example',
+          'email', 'wkymgchewarbuljq@yandex.ru',
           'telegram', '@I_O_S_NN',
           'telegramBotUsername', 'oneBikePlsBot',
           'workingHours', '10:00 - 22:00 (ежедневно)',
@@ -404,7 +404,7 @@ set
         ),
         '{bankCity}', '"г. Нижний Новгород"'
       ),
-      '{email}', '"vip_bike@mail.ru"'
+      '{email}', '"wkymgchewarbuljq@yandex.ru"'
     ),
     '{legalAddress}', '"г. Нижний Новгород, пл. Комсомольская 2"'
   ),
