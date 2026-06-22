@@ -32,12 +32,13 @@ export interface RentalDashboardItem {
     username: string | null;
     metadata: Record<string, unknown>;
   } | null;
-  // Document secret for QR generation
+  // Document secret for QR generation (latest by created_at)
   documentSecret?: {
     doc_sha256: string | null;
     verification_status: string | null;
     renter_full_name: string | null;
     source_rental_id: string | null;
+    created_at?: string; // Timestamp for deduplication
   } | null;
 }
 
@@ -175,47 +176,82 @@ export async function getRentalsDashboard(input: {
       return { success: false, error: rentalsError.message };
     }
 
-    let items = ((rentals || []) as RentalDashboardItem[]).map(item => ({
-      ...item,
-      documentSecret: null,
-    }));
+    // DEDUPLICATION: Handle multiple rental generations for same transaction
+    // When user re-uploads documents (same date, same bike, same dude), a NEW rental_id
+    // is created each time. We keep only the LATEST rental for each (user_id + vehicle_id).
+    // Results are already ordered by created_at DESC, so first occurrence is the latest.
+    const seenUserVehiclePairs = new Set<string>();
+    let items: RentalDashboardItem[] = [];
+    for (const rental of (rentals || []) as RentalDashboardItem[]) {
+      const dedupeKey = `${rental.user_id}::${rental.vehicle_id}`;
+      if (!seenUserVehiclePairs.has(dedupeKey)) {
+        seenUserVehiclePairs.add(dedupeKey);
+        items.push({ ...rental, documentSecret: null });
+      }
+      // Skip duplicate (user, vehicle) pairs - older rental generations
+    }
 
-    // Filter by verification status if specified
+    // Filter by verification status if specified - DEDUPLICATED per rental
+    // Uses same dedupe logic: only latest document (by created_at) counts
     if (verificationStatus && verificationStatus !== "all") {
       const rentalIds = items.map(r => r.rental_id);
       if (rentalIds.length > 0) {
-        // Get document secrets for these rentals
+        // Get all document secrets for these rentals, ordered by created_at DESC
         const { data: secrets } = await privateSchema()
           .from("user_rental_secrets")
-          .select("source_rental_id, verification_status")
-          .in("source_rental_id", rentalIds);
+          .select("source_rental_id, verification_status, created_at")
+          .in("source_rental_id", rentalIds)
+          .order("created_at", { ascending: false });
 
-        const secretMap = new Map(secrets?.map(s => [s.source_rental_id, s.verification_status]) || []);
+        // Dedupe: only latest verification_status per rental counts
+        const latestStatusByRental = new Map<string, string>();
+        const seenRentals = new Set<string>();
+        for (const secret of secrets || []) {
+          const rentalId = secret.source_rental_id || "";
+          // Only add if we haven't seen this rental yet (latest document wins)
+          if (!seenRentals.has(rentalId)) {
+            seenRentals.add(rentalId);
+            latestStatusByRental.set(rentalId, secret.verification_status);
+          }
+        }
 
         items = items.filter(item => {
-          const itemStatus = secretMap.get(item.rental_id);
+          const itemStatus = latestStatusByRental.get(item.rental_id);
           return itemStatus === verificationStatus;
         });
       }
     }
 
-    // Enrich items with document secrets (for QR codes)
+    // Enrich items with document secrets (for QR codes) - DEDUPLICATED per rental
+    // Multiple document uploads can occur for same rental (same date, same bike, same dude)
+    // We keep ONLY the latest version by created_at for each unique source_rental_id
     const rentalIds = items.map(r => r.rental_id);
     const secretsByRentalId = new Map<string, RentalDashboardItem["documentSecret"]>();
 
     if (rentalIds.length > 0) {
+      // Fetch all secrets ordered by created_at DESC (newest first)
       const { data: secrets } = await privateSchema()
         .from("user_rental_secrets")
-        .select("source_rental_id, doc_sha256, verification_status, renter_full_name")
-        .in("source_rental_id", rentalIds);
+        .select("source_rental_id, doc_sha256, verification_status, renter_full_name, renter_passport, created_at")
+        .in("source_rental_id", rentalIds)
+        .order("created_at", { ascending: false });
 
+      // Dedupe: keep only first (latest) secret for each source_rental_id
+      // Since results are ordered by created_at DESC, first occurrence is the latest
+      const seenRentals = new Set<string>();
       for (const secret of secrets || []) {
-        secretsByRentalId.set(secret.source_rental_id || "", {
-          doc_sha256: secret.doc_sha256,
-          verification_status: secret.verification_status,
-          renter_full_name: secret.renter_full_name,
-          source_rental_id: secret.source_rental_id,
-        });
+        const rentalId = secret.source_rental_id || "";
+        // Only set if we haven't seen this rental yet (latest document wins)
+        if (!seenRentals.has(rentalId)) {
+          seenRentals.add(rentalId);
+          secretsByRentalId.set(rentalId, {
+            doc_sha256: secret.doc_sha256,
+            verification_status: secret.verification_status,
+            renter_full_name: secret.renter_full_name,
+            source_rental_id: secret.source_rental_id,
+            created_at: secret.created_at,
+          } as RentalDashboardItem["documentSecret"] & { created_at: string });
+        }
       }
     }
 
@@ -831,9 +867,23 @@ export async function getRentalsForExport(input: {
       return { success: true, data: [] };
     }
 
+    // DEDUPLICATION: Handle multiple rental generations for same transaction
+    // When user re-uploads documents (same date, same bike, same dude), a NEW rental_id
+    // is created each time. We keep only the LATEST rental for each (user_id + vehicle_id).
+    // Results are already ordered by created_at DESC, so first occurrence is the latest.
+    const seenUserVehiclePairs = new Set<string>();
+    const uniqueRentals: RentalDashboardItem[] = [];
+    for (const rental of (rentals || []) as RentalDashboardItem[]) {
+      const dedupeKey = `${rental.user_id}::${rental.vehicle_id}`;
+      if (!seenUserVehiclePairs.has(dedupeKey)) {
+        seenUserVehiclePairs.add(dedupeKey);
+        uniqueRentals.push(rental);
+      }
+    }
+
     // Get checklist states for these rentals (by vehicle_id)
-    const rentalIds = rentals.map(r => r.rental_id);
-    const vehicleIds = [...new Set(rentals.map(r => r.vehicle_id))];
+    const rentalIds = uniqueRentals.map(r => r.rental_id);
+    const vehicleIds = [...new Set(uniqueRentals.map(r => r.vehicle_id))];
 
     // Run all queries in parallel for better performance
     const [checklistStates, secrets] = await Promise.all([
@@ -843,18 +893,30 @@ export async function getRentalsForExport(input: {
         .in("vehicle_id", vehicleIds),
       privateSchema()
         .from("user_rental_secrets")
-        .select("source_rental_id, verification_status")
-        .in("source_rental_id", rentalIds),
+        .select("source_rental_id, verification_status, created_at")
+        .in("source_rental_id", rentalIds)
+        .order("created_at", { ascending: false }), // Latest first for dedupe
     ]);
 
     const checklistMap = new Map(checklistStates.data?.map(c => [c.vehicle_id, c]) || []);
 
-    const verifiedSet = new Set(
-      secrets.data?.filter(s => s.verification_status === "verified").map(s => s.source_rental_id) || []
-    );
+    // DEDUPLICATION: Only latest verification status per rental counts
+    // Multiple uploads for same rental (same date, bike, dude) -> use latest
+    const verifiedSet = new Set<string>();
+    const seenRentals = new Set<string>();
+    for (const secret of (secrets.data || [])) {
+      const rentalId = secret.source_rental_id || "";
+      // Only process first occurrence (latest document) per rental
+      if (!seenRentals.has(rentalId)) {
+        seenRentals.add(rentalId);
+        if (secret.verification_status === "verified") {
+          verifiedSet.add(rentalId);
+        }
+      }
+    }
 
     // Build export data
-    const exportData = rentals.map((rental: RentalDashboardItem) => {
+    const exportData = uniqueRentals.map((rental: RentalDashboardItem) => {
       const vehicle = rental.vehicle;
       const user = rental.user;
       const checklist = checklistMap.get(rental.vehicle_id);
@@ -883,6 +945,65 @@ export async function getRentalsForExport(input: {
     return { success: true, data: exportData };
   } catch (error) {
     console.error("[rentals-export] Error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+// ─── Analytics Password Access ─────────────────────────────────────────────────────
+
+/**
+ * Temporary password-based access for PC version (no Telegram context).
+ * Password maps to crew slug - initially hardcoded for "vip-bike".
+ * TODO: Implement dynamic password-to-slug mapping via crew metadata/config table.
+ */
+export async function validateAnalyticsPassword(input: {
+  password: string;
+}): Promise<{ success: boolean; slug?: string; crewId?: string; ownerId?: string; error?: string }> {
+  try {
+    const parsed = z.object({
+      password: z.string().trim().min(1),
+    }).safeParse(input);
+
+    if (!parsed.success) {
+      return { success: false, error: "Некорректный запрос." };
+    }
+
+    const { password } = parsed.data;
+
+    // TEMPORARY: Hardcode "vip-bike" with default password
+    // Password format: "vip-bike-YYYY-MM-DD" for daily passwords
+    // Or "vip-bike-master" for permanent access
+    const VIP_BIKE_SLUG = "vip-bike";
+    const todaysPassword = `${VIP_BIKE_SLUG}-${new Date().toISOString().split("T")[0]}`;
+    const masterPassword = `${VIP_BIKE_SLUG}-master`;
+
+    if (password === todaysPassword || password === masterPassword) {
+      // Get crew ID and owner_id for the slug
+      const { data: crew, error: crewError } = await supabaseAdmin
+        .from("crews")
+        .select("id, slug, owner_id")
+        .eq("slug", VIP_BIKE_SLUG)
+        .maybeSingle();
+
+      if (crewError || !crew) {
+        console.error("[analytics-password] Crew not found for slug:", VIP_BIKE_SLUG);
+        return { success: false, error: "Экипаж не найден." };
+      }
+
+      return {
+        success: true,
+        slug: crew.slug,
+        crewId: crew.id,
+        ownerId: crew.owner_id || undefined,
+      };
+    }
+
+    return { success: false, error: "Неверный пароль." };
+  } catch (error) {
+    console.error("[analytics-password] Error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
