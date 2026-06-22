@@ -128,22 +128,32 @@ export async function getRentalsDashboard(input: {
       return { success: false, error: "Экипаж не найден." };
     }
 
-    // Check access (owner or admin)
+    // Check access (owner or admin or password auth or orudjov)
     const isOwner = crew.owner_id === actorUserId;
-    const { data: userRoles } = await supabaseAdmin
-      .from("users")
-      .select("metadata, username")
-      .eq("user_id", actorUserId)
-      .maybeSingle();
+    // Password auth: when actorUserId is exactly the crew.owner_id, treat as full access
+    // (this is set by the password flow when no Telegram user exists)
+    const isPasswordAuth = isOwner;
 
-    const userMetadata = userRoles?.metadata as Record<string, unknown> | null;
-    const userUsername = userRoles?.username as string | null;
-    const isAdmin = userMetadata?.role === "admin";
-    // Special case: orudjov (and variations) always have access
-    const isOrudjov = userUsername?.toLowerCase().includes("orud");
+    if (isPasswordAuth) {
+      // Password auth grants full access - skip user checks
+      // Fall through to data loading
+    } else {
+      // Telegram auth: check user roles and username
+      const { data: userRoles } = await supabaseAdmin
+        .from("users")
+        .select("metadata, username")
+        .eq("user_id", actorUserId)
+        .maybeSingle();
 
-    if (!isOwner && !isAdmin && !isOrudjov) {
-      return { success: false, error: "Недостаточно прав для просмотра." };
+      const userMetadata = userRoles?.metadata as Record<string, unknown> | null;
+      const userUsername = userRoles?.username as string | null;
+      const isAdmin = userMetadata?.role === "admin";
+      // Special case: orudjov (and variations) always have access
+      const isOrudjov = userUsername?.toLowerCase().includes("orud");
+
+      if (!isOwner && !isAdmin && !isOrudjov) {
+        return { success: false, error: "Недостаточно прав для просмотра." };
+      }
     }
 
     // Parse date boundaries for the selected day (UTC to avoid timezone issues)
@@ -448,21 +458,27 @@ export async function getRentalsDateRange(input: {
       return { success: false, error: "Экипаж не найден." };
     }
 
-    // Check access
+    // Check access (owner or admin or password auth or orudjov)
     const isOwner = crew.owner_id === actorUserId;
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("metadata, username")
-      .eq("user_id", actorUserId)
-      .maybeSingle();
+    const isPasswordAuth = isOwner; // Password auth sets actorUserId to owner_id
 
-    const userMetadata = user?.metadata as Record<string, unknown> | null;
-    const userUsername = user?.username as string | null;
-    const isAdmin = userMetadata?.role === "admin";
-    const isOrudjov = userUsername?.toLowerCase().includes("orud");
+    if (isPasswordAuth) {
+      // Password auth grants full access
+    } else {
+      const { data: user } = await supabaseAdmin
+        .from("users")
+        .select("metadata, username")
+        .eq("user_id", actorUserId)
+        .maybeSingle();
 
-    if (!isOwner && !isAdmin && !isOrudjov) {
-      return { success: false, error: "Недостаточно прав." };
+      const userMetadata = user?.metadata as Record<string, unknown> | null;
+      const userUsername = user?.username as string | null;
+      const isAdmin = userMetadata?.role === "admin";
+      const isOrudjov = userUsername?.toLowerCase().includes("orud");
+
+      if (!isOwner && !isAdmin && !isOrudjov) {
+        return { success: false, error: "Недостаточно прав." };
+      }
     }
 
     // Get min/max dates
@@ -821,21 +837,27 @@ export async function getRentalsForExport(input: {
       return { success: false, error: "Экипаж не найден." };
     }
 
-    // Check access (owner or admin)
+    // Check access (owner or admin or password auth or orudjov)
     const isOwner = crew.owner_id === actorUserId;
-    const { data: userRoles } = await supabaseAdmin
-      .from("users")
-      .select("metadata, username")
-      .eq("user_id", actorUserId)
-      .maybeSingle();
+    const isPasswordAuth = isOwner; // Password auth sets actorUserId to owner_id
 
-    const userMetadata = userRoles?.metadata as Record<string, unknown> | null;
-    const userUsername = userRoles?.username as string | null;
-    const isAdmin = userMetadata?.role === "admin";
-    const isOrudjov = userUsername?.toLowerCase().includes("orud");
+    if (isPasswordAuth) {
+      // Password auth grants full access
+    } else {
+      const { data: userRoles } = await supabaseAdmin
+        .from("users")
+        .select("metadata, username")
+        .eq("user_id", actorUserId)
+        .maybeSingle();
 
-    if (!isOwner && !isAdmin && !isOrudjov) {
-      return { success: false, error: "Недостаточно прав для экспорта." };
+      const userMetadata = userRoles?.metadata as Record<string, unknown> | null;
+      const userUsername = userRoles?.username as string | null;
+      const isAdmin = userMetadata?.role === "admin";
+      const isOrudjov = userUsername?.toLowerCase().includes("orud");
+
+      if (!isOwner && !isAdmin && !isOrudjov) {
+        return { success: false, error: "Недостаточно прав для экспорта." };
+      }
     }
 
     // Parse date boundaries (UTC to avoid timezone issues)
