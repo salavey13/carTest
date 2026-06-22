@@ -971,26 +971,35 @@ export function RentalsAnalyticsClient({
     );
   }
 
-  // Compact mode CSS variables
+  // Compact mode CSS variables - more aggressive in compact mode
   const compactVars = {
-    "--fr-analytics-btn-size": compactMode ? "1.75rem" : "2.25rem",
-    "--fr-analytics-btn-text": compactMode ? "0.75rem" : "0.875rem",
-    "--fr-analytics-icon-size": compactMode ? "0.75rem" : "1rem",
-    "--fr-analytics-icon-sm": compactMode ? "0.5rem" : "0.75rem",
-    "--fr-analytics-text-xs": compactMode ? "0.625rem" : "0.75rem",
-    "--fr-analytics-text-sm": compactMode ? "0.75rem" : "0.875rem",
-    "--fr-analytics-text-base": compactMode ? "1rem" : "1.5rem",
-    "--fr-analytics-text-lg": compactMode ? "1.25rem" : "2rem",
-    "--fr-analytics-gap-sm": compactMode ? "0.25rem" : "0.5rem",
-    "--fr-analytics-gap-md": compactMode ? "0.5rem" : "0.75rem",
-    "--fr-analytics-gap-lg": compactMode ? "0.5rem" : "1rem",
-    "--fr-analytics-padding-sm": compactMode ? "0.5rem" : "0.75rem",
-    "--fr-analytics-padding-md": compactMode ? "0.25rem 0.5rem" : "0.5rem 0.75rem",
+    // Buttons - much smaller in compact mode
+    "--fr-analytics-btn-size": compactMode ? "1.5rem" : "2.25rem",
+    "--fr-analytics-btn-text": compactMode ? "0.625rem" : "0.875rem",
+    // Icons - smaller in compact mode
+    "--fr-analytics-icon-size": compactMode ? "0.625rem" : "1rem",
+    "--fr-analytics-icon-sm": compactMode ? "0.375rem" : "0.75rem",
+    // Text sizes - reduced hierarchy in compact mode
+    "--fr-analytics-text-xs": compactMode ? "0.5rem" : "0.75rem",
+    "--fr-analytics-text-sm": compactMode ? "0.625rem" : "0.875rem",
+    "--fr-analytics-text-base": compactMode ? "0.75rem" : "1.5rem",
+    "--fr-analytics-text-lg": compactMode ? "0.875rem" : "2rem",
+    // Spacing - tighter in compact mode
+    "--fr-analytics-gap-sm": compactMode ? "0.125rem" : "0.5rem",
+    "--fr-analytics-gap-md": compactMode ? "0.25rem" : "0.75rem",
+    "--fr-analytics-gap-lg": compactMode ? "0.25rem" : "1rem",
+    // Padding - minimal in compact mode
+    "--fr-analytics-padding-sm": compactMode ? "0.25rem" : "0.75rem",
+    "--fr-analytics-padding-md": compactMode ? "0.125rem 0.25rem" : "0.5rem 0.75rem",
+    // Card padding - tighter in compact mode
+    "--fr-analytics-card-padding": compactMode ? "0.5rem" : "0.75rem",
+    // Table row height - smaller in compact mode
+    "--fr-analytics-row-min-height": compactMode ? "2rem" : "3rem",
   } as Record<string, string>;
 
   return (
     <div
-      className="space-y-3 sm:space-y-4"
+      className={compactMode ? "space-y-1" : "space-y-3 sm:space-y-4"}
       style={{
         ["--fr-analytics-accent" as string]: crew.theme.palette.accentMain,
         ["--fr-analytics-accent-hover" as string]: crew.theme.palette.accentMainHover,
@@ -1003,7 +1012,7 @@ export function RentalsAnalyticsClient({
       }}
     >
       {/* Header - Responsive Layout */}
-      <div className="flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className={compactMode ? "flex flex-col gap-1 lg:flex-row lg:items-center lg:justify-between" : "flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-center lg:justify-between"}>
         {/* Title Section */}
         <div className="flex items-center gap-2">
           <h1 className="text-base font-semibold text-[var(--fr-analytics-text)] sm:text-lg lg:text-xl">
@@ -1019,8 +1028,42 @@ export function RentalsAnalyticsClient({
         </div>
 
         {/* Controls Bar - Responsive */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:gap-2 lg:pb-0 lg:overflow-visible">
-          {/* Date Navigation - Hidden on mobile (shown in title) */}
+        <div className={compactMode ? "flex items-center gap-1 overflow-x-auto pb-0.5 lg:overflow-visible" : "flex items-center gap-1.5 overflow-x-auto pb-1 sm:gap-2 lg:pb-0 lg:overflow-visible"}>
+          {/* Date Navigation - Mobile/Tablet */}
+          <div className="flex items-center gap-1 lg:hidden">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => navigateDate(-1)}
+              disabled={!dateRange || selectedDate <= dateRange.minDate || loading}
+              style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
+              title="Предыдущий день"
+            >
+              <ChevronLeft style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
+            </Button>
+
+            <div className="flex items-center rounded-lg border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)] px-2 py-1" style={{ gap: "var(--fr-analytics-gap-sm)" }}>
+              <Calendar className="text-[var(--fr-analytics-muted)]" style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
+              <span className="text-xs font-medium text-[var(--fr-analytics-text)]" style={{ fontSize: "var(--fr-analytics-text-xs)" }}>
+                {formatRussianDateOnly(selectedDate)}
+              </span>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => navigateDate(1)}
+              disabled={!dateRange || selectedDate >= dateRange.maxDate || loading}
+              style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
+              title="Следующий день"
+            >
+              <ChevronRight style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
+            </Button>
+          </div>
+
+          {/* Date Navigation - Desktop */}
           <div className="hidden items-center gap-1 lg:flex">
             <Button
               type="button"
@@ -1054,24 +1097,6 @@ export function RentalsAnalyticsClient({
             </Button>
           </div>
 
-          {/* Mobile Date Toggle - Shows modal with date picker */}
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => {
-              const today = new Date().toISOString().split("T")[0];
-              setSelectedDate(today);
-              window.history.pushState({}, "", `/franchize/${slug}/rentals-analytics?date=${today}`);
-            }}
-            disabled={selectedDate === new Date().toISOString().split("T")[0] || loading}
-            className="lg:hidden"
-            style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
-            title="Сегодня"
-          >
-            <RefreshCw style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
-          </Button>
-
           <Button
             type="button"
             variant="outline"
@@ -1100,8 +1125,8 @@ export function RentalsAnalyticsClient({
       </div>
 
       {/* Verification Status Filter */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-        <Filter className="h-4 w-4 shrink-0 text-[var(--fr-analytics-muted)]" />
+      <div className={compactMode ? "flex items-center gap-1 overflow-x-auto no-scrollbar" : "flex items-center gap-2 overflow-x-auto no-scrollbar"}>
+        <Filter className={compactMode ? "h-3 w-3 shrink-0 text-[var(--fr-analytics-muted)]" : "h-4 w-4 shrink-0 text-[var(--fr-analytics-muted)]"} />
         <div className="flex gap-1">
           {VERIFICATION_FILTERS.map((filter) => {
             const Icon = filter.icon;
@@ -1111,15 +1136,22 @@ export function RentalsAnalyticsClient({
                 key={filter.value}
                 type="button"
                 onClick={() => setVerificationFilter(filter.value as typeof verificationFilter)}
-                className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                  isActive
-                    ? "bg-[var(--fr-analytics-accent)] text-white"
-                    : "bg-transparent text-[var(--fr-analytics-muted)] hover:bg-[var(--fr-analytics-accent)]/10"
-                }`}
+                className={compactMode
+                  ? `flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium transition-colors ${
+                      isActive
+                        ? "bg-[var(--fr-analytics-accent)] text-white"
+                        : "bg-transparent text-[var(--fr-analytics-muted)] hover:bg-[var(--fr-analytics-accent)]/10"
+                    }`
+                  : `flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                      isActive
+                        ? "bg-[var(--fr-analytics-accent)] text-white"
+                        : "bg-transparent text-[var(--fr-analytics-muted)] hover:bg-[var(--fr-analytics-accent)]/10"
+                    }`
+                }
                 title={filter.label}
               >
-                <Icon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{filter.label}</span>
+                <Icon className={compactMode ? "h-2.5 w-2.5" : "h-3.5 w-3.5"} />
+                <span className={compactMode ? "hidden lg:inline" : "hidden sm:inline"}>{filter.label}</span>
               </button>
             );
           })}
@@ -1128,27 +1160,27 @@ export function RentalsAnalyticsClient({
 
       {/* Summary Stats - Compact Design */}
       {summary && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className={compactMode ? "grid grid-cols-2 gap-1" : "grid grid-cols-2 gap-3"}>
           <StatCard
-            icon={<FileText className="h-4 w-4" />}
+            icon={<FileText className={compactMode ? "h-3 w-3" : "h-4 w-4"} />}
             label="Всего аренд"
             value={summary.totalCount}
             color="text-[var(--fr-analytics-accent)]"
           />
           <StatCard
-            icon={<CreditCard className="h-4 w-4" />}
+            icon={<CreditCard className={compactMode ? "h-3 w-3" : "h-4 w-4"} />}
             label="Выручка"
             value={formatRubles(summary.totalRevenue)}
             color="text-emerald-500"
           />
           <StatCard
-            icon={<CheckCircle2 className="h-4 w-4" />}
+            icon={<CheckCircle2 className={compactMode ? "h-3 w-3" : "h-4 w-4"} />}
             label="Подтверждённые"
             value={summary.byStatus.confirmed || 0}
             color="text-emerald-500"
           />
           <StatCard
-            icon={<Clock className="h-4 w-4" />}
+            icon={<Clock className={compactMode ? "h-3 w-3" : "h-4 w-4"} />}
             label="Активные"
             value={summary.byStatus.active || 0}
             color="text-blue-500"
@@ -1157,13 +1189,13 @@ export function RentalsAnalyticsClient({
       )}
 
       {/* Checklist Section */}
-      <div className="grid md:grid-cols-2" style={{ gap: "var(--fr-analytics-gap-lg)" }}>
+      <div className="grid md:grid-cols-2" style={{ gap: compactMode ? "var(--fr-analytics-gap-md)" : "var(--fr-analytics-gap-lg)" }}>
         {/* Выдача Checklist */}
         <FranchizeOperatorPanel>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <ListChecks className="h-4 w-4 text-[var(--fr-analytics-accent)]" />
-              <p className="text-sm font-semibold text-[var(--fr-analytics-text)]">
+          <div className={compactMode ? "flex items-center justify-between gap-1" : "flex items-center justify-between gap-3"}>
+            <div className={compactMode ? "flex items-center gap-1" : "flex items-center gap-2"}>
+              <ListChecks className={compactMode ? "h-3 w-3 text-[var(--fr-analytics-accent)]" : "h-4 w-4 text-[var(--fr-analytics-accent)]"} />
+              <p className={compactMode ? "text-[10px] font-semibold text-[var(--fr-analytics-text)]" : "text-sm font-semibold text-[var(--fr-analytics-text)]"}>
                 Выдача
               </p>
             </div>
