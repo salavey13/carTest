@@ -669,21 +669,67 @@ async function generateAndSendContract(
     const docxBuf = Buffer.from(docResult.bytes);
     const docSha256 = docResult.sha256;
 
-    // Generate QR code for 1-click next rent
+    // Generate QR code for 1-click next rent with retry logic
     const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${bike.id}_${docSha256}`;
     const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
 
-    let qrPngBuffer: Buffer | null = null;
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-      const qrRes = await fetch(qrPngUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
-      if (qrRes.ok) {
-        qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
+    /**
+     * Fetch with retry and exponential backoff for transient failures
+     */
+    async function fetchWithRetry(url: string, maxRetries = 3): Promise<Buffer | null> {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const timeoutMs = Math.min(8000, 2000 * attempt); // 2s, 4s, 8s
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+          const response = await fetch(url, { signal: controller.signal });
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const buffer = Buffer.from(await response.arrayBuffer());
+            if (buffer.length > 0) {
+              logger.info(`[/doc] QR generation succeeded on attempt ${attempt}/${maxRetries}`);
+              return buffer;
+            }
+          }
+
+          // Non-OK response (404, 500, etc.)
+          if (attempt === maxRetries) {
+            logger.warn(`[/doc] QR generation failed on attempt ${attempt}/${maxRetries}: HTTP ${response.status}`);
+            return null;
+          }
+
+          // Backoff before retry
+          const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // 1s, 2s, 4s max
+          logger.info(`[/doc] QR generation attempt ${attempt}/${maxRetries} failed, retrying in ${backoffMs}ms`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+
+        } catch (error) {
+          const isAbort = error instanceof Error && error.name === 'AbortError';
+          const isTransient = error instanceof Error && (
+            /timeout/i.test(error.message) ||
+            /fetch failed/i.test(error.message) ||
+            /network/i.test(error.message)
+          );
+
+          if (attempt === maxRetries || !isTransient) {
+            logger.warn(`[/doc] QR generation failed on attempt ${attempt}/${maxRetries}:`, error instanceof Error ? error.message : String(error));
+            return null;
+          }
+
+          // Backoff for transient errors
+          const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          logger.info(`[/doc] QR generation transient error on attempt ${attempt}/${maxRetries}, retrying in ${backoffMs}ms`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+        }
       }
-    } catch (qrErr) {
-      logger.warn("[/doc] QR generation failed, sending DOCX only:", qrErr instanceof Error ? qrErr.message : String(qrErr));
+      return null;
+    }
+
+    const qrPngBuffer = await fetchWithRetry(qrPngUrl, 3);
+    if (!qrPngBuffer) {
+      logger.warn("[/doc] QR generation failed after all retries, sending DOCX only");
     }
 
     // ── Send document + QR via Telegram (direct API, no @/app/actions dependency) ──
@@ -831,13 +877,37 @@ async function generateAndSendContract(
 
 // ── State management ──────────────────────────────────────────────────────────
 
+/**
+ * Set or overwrite doc state for a user.
+ * Always overwrites any existing state - user can only have one active /doc flow at a time.
+ * This is intentional: starting a new /doc flow abandons any previous in-progress draft.
+ */
 async function setDocState(userId: string, state: string, context: DocFlowContext) {
-  await supabaseAdmin.from("user_states").upsert({
-    user_id: userId,
-    state,
-    context,
-    expires_at: new Date(Date.now() + DOC_STATE_EXPIRY_MINUTES * 60 * 1000).toISOString(),
-  });
+  const expiresAt = new Date(Date.now() + DOC_STATE_EXPIRY_MINUTES * 60 * 1000).toISOString();
+
+  // Use upsert with explicit onConflict to ensure overwrite behavior
+  const { error } = await supabaseAdmin
+    .from("user_states")
+    .upsert(
+      {
+        user_id: userId,
+        state,
+        context,
+        expires_at: expiresAt,
+        updated_at: new Date().toISOString(), // Force update timestamp
+      },
+      {
+        onConflict: "user_id", // Explicitly state that user_id is the conflict target
+        ignoreDuplicates: false, // We want to overwrite, not ignore
+      }
+    );
+
+  if (error) {
+    logger.error("[/doc] setDocState upsert failed", { userId, state, error: error.message });
+    throw new Error(`Failed to set doc state: ${error.message}`);
+  }
+
+  logger.info("[/doc] Doc state set/overwritten", { userId, state, expiresAt });
 }
 
 async function clearDocState(userId: string) {

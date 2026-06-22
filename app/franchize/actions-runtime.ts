@@ -1707,9 +1707,25 @@ class FranchizeOrderDocValidationError extends Error {
 }
 
 function formatDateDdMmYyyy(raw: string): string {
-  const value = raw.trim();
+  const value = String(raw || '').trim();
   if (!value) return "";
-  if (/^\d{2}\.\d{2}\.\d{4}$/.test(value)) return value;
+
+  // Already in DD.MM.YYYY format (with 1-2 digit day/month and 4 digit year)
+  if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(value)) {
+    const parts = value.split('.');
+    const day = String(Number(parts[0])).padStart(2, '0');
+    const month = String(Number(parts[1])).padStart(2, '0');
+    return `${day}.${month}.${parts[2]}`;
+  }
+
+  // Try YYYY-MM-DD format
+  const isoMatch = value.match(/^\d{4}-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    const [, month, day] = isoMatch;
+    return `${String(Number(day)).padStart(2, '0')}.${String(Number(month)).padStart(2, '0')}.${value.slice(0, 4)}`;
+  }
+
+  // Fallback: try native Date parsing
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   const day = String(date.getDate()).padStart(2, "0");
@@ -2101,6 +2117,55 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // owner_id IS the Telegram chat ID (user_id === telegram chat_id)
     if (crewRow?.owner_id) {
       recipientSet.add(String(crewRow.owner_id));
+    }
+
+    // ── Persist each bike document to rental_contract_artifacts ────────────────
+    // For audit trail and consistent access across flows
+    for (const doc of bikeDocs) {
+      try {
+        const { error: artifactError } = await supabaseAdmin
+          .schema("private")
+          .from("rental_contract_artifacts")
+          .insert({
+            contract_key: doc.documentKey,
+            original_sha256: doc.sha256,
+            requested_bike_id: null, // Not tracked separately in web flow
+            resolved_bike_id: null, // Not tracked separately in web flow
+            telegram_chat_id: payload.telegramUserId,
+            telegram_message_id: null,
+            renter_full_name: payload.recipient || null,
+            renter_passport: rentalSecrets?.renter_passport || userSensitive.passport || payload.renterPassport || null,
+            renter_passport_issued_by: rentalSecrets?.renter_passport_issued_by || null,
+            renter_passport_issue_date: rentalSecrets?.renter_passport_issue_date || null,
+            renter_registration: rentalSecrets?.renter_registration || null,
+            renter_driver_license: rentalSecrets?.renter_driver_license || userSensitive.driverLicense || payload.renterDriverLicense || null,
+            renter_birth_date: docIdentity.renterBirthDate || null,
+            license_categories: null, // Not collected in web app
+            rent_start_date: rentStartDate || null,
+            rent_end_date: rentEndDate || null,
+            daily_price: null, // Varied per bike
+            deposit_rub: null, // Varied per bike
+            total_sum: payload.totalAmount,
+            template_version: CURRENT_RENTAL_TEMPLATE_VERSION,
+            metadata: {
+              flow_type: flowType,
+              order_id: payload.orderId,
+              file_name: doc.fileName,
+              source: "franchize-web-order",
+            },
+          });
+        if (artifactError) {
+          logger.error("[franchize] Failed to save rental_contract_artifact", {
+            documentKey: doc.documentKey,
+            error: artifactError.message,
+          });
+        }
+      } catch (artifactError) {
+        logger.error("[franchize] Exception saving rental_contract_artifact", {
+          documentKey: doc.documentKey,
+          error: artifactError instanceof Error ? artifactError.message : String(artifactError),
+        });
+      }
     }
 
     // ── Send DOCX for each bike ─────────────────────────────────────────────

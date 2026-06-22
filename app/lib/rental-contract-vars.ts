@@ -253,10 +253,16 @@ function buildEngineSpecLines(bike: BikeSpecs, isElectric: boolean): {
  * Resolve deposit value: explicit override > bike.specs.deposit_rub > default
  */
 function resolveDeposit(rentalPeriod: RentalPeriod, bikeSpecs: BikeSpecs["specs"]): string {
-  if (rentalPeriod.depositOverride && rentalPeriod.depositOverride > 0) {
+  // Validate depositOverride: must be positive finite number
+  if (
+    rentalPeriod.depositOverride != null &&
+    typeof rentalPeriod.depositOverride === "number" &&
+    isFinite(rentalPeriod.depositOverride) &&
+    rentalPeriod.depositOverride > 0
+  ) {
     return String(rentalPeriod.depositOverride);
   }
-  if (bikeSpecs?.deposit_rub) {
+  if (bikeSpecs?.deposit_rub && isFinite(bikeSpecs.deposit_rub) && bikeSpecs.deposit_rub > 0) {
     return String(bikeSpecs.deposit_rub);
   }
   return String(DEFAULT_DEPOSIT);
@@ -292,7 +298,7 @@ function resolveDailyPrice(rentalPeriod: RentalPeriod, bikeSpecs: BikeSpecs["spe
 }
 
 /**
- * Resolve hourly price: rentalPeriod.hourlyPrice > bike.specs.price_per_hour > daily/8
+ * Resolve hourly price: rentalPeriod.hourlyPrice > bike.specs.price_per_hour > daily/8 > default
  */
 function resolveHourlyPrice(rentalPeriod: RentalPeriod, bikeSpecs: BikeSpecs["specs"], dailyPrice: string): string {
   if (rentalPeriod.hourlyPrice && rentalPeriod.hourlyPrice > 0) {
@@ -301,9 +307,13 @@ function resolveHourlyPrice(rentalPeriod: RentalPeriod, bikeSpecs: BikeSpecs["sp
   if (bikeSpecs?.price_per_hour) {
     return String(bikeSpecs.price_per_hour);
   }
-  // Fallback: calculate from daily price
-  const dailyNum = Number(dailyPrice) || 10000;
-  return String(Math.round(dailyNum / 8));
+  // Fallback: calculate from daily price with default safety net
+  const DEFAULT_HOURLY_PRICE = 1250; // ~1/8 of default daily price
+  const dailyNum = Number(dailyPrice);
+  if (dailyNum > 0) {
+    return String(Math.round(dailyNum / 8));
+  }
+  return String(DEFAULT_HOURLY_PRICE);
 }
 
 /**
@@ -325,9 +335,9 @@ function getContractDefault(
  * Calculate rental duration in hours from start/end dates and times
  * Handles both DD.MM.YYYY and YYYY-MM-DD date formats
  *
- * NOTE: Dates are treated as local midnight (no timezone conversion).
- * Time offsets are applied in minutes, so we compute UTC timestamps that
- * represent the local datetime to avoid timezone mixing.
+ * NOTE: Dates and times are treated as local to the user (no timezone conversion).
+ * All timestamps are computed in UTC to ensure consistent arithmetic regardless
+ * of server timezone. This works because we're computing differences, not absolute times.
  */
 function calculateRentalHours(
   startDate: string,
@@ -336,41 +346,49 @@ function calculateRentalHours(
   endTime: string
 ): number {
   const parseDate = (dateStr: string) => {
-    // Try DD.MM.YYYY format first
+    // Try DD.MM.YYYY format first (supports single or double digit day/month)
     const parts = dateStr.split('.');
     if (parts.length === 3) {
       const [d, m, y] = parts.map(Number);
+      // Validate ranges
+      if (d < 1 || d > 31 || m < 1 || m > 12 || y < 1900 || y > 2100) return null;
       return { y, m: m - 1, d };
     }
     // Try YYYY-MM-DD format
     const isoParts = dateStr.split('-');
     if (isoParts.length === 3) {
       const [y, m, d] = isoParts.map(Number);
+      if (d < 1 || d > 31 || m < 1 || m > 12 || y < 1900 || y > 2100) return null;
       return { y, m: m - 1, d };
     }
     return null;
   };
 
   const parseTime = (timeStr: string) => {
-    const parts = timeStr.split(':');
-    if (parts.length !== 2) return 0;
-    const [h, m] = parts.map(Number);
-    return h * 60 + m;
+    // Support HH:MM or H:M format (also HH.MM due to normalizeTime)
+    const parts = String(timeStr || '').replace('.', ':').split(':');
+    if (parts.length !== 2) return { hours: 0, minutes: 0 };
+    const h = Number(parts[0]);
+    const m = Number(parts[1]);
+    if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) {
+      return { hours: 0, minutes: 0 };
+    }
+    return { hours: h, minutes: m };
   };
 
   const startParts = parseDate(startDate);
   const endParts = parseDate(endDate);
   if (!startParts || !endParts) return 0;
 
-  const startMinutes = parseTime(startTime);
-  const endMinutes = parseTime(endTime);
+  const startHourMin = parseTime(startTime);
+  const endHourMin = parseTime(endTime);
 
-  // Create UTC timestamps representing local datetime (no TZ conversion)
-  // Date.UTC returns milliseconds since epoch for UTC date/time
-  const startMs = Date.UTC(startParts.y, startParts.m, startParts.d, 0, startMinutes);
-  const endMs = Date.UTC(endParts.y, endParts.m, endParts.d, 0, endMinutes);
+  // Create UTC timestamps representing local datetime
+  // Date.UTC(y, month, day, hours, minutes, seconds, ms)
+  const startMs = Date.UTC(startParts.y, startParts.m, startParts.d, startHourMin.hours, startHourMin.minutes, 0, 0);
+  const endMs = Date.UTC(endParts.y, endParts.m, endParts.d, endHourMin.hours, endHourMin.minutes, 0, 0);
 
-  // Calculate hours difference
+  // Calculate hours difference (rounded to 0.1 for precision)
   return Math.max(0, Math.round((endMs - startMs) / (1000 * 60 * 60) * 10) / 10);
 }
 

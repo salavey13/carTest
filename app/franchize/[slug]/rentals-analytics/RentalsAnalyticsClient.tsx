@@ -46,12 +46,12 @@ import {
   getRentalsDateRange,
   resendRentalContract,
   getRentalsForExport,
+  validateAnalyticsPassword,
   type RentalDashboardItem,
   type RentalDashboardSummary,
   type RentalDocumentDetail,
 } from "@/app/franchize/server-actions/rentals-dashboard";
 import { useSupabaseRealtime } from "@/app/franchize/hooks/useSupabaseRealtime";
-import { ConnectionStatus } from "./ConnectionStatus";
 import { ExportModal } from "./ExportModal";
 import {
   getAllChecklistStates,
@@ -255,6 +255,14 @@ export function RentalsAnalyticsClient({
   const [exporting, setExporting] = useState(false);
   const [compactMode, setCompactMode] = useState(false);
 
+  // Password-based auth state (for PC access without Telegram)
+  const [showPasswordEntry, setShowPasswordEntry] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [isPasswordValidating, setIsPasswordValidating] = useState(false);
+  const [passwordAuthCrewId, setPasswordAuthCrewId] = useState<string | null>(null);
+  const [passwordAuthOwnerId, setPasswordAuthOwnerId] = useState<string | null>(null);
+
   // Real-time subscriptions for crew_todos and checklist_state
   const todosRealtime = useSupabaseRealtime({
     tableName: "crew_todos",
@@ -286,6 +294,11 @@ export function RentalsAnalyticsClient({
     crew.theme.palette.accentMain,
     crew.theme.palette,
   );
+
+  // Helper: Get effective actor user ID (Telegram auth or password auth)
+  const getActorUserId = useCallback((): string | null => {
+    return dbUser?.user_id || passwordAuthOwnerId;
+  }, [dbUser?.user_id, passwordAuthOwnerId]);
 
   // 🎁 Surprise easter egg - console greeting
   useEffect(() => {
@@ -347,7 +360,8 @@ export function RentalsAnalyticsClient({
 
   // Load rentals for selected date
   const loadRentals = useCallback(async (date: string, showRefresh = false) => {
-    if (!dbUser?.user_id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
 
     if (showRefresh) {
       setRefreshing(true);
@@ -358,9 +372,9 @@ export function RentalsAnalyticsClient({
     try {
       const result = await getRentalsDashboard({
         slug,
-        actorUserId: dbUser.user_id,
+        actorUserId,
         date,
-        verificationStatus: verificationFilter === "all" ? undefined : verificationFilter,
+        verificationStatus: verificationFilter === "all" ? undefined : verificationStatus,
       });
 
       if (!result.success) {
@@ -377,16 +391,17 @@ export function RentalsAnalyticsClient({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [dbUser?.user_id, slug, verificationFilter]);
+  }, [getActorUserId, slug, verificationFilter]);
 
   // Load rental document details
   const loadRentalDetails = useCallback(async (rentalId: string) => {
-    if (!dbUser?.user_id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
 
     setLoadingDetails(true);
     try {
       const result = await getRentalDocumentDetails({
-        actorUserId: dbUser.user_id,
+        actorUserId,
         rentalId,
       });
 
@@ -402,16 +417,17 @@ export function RentalsAnalyticsClient({
     } finally {
       setLoadingDetails(false);
     }
-  }, [dbUser?.user_id]);
+  }, [getActorUserId]);
 
   // Load date range
   const loadDateRange = useCallback(async () => {
-    if (!dbUser?.user_id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
 
     try {
       const result = await getRentalsDateRange({
         slug,
-        actorUserId: dbUser.user_id,
+        actorUserId,
       });
 
       if (result.success && result.data) {
@@ -423,15 +439,16 @@ export function RentalsAnalyticsClient({
       console.error("[RentalsAnalytics] Date range error:", error);
       toast.error("Ошибка загрузки диапазона дат");
     }
-  }, [dbUser?.user_id, slug]);
+  }, [getActorUserId, slug]);
 
   // Load checklist states
   const loadChecklistStates = useCallback(async () => {
-    if (!dbUser?.user_id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
 
     try {
       const result = await getAllChecklistStates({
-        actorUserId: dbUser.user_id,
+        actorUserId,
       });
 
       if (result.success && result.data) {
@@ -443,27 +460,28 @@ export function RentalsAnalyticsClient({
       console.error("[RentalsAnalytics] Checklist load error:", error);
       toast.error("Ошибка загрузки чеклистов");
     }
-  }, [dbUser?.user_id]);
+  }, [getActorUserId]);
 
   // Load crew todos
   const loadTodos = useCallback(async () => {
-    if (!dbUser?.user_id || !crew.id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId || !crew.id) return;
 
     setLoadingTodos(true);
     try {
       const [todosResult, statsResult, membersResult] = await Promise.all([
         getCrewTodos({
-          actorUserId: dbUser.user_id,
+          actorUserId,
           crewId: crew.id,
           status: todoFilter === "all" ? undefined : todoFilter,
           assignedTo: todoAssigneeFilter === "all" ? undefined : todoAssigneeFilter,
         }),
         getCrewTodoStats({
-          actorUserId: dbUser.user_id,
+          actorUserId,
           crewId: crew.id,
         }),
         getCrewMembersForTodos({
-          actorUserId: dbUser.user_id,
+          actorUserId,
           crewId: crew.id,
         }),
       ]);
@@ -482,11 +500,12 @@ export function RentalsAnalyticsClient({
     } finally {
       setLoadingTodos(false);
     }
-  }, [dbUser?.user_id, crew.id, todoFilter, todoAssigneeFilter]);
+  }, [getActorUserId, crew.id, todoFilter, todoAssigneeFilter]);
 
   // Create todo
   const handleCreateTodo = useCallback(async () => {
-    if (!dbUser?.user_id || !crew.id || !newTodoTitle.trim()) {
+    const actorUserId = getActorUserId();
+    if (!actorUserId || !crew.id || !newTodoTitle.trim()) {
       toast.error("Введите название задачи");
       return;
     }
@@ -494,7 +513,7 @@ export function RentalsAnalyticsClient({
     setCreatingTodo(true);
     try {
       const result = await createCrewTodo({
-        actorUserId: dbUser.user_id,
+        actorUserId,
         todo: {
           crewId: crew.id,
           assignedTo: newTodoAssignedTo,
@@ -523,15 +542,16 @@ export function RentalsAnalyticsClient({
     } finally {
       setCreatingTodo(false);
     }
-  }, [dbUser?.user_id, crew.id, newTodoTitle, newTodoDescription, newTodoCategory, newTodoPriority, newTodoAssignedTo, loadTodos]);
+  }, [getActorUserId, crew.id, newTodoTitle, newTodoDescription, newTodoCategory, newTodoPriority, newTodoAssignedTo, loadTodos]);
 
   // Update todo status
   const updateTodoStatus = useCallback(async (todo: CrewTodo, newStatus: TodoStatus) => {
-    if (!dbUser?.user_id || !crew.id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId || !crew.id) return;
 
     try {
       const result = await updateCrewTodo({
-        actorUserId: dbUser.user_id,
+        actorUserId,
         crewId: crew.id,
         todo: {
           id: todo.id,
@@ -548,15 +568,16 @@ export function RentalsAnalyticsClient({
       console.error("[RentalsAnalytics] Update todo error:", error);
       toast.error("Ошибка обновления задачи");
     }
-  }, [dbUser?.user_id, crew.id, loadTodos]);
+  }, [getActorUserId, crew.id, loadTodos]);
 
   // Delete todo
   const handleDeleteTodo = useCallback(async (todoId: string) => {
-    if (!dbUser?.user_id || !crew.id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId || !crew.id) return;
 
     try {
       const result = await deleteCrewTodo({
-        actorUserId: dbUser.user_id,
+        actorUserId,
         crewId: crew.id,
         todoId,
       });
@@ -571,11 +592,12 @@ export function RentalsAnalyticsClient({
       console.error("[RentalsAnalytics] Delete todo error:", error);
       toast.error("Ошибка удаления задачи");
     }
-  }, [dbUser?.user_id, crew.id, loadTodos]);
+  }, [getActorUserId, crew.id, loadTodos]);
 
   // Toggle checklist item
   const toggleChecklistItem = useCallback(async (type: "handout" | "return", itemId: string) => {
-    if (!dbUser?.user_id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
 
     const currentState = checklistStates[type];
     if (!currentState) return;
@@ -587,7 +609,7 @@ export function RentalsAnalyticsClient({
       );
 
       const result = await updateChecklistState({
-        actorUserId: dbUser.user_id,
+        actorUserId,
         type,
         items: updatedItems,
         action: "toggle",
@@ -607,16 +629,17 @@ export function RentalsAnalyticsClient({
     } finally {
       setUpdatingChecklist(null);
     }
-  }, [dbUser?.user_id, checklistStates]);
+  }, [getActorUserId, checklistStates]);
 
   // Reset checklist
   const resetChecklist = useCallback(async (type: "handout" | "return") => {
-    if (!dbUser?.user_id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
 
     setUpdatingChecklist(type);
     try {
       const result = await resetChecklistState({
-        actorUserId: dbUser.user_id,
+        actorUserId,
         type,
       });
 
@@ -635,28 +658,97 @@ export function RentalsAnalyticsClient({
     } finally {
       setUpdatingChecklist(null);
     }
-  }, [dbUser?.user_id]);
+  }, [getActorUserId]);
 
   // Initial load
   useEffect(() => {
-    if (dbUser?.user_id) {
+    const actorUserId = getActorUserId();
+    if (actorUserId) {
+      // Have auth (Telegram or password) - load data
       void loadRentals(selectedDate);
       void loadDateRange();
       void loadChecklistStates();
       void loadTodos();
+    } else if (!dbUser?.user_id) {
+      // No Telegram auth - check for password auth in session storage
+      const storedCrewId = sessionStorage.getItem("analytics-password-crew-id");
+      const storedOwnerId = sessionStorage.getItem("analytics-password-owner-id");
+      const storedSlug = sessionStorage.getItem("analytics-password-slug");
+      if (storedCrewId && storedSlug === slug) {
+        setPasswordAuthCrewId(storedCrewId);
+        setPasswordAuthOwnerId(storedOwnerId);
+        setShowPasswordEntry(false);
+        // Password auth is active - load data
+        void loadRentals(selectedDate);
+        void loadDateRange();
+        void loadChecklistStates();
+        void loadTodos();
+      } else {
+        setShowPasswordEntry(true);
+        setLoading(false);
+      }
     }
-  }, [dbUser?.user_id, selectedDate, loadRentals, loadDateRange, loadChecklistStates, loadTodos]);
+  }, [dbUser?.user_id, getActorUserId, selectedDate, loadRentals, loadDateRange, loadChecklistStates, loadTodos, slug]);
 
   // Reload when verification filter changes
   useEffect(() => {
-    if (dbUser?.user_id) {
+    const actorUserId = getActorUserId();
+    if (actorUserId) {
       void loadRentals(selectedDate);
     }
-  }, [verificationFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [verificationFilter, getActorUserId, selectedDate, loadRentals]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Password validation handler
+  const handlePasswordSubmit = useCallback(async () => {
+    if (!passwordInput.trim()) {
+      setPasswordError("Введите пароль");
+      return;
+    }
+
+    setIsPasswordValidating(true);
+    setPasswordError(null);
+
+    try {
+      const result = await validateAnalyticsPassword({ password: passwordInput.trim() });
+
+      if (!result.success || !result.slug) {
+        setPasswordError(result.error || "Неверный пароль");
+        return;
+      }
+
+      // Password valid - store auth and load data
+      setPasswordAuthCrewId(result.crewId || null);
+      setPasswordAuthOwnerId(result.ownerId || null);
+      sessionStorage.setItem("analytics-password-crew-id", result.crewId || "");
+      sessionStorage.setItem("analytics-password-owner-id", result.ownerId || "");
+      sessionStorage.setItem("analytics-password-slug", result.slug || "");
+      setShowPasswordEntry(false);
+      setLoading(true);
+
+      // Load data with password auth
+      void loadRentals(selectedDate);
+      void loadDateRange();
+      void loadChecklistStates();
+      void loadTodos();
+    } catch (error) {
+      console.error("[RentalsAnalytics] Password validation error:", error);
+      setPasswordError("Ошибка проверки пароля");
+    } finally {
+      setIsPasswordValidating(false);
+    }
+  }, [passwordInput, selectedDate, loadRentals, loadDateRange, loadChecklistStates, loadTodos]);
+
+  // Handle Enter key in password input
+  const handlePasswordKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      void handlePasswordSubmit();
+    }
+  }, [handlePasswordSubmit]);
 
   // Resend contract handler
   const handleResendContract = useCallback(async (rental: RentalDashboardItem) => {
-    if (!dbUser?.user_id || !rental.documentSecret?.doc_sha256) {
+    const actorUserId = getActorUserId();
+    if (!actorUserId || !rental.documentSecret?.doc_sha256) {
       toast.error("QR код недоступен для этой аренды");
       return;
     }
@@ -673,7 +765,7 @@ export function RentalsAnalyticsClient({
       }
 
       const result = await resendRentalContract({
-        actorUserId: dbUser.user_id,
+        actorUserId,
         rentalId: rental.rental_id,
         telegramChatId: chatIdToSend,
       });
@@ -690,7 +782,7 @@ export function RentalsAnalyticsClient({
     } finally {
       setResending(null);
     }
-  }, [dbUser?.user_id]);
+  }, [getActorUserId]);
 
   // Navigate date
   const navigateDate = useCallback((days: number) => {
@@ -727,13 +819,14 @@ export function RentalsAnalyticsClient({
 
   // Export handler
   const handleExport = useCallback(async (startDate: string, endDate: string) => {
-    if (!dbUser?.user_id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
 
     setExporting(true);
     try {
       const result = await getRentalsForExport({
         slug,
-        actorUserId: dbUser.user_id,
+        actorUserId,
         startDate,
         endDate,
       });
@@ -779,7 +872,7 @@ export function RentalsAnalyticsClient({
     } finally {
       setExporting(false);
     }
-  }, [dbUser?.user_id, slug]);
+  }, [getActorUserId, slug]);
 
   // Get status config
   const getStatusConfig = (status: string) => {
@@ -791,6 +884,101 @@ export function RentalsAnalyticsClient({
   };
 
   if (authLoading) return <Loading text="Загружаем данные..." compact />;
+
+  // Password entry screen (for PC access without Telegram)
+  if (showPasswordEntry) {
+    return (
+      <div
+        className="flex min-h-[400px] items-center justify-center"
+        style={{
+          ["--fr-analytics-accent" as string]: crew.theme.palette.accentMain,
+          ["--fr-analytics-border" as string]: crew.theme.palette.borderSoft,
+          ["--fr-analytics-text" as string]: crew.theme.palette.textPrimary,
+          ["--fr-analytics-muted" as string]: crew.theme.palette.textSecondary,
+          ["--fr-analytics-bg-card" as string]: crew.theme.palette.bgCard,
+          ["--fr-analytics-bg-base" as string]: crew.theme.palette.bgBase,
+        }}
+      >
+        <div
+          className="w-full max-w-md rounded-2xl border p-8 shadow-lg"
+          style={{
+            borderColor: "var(--fr-analytics-border)",
+            backgroundColor: "var(--fr-analytics-bg-card)",
+          }}
+        >
+          <div className="mb-6 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2">
+              <ShieldCheck className="h-8 w-8" style={{ color: "var(--fr-analytics-accent)" }} />
+            </div>
+            <h1 className="text-2xl font-semibold" style={{ color: "var(--fr-analytics-text)" }}>
+              Аналитика аренд
+            </h1>
+            <p className="mt-2 text-sm" style={{ color: "var(--fr-analytics-muted)" }}>
+              Введите пароль для доступа
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => {
+                  setPasswordInput(e.target.value);
+                  setPasswordError(null);
+                }}
+                onKeyDown={handlePasswordKeyDown}
+                placeholder="Пароль"
+                disabled={isPasswordValidating}
+                className="w-full rounded-lg border px-4 py-3 text-sm focus:outline-none focus:ring-2"
+                style={{
+                  borderColor: passwordError
+                    ? "rgb(239, 68, 68)"
+                    : "var(--fr-analytics-border)",
+                  backgroundColor: "var(--fr-analytics-bg-base)",
+                  color: "var(--fr-analytics-text)",
+                  ringColor: "var(--fr-analytics-accent)",
+                }}
+                autoFocus
+              />
+              {passwordError && (
+                <p className="mt-2 text-xs text-rose-500">{passwordError}</p>
+              )}
+            </div>
+
+            <Button
+              type="button"
+              onClick={handlePasswordSubmit}
+              disabled={isPasswordValidating || !passwordInput.trim()}
+              className="w-full"
+              style={{
+                backgroundColor: "var(--fr-analytics-accent)",
+                color: crew.theme.palette.accentMainHover || "white",
+              }}
+            >
+              {isPasswordValidating ? (
+                <span className="flex items-center justify-center gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Проверка...
+                </span>
+              ) : (
+                "Войти"
+              )}
+            </Button>
+
+            <div className="rounded-lg border p-3 text-center" style={{ borderColor: "var(--fr-analytics-border)" }}>
+              <p className="text-xs" style={{ color: "var(--fr-analytics-muted)" }}>
+                Формат дневного пароля: <code className="rounded bg-[var(--fr-analytics-accent)]/10 px-1.5 py-0.5">vip-bike-ГГГГ-ММ-ДД</code>
+              </p>
+              <p className="mt-1 text-xs" style={{ color: "var(--fr-analytics-muted)" }}>
+                Например: <code className="rounded bg-[var(--fr-analytics-accent)]/10 px-1.5 py-0.5">vip-bike-{new Date().toISOString().split("T")[0]}</code>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Compact mode CSS variables
   const compactVars = {
@@ -811,7 +999,7 @@ export function RentalsAnalyticsClient({
 
   return (
     <div
-      className="space-y-4"
+      className="space-y-3 sm:space-y-4"
       style={{
         ["--fr-analytics-accent" as string]: crew.theme.palette.accentMain,
         ["--fr-analytics-accent-hover" as string]: crew.theme.palette.accentMainHover,
@@ -823,56 +1011,59 @@ export function RentalsAnalyticsClient({
         ...compactVars,
       }}
     >
-      {/* Header */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        {/* Title */}
-        <div className="flex-1">
-          <h1 className="font-semibold text-[var(--fr-analytics-text)]" style={{ fontSize: "var(--fr-analytics-text-base)" }}>
+      {/* Header - Responsive Layout */}
+      <div className="flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-center lg:justify-between">
+        {/* Title Section */}
+        <div className="flex items-center gap-2">
+          <h1 className="text-base font-semibold text-[var(--fr-analytics-text)] sm:text-lg lg:text-xl">
             Аренды за день
           </h1>
-        </div>
-
-        {/* Connection Status - Sticky indicator in corner */}
-        <div className="fixed bottom-4 right-4 z-40 flex items-center gap-1 rounded-full bg-[var(--fr-analytics-bg-card)] border border-[var(--fr-analytics-border)] px-3 py-1.5 shadow-lg">
-          <ConnectionStatus status={todosRealtime.state.status === "connected" && checklistRealtime.state.status === "connected" ? "connected" : "connecting"} compact />
-          <span className="text-[10px] text-[var(--fr-analytics-muted)]">
-            {todosRealtime.state.status === "connected" && checklistRealtime.state.status === "connected" ? "Live" : "Reconnecting..."}
-          </span>
-        </div>
-
-        {/* Date Picker - Compact */}
-        <div className="flex items-center gap-1 md:gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => navigateDate(-1)}
-            disabled={!dateRange || selectedDate <= dateRange.minDate || loading}
-            className="h-8 w-8 md:h-9 md:w-9"
-            style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
-          >
-            <ChevronLeft style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
-          </Button>
-
-          <div className="flex items-center rounded-lg border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)]" style={{ gap: "var(--fr-analytics-gap-sm)", padding: "var(--fr-analytics-padding-md)" }}>
-            <Calendar className="text-[var(--fr-analytics-muted)]" style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
-            <span className="font-medium text-[var(--fr-analytics-text)]" style={{ fontSize: "var(--fr-analytics-text-sm)" }}>
+          {/* Date Badge - Mobile */}
+          <div className="hidden rounded-lg border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)] px-2 py-1 sm:flex lg:hidden">
+            <Calendar className="h-3.5 w-3.5 text-[var(--fr-analytics-muted)]" />
+            <span className="ml-1.5 text-xs font-medium text-[var(--fr-analytics-text)]">
               {formatRussianDateOnly(selectedDate)}
             </span>
           </div>
+        </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => navigateDate(1)}
-            disabled={!dateRange || selectedDate >= dateRange.maxDate || loading}
-            className="h-8 w-8 md:h-9 md:w-9"
-            style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
-          >
-            <ChevronRight style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
-          </Button>
+        {/* Controls Bar - Responsive */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:gap-2 lg:pb-0 lg:overflow-visible">
+          {/* Date Navigation - Hidden on mobile (shown in title) */}
+          <div className="hidden items-center gap-1 lg:flex">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => navigateDate(-1)}
+              disabled={!dateRange || selectedDate <= dateRange.minDate || loading}
+              className="h-8 w-8"
+              style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
+            >
+              <ChevronLeft style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
+            </Button>
 
+            <div className="flex items-center rounded-lg border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)]" style={{ gap: "var(--fr-analytics-gap-sm)", padding: "var(--fr-analytics-padding-md)" }}>
+              <Calendar className="text-[var(--fr-analytics-muted)]" style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
+              <span className="font-medium text-[var(--fr-analytics-text)]" style={{ fontSize: "var(--fr-analytics-text-sm)" }}>
+                {formatRussianDateOnly(selectedDate)}
+              </span>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => navigateDate(1)}
+              disabled={!dateRange || selectedDate >= dateRange.maxDate || loading}
+              className="h-8 w-8"
+              style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
+            >
+              <ChevronRight style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
+            </Button>
+          </div>
+
+          {/* Mobile Date Toggle - Shows modal with date picker */}
           <Button
             type="button"
             variant="outline"
@@ -880,14 +1071,10 @@ export function RentalsAnalyticsClient({
             onClick={() => {
               const today = new Date().toISOString().split("T")[0];
               setSelectedDate(today);
-              window.history.pushState(
-                {},
-                "",
-                `/franchize/${slug}/rentals-analytics?date=${today}`,
-              );
+              window.history.pushState({}, "", `/franchize/${slug}/rentals-analytics?date=${today}`);
             }}
             disabled={selectedDate === new Date().toISOString().split("T")[0] || loading}
-            className="h-8 w-8 md:h-9 md:w-9"
+            className="lg:hidden"
             style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
             title="Сегодня"
           >
@@ -900,7 +1087,7 @@ export function RentalsAnalyticsClient({
             size="icon"
             onClick={() => setShowExportModal(true)}
             disabled={!dateRange}
-            className="h-8 w-8 md:h-9 md:w-9"
+            className="h-8 w-8"
             style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
             title="Экспорт в Excel"
           >
@@ -912,12 +1099,8 @@ export function RentalsAnalyticsClient({
             variant={compactMode ? "default" : "outline"}
             size="icon"
             onClick={() => setCompactMode(!compactMode)}
-            className="h-8 w-8 md:h-9 md:w-9"
-            style={{
-              width: "var(--fr-analytics-btn-size)",
-              height: "var(--fr-analytics-btn-size)",
-              ...(compactMode ? { backgroundColor: "var(--fr-analytics-accent)", color: "white" } : {})
-            }}
+            className="h-8 w-8"
+            style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
             title={compactMode ? "Обычный режим" : "Компактный режим"}
           >
             <Monitor style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
