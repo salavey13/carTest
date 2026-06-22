@@ -752,10 +752,6 @@ export async function getRentalsForExport(input: {
   // Checklist status
   checklist_status: string;
   checklist_updated_at: string | null;
-  // Todo count (by status)
-  todos_pending: number;
-  todos_in_progress: number;
-  todos_done: number;
   // Document verification
   document_verified: boolean;
 }> | null; error?: string }> {
