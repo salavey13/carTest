@@ -43,6 +43,9 @@ export function ExportModal({
     }
   };
 
+  // Validate date range
+  const isDateRangeValid = startDate && endDate && new Date(startDate) <= new Date(endDate);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
@@ -90,6 +93,12 @@ export function ExportModal({
             />
           </div>
 
+          {!isDateRangeValid && startDate && endDate && (
+            <p className="text-xs text-rose-500">
+              Дата начала должна быть раньше даты конца
+            </p>
+          )}
+
           <div className="flex justify-end gap-2 pt-4">
             <Button
               type="button"
@@ -102,7 +111,7 @@ export function ExportModal({
             <Button
               type="button"
               onClick={handleExport}
-              disabled={exporting || !startDate || !endDate}
+              disabled={exporting || !isDateRangeValid}
             >
               {exporting ? (
                 <span>Экспорт...</span>

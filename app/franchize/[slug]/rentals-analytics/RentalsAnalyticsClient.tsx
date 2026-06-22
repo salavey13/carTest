@@ -676,9 +676,6 @@ export function RentalsAnalyticsClient({
         "Клиент": row.user_full_name || row.user_username || `ID: ${row.rental_id.slice(0, 8)}`,
         "Чеклист": row.checklist_status === "not_started" ? "Не начат" : row.checklist_status,
         "Чеклист обновлен": formatRussianDate(row.checklist_updated_at),
-        "Задачи ожидают": row.todos_pending,
-        "Задачи в работе": row.todos_in_progress,
-        "Задачи выполнено": row.todos_done,
         "Документ проверен": row.document_verified ? "Да" : "Нет",
       }));
 

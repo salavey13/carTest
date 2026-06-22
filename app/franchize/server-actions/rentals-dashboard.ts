@@ -839,35 +839,23 @@ export async function getRentalsForExport(input: {
     const rentalIds = rentals.map(r => r.rental_id);
     const vehicleIds = [...new Set(rentals.map(r => r.vehicle_id))];
 
-    const { data: checklistStates } = await supabaseAdmin
-      .from("checklist_state")
-      .select("vehicle_id, status, updated_at")
-      .in("vehicle_id", vehicleIds);
+    // Run all queries in parallel for better performance
+    const [checklistStates, secrets] = await Promise.all([
+      supabaseAdmin
+        .from("checklist_state")
+        .select("vehicle_id, status, updated_at")
+        .in("vehicle_id", vehicleIds),
+      privateSchema()
+        .from("user_rental_secrets")
+        .select("source_rental_id, verification_status")
+        .in("source_rental_id", rentalIds),
+    ]);
 
-    const checklistMap = new Map(checklistStates?.map(c => [c.vehicle_id, c]) || []);
-
-    // Get document verification status for rentals
-    const { data: secrets } = await privateSchema()
-      .from("user_rental_secrets")
-      .select("source_rental_id, verification_status")
-      .in("source_rental_id", rentalIds);
+    const checklistMap = new Map(checklistStates.data?.map(c => [c.vehicle_id, c]) || []);
 
     const verifiedSet = new Set(
-      secrets?.filter(s => s.verification_status === "verified").map(s => s.source_rental_id) || []
+      secrets.data?.filter(s => s.verification_status === "verified").map(s => s.source_rental_id) || []
     );
-
-    // Get todo counts by status for this crew
-    const { data: todos } = await supabaseAdmin
-      .from("crew_todos")
-      .select("status")
-      .eq("crew_id", crew.id);
-
-    const todoStats = { pending: 0, in_progress: 0, done: 0 };
-    for (const todo of todos || []) {
-      if (todo.status === "pending") todoStats.pending++;
-      else if (todo.status === "in_progress") todoStats.in_progress++;
-      else if (todo.status === "done") todoStats.done++;
-    }
 
     // Build export data
     const exportData = rentals.map((rental: any) => {
@@ -892,9 +880,6 @@ export async function getRentalsForExport(input: {
         user_username: user?.username,
         checklist_status: checklist?.status || "not_started",
         checklist_updated_at: checklist?.updated_at || null,
-        todos_pending: todoStats.pending,
-        todos_in_progress: todoStats.in_progress,
-        todos_done: todoStats.done,
         document_verified: verifiedSet.has(rental.rental_id),
       };
     });
