@@ -116,7 +116,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions) {
       window.removeEventListener("online", handleOnline);
       disconnect();
     };
-  }, [subscribe, disconnect, state.status]);
+  }, [subscribe, disconnect]);
 
   return { state, disconnect, reconnect: subscribe };
 }
