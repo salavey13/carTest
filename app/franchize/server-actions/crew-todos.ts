@@ -29,24 +29,31 @@ interface CrewTodoDBRow {
   created_by: string | null;
   updated_at: string;
   completed_at: string | null;
-  assigned_to_user?: Array<{
+  created_by_user?: {
     user_id: string;
     full_name: string | null;
     username: string | null;
-  }>;
-  created_by_user?: Array<{
-    user_id: string;
-    full_name: string | null;
-    username: string | null;
-  }>;
+  };
 }
 
 // Helper to convert DB row to clean type
-function toCrewTodo(row: CrewTodoDBRow): CrewTodo {
+function toCrewTodo(row: CrewTodoDBRow, assigneeUser?: { full_name: string | null; username: string | null }): CrewTodo {
   return {
-    ...row,
-    assigned_to_user: row.assigned_to_user?.[0] || null,
-    created_by_user: row.created_by_user?.[0] || null,
+    id: row.id,
+    crew_id: row.crew_id,
+    assigned_to: row.assigned_to,
+    title: row.title,
+    description: row.description,
+    category: row.category,
+    status: row.status,
+    priority: row.priority,
+    due_date: row.due_date,
+    created_at: row.created_at,
+    created_by: row.created_by,
+    updated_at: row.updated_at,
+    completed_at: row.completed_at,
+    assigned_to_user: assigneeUser ? { user_id: row.assigned_to || "", ...assigneeUser } : null,
+    created_by_user: row.created_by_user,
   };
 }
 
@@ -61,6 +68,7 @@ export async function getCrewTodos(input: {
   status?: TodoStatus | "all";
   assignedTo?: string | "all";
   category?: string | "all";
+  isPasswordAuth?: boolean;
 }): Promise<{ success: boolean; data?: CrewTodo[]; error?: string }> {
   try {
     const parsed = z.object({
@@ -69,35 +77,37 @@ export async function getCrewTodos(input: {
       status: z.enum(["pending", "in_progress", "done", "all"]).optional(),
       assignedTo: z.string().optional(),
       category: z.string().optional(),
+      isPasswordAuth: z.boolean().optional(),
     }).safeParse(input);
 
     if (!parsed.success) {
       return { success: false, error: "Некорректный запрос." };
     }
 
-    const { actorUserId, crewId, status, assignedTo, category } = parsed.data;
+    const { actorUserId, crewId, status, assignedTo, category, isPasswordAuth = false } = parsed.data;
 
-    // Password auth bypass: check if user exists. If not, assume password auth.
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("user_id")
-      .eq("user_id", actorUserId)
-      .maybeSingle();
-
-    if (user) {
-      // User exists - verify crew membership
-      const { data: memberCheck } = await supabaseAdmin
-        .from("crew_members")
-        .select("role")
-        .eq("crew_id", crewId)
+    // Password auth bypass - grant full access
+    if (!isPasswordAuth) {
+      // Telegram auth: verify crew membership
+      const { data: user } = await supabaseAdmin
+        .from("users")
+        .select("user_id")
         .eq("user_id", actorUserId)
         .maybeSingle();
 
-      if (!memberCheck) {
-        return { success: false, error: "Нет доступа к экипажу." };
+      if (user) {
+        const { data: memberCheck } = await supabaseAdmin
+          .from("crew_members")
+          .select("role")
+          .eq("crew_id", crewId)
+          .eq("user_id", actorUserId)
+          .maybeSingle();
+
+        if (!memberCheck) {
+          return { success: false, error: "Нет доступа к экипажу." };
+        }
       }
     }
-    // If no user found, assume password auth - grant access
 
     let query = supabaseAdmin
       .from("crew_todos")
@@ -115,11 +125,6 @@ export async function getCrewTodos(input: {
         created_by,
         updated_at,
         completed_at,
-        assigned_to_user:users!crew_todos_assigned_to_fkey (
-          user_id,
-          full_name,
-          username
-        ),
         created_by_user:users!crew_todos_created_by_fkey (
           user_id,
           full_name,
@@ -156,7 +161,28 @@ export async function getCrewTodos(input: {
       return { success: false, error: error.message };
     }
 
-    return { success: true, data: (data || []).map(toCrewTodo) };
+    // Get assignee users separately to avoid relationship errors
+    const assigneeIds = [...new Set((data || []).map(t => t.assigned_to).filter(Boolean))] as string[];
+    const assigneesMap = new Map<string, { full_name: string | null; username: string | null }>();
+
+    if (assigneeIds.length > 0) {
+      const { data: assignees } = await supabaseAdmin
+        .from("users")
+        .select("user_id, full_name, username")
+        .in("user_id", assigneeIds);
+
+      for (const a of assignees || []) {
+        assigneesMap.set(a.user_id, { full_name: a.full_name, username: a.username });
+      }
+    }
+
+    return {
+      success: true,
+      data: (data || []).map(row => toCrewTodo(
+        row as CrewTodoDBRow,
+        row.assigned_to ? assigneesMap.get(row.assigned_to) : undefined
+      )),
+    };
   } catch (error) {
     console.error("[get-crew-todos] Error:", error);
     return {
@@ -172,37 +198,41 @@ export async function getCrewTodos(input: {
 export async function getCrewMembersForTodos(input: {
   actorUserId: string;
   crewId: string;
+  isPasswordAuth?: boolean;
 }): Promise<{ success: boolean; data?: Array<{ user_id: string; full_name: string | null; username: string | null }>; error?: string }> {
   try {
     const parsed = z.object({
       actorUserId: z.string().trim().min(1),
       crewId: z.string().trim().min(1),
+      isPasswordAuth: z.boolean().optional(),
     }).safeParse(input);
 
     if (!parsed.success) {
       return { success: false, error: "Некорректный запрос." };
     }
 
-    const { actorUserId, crewId } = parsed.data;
+    const { actorUserId, crewId, isPasswordAuth = false } = parsed.data;
 
-    // Password auth bypass
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("user_id")
-      .eq("user_id", actorUserId)
-      .maybeSingle();
-
-    if (user) {
-      // User exists - verify crew membership
-      const { data: memberCheck } = await supabaseAdmin
-        .from("crew_members")
-        .select("role")
-        .eq("crew_id", crewId)
+    // Password auth bypass - grant full access
+    if (!isPasswordAuth) {
+      // Telegram auth: verify crew membership
+      const { data: user } = await supabaseAdmin
+        .from("users")
+        .select("user_id")
         .eq("user_id", actorUserId)
         .maybeSingle();
 
-      if (!memberCheck) {
-        return { success: false, error: "Нет доступа к экипажу." };
+      if (user) {
+        const { data: memberCheck } = await supabaseAdmin
+          .from("crew_members")
+          .select("role")
+          .eq("crew_id", crewId)
+          .eq("user_id", actorUserId)
+          .maybeSingle();
+
+        if (!memberCheck) {
+          return { success: false, error: "Нет доступа к экипажу." };
+        }
       }
     }
 
@@ -239,6 +269,7 @@ export async function getCrewMembersForTodos(input: {
 export async function createCrewTodo(input: {
   actorUserId: string;
   todo: CreateTodoInput;
+  isPasswordAuth?: boolean;
 }): Promise<{ success: boolean; data?: CrewTodo; error?: string }> {
   try {
     const parsed = z.object({
@@ -252,32 +283,35 @@ export async function createCrewTodo(input: {
         priority: z.enum(["low", "medium", "high"]).default("medium"),
         dueDate: z.string().optional(),
       }),
+      isPasswordAuth: z.boolean().optional(),
     }).safeParse(input);
 
     if (!parsed.success) {
       return { success: false, error: "Некорректный запрос." };
     }
 
-    const { actorUserId, todo } = parsed.data;
+    const { actorUserId, todo, isPasswordAuth = false } = parsed.data;
 
-    // Password auth bypass
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("user_id")
-      .eq("user_id", actorUserId)
-      .maybeSingle();
-
-    if (user) {
-      // User exists - verify crew membership
-      const { data: memberCheck } = await supabaseAdmin
-        .from("crew_members")
-        .select("role")
-        .eq("crew_id", todo.crewId)
+    // Password auth bypass - grant full access
+    if (!isPasswordAuth) {
+      // Telegram auth: verify crew membership
+      const { data: user } = await supabaseAdmin
+        .from("users")
+        .select("user_id")
         .eq("user_id", actorUserId)
         .maybeSingle();
 
-      if (!memberCheck) {
-        return { success: false, error: "Нет доступа к созданию задач." };
+      if (user) {
+        const { data: memberCheck } = await supabaseAdmin
+          .from("crew_members")
+          .select("role")
+          .eq("crew_id", todo.crewId)
+          .eq("user_id", actorUserId)
+          .maybeSingle();
+
+        if (!memberCheck) {
+          return { success: false, error: "Нет доступа к созданию задач." };
+        }
       }
     }
 
@@ -326,25 +360,34 @@ export async function createCrewTodo(input: {
         created_by,
         updated_at,
         completed_at,
-        assigned_to_user:users!crew_todos_assigned_to_fkey (
-          user_id,
-          full_name,
-          username
-        ),
         created_by_user:users!crew_todos_created_by_fkey (
           user_id,
           full_name,
           username
         )
       `)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error("[create-crew-todo] Insert error:", error);
       return { success: false, error: error.message };
     }
 
-    return { success: true, data: toCrewTodo(data as CrewTodoDBRow) };
+    // Get assignee user if any
+    let assigneeUser;
+    if (newTodo.assigned_to) {
+      const { data: assignee } = await supabaseAdmin
+        .from("users")
+        .select("full_name, username")
+        .eq("user_id", newTodo.assigned_to)
+        .maybeSingle();
+      assigneeUser = assignee;
+    }
+
+    return {
+      success: true,
+      data: data ? toCrewTodo(data as CrewTodoDBRow, assigneeUser) : undefined,
+    };
   } catch (error) {
     console.error("[create-crew-todo] Error:", error);
     return {
@@ -361,6 +404,7 @@ export async function updateCrewTodo(input: {
   actorUserId: string;
   todo: UpdateTodoInput;
   crewId: string;
+  isPasswordAuth?: boolean;
 }): Promise<{ success: boolean; data?: CrewTodo; error?: string }> {
   try {
     const parsed = z.object({
@@ -376,32 +420,35 @@ export async function updateCrewTodo(input: {
         priority: z.enum(["low", "medium", "high"]).optional(),
         dueDate: z.string().nullable().optional(),
       }),
+      isPasswordAuth: z.boolean().optional(),
     }).safeParse(input);
 
     if (!parsed.success) {
       return { success: false, error: "Некорректный запрос." };
     }
 
-    const { actorUserId, crewId, todo } = parsed.data;
+    const { actorUserId, crewId, todo, isPasswordAuth = false } = parsed.data;
 
-    // Password auth bypass
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("user_id")
-      .eq("user_id", actorUserId)
-      .maybeSingle();
-
-    if (user) {
-      // User exists - verify crew membership
-      const { data: memberCheck } = await supabaseAdmin
-        .from("crew_members")
-        .select("role")
-        .eq("crew_id", crewId)
+    // Password auth bypass - grant full access
+    if (!isPasswordAuth) {
+      // Telegram auth: verify crew membership
+      const { data: user } = await supabaseAdmin
+        .from("users")
+        .select("user_id")
         .eq("user_id", actorUserId)
         .maybeSingle();
 
-      if (!memberCheck) {
-        return { success: false, error: "Нет доступа к обновлению задач." };
+      if (user) {
+        const { data: memberCheck } = await supabaseAdmin
+          .from("crew_members")
+          .select("role")
+          .eq("crew_id", crewId)
+          .eq("user_id", actorUserId)
+          .maybeSingle();
+
+        if (!memberCheck) {
+          return { success: false, error: "Нет доступа к обновлению задач." };
+        }
       }
     }
 
@@ -449,25 +496,34 @@ export async function updateCrewTodo(input: {
         created_by,
         updated_at,
         completed_at,
-        assigned_to_user:users!crew_todos_assigned_to_fkey (
-          user_id,
-          full_name,
-          username
-        ),
         created_by_user:users!crew_todos_created_by_fkey (
           user_id,
           full_name,
           username
         )
       `)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error("[update-crew-todo] Update error:", error);
       return { success: false, error: error.message };
     }
 
-    return { success: true, data: toCrewTodo(data as CrewTodoDBRow) };
+    // Get assignee user if any
+    let assigneeUser;
+    if (data?.assigned_to) {
+      const { data: assignee } = await supabaseAdmin
+        .from("users")
+        .select("full_name, username")
+        .eq("user_id", data.assigned_to)
+        .maybeSingle();
+      assigneeUser = assignee;
+    }
+
+    return {
+      success: true,
+      data: data ? toCrewTodo(data as CrewTodoDBRow, assigneeUser) : undefined,
+    };
   } catch (error) {
     console.error("[update-crew-todo] Error:", error);
     return {
@@ -484,38 +540,42 @@ export async function deleteCrewTodo(input: {
   actorUserId: string;
   todoId: string;
   crewId: string;
+  isPasswordAuth?: boolean;
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const parsed = z.object({
       actorUserId: z.string().trim().min(1),
       todoId: z.string().trim().min(1),
       crewId: z.string().trim().min(1),
+      isPasswordAuth: z.boolean().optional(),
     }).safeParse(input);
 
     if (!parsed.success) {
       return { success: false, error: "Некорректный запрос." };
     }
 
-    const { actorUserId, todoId, crewId } = parsed.data;
+    const { actorUserId, todoId, crewId, isPasswordAuth = false } = parsed.data;
 
-    // Password auth bypass
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("user_id")
-      .eq("user_id", actorUserId)
-      .maybeSingle();
-
-    if (user) {
-      // User exists - verify crew membership
-      const { data: memberCheck } = await supabaseAdmin
-        .from("crew_members")
-        .select("role")
-        .eq("crew_id", crewId)
+    // Password auth bypass - grant full access
+    if (!isPasswordAuth) {
+      // Telegram auth: verify crew membership
+      const { data: user } = await supabaseAdmin
+        .from("users")
+        .select("user_id")
         .eq("user_id", actorUserId)
         .maybeSingle();
 
-      if (!memberCheck) {
-        return { success: false, error: "Нет доступа к удалению задач." };
+      if (user) {
+        const { data: memberCheck } = await supabaseAdmin
+          .from("crew_members")
+          .select("role")
+          .eq("crew_id", crewId)
+          .eq("user_id", actorUserId)
+          .maybeSingle();
+
+        if (!memberCheck) {
+          return { success: false, error: "Нет доступа к удалению задач." };
+        }
       }
     }
 
@@ -546,6 +606,7 @@ export async function deleteCrewTodo(input: {
 export async function getCrewTodoStats(input: {
   actorUserId: string;
   crewId: string;
+  isPasswordAuth?: boolean;
 }): Promise<{
   success: boolean;
   data?: {
@@ -562,32 +623,35 @@ export async function getCrewTodoStats(input: {
     const parsed = z.object({
       actorUserId: z.string().trim().min(1),
       crewId: z.string().trim().min(1),
+      isPasswordAuth: z.boolean().optional(),
     }).safeParse(input);
 
     if (!parsed.success) {
       return { success: false, error: "Некорректный запрос." };
     }
 
-    const { actorUserId, crewId } = parsed.data;
+    const { actorUserId, crewId, isPasswordAuth = false } = parsed.data;
 
-    // Password auth bypass
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("user_id")
-      .eq("user_id", actorUserId)
-      .maybeSingle();
-
-    if (user) {
-      // User exists - verify crew membership
-      const { data: memberCheck } = await supabaseAdmin
-        .from("crew_members")
-        .select("role")
-        .eq("crew_id", crewId)
+    // Password auth bypass - grant full access
+    if (!isPasswordAuth) {
+      // Telegram auth: verify crew membership
+      const { data: user } = await supabaseAdmin
+        .from("users")
+        .select("user_id")
         .eq("user_id", actorUserId)
         .maybeSingle();
 
-      if (!memberCheck) {
-        return { success: false, error: "Нет доступа к экипажу." };
+      if (user) {
+        const { data: memberCheck } = await supabaseAdmin
+          .from("crew_members")
+          .select("role")
+          .eq("crew_id", crewId)
+          .eq("user_id", actorUserId)
+          .maybeSingle();
+
+        if (!memberCheck) {
+          return { success: false, error: "Нет доступа к экипажу." };
+        }
       }
     }
 

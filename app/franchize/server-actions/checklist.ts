@@ -44,37 +44,38 @@ const DEFAULT_CHECKLIST_ITEMS: Record<"handout" | "return", ChecklistItem[]> = {
  */
 export async function getAllChecklistStates(input: {
   actorUserId: string;
+  isPasswordAuth?: boolean;
 }): Promise<{ success: boolean; data?: { handout: ChecklistState | null; return: ChecklistState | null } | null; error?: string }> {
   try {
     const parsed = z.object({
       actorUserId: z.string().trim().min(1),
+      isPasswordAuth: z.boolean().optional(),
     }).safeParse(input);
 
     if (!parsed.success) {
       return { success: false, error: "Некорректный запрос." };
     }
 
-    const { actorUserId } = parsed.data;
+    const { actorUserId, isPasswordAuth = false } = parsed.data;
 
-    // Password auth bypass: if actorUserId looks like it's from password flow,
-    // skip admin check. Password auth users have full access.
-    // We detect this by checking if there's no user record (password auth uses placeholder IDs)
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("user_id, metadata")
-      .eq("user_id", actorUserId)
-      .maybeSingle();
+    // Password auth bypass - grant full access
+    if (!isPasswordAuth) {
+      // Telegram auth: check admin rights
+      const { data: user } = await supabaseAdmin
+        .from("users")
+        .select("user_id, metadata")
+        .eq("user_id", actorUserId)
+        .maybeSingle();
 
-    // If user exists, check admin rights. If not, assume password auth (bypass).
-    if (user) {
-      const userMetadata = user?.metadata as Record<string, unknown> | null;
-      const isAdmin = userMetadata?.role === "admin";
+      if (user) {
+        const userMetadata = user?.metadata as Record<string, unknown> | null;
+        const isAdmin = userMetadata?.role === "admin";
 
-      if (!isAdmin) {
-        return { success: false, error: "Недостаточно прав для просмотра." };
+        if (!isAdmin) {
+          return { success: false, error: "Недостаточно прав для просмотра." };
+        }
       }
     }
-    // If no user found, assume password auth - grant access
 
     // Get both checklist states
     const [handoutResult, returnResult] = await Promise.all([
@@ -226,6 +227,7 @@ export async function updateChecklistState(input: {
   type: "handout" | "return";
   items: ChecklistItem[];
   action?: "toggle" | "reset";
+  isPasswordAuth?: boolean;
 }): Promise<{ success: boolean; data?: ChecklistState; error?: string }> {
   try {
     const parsed = z.object({
@@ -237,31 +239,33 @@ export async function updateChecklistState(input: {
         checked: z.boolean(),
       })),
       action: z.enum(["toggle", "reset"]).optional(),
+      isPasswordAuth: z.boolean().optional(),
     }).safeParse(input);
 
     if (!parsed.success) {
       return { success: false, error: "Некорректный запрос." };
     }
 
-    const { actorUserId, type, items, action } = parsed.data;
+    const { actorUserId, type, items, action, isPasswordAuth = false } = parsed.data;
 
-    // Password auth bypass: if no user found, assume password auth (grant access)
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("user_id, metadata")
-      .eq("user_id", actorUserId)
-      .maybeSingle();
+    // Password auth bypass - grant full access
+    if (!isPasswordAuth) {
+      // Telegram auth: check admin rights
+      const { data: user } = await supabaseAdmin
+        .from("users")
+        .select("user_id, metadata")
+        .eq("user_id", actorUserId)
+        .maybeSingle();
 
-    // If user exists, check admin rights. If not, assume password auth (bypass).
-    if (user) {
-      const userMetadata = user?.metadata as Record<string, unknown> | null;
-      const isAdmin = userMetadata?.role === "admin";
+      if (user) {
+        const userMetadata = user?.metadata as Record<string, unknown> | null;
+        const isAdmin = userMetadata?.role === "admin";
 
-      if (!isAdmin) {
-        return { success: false, error: "Недостаточно прав для обновления." };
+        if (!isAdmin) {
+          return { success: false, error: "Недостаточно прав для обновления." };
+        }
       }
     }
-    // If no user found, assume password auth - grant access
 
     // Determine the final items based on action
     let finalItems = items;
