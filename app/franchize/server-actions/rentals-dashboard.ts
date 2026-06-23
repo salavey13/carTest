@@ -125,6 +125,7 @@ export async function getRentalsDashboard(input: {
       .maybeSingle();
 
     if (crewError || !crew) {
+      console.error("[rentals-dashboard] Crew not found for slug:", slug);
       return { success: false, error: "Экипаж не найден." };
     }
 
@@ -133,6 +134,14 @@ export async function getRentalsDashboard(input: {
     // Password auth: when actorUserId is exactly the crew.owner_id, treat as full access
     // (this is set by the password flow when no Telegram user exists)
     const isPasswordAuth = isOwner;
+
+    console.log("[rentals-dashboard] Auth check:", {
+      actorUserId,
+      crewOwnerId: crew.owner_id,
+      isOwner,
+      isPasswordAuth,
+      slug,
+    });
 
     if (isPasswordAuth) {
       // Password auth grants full access - skip user checks
@@ -1034,8 +1043,15 @@ export async function validateAnalyticsPassword(input: {
 
     const result = validationResult[0];
     if (!result.is_valid) {
+      console.log("[analytics-password] Password expired");
       return { success: false, error: "Пароль истёк. Запросите новый через /analytics-pass" };
     }
+
+    console.log("[analytics-password] Password valid, returning:", {
+      slug: result.slug,
+      crewId: result.crew_id,
+      ownerId: result.crew_owner_id,
+    });
 
     return {
       success: true,
