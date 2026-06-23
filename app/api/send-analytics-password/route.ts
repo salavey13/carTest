@@ -87,7 +87,11 @@ export async function POST(request: NextRequest) {
     const hoursLeft = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)));
 
     // Get site URL for link
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://your-app.vercel.app";
+    // Get site URL for link - check multiple env vars in order
+    const siteUrl = process.env.NEXT_PUBLIC_APP_URL ||
+                    process.env.NEXT_PUBLIC_SITE_URL ||
+                    process.env.NEXT_PUBLIC_VERCEL_URL ||
+                    `https://${process.env.VERCEL_URL || "your-app.vercel.app"}`;
     const analyticsUrl = `${siteUrl}/franchize/${crew.slug}/rentals-analytics`;
 
     // Configure SMTP (Yandex first, fallback to Gmail)
