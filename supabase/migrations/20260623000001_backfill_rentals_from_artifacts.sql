@@ -79,7 +79,11 @@ SELECT
   -- Use telegram_chat_id as owner_id placeholder
   COALESCE(rca.telegram_chat_id::TEXT, 'system') AS owner_id,
   rca.resolved_bike_id AS vehicle_id,
-  'active' AS status,  -- Backfilled as active since contracts were signed
+  -- Determine status based on end_date: historical = completed, recent = active
+  CASE
+    WHEN private.parse_ru_date(rca.rent_end_date) < NOW() - INTERVAL '7 days' THEN 'completed'
+    ELSE 'active'
+  END AS status,
   'fully_paid' AS payment_status,  -- Assume fully paid for signed contracts
   private.parse_ru_date(rca.rent_start_date) AS requested_start_date,
   private.parse_ru_date(rca.rent_end_date) AS requested_end_date,
