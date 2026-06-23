@@ -34,14 +34,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get crew email from crew_secrets
+    // Get crew email from crew_secrets (private schema)
+    // Email is stored in contract_defaults -> legal -> organizationRepresentative -> email
     let recipientEmail = email;
     if (!recipientEmail) {
       const { data: crewSecrets } = await supabaseAdmin
+        .schema("private")
         .from("crew_secrets")
-        .select("email")
-        .eq("crew_id", crewId)
+        .select("contract_defaults")
+        .eq("crew_slug", slug)
         .maybeSingle();
+
+      if (crewSecrets?.contract_defaults) {
+        try {
+          const defaults = typeof crewSecrets.contract_defaults === "string"
+            ? JSON.parse(crewSecrets.contract_defaults)
+            : crewSecrets.contract_defaults;
+
+          // Try to get email from legal -> organizationRepresentative -> email
+          recipientEmail = defaults?.legal?.organizationRepresentative?.email ||
+                          defaults?.signer?.email ||
+                          defaults?.email;
+        } catch (parseError) {
+          console.error("[send-analytics-password] Failed to parse contract_defaults:", parseError);
+        }
+      }
+    }
 
       if (crewSecrets?.email) {
         recipientEmail = crewSecrets.email;
