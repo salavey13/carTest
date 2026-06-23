@@ -593,7 +593,7 @@ export async function getCrewTodoStats(input: {
 
     const { data, error } = await supabaseAdmin
       .from("crew_todos")
-      .select("status, assigned_to, due_date, assigned_to_user (user_id, full_name, username)")
+      .select("status, assigned_to, due_date")
       .eq("crew_id", crewId);
 
     if (error) {
@@ -616,14 +616,28 @@ export async function getCrewTodoStats(input: {
       return new Date(t.due_date) < now;
     }).length;
 
+    // Get all unique assignees
+    const assigneeIds = [...new Set(todos.map(t => t.assigned_to).filter(Boolean))] as string[];
+    const assigneesMap = new Map<string, { full_name: string | null; username: string | null }>();
+
+    if (assigneeIds.length > 0) {
+      const { data: assignees } = await supabaseAdmin
+        .from("users")
+        .select("user_id, full_name, username")
+        .in("user_id", assigneeIds);
+
+      for (const a of assignees || []) {
+        assigneesMap.set(a.user_id, { full_name: a.full_name, username: a.username });
+      }
+    }
+
     // Group by assignee
     const byAssigneeMap = new Map<string, { userId: string; userName: string | null; pending: number; inProgress: number; done: number }>();
 
     for (const todo of todos) {
       const userId = todo.assigned_to || "unassigned";
-      // assigned_to_user is an array in Supabase joins
-      const userArray = todo.assigned_to_user as Array<{ user_id: string; full_name: string | null; username: string | null }> | null;
-      const userName = userArray?.[0]?.full_name || userArray?.[0]?.username || "Не назначен";
+      const assignee = userId !== "unassigned" ? assigneesMap.get(userId) : null;
+      const userName = assignee?.full_name || assignee?.username || "Не назначен";
 
       if (!byAssigneeMap.has(userId)) {
         byAssigneeMap.set(userId, {

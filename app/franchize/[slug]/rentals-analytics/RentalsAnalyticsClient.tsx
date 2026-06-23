@@ -374,7 +374,8 @@ export function RentalsAnalyticsClient({
         slug,
         actorUserId,
         date,
-        verificationStatus: verificationFilter === "all" ? undefined : verificationStatus,
+        verificationStatus: verificationFilter === "all" ? undefined : verificationFilter,
+        isPasswordAuth: !!passwordAuthOwnerId, // true when using password auth
       });
 
       if (!result.success) {

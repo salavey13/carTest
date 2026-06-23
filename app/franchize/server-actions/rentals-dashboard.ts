@@ -102,6 +102,7 @@ export async function getRentalsDashboard(input: {
   actorUserId: string;
   date: string; // ISO date string (YYYY-MM-DD)
   verificationStatus?: "verified" | "pending" | "revoked" | "all";
+  isPasswordAuth?: boolean; // Flag to indicate password-based auth (no Telegram user)
 }): Promise<{ success: boolean; data?: RentalDashboardResult; error?: string }> {
   try {
     const parsed = z.object({
@@ -109,13 +110,14 @@ export async function getRentalsDashboard(input: {
       actorUserId: z.string().trim().min(1),
       date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
       verificationStatus: z.enum(["verified", "pending", "revoked", "all"]).optional(),
+      isPasswordAuth: z.boolean().optional(),
     }).safeParse(input);
 
     if (!parsed.success) {
       return { success: false, error: "Некорректный запрос." };
     }
 
-    const { slug, actorUserId, date, verificationStatus } = parsed.data;
+    const { slug, actorUserId, date, verificationStatus, isPasswordAuth = false } = parsed.data;
 
     // Get crew and verify access
     const { data: crew, error: crewError } = await supabaseAdmin
@@ -129,23 +131,10 @@ export async function getRentalsDashboard(input: {
       return { success: false, error: "Экипаж не найден." };
     }
 
-    // Check access (owner or admin or password auth or orudjov)
-    // First, check if this is a real Telegram user (exists in users table)
-    const { data: realUser, error: userError } = await supabaseAdmin
-      .from("users")
-      .select("user_id, metadata, username")
-      .eq("user_id", actorUserId)
-      .maybeSingle();
-
-    const isTelegramAuth = !!realUser; // User exists = Telegram auth
-    const isPasswordAuth = !isTelegramAuth; // No user = password auth
-
     console.log("[rentals-dashboard] Auth check:", {
       actorUserId,
-      isTelegramAuth,
       isPasswordAuth,
-      hasRealUser: !!realUser,
-      userError,
+      crewOwnerId: crew.owner_id,
       slug,
     });
 
