@@ -406,10 +406,29 @@ const startTimeArg = arg('startTime', phraseSchedule.startTime || '18:00');
 const endTimeArg   = arg('endTime', phraseSchedule.endTime || '10:00');
 
 // Parse dates to compute duration
+// Supports both DD.MM.YYYY and D.M.YYYY formats (single or double digit days/months)
+// Also supports YYYY-MM-DD format
 function parseRuDateParts(dateStr) {
-  const m = String(dateStr).match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-  if (!m) return null;
-  return { d: Number(m[1]), mo: Number(m[2])-1, y: Number(m[3]) };
+  const str = String(dateStr || '').trim();
+  if (!str) return null;
+
+  // Try YYYY-MM-DD format first
+  const isoMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch.map(Number);
+    return { d, mo: m - 1, y };
+  }
+
+  // Try DD.MM.YYYY or D.M.YYYY format
+  const ruMatch = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (ruMatch) {
+    const [, d, m, y] = ruMatch.map(Number);
+    // Validate ranges
+    if (d < 1 || d > 31 || m < 1 || m > 12) return null;
+    return { d, mo: m - 1, y };
+  }
+
+  return null;
 }
 function parseTimeToMinutes(timeStr) {
   const m = String(timeStr).match(/^(\d{1,2}):(\d{2})$/);
@@ -433,13 +452,19 @@ const isHourlyRental = rentalHours > 0 && rentalHours < 24;
 const explicitDailyPrice = arg('dailyPrice', '');
 const explicitHourlyPrice = arg('hourlyPrice', '');
 const explicitDeposit = arg('deposit', '');
+const DEFAULT_DAILY_PRICE = 10000;
+const DEFAULT_HOURLY_PRICE = 1250; // ~1/8 of default daily
+
 const bikeDailyPrice = Number(explicitDailyPrice) > 0 ? explicitDailyPrice
   : Number(bike.specs?.dailyPrice) > 0 ? String(bike.specs.dailyPrice)
   : Number(bike.specs?.rent_weekday) > 0 ? String(bike.specs.rent_weekday)
-  : '10000';
+  : String(DEFAULT_DAILY_PRICE);
+
+// Calculate hourly price: explicit > bike.specs > daily/8 > default
+const bikeDailyPriceNum = Number(bikeDailyPrice);
 const bikeHourlyPrice = Number(explicitHourlyPrice) > 0 ? explicitHourlyPrice
   : Number(bike.specs?.price_per_hour) > 0 ? String(bike.specs.price_per_hour)
-  : String(Math.round(Number(bikeDailyPrice) / 8));
+  : String(bikeDailyPriceNum > 0 ? Math.round(bikeDailyPriceNum / 8) : DEFAULT_HOURLY_PRICE);
 const bikeDeposit = Number(explicitDeposit) > 0 ? explicitDeposit
   : Number(bike.specs?.deposit_rub) > 0 ? String(bike.specs.deposit_rub)
   : '20000';

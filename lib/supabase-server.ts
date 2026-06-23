@@ -74,8 +74,6 @@ export const supabaseAdmin: SupabaseClient<Database> = (() => {
     });
   }
 
-  logger.info("Supabase Admin client initialized with service role key.");
-
   return createClient<Database>(supabaseUrl, serviceRoleKey, {
     auth: {
       persistSession: false,

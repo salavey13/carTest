@@ -26,8 +26,9 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions) {
   });
   const channelRef = useRef<RealtimeChannel | null>(null);
   const retryCountRef = useRef(0);
-  const maxRetries = 3;
+  const maxRetries = 10; // More retries before giving up
   const maxBackoff = 30000; // 30 seconds
+  const isConnectedRef = useRef(false); // Track actual connection state
 
   const calculateBackoff = (attempt: number): number => {
     const backoff = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s, 8s...
@@ -45,6 +46,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions) {
     disconnect();
 
     setState({ status: "connecting", error: null });
+    isConnectedRef.current = false;
 
     const channelName = `realtime-${tableName}-${filter || "all"}`;
     const channel = supabaseAnon.channel(channelName, {
@@ -67,6 +69,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions) {
     channel
       .on("postgres_changes", subscriptionConfig, (payload) => {
         setState({ status: "connected", error: null });
+        isConnectedRef.current = true;
         retryCountRef.current = 0;
         onData?.({
           eventType: payload.eventType,
@@ -77,22 +80,20 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions) {
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
           setState({ status: "connected", error: null });
+          isConnectedRef.current = true;
           retryCountRef.current = 0;
-        } else if (status === "SUBSCRIPTION_FAILED" || status === "TIMED_OUT") {
+        } else if (status === "SUBSCRIPTION_FAILED" || status === "TIMED_OUT" || status === "CLOSED") {
+          isConnectedRef.current = false;
           const error = new Error(`Subscription ${status}`);
           setState({ status: "connecting", error });
           onError?.(error);
 
-          // Auto-reconnect with backoff
-          if (retryCountRef.current < maxRetries) {
-            const backoff = calculateBackoff(retryCountRef.current);
-            setTimeout(() => {
-              retryCountRef.current++;
-              subscribe();
-            }, backoff);
-          } else {
-            setState({ status: "disconnected", error });
-          }
+          // Auto-reconnect with backoff (infinite retry with cap)
+          const backoff = calculateBackoff(retryCountRef.current);
+          setTimeout(() => {
+            retryCountRef.current++;
+            subscribe();
+          }, backoff);
         }
       });
 
@@ -102,9 +103,9 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions) {
   useEffect(() => {
     subscribe();
 
-    // Handle online event
+    // Handle online event - use ref to avoid stale closure
     const handleOnline = () => {
-      if (state.status === "disconnected") {
+      if (!isConnectedRef.current) {
         retryCountRef.current = 0;
         subscribe();
       }
