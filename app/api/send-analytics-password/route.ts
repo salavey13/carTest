@@ -20,10 +20,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get crew details
+    // Get crew details with metadata
     const { data: crew, error: crewError } = await supabaseAdmin
       .from("crews")
-      .select("id, slug, name, owner_id")
+      .select("id, slug, name, owner_id, metadata")
       .eq("id", crewId)
       .single();
 
@@ -34,35 +34,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get crew email from crew_secrets (private schema)
-    // Email is stored in contract_defaults -> legal -> organizationRepresentative -> email
+    // Get crew email from crews.metadata
+    // Email is stored in metadata -> franchize -> contacts -> email
     let recipientEmail = email;
     if (!recipientEmail) {
-      const { data: crewSecrets } = await supabaseAdmin
-        .schema("private")
-        .from("crew_secrets")
-        .select("contract_defaults")
-        .eq("crew_slug", slug)
-        .maybeSingle();
-
-      if (crewSecrets?.contract_defaults) {
-        try {
-          const defaults = typeof crewSecrets.contract_defaults === "string"
-            ? JSON.parse(crewSecrets.contract_defaults)
-            : crewSecrets.contract_defaults;
-
-          // Try to get email from legal -> organizationRepresentative -> email
-          recipientEmail = defaults?.legal?.organizationRepresentative?.email ||
-                          defaults?.signer?.email ||
-                          defaults?.email;
-        } catch (parseError) {
-          console.error("[send-analytics-password] Failed to parse contract_defaults:", parseError);
-        }
-      }
-    }
-
-      if (crewSecrets?.email) {
-        recipientEmail = crewSecrets.email;
+      // Email from franchize contacts
+      const contactsEmail = crew.metadata?.franchize?.contacts?.email;
+      if (typeof contactsEmail === "string") {
+        recipientEmail = contactsEmail;
       }
     }
 
