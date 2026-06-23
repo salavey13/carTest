@@ -1077,7 +1077,7 @@ export function RentalsAnalyticsClient({
               variant="outline"
               size="icon"
               onClick={() => navigateDate(-1)}
-              disabled={!dateRange || selectedDate <= dateRange.minDate || loading}
+              disabled={loading || (dateRange && selectedDate <= dateRange.minDate)}
               style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
               title="Предыдущий день"
             >
@@ -1096,7 +1096,7 @@ export function RentalsAnalyticsClient({
               variant="outline"
               size="icon"
               onClick={() => navigateDate(1)}
-              disabled={!dateRange || selectedDate >= dateRange.maxDate || loading}
+              disabled={loading || (dateRange && selectedDate >= dateRange.maxDate)}
               style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
               title="Следующий день"
             >
@@ -1111,7 +1111,7 @@ export function RentalsAnalyticsClient({
               variant="outline"
               size="icon"
               onClick={() => navigateDate(-1)}
-              disabled={!dateRange || selectedDate <= dateRange.minDate || loading}
+              disabled={loading || (dateRange && selectedDate <= dateRange.minDate)}
               className="h-8 w-8"
               style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
             >
@@ -1130,7 +1130,7 @@ export function RentalsAnalyticsClient({
               variant="outline"
               size="icon"
               onClick={() => navigateDate(1)}
-              disabled={!dateRange || selectedDate >= dateRange.maxDate || loading}
+              disabled={loading || (dateRange && selectedDate >= dateRange.maxDate)}
               className="h-8 w-8"
               style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
             >
