@@ -389,7 +389,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                   boxShadow: `0 10px 40px ${withAlpha(accentMain, 0.3)}`,
                 }}
               >
-                <ShieldCheck className="w-10 h-10 text-white" />
+                <ShieldCheck className="w-10 h-10" style={{ color: "#FFFFFF" }} />
               </div>
               <h1 className="text-3xl font-black tracking-tight" style={{ backgroundImage: `linear-gradient(to right, ${accentMain}, ${accentHover})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                 Аналитика
@@ -425,10 +425,11 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
             <button
               onClick={handlePasswordSubmit}
               disabled={isPasswordValidating || !passwordInput.trim()}
-              className="w-full mt-6 px-6 py-4 font-bold rounded-xl transition-all hover:scale-[1.02] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2 text-white"
+              className="w-full mt-6 px-6 py-4 font-bold rounded-xl transition-all hover:scale-[1.02] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
               style={{
                 background: `linear-gradient(to right, ${accentMain}, ${accentHover})`,
                 boxShadow: `0 4px 20px ${withAlpha(accentMain, 0.4)}`,
+                color: "#000000",
               }}
             >
               {isPasswordValidating ? (
