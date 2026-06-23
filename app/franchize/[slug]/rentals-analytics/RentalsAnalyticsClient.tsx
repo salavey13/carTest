@@ -63,6 +63,7 @@ import {
   readablePaletteTextOnColor,
 } from "@/app/franchize/lib/theme";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
+import { RentalHandoffModal } from "./RentalHandoffModal";
 
 // ─── Ultra-compact formatting helpers ───────────────────────────────────────
 
@@ -126,6 +127,11 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const [todoFilter, setTodoFilter] = useState<TodoStatus | "all">("all");
   const [showExportModal, setShowExportModal] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  // Handoff modal state
+  const [handoffModalOpen, setHandoffModalOpen] = useState(false);
+  const [handoffModalPhase, setHandoffModalPhase] = useState<"handout" | "return">("handout");
+  const [handoffModalRental, setHandoffModalRental] = useState<RentalDashboardItem | null>(null);
 
   // Password auth
   const [showPasswordEntry, setShowPasswordEntry] = useState(false);
@@ -569,16 +575,18 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                     <th className="px-2 py-1 text-right text-[10px] font-medium text-white/50">СУММА</th>
                     <th className="px-2 py-1 text-center text-[10px] font-medium text-white/50">СТАТУС</th>
                     <th className="px-2 py-1 text-center text-[10px] font-medium text-white/50">ДОК</th>
+                    <th className="px-2 py-1 text-center text-[10px] font-medium text-white/50">ОДОМЕТР</th>
+                    <th className="px-2 py-1 text-center text-[10px] font-medium text-white/50">ДЕЙСТВИЯ</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={5} className="px-2 py-4 text-center text-white/30 text-xs">Загрузка...</td>
+                      <td colSpan={7} className="px-2 py-4 text-center text-white/30 text-xs">Загрузка...</td>
                     </tr>
                   ) : rentals.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-2 py-4 text-center text-white/30 text-xs">
+                      <td colSpan={7} className="px-2 py-4 text-center text-white/30 text-xs">
                         Нет аренд за этот день. Выберите другую дату.
                       </td>
                     </tr>
@@ -611,6 +619,49 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                               {rental.documentSecret ? "✓" : "—"}
                             </span>
                           </td>
+                          <td className="px-2 py-1.5 text-center text-[9px] text-white/50">
+                            {rental.odometerStart || rental.odometerEnd ? (
+                              <span className="text-emerald-400">
+                                {rental.odometerStart || "?"}→{rental.odometerEnd || "?"} км
+                              </span>
+                            ) : (
+                              <span className="text-white/30">—</span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => {
+                                  setHandoffModalRental(rental);
+                                  setHandoffModalPhase("handout");
+                                  setHandoffModalOpen(true);
+                                }}
+                                className={`px-1.5 py-0.5 text-[8px] rounded transition-colors ${
+                                  rental.handoutCompleted
+                                    ? "bg-emerald-500 text-white"
+                                    : "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
+                                }`}
+                                title={rental.handoutCompleted ? "Выдача выполнена ✓" : "Выдача"}
+                              >
+                                →
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setHandoffModalRental(rental);
+                                  setHandoffModalPhase("return");
+                                  setHandoffModalOpen(true);
+                                }}
+                                className={`px-1.5 py-0.5 text-[8px] rounded transition-colors ${
+                                  rental.returnCompleted
+                                    ? "bg-blue-500 text-white"
+                                    : "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"
+                                }`}
+                                title={rental.returnCompleted ? "Возврат выполнен ✓" : "Возврат"}
+                              >
+                                ←
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       );
                     })
@@ -633,6 +684,21 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
         .animation-delay-2000 { animation-delay: 2s; }
         .animation-delay-4000 { animation-delay: 4s; }
       `}</style>
+
+      {/* Rental Handoff Modal */}
+      {handoffModalRental && (
+        <RentalHandoffModal
+          rentalId={handoffModalRental.rental_id}
+          vehicleName={`${handoffModalRental.vehicle?.make || ""} ${handoffModalRental.vehicle?.model || ""}`.trim()}
+          phase={handoffModalPhase}
+          isOpen={handoffModalOpen}
+          onClose={() => setHandoffModalOpen(false)}
+          onSuccess={() => {
+            void loadRentals(selectedDate, true);
+          }}
+          isPasswordAuth={!!passwordAuthOwnerId}
+        />
+      )}
     </div>
   );
 }
