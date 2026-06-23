@@ -308,11 +308,13 @@ export async function updateChecklistState(input: {
 export async function resetChecklistState(input: {
   actorUserId: string;
   type: "handout" | "return";
+  isPasswordAuth?: boolean;
 }): Promise<{ success: boolean; data?: ChecklistState; error?: string }> {
   return updateChecklistState({
     actorUserId: input.actorUserId,
     type: input.type,
     items: DEFAULT_CHECKLIST_ITEMS[input.type],
     action: "reset",
+    isPasswordAuth: input.isPasswordAuth,
   });
 }

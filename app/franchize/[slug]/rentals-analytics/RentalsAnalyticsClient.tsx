@@ -663,6 +663,7 @@ export function RentalsAnalyticsClient({
       const result = await resetChecklistState({
         actorUserId,
         type,
+        isPasswordAuth: !!passwordAuthOwnerId,
       });
 
       if (result.success && result.data) {
