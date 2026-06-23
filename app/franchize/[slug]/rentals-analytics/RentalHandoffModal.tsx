@@ -325,7 +325,7 @@ export function RentalHandoffModal({
             <h2 className="text-lg font-bold" style={{ color: textPrimary }}>{PHASE_LABELS[phase]}</h2>
             <span className="text-sm" style={{ color: textSecondary }}>{vehicleName}</span>
           </div>
-          <button onClick={onClose} className="p-1 rounded transition-colors hover:bg-white/10" style={{ color: textSecondary }}>
+          <button onClick={onClose} className="p-1 rounded transition-colors hover:bg-white/10" style={{ color: textSecondary, backgroundColor: "transparent" }}>
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -647,9 +647,10 @@ export function RentalHandoffModal({
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-5 py-2 text-sm font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-white"
+              className="px-5 py-2 text-sm font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 backgroundColor: isCompleted ? "#10b981" : accentMain,
+                color: "#000000",
               }}
             >
               {saving ? "..." : isCompleted ? "Готово ✓" : "Сохранить"}
