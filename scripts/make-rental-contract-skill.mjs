@@ -749,38 +749,41 @@ if (!json.ok) {
 const result = {ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id, contractKey: vars.document_key, templateMode: RENTAL_DOC_TEMPLATE_MODE, docFileName, isElectric, isHourlyRental, rentalHours, rentalDays, subtotal: vars.subtotal_rub, localDocPath};
 const saveMetadata = arg('saveMetadata', '0') !== '0';
 const metadataTable = arg('metadataTable', 'rental_contract_artifacts');
+
+// ── ALWAYS create rentals row for unified tracking ──────────────────────
+// Rentals entry is created regardless of saveMetadata flag, ensuring analytics visibility
 let createdRentalId = null;
-if (saveMetadata) {
-  // Create rentals row for unified tracking (before artifact)
-  try {
-    const { resolveCrewOwnerChatId } = await import('../app/lib/rental-date-utils.ts');
-    const crewOwnerChatId = await resolveCrewOwnerChatId(supabase, bike.crew_id) || telegramChatId;
+try {
+  const { resolveCrewOwnerChatId } = await import('../app/lib/rental-date-utils.ts');
+  const crewOwnerChatId = await resolveCrewOwnerChatId(supabase, bike.crew_id) || telegramChatId;
 
-    createdRentalId = await createRentalFromBotContract(
-      supabase,
-      bike,
-      startDate,
-      startTimeArg,
-      endDate,
-      endTimeArg,
-      bikeDailyPrice,
-      subtotalRounded,
-      crewOwnerChatId
-    );
+  createdRentalId = await createRentalFromBotContract(
+    supabase,
+    bike,
+    startDate,
+    startTimeArg,
+    endDate,
+    endTimeArg,
+    bikeDailyPrice,
+    subtotalRounded,
+    crewOwnerChatId
+  );
 
-    if (createdRentalId) {
-      result.rentalId = createdRentalId;
-      result.rentalCreated = true;
-      console.log('[make-rental-contract-skill] Rental created successfully:', createdRentalId);
-    } else {
-      console.warn('[make-rental-contract-skill] Failed to create rental, artifact will have no rental_id');
-      result.rentalCreated = false;
-    }
-  } catch (rentalError) {
-    console.error('[make-rental-contract-skill] Rental creation failed:', rentalError);
+  if (createdRentalId) {
+    result.rentalId = createdRentalId;
+    result.rentalCreated = true;
+    console.log('[make-rental-contract-skill] Rental created successfully:', createdRentalId);
+  } else {
+    console.warn('[make-rental-contract-skill] Failed to create rental, artifact will have no rental_id');
     result.rentalCreated = false;
   }
+} catch (rentalError) {
+  console.error('[make-rental-contract-skill] Rental creation failed:', rentalError);
+  result.rentalCreated = false;
+}
 
+// ── Metadata persistence (conditional) ────────────────────────────────────
+if (saveMetadata) {
   const payload = {
     contract_key: vars.document_key,
     requested_bike_id: bikeId,
@@ -815,7 +818,7 @@ const rentalSecretsPayload = {
   renter_email: vars.renter_email,
   renter_address: vars.renter_address || null,
   source_doc_key: vars.document_key,
-  source_rental_id: null,
+  source_rental_id: createdRentalId || null,  // Link to rentals table if created
   verification_status: 'verified',
   template_version: CURRENT_RENTAL_TEMPLATE_VERSION,
 };
