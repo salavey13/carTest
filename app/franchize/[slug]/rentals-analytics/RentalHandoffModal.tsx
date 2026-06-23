@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { X, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
+import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
+import { withAlpha } from "@/app/franchize/lib/theme";
 import {
   getRentalHandoff,
   saveRentalHandoff,
@@ -19,6 +21,7 @@ interface RentalHandoffModalProps {
   onClose: () => void;
   onSuccess?: () => void;
   isPasswordAuth?: boolean;
+  crewTheme?: any;
 }
 
 const PHASE_LABELS = {
@@ -26,10 +29,8 @@ const PHASE_LABELS = {
   return: "ВОЗВРАТ",
 };
 
-// Quick-select options for fuel/battery
 const PERCENT_OPTIONS = [0, 25, 50, 75, 100];
 
-// Common equipment condition options
 const CONDITION_OPTIONS = [
   { label: "Норм", value: "Норм" },
   { label: "Грязно", value: "Грязно" },
@@ -38,31 +39,68 @@ const CONDITION_OPTIONS = [
   { label: "Есть повреждения", value: "Есть повреждения" },
 ];
 
-// ─── QuickSelect Chip Component ───────────────────────────────────────────────
+// ─── Theme-aware QuickSelect Chip ────────────────────────────────────────────────
 
-function QuickSelectChip({
-  label,
-  selected,
-  onClick,
-}: {
+interface QuickSelectChipProps {
   label: string;
   selected: boolean;
   onClick: () => void;
-}) {
+  accentColor: string;
+  textColor: string;
+  borderColor: string;
+}
+
+function QuickSelectChip({ label, selected, onClick, accentColor, textColor, borderColor }: QuickSelectChipProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+      className="px-3 py-1.5 text-xs rounded-full transition-all"
+      style={
         selected
-          ? "bg-yellow-400 text-black font-medium"
-          : "bg-white/10 text-white/70 hover:bg-white/20"
-      }`}
+          ? { backgroundColor: accentColor, color: "#000000", fontWeight: 500 }
+          : { backgroundColor: withAlpha(borderColor, 0.15), color: textColor }
+      }
     >
       {label}
     </button>
   );
 }
+
+// ─── Theme-aware Checkbox Item ───────────────────────────────────────────────────
+
+interface CheckboxItemProps {
+  checked: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  label: string;
+  accentColor: string;
+  cardBg: string;
+  textColor: string;
+  completedColor?: string;
+}
+
+function CheckboxItem({ checked, onChange, label, accentColor, cardBg, textColor, completedColor = "#10b981" }: CheckboxItemProps) {
+  return (
+    <label
+      className="flex items-center gap-2 p-2 rounded cursor-pointer transition-all"
+      style={{
+        backgroundColor: checked ? withAlpha(completedColor, 0.2) : withAlpha(cardBg, 0.5),
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="w-4 h-4 rounded"
+        style={{ accentColor }}
+      />
+      <span className="text-sm" style={{ color: textColor }}>{label}</span>
+      {checked && <CheckCircle2 className="w-3.5 h-3.5 ml-auto" style={{ color: completedColor }} />}
+    </label>
+  );
+}
+
+// ─── Main Modal Component ───────────────────────────────────────────────────────────
 
 export function RentalHandoffModal({
   rentalId,
@@ -72,15 +110,35 @@ export function RentalHandoffModal({
   onClose,
   onSuccess,
   isPasswordAuth,
+  crewTheme,
 }: RentalHandoffModalProps) {
   const { dbUser, passwordAuthOwnerId } = useAppContext();
   const actorUserId = dbUser?.user_id || passwordAuthOwnerId || "";
+
+  // Get theme colors
+  const cssVars = crewTheme ? useFranchizeTheme(crewTheme).cssVars : {
+    backgroundColor: "#0A0A0A",
+    cardBackground: "#1A1A1A",
+    accentColor: "#FFD700",
+    accentHover: "#FFC125",
+    textColor: "#FFFAF0",
+    mutedColor: "#D4AF37",
+    borderColor: "#2A2A2A",
+  };
+
+  const bgBase = cssVars.backgroundColor;
+  const bgCard = cssVars.cardBackground;
+  const accentMain = cssVars.accentColor;
+  const accentHover = cssVars.accentHover;
+  const textPrimary = cssVars.textColor;
+  const textSecondary = cssVars.mutedColor;
+  const borderSoft = cssVars.borderColor;
 
   const [handoff, setHandoff] = useState<RentalHandoff | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Form state - booleans (already 1-tap checkboxes)
+  // Form state
   const [passportChecked, setPassportChecked] = useState(false);
   const [licenseChecked, setLicenseChecked] = useState(false);
   const [depositCollected, setDepositCollected] = useState(false);
@@ -95,20 +153,14 @@ export function RentalHandoffModal({
   const [depositReturned, setDepositReturned] = useState(false);
   const [noDamagesConfirmed, setNoDamagesConfirmed] = useState(false);
 
-  // Numeric - odometer (keep as number input, too variable)
   const [odometerStart, setOdometerStart] = useState("");
   const [odometerEnd, setOdometerEnd] = useState("");
-
-  // Percentages - use quick-select
   const [fuelLevelStart, setFuelLevelStart] = useState<number | null>(null);
   const [fuelLevelEnd, setFuelLevelEnd] = useState<number | null>(null);
   const [batteryLevelStart, setBatteryLevelStart] = useState<number | null>(null);
   const [batteryLevelEnd, setBatteryLevelEnd] = useState<number | null>(null);
-
-  // Equipment - use quick-select for count
   const [keysCount, setKeysCount] = useState<number>(1);
 
-  // Equipment checkboxes (already 1-tap)
   const [chargerIncluded, setChargerIncluded] = useState(false);
   const [lockCableIncluded, setLockCableIncluded] = useState(false);
   const [jacketIssued, setJacketIssued] = useState(false);
@@ -119,7 +171,6 @@ export function RentalHandoffModal({
   const [motoCoverIssued, setMotoCoverIssued] = useState(false);
   const [ebikeChargerIssued, setEbikeChargerIssued] = useState(false);
 
-  // Notes - keep as text (natural for freeform)
   const [otherEquipment, setOtherEquipment] = useState("");
   const [equipmentConditionReturn, setEquipmentConditionReturn] = useState("");
   const [damageNotes, setDamageNotes] = useState("");
@@ -130,17 +181,12 @@ export function RentalHandoffModal({
     if (!isOpen || !rentalId) return;
 
     setLoading(true);
-    getRentalHandoff({
-      actorUserId,
-      rentalId,
-      isPasswordAuth,
-    })
+    getRentalHandoff({ actorUserId, rentalId, isPasswordAuth })
       .then((result) => {
         if (result.success && result.data) {
           const phaseData = phase === "handout" ? result.data.handout : result.data.return;
           setHandoff(phaseData);
 
-          // Populate form
           if (phaseData) {
             setPassportChecked(phaseData.passport_checked || false);
             setLicenseChecked(phaseData.license_checked || false);
@@ -165,7 +211,6 @@ export function RentalHandoffModal({
             setDamageNotes(phaseData.damage_notes || "");
             setNotes(phase === "handout" ? phaseData.handout_notes || "" : phaseData.return_notes || "");
 
-            // Equipment fields
             setKeysCount(phaseData.keys_count ?? 1);
             setChargerIncluded(phaseData.charger_included || false);
             setLockCableIncluded(phaseData.lock_cable_included || false);
@@ -181,9 +226,7 @@ export function RentalHandoffModal({
           }
         }
       })
-      .finally(() => {
-        setLoading(false);
-      });
+      .finally(() => { setLoading(false); });
   }, [isOpen, rentalId, phase, actorUserId, isPasswordAuth]);
 
   const handleSave = async () => {
@@ -194,7 +237,6 @@ export function RentalHandoffModal({
         rentalId,
         phase,
         data: {
-          // Handout fields
           passport_checked: passportChecked,
           license_checked: licenseChecked,
           deposit_collected: depositCollected,
@@ -202,24 +244,20 @@ export function RentalHandoffModal({
           keys_issued: keysIssued,
           instructions_given: instructionsGiven,
           photos_taken: photosTaken,
-          // Return fields
           condition_checked: conditionChecked,
           helmet_returned: helmetReturned,
           keys_returned: keysReturned,
           deposit_returned: depositReturned,
           no_damages_confirmed: noDamagesConfirmed,
-          // Numeric fields
           odometer_start: odometerStart ? parseInt(odometerStart) : null,
           odometer_end: odometerEnd ? parseInt(odometerEnd) : null,
           fuel_level_start: fuelLevelStart,
           fuel_level_end: fuelLevelEnd,
           battery_level_start: batteryLevelStart,
           battery_level_end: batteryLevelEnd,
-          // Notes
           damage_notes: damageNotes || null,
           handout_notes: phase === "handout" ? notes || null : undefined,
           return_notes: phase === "return" ? notes || null : undefined,
-          // Equipment fields
           keys_count: keysCount,
           charger_included: chargerIncluded,
           lock_cable_included: lockCableIncluded,
@@ -255,12 +293,7 @@ export function RentalHandoffModal({
 
     setSaving(true);
     try {
-      const result = await deleteRentalHandoff({
-        actorUserId,
-        rentalId,
-        phase,
-        isPasswordAuth,
-      });
+      const result = await deleteRentalHandoff({ actorUserId, rentalId, phase, isPasswordAuth });
 
       if (result.success) {
         toast.success("Запись удалена");
@@ -283,117 +316,83 @@ export function RentalHandoffModal({
     : conditionChecked && helmetReturned && keysReturned && odometerEnd;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl border border-white/10 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm p-4" style={{ backgroundColor: withAlpha("#000000", 0.5) }}>
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl" style={{ background: `linear-gradient(to bottom right, ${bgCard}, ${withAlpha(bgCard, 0.8)})`, borderColor: withAlpha(borderSoft, 0.3) }}>
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: withAlpha(borderSoft, 0.3) }}>
           <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isCompleted ? "bg-emerald-400" : "bg-amber-400"}`} />
-            <h2 className="text-lg font-bold text-white">{PHASE_LABELS[phase]}</h2>
-            <span className="text-sm text-white/60">{vehicleName}</span>
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: isCompleted ? "#10b981" : "#f59e0b" }} />
+            <h2 className="text-lg font-bold" style={{ color: textPrimary }}>{PHASE_LABELS[phase]}</h2>
+            <span className="text-sm" style={{ color: textSecondary }}>{vehicleName}</span>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-white/10 transition-colors">
-            <X className="w-5 h-5 text-white/60" />
+          <button onClick={onClose} className="p-1 rounded transition-colors hover:bg-white/10" style={{ color: textSecondary }}>
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
         <div className="p-4 space-y-4">
           {loading ? (
-            <div className="text-center py-8 text-white/60">Загрузка...</div>
+            <div className="text-center py-8" style={{ color: textSecondary }}>Загрузка...</div>
           ) : (
             <>
               {/* Phase-specific checklist */}
               {phase === "handout" ? (
                 <div className="space-y-1.5">
-                  <h3 className="text-xs font-medium text-white/50 uppercase tracking-wide">Чеклист</h3>
+                  <h3 className="text-xs font-medium uppercase tracking-wide" style={{ color: textSecondary }}>Чеклист</h3>
                   <div className="space-y-1">
-                    {[
-                      { checked: passportChecked, set: setPassportChecked, label: "Паспорт" },
-                      { checked: licenseChecked, set: setLicenseChecked, label: "ВУ" },
-                      { checked: depositCollected, set: setDepositCollected, label: "Залог" },
-                      { checked: helmetIssued, set: setHelmetIssued, label: "Шлем" },
-                      { checked: keysIssued, set: setKeysIssued, label: "Ключи" },
-                      { checked: instructionsGiven, set: setInstructionsGiven, label: "Инструкция" },
-                      { checked: photosTaken, set: setPhotosTaken, label: "Фото" },
-                    ].map((item) => (
-                      <label
-                        key={item.label}
-                        className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-                          item.checked ? "bg-emerald-500/20" : "bg-white/5 hover:bg-white/10"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={item.checked}
-                          onChange={(e) => item.set(e.target.checked)}
-                          className="w-4 h-4 rounded accent-yellow-400"
-                        />
-                        <span className="text-sm text-white">{item.label}</span>
-                        {item.checked && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 ml-auto" />}
-                      </label>
-                    ))}
+                    <CheckboxItem checked={passportChecked} onChange={(e) => setPassportChecked(e.target.checked)} label="Паспорт" accentColor={accentMain} cardBg={bgCard} textColor={textPrimary} />
+                    <CheckboxItem checked={licenseChecked} onChange={(e) => setLicenseChecked(e.target.checked)} label="ВУ" accentColor={accentMain} cardBg={bgCard} textColor={textPrimary} />
+                    <CheckboxItem checked={depositCollected} onChange={(e) => setDepositCollected(e.target.checked)} label="Залог" accentColor={accentMain} cardBg={bgCard} textColor={textPrimary} />
+                    <CheckboxItem checked={helmetIssued} onChange={(e) => setHelmetIssued(e.target.checked)} label="Шлем" accentColor={accentMain} cardBg={bgCard} textColor={textPrimary} />
+                    <CheckboxItem checked={keysIssued} onChange={(e) => setKeysIssued(e.target.checked)} label="Ключи" accentColor={accentMain} cardBg={bgCard} textColor={textPrimary} />
+                    <CheckboxItem checked={instructionsGiven} onChange={(e) => setInstructionsGiven(e.target.checked)} label="Инструкция" accentColor={accentMain} cardBg={bgCard} textColor={textPrimary} />
+                    <CheckboxItem checked={photosTaken} onChange={(e) => setPhotosTaken(e.target.checked)} label="Фото" accentColor={accentMain} cardBg={bgCard} textColor={textPrimary} />
                   </div>
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  <h3 className="text-xs font-medium text-white/50 uppercase tracking-wide">Чеклист</h3>
+                  <h3 className="text-xs font-medium uppercase tracking-wide" style={{ color: textSecondary }}>Чеклист</h3>
                   <div className="space-y-1">
-                    {[
-                      { checked: conditionChecked, set: setConditionChecked, label: "Состояние проверено" },
-                      { checked: helmetReturned, set: setHelmetReturned, label: "Шлем возвращён" },
-                      { checked: keysReturned, set: setKeysReturned, label: "Ключи возвращены" },
-                      { checked: depositReturned, set: setDepositReturned, label: "Залог возвращён" },
-                      { checked: noDamagesConfirmed, set: setNoDamagesConfirmed, label: "Без повреждений" },
-                    ].map((item) => (
-                      <label
-                        key={item.label}
-                        className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-                          item.checked ? "bg-emerald-500/20" : "bg-white/5 hover:bg-white/10"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={item.checked}
-                          onChange={(e) => item.set(e.target.checked)}
-                          className="w-4 h-4 rounded accent-yellow-400"
-                        />
-                        <span className="text-sm text-white">{item.label}</span>
-                        {item.checked && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 ml-auto" />}
-                      </label>
-                    ))}
+                    <CheckboxItem checked={conditionChecked} onChange={(e) => setConditionChecked(e.target.checked)} label="Состояние проверено" accentColor={accentMain} cardBg={bgCard} textColor={textPrimary} />
+                    <CheckboxItem checked={helmetReturned} onChange={(e) => setHelmetReturned(e.target.checked)} label="Шлем возвращён" accentColor={accentMain} cardBg={bgCard} textColor={textPrimary} />
+                    <CheckboxItem checked={keysReturned} onChange={(e) => setKeysReturned(e.target.checked)} label="Ключи возвращены" accentColor={accentMain} cardBg={bgCard} textColor={textPrimary} />
+                    <CheckboxItem checked={depositReturned} onChange={(e) => setDepositReturned(e.target.checked)} label="Залог возвращён" accentColor={accentMain} cardBg={bgCard} textColor={textPrimary} />
+                    <CheckboxItem checked={noDamagesConfirmed} onChange={(e) => setNoDamagesConfirmed(e.target.checked)} label="Без повреждений" accentColor={accentMain} cardBg={bgCard} textColor={textPrimary} />
                   </div>
                 </div>
               )}
 
-              {/* Odometer - keep as number input */}
+              {/* Odometer */}
               <div className="space-y-2">
-                <h3 className="text-xs font-medium text-white/50 uppercase tracking-wide">Одометр (км)</h3>
+                <h3 className="text-xs font-medium uppercase tracking-wide" style={{ color: textSecondary }}>Одометр (км)</h3>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-xs text-white/50 mb-1 block">Выдача</label>
+                    <label className="text-xs mb-1 block" style={{ color: textSecondary }}>Выдача</label>
                     <input
                       type="number"
                       value={odometerStart}
                       onChange={(e) => setOdometerStart(e.target.value)}
                       placeholder="1250"
                       disabled={phase === "return" && handoff?.odometer_start}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50 text-sm"
+                      className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none"
+                      style={{ backgroundColor: withAlpha(bgCard, 0.5), border: `1px solid ${borderSoft}`, color: textPrimary }}
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-white/50 mb-1 block">Возврат</label>
+                    <label className="text-xs mb-1 block" style={{ color: textSecondary }}>Возврат</label>
                     <input
                       type="number"
                       value={odometerEnd}
                       onChange={(e) => setOdometerEnd(e.target.value)}
                       placeholder="1450"
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50 text-sm"
+                      className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none"
+                      style={{ backgroundColor: withAlpha(bgCard, 0.5), border: `1px solid ${borderSoft}`, color: textPrimary }}
                     />
                   </div>
                 </div>
                 {odometerStart && odometerEnd && (
-                  <div className="flex items-center justify-center gap-1 text-xs text-emerald-400 bg-emerald-500/10 py-1.5 rounded-lg">
+                  <div className="flex items-center justify-center gap-1 text-xs py-1.5 rounded-lg" style={{ color: "#10b981", backgroundColor: withAlpha("#10b981", 0.1) }}>
                     <span>Пробег:</span>
                     <span className="font-bold">{parseInt(odometerEnd) - parseInt(odometerStart)}</span>
                     <span>км</span>
@@ -401,12 +400,12 @@ export function RentalHandoffModal({
                 )}
               </div>
 
-              {/* Fuel level - quick-select */}
+              {/* Fuel level */}
               <div className="space-y-2">
-                <h3 className="text-xs font-medium text-white/50 uppercase tracking-wide">Топливо (%)</h3>
+                <h3 className="text-xs font-medium uppercase tracking-wide" style={{ color: textSecondary }}>Топливо (%)</h3>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs text-white/50 mb-1.5 block">Выдача</label>
+                    <label className="text-xs mb-1.5 block" style={{ color: textSecondary }}>Выдача</label>
                     <div className="flex flex-wrap gap-1.5">
                       {PERCENT_OPTIONS.map((pct) => (
                         <QuickSelectChip
@@ -414,16 +413,16 @@ export function RentalHandoffModal({
                           label={`${pct}%`}
                           selected={fuelLevelStart === pct}
                           onClick={() => setFuelLevelStart(pct)}
+                          accentColor={accentMain}
+                          textColor={textPrimary}
+                          borderColor={borderSoft}
                         />
                       ))}
                       <button
                         type="button"
                         onClick={() => setFuelLevelStart(null)}
-                        className={`px-3 py-1.5 text-xs rounded-full transition-all ${
-                          fuelLevelStart === null
-                            ? "bg-white/10 text-white/40"
-                            : "bg-white/5 text-white/30"
-                        }`}
+                        className="px-3 py-1.5 text-xs rounded-full transition-all"
+                        style={{ backgroundColor: fuelLevelStart === null ? withAlpha(borderSoft, 0.2) : withAlpha(borderSoft, 0.1), color: textSecondary }}
                       >
                         —
                       </button>
@@ -431,7 +430,7 @@ export function RentalHandoffModal({
                   </div>
                   {phase === "return" && (
                     <div>
-                      <label className="text-xs text-white/50 mb-1.5 block">Возврат</label>
+                      <label className="text-xs mb-1.5 block" style={{ color: textSecondary }}>Возврат</label>
                       <div className="flex flex-wrap gap-1.5">
                         {PERCENT_OPTIONS.map((pct) => (
                           <QuickSelectChip
@@ -439,16 +438,16 @@ export function RentalHandoffModal({
                             label={`${pct}%`}
                             selected={fuelLevelEnd === pct}
                             onClick={() => setFuelLevelEnd(pct)}
+                            accentColor={accentMain}
+                            textColor={textPrimary}
+                            borderColor={borderSoft}
                           />
                         ))}
                         <button
                           type="button"
                           onClick={() => setFuelLevelEnd(null)}
-                          className={`px-3 py-1.5 text-xs rounded-full transition-all ${
-                            fuelLevelEnd === null
-                              ? "bg-white/10 text-white/40"
-                              : "bg-white/5 text-white/30"
-                          }`}
+                          className="px-3 py-1.5 text-xs rounded-full transition-all"
+                          style={{ backgroundColor: fuelLevelEnd === null ? withAlpha(borderSoft, 0.2) : withAlpha(borderSoft, 0.1), color: textSecondary }}
                         >
                           —
                         </button>
@@ -458,12 +457,12 @@ export function RentalHandoffModal({
                 </div>
               </div>
 
-              {/* Battery level - quick-select */}
+              {/* Battery level */}
               <div className="space-y-2">
-                <h3 className="text-xs font-medium text-white/50 uppercase tracking-wide">Заряд АКБ (%)</h3>
+                <h3 className="text-xs font-medium uppercase tracking-wide" style={{ color: textSecondary }}>Заряд АКБ (%)</h3>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs text-white/50 mb-1.5 block">Выдача</label>
+                    <label className="text-xs mb-1.5 block" style={{ color: textSecondary }}>Выдача</label>
                     <div className="flex flex-wrap gap-1.5">
                       {PERCENT_OPTIONS.map((pct) => (
                         <QuickSelectChip
@@ -471,16 +470,16 @@ export function RentalHandoffModal({
                           label={`${pct}%`}
                           selected={batteryLevelStart === pct}
                           onClick={() => setBatteryLevelStart(pct)}
+                          accentColor={accentMain}
+                          textColor={textPrimary}
+                          borderColor={borderSoft}
                         />
                       ))}
                       <button
                         type="button"
                         onClick={() => setBatteryLevelStart(null)}
-                        className={`px-3 py-1.5 text-xs rounded-full transition-all ${
-                          batteryLevelStart === null
-                            ? "bg-white/10 text-white/40"
-                            : "bg-white/5 text-white/30"
-                        }`}
+                        className="px-3 py-1.5 text-xs rounded-full transition-all"
+                        style={{ backgroundColor: batteryLevelStart === null ? withAlpha(borderSoft, 0.2) : withAlpha(borderSoft, 0.1), color: textSecondary }}
                       >
                         —
                       </button>
@@ -488,7 +487,7 @@ export function RentalHandoffModal({
                   </div>
                   {phase === "return" && (
                     <div>
-                      <label className="text-xs text-white/50 mb-1.5 block">Возврат</label>
+                      <label className="text-xs mb-1.5 block" style={{ color: textSecondary }}>Возврат</label>
                       <div className="flex flex-wrap gap-1.5">
                         {PERCENT_OPTIONS.map((pct) => (
                           <QuickSelectChip
@@ -496,16 +495,16 @@ export function RentalHandoffModal({
                             label={`${pct}%`}
                             selected={batteryLevelEnd === pct}
                             onClick={() => setBatteryLevelEnd(pct)}
+                            accentColor={accentMain}
+                            textColor={textPrimary}
+                            borderColor={borderSoft}
                           />
                         ))}
                         <button
                           type="button"
                           onClick={() => setBatteryLevelEnd(null)}
-                          className={`px-3 py-1.5 text-xs rounded-full transition-all ${
-                            batteryLevelEnd === null
-                              ? "bg-white/10 text-white/40"
-                              : "bg-white/5 text-white/30"
-                          }`}
+                          className="px-3 py-1.5 text-xs rounded-full transition-all"
+                          style={{ backgroundColor: batteryLevelEnd === null ? withAlpha(borderSoft, 0.2) : withAlpha(borderSoft, 0.1), color: textSecondary }}
                         >
                           —
                         </button>
@@ -517,11 +516,10 @@ export function RentalHandoffModal({
 
               {/* Equipment */}
               <div className="space-y-2">
-                <h3 className="text-xs font-medium text-white/50 uppercase tracking-wide">Комплектация</h3>
+                <h3 className="text-xs font-medium uppercase tracking-wide" style={{ color: textSecondary }}>Комплектация</h3>
 
-                {/* Keys count - quick-select */}
                 <div>
-                  <label className="text-xs text-white/50 mb-1.5 block">Ключи (шт)</label>
+                  <label className="text-xs mb-1.5 block" style={{ color: textSecondary }}>Ключи (шт)</label>
                   <div className="flex gap-2">
                     {[1, 2].map((count) => (
                       <QuickSelectChip
@@ -529,12 +527,14 @@ export function RentalHandoffModal({
                         label={`${count}`}
                         selected={keysCount === count}
                         onClick={() => setKeysCount(count)}
+                        accentColor={accentMain}
+                        textColor={textPrimary}
+                        borderColor={borderSoft}
                       />
                     ))}
                   </div>
                 </div>
 
-                {/* Equipment checkboxes - already 1-tap */}
                 <div className="grid grid-cols-2 gap-1.5 mt-2">
                   {[
                     { checked: chargerIncluded, set: setChargerIncluded, label: "Зарядка" },
@@ -549,34 +549,33 @@ export function RentalHandoffModal({
                   ].map((item) => (
                     <label
                       key={item.label}
-                      className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-                        item.checked ? "bg-yellow-500/20" : "bg-white/5 hover:bg-white/10"
-                      }`}
+                      className="flex items-center gap-2 p-2 rounded cursor-pointer transition-colors"
+                      style={{ backgroundColor: item.checked ? withAlpha(accentMain, 0.2) : withAlpha(bgCard, 0.5) }}
                     >
                       <input
                         type="checkbox"
                         checked={item.checked}
                         onChange={(e) => item.set(e.target.checked)}
-                        className="w-3.5 h-3.5 rounded accent-yellow-400"
+                        className="w-3.5 h-3.5 rounded"
+                        style={{ accentColor }}
                       />
-                      <span className="text-xs text-white">{item.label}</span>
+                      <span className="text-xs" style={{ color: textPrimary }}>{item.label}</span>
                     </label>
                   ))}
                 </div>
 
-                {/* Other equipment - text input */}
                 <input
                   type="text"
                   value={otherEquipment}
                   onChange={(e) => setOtherEquipment(e.target.value)}
                   placeholder="Другое оборудование..."
-                  className="w-full px-3 py-2 text-xs bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50"
+                  className="w-full px-3 py-2 text-xs rounded-lg focus:outline-none"
+                  style={{ backgroundColor: withAlpha(bgCard, 0.5), border: `1px solid ${borderSoft}`, color: textPrimary }}
                 />
 
-                {/* Equipment condition - quick-select for return */}
                 {phase === "return" && (
                   <div className="mt-2">
-                    <label className="text-xs text-white/50 mb-1.5 block">Состояние экипировки</label>
+                    <label className="text-xs mb-1.5 block" style={{ color: textSecondary }}>Состояние экипировки</label>
                     <div className="flex flex-wrap gap-1.5">
                       {CONDITION_OPTIONS.map((opt) => (
                         <QuickSelectChip
@@ -584,6 +583,9 @@ export function RentalHandoffModal({
                           label={opt.label}
                           selected={equipmentConditionReturn === opt.value}
                           onClick={() => setEquipmentConditionReturn(opt.value)}
+                          accentColor={accentMain}
+                          textColor={textPrimary}
+                          borderColor={borderSoft}
                         />
                       ))}
                     </div>
@@ -592,28 +594,31 @@ export function RentalHandoffModal({
                       onChange={(e) => setEquipmentConditionReturn(e.target.value)}
                       placeholder="Или введите своё..."
                       rows={1}
-                      className="w-full mt-2 px-3 py-2 text-xs bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50 resize-none"
+                      className="w-full mt-2 px-3 py-2 text-xs rounded-lg focus:outline-none resize-none"
+                      style={{ backgroundColor: withAlpha(bgCard, 0.5), border: `1px solid ${borderSoft}`, color: textPrimary }}
                     />
                   </div>
                 )}
               </div>
 
-              {/* Notes - keep as text */}
+              {/* Notes */}
               <div className="space-y-2">
-                <h3 className="text-xs font-medium text-white/50 uppercase tracking-wide">Заметки</h3>
+                <h3 className="text-xs font-medium uppercase tracking-wide" style={{ color: textSecondary }}>Заметки</h3>
                 <textarea
                   value={damageNotes}
                   onChange={(e) => setDamageNotes(e.target.value)}
                   placeholder="Повреждения..."
                   rows={2}
-                  className="w-full px-3 py-2 text-xs bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50 resize-none"
+                  className="w-full px-3 py-2 text-xs rounded-lg focus:outline-none resize-none"
+                  style={{ backgroundColor: withAlpha(bgCard, 0.5), border: `1px solid ${borderSoft}`, color: textPrimary }}
                 />
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Другие заметки..."
                   rows={1}
-                  className="w-full px-3 py-2 text-xs bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50 resize-none"
+                  className="w-full px-3 py-2 text-xs rounded-lg focus:outline-none resize-none"
+                  style={{ backgroundColor: withAlpha(bgCard, 0.5), border: `1px solid ${borderSoft}`, color: textPrimary }}
                 />
               </div>
             </>
@@ -621,11 +626,12 @@ export function RentalHandoffModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t border-white/10">
+        <div className="flex items-center justify-between p-4 border-t" style={{ borderColor: withAlpha(borderSoft, 0.3) }}>
           <button
             onClick={handleDelete}
             disabled={saving || !handoff}
-            className="px-3 py-2 text-sm text-rose-400 hover:text-rose-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-2 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ color: "#f87171" }}
           >
             Сбросить
           </button>
@@ -633,18 +639,18 @@ export function RentalHandoffModal({
             <button
               onClick={onClose}
               disabled={saving}
-              className="px-4 py-2 text-sm text-white/70 hover:text-white disabled:opacity-50 transition-colors"
+              className="px-4 py-2 text-sm disabled:opacity-50 transition-colors"
+              style={{ color: textSecondary }}
             >
               Отмена
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${
-                isCompleted
-                  ? "bg-emerald-500 text-white"
-                  : "bg-gradient-to-r from-yellow-400 to-orange-500 text-black hover:from-yellow-300 hover:to-orange-400"
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              className="px-5 py-2 text-sm font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-white"
+              style={{
+                backgroundColor: isCompleted ? "#10b981" : accentMain,
+              }}
             >
               {saving ? "..." : isCompleted ? "Готово ✓" : "Сохранить"}
             </button>

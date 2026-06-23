@@ -100,16 +100,16 @@ set
               'borderSoft', '#2A2A2A'
             ),
             'light', jsonb_build_object(
-              -- vip-bike.ru light theme: electric cyan accent, off-white base,
-              -- pure white cards, light cyan borders for crisp modern look.
+              -- vip-bike.ru light theme: darker cyan accent for WCAG AA compliance (4.5:1+),
+              -- off-white base, pure white cards, subtle teal borders for crisp modern look.
               -- Only 7 tokens are consumed by resolvePaletteByMode().
               'bgBase', '#FAFAFA',
               'bgCard', '#FFFFFF',
-              'accentMain', '#00FFFF',
-              'accentMainHover', '#00CED1',
+              'accentMain', '#0891B2',
+              'accentMainHover', '#0E7490',
               'textPrimary', '#1A1A1A',
               'textSecondary', '#4A4A4A',
-              'borderSoft', '#E0F7FA'
+              'borderSoft', '#CCFBF1'
             )
           ),
           'radius', jsonb_build_object('card', 16, 'button', 14, 'pill', 999, 'sm', 10, 'md', 14, 'lg', 18, 'hero', 28),

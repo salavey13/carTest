@@ -32,6 +32,7 @@ import {
   type RentalDashboardSummary,
 } from "@/app/franchize/server-actions/rentals-dashboard";
 import { useSupabaseRealtime } from "@/app/franchize/hooks/useSupabaseRealtime";
+import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import {
   getAllChecklistStates,
   updateChecklistState,
@@ -44,6 +45,7 @@ import {
   type TodoStatus,
 } from "@/app/franchize/server-actions/crew-todos";
 import { RentalHandoffModal } from "./RentalHandoffModal";
+import { withAlpha } from "@/app/franchize/lib/theme";
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────────
 
@@ -75,24 +77,26 @@ const formatRussianDateOnly = (dateStr: string | null): string => {
   }
 };
 
-// ─── Status configs ────────────────────────────────────────────────────────────
+// ─── Status configs (will be themed dynamically) ───────────────────────────────
 
-const STATUS_STYLES = {
-  confirmed: { bg: "rgba(52, 211, 153, 0.15)", border: "#34d399", text: "#34d399", icon: CheckCircle2, label: "Подтв" },
-  active: { bg: "rgba(96, 165, 250, 0.15)", border: "#60a5fa", text: "#60a5fa", icon: Clock, label: "Активна" },
-  completed: { bg: "rgba(74, 222, 128, 0.15)", border: "#4ade80", text: "#4ade80", icon: CheckCircle2, label: "Завершена" },
-  cancelled: { bg: "rgba(248, 113, 113, 0.15)", border: "#f87171", text: "#f87171", icon: XCircle, label: "Отменена" },
-  pending_confirmation: { bg: "rgba(251, 191, 36, 0.15)", border: "#fbbf24", text: "#fbbf24", icon: AlertCircle, label: "Ожидает" },
-};
+const getStatusConfig = (accentMain: string) => ({
+  confirmed: { icon: CheckCircle2, label: "Подтв", color: "#34d399" },
+  active: { icon: Clock, label: "Активна", color: "#60a5fa" },
+  completed: { icon: CheckCircle2, label: "Завершена", color: "#4ade80" },
+  cancelled: { icon: XCircle, label: "Отменена", color: "#f87171" },
+  pending_confirmation: { icon: AlertCircle, label: "Ожидает", color: "#fbbf24" },
+});
 
 interface RentalsAnalyticsClientProps {
   initialSlug: string;
   initialDate: string;
-  crew: { id: string; name: string; theme: { palette: { primary: string } } };
+  crew: { id: string; name: string; theme: any };
 }
 
 export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: RentalsAnalyticsClientProps) {
   const { dbUser, isLoading: authLoading } = useAppContext();
+  const theme = useFranchizeTheme(crew.theme);
+
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [verificationFilter, setVerificationFilter] = useState<"all" | "verified" | "pending" | "revoked">("all");
   const [rentals, setRentals] = useState<RentalDashboardItem[]>([]);
@@ -334,13 +338,30 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     }
   }, [todoFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ─── Calculations ───────────────────────────────────────────────────────────────
+
+  const totalRentals = rentals.length;
+  const totalRevenue = rentals.reduce((sum, r) => sum + (r.total_cost || 0), 0);
+  const activeRentals = rentals.filter(r => r.status === "active").length;
+  const completedRentals = rentals.filter(r => r.status === "completed").length;
+  const completionRate = totalRentals > 0 ? Math.round((completedRentals / totalRentals) * 100) : 0;
+
+  // Theme colors from CSS variables
+  const bgBase = "var(--franchize-bg-base)";
+  const bgCard = "var(--franchize-bg-card)";
+  const accentMain = "var(--franchize-accent-main)";
+  const accentHover = "var(--franchize-accent-hover)";
+  const textPrimary = "var(--franchize-text-primary)";
+  const textSecondary = "var(--franchize-text-secondary)";
+  const borderSoft = "var(--franchize-border-soft)";
+
   // ─── Password entry screen ────────────────────────────────────────────────────
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: bgBase }}>
         <div className="relative">
-          <div className="w-16 h-16 border-4 border-yellow-400/30 border-t-yellow-400 rounded-full animate-spin" />
+          <div className="w-16 h-16 border-4 rounded-full animate-spin" style={{ borderColor: withAlpha(accentMain, 0.3), borderTopColor: accentMain }} />
         </div>
       </div>
     );
@@ -348,20 +369,32 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
   if (showPasswordEntry) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: bgBase }}>
         <div className="w-full max-w-sm relative">
           {/* Animated glow effect */}
-          <div className="absolute -inset-4 bg-gradient-to-r from-purple-600 via-pink-600 to-yellow-600 rounded-full blur-3xl opacity-20 animate-pulse" />
+          <div
+            className="absolute -inset-4 rounded-full blur-3xl animate-pulse"
+            style={{ backgroundColor: withAlpha(accentMain, 0.15) }}
+          />
 
-          <div className="relative bg-gradient-to-br from-zinc-900 to-black rounded-3xl p-8 border border-zinc-800 shadow-2xl">
+          <div
+            className="relative rounded-3xl p-8 border shadow-2xl"
+            style={{ backgroundColor: bgCard, borderColor: borderSoft }}
+          >
             <div className="text-center mb-8">
-              <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
+              <div
+                className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center shadow-lg"
+                style={{
+                  background: `linear-gradient(135deg, ${accentMain}, ${accentHover})`,
+                  boxShadow: `0 10px 40px ${withAlpha(accentMain, 0.3)}`,
+                }}
+              >
                 <ShieldCheck className="w-10 h-10 text-white" />
               </div>
-              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-yellow-500 tracking-tight">
+              <h1 className="text-3xl font-black tracking-tight" style={{ backgroundImage: `linear-gradient(to right, ${accentMain}, ${accentHover})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                 Аналитика
               </h1>
-              <p className="text-zinc-500 text-sm mt-2">Введите пароль для доступа</p>
+              <p className="text-sm mt-2" style={{ color: textSecondary }}>Введите пароль для доступа</p>
             </div>
 
             <div className="relative">
@@ -372,11 +405,17 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                 onKeyDown={(e) => e.key === "Enter" && void handlePasswordSubmit()}
                 placeholder="••••••••"
                 disabled={isPasswordValidating}
-                className="w-full px-6 py-4 bg-zinc-900/50 border-2 border-zinc-800 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/20 text-center tracking-widest text-lg transition-all"
+                className="w-full px-6 py-4 rounded-xl border-2 text-center tracking-widest text-lg transition-all focus:outline-none focus:ring-2"
+                style={{
+                  backgroundColor: withAlpha(bgCard, 0.5),
+                  borderColor: borderSoft,
+                  color: textPrimary,
+                  placeholderColor: textSecondary,
+                }}
                 autoFocus
               />
               {passwordError && (
-                <p className="mt-3 text-center text-sm text-rose-400 flex items-center justify-center gap-2">
+                <p className="mt-3 text-center text-sm flex items-center justify-center gap-2" style={{ color: "#ef4444" }}>
                   <AlertCircle className="w-4 h-4" />
                   {passwordError}
                 </p>
@@ -386,7 +425,11 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
             <button
               onClick={handlePasswordSubmit}
               disabled={isPasswordValidating || !passwordInput.trim()}
-              className="w-full mt-6 px-6 py-4 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-300 hover:to-orange-400 text-black font-bold rounded-xl transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-yellow-400/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+              className="w-full mt-6 px-6 py-4 font-bold rounded-xl transition-all hover:scale-[1.02] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2 text-white"
+              style={{
+                background: `linear-gradient(to right, ${accentMain}, ${accentHover})`,
+                boxShadow: `0 4px 20px ${withAlpha(accentMain, 0.4)}`,
+              }}
             >
               {isPasswordValidating ? (
                 <>
@@ -406,53 +449,59 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     );
   }
 
-  // ─── Calculations ───────────────────────────────────────────────────────────────
-
-  const totalRentals = rentals.length;
-  const totalRevenue = rentals.reduce((sum, r) => sum + (r.total_cost || 0), 0);
-  const activeRentals = rentals.filter(r => r.status === "active").length;
-  const completedRentals = rentals.filter(r => r.status === "completed").length;
-  const completionRate = totalRentals > 0 ? Math.round((completedRentals / totalRentals) * 100) : 0;
+  const statusConfig = getStatusConfig(accentMain);
 
   // ─── Main render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Animated gradient orbs background */}
+    <div className="min-h-screen" style={{ backgroundColor: bgBase, color: textPrimary }}>
+      {/* Animated gradient orbs background - themed */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute w-[800px] h-[800px] bg-purple-600/10 rounded-full blur-[120px] animate-orb-1" />
-        <div className="absolute w-[600px] h-[600px] bg-yellow-600/10 rounded-full blur-[100px] animate-orb-2 top-[20%] right-[10%]" />
-        <div className="absolute w-[700px] h-[700px] bg-pink-600/8 rounded-full blur-[110px] animate-orb-3 bottom-[10%] left-[30%]" />
+        <div
+          className="absolute w-[800px] h-[800px] rounded-full blur-[120px] animate-orb-1"
+          style={{ backgroundColor: withAlpha(accentMain, 0.08) }}
+        />
+        <div
+          className="absolute w-[600px] h-[600px] rounded-full blur-[100px] animate-orb-2 top-[20%] right-[10%]"
+          style={{ backgroundColor: withAlpha(accentMain, 0.06) }}
+        />
+        <div
+          className="absolute w-[700px] h-[700px] rounded-full blur-[110px] animate-orb-3 bottom-[10%] left-[30%]"
+          style={{ backgroundColor: withAlpha(accentMain, 0.05) }}
+        />
       </div>
 
       <div className="relative z-10 h-screen flex flex-col">
         {/* HEADER */}
-        <header className="flex-shrink-0 px-6 py-4 border-b border-white/5 bg-black/50 backdrop-blur-xl">
+        <header className="flex-shrink-0 px-6 py-4 border-b backdrop-blur-xl" style={{ borderColor: withAlpha(borderSoft, 0.5), backgroundColor: withAlpha(bgCard, 0.5) }}>
           <div className="flex items-center justify-between max-w-7xl mx-auto">
             {/* Left section */}
             <div className="flex items-center gap-6">
               <div>
-                <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-yellow-200 to-yellow-500 bg-clip-text text-transparent">
+                <h1 className="text-xl font-black tracking-tight" style={{ backgroundImage: `linear-gradient(to right, ${accentMain}, ${accentHover})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                   Аналитика
                 </h1>
-                <p className="text-xs text-zinc-500 mt-0.5">{crew.name}</p>
+                <p className="text-xs mt-0.5" style={{ color: textSecondary }}>{crew.name}</p>
               </div>
 
-              <div className="h-8 w-px bg-white/10" />
+              <div className="h-8 w-px" style={{ backgroundColor: withAlpha(borderSoft, 0.5) }} />
 
               {/* Date navigation */}
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => navigateDate(-1)}
                   disabled={loading}
-                  className="p-2 rounded-xl bg-zinc-900/50 border border-zinc-800 hover:border-yellow-400/30 hover:bg-zinc-800 transition-all group"
+                  className="p-2 rounded-xl border transition-all group"
+                  style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = accentMain; e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.1); }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = borderSoft; e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.5); }}
                 >
-                  <ChevronLeft className="w-5 h-5 text-zinc-400 group-hover:text-yellow-400 transition-colors" />
+                  <ChevronLeft className="w-5 h-5 transition-colors group-hover:text-[var(--hover-color)]" style={{ color: textSecondary, '--hover-color': accentMain } as React.CSSProperties} />
                 </button>
 
-                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-yellow-400/10 to-orange-400/10 border border-yellow-400/20">
-                  <Calendar className="w-4 h-4 text-yellow-400" />
-                  <span className="text-sm font-medium text-yellow-100">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl border">
+                  <Calendar className="w-4 h-4" style={{ color: accentMain }} />
+                  <span className="text-sm font-medium" style={{ color: textPrimary }}>
                     {formatRussianDateOnly(selectedDate)}
                   </span>
                 </div>
@@ -460,9 +509,12 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                 <button
                   onClick={() => navigateDate(1)}
                   disabled={loading}
-                  className="p-2 rounded-xl bg-zinc-900/50 border border-zinc-800 hover:border-yellow-400/30 hover:bg-zinc-800 transition-all group"
+                  className="p-2 rounded-xl border transition-all group"
+                  style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = accentMain; e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.1); }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = borderSoft; e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.5); }}
                 >
-                  <ChevronRight className="w-5 h-5 text-zinc-400 group-hover:text-yellow-400 transition-colors" />
+                  <ChevronRight className="w-5 h-5 transition-colors" style={{ color: textSecondary, '--hover-color': accentMain } as React.CSSProperties} />
                 </button>
               </div>
             </div>
@@ -472,14 +524,24 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
               <button
                 onClick={() => void loadRentals(selectedDate, true)}
                 disabled={refreshing}
-                className="p-2.5 rounded-xl bg-zinc-900/50 border border-zinc-800 hover:border-emerald-400/30 hover:bg-zinc-800 transition-all group"
+                className="p-2.5 rounded-xl border transition-all group"
+                style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#34d399"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = borderSoft; }}
               >
-                <RefreshCw className={`w-5 h-5 text-zinc-400 group-hover:text-emerald-400 transition-colors ${refreshing ? "animate-spin" : ""}`} />
+                <RefreshCw className={`w-5 h-5 transition-colors ${refreshing ? "animate-spin" : ""}`} style={{ color: textSecondary }} />
               </button>
 
               <button
                 onClick={exportToExcel}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 text-emerald-400 hover:from-emerald-500/30 hover:to-teal-500/30 hover:border-emerald-400/40 transition-all flex items-center gap-2 text-sm font-medium"
+                className="px-4 py-2.5 rounded-xl border font-medium transition-all flex items-center gap-2 text-sm"
+                style={{
+                  backgroundColor: withAlpha("#10b981", 0.15),
+                  borderColor: withAlpha("#10b981", 0.3),
+                  color: "#34d399",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = withAlpha("#10b981", 0.25); e.currentTarget.style.borderColor = withAlpha("#10b981", 0.4); }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = withAlpha("#10b981", 0.15); e.currentTarget.style.borderColor = withAlpha("#10b981", 0.3); }}
               >
                 <Download className="w-4 h-4" />
                 Экспорт
@@ -496,16 +558,16 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Total rentals */}
               <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-purple-600/5 rounded-2xl blur-xl group-hover:blur-2xl transition-all" />
-                <div className="relative bg-zinc-900/50 backdrop-blur-xl rounded-2xl p-5 border border-white/5 group-hover:border-purple-500/20 transition-all">
+                <div className="absolute inset-0 rounded-2xl blur-xl group-hover:blur-2xl transition-all" style={{ backgroundColor: withAlpha(accentMain, 0.12) }} />
+                <div className="relative rounded-2xl p-5 border transition-all" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-purple-500/20">
-                      <Eye className="w-5 h-5 text-purple-400" />
+                    <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha(accentMain, 0.15) }}>
+                      <Eye className="w-5 h-5" style={{ color: accentMain }} />
                     </div>
-                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Всего аренд</span>
+                    <span className="text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Всего аренд</span>
                   </div>
-                  <div className="text-3xl font-black text-white">{totalRentals}</div>
-                  <div className="mt-2 flex items-center gap-1 text-xs text-zinc-500">
+                  <div className="text-3xl font-black" style={{ color: textPrimary }}>{totalRentals}</div>
+                  <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: textSecondary }}>
                     <Calendar className="w-3 h-3" />
                     За выбранный день
                   </div>
@@ -514,16 +576,16 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
               {/* Revenue */}
               <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/20 to-emerald-600/5 rounded-2xl blur-xl group-hover:blur-2xl transition-all" />
-                <div className="relative bg-zinc-900/50 backdrop-blur-xl rounded-2xl p-5 border border-white/5 group-hover:border-emerald-500/20 transition-all">
+                <div className="absolute inset-0 rounded-2xl blur-xl group-hover:blur-2xl transition-all" style={{ backgroundColor: withAlpha("#10b981", 0.12) }} />
+                <div className="relative rounded-2xl p-5 border transition-all" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-emerald-500/20">
-                      <TrendingUp className="w-5 h-5 text-emerald-400" />
+                    <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha("#10b981", 0.15) }}>
+                      <TrendingUp className="w-5 h-5" style={{ color: "#34d399" }} />
                     </div>
-                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Выручка</span>
+                    <span className="text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Выручка</span>
                   </div>
-                  <div className="text-3xl font-black text-emerald-400">{formatRubles(totalRevenue)}</div>
-                  <div className="mt-2 flex items-center gap-1 text-xs text-zinc-500">
+                  <div className="text-3xl font-black" style={{ color: "#34d399" }}>{formatRubles(totalRevenue)}</div>
+                  <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: textSecondary }}>
                     <Zap className="w-3 h-3" />
                     Общий доход
                   </div>
@@ -532,16 +594,16 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
               {/* Active rentals */}
               <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-blue-600/5 rounded-2xl blur-xl group-hover:blur-2xl transition-all" />
-                <div className="relative bg-zinc-900/50 backdrop-blur-xl rounded-2xl p-5 border border-white/5 group-hover:border-blue-500/20 transition-all">
+                <div className="absolute inset-0 rounded-2xl blur-xl group-hover:blur-2xl transition-all" style={{ backgroundColor: withAlpha("#3b82f6", 0.12) }} />
+                <div className="relative rounded-2xl p-5 border transition-all" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-blue-500/20">
-                      <Clock className="w-5 h-5 text-blue-400" />
+                    <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha("#3b82f6", 0.15) }}>
+                      <Clock className="w-5 h-5" style={{ color: "#60a5fa" }} />
                     </div>
-                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Активных</span>
+                    <span className="text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Активных</span>
                   </div>
-                  <div className="text-3xl font-black text-blue-400">{activeRentals}</div>
-                  <div className="mt-2 flex items-center gap-1 text-xs text-zinc-500">
+                  <div className="text-3xl font-black" style={{ color: "#60a5fa" }}>{activeRentals}</div>
+                  <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: textSecondary }}>
                     <Sparkles className="w-3 h-3" />
                     Сейчас на выезде
                   </div>
@@ -550,16 +612,16 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
               {/* Completion rate */}
               <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-br from-yellow-600/20 to-yellow-600/5 rounded-2xl blur-xl group-hover:blur-2xl transition-all" />
-                <div className="relative bg-zinc-900/50 backdrop-blur-xl rounded-2xl p-5 border border-white/5 group-hover:border-yellow-500/20 transition-all">
+                <div className="absolute inset-0 rounded-2xl blur-xl group-hover:blur-2xl transition-all" style={{ backgroundColor: withAlpha(accentMain, 0.12) }} />
+                <div className="relative rounded-2xl p-5 border transition-all" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-yellow-500/20">
-                      <CheckCircle2 className="w-5 h-5 text-yellow-400" />
+                    <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha(accentMain, 0.15) }}>
+                      <CheckCircle2 className="w-5 h-5" style={{ color: accentMain }} />
                     </div>
-                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Завершено</span>
+                    <span className="text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Завершено</span>
                   </div>
-                  <div className="text-3xl font-black text-yellow-400">{completionRate}%</div>
-                  <div className="mt-2 flex items-center gap-1 text-xs text-zinc-500">
+                  <div className="text-3xl font-black" style={{ color: accentMain }}>{completionRate}%</div>
+                  <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: textSecondary }}>
                     <CheckCircle2 className="w-3 h-3" />
                     {completedRentals} из {totalRentals}
                   </div>
@@ -569,7 +631,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
             {/* FILTER BAR */}
             <div className="flex items-center gap-3 overflow-x-auto pb-2">
-              <span className="text-xs font-medium text-zinc-600 uppercase tracking-wider whitespace-nowrap">Фильтр:</span>
+              <span className="text-xs font-medium uppercase tracking-wider whitespace-nowrap" style={{ color: textSecondary }}>Фильтр:</span>
               {[
                 { value: "all", label: "Все", icon: Eye },
                 { value: "verified", label: "Проверены", icon: CheckCircle2 },
@@ -581,11 +643,24 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                   <button
                     key={filter.value}
                     onClick={() => setVerificationFilter(isActive ? "all" : (filter.value as any))}
-                    className={`px-4 py-2 rounded-xl border flex items-center gap-2 text-sm font-medium transition-all whitespace-nowrap ${
+                    className="px-4 py-2 rounded-xl border flex items-center gap-2 text-sm font-medium transition-all whitespace-nowrap"
+                    style={
                       isActive
-                        ? "bg-gradient-to-r from-yellow-400/20 to-orange-400/20 border-yellow-400/30 text-yellow-400"
-                        : "bg-zinc-900/50 border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400"
-                    }`}
+                        ? { background: withAlpha(accentMain, 0.15), borderColor: withAlpha(accentMain, 0.3), color: accentMain }
+                        : { backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft, color: textSecondary }
+                    }
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.borderColor = withAlpha(borderSoft, 0.8);
+                        e.currentTarget.style.color = textPrimary;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.borderColor = borderSoft;
+                        e.currentTarget.style.color = textSecondary;
+                      }
+                    }}
                   >
                     <Icon className="w-4 h-4" />
                     {filter.label}
@@ -597,14 +672,14 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
             {/* CHECKLISTS & TODOS */}
             <div className="grid lg:grid-cols-2 gap-4">
               {/* Handout checklist */}
-              <div className="bg-zinc-900/30 backdrop-blur-xl rounded-2xl border border-white/5 overflow-hidden">
-                <div className="px-5 py-3 border-b border-white/5 flex items-center justify-between">
+              <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.3), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
+                <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: withAlpha(borderSoft, 0.3) }}>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span className="text-sm font-bold text-white">ВЫДАЧА</span>
-                    <span className="text-zinc-600">→</span>
+                    <span className="text-sm font-bold" style={{ color: textPrimary }}>ВЫДАЧА</span>
+                    <span style={{ color: textSecondary }}>→</span>
                   </div>
-                  <span className="text-xs text-zinc-500">
+                  <span className="text-xs" style={{ color: textSecondary }}>
                     {checklistStates.handout?.items.filter(i => i.checked).length || 0} / {checklistStates.handout?.items.length || 0}
                   </span>
                 </div>
@@ -614,11 +689,24 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                       key={item.id}
                       onClick={() => void toggleChecklistItem("handout", item.id)}
                       disabled={updatingChecklist === item.id}
-                      className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all whitespace-nowrap ${
+                      className="px-3 py-1.5 rounded-lg border text-xs font-medium transition-all whitespace-nowrap"
+                      style={
                         item.checked
-                          ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400"
-                          : "bg-zinc-900/50 border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400"
-                      }`}
+                          ? { backgroundColor: withAlpha("#10b981", 0.2), borderColor: withAlpha("#10b981", 0.3), color: "#34d399" }
+                          : { backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft, color: textSecondary }
+                      }
+                      onMouseEnter={(e) => {
+                        if (!item.checked) {
+                          e.currentTarget.style.borderColor = withAlpha(borderSoft, 0.8);
+                          e.currentTarget.style.color = textPrimary;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!item.checked) {
+                          e.currentTarget.style.borderColor = borderSoft;
+                          e.currentTarget.style.color = textSecondary;
+                        }
+                      }}
                     >
                       {item.checked && <CheckCircle2 className="w-3 h-3 inline mr-1" />}
                       {item.text}
@@ -628,14 +716,14 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
               </div>
 
               {/* Return checklist */}
-              <div className="bg-zinc-900/30 backdrop-blur-xl rounded-2xl border border-white/5 overflow-hidden">
-                <div className="px-5 py-3 border-b border-white/5 flex items-center justify-between">
+              <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.3), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
+                <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: withAlpha(borderSoft, 0.3) }}>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-blue-400" />
-                    <span className="text-sm font-bold text-white">ВОЗВРАТ</span>
-                    <span className="text-zinc-600">←</span>
+                    <span className="text-sm font-bold" style={{ color: textPrimary }}>ВОЗВРАТ</span>
+                    <span style={{ color: textSecondary }}>←</span>
                   </div>
-                  <span className="text-xs text-zinc-500">
+                  <span className="text-xs" style={{ color: textSecondary }}>
                     {checklistStates.return?.items.filter(i => i.checked).length || 0} / {checklistStates.return?.items.length || 0}
                   </span>
                 </div>
@@ -645,11 +733,24 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                       key={item.id}
                       onClick={() => void toggleChecklistItem("return", item.id)}
                       disabled={updatingChecklist === item.id}
-                      className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all whitespace-nowrap ${
+                      className="px-3 py-1.5 rounded-lg border text-xs font-medium transition-all whitespace-nowrap"
+                      style={
                         item.checked
-                          ? "bg-blue-500/20 border-blue-500/30 text-blue-400"
-                          : "bg-zinc-900/50 border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400"
-                      }`}
+                          ? { backgroundColor: withAlpha("#3b82f6", 0.2), borderColor: withAlpha("#3b82f6", 0.3), color: "#60a5fa" }
+                          : { backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft, color: textSecondary }
+                      }
+                      onMouseEnter={(e) => {
+                        if (!item.checked) {
+                          e.currentTarget.style.borderColor = withAlpha(borderSoft, 0.8);
+                          e.currentTarget.style.color = textPrimary;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!item.checked) {
+                          e.currentTarget.style.borderColor = borderSoft;
+                          e.currentTarget.style.color = textSecondary;
+                        }
+                      }}
                     >
                       {item.checked && <CheckCircle2 className="w-3 h-3 inline mr-1" />}
                       {item.text}
@@ -659,11 +760,11 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
               </div>
 
               {/* Todos */}
-              <div className="lg:col-span-2 bg-zinc-900/30 backdrop-blur-xl rounded-2xl border border-white/5 overflow-hidden">
-                <div className="px-5 py-3 border-b border-white/5 flex items-center justify-between">
+              <div className="lg:col-span-2 rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.3), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
+                <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: withAlpha(borderSoft, 0.3) }}>
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-purple-400" />
-                    <span className="text-sm font-bold text-white">ЗАДАЧИ</span>
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: accentMain }} />
+                    <span className="text-sm font-bold" style={{ color: textPrimary }}>ЗАДАЧИ</span>
                   </div>
                   <div className="flex items-center gap-2">
                     {[
@@ -675,11 +776,18 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                       <button
                         key={filter.value}
                         onClick={() => setTodoFilter(todoFilter === filter.value ? "all" : (filter.value as any))}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                        className="px-2.5 py-1 rounded-lg text-xs font-medium transition-all"
+                        style={
                           todoFilter === filter.value
-                            ? "bg-purple-500/20 text-purple-400"
-                            : "text-zinc-600 hover:text-zinc-400"
-                        }`}
+                            ? { backgroundColor: withAlpha(accentMain, 0.2), color: accentMain }
+                            : { color: textSecondary }
+                        }
+                        onMouseEnter={(e) => {
+                          if (todoFilter !== filter.value) e.currentTarget.style.color = textPrimary;
+                        }}
+                        onMouseLeave={(e) => {
+                          if (todoFilter !== filter.value) e.currentTarget.style.color = textSecondary;
+                        }}
                       >
                         {filter.label}
                       </button>
@@ -688,30 +796,36 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                 </div>
                 <div className="p-4">
                   {todos.length === 0 ? (
-                    <div className="text-center py-6 text-zinc-600 text-sm">Нет активных задач</div>
+                    <div className="text-center py-6 text-sm" style={{ color: textSecondary }}>Нет активных задач</div>
                   ) : (
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-2">
-                      {todos.slice(0, 6).map((todo) => (
-                        <div
-                          key={todo.id}
-                          className={`p-3 rounded-xl border transition-all ${
-                            todo.status === "done"
-                              ? "bg-emerald-500/10 border-emerald-500/20"
-                              : todo.status === "in_progress"
-                              ? "bg-amber-500/10 border-amber-500/20"
-                              : "bg-zinc-900/50 border-zinc-800"
-                          }`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${
-                              todo.status === "done" ? "bg-emerald-400" :
-                              todo.status === "in_progress" ? "bg-amber-400 animate-pulse" :
-                              "bg-zinc-600"
-                            }`} />
-                            <span className="text-sm text-zinc-300">{todo.title}</span>
+                      {todos.slice(0, 6).map((todo) => {
+                        const statusColor =
+                          todo.status === "done" ? "#10b981" :
+                          todo.status === "in_progress" ? "#f59e0b" :
+                          withAlpha(borderSoft, 2);
+                        return (
+                          <div
+                            key={todo.id}
+                            className="p-3 rounded-xl border transition-all"
+                            style={{
+                              backgroundColor: todo.status === "done" ? withAlpha("#10b981", 0.1) : todo.status === "in_progress" ? withAlpha("#f59e0b", 0.1) : withAlpha(bgCard, 0.5),
+                              borderColor: todo.status === "done" ? withAlpha("#10b981", 0.2) : todo.status === "in_progress" ? withAlpha("#f59e0b", 0.2) : borderSoft,
+                            }}
+                          >
+                            <div className="flex items-start gap-2">
+                              <div
+                                className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
+                                style={{
+                                  backgroundColor: statusColor,
+                                  animation: todo.status === "in_progress" ? "pulse 2s infinite" : undefined,
+                                }}
+                              />
+                              <span className="text-sm" style={{ color: textPrimary }}>{todo.title}</span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -719,66 +833,69 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
             </div>
 
             {/* RENTALS TABLE */}
-            <div className="bg-zinc-900/30 backdrop-blur-xl rounded-2xl border border-white/5 overflow-hidden">
-              <div className="px-5 py-3 border-b border-white/5">
-                <span className="text-sm font-bold text-white">АРЕНДЫ</span>
+            <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.3), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
+              <div className="px-5 py-3 border-b" style={{ borderColor: withAlpha(borderSoft, 0.3) }}>
+                <span className="text-sm font-bold" style={{ color: textPrimary }}>АРЕНДЫ</span>
               </div>
 
               {loading ? (
                 <div className="p-12 text-center">
-                  <div className="w-10 h-10 border-3 border-yellow-400/30 border-t-yellow-400 rounded-full animate-spin mx-auto mb-4" />
-                  <p className="text-zinc-500 text-sm">Загрузка...</p>
+                  <div className="w-10 h-10 border-3 rounded-full animate-spin mx-auto mb-4" style={{ borderColor: withAlpha(accentMain, 0.3), borderTopColor: accentMain }} />
+                  <p className="text-sm" style={{ color: textSecondary }}>Загрузка...</p>
                 </div>
               ) : rentals.length === 0 ? (
                 <div className="p-12 text-center">
-                  <Calendar className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
-                  <p className="text-zinc-500 text-sm">Нет аренд за этот день</p>
-                  <p className="text-zinc-600 text-xs mt-1">Выберите другую дату</p>
+                  <Calendar className="w-12 h-12 mx-auto mb-4" style={{ color: borderSoft }} />
+                  <p className="text-sm" style={{ color: textSecondary }}>Нет аренд за этот день</p>
+                  <p className="text-xs mt-1" style={{ color: textSecondary }}>Выберите другую дату</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b border-white/5">
-                        <th className="px-5 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Время</th>
-                        <th className="px-5 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Клиент / Техника</th>
-                        <th className="px-5 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">Сумма</th>
-                        <th className="px-5 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider">Статус</th>
-                        <th className="px-5 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider">Док</th>
-                        <th className="px-5 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider">Одометр</th>
-                        <th className="px-5 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider">Действия</th>
+                      <tr className="border-b" style={{ borderColor: withAlpha(borderSoft, 0.3) }}>
+                        <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Время</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Клиент / Техника</th>
+                        <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Сумма</th>
+                        <th className="px-5 py-3 text-center text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Статус</th>
+                        <th className="px-5 py-3 text-center text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Док</th>
+                        <th className="px-5 py-3 text-center text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Одометр</th>
+                        <th className="px-5 py-3 text-center text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Действия</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/5">
+                    <tbody className="divide-y" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
                       {rentals.map((rental) => {
-                        const statusStyle = STATUS_STYLES[rental.status as keyof typeof STATUS_STYLES] || STATUS_STYLES.pending_confirmation;
+                        const statusStyle = statusConfig[rental.status as keyof typeof statusConfig] || statusConfig.pending_confirmation;
                         const StatusIcon = statusStyle.icon;
                         return (
                           <tr
                             key={rental.rental_id}
-                            className="hover:bg-white/[0.02] transition-colors group"
+                            className="transition-colors"
+                            style={{ backgroundColor: withAlpha(accentMain, 0.02) }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.05); }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.02); }}
                           >
                             <td className="px-5 py-4 whitespace-nowrap">
-                              <span className="text-sm text-zinc-400 font-mono">
+                              <span className="text-sm font-mono" style={{ color: textPrimary }}>
                                 {formatRussianDate(rental.agreed_start_date || rental.created_at).split(",")[1]?.trim() || "—"}
                               </span>
                             </td>
                             <td className="px-5 py-4">
-                              <div className="text-sm font-medium text-white">{rental.user?.full_name || rental.user?.username || "—"}</div>
-                              <div className="text-xs text-zinc-600 mt-0.5">
+                              <div className="text-sm font-medium" style={{ color: textPrimary }}>{rental.user?.full_name || rental.user?.username || "—"}</div>
+                              <div className="text-xs mt-0.5" style={{ color: textSecondary }}>
                                 {rental.vehicle?.make} {rental.vehicle?.model}
                               </div>
                             </td>
                             <td className="px-5 py-4 text-right">
-                              <span className="text-sm font-mono text-emerald-400">{formatRubles(rental.total_cost)}</span>
+                              <span className="text-sm font-mono" style={{ color: "#34d399" }}>{formatRubles(rental.total_cost)}</span>
                             </td>
                             <td className="px-5 py-4 text-center">
                               <span
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all"
                                 style={{
-                                  background: statusStyle.bg,
-                                  borderColor: statusStyle.border,
-                                  color: statusStyle.text,
+                                  backgroundColor: withAlpha(statusStyle.color, 0.15),
+                                  borderColor: withAlpha(statusStyle.color, 0.3),
+                                  color: statusStyle.color,
                                 }}
                               >
                                 <StatusIcon className="w-3.5 h-3.5" />
@@ -786,17 +903,17 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                               </span>
                             </td>
                             <td className="px-5 py-4 text-center">
-                              <span className={`text-lg ${rental.documentSecret ? "text-emerald-400" : "text-zinc-700"}`}>
+                              <span className="text-lg" style={{ color: rental.documentSecret ? "#34d399" : borderSoft }}>
                                 {rental.documentSecret ? "✓" : "—"}
                               </span>
                             </td>
                             <td className="px-5 py-4 text-center">
                               {rental.odometerStart || rental.odometerEnd ? (
-                                <span className="text-sm text-emerald-400 font-mono">
+                                <span className="text-sm font-mono" style={{ color: "#34d399" }}>
                                   {rental.odometerStart || "?"}→{rental.odometerEnd || "?"}
                                 </span>
                               ) : (
-                                <span className="text-zinc-700">—</span>
+                                <span style={{ color: borderSoft }}>—</span>
                               )}
                             </td>
                             <td className="px-5 py-4 text-center">
@@ -807,11 +924,12 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                                     setHandoffModalPhase("handout");
                                     setHandoffModalOpen(true);
                                   }}
-                                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+                                  style={
                                     rental.handoutCompleted
-                                      ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
-                                      : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30"
-                                  }`}
+                                      ? { backgroundColor: "#10b981", color: "white", boxShadow: `0 4px 12px ${withAlpha("#10b981", 0.3)}` }
+                                      : { backgroundColor: withAlpha("#10b981", 0.15), borderColor: withAlpha("#10b981", 0.3), color: "#34d399", border: "1px solid" }
+                                  }
                                 >
                                   →
                                 </button>
@@ -821,11 +939,12 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                                     setHandoffModalPhase("return");
                                     setHandoffModalOpen(true);
                                   }}
-                                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+                                  style={
                                     rental.returnCompleted
-                                      ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
-                                      : "bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30"
-                                  }`}
+                                      ? { backgroundColor: "#3b82f6", color: "white", boxShadow: `0 4px 12px ${withAlpha("#3b82f6", 0.3)}` }
+                                      : { backgroundColor: withAlpha("#3b82f6", 0.15), borderColor: withAlpha("#3b82f6", 0.3), color: "#60a5fa", border: "1px solid" }
+                                  }
                                 >
                                   ←
                                 </button>
@@ -842,7 +961,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
             {/* Footer */}
             <div className="text-center py-4">
-              <p className="text-xs text-zinc-700">
+              <p className="text-xs" style={{ color: textSecondary }}>
                 CarTest Analytics • {new Date().getFullYear()}
               </p>
             </div>
@@ -868,6 +987,10 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
         .animate-orb-1 { animation: orb-1 20s ease-in-out infinite; }
         .animate-orb-2 { animation: orb-2 25s ease-in-out infinite; }
         .animate-orb-3 { animation: orb-3 18s ease-in-out infinite; }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
       `}</style>
 
       {/* Rental Handoff Modal */}
@@ -880,6 +1003,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
           onClose={() => setHandoffModalOpen(false)}
           onSuccess={() => void loadRentals(selectedDate, true)}
           isPasswordAuth={!!passwordAuthOwnerId}
+          crewTheme={crew.theme}
         />
       )}
     </div>
