@@ -300,16 +300,36 @@ let bikeCatalogTable = '';
 
 if (wantBikeCatalog) {
   try {
+    // Get crew_id for filtering bikes
+    let crewIdFilter = null;
+    try {
+      const { data: crewData } = await supabase
+        .from('crews')
+        .select('id')
+        .eq('slug', crewSlug)
+        .maybeSingle();
+      if (crewData?.id) {
+        crewIdFilter = crewData.id;
+        console.error(`[proposal] Filtering bikes by crew_id: ${crewIdFilter} (${crewSlug})`);
+      }
+    } catch (crewErr) {
+      console.warn(`[proposal] Failed to fetch crew_id, showing all bikes: ${crewErr?.message || crewErr}`);
+    }
+
     const pageSize = 1000;
     let from = 0;
     const all = [];
     while (true) {
       const to = from + pageSize - 1;
-      const { data, error } = await supabase
+      let query = supabase
         .from('cars')
         .select('id, make, model, type, specs')
-        .in('type', ['bike', 'ebike'])
-        .range(from, to);
+        .in('type', ['bike', 'ebike']);
+      // Filter by crew_id if available
+      if (crewIdFilter) {
+        query = query.eq('crew_id', crewIdFilter);
+      }
+      const { data, error } = await query.range(from, to);
       if (error) throw error;
       if (!data?.length) break;
       all.push(...data);
