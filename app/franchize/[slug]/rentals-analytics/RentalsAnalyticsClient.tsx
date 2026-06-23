@@ -462,6 +462,7 @@ export function RentalsAnalyticsClient({
     try {
       const result = await getAllChecklistStates({
         actorUserId,
+        isPasswordAuth: !!passwordAuthOwnerId,
       });
 
       if (result.success && result.data) {
@@ -488,14 +489,17 @@ export function RentalsAnalyticsClient({
           crewId: crew.id,
           status: todoFilter === "all" ? undefined : todoFilter,
           assignedTo: todoAssigneeFilter === "all" ? undefined : todoAssigneeFilter,
+          isPasswordAuth: !!passwordAuthOwnerId,
         }),
         getCrewTodoStats({
           actorUserId,
           crewId: crew.id,
+          isPasswordAuth: !!passwordAuthOwnerId,
         }),
         getCrewMembersForTodos({
           actorUserId,
           crewId: crew.id,
+          isPasswordAuth: !!passwordAuthOwnerId,
         }),
       ]);
 
@@ -535,6 +539,7 @@ export function RentalsAnalyticsClient({
           category: newTodoCategory,
           priority: newTodoPriority,
         },
+        isPasswordAuth: !!passwordAuthOwnerId,
       });
 
       if (result.success) {
@@ -570,6 +575,7 @@ export function RentalsAnalyticsClient({
           id: todo.id,
           status: newStatus,
         },
+        isPasswordAuth: !!passwordAuthOwnerId,
       });
 
       if (result.success) {
@@ -593,6 +599,7 @@ export function RentalsAnalyticsClient({
         actorUserId,
         crewId: crew.id,
         todoId,
+        isPasswordAuth: !!passwordAuthOwnerId,
       });
 
       if (result.success) {
@@ -626,6 +633,7 @@ export function RentalsAnalyticsClient({
         type,
         items: updatedItems,
         action: "toggle",
+        isPasswordAuth: !!passwordAuthOwnerId,
       });
 
       if (result.success && result.data) {
