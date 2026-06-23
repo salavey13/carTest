@@ -105,11 +105,22 @@ FROM private.rental_contract_artifacts rca
 WHERE rca.rent_start_date IS NOT NULL
   AND rca.rent_end_date IS NOT NULL
   AND rca.resolved_bike_id IS NOT NULL
-  -- Skip artifacts that already have a matching rental (by contract_key in metadata)
+  -- DEDUPE: Skip if rental already exists by multiple criteria
   AND NOT EXISTS (
-    SELECT 1
-    FROM public.rentals r
+    -- Check 1: By original_contract_key in metadata (already backfilled)
+    SELECT 1 FROM public.rentals r
     WHERE r.metadata->>'original_contract_key' = rca.contract_key
+    UNION ALL
+    -- Check 2: By original_sha256 in metadata (created by skill with contract_sha256)
+    SELECT 1 FROM public.rentals r
+    WHERE r.metadata->>'contract_sha256' = rca.original_sha256
+    UNION ALL
+    -- Check 3: By bike_id + date overlap (same bike, same dates = same rental)
+    SELECT 1 FROM public.rentals r
+    WHERE r.vehicle_id = rca.resolved_bike_id
+      AND r.requested_start_date = private.parse_ru_date(rca.rent_start_date)
+      AND r.requested_end_date = private.parse_ru_date(rca.rent_end_date)
+      AND r.metadata->>'source' IN ('bot_contract', 'doc_command', 'franchize_order')
   )
 ON CONFLICT (rental_id) DO NOTHING;
 
