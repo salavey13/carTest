@@ -439,8 +439,9 @@ export function RentalsAnalyticsClient({
         isPasswordAuth: !!passwordAuthOwnerId,
       });
 
-      if (result.success && result.data) {
-        setDateRange(result.data);
+      if (result.success) {
+        // null data is valid (no rentals yet)
+        setDateRange(result.data || null);
       } else {
         // Check if this is an auth error - show password entry UI
         if (result.error?.includes("прав") || result.error?.includes("доступ")) {
