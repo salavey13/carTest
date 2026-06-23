@@ -1605,9 +1605,7 @@ export function RentalsAnalyticsClient({
 
               {/* Document Details */}
               {loadingDetails ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loading text="Загружаем документы..." />
-                </div>
+                <Loading text="Загружаем документы..." compact />
               ) : rentalDetails?.secret ? (
                 <div className="space-y-3">
                   <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">
