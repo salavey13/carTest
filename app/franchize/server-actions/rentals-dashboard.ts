@@ -495,8 +495,11 @@ export async function getRentalsDateRange(input: {
       .eq("crew_id", crew.id);
 
     if (carsError) {
+      console.error("[getRentalsDateRange] Cars query error:", carsError);
       return { success: false, error: carsError.message };
     }
+
+    console.log("[getRentalsDateRange] Found cars:", crewCars?.length || 0);
 
     if (!crewCars || crewCars.length === 0) {
       return { success: true, data: null };
@@ -514,8 +517,11 @@ export async function getRentalsDateRange(input: {
       .limit(1);
 
     if (error) {
+      console.error("[getRentalsDateRange] Rentals min query error:", error);
       return { success: false, error: error.message };
     }
+
+    console.log("[getRentalsDateRange] Min date data:", data?.length || 0);
 
     if (!data || data.length === 0) {
       return { success: true, data: null };
@@ -535,6 +541,8 @@ export async function getRentalsDateRange(input: {
     const maxDate = maxData && maxData.length > 0
       ? new Date(maxData[0].created_at).toISOString().split("T")[0]
       : minDate;
+
+    console.log("[getRentalsDateRange] Returning:", { minDate, maxDate });
 
     return {
       success: true,
