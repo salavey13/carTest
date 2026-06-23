@@ -1139,6 +1139,21 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       logger.error("[/doc] All document delivery methods failed!");
     }
 
+    let rentalId: string | null = null;
+    if (isRent) {
+      // Create rentals row for unified tracking (before artifact)
+      try {
+        rentalId = await createRentalFromDocContract(chatId, String(userId), context, bike, docSha256);
+        if (rentalId) {
+          logger.info('[/doc] Rental created successfully:', rentalId);
+        } else {
+          logger.warn('[/doc] Failed to create rental, continuing without rental_id');
+        }
+      } catch (rentalErr) {
+        logger.error('[/doc] Rental creation exception:', rentalErr);
+      }
+    }
+
     const { error: secretsError } = await privateSchema().from("user_rental_secrets").insert({
       chat_id: String(userId),
       crew_slug: "vip-bike",
@@ -1154,7 +1169,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       renter_email: null,
       renter_address: context.mpRegistration || null,
       source_doc_key: vars.document_key,
-      source_rental_id: null,
+      source_rental_id: rentalId || null,  // Link to rentals table if rental was created
       verification_status: "verified",
       template_version: 1,
     });
@@ -1163,18 +1178,6 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
     }
 
     if (isRent) {
-      // Create rentals row for unified tracking (before artifact)
-      let rentalId: string | null = null;
-      try {
-        rentalId = await createRentalFromDocContract(chatId, String(userId), context, bike, docSha256);
-        if (rentalId) {
-          logger.info('[/doc] Rental created successfully:', rentalId);
-        } else {
-          logger.warn('[/doc] Failed to create rental, continuing without rental_id');
-        }
-      } catch (rentalErr) {
-        logger.error('[/doc] Rental creation exception:', rentalErr);
-      }
 
       // rental_contract_artifacts is in private schema — use explicit columns only.
       // sts_* columns added by migration 20260617000000_rental_sts_pledge.sql
