@@ -130,16 +130,22 @@ export async function getRentalsDashboard(input: {
     }
 
     // Check access (owner or admin or password auth or orudjov)
-    const isOwner = crew.owner_id === actorUserId;
-    // Password auth: when actorUserId is exactly the crew.owner_id, treat as full access
-    // (this is set by the password flow when no Telegram user exists)
-    const isPasswordAuth = isOwner;
+    // First, check if this is a real Telegram user (exists in users table)
+    const { data: realUser, error: userError } = await supabaseAdmin
+      .from("users")
+      .select("user_id, metadata, username")
+      .eq("user_id", actorUserId)
+      .maybeSingle();
+
+    const isTelegramAuth = !!realUser; // User exists = Telegram auth
+    const isPasswordAuth = !isTelegramAuth; // No user = password auth
 
     console.log("[rentals-dashboard] Auth check:", {
       actorUserId,
-      crewOwnerId: crew.owner_id,
-      isOwner,
+      isTelegramAuth,
       isPasswordAuth,
+      hasRealUser: !!realUser,
+      userError,
       slug,
     });
 
@@ -148,10 +154,17 @@ export async function getRentalsDashboard(input: {
       // Fall through to data loading
     } else {
       // Telegram auth: check user roles and username
-      const { data: userRoles } = await supabaseAdmin
-        .from("users")
-        .select("metadata, username")
-        .eq("user_id", actorUserId)
+      const userMetadata = realUser?.metadata as Record<string, unknown> | null;
+      const userUsername = realUser?.username as string | null;
+      const isAdmin = userMetadata?.role === "admin";
+      const isOwner = crew.owner_id === actorUserId;
+      // Special case: orudjov (and variations) always have access
+      const isOrudjov = userUsername?.toLowerCase().includes("orud");
+
+      if (!isOwner && !isAdmin && !isOrudjov) {
+        return { success: false, error: "Недостаточно прав для просмотра." };
+      }
+    }
         .maybeSingle();
 
       const userMetadata = userRoles?.metadata as Record<string, unknown> | null;
