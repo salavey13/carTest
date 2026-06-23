@@ -309,6 +309,7 @@ if (wantBikeCatalog) {
         .from('cars')
         .select('id, make, model, type, specs')
         .in('type', ['bike', 'ebike'])
+        .eq('is_active', true)  -- Only show active/available bikes, filter out obsolete
         .range(from, to);
       if (error) throw error;
       if (!data?.length) break;
