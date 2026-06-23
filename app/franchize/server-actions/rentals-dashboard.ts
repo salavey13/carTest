@@ -433,18 +433,20 @@ export async function getRentalDocumentDetails(input: {
 export async function getRentalsDateRange(input: {
   slug: string;
   actorUserId: string;
+  isPasswordAuth?: boolean;
 }): Promise<{ success: boolean; data?: { minDate: string; maxDate: string } | null; error?: string }> {
   try {
     const parsed = z.object({
       slug: z.string().trim().min(1),
       actorUserId: z.string().trim().min(1),
+      isPasswordAuth: z.boolean().optional(),
     }).safeParse(input);
 
     if (!parsed.success) {
       return { success: false, error: "Некорректный запрос." };
     }
 
-    const { slug, actorUserId } = parsed.data;
+    const { slug, actorUserId, isPasswordAuth = false } = parsed.data;
 
     // Get crew
     const { data: crew } = await supabaseAdmin
@@ -457,13 +459,18 @@ export async function getRentalsDateRange(input: {
       return { success: false, error: "Экипаж не найден." };
     }
 
-    // Check access (owner or admin or password auth or orudjov)
-    const isOwner = crew.owner_id === actorUserId;
-    const isPasswordAuth = isOwner; // Password auth sets actorUserId to owner_id
+    console.log("[getRentalsDateRange] Auth check:", {
+      actorUserId,
+      isPasswordAuth,
+      crewOwnerId: crew.owner_id,
+      slug,
+    });
 
     if (isPasswordAuth) {
       // Password auth grants full access
     } else {
+      // Telegram auth: check permissions
+      const isOwner = crew.owner_id === actorUserId;
       const { data: user } = await supabaseAdmin
         .from("users")
         .select("metadata, username")

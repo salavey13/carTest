@@ -436,6 +436,7 @@ export function RentalsAnalyticsClient({
       const result = await getRentalsDateRange({
         slug,
         actorUserId,
+        isPasswordAuth: !!passwordAuthOwnerId,
       });
 
       if (result.success && result.data) {
