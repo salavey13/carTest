@@ -143,8 +143,15 @@ export async function getRentalsDashboard(input: {
       // Fall through to data loading
     } else {
       // Telegram auth: check user roles and username
-      const userMetadata = realUser?.metadata as Record<string, unknown> | null;
-      const userUsername = realUser?.username as string | null;
+      // Fetch user data for permission checks
+      const { data: user } = await supabaseAdmin
+        .from("users")
+        .select("metadata, username")
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+
+      const userMetadata = user?.metadata as Record<string, unknown> | null;
+      const userUsername = user?.username as string | null;
       const isAdmin = userMetadata?.role === "admin";
       const isOwner = crew.owner_id === actorUserId;
       // Special case: orudjov (and variations) always have access
