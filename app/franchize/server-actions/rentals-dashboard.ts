@@ -40,6 +40,11 @@ export interface RentalDashboardItem {
     source_rental_id: string | null;
     created_at?: string; // Timestamp for deduplication
   } | null;
+  // Handoff data from rental_handoffs table
+  odometerStart?: number | null;
+  odometerEnd?: number | null;
+  handoutCompleted?: boolean;
+  returnCompleted?: boolean;
 }
 
 export interface RentalDashboardSummary {
@@ -279,6 +284,59 @@ export async function getRentalsDashboard(input: {
       ...item,
       documentSecret: secretsByRentalId.get(item.rental_id),
     }));
+
+    // Enrich items with handoff data (odometer, equipment, etc.)
+    // Use PostgreSQL function for efficient batch lookup
+    if (rentalIds.length > 0) {
+      const { data: handoffs } = await supabaseAdmin.rpc("get_rental_handoff_summary", {
+        p_rental_id: null,  // We'll fetch per rental below
+      });
+
+      // For each rental, fetch its handoff summary
+      const handoffDataByRental = new Map<string, {
+        odometerStart: number | null;
+        odometerEnd: number | null;
+        handoutCompleted: boolean;
+        returnCompleted: boolean;
+      }>();
+
+      // Batch fetch handoffs for all rentals
+      const { data: allHandoffs } = await supabaseAdmin
+        .from("rental_handoffs")
+        .select("rental_id, phase, odometer_start, odometer_end, completed_at")
+        .in("rental_id", rentalIds);
+
+      for (const handoff of allHandoffs || []) {
+        const existing = handoffDataByRental.get(handoff.rental_id) || {
+          odometerStart: null,
+          odometerEnd: null,
+          handoutCompleted: false,
+          returnCompleted: false,
+        };
+
+        if (handoff.phase === "handout") {
+          existing.odometerStart = handoff.odometer_start;
+          existing.handoutCompleted = !!handoff.completed_at;
+        } else if (handoff.phase === "return") {
+          existing.odometerEnd = handoff.odometer_end;
+          existing.returnCompleted = !!handoff.completed_at;
+        }
+
+        handoffDataByRental.set(handoff.rental_id, existing);
+      }
+
+      // Merge handoff data into items
+      items = items.map(item => {
+        const handoff = handoffDataByRental.get(item.rental_id);
+        return {
+          ...item,
+          odometerStart: handoff?.odometerStart ?? null,
+          odometerEnd: handoff?.odometerEnd ?? null,
+          handoutCompleted: handoff?.handoutCompleted ?? false,
+          returnCompleted: handoff?.returnCompleted ?? false,
+        };
+      });
+    }
 
     // Calculate summary statistics
     const summary: RentalDashboardSummary = {
