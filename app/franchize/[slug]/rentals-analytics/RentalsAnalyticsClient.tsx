@@ -46,12 +46,12 @@ import {
   getRentalsDateRange,
   resendRentalContract,
   getRentalsForExport,
+  validateAnalyticsPassword,
   type RentalDashboardItem,
   type RentalDashboardSummary,
   type RentalDocumentDetail,
 } from "@/app/franchize/server-actions/rentals-dashboard";
 import { useSupabaseRealtime } from "@/app/franchize/hooks/useSupabaseRealtime";
-import { ConnectionStatus } from "./ConnectionStatus";
 import { ExportModal } from "./ExportModal";
 import {
   getAllChecklistStates,
@@ -67,10 +67,10 @@ import {
   updateCrewTodo,
   deleteCrewTodo,
   getCrewTodoStats,
-  DEFAULT_TODO_CATEGORIES,
   type CrewTodo,
   type TodoStatus,
 } from "@/app/franchize/server-actions/crew-todos";
+import { DEFAULT_TODO_CATEGORIES } from "@/app/franchize/server-actions/crew-todos-constants";
 import {
   crewPaletteForSurface,
   focusRingOutlineStyle,
@@ -80,7 +80,6 @@ import {
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
 import {
   FranchizeOperatorPanel,
-  FranchizeOperatorStatCard,
 } from "@/app/franchize/components/FranchizeOperatorSurface";
 
 interface RentalsAnalyticsClientProps {
@@ -181,6 +180,31 @@ const TODO_STATUS_FILTERS = [
   { value: "done" as const, label: "Выполнено" },
 ];
 
+// Custom compact stat card component
+function StatCard({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: React.ReactNode;
+  color?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)] p-3 transition-all hover:shadow-sm">
+      <div className={`flex shrink-0 items-center justify-center rounded-lg ${color || "text-[var(--fr-analytics-accent)]"}`}>
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">{label}</p>
+        <p className="mt-0.5 truncate text-lg font-semibold text-[var(--fr-analytics-text)]">{value}</p>
+      </div>
+    </div>
+  );
+}
+
 export function RentalsAnalyticsClient({
   initialSlug,
   initialDate,
@@ -231,6 +255,14 @@ export function RentalsAnalyticsClient({
   const [exporting, setExporting] = useState(false);
   const [compactMode, setCompactMode] = useState(false);
 
+  // Password-based auth state (for PC access without Telegram)
+  const [showPasswordEntry, setShowPasswordEntry] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [isPasswordValidating, setIsPasswordValidating] = useState(false);
+  const [passwordAuthCrewId, setPasswordAuthCrewId] = useState<string | null>(null);
+  const [passwordAuthOwnerId, setPasswordAuthOwnerId] = useState<string | null>(null);
+
   // Real-time subscriptions for crew_todos and checklist_state
   const todosRealtime = useSupabaseRealtime({
     tableName: "crew_todos",
@@ -262,6 +294,11 @@ export function RentalsAnalyticsClient({
     crew.theme.palette.accentMain,
     crew.theme.palette,
   );
+
+  // Helper: Get effective actor user ID (Telegram auth or password auth)
+  const getActorUserId = useCallback((): string | null => {
+    return dbUser?.user_id || passwordAuthOwnerId;
+  }, [dbUser?.user_id, passwordAuthOwnerId]);
 
   // 🎁 Surprise easter egg - console greeting
   useEffect(() => {
@@ -323,7 +360,8 @@ export function RentalsAnalyticsClient({
 
   // Load rentals for selected date
   const loadRentals = useCallback(async (date: string, showRefresh = false) => {
-    if (!dbUser?.user_id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
 
     if (showRefresh) {
       setRefreshing(true);
@@ -334,12 +372,19 @@ export function RentalsAnalyticsClient({
     try {
       const result = await getRentalsDashboard({
         slug,
-        actorUserId: dbUser.user_id,
+        actorUserId,
         date,
-        verificationStatus: verificationFilter === "all" ? undefined : verificationFilter,
+        verificationStatus: verificationFilter === "all" ? undefined : verificationStatus,
       });
 
       if (!result.success) {
+        // Check if this is an auth error - show password entry UI
+        if (result.error?.includes("прав") || result.error?.includes("доступ")) {
+          // Clear Telegram auth context and show password entry
+          setShowPasswordEntry(true);
+          toast.error("Требуется пароль для доступа");
+          return;
+        }
         toast.error(result.error || "Не удалось загрузить аренды");
         return;
       }
@@ -353,16 +398,17 @@ export function RentalsAnalyticsClient({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [dbUser?.user_id, slug, verificationFilter]);
+  }, [getActorUserId, slug, verificationFilter]);
 
   // Load rental document details
   const loadRentalDetails = useCallback(async (rentalId: string) => {
-    if (!dbUser?.user_id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
 
     setLoadingDetails(true);
     try {
       const result = await getRentalDocumentDetails({
-        actorUserId: dbUser.user_id,
+        actorUserId,
         rentalId,
       });
 
@@ -378,36 +424,43 @@ export function RentalsAnalyticsClient({
     } finally {
       setLoadingDetails(false);
     }
-  }, [dbUser?.user_id]);
+  }, [getActorUserId]);
 
   // Load date range
   const loadDateRange = useCallback(async () => {
-    if (!dbUser?.user_id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
 
     try {
       const result = await getRentalsDateRange({
         slug,
-        actorUserId: dbUser.user_id,
+        actorUserId,
       });
 
       if (result.success && result.data) {
         setDateRange(result.data);
       } else {
+        // Check if this is an auth error - show password entry UI
+        if (result.error?.includes("прав") || result.error?.includes("доступ")) {
+          setShowPasswordEntry(true);
+          return;
+        }
         toast.error(result.error || "Не удалось загрузить диапазон дат");
       }
     } catch (error) {
       console.error("[RentalsAnalytics] Date range error:", error);
       toast.error("Ошибка загрузки диапазона дат");
     }
-  }, [dbUser?.user_id, slug]);
+  }, [getActorUserId, slug]);
 
   // Load checklist states
   const loadChecklistStates = useCallback(async () => {
-    if (!dbUser?.user_id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
 
     try {
       const result = await getAllChecklistStates({
-        actorUserId: dbUser.user_id,
+        actorUserId,
       });
 
       if (result.success && result.data) {
@@ -419,27 +472,28 @@ export function RentalsAnalyticsClient({
       console.error("[RentalsAnalytics] Checklist load error:", error);
       toast.error("Ошибка загрузки чеклистов");
     }
-  }, [dbUser?.user_id]);
+  }, [getActorUserId]);
 
   // Load crew todos
   const loadTodos = useCallback(async () => {
-    if (!dbUser?.user_id || !crew.id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId || !crew.id) return;
 
     setLoadingTodos(true);
     try {
       const [todosResult, statsResult, membersResult] = await Promise.all([
         getCrewTodos({
-          actorUserId: dbUser.user_id,
+          actorUserId,
           crewId: crew.id,
           status: todoFilter === "all" ? undefined : todoFilter,
           assignedTo: todoAssigneeFilter === "all" ? undefined : todoAssigneeFilter,
         }),
         getCrewTodoStats({
-          actorUserId: dbUser.user_id,
+          actorUserId,
           crewId: crew.id,
         }),
         getCrewMembersForTodos({
-          actorUserId: dbUser.user_id,
+          actorUserId,
           crewId: crew.id,
         }),
       ]);
@@ -458,11 +512,12 @@ export function RentalsAnalyticsClient({
     } finally {
       setLoadingTodos(false);
     }
-  }, [dbUser?.user_id, crew.id, todoFilter, todoAssigneeFilter]);
+  }, [getActorUserId, crew.id, todoFilter, todoAssigneeFilter]);
 
   // Create todo
   const handleCreateTodo = useCallback(async () => {
-    if (!dbUser?.user_id || !crew.id || !newTodoTitle.trim()) {
+    const actorUserId = getActorUserId();
+    if (!actorUserId || !crew.id || !newTodoTitle.trim()) {
       toast.error("Введите название задачи");
       return;
     }
@@ -470,7 +525,7 @@ export function RentalsAnalyticsClient({
     setCreatingTodo(true);
     try {
       const result = await createCrewTodo({
-        actorUserId: dbUser.user_id,
+        actorUserId,
         todo: {
           crewId: crew.id,
           assignedTo: newTodoAssignedTo,
@@ -499,15 +554,16 @@ export function RentalsAnalyticsClient({
     } finally {
       setCreatingTodo(false);
     }
-  }, [dbUser?.user_id, crew.id, newTodoTitle, newTodoDescription, newTodoCategory, newTodoPriority, newTodoAssignedTo, loadTodos]);
+  }, [getActorUserId, crew.id, newTodoTitle, newTodoDescription, newTodoCategory, newTodoPriority, newTodoAssignedTo, loadTodos]);
 
   // Update todo status
   const updateTodoStatus = useCallback(async (todo: CrewTodo, newStatus: TodoStatus) => {
-    if (!dbUser?.user_id || !crew.id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId || !crew.id) return;
 
     try {
       const result = await updateCrewTodo({
-        actorUserId: dbUser.user_id,
+        actorUserId,
         crewId: crew.id,
         todo: {
           id: todo.id,
@@ -524,15 +580,16 @@ export function RentalsAnalyticsClient({
       console.error("[RentalsAnalytics] Update todo error:", error);
       toast.error("Ошибка обновления задачи");
     }
-  }, [dbUser?.user_id, crew.id, loadTodos]);
+  }, [getActorUserId, crew.id, loadTodos]);
 
   // Delete todo
   const handleDeleteTodo = useCallback(async (todoId: string) => {
-    if (!dbUser?.user_id || !crew.id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId || !crew.id) return;
 
     try {
       const result = await deleteCrewTodo({
-        actorUserId: dbUser.user_id,
+        actorUserId,
         crewId: crew.id,
         todoId,
       });
@@ -547,11 +604,12 @@ export function RentalsAnalyticsClient({
       console.error("[RentalsAnalytics] Delete todo error:", error);
       toast.error("Ошибка удаления задачи");
     }
-  }, [dbUser?.user_id, crew.id, loadTodos]);
+  }, [getActorUserId, crew.id, loadTodos]);
 
   // Toggle checklist item
   const toggleChecklistItem = useCallback(async (type: "handout" | "return", itemId: string) => {
-    if (!dbUser?.user_id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
 
     const currentState = checklistStates[type];
     if (!currentState) return;
@@ -563,7 +621,7 @@ export function RentalsAnalyticsClient({
       );
 
       const result = await updateChecklistState({
-        actorUserId: dbUser.user_id,
+        actorUserId,
         type,
         items: updatedItems,
         action: "toggle",
@@ -583,16 +641,17 @@ export function RentalsAnalyticsClient({
     } finally {
       setUpdatingChecklist(null);
     }
-  }, [dbUser?.user_id, checklistStates]);
+  }, [getActorUserId, checklistStates]);
 
   // Reset checklist
   const resetChecklist = useCallback(async (type: "handout" | "return") => {
-    if (!dbUser?.user_id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
 
     setUpdatingChecklist(type);
     try {
       const result = await resetChecklistState({
-        actorUserId: dbUser.user_id,
+        actorUserId,
         type,
       });
 
@@ -611,28 +670,100 @@ export function RentalsAnalyticsClient({
     } finally {
       setUpdatingChecklist(null);
     }
-  }, [dbUser?.user_id]);
+  }, [getActorUserId]);
 
   // Initial load
   useEffect(() => {
-    if (dbUser?.user_id) {
+    // Don't do anything while auth is still loading
+    if (authLoading) return;
+
+    const actorUserId = getActorUserId();
+    if (actorUserId) {
+      // Have auth (Telegram or password) - load data
       void loadRentals(selectedDate);
       void loadDateRange();
       void loadChecklistStates();
       void loadTodos();
+    } else if (!dbUser?.user_id) {
+      // No Telegram auth - check for password auth in session storage
+      const storedCrewId = sessionStorage.getItem("analytics-password-crew-id");
+      const storedOwnerId = sessionStorage.getItem("analytics-password-owner-id");
+      const storedSlug = sessionStorage.getItem("analytics-password-slug");
+      if (storedCrewId && storedSlug === slug) {
+        setPasswordAuthCrewId(storedCrewId);
+        setPasswordAuthOwnerId(storedOwnerId);
+        setShowPasswordEntry(false);
+        // Password auth is active - load data
+        void loadRentals(selectedDate);
+        void loadDateRange();
+        void loadChecklistStates();
+        void loadTodos();
+      } else {
+        setShowPasswordEntry(true);
+        setLoading(false);
+      }
     }
-  }, [dbUser?.user_id, selectedDate, loadRentals, loadDateRange, loadChecklistStates, loadTodos]);
+  }, [authLoading, dbUser?.user_id, getActorUserId, selectedDate, loadRentals, loadDateRange, loadChecklistStates, loadTodos, slug]);
 
   // Reload when verification filter changes
   useEffect(() => {
-    if (dbUser?.user_id) {
+    const actorUserId = getActorUserId();
+    if (actorUserId) {
       void loadRentals(selectedDate);
     }
-  }, [verificationFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [verificationFilter, getActorUserId, selectedDate, loadRentals]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Password validation handler
+  const handlePasswordSubmit = useCallback(async () => {
+    if (!passwordInput.trim()) {
+      setPasswordError("Введите пароль");
+      return;
+    }
+
+    setIsPasswordValidating(true);
+    setPasswordError(null);
+
+    try {
+      const result = await validateAnalyticsPassword({ password: passwordInput.trim() });
+
+      if (!result.success || !result.slug) {
+        setPasswordError(result.error || "Неверный пароль");
+        return;
+      }
+
+      // Password valid - store auth and load data
+      setPasswordAuthCrewId(result.crewId || null);
+      setPasswordAuthOwnerId(result.ownerId || null);
+      sessionStorage.setItem("analytics-password-crew-id", result.crewId || "");
+      sessionStorage.setItem("analytics-password-owner-id", result.ownerId || "");
+      sessionStorage.setItem("analytics-password-slug", result.slug || "");
+      setShowPasswordEntry(false);
+      setLoading(true);
+
+      // Load data with password auth
+      void loadRentals(selectedDate);
+      void loadDateRange();
+      void loadChecklistStates();
+      void loadTodos();
+    } catch (error) {
+      console.error("[RentalsAnalytics] Password validation error:", error);
+      setPasswordError("Ошибка проверки пароля");
+    } finally {
+      setIsPasswordValidating(false);
+    }
+  }, [passwordInput, selectedDate, loadRentals, loadDateRange, loadChecklistStates, loadTodos]);
+
+  // Handle Enter key in password input
+  const handlePasswordKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      void handlePasswordSubmit();
+    }
+  }, [handlePasswordSubmit]);
 
   // Resend contract handler
   const handleResendContract = useCallback(async (rental: RentalDashboardItem) => {
-    if (!dbUser?.user_id || !rental.documentSecret?.doc_sha256) {
+    const actorUserId = getActorUserId();
+    if (!actorUserId || !rental.documentSecret?.doc_sha256) {
       toast.error("QR код недоступен для этой аренды");
       return;
     }
@@ -649,7 +780,7 @@ export function RentalsAnalyticsClient({
       }
 
       const result = await resendRentalContract({
-        actorUserId: dbUser.user_id,
+        actorUserId,
         rentalId: rental.rental_id,
         telegramChatId: chatIdToSend,
       });
@@ -666,7 +797,7 @@ export function RentalsAnalyticsClient({
     } finally {
       setResending(null);
     }
-  }, [dbUser?.user_id]);
+  }, [getActorUserId]);
 
   // Navigate date
   const navigateDate = useCallback((days: number) => {
@@ -703,13 +834,14 @@ export function RentalsAnalyticsClient({
 
   // Export handler
   const handleExport = useCallback(async (startDate: string, endDate: string) => {
-    if (!dbUser?.user_id) return;
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
 
     setExporting(true);
     try {
       const result = await getRentalsForExport({
         slug,
-        actorUserId: dbUser.user_id,
+        actorUserId,
         startDate,
         endDate,
       });
@@ -755,7 +887,7 @@ export function RentalsAnalyticsClient({
     } finally {
       setExporting(false);
     }
-  }, [dbUser?.user_id, slug]);
+  }, [getActorUserId, slug]);
 
   // Get status config
   const getStatusConfig = (status: string) => {
@@ -768,26 +900,135 @@ export function RentalsAnalyticsClient({
 
   if (authLoading) return <Loading text="Загружаем данные..." compact />;
 
-  // Compact mode CSS variables
+  // Password entry screen (for PC access without Telegram)
+  if (showPasswordEntry) {
+    return (
+      <div
+        className="flex min-h-[400px] items-center justify-center"
+        style={{
+          ["--fr-analytics-accent" as string]: crew.theme.palette.accentMain,
+          ["--fr-analytics-border" as string]: crew.theme.palette.borderSoft,
+          ["--fr-analytics-text" as string]: crew.theme.palette.textPrimary,
+          ["--fr-analytics-muted" as string]: crew.theme.palette.textSecondary,
+          ["--fr-analytics-bg-card" as string]: crew.theme.palette.bgCard,
+          ["--fr-analytics-bg-base" as string]: crew.theme.palette.bgBase,
+        }}
+      >
+        <div
+          className="w-full max-w-md rounded-2xl border p-8 shadow-lg"
+          style={{
+            borderColor: "var(--fr-analytics-border)",
+            backgroundColor: "var(--fr-analytics-bg-card)",
+          }}
+        >
+          <div className="mb-6 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2">
+              <ShieldCheck className="h-8 w-8" style={{ color: "var(--fr-analytics-accent)" }} />
+            </div>
+            <h1 className="text-2xl font-semibold" style={{ color: "var(--fr-analytics-text)" }}>
+              Аналитика аренд
+            </h1>
+            <p className="mt-2 text-sm" style={{ color: "var(--fr-analytics-muted)" }}>
+              Введите пароль для доступа
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => {
+                  setPasswordInput(e.target.value);
+                  setPasswordError(null);
+                }}
+                onKeyDown={handlePasswordKeyDown}
+                placeholder="Пароль"
+                disabled={isPasswordValidating}
+                className="w-full rounded-lg border px-4 py-3 text-sm focus:outline-none focus:ring-2"
+                style={{
+                  borderColor: passwordError
+                    ? "rgb(239, 68, 68)"
+                    : "var(--fr-analytics-border)",
+                  backgroundColor: "var(--fr-analytics-bg-base)",
+                  color: "var(--fr-analytics-text)",
+                  ringColor: "var(--fr-analytics-accent)",
+                }}
+                autoFocus
+              />
+              {passwordError && (
+                <p className="mt-2 text-xs text-rose-500">{passwordError}</p>
+              )}
+            </div>
+
+            <Button
+              type="button"
+              onClick={handlePasswordSubmit}
+              disabled={isPasswordValidating || !passwordInput.trim()}
+              className="w-full"
+              style={{
+                backgroundColor: "var(--fr-analytics-accent)",
+                color: crew.theme.palette.accentMainHover || "white",
+              }}
+            >
+              {isPasswordValidating ? (
+                <span className="flex items-center justify-center gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Проверка...
+                </span>
+              ) : (
+                "Войти"
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                // Clear session storage and reload page
+                sessionStorage.clear();
+                window.location.reload();
+              }}
+              className="w-full text-xs"
+              style={{ color: "var(--fr-analytics-muted)" }}
+            >
+              Сбросить сессию
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Compact mode CSS variables - more aggressive in compact mode
   const compactVars = {
-    "--fr-analytics-btn-size": compactMode ? "1.75rem" : "2.25rem",
-    "--fr-analytics-btn-text": compactMode ? "0.75rem" : "0.875rem",
-    "--fr-analytics-icon-size": compactMode ? "0.75rem" : "1rem",
-    "--fr-analytics-icon-sm": compactMode ? "0.5rem" : "0.75rem",
-    "--fr-analytics-text-xs": compactMode ? "0.625rem" : "0.75rem",
-    "--fr-analytics-text-sm": compactMode ? "0.75rem" : "0.875rem",
-    "--fr-analytics-text-base": compactMode ? "1rem" : "1.5rem",
-    "--fr-analytics-text-lg": compactMode ? "1.25rem" : "2rem",
-    "--fr-analytics-gap-sm": compactMode ? "0.25rem" : "0.5rem",
-    "--fr-analytics-gap-md": compactMode ? "0.5rem" : "0.75rem",
-    "--fr-analytics-gap-lg": compactMode ? "0.5rem" : "1rem",
-    "--fr-analytics-padding-sm": compactMode ? "0.5rem" : "0.75rem",
-    "--fr-analytics-padding-md": compactMode ? "0.25rem 0.5rem" : "0.5rem 0.75rem",
+    // Buttons - much smaller in compact mode
+    "--fr-analytics-btn-size": compactMode ? "1.5rem" : "2.25rem",
+    "--fr-analytics-btn-text": compactMode ? "0.625rem" : "0.875rem",
+    // Icons - smaller in compact mode
+    "--fr-analytics-icon-size": compactMode ? "0.625rem" : "1rem",
+    "--fr-analytics-icon-sm": compactMode ? "0.375rem" : "0.75rem",
+    // Text sizes - reduced hierarchy in compact mode
+    "--fr-analytics-text-xs": compactMode ? "0.5rem" : "0.75rem",
+    "--fr-analytics-text-sm": compactMode ? "0.625rem" : "0.875rem",
+    "--fr-analytics-text-base": compactMode ? "0.75rem" : "1.5rem",
+    "--fr-analytics-text-lg": compactMode ? "0.875rem" : "2rem",
+    // Spacing - tighter in compact mode
+    "--fr-analytics-gap-sm": compactMode ? "0.125rem" : "0.5rem",
+    "--fr-analytics-gap-md": compactMode ? "0.25rem" : "0.75rem",
+    "--fr-analytics-gap-lg": compactMode ? "0.25rem" : "1rem",
+    // Padding - minimal in compact mode
+    "--fr-analytics-padding-sm": compactMode ? "0.25rem" : "0.75rem",
+    "--fr-analytics-padding-md": compactMode ? "0.125rem 0.25rem" : "0.5rem 0.75rem",
+    // Card padding - tighter in compact mode
+    "--fr-analytics-card-padding": compactMode ? "0.5rem" : "0.75rem",
+    // Table row height - smaller in compact mode
+    "--fr-analytics-row-min-height": compactMode ? "2rem" : "3rem",
   } as Record<string, string>;
 
   return (
     <div
-      className="space-y-4"
+      className={compactMode ? "space-y-1" : "space-y-3 sm:space-y-4"}
       style={{
         ["--fr-analytics-accent" as string]: crew.theme.palette.accentMain,
         ["--fr-analytics-accent-hover" as string]: crew.theme.palette.accentMainHover,
@@ -799,76 +1040,91 @@ export function RentalsAnalyticsClient({
         ...compactVars,
       }}
     >
-      {/* Header */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        {/* Title */}
-        <div className="flex-1">
-          <h1 className="font-semibold text-[var(--fr-analytics-text)]" style={{ fontSize: "var(--fr-analytics-text-base)" }}>
+      {/* Header - Responsive Layout */}
+      <div className={compactMode ? "flex flex-col gap-1 lg:flex-row lg:items-center lg:justify-between" : "flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-center lg:justify-between"}>
+        {/* Title Section */}
+        <div className="flex items-center gap-2">
+          <h1 className="text-base font-semibold text-[var(--fr-analytics-text)] sm:text-lg lg:text-xl">
             Аренды за день
           </h1>
-        </div>
-
-        {/* Connection Status - Sticky indicator in corner */}
-        <div className="fixed bottom-4 right-4 z-40 flex items-center gap-1 rounded-full bg-[var(--fr-analytics-bg-card)] border border-[var(--fr-analytics-border)] px-3 py-1.5 shadow-lg">
-          <ConnectionStatus status={todosRealtime.state.status === "connected" && checklistRealtime.state.status === "connected" ? "connected" : "connecting"} compact />
-          <span className="text-[10px] text-[var(--fr-analytics-muted)]">
-            {todosRealtime.state.status === "connected" && checklistRealtime.state.status === "connected" ? "Live" : "Reconnecting..."}
-          </span>
-        </div>
-
-        {/* Date Picker - Compact */}
-        <div className="flex items-center gap-1 md:gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => navigateDate(-1)}
-            disabled={!dateRange || selectedDate <= dateRange.minDate || loading}
-            className="h-8 w-8 md:h-9 md:w-9"
-            style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
-          >
-            <ChevronLeft style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
-          </Button>
-
-          <div className="flex items-center rounded-lg border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)]" style={{ gap: "var(--fr-analytics-gap-sm)", padding: "var(--fr-analytics-padding-md)" }}>
-            <Calendar className="text-[var(--fr-analytics-muted)]" style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
-            <span className="font-medium text-[var(--fr-analytics-text)]" style={{ fontSize: "var(--fr-analytics-text-sm)" }}>
+          {/* Date Badge - Mobile */}
+          <div className="hidden rounded-lg border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)] px-2 py-1 sm:flex lg:hidden">
+            <Calendar className="h-3.5 w-3.5 text-[var(--fr-analytics-muted)]" />
+            <span className="ml-1.5 text-xs font-medium text-[var(--fr-analytics-text)]">
               {formatRussianDateOnly(selectedDate)}
             </span>
           </div>
+        </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => navigateDate(1)}
-            disabled={!dateRange || selectedDate >= dateRange.maxDate || loading}
-            className="h-8 w-8 md:h-9 md:w-9"
-            style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
-          >
-            <ChevronRight style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
-          </Button>
+        {/* Controls Bar - Responsive */}
+        <div className={compactMode ? "flex items-center gap-1 overflow-x-auto pb-0.5 lg:overflow-visible" : "flex items-center gap-1.5 overflow-x-auto pb-1 sm:gap-2 lg:pb-0 lg:overflow-visible"}>
+          {/* Date Navigation - Mobile/Tablet */}
+          <div className="flex items-center gap-1 lg:hidden">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => navigateDate(-1)}
+              disabled={!dateRange || selectedDate <= dateRange.minDate || loading}
+              style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
+              title="Предыдущий день"
+            >
+              <ChevronLeft style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
+            </Button>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => {
-              const today = new Date().toISOString().split("T")[0];
-              setSelectedDate(today);
-              window.history.pushState(
-                {},
-                "",
-                `/franchize/${slug}/rentals-analytics?date=${today}`,
-              );
-            }}
-            disabled={selectedDate === new Date().toISOString().split("T")[0] || loading}
-            className="h-8 w-8 md:h-9 md:w-9"
-            style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
-            title="Сегодня"
-          >
-            <RefreshCw style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
-          </Button>
+            <div className="flex items-center rounded-lg border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)] px-2 py-1" style={{ gap: "var(--fr-analytics-gap-sm)" }}>
+              <Calendar className="text-[var(--fr-analytics-muted)]" style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
+              <span className="text-xs font-medium text-[var(--fr-analytics-text)]" style={{ fontSize: "var(--fr-analytics-text-xs)" }}>
+                {formatRussianDateOnly(selectedDate)}
+              </span>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => navigateDate(1)}
+              disabled={!dateRange || selectedDate >= dateRange.maxDate || loading}
+              style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
+              title="Следующий день"
+            >
+              <ChevronRight style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
+            </Button>
+          </div>
+
+          {/* Date Navigation - Desktop */}
+          <div className="hidden items-center gap-1 lg:flex">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => navigateDate(-1)}
+              disabled={!dateRange || selectedDate <= dateRange.minDate || loading}
+              className="h-8 w-8"
+              style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
+            >
+              <ChevronLeft style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
+            </Button>
+
+            <div className="flex items-center rounded-lg border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)]" style={{ gap: "var(--fr-analytics-gap-sm)", padding: "var(--fr-analytics-padding-md)" }}>
+              <Calendar className="text-[var(--fr-analytics-muted)]" style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
+              <span className="font-medium text-[var(--fr-analytics-text)]" style={{ fontSize: "var(--fr-analytics-text-sm)" }}>
+                {formatRussianDateOnly(selectedDate)}
+              </span>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => navigateDate(1)}
+              disabled={!dateRange || selectedDate >= dateRange.maxDate || loading}
+              className="h-8 w-8"
+              style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
+            >
+              <ChevronRight style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
+            </Button>
+          </div>
 
           <Button
             type="button"
@@ -876,7 +1132,7 @@ export function RentalsAnalyticsClient({
             size="icon"
             onClick={() => setShowExportModal(true)}
             disabled={!dateRange}
-            className="h-8 w-8 md:h-9 md:w-9"
+            className="h-8 w-8"
             style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
             title="Экспорт в Excel"
           >
@@ -888,12 +1144,8 @@ export function RentalsAnalyticsClient({
             variant={compactMode ? "default" : "outline"}
             size="icon"
             onClick={() => setCompactMode(!compactMode)}
-            className="h-8 w-8 md:h-9 md:w-9"
-            style={{
-              width: "var(--fr-analytics-btn-size)",
-              height: "var(--fr-analytics-btn-size)",
-              ...(compactMode ? { backgroundColor: "var(--fr-analytics-accent)", color: "white" } : {})
-            }}
+            className="h-8 w-8"
+            style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
             title={compactMode ? "Обычный режим" : "Компактный режим"}
           >
             <Monitor style={{ width: "var(--fr-analytics-icon-size)", height: "var(--fr-analytics-icon-size)" }} />
@@ -902,8 +1154,8 @@ export function RentalsAnalyticsClient({
       </div>
 
       {/* Verification Status Filter */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-        <Filter className="h-4 w-4 shrink-0 text-[var(--fr-analytics-muted)]" />
+      <div className={compactMode ? "flex items-center gap-1 overflow-x-auto no-scrollbar" : "flex items-center gap-2 overflow-x-auto no-scrollbar"}>
+        <Filter className={compactMode ? "h-3 w-3 shrink-0 text-[var(--fr-analytics-muted)]" : "h-4 w-4 shrink-0 text-[var(--fr-analytics-muted)]"} />
         <div className="flex gap-1">
           {VERIFICATION_FILTERS.map((filter) => {
             const Icon = filter.icon;
@@ -913,55 +1165,66 @@ export function RentalsAnalyticsClient({
                 key={filter.value}
                 type="button"
                 onClick={() => setVerificationFilter(filter.value as typeof verificationFilter)}
-                className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                  isActive
-                    ? "bg-[var(--fr-analytics-accent)] text-white"
-                    : "bg-transparent text-[var(--fr-analytics-muted)] hover:bg-[var(--fr-analytics-accent)]/10"
-                }`}
+                className={compactMode
+                  ? `flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium transition-colors ${
+                      isActive
+                        ? "bg-[var(--fr-analytics-accent)] text-white"
+                        : "bg-transparent text-[var(--fr-analytics-muted)] hover:bg-[var(--fr-analytics-accent)]/10"
+                    }`
+                  : `flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                      isActive
+                        ? "bg-[var(--fr-analytics-accent)] text-white"
+                        : "bg-transparent text-[var(--fr-analytics-muted)] hover:bg-[var(--fr-analytics-accent)]/10"
+                    }`
+                }
                 title={filter.label}
               >
-                <Icon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{filter.label}</span>
+                <Icon className={compactMode ? "h-2.5 w-2.5" : "h-3.5 w-3.5"} />
+                <span className={compactMode ? "hidden lg:inline" : "hidden sm:inline"}>{filter.label}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Summary Stats */}
+      {/* Summary Stats - Compact Design */}
       {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4">
-          <FranchizeOperatorStatCard
-            label="Всего"
+        <div className={compactMode ? "grid grid-cols-2 gap-1" : "grid grid-cols-2 gap-3"}>
+          <StatCard
+            icon={<FileText className={compactMode ? "h-3 w-3" : "h-4 w-4"} />}
+            label="Всего аренд"
             value={summary.totalCount}
-            detail={<FileText className="h-4 w-4 opacity-60" />}
+            color="text-[var(--fr-analytics-accent)]"
           />
-          <FranchizeOperatorStatCard
+          <StatCard
+            icon={<CreditCard className={compactMode ? "h-3 w-3" : "h-4 w-4"} />}
             label="Выручка"
             value={formatRubles(summary.totalRevenue)}
-            detail={<CreditCard className="h-4 w-4 text-emerald-500" />}
+            color="text-emerald-500"
           />
-          <FranchizeOperatorStatCard
-            label="Подтв."
+          <StatCard
+            icon={<CheckCircle2 className={compactMode ? "h-3 w-3" : "h-4 w-4"} />}
+            label="Подтверждённые"
             value={summary.byStatus.confirmed || 0}
-            detail={<CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+            color="text-emerald-500"
           />
-          <FranchizeOperatorStatCard
+          <StatCard
+            icon={<Clock className={compactMode ? "h-3 w-3" : "h-4 w-4"} />}
             label="Активные"
             value={summary.byStatus.active || 0}
-            detail={<Clock className="h-4 w-4 text-blue-500" />}
+            color="text-blue-500"
           />
         </div>
       )}
 
       {/* Checklist Section */}
-      <div className="grid md:grid-cols-2" style={{ gap: "var(--fr-analytics-gap-lg)" }}>
+      <div className="grid md:grid-cols-2" style={{ gap: compactMode ? "var(--fr-analytics-gap-md)" : "var(--fr-analytics-gap-lg)" }}>
         {/* Выдача Checklist */}
         <FranchizeOperatorPanel>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <ListChecks className="h-4 w-4 text-[var(--fr-analytics-accent)]" />
-              <p className="text-sm font-semibold text-[var(--fr-analytics-text)]">
+          <div className={compactMode ? "flex items-center justify-between gap-1" : "flex items-center justify-between gap-3"}>
+            <div className={compactMode ? "flex items-center gap-1" : "flex items-center gap-2"}>
+              <ListChecks className={compactMode ? "h-3 w-3 text-[var(--fr-analytics-accent)]" : "h-4 w-4 text-[var(--fr-analytics-accent)]"} />
+              <p className={compactMode ? "text-[10px] font-semibold text-[var(--fr-analytics-text)]" : "text-sm font-semibold text-[var(--fr-analytics-text)]"}>
                 Выдача
               </p>
             </div>
@@ -1008,10 +1271,10 @@ export function RentalsAnalyticsClient({
 
         {/* Возврат Checklist */}
         <FranchizeOperatorPanel>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <ListChecks className="h-4 w-4 text-[var(--fr-analytics-accent)]" />
-              <p className="text-sm font-semibold text-[var(--fr-analytics-text)]">
+          <div className={compactMode ? "flex items-center justify-between gap-1" : "flex items-center justify-between gap-3"}>
+            <div className={compactMode ? "flex items-center gap-1" : "flex items-center gap-2"}>
+              <ListChecks className={compactMode ? "h-3 w-3 text-[var(--fr-analytics-accent)]" : "h-4 w-4 text-[var(--fr-analytics-accent)]"} />
+              <p className={compactMode ? "text-[10px] font-semibold text-[var(--fr-analytics-text)]" : "text-sm font-semibold text-[var(--fr-analytics-text)]"}>
                 Возврат
               </p>
             </div>
@@ -1019,12 +1282,12 @@ export function RentalsAnalyticsClient({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 text-xs"
+              className={compactMode ? "h-6 text-[10px]" : "h-7 text-xs"}
               onClick={() => resetChecklist("return")}
               disabled={updatingChecklist === "return"}
               title="Сбросить чеклист"
             >
-              <RotateCcw className={`h-3.5 w-3.5 ${updatingChecklist === "return" ? "animate-spin" : ""}`} />
+              <RotateCcw className={compactMode ? `h-2.5 w-2.5 ${updatingChecklist === "return" ? "animate-spin" : ""}` : `h-3.5 w-3.5 ${updatingChecklist === "return" ? "animate-spin" : ""}`} />
             </Button>
           </div>
           <div className="space-y-2" style={{ marginTop: compactMode ? "var(--fr-analytics-gap-sm)" : "var(--fr-analytics-gap-md)", gap: compactMode ? "var(--fr-analytics-gap-sm)" : "var(--fr-analytics-gap-md)" }}>
@@ -1052,34 +1315,34 @@ export function RentalsAnalyticsClient({
                   {item.text}
                 </span>
               </button>
-            )) || <p className="py-4 text-center text-xs text-[var(--fr-analytics-muted)]">Загрузка...</p>}
+            )) || <p className={compactMode ? "py-2 text-center text-[10px] text-[var(--fr-analytics-muted)]" : "py-4 text-center text-xs text-[var(--fr-analytics-muted)]"}>Загрузка...</p>}
           </div>
         </FranchizeOperatorPanel>
       </div>
 
       {/* Crew Todos Section */}
       <FranchizeOperatorPanel>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <ListChecks className="h-4 w-4 text-[var(--fr-analytics-accent)]" />
-            <p className="text-sm font-semibold text-[var(--fr-analytics-text)]">
+        <div className={compactMode ? "flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between" : "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"}>
+          <div className={compactMode ? "flex items-center gap-1" : "flex items-center gap-2"}>
+            <ListChecks className={compactMode ? "h-3 w-3 text-[var(--fr-analytics-accent)]" : "h-4 w-4 text-[var(--fr-analytics-accent)]"} />
+            <p className={compactMode ? "text-[10px] font-semibold text-[var(--fr-analytics-text)]" : "text-sm font-semibold text-[var(--fr-analytics-text)]"}>
               Задачи экипажа
             </p>
             {/* Easter egg for orudjev - todos are his paper notebook overhaul */}
             {dbUser?.username && dbUser.username.toLowerCase().includes("orud") && (
-              <span className="ml-2 rounded-full bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-600 animate-pulse">
+              <span className={compactMode ? "ml-1 rounded-full bg-purple-500/10 px-1 py-0.5 text-[10px] font-medium text-purple-600 animate-pulse" : "ml-2 rounded-full bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-600 animate-pulse"}>
                 📓 Блокнот Рустама
               </span>
             )}
             {todoStats && (
-              <span className="ml-2 flex gap-2">
-                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
+              <span className={compactMode ? "ml-1 flex gap-1" : "ml-2 flex gap-2"}>
+                <span className={compactMode ? "rounded-full bg-amber-500/10 px-1 py-0.5 text-[10px] font-medium text-amber-600" : "rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600"}>
                   {todoStats.pending} ожидают
                 </span>
-                <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600">
+                <span className={compactMode ? "rounded-full bg-blue-500/10 px-1 py-0.5 text-[10px] font-medium text-blue-600" : "rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600"}>
                   {todoStats.inProgress} в работе
                 </span>
-                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600">
+                <span className={compactMode ? "rounded-full bg-emerald-500/10 px-1 py-0.5 text-[10px] font-medium text-emerald-600" : "rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600"}>
                   {todoStats.done} выполнено
                 </span>
               </span>
@@ -1089,28 +1352,35 @@ export function RentalsAnalyticsClient({
             type="button"
             variant="outline"
             size="sm"
-            className="h-8"
+            className={compactMode ? "h-6 text-[10px]" : "h-8"}
             onClick={() => setShowCreateTodo(!showCreateTodo)}
           >
-            <Plus className="h-4 w-4" />
-            <span className="ml-1">Новая задача</span>
+            <Plus className={compactMode ? "h-3 w-3" : "h-4 w-4"} />
+            <span className={compactMode ? "ml-0.5" : "ml-1"}>Новая задача</span>
           </Button>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-[var(--fr-analytics-muted)]">Фильтр:</span>
+        <div className={compactMode ? "flex flex-wrap items-center gap-1" : "flex flex-wrap items-center gap-2"}>
+          <span className={compactMode ? "text-[10px] text-[var(--fr-analytics-muted)]" : "text-xs text-[var(--fr-analytics-muted)]"}>Фильтр:</span>
           <div className="flex gap-1">
             {TODO_STATUS_FILTERS.map((filter) => (
               <button
                 key={filter.value}
                 type="button"
                 onClick={() => setTodoFilter(filter.value)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                  todoFilter === filter.value
-                    ? "bg-[var(--fr-analytics-accent)] text-white"
-                    : "bg-transparent text-[var(--fr-analytics-muted)] hover:bg-[var(--fr-analytics-accent)]/10"
-                }`}
+                className={compactMode
+                  ? `rounded px-1 py-0.5 text-[10px] font-medium transition-colors ${
+                      todoFilter === filter.value
+                        ? "bg-[var(--fr-analytics-accent)] text-white"
+                        : "bg-transparent text-[var(--fr-analytics-muted)] hover:bg-[var(--fr-analytics-accent)]/10"
+                    }`
+                  : `rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                      todoFilter === filter.value
+                        ? "bg-[var(--fr-analytics-accent)] text-white"
+                        : "bg-transparent text-[var(--fr-analytics-muted)] hover:bg-[var(--fr-analytics-accent)]/10"
+                    }`
+                }
               >
                 {filter.label}
               </button>
@@ -1118,11 +1388,14 @@ export function RentalsAnalyticsClient({
           </div>
           {todoStats?.byAssignee && todoStats.byAssignee.length > 0 && (
             <>
-              <span className="ml-2 text-xs text-[var(--fr-analytics-muted)]">Исполнитель:</span>
+              <span className={compactMode ? "ml-1 text-[10px] text-[var(--fr-analytics-muted)]" : "ml-2 text-xs text-[var(--fr-analytics-muted)]"}>Исполнитель:</span>
               <select
                 value={todoAssigneeFilter}
                 onChange={(e) => setTodoAssigneeFilter(e.target.value)}
-                className="rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-2 py-1 text-xs text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                className={compactMode
+                  ? "rounded border border-[var(--fr-analytics-border)] bg-transparent px-1 py-0.5 text-[10px] text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                  : "rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-2 py-1 text-xs text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                }
               >
                 <option value="all">Все</option>
                 <option value="unassigned">Не назначен</option>
@@ -1138,20 +1411,26 @@ export function RentalsAnalyticsClient({
 
         {/* Create Todo Form */}
         {showCreateTodo && (
-          <div className="rounded-lg border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-base)] p-4">
-            <div className="grid gap-3 sm:grid-cols-2">
+          <div className={compactMode ? "rounded border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-base)] p-2" : "rounded-lg border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-base)] p-4"}>
+            <div className={compactMode ? "grid gap-1 sm:grid-cols-2" : "grid gap-3 sm:grid-cols-2"}>
               <input
                 type="text"
                 placeholder="Название задачи *"
                 value={newTodoTitle}
                 onChange={(e) => setNewTodoTitle(e.target.value)}
-                className="rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] placeholder:text-[var(--fr-analytics-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                className={compactMode
+                  ? "rounded border border-[var(--fr-analytics-border)] bg-transparent px-2 py-1 text-[10px] text-[var(--fr-analytics-text)] placeholder:text-[var(--fr-analytics-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                  : "rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] placeholder:text-[var(--fr-analytics-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                }
                 maxLength={200}
               />
               <select
                 value={newTodoAssignedTo || ""}
                 onChange={(e) => setNewTodoAssignedTo(e.target.value || null)}
-                className="rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                className={compactMode
+                  ? "rounded border border-[var(--fr-analytics-border)] bg-transparent px-2 py-1 text-[10px] text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                  : "rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                }
               >
                 <option value="">Не назначен</option>
                 {crewMembers.map((member) => (
@@ -1164,13 +1443,19 @@ export function RentalsAnalyticsClient({
                 placeholder="Описание (необязательно)"
                 value={newTodoDescription}
                 onChange={(e) => setNewTodoDescription(e.target.value)}
-                className="sm:col-span-2 min-h-[60px] rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] placeholder:text-[var(--fr-analytics-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                className={compactMode
+                  ? "sm:col-span-2 min-h-[40px] rounded border border-[var(--fr-analytics-border)] bg-transparent px-2 py-1 text-[10px] text-[var(--fr-analytics-text)] placeholder:text-[var(--fr-analytics-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                  : "sm:col-span-2 min-h-[60px] rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] placeholder:text-[var(--fr-analytics-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                }
                 rows={2}
               />
               <select
                 value={newTodoCategory}
                 onChange={(e) => setNewTodoCategory(e.target.value)}
-                className="rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                className={compactMode
+                  ? "rounded border border-[var(--fr-analytics-border)] bg-transparent px-2 py-1 text-[10px] text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                  : "rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                }
               >
                 {DEFAULT_TODO_CATEGORIES.map((cat) => (
                   <option key={cat.id} value={cat.id}>
@@ -1181,19 +1466,22 @@ export function RentalsAnalyticsClient({
               <select
                 value={newTodoPriority}
                 onChange={(e) => setNewTodoPriority(e.target.value as "low" | "medium" | "high")}
-                className="rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                className={compactMode
+                  ? "rounded border border-[var(--fr-analytics-border)] bg-transparent px-2 py-1 text-[10px] text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                  : "rounded-md border border-[var(--fr-analytics-border)] bg-transparent px-3 py-2 text-sm text-[var(--fr-analytics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fr-analytics-accent)]"
+                }
               >
                 <option value="low">Низкий приоритет</option>
                 <option value="medium">Средний приоритет</option>
                 <option value="high">Высокий приоритет</option>
               </select>
             </div>
-            <div className="mt-3 flex justify-end gap-2">
+            <div className={compactMode ? "mt-1 flex justify-end gap-1" : "mt-3 flex justify-end gap-2"}>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-8"
+                className={compactMode ? "h-6 text-[10px]" : "h-8"}
                 onClick={() => setShowCreateTodo(false)}
               >
                 Отмена
@@ -1202,16 +1490,16 @@ export function RentalsAnalyticsClient({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-8"
+                className={compactMode ? "h-6 text-[10px]" : "h-8"}
                 onClick={handleCreateTodo}
                 disabled={!newTodoTitle.trim() || creatingTodo}
               >
                 {creatingTodo ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <RefreshCw className={compactMode ? "h-3 w-3 animate-spin" : "h-4 w-4 animate-spin"} />
                 ) : (
                   <>
-                    <Plus className="h-4 w-4" />
-                    <span className="ml-1">Создать</span>
+                    <Plus className={compactMode ? "h-3 w-3" : "h-4 w-4"} />
+                    <span className={compactMode ? "ml-0.5" : "ml-1"}>Создать</span>
                   </>
                 )}
               </Button>
@@ -1223,16 +1511,16 @@ export function RentalsAnalyticsClient({
         {loadingTodos ? (
           <Loading text="Загружаем задачи..." compact />
         ) : !todos.length ? (
-          <div className="py-8 text-center">
-            <ListChecks className="mx-auto h-8 w-8 text-[var(--fr-analytics-muted)] opacity-50" />
-            <p className="mt-2 text-sm text-[var(--fr-analytics-muted)]">
+          <div className={compactMode ? "py-4 text-center" : "py-8 text-center"}>
+            <ListChecks className={compactMode ? "mx-auto h-6 w-6 text-[var(--fr-analytics-muted)] opacity-50" : "mx-auto h-8 w-8 text-[var(--fr-analytics-muted)] opacity-50"} />
+            <p className={compactMode ? "mt-1 text-[10px] text-[var(--fr-analytics-muted)]" : "mt-2 text-sm text-[var(--fr-analytics-muted)]"}>
               {dbUser?.username && dbUser.username.toLowerCase().includes("orud")
                 ? "📓 Блокнот пуст, но чист!"
                 : "Нет активных задач"}
             </p>
           </div>
         ) : (
-          <div className="mt-3 space-y-2">
+          <div className={compactMode ? "mt-1 space-y-1" : "mt-3 space-y-2"}>
             {todos.map((todo) => {
               const categoryLabel = DEFAULT_TODO_CATEGORIES.find(c => c.id === todo.category)?.label || todo.category;
               const assigneeName = todo.assigned_to_user?.full_name || todo.assigned_to_user?.username || null;
@@ -1240,15 +1528,24 @@ export function RentalsAnalyticsClient({
               return (
                 <div
                   key={todo.id}
-                  className={`rounded-lg border p-3 transition-all ${
-                    todo.status === "done"
-                      ? "border-emerald-500/30 bg-emerald-500/5 opacity-70"
-                      : todo.status === "in_progress"
-                        ? "border-blue-500/30 bg-blue-500/5"
-                        : "border-[var(--fr-analytics-border)] hover:border-[var(--fr-analytics-accent)]/30"
-                  }`}
+                  className={compactMode
+                    ? `rounded border p-2 transition-all ${
+                        todo.status === "done"
+                          ? "border-emerald-500/30 bg-emerald-500/5 opacity-70"
+                          : todo.status === "in_progress"
+                            ? "border-blue-500/30 bg-blue-500/5"
+                            : "border-[var(--fr-analytics-border)] hover:border-[var(--fr-analytics-accent)]/30"
+                      }`
+                    : `rounded-lg border p-3 transition-all ${
+                        todo.status === "done"
+                          ? "border-emerald-500/30 bg-emerald-500/5 opacity-70"
+                          : todo.status === "in_progress"
+                            ? "border-blue-500/30 bg-blue-500/5"
+                            : "border-[var(--fr-analytics-border)] hover:border-[var(--fr-analytics-accent)]/30"
+                      }`
+                  }
                 >
-                  <div className="flex items-start gap-3">
+                  <div className={compactMode ? "flex items-start gap-1" : "flex items-start gap-3"}>
                     {/* Status Circle */}
                     <button
                       type="button"
@@ -1261,55 +1558,73 @@ export function RentalsAnalyticsClient({
                           void updateTodoStatus(todo, "pending");
                         }
                       }}
-                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                        todo.status === "done"
-                          ? "border-emerald-500 bg-emerald-500"
-                          : todo.status === "in_progress"
-                            ? "border-blue-500 bg-blue-500"
-                            : "border-[var(--fr-analytics-muted)] hover:border-[var(--fr-analytics-accent)]"
-                      }`}
+                      className={compactMode
+                        ? `mt-0 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                            todo.status === "done"
+                              ? "border-emerald-500 bg-emerald-500"
+                              : todo.status === "in_progress"
+                                ? "border-blue-500 bg-blue-500"
+                                : "border-[var(--fr-analytics-muted)] hover:border-[var(--fr-analytics-accent)]"
+                          }`
+                        : `mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                            todo.status === "done"
+                              ? "border-emerald-500 bg-emerald-500"
+                              : todo.status === "in_progress"
+                                ? "border-blue-500 bg-blue-500"
+                                : "border-[var(--fr-analytics-muted)] hover:border-[var(--fr-analytics-accent)]"
+                          }`
+                      }
                     >
-                      {todo.status === "done" && <Check className="h-3 w-3 text-white" />}
+                      {todo.status === "done" && <Check className={compactMode ? "h-2 w-2 text-white" : "h-3 w-3 text-white"} />}
                       {todo.status === "in_progress" && (
-                        <div className="h-2 w-2 animate-pulse rounded-full bg-white" />
+                        <div className={compactMode ? "h-1.5 w-1.5 animate-pulse rounded-full bg-white" : "h-2 w-2 animate-pulse rounded-full bg-white"} />
                       )}
                     </button>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
+                      <div className={compactMode ? "flex items-start justify-between gap-1" : "flex items-start justify-between gap-2"}>
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium ${
-                            todo.status === "done" ? "line-through text-[var(--fr-analytics-muted)]" : "text-[var(--fr-analytics-text)]"
-                          }`}>
+                          <p className={compactMode
+                            ? `text-[10px] font-medium ${
+                                todo.status === "done" ? "line-through text-[var(--fr-analytics-muted)]" : "text-[var(--fr-analytics-text)]"
+                              }`
+                            : `text-sm font-medium ${
+                                todo.status === "done" ? "line-through text-[var(--fr-analytics-muted)]" : "text-[var(--fr-analytics-text)]"
+                              }`
+                          }>
                             {todo.title}
                           </p>
                           {todo.description && (
-                            <p className="mt-1 text-xs text-[var(--fr-analytics-muted)] line-clamp-2">
+                            <p className={compactMode ? "mt-0.5 text-[10px] text-[var(--fr-analytics-muted)] line-clamp-2" : "mt-1 text-xs text-[var(--fr-analytics-muted)] line-clamp-2"}>
                               {todo.description}
                             </p>
                           )}
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-[var(--fr-analytics-accent)]/10 px-2 py-0.5 text-xs text-[var(--fr-analytics-accent)]">
+                          <div className={compactMode ? "mt-1 flex flex-wrap items-center gap-1" : "mt-2 flex flex-wrap items-center gap-2"}>
+                            <span className={compactMode ? "rounded-full bg-[var(--fr-analytics-accent)]/10 px-1 py-0.5 text-[10px] text-[var(--fr-analytics-accent)]" : "rounded-full bg-[var(--fr-analytics-accent)]/10 px-2 py-0.5 text-xs text-[var(--fr-analytics-accent)]"}>
                               {categoryLabel}
                             </span>
                             {todo.priority === "high" && (
-                              <span className="rounded-full bg-rose-500/10 px-2 py-0.5 text-xs text-rose-600">
+                              <span className={compactMode ? "rounded-full bg-rose-500/10 px-1 py-0.5 text-[10px] text-rose-600" : "rounded-full bg-rose-500/10 px-2 py-0.5 text-xs text-rose-600"}>
                                 Срочно
                               </span>
                             )}
                             {assigneeName && (
-                              <span className="flex items-center gap-1 text-xs text-[var(--fr-analytics-muted)]">
-                                <User className="h-3 w-3" />
+                              <span className={compactMode ? "flex items-center gap-0.5 text-[10px] text-[var(--fr-analytics-muted)]" : "flex items-center gap-1 text-xs text-[var(--fr-analytics-muted)]"}>
+                                <User className={compactMode ? "h-2.5 w-2.5" : "h-3 w-3"} />
                                 {assigneeName}
                               </span>
                             )}
                             {todo.due_date && (
-                              <span className={`text-xs ${
-                                new Date(todo.due_date) < new Date() && todo.status !== "done"
-                                  ? "text-rose-600"
-                                  : "text-[var(--fr-analytics-muted)]"
-                              }`}>
+                              <span className={compactMode ? `text-[10px] ${
+                                  new Date(todo.due_date) < new Date() && todo.status !== "done"
+                                    ? "text-rose-600"
+                                    : "text-[var(--fr-analytics-muted)]"
+                                }` : `text-xs ${
+                                  new Date(todo.due_date) < new Date() && todo.status !== "done"
+                                    ? "text-rose-600"
+                                    : "text-[var(--fr-analytics-muted)]"
+                                }`}>
                                 до {formatRussianDate(todo.due_date)}
                               </span>
                             )}
@@ -1319,14 +1634,14 @@ export function RentalsAnalyticsClient({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 shrink-0"
+                          className={compactMode ? "h-5 w-5 shrink-0" : "h-7 w-7 shrink-0"}
                           onClick={() => {
                             if (confirm("Удалить задачу?")) {
                               void handleDeleteTodo(todo.id);
                             }
                           }}
                         >
-                          <Trash2 className="h-3.5 w-3.5 text-[var(--fr-analytics-muted)]" />
+                          <Trash2 className={compactMode ? "h-2.5 w-2.5 text-[var(--fr-analytics-muted)]" : "h-3.5 w-3.5 text-[var(--fr-analytics-muted)]"} />
                         </Button>
                       </div>
                     </div>
@@ -1339,17 +1654,20 @@ export function RentalsAnalyticsClient({
 
         {/* By Assignee Stats */}
         {todoStats?.byAssignee && todoStats.byAssignee.length > 0 && (
-          <div className="mt-4 border-t border-[var(--fr-analytics-border)] pt-4">
-            <p className="mb-2 text-xs font-medium text-[var(--fr-analytics-muted)]">
+          <div className={compactMode ? "mt-2 border-t border-[var(--fr-analytics-border)] pt-2" : "mt-4 border-t border-[var(--fr-analytics-border)] pt-4"}>
+            <p className={compactMode ? "mb-1 text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "mb-2 text-xs font-medium text-[var(--fr-analytics-muted)]"}>
               По исполнителям
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className={compactMode ? "flex flex-wrap gap-1" : "flex flex-wrap gap-2"}>
               {todoStats.byAssignee.slice(0, 5).map((assignee) => (
                 <div
                   key={assignee.userId}
-                  className="flex items-center gap-2 rounded-full border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)] px-3 py-1.5 text-xs"
+                  className={compactMode
+                    ? "flex items-center gap-1 rounded-full border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)] px-2 py-0.5 text-[10px]"
+                    : "flex items-center gap-2 rounded-full border border-[var(--fr-analytics-border)] bg-[var(--fr-analytics-bg-card)] px-3 py-1.5 text-xs"
+                }
                 >
-                  <User className="h-3.5 w-3.5 text-[var(--fr-analytics-muted)]" />
+                  <User className={compactMode ? "h-2.5 w-2.5 text-[var(--fr-analytics-muted)]" : "h-3.5 w-3.5 text-[var(--fr-analytics-muted)]"} />
                   <span className="font-medium text-[var(--fr-analytics-text)]">
                     {assignee.userName || assignee.userId.slice(0, 8)}
                   </span>
@@ -1365,30 +1683,33 @@ export function RentalsAnalyticsClient({
 
       {/* Rentals List */}
       <FranchizeOperatorPanel>
-        <div className="flex items-center justify-between gap-3">
+        <div className={compactMode ? "flex items-center justify-between gap-1" : "flex items-center justify-between gap-3"}>
           <div>
-            <p className="text-sm font-semibold text-[var(--fr-analytics-text)]">
+            <p className={compactMode ? "text-[10px] font-semibold text-[var(--fr-analytics-text)]" : "text-sm font-semibold text-[var(--fr-analytics-text)]"}>
               Список аренд
             </p>
-            <p className="mt-1 text-xs text-[var(--fr-analytics-muted)]">
+            <p className={compactMode ? "mt-0.5 text-[10px] text-[var(--fr-analytics-muted)]" : "mt-1 text-xs text-[var(--fr-analytics-muted)]"}>
               Нажмите на аренду для просмотра деталей
             </p>
           </div>
           {refreshing && (
-            <RefreshCw className="h-4 w-4 animate-spin text-[var(--fr-analytics-muted)]" />
+            <RefreshCw className={compactMode ? "h-3 w-3 animate-spin text-[var(--fr-analytics-muted)]" : "h-4 w-4 animate-spin text-[var(--fr-analytics-muted)]"} />
           )}
         </div>
 
         {loading ? (
           <Loading text="Загружаем аренды..." compact />
         ) : !rentals.length ? (
-          <p className="py-12 text-center text-sm text-[var(--fr-analytics-muted)]">
+          <p className={compactMode ? "py-6 text-center text-[10px] text-[var(--fr-analytics-muted)]" : "py-12 text-center text-sm text-[var(--fr-analytics-muted)]"}>
             За этот день аренд нет
           </p>
         ) : (
-          <div className="mt-3 overflow-hidden rounded-xl border" style={{ borderColor: "var(--fr-analytics-border)" }}>
+          <div className={compactMode ? "mt-1 overflow-hidden rounded-lg border" : "mt-3 overflow-hidden rounded-xl border"} style={{ borderColor: "var(--fr-analytics-border)" }}>
             {/* Table Header */}
-            <div className="hidden grid-cols-[1fr_1.5fr_1fr_1fr_1fr_1.2fr] gap-3 border-b px-4 py-3 text-xs font-semibold text-[var(--fr-analytics-muted)] md:grid" style={{ borderColor: "var(--fr-analytics-border)" }}>
+            <div className={compactMode
+              ? "hidden grid-cols-[1fr_1.5fr_1fr_1fr_1fr_1.2fr] gap-1 border-b px-2 py-1 text-[10px] font-semibold text-[var(--fr-analytics-muted)] md:grid"
+              : "hidden grid-cols-[1fr_1.5fr_1fr_1fr_1fr_1.2fr] gap-3 border-b px-4 py-3 text-xs font-semibold text-[var(--fr-analytics-muted)] md:grid"
+            } style={{ borderColor: "var(--fr-analytics-border)" }}>
               <span>Время</span>
               <span>Клиент / Техника</span>
               <span>Сумма</span>
@@ -1412,85 +1733,89 @@ export function RentalsAnalyticsClient({
                 return (
                   <div
                     key={rental.rental_id}
-                    className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[1fr_1.5fr_1fr_1fr_1fr_1.2fr] md:items-center hover:bg-[var(--fr-analytics-accent)]/5 cursor-pointer transition-colors"
+                    className={compactMode
+                      ? "grid gap-1 px-2 py-1.5 text-[10px] md:grid-cols-[1fr_1.5fr_1fr_1fr_1fr_1.2fr] md:items-center hover:bg-[var(--fr-analytics-accent)]/5 cursor-pointer transition-colors"
+                      : "grid gap-2 px-4 py-3 text-sm md:grid-cols-[1fr_1.5fr_1fr_1fr_1fr_1.2fr] md:items-center hover:bg-[var(--fr-analytics-accent)]/5 cursor-pointer transition-colors"
+                    }
                     onClick={() => openRentalDetails(rental)}
                   >
                     {/* Time */}
                     <div className="text-[var(--fr-analytics-text)]">
-                      <span className="md:hidden text-xs text-[var(--fr-analytics-muted)]">Время: </span>
+                      <span className={compactMode ? "md:hidden text-[10px] text-[var(--fr-analytics-muted)]" : "md:hidden text-xs text-[var(--fr-analytics-muted)]"}>Время: </span>
                       {formatRussianDate(rental.created_at)?.split(",")?.[1] || "—"}
                     </div>
 
                     {/* Client / Vehicle */}
                     <div>
-                      <div className="flex items-center gap-2">
-                        <User className="h-3.5 w-3.5 text-[var(--fr-analytics-muted)]" />
-                        <span className="font-medium text-[var(--fr-analytics-text)]">
+                      <div className={compactMode ? "flex items-center gap-1" : "flex items-center gap-2"}>
+                        <User className={compactMode ? "h-2.5 w-2.5 text-[var(--fr-analytics-muted)]" : "h-3.5 w-3.5 text-[var(--fr-analytics-muted)]"} />
+                        <span className={compactMode ? "font-medium text-[10px] text-[var(--fr-analytics-text)]" : "font-medium text-[var(--fr-analytics-text)]"}>
                           {rental.user?.full_name || rental.user?.username || `Пользователь #${rental.user_id.slice(0, 8)}`}
                         </span>
                       </div>
-                      <div className="mt-0.5 text-xs text-[var(--fr-analytics-muted)]">
+                      <div className={compactMode ? "mt-0 text-[10px] text-[var(--fr-analytics-muted)]" : "mt-0.5 text-xs text-[var(--fr-analytics-muted)]"}>
                         {vehicleName}
                       </div>
                     </div>
 
                     {/* Sum */}
-                    <div className="font-medium text-[var(--fr-analytics-text)]">
-                      <span className="md:hidden text-xs text-[var(--fr-analytics-muted)]">Сумма: </span>
+                    <div className={compactMode ? "font-medium text-[10px] text-[var(--fr-analytics-text)]" : "font-medium text-[var(--fr-analytics-text)]"}>
+                      <span className={compactMode ? "md:hidden text-[10px] text-[var(--fr-analytics-muted)]" : "md:hidden text-xs text-[var(--fr-analytics-muted)]"}>Сумма: </span>
                       {formatRubles(rental.total_cost)}
                     </div>
 
                     {/* Status */}
-                    <div className="flex items-center gap-1.5">
-                      <StatusIcon className={`h-3.5 w-3.5 text-${statusConf.color}-500`} />
-                      <span className="text-xs text-[var(--fr-analytics-muted)] md:text-[var(--fr-analytics-text)]">
+                    <div className={compactMode ? "flex items-center gap-0.5" : "flex items-center gap-1.5"}>
+                      <StatusIcon className={compactMode ? `h-2.5 w-2.5 text-${statusConf.color}-500` : `h-3.5 w-3.5 text-${statusConf.color}-500`} />
+                      <span className={compactMode ? "text-[10px] text-[var(--fr-analytics-muted)] md:text-[var(--fr-analytics-text)]" : "text-xs text-[var(--fr-analytics-muted)] md:text-[var(--fr-analytics-text)]"}>
                         {statusConf.label}
                       </span>
                     </div>
 
                     {/* Documents */}
-                    <div className="flex items-center gap-2">
+                    <div className={compactMode ? "flex items-center gap-0.5" : "flex items-center gap-2"}>
                       {hasQrCode && (
-                        <div className="flex items-center gap-1 text-emerald-600" title="QR код доступен">
-                          <QrCode className="h-3.5 w-3.5" />
-                          <span className="text-xs">QR</span>
+                        <div className={compactMode ? "flex items-center gap-0.5 text-emerald-600" : "flex items-center gap-1 text-emerald-600"} title="QR код доступен">
+                          <QrCode className={compactMode ? "h-2.5 w-2.5" : "h-3.5 w-3.5"} />
+                          <span className={compactMode ? "text-[10px]" : "text-xs"}>QR</span>
                         </div>
                       )}
                       {verificationStatus === "verified" && (
-                        <div className="flex items-center gap-1 text-emerald-600" title="Документы проверены">
-                          <ShieldCheck className="h-3.5 w-3.5" />
+                        <div className={compactMode ? "flex items-center gap-0.5 text-emerald-600" : "flex items-center gap-1 text-emerald-600"} title="Документы проверены">
+                          <ShieldCheck className={compactMode ? "h-2.5 w-2.5" : "h-3.5 w-3.5"} />
                         </div>
                       )}
                       {verificationStatus === "pending" && (
-                        <div className="flex items-center gap-1 text-amber-600" title="Ожидает проверки">
-                          <Clock className="h-3.5 w-3.5" />
+                        <div className={compactMode ? "flex items-center gap-0.5 text-amber-600" : "flex items-center gap-1 text-amber-600"} title="Ожидает проверки">
+                          <Clock className={compactMode ? "h-2.5 w-2.5" : "h-3.5 w-3.5"} />
                         </div>
                       )}
                       {verificationStatus === "revoked" && (
-                        <div className="flex items-center gap-1 text-rose-600" title="Документы отозваны">
-                          <ShieldAlert className="h-3.5 w-3.5" />
+                        <div className={compactMode ? "flex items-center gap-0.5 text-rose-600" : "flex items-center gap-1 text-rose-600"} title="Документы отозваны">
+                          <ShieldAlert className={compactMode ? "h-2.5 w-2.5" : "h-3.5 w-3.5"} />
                         </div>
                       )}
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                    <div className={compactMode ? "flex items-center justify-end gap-0.5" : "flex items-center justify-end gap-1"} onClick={(e) => e.stopPropagation()}>
                       {hasQrCode && (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-7 text-xs"
+                          className={compactMode ? "h-5 text-[10px]" : "h-7 text-xs"}
                           onClick={() => handleResendContract(rental)}
                           disabled={resending === rental.rental_id}
                           title="Отправить договор + QR"
+                          style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
                         >
                           {resending === rental.rental_id ? (
-                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                            <RefreshCw className={compactMode ? "h-2.5 w-2.5 animate-spin" : "h-3.5 w-3.5 animate-spin"} />
                           ) : (
                             <>
-                              <Send className="h-3.5 w-3.5" />
-                              <span className="hidden sm:inline">Отправить</span>
+                              <Send className={compactMode ? "h-2.5 w-2.5" : "h-3.5 w-3.5"} />
+                              <span className={compactMode ? "hidden sm:inline" : "hidden sm:inline"}>Отправить</span>
                             </>
                           )}
                         </Button>
@@ -1499,13 +1824,14 @@ export function RentalsAnalyticsClient({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-7 text-xs"
+                        className={compactMode ? "h-5 text-[10px]" : "h-7 text-xs"}
                         onClick={(e) => {
                           e.stopPropagation();
                           openRentalDetails(rental);
                         }}
+                        style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
                       >
-                        Подробнее
+                        {compactMode ? "→" : "Подробнее"}
                       </Button>
                     </div>
                   </div>
@@ -1523,7 +1849,10 @@ export function RentalsAnalyticsClient({
           onClick={closeModal}
         >
           <div
-            className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border p-6 shadow-2xl"
+            className={compactMode
+              ? "max-h-[90vh] w-full max-w-2xl overflow-auto rounded-lg border p-3 shadow-xl"
+              : "max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border p-6 shadow-2xl"
+            }
             style={{
               borderColor: "var(--fr-analytics-border)",
               backgroundColor: "var(--fr-analytics-bg-card)",
@@ -1531,12 +1860,12 @@ export function RentalsAnalyticsClient({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-start justify-between gap-4">
+            <div className={compactMode ? "flex items-start justify-between gap-2" : "flex items-start justify-between gap-4"}>
               <div>
-                <h2 className="text-lg font-semibold text-[var(--fr-analytics-text)]">
+                <h2 className={compactMode ? "text-sm font-semibold text-[var(--fr-analytics-text)]" : "text-lg font-semibold text-[var(--fr-analytics-text)]"}>
                   Детали аренды
                 </h2>
-                <p className="mt-1 text-xs text-[var(--fr-analytics-muted)]">
+                <p className={compactMode ? "mt-0.5 text-[10px] text-[var(--fr-analytics-muted)]" : "mt-1 text-xs text-[var(--fr-analytics-muted)]"}>
                   #{selectedRental.rental_id.slice(0, 8)}
                 </p>
               </div>
@@ -1545,45 +1874,46 @@ export function RentalsAnalyticsClient({
                 variant="ghost"
                 size="icon"
                 onClick={closeModal}
-                className="h-8 w-8"
+                className={compactMode ? "h-6 w-6" : "h-8 w-8"}
+                style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
               >
-                <X className="h-4 w-4" />
+                <X className={compactMode ? "h-3 w-3" : "h-4 w-4"} />
               </Button>
             </div>
 
             {/* Rental Info */}
-            <div className="mt-4 space-y-4">
+            <div className={compactMode ? "mt-2 space-y-2" : "mt-4 space-y-4"}>
               {/* Vehicle */}
-              <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-analytics-border)" }}>
-                <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">Техника</p>
-                <p className="mt-1 text-sm font-semibold text-[var(--fr-analytics-text)]">
+              <div className={compactMode ? "rounded-lg border p-2" : "rounded-xl border p-3"} style={{ borderColor: "var(--fr-analytics-border)" }}>
+                <p className={compactMode ? "text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "text-xs font-medium text-[var(--fr-analytics-muted)]"}>Техника</p>
+                <p className={compactMode ? "mt-0.5 text-[10px] font-semibold text-[var(--fr-analytics-text)]" : "mt-1 text-sm font-semibold text-[var(--fr-analytics-text)]"}>
                   {selectedRental.vehicle
                     ? `${selectedRental.vehicle.make} ${selectedRental.vehicle.model}`
                     : "Неизвестно"}
                 </p>
-                <p className="mt-0.5 text-xs text-[var(--fr-analytics-muted)]">
+                <p className={compactMode ? "mt-0 text-[10px] text-[var(--fr-analytics-muted)]" : "mt-0.5 text-xs text-[var(--fr-analytics-muted)]"}>
                   ID: {selectedRental.vehicle_id}
                 </p>
               </div>
 
               {/* Customer */}
-              <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-analytics-border)" }}>
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-[var(--fr-analytics-muted)]" />
-                  <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">Клиент</p>
+              <div className={compactMode ? "rounded-lg border p-2" : "rounded-xl border p-3"} style={{ borderColor: "var(--fr-analytics-border)" }}>
+                <div className={compactMode ? "flex items-center gap-1" : "flex items-center gap-2"}>
+                  <User className={compactMode ? "h-3 w-3 text-[var(--fr-analytics-muted)]" : "h-4 w-4 text-[var(--fr-analytics-muted)]"} />
+                  <p className={compactMode ? "text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "text-xs font-medium text-[var(--fr-analytics-muted)]"}>Клиент</p>
                 </div>
-                <p className="mt-1 text-sm font-semibold text-[var(--fr-analytics-text)]">
+                <p className={compactMode ? "mt-0.5 text-[10px] font-semibold text-[var(--fr-analytics-text)]" : "mt-1 text-sm font-semibold text-[var(--fr-analytics-text)]"}>
                   {selectedRental.user?.full_name || selectedRental.user?.username || `Пользователь #${selectedRental.user_id.slice(0, 8)}`}
                 </p>
-                <p className="mt-0.5 text-xs text-[var(--fr-analytics-muted)]">
+                <p className={compactMode ? "mt-0 text-[10px] text-[var(--fr-analytics-muted)]" : "mt-0.5 text-xs text-[var(--fr-analytics-muted)]"}>
                   ID: {selectedRental.user_id}
                 </p>
               </div>
 
               {/* Dates */}
-              <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-analytics-border)" }}>
-                <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">Даты аренды</p>
-                <div className="mt-2 space-y-1 text-sm text-[var(--fr-analytics-text)]">
+              <div className={compactMode ? "rounded-lg border p-2" : "rounded-xl border p-3"} style={{ borderColor: "var(--fr-analytics-border)" }}>
+                <p className={compactMode ? "text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "text-xs font-medium text-[var(--fr-analytics-muted)]"}>Даты аренды</p>
+                <div className={compactMode ? "mt-1 space-y-0.5 text-[10px] text-[var(--fr-analytics-text)]" : "mt-2 space-y-1 text-sm text-[var(--fr-analytics-text)]"}>
                   <div className="flex justify-between">
                     <span className="text-[var(--fr-analytics-muted)]">Начало:</span>
                     <span>{formatRussianDate(selectedRental.agreed_start_date || selectedRental.requested_start_date)}</span>
@@ -1596,30 +1926,32 @@ export function RentalsAnalyticsClient({
               </div>
 
               {/* Cost */}
-              <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-analytics-border)" }}>
-                <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">Стоимость</p>
-                <p className="mt-1 text-xl font-bold text-[var(--fr-analytics-accent)]">
+              <div className={compactMode ? "rounded-lg border p-2" : "rounded-xl border p-3"} style={{ borderColor: "var(--fr-analytics-border)" }}>
+                <p className={compactMode ? "text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "text-xs font-medium text-[var(--fr-analytics-muted)]"}>Стоимость</p>
+                <p className={compactMode ? "mt-0.5 text-sm font-bold text-[var(--fr-analytics-accent)]" : "mt-1 text-xl font-bold text-[var(--fr-analytics-accent)]"}>
                   {formatRubles(selectedRental.total_cost)}
                 </p>
               </div>
 
               {/* Document Details */}
               {loadingDetails ? (
-                <Loading text="Загружаем документы..." compact />
+                <div className={compactMode ? "flex items-center justify-center py-4" : "flex items-center justify-center py-8"}>
+                  <Loading text="Загружаем документы..." />
+                </div>
               ) : rentalDetails?.secret ? (
-                <div className="space-y-3">
-                  <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">
+                <div className={compactMode ? "space-y-2" : "space-y-3"}>
+                  <p className={compactMode ? "text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "text-xs font-medium text-[var(--fr-analytics-muted)]"}>
                     Данные из документов
                   </p>
 
                   {/* Personal Info */}
                   {rentalDetails.secret.renter_full_name && (
-                    <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-analytics-border)" }}>
-                      <div className="flex items-center gap-2">
-                        <IdCard className="h-4 w-4 text-[var(--fr-analytics-muted)]" />
-                        <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">ФИО</p>
+                    <div className={compactMode ? "rounded-lg border p-2" : "rounded-xl border p-3"} style={{ borderColor: "var(--fr-analytics-border)" }}>
+                      <div className={compactMode ? "flex items-center gap-1" : "flex items-center gap-2"}>
+                        <IdCard className={compactMode ? "h-3 w-3 text-[var(--fr-analytics-muted)]" : "h-4 w-4 text-[var(--fr-analytics-muted)]"} />
+                        <p className={compactMode ? "text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "text-xs font-medium text-[var(--fr-analytics-muted)]"}>ФИО</p>
                       </div>
-                      <p className="mt-1 text-sm text-[var(--fr-analytics-text)]">
+                      <p className={compactMode ? "mt-0.5 text-[10px] text-[var(--fr-analytics-text)]" : "mt-1 text-sm text-[var(--fr-analytics-text)]"}>
                         {rentalDetails.secret.renter_full_name}
                       </p>
                     </div>
@@ -1627,17 +1959,17 @@ export function RentalsAnalyticsClient({
 
                   {/* Passport */}
                   {rentalDetails.secret.renter_passport && (
-                    <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-analytics-border)" }}>
-                      <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">Паспорт</p>
-                      <div className="mt-1 space-y-1 text-sm text-[var(--fr-analytics-text)]">
+                    <div className={compactMode ? "rounded-lg border p-2" : "rounded-xl border p-3"} style={{ borderColor: "var(--fr-analytics-border)" }}>
+                      <p className={compactMode ? "text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "text-xs font-medium text-[var(--fr-analytics-muted)]"}>Паспорт</p>
+                      <div className={compactMode ? "mt-0.5 space-y-0.5 text-[10px] text-[var(--fr-analytics-text)]" : "mt-1 space-y-1 text-sm text-[var(--fr-analytics-text)]"}>
                         <p>Серия/номер: {rentalDetails.secret.renter_passport}</p>
                         {rentalDetails.secret.renter_passport_issue_date && (
-                          <p className="text-xs text-[var(--fr-analytics-muted)]">
+                          <p className={compactMode ? "text-[10px] text-[var(--fr-analytics-muted)]" : "text-xs text-[var(--fr-analytics-muted)]"}>
                             Выдан: {rentalDetails.secret.renter_passport_issue_date}
                           </p>
                         )}
                         {rentalDetails.secret.renter_birth_date && (
-                          <p className="text-xs text-[var(--fr-analytics-muted)]">
+                          <p className={compactMode ? "text-[10px] text-[var(--fr-analytics-muted)]" : "text-xs text-[var(--fr-analytics-muted)]"}>
                             Дата рождения: {rentalDetails.secret.renter_birth_date}
                           </p>
                         )}
@@ -1647,12 +1979,12 @@ export function RentalsAnalyticsClient({
 
                   {/* Registration */}
                   {rentalDetails.secret.renter_registration && (
-                    <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-analytics-border)" }}>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-[var(--fr-analytics-muted)]" />
-                        <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">Прописка</p>
+                    <div className={compactMode ? "rounded-lg border p-2" : "rounded-xl border p-3"} style={{ borderColor: "var(--fr-analytics-border)" }}>
+                      <div className={compactMode ? "flex items-center gap-1" : "flex items-center gap-2"}>
+                        <MapPin className={compactMode ? "h-3 w-3 text-[var(--fr-analytics-muted)]" : "h-4 w-4 text-[var(--fr-analytics-muted)]"} />
+                        <p className={compactMode ? "text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "text-xs font-medium text-[var(--fr-analytics-muted)]"}>Прописка</p>
                       </div>
-                      <p className="mt-1 text-sm text-[var(--fr-analytics-text)]">
+                      <p className={compactMode ? "mt-0.5 text-[10px] text-[var(--fr-analytics-text)]" : "mt-1 text-sm text-[var(--fr-analytics-text)]"}>
                         {rentalDetails.secret.renter_registration}
                       </p>
                     </div>
@@ -1660,34 +1992,34 @@ export function RentalsAnalyticsClient({
 
                   {/* Driver License */}
                   {rentalDetails.secret.renter_driver_license && (
-                    <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-analytics-border)" }}>
-                      <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">Водительское удостоверение</p>
-                      <p className="mt-1 text-sm text-[var(--fr-analytics-text)]">
+                    <div className={compactMode ? "rounded-lg border p-2" : "rounded-xl border p-3"} style={{ borderColor: "var(--fr-analytics-border)" }}>
+                      <p className={compactMode ? "text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "text-xs font-medium text-[var(--fr-analytics-muted)]"}>Водительское удостоверение</p>
+                      <p className={compactMode ? "mt-0.5 text-[10px] text-[var(--fr-analytics-text)]" : "mt-1 text-sm text-[var(--fr-analytics-text)]"}>
                         {rentalDetails.secret.renter_driver_license}
                       </p>
                     </div>
                   )}
 
                   {/* Contact */}
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className={compactMode ? "grid gap-2 sm:grid-cols-2" : "grid gap-3 sm:grid-cols-2"}>
                     {rentalDetails.secret.renter_phone && (
-                      <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-analytics-border)" }}>
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-[var(--fr-analytics-muted)]" />
-                          <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">Телефон</p>
+                      <div className={compactMode ? "rounded-lg border p-2" : "rounded-xl border p-3"} style={{ borderColor: "var(--fr-analytics-border)" }}>
+                        <div className={compactMode ? "flex items-center gap-1" : "flex items-center gap-2"}>
+                          <Phone className={compactMode ? "h-3 w-3 text-[var(--fr-analytics-muted)]" : "h-4 w-4 text-[var(--fr-analytics-muted)]"} />
+                          <p className={compactMode ? "text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "text-xs font-medium text-[var(--fr-analytics-muted)]"}>Телефон</p>
                         </div>
-                        <p className="mt-1 text-sm text-[var(--fr-analytics-text)]">
+                        <p className={compactMode ? "mt-0.5 text-[10px] text-[var(--fr-analytics-text)]" : "mt-1 text-sm text-[var(--fr-analytics-text)]"}>
                           {rentalDetails.secret.renter_phone}
                         </p>
                       </div>
                     )}
                     {rentalDetails.secret.renter_email && (
-                      <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-analytics-border)" }}>
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-[var(--fr-analytics-muted)]" />
-                          <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">Email</p>
+                      <div className={compactMode ? "rounded-lg border p-2" : "rounded-xl border p-3"} style={{ borderColor: "var(--fr-analytics-border)" }}>
+                        <div className={compactMode ? "flex items-center gap-1" : "flex items-center gap-2"}>
+                          <Mail className={compactMode ? "h-3 w-3 text-[var(--fr-analytics-muted)]" : "h-4 w-4 text-[var(--fr-analytics-muted)]"} />
+                          <p className={compactMode ? "text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "text-xs font-medium text-[var(--fr-analytics-muted)]"}>Email</p>
                         </div>
-                        <p className="mt-1 text-sm text-[var(--fr-analytics-text)]">
+                        <p className={compactMode ? "mt-0.5 text-[10px] text-[var(--fr-analytics-text)]" : "mt-1 text-sm text-[var(--fr-analytics-text)]"}>
                           {rentalDetails.secret.renter_email}
                         </p>
                       </div>
@@ -1696,12 +2028,12 @@ export function RentalsAnalyticsClient({
 
                   {/* Address */}
                   {rentalDetails.secret.renter_address && (
-                    <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-analytics-border)" }}>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-[var(--fr-analytics-muted)]" />
-                        <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">Адрес</p>
+                    <div className={compactMode ? "rounded-lg border p-2" : "rounded-xl border p-3"} style={{ borderColor: "var(--fr-analytics-border)" }}>
+                      <div className={compactMode ? "flex items-center gap-1" : "flex items-center gap-2"}>
+                        <MapPin className={compactMode ? "h-3 w-3 text-[var(--fr-analytics-muted)]" : "h-4 w-4 text-[var(--fr-analytics-muted)]"} />
+                        <p className={compactMode ? "text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "text-xs font-medium text-[var(--fr-analytics-muted)]"}>Адрес</p>
                       </div>
-                      <p className="mt-1 text-sm text-[var(--fr-analytics-text)]">
+                      <p className={compactMode ? "mt-0.5 text-[10px] text-[var(--fr-analytics-text)]" : "mt-1 text-sm text-[var(--fr-analytics-text)]"}>
                         {rentalDetails.secret.renter_address}
                       </p>
                     </div>
@@ -1709,22 +2041,22 @@ export function RentalsAnalyticsClient({
 
                   {/* Contract Verifier */}
                   {rentalDetails.contractVerifier && (
-                    <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-analytics-border)" }}>
-                      <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">Статус договора</p>
-                      <div className="mt-2 flex items-center gap-2">
+                    <div className={compactMode ? "rounded-lg border p-2" : "rounded-xl border p-3"} style={{ borderColor: "var(--fr-analytics-border)" }}>
+                      <p className={compactMode ? "text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "text-xs font-medium text-[var(--fr-analytics-muted)]"}>Статус договора</p>
+                      <div className={compactMode ? "mt-1 flex items-center gap-1" : "mt-2 flex items-center gap-2"}>
                         {rentalDetails.contractVerifier.status === "verified" ? (
-                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          <CheckCircle2 className={compactMode ? "h-3 w-3 text-emerald-500" : "h-4 w-4 text-emerald-500"} />
                         ) : (
-                          <AlertCircle className="h-4 w-4 text-amber-500" />
+                          <AlertCircle className={compactMode ? "h-3 w-3 text-amber-500" : "h-4 w-4 text-amber-500"} />
                         )}
-                        <span className="text-sm text-[var(--fr-analytics-text)]">
+                        <span className={compactMode ? "text-[10px] text-[var(--fr-analytics-text)]" : "text-sm text-[var(--fr-analytics-text)]"}>
                           {rentalDetails.contractVerifier.status === "verified"
                             ? "Проверен"
                             : rentalDetails.contractVerifier.status}
                         </span>
                       </div>
                       {rentalDetails.contractVerifier.verifiedAt && (
-                        <p className="mt-1 text-xs text-[var(--fr-analytics-muted)]">
+                        <p className={compactMode ? "mt-0.5 text-[10px] text-[var(--fr-analytics-muted)]" : "mt-1 text-xs text-[var(--fr-analytics-muted)]"}>
                           Проверен: {formatRussianDate(rentalDetails.contractVerifier.verifiedAt)}
                         </p>
                       )}
@@ -1733,17 +2065,17 @@ export function RentalsAnalyticsClient({
 
                   {/* Doc SHA256 */}
                   {rentalDetails.secret.doc_sha256 && (
-                    <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-analytics-border)" }}>
-                      <p className="text-xs font-medium text-[var(--fr-analytics-muted)]">Хэш документа</p>
-                      <p className="mt-1 text-xs font-mono text-[var(--fr-analytics-muted)] break-all">
+                    <div className={compactMode ? "rounded-lg border p-2" : "rounded-xl border p-3"} style={{ borderColor: "var(--fr-analytics-border)" }}>
+                      <p className={compactMode ? "text-[10px] font-medium text-[var(--fr-analytics-muted)]" : "text-xs font-medium text-[var(--fr-analytics-muted)]"}>Хэш документа</p>
+                      <p className={compactMode ? "mt-0.5 text-[10px] font-mono text-[var(--fr-analytics-muted)] break-all" : "mt-1 text-xs font-mono text-[var(--fr-analytics-muted)] break-all"}>
                         {rentalDetails.secret.doc_sha256}
                       </p>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="rounded-xl border p-4" style={{ borderColor: "var(--fr-analytics-border)" }}>
-                  <p className="text-sm text-[var(--fr-analytics-muted)]">
+                <div className={compactMode ? "rounded-lg border p-2" : "rounded-xl border p-4"} style={{ borderColor: "var(--fr-analytics-border)" }}>
+                  <p className={compactMode ? "text-[10px] text-[var(--fr-analytics-muted)]" : "text-sm text-[var(--fr-analytics-muted)]"}>
                     Данные из документов не найдены
                   </p>
                 </div>
@@ -1751,12 +2083,13 @@ export function RentalsAnalyticsClient({
             </div>
 
             {/* Modal Footer */}
-            <div className="mt-6 flex justify-end gap-2">
+            <div className={compactMode ? "mt-3 flex justify-end gap-1" : "mt-6 flex justify-end gap-2"}>
               <Button
                 type="button"
                 variant="outline"
                 onClick={closeModal}
-                className="h-9"
+                className={compactMode ? "h-6 text-[10px]" : "h-9"}
+                style={{ width: "var(--fr-analytics-btn-size)", height: "var(--fr-analytics-btn-size)" }}
               >
                 Закрыть
               </Button>
