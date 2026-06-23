@@ -165,18 +165,6 @@ export async function getRentalsDashboard(input: {
         return { success: false, error: "Недостаточно прав для просмотра." };
       }
     }
-        .maybeSingle();
-
-      const userMetadata = userRoles?.metadata as Record<string, unknown> | null;
-      const userUsername = userRoles?.username as string | null;
-      const isAdmin = userMetadata?.role === "admin";
-      // Special case: orudjov (and variations) always have access
-      const isOrudjov = userUsername?.toLowerCase().includes("orud");
-
-      if (!isOwner && !isAdmin && !isOrudjov) {
-        return { success: false, error: "Недостаточно прав для просмотра." };
-      }
-    }
 
     // Parse date boundaries for the selected day (UTC to avoid timezone issues)
     const startOfDay = new Date(`${date}T00:00:00.000Z`).toISOString();
