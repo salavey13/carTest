@@ -34,22 +34,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get owner's user_id (chat_id) to generate password
-    const ownerId = crew.owner_id;
-    if (!ownerId) {
-      return NextResponse.json(
-        { success: false, error: "Crew has no owner" },
-        { status: 400 }
-      );
-    }
-
-    // Get owner's email if not provided
+    // Get crew email from crew_secrets
     let recipientEmail = email;
     if (!recipientEmail) {
+      const { data: crewSecrets } = await supabaseAdmin
+        .from("crew_secrets")
+        .select("email")
+        .eq("crew_id", crewId)
+        .maybeSingle();
+
+      if (crewSecrets?.email) {
+        recipientEmail = crewSecrets.email;
+      }
+    }
+
+    // Fallback: try owner's user email
+    if (!recipientEmail && crew.owner_id) {
       const { data: owner } = await supabaseAdmin
         .from("users")
         .select("metadata")
-        .eq("user_id", ownerId)
+        .eq("user_id", crew.owner_id)
         .single();
 
       if (owner?.metadata) {
@@ -69,7 +73,7 @@ export async function POST(request: NextRequest) {
     const { data: passwordResult, error: passwordError } = await supabaseAdmin
       .rpc("generate_analytics_password", {
         p_crew_id: crewId,
-        p_created_by: ownerId,
+        p_created_by: crew.owner_id || "system",
         p_slug: crew.slug,
       });
 

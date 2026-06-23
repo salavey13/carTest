@@ -1,7 +1,7 @@
 /**
  * /analytics-pass command
  * =====================
- * Generates a time-based password for analytics access.
+ * Generates a time-based password for analytics access and sends it to crew email.
  * Only available to crew members.
  * Password expires after 24 hours.
  */
@@ -9,6 +9,31 @@
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/lib/supabase-server";
+
+// Internal API URL for email sending
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
+  ? `https://${process.env.VERCEL_URL}`
+  : "http://localhost:3000";
+
+async function sendPasswordToEmail(crewId: string, slug: string, crewName: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${SITE_URL}/api/send-analytics-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ crewId }),
+    });
+
+    const result = await response.json();
+    if (!result.success) {
+      return { success: false, error: result.error || "Failed to send email" };
+    }
+
+    return { success: true };
+  } catch (error) {
+    logger.error("[ANALYTICS_PASS] Email send error:", error);
+    return { success: false, error: "Network error sending email" };
+  }
+}
 
 export async function analyticsPassCommand(chatId: number, userId: number, username?: string) {
   logger.info(`[ANALYTICS_PASS] >>> FUNCTION ENTERED <<< chatId=${chatId}, userId=${userId}, username=${username}`);
@@ -55,9 +80,8 @@ export async function analyticsPassCommand(chatId: number, userId: number, usern
       return;
     }
 
-    // For each crew the user belongs to, generate or get existing password
+    // For each crew the user belongs to, send password via email
     const results: string[] = [];
-    const botUrl = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
 
     for (const membership of memberships) {
       const crew = (membership as any).crews;
@@ -65,64 +89,26 @@ export async function analyticsPassCommand(chatId: number, userId: number, usern
       const slug = crew.slug;
       const crewName = crew.name;
 
-      // Check if there's an existing active password (less than 24 hours old)
-      const { data: existingPassword, error: existingError } = await supabaseAdmin
-        .from("analytics_passwords")
-        .select("password, expires_at")
-        .eq("crew_id", crewId)
-        .eq("created_by", userIdStr)
-        .gte("expires_at", new Date().toISOString())
-        .order("created_at", { ascending: false })
-        .maybeSingle();
+      logger.info(`[ANALYTICS_PASS] Sending password to email for crew ${slug} (${crewId})`);
 
-      if (existingPassword && !existingError) {
-        const expiresAt = new Date(existingPassword.expires_at);
-        const hoursLeft = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)));
+      // Send password via email
+      const emailResult = await sendPasswordToEmail(crewId, slug, crewName);
+
+      if (emailResult.success) {
         results.push(
-          `🔑 *${crewName}* (${slug})\n` +
-          `Пароль: "${existingPassword.password}"\n` +
-          `⏰ Действует ещё ${hoursLeft} ч.\n` +
-          `🔗 [Открыть аналитику](${botUrl}/franchize/${slug}/rentals-analytics)`
+          `✅ *${crewName}*: Пароль отправлен на эл. почту экипажа.`
         );
       } else {
-        // Generate new password
-        logger.info(`[ANALYTICS_PASS] Generating new password for crew ${slug} (${crewId})`);
-        const { data: newPassword, error: generateError } = await supabaseAdmin
-          .rpc("generate_analytics_password", {
-            p_crew_id: crewId,
-            p_created_by: userIdStr,
-            p_slug: slug,
-          });
-
-        logger.info(`[ANALYTICS_PASS] Generate result:`, {
-          generateError,
-          hasData: !!newPassword,
-          dataLength: newPassword?.length
-        });
-
-        if (generateError || !newPassword || newPassword.length === 0) {
-          logger.error("[ANALYTICS_PASS] Error generating password:", generateError);
-          results.push(`❌ *${crewName}*: Ошибка генерации пароля`);
-          continue;
-        }
-
-        const passwordData = newPassword[0];
-        const expiresAt = new Date(passwordData.expires_at);
-        const hoursLeft = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)));
-
         results.push(
-          `🔑 *${crewName}* (${slug})\n` +
-          `Пароль: "${passwordData.password}"\n` +
-          `⏰ Действует ${hoursLeft} ч.\n` +
-          `🔗 [Открыть аналитику](${botUrl}/franchize/${slug}/rentals-analytics)`
+          `❌ *${crewName}*: ${emailResult.error || "Ошибка отправки"}`
         );
       }
     }
 
-    const message = `🔐 *Пароли для аналитики*\n\n${results.join("\n\n")}\n\n⚠️ Пароли действуют 24 часа. Не передавайте их посторонним.`;
+    const message = `🔐 *Пароли для аналитики*\n\n${results.join("\n\n")}\n\n⏰ Пароли действуют 24 часа. Проверьте почту.`;
 
     await sendComplexMessage(chatId, message);
-    logger.info(`[ANALYTICS_PASS] Password(s) sent to user ${userId}.`);
+    logger.info(`[ANALYTICS_PASS] Password email(s) triggered for user ${userId}.`);
 
   } catch (error) {
     logger.error("[ANALYTICS_PASS] ++++ ERROR CAUGHT ++++", error);
