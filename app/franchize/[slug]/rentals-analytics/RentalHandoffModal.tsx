@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, CheckCircle2, AlertCircle } from "lucide-react";
+import { X, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import {
@@ -26,6 +26,44 @@ const PHASE_LABELS = {
   return: "ВОЗВРАТ",
 };
 
+// Quick-select options for fuel/battery
+const PERCENT_OPTIONS = [0, 25, 50, 75, 100];
+
+// Common equipment condition options
+const CONDITION_OPTIONS = [
+  { label: "Норм", value: "Норм" },
+  { label: "Грязно", value: "Грязно" },
+  { label: "Есть царапины", value: "Есть царапины" },
+  { label: "Есть потёртости", value: "Есть потёртости" },
+  { label: "Есть повреждения", value: "Есть повреждения" },
+];
+
+// ─── QuickSelect Chip Component ───────────────────────────────────────────────
+
+function QuickSelectChip({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+        selected
+          ? "bg-yellow-400 text-black font-medium"
+          : "bg-white/10 text-white/70 hover:bg-white/20"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 export function RentalHandoffModal({
   rentalId,
   vehicleName,
@@ -42,7 +80,7 @@ export function RentalHandoffModal({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Form state
+  // Form state - booleans (already 1-tap checkboxes)
   const [passportChecked, setPassportChecked] = useState(false);
   const [licenseChecked, setLicenseChecked] = useState(false);
   const [depositCollected, setDepositCollected] = useState(false);
@@ -57,17 +95,20 @@ export function RentalHandoffModal({
   const [depositReturned, setDepositReturned] = useState(false);
   const [noDamagesConfirmed, setNoDamagesConfirmed] = useState(false);
 
+  // Numeric - odometer (keep as number input, too variable)
   const [odometerStart, setOdometerStart] = useState("");
   const [odometerEnd, setOdometerEnd] = useState("");
-  const [fuelLevelStart, setFuelLevelStart] = useState("");
-  const [fuelLevelEnd, setFuelLevelEnd] = useState("");
-  const [batteryLevelStart, setBatteryLevelStart] = useState("");
-  const [batteryLevelEnd, setBatteryLevelEnd] = useState("");
-  const [damageNotes, setDamageNotes] = useState("");
-  const [notes, setNotes] = useState("");
 
-  // Equipment fields
-  const [keysCount, setKeysCount] = useState("1");
+  // Percentages - use quick-select
+  const [fuelLevelStart, setFuelLevelStart] = useState<number | null>(null);
+  const [fuelLevelEnd, setFuelLevelEnd] = useState<number | null>(null);
+  const [batteryLevelStart, setBatteryLevelStart] = useState<number | null>(null);
+  const [batteryLevelEnd, setBatteryLevelEnd] = useState<number | null>(null);
+
+  // Equipment - use quick-select for count
+  const [keysCount, setKeysCount] = useState<number>(1);
+
+  // Equipment checkboxes (already 1-tap)
   const [chargerIncluded, setChargerIncluded] = useState(false);
   const [lockCableIncluded, setLockCableIncluded] = useState(false);
   const [jacketIssued, setJacketIssued] = useState(false);
@@ -77,8 +118,12 @@ export function RentalHandoffModal({
   const [cameraMountIssued, setCameraMountIssued] = useState(false);
   const [motoCoverIssued, setMotoCoverIssued] = useState(false);
   const [ebikeChargerIssued, setEbikeChargerIssued] = useState(false);
+
+  // Notes - keep as text (natural for freeform)
   const [otherEquipment, setOtherEquipment] = useState("");
   const [equipmentConditionReturn, setEquipmentConditionReturn] = useState("");
+  const [damageNotes, setDamageNotes] = useState("");
+  const [notes, setNotes] = useState("");
 
   // Load existing handoff data
   useEffect(() => {
@@ -113,15 +158,15 @@ export function RentalHandoffModal({
 
             setOdometerStart(phaseData.odometer_start?.toString() || "");
             setOdometerEnd(phaseData.odometer_end?.toString() || "");
-            setFuelLevelStart(phaseData.fuel_level_start?.toString() || "");
-            setFuelLevelEnd(phaseData.fuel_level_end?.toString() || "");
-            setBatteryLevelStart(phaseData.battery_level_start?.toString() || "");
-            setBatteryLevelEnd(phaseData.battery_level_end?.toString() || "");
+            setFuelLevelStart(phaseData.fuel_level_start ?? null);
+            setFuelLevelEnd(phaseData.fuel_level_end ?? null);
+            setBatteryLevelStart(phaseData.battery_level_start ?? null);
+            setBatteryLevelEnd(phaseData.battery_level_end ?? null);
             setDamageNotes(phaseData.damage_notes || "");
             setNotes(phase === "handout" ? phaseData.handout_notes || "" : phaseData.return_notes || "");
 
             // Equipment fields
-            setKeysCount(phaseData.keys_count?.toString() || "1");
+            setKeysCount(phaseData.keys_count ?? 1);
             setChargerIncluded(phaseData.charger_included || false);
             setLockCableIncluded(phaseData.lock_cable_included || false);
             setJacketIssued(phaseData.jacket_issued || false);
@@ -166,16 +211,16 @@ export function RentalHandoffModal({
           // Numeric fields
           odometer_start: odometerStart ? parseInt(odometerStart) : null,
           odometer_end: odometerEnd ? parseInt(odometerEnd) : null,
-          fuel_level_start: fuelLevelStart ? parseInt(fuelLevelStart) : null,
-          fuel_level_end: fuelLevelEnd ? parseInt(fuelLevelEnd) : null,
-          battery_level_start: batteryLevelStart ? parseInt(batteryLevelStart) : null,
-          battery_level_end: batteryLevelEnd ? parseInt(batteryLevelEnd) : null,
+          fuel_level_start: fuelLevelStart,
+          fuel_level_end: fuelLevelEnd,
+          battery_level_start: batteryLevelStart,
+          battery_level_end: batteryLevelEnd,
           // Notes
           damage_notes: damageNotes || null,
           handout_notes: phase === "handout" ? notes || null : undefined,
           return_notes: phase === "return" ? notes || null : undefined,
           // Equipment fields
-          keys_count: keysCount ? parseInt(keysCount) : 1,
+          keys_count: keysCount,
           charger_included: chargerIncluded,
           lock_cable_included: lockCableIncluded,
           jacket_issued: jacketIssued,
@@ -238,7 +283,7 @@ export function RentalHandoffModal({
     : conditionChecked && helmetReturned && keysReturned && odometerEnd;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl border border-white/10 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
@@ -260,360 +305,315 @@ export function RentalHandoffModal({
             <>
               {/* Phase-specific checklist */}
               {phase === "handout" ? (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium text-white/70">Чеклист выдачи</h3>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={passportChecked}
-                      onChange={(e) => setPassportChecked(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-white">Паспорт проверен</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={licenseChecked}
-                      onChange={(e) => setLicenseChecked(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-white">ВУ проверено</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={depositCollected}
-                      onChange={(e) => setDepositCollected(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-white">Залог собран</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={helmetIssued}
-                      onChange={(e) => setHelmetIssued(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-white">Шлем выдан</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={keysIssued}
-                      onChange={(e) => setKeysIssued(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-white">Ключи выданы</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={instructionsGiven}
-                      onChange={(e) => setInstructionsGiven(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-white">Инструкции даны</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={photosTaken}
-                      onChange={(e) => setPhotosTaken(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-white">Фото (8-10) сделано</span>
-                  </label>
+                <div className="space-y-1.5">
+                  <h3 className="text-xs font-medium text-white/50 uppercase tracking-wide">Чеклист</h3>
+                  <div className="space-y-1">
+                    {[
+                      { checked: passportChecked, set: setPassportChecked, label: "Паспорт" },
+                      { checked: licenseChecked, set: setLicenseChecked, label: "ВУ" },
+                      { checked: depositCollected, set: setDepositCollected, label: "Залог" },
+                      { checked: helmetIssued, set: setHelmetIssued, label: "Шлем" },
+                      { checked: keysIssued, set: setKeysIssued, label: "Ключи" },
+                      { checked: instructionsGiven, set: setInstructionsGiven, label: "Инструкция" },
+                      { checked: photosTaken, set: setPhotosTaken, label: "Фото" },
+                    ].map((item) => (
+                      <label
+                        key={item.label}
+                        className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                          item.checked ? "bg-emerald-500/20" : "bg-white/5 hover:bg-white/10"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.checked}
+                          onChange={(e) => item.set(e.target.checked)}
+                          className="w-4 h-4 rounded accent-yellow-400"
+                        />
+                        <span className="text-sm text-white">{item.label}</span>
+                        {item.checked && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 ml-auto" />}
+                      </label>
+                    ))}
+                  </div>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium text-white/70">Чеклист возврата</h3>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={conditionChecked}
-                      onChange={(e) => setConditionChecked(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-white">Состояние проверено</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={helmetReturned}
-                      onChange={(e) => setHelmetReturned(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-white">Шлем возвращён</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={keysReturned}
-                      onChange={(e) => setKeysReturned(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-white">Ключи возвращены</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={depositReturned}
-                      onChange={(e) => setDepositReturned(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-white">Залог возвращён</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={noDamagesConfirmed}
-                      onChange={(e) => setNoDamagesConfirmed(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-white">Повреждений нет</span>
-                  </label>
+                <div className="space-y-1.5">
+                  <h3 className="text-xs font-medium text-white/50 uppercase tracking-wide">Чеклист</h3>
+                  <div className="space-y-1">
+                    {[
+                      { checked: conditionChecked, set: setConditionChecked, label: "Состояние проверено" },
+                      { checked: helmetReturned, set: setHelmetReturned, label: "Шлем возвращён" },
+                      { checked: keysReturned, set: setKeysReturned, label: "Ключи возвращены" },
+                      { checked: depositReturned, set: setDepositReturned, label: "Залог возвращён" },
+                      { checked: noDamagesConfirmed, set: setNoDamagesConfirmed, label: "Без повреждений" },
+                    ].map((item) => (
+                      <label
+                        key={item.label}
+                        className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                          item.checked ? "bg-emerald-500/20" : "bg-white/5 hover:bg-white/10"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.checked}
+                          onChange={(e) => item.set(e.target.checked)}
+                          className="w-4 h-4 rounded accent-yellow-400"
+                        />
+                        <span className="text-sm text-white">{item.label}</span>
+                        {item.checked && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 ml-auto" />}
+                      </label>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {/* Odometer */}
+              {/* Odometer - keep as number input */}
               <div className="space-y-2">
-                <h3 className="text-sm font-medium text-white/70">Показания одометра (км)</h3>
+                <h3 className="text-xs font-medium text-white/50 uppercase tracking-wide">Одометр (км)</h3>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-xs text-white/50">Выдача</label>
+                    <label className="text-xs text-white/50 mb-1 block">Выдача</label>
                     <input
                       type="number"
                       value={odometerStart}
                       onChange={(e) => setOdometerStart(e.target.value)}
                       placeholder="1250"
                       disabled={phase === "return" && handoff?.odometer_start}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50"
+                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50 text-sm"
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-white/50">Возврат</label>
+                    <label className="text-xs text-white/50 mb-1 block">Возврат</label>
                     <input
                       type="number"
                       value={odometerEnd}
                       onChange={(e) => setOdometerEnd(e.target.value)}
                       placeholder="1450"
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50"
+                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50 text-sm"
                     />
                   </div>
                 </div>
                 {odometerStart && odometerEnd && (
-                  <div className="text-xs text-emerald-400">
-                    Пробег: {parseInt(odometerEnd) - parseInt(odometerStart)} км
+                  <div className="flex items-center justify-center gap-1 text-xs text-emerald-400 bg-emerald-500/10 py-1.5 rounded-lg">
+                    <span>Пробег:</span>
+                    <span className="font-bold">{parseInt(odometerEnd) - parseInt(odometerStart)}</span>
+                    <span>км</span>
                   </div>
                 )}
               </div>
 
-              {/* Fuel/Charge levels */}
+              {/* Fuel level - quick-select */}
               <div className="space-y-2">
-                <h3 className="text-sm font-medium text-white/70">Топливо / Заряд (%)</h3>
-                <div className="grid grid-cols-2 gap-2">
+                <h3 className="text-xs font-medium text-white/50 uppercase tracking-wide">Топливо (%)</h3>
+                <div className="space-y-3">
                   <div>
-                    <label className="text-xs text-white/50">Выдача</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={fuelLevelStart}
-                      onChange={(e) => setFuelLevelStart(e.target.value)}
-                      placeholder="100"
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50"
-                    />
+                    <label className="text-xs text-white/50 mb-1.5 block">Выдача</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {PERCENT_OPTIONS.map((pct) => (
+                        <QuickSelectChip
+                          key={`fuel-start-${pct}`}
+                          label={`${pct}%`}
+                          selected={fuelLevelStart === pct}
+                          onClick={() => setFuelLevelStart(pct)}
+                        />
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setFuelLevelStart(null)}
+                        className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                          fuelLevelStart === null
+                            ? "bg-white/10 text-white/40"
+                            : "bg-white/5 text-white/30"
+                        }`}
+                      >
+                        —
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs text-white/50">Возврат</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={fuelLevelEnd}
-                      onChange={(e) => setFuelLevelEnd(e.target.value)}
-                      placeholder="80"
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50"
-                    />
-                  </div>
+                  {phase === "return" && (
+                    <div>
+                      <label className="text-xs text-white/50 mb-1.5 block">Возврат</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {PERCENT_OPTIONS.map((pct) => (
+                          <QuickSelectChip
+                            key={`fuel-end-${pct}`}
+                            label={`${pct}%`}
+                            selected={fuelLevelEnd === pct}
+                            onClick={() => setFuelLevelEnd(pct)}
+                          />
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setFuelLevelEnd(null)}
+                          className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                            fuelLevelEnd === null
+                              ? "bg-white/10 text-white/40"
+                              : "bg-white/5 text-white/30"
+                          }`}
+                        >
+                          —
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Battery levels (for EV) */}
+              {/* Battery level - quick-select */}
               <div className="space-y-2">
-                <h3 className="text-sm font-medium text-white/70">Заряд АКБ электробайка (%)</h3>
-                <div className="grid grid-cols-2 gap-2">
+                <h3 className="text-xs font-medium text-white/50 uppercase tracking-wide">Заряд АКБ (%)</h3>
+                <div className="space-y-3">
                   <div>
-                    <label className="text-xs text-white/50">Выдача</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={batteryLevelStart}
-                      onChange={(e) => setBatteryLevelStart(e.target.value)}
-                      placeholder="100"
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50"
-                    />
+                    <label className="text-xs text-white/50 mb-1.5 block">Выдача</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {PERCENT_OPTIONS.map((pct) => (
+                        <QuickSelectChip
+                          key={`battery-start-${pct}`}
+                          label={`${pct}%`}
+                          selected={batteryLevelStart === pct}
+                          onClick={() => setBatteryLevelStart(pct)}
+                        />
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setBatteryLevelStart(null)}
+                        className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                          batteryLevelStart === null
+                            ? "bg-white/10 text-white/40"
+                            : "bg-white/5 text-white/30"
+                        }`}
+                      >
+                        —
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs text-white/50">Возврат</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={batteryLevelEnd}
-                      onChange={(e) => setBatteryLevelEnd(e.target.value)}
-                      placeholder="60"
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50"
-                    />
-                  </div>
+                  {phase === "return" && (
+                    <div>
+                      <label className="text-xs text-white/50 mb-1.5 block">Возврат</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {PERCENT_OPTIONS.map((pct) => (
+                          <QuickSelectChip
+                            key={`battery-end-${pct}`}
+                            label={`${pct}%`}
+                            selected={batteryLevelEnd === pct}
+                            onClick={() => setBatteryLevelEnd(pct)}
+                          />
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setBatteryLevelEnd(null)}
+                          className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                            batteryLevelEnd === null
+                              ? "bg-white/10 text-white/40"
+                              : "bg-white/5 text-white/30"
+                          }`}
+                        >
+                          —
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Equipment / Completeness (from Appendix 1) */}
+              {/* Equipment */}
               <div className="space-y-2">
-                <h3 className="text-sm font-medium text-white/70">Комплектация и экипировка</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs text-white/50">Ключи (шт)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={keysCount}
-                      onChange={(e) => setKeysCount(e.target.value)}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50"
-                    />
+                <h3 className="text-xs font-medium text-white/50 uppercase tracking-wide">Комплектация</h3>
+
+                {/* Keys count - quick-select */}
+                <div>
+                  <label className="text-xs text-white/50 mb-1.5 block">Ключи (шт)</label>
+                  <div className="flex gap-2">
+                    {[1, 2].map((count) => (
+                      <QuickSelectChip
+                        key={`keys-${count}`}
+                        label={`${count}`}
+                        selected={keysCount === count}
+                        onClick={() => setKeysCount(count)}
+                      />
+                    ))}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={chargerIncluded}
-                      onChange={(e) => setChargerIncluded(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-xs text-white">Зарядное устройство</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={lockCableIncluded}
-                      onChange={(e) => setLockCableIncluded(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-xs text-white">Замок/трос</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={jacketIssued}
-                      onChange={(e) => setJacketIssued(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-xs text-white">Куртка/черепаха</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={secondHelmetIssued}
-                      onChange={(e) => setSecondHelmetIssued(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-xs text-white">Второй шлем</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={bagIssued}
-                      onChange={(e) => setBagIssued(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-xs text-white">Сумка/рюкзак</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={netIssued}
-                      onChange={(e) => setNetIssued(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-xs text-white">Сетка</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={cameraMountIssued}
-                      onChange={(e) => setCameraMountIssued(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-xs text-white">Крепление для камеры</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={motoCoverIssued}
-                      onChange={(e) => setMotoCoverIssued(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-xs text-white">Чехол для мотоцикла</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={ebikeChargerIssued}
-                      onChange={(e) => setEbikeChargerIssued(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-xs text-white">Зарядка для электробайка</span>
-                  </label>
+
+                {/* Equipment checkboxes - already 1-tap */}
+                <div className="grid grid-cols-2 gap-1.5 mt-2">
+                  {[
+                    { checked: chargerIncluded, set: setChargerIncluded, label: "Зарядка" },
+                    { checked: lockCableIncluded, set: setLockCableIncluded, label: "Замок/трос" },
+                    { checked: jacketIssued, set: setJacketIssued, label: "Куртка" },
+                    { checked: secondHelmetIssued, set: setSecondHelmetIssued, label: "2-й шлем" },
+                    { checked: bagIssued, set: setBagIssued, label: "Сумка" },
+                    { checked: netIssued, set: setNetIssued, label: "Сетка" },
+                    { checked: cameraMountIssued, set: setCameraMountIssued, label: "Крепление камеры" },
+                    { checked: motoCoverIssued, set: setMotoCoverIssued, label: "Чехол мото" },
+                    { checked: ebikeChargerIssued, set: setEbikeChargerIssued, label: "Зарядка е-байк" },
+                  ].map((item) => (
+                    <label
+                      key={item.label}
+                      className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                        item.checked ? "bg-yellow-500/20" : "bg-white/5 hover:bg-white/10"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={(e) => item.set(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded accent-yellow-400"
+                      />
+                      <span className="text-xs text-white">{item.label}</span>
+                    </label>
+                  ))}
                 </div>
-                <div className="mt-2">
-                  <input
-                    type="text"
-                    value={otherEquipment}
-                    onChange={(e) => setOtherEquipment(e.target.value)}
-                    placeholder="Другое оборудование..."
-                    className="w-full px-3 py-2 text-xs bg-white/10 border border-white/20 rounded text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50"
-                  />
-                </div>
+
+                {/* Other equipment - text input */}
+                <input
+                  type="text"
+                  value={otherEquipment}
+                  onChange={(e) => setOtherEquipment(e.target.value)}
+                  placeholder="Другое оборудование..."
+                  className="w-full px-3 py-2 text-xs bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50"
+                />
+
+                {/* Equipment condition - quick-select for return */}
                 {phase === "return" && (
                   <div className="mt-2">
-                    <label className="text-xs text-white/50">Состояние экипировки при возврате</label>
+                    <label className="text-xs text-white/50 mb-1.5 block">Состояние экипировки</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {CONDITION_OPTIONS.map((opt) => (
+                        <QuickSelectChip
+                          key={opt.value}
+                          label={opt.label}
+                          selected={equipmentConditionReturn === opt.value}
+                          onClick={() => setEquipmentConditionReturn(opt.value)}
+                        />
+                      ))}
+                    </div>
                     <textarea
                       value={equipmentConditionReturn}
                       onChange={(e) => setEquipmentConditionReturn(e.target.value)}
-                      placeholder="Описание состояния экипировки..."
-                      rows={2}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50 resize-none text-xs"
+                      placeholder="Или введите своё..."
+                      rows={1}
+                      className="w-full mt-2 px-3 py-2 text-xs bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50 resize-none"
                     />
                   </div>
                 )}
               </div>
 
-              {/* Damage notes */}
+              {/* Notes - keep as text */}
               <div className="space-y-2">
-                <h3 className="text-sm font-medium text-white/70">Заметки о повреждениях</h3>
+                <h3 className="text-xs font-medium text-white/50 uppercase tracking-wide">Заметки</h3>
                 <textarea
                   value={damageNotes}
                   onChange={(e) => setDamageNotes(e.target.value)}
-                  placeholder="Царапина на пластике справа..."
-                  rows={3}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50 resize-none"
+                  placeholder="Повреждения..."
+                  rows={2}
+                  className="w-full px-3 py-2 text-xs bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50 resize-none"
                 />
-              </div>
-
-              {/* General notes */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-white/70">Доп. заметки</h3>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Любые другие заметки..."
-                  rows={2}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50 resize-none"
+                  placeholder="Другие заметки..."
+                  rows={1}
+                  className="w-full px-3 py-2 text-xs bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-yellow-400/50 resize-none"
                 />
               </div>
             </>
@@ -625,7 +625,7 @@ export function RentalHandoffModal({
           <button
             onClick={handleDelete}
             disabled={saving || !handoff}
-            className="px-4 py-2 text-sm text-rose-400 hover:text-rose-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-2 text-sm text-rose-400 hover:text-rose-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Сбросить
           </button>
@@ -633,16 +633,20 @@ export function RentalHandoffModal({
             <button
               onClick={onClose}
               disabled={saving}
-              className="px-4 py-2 text-sm text-white/70 hover:text-white disabled:opacity-50"
+              className="px-4 py-2 text-sm text-white/70 hover:text-white disabled:opacity-50 transition-colors"
             >
               Отмена
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 text-sm bg-gradient-to-r from-yellow-400 to-orange-500 text-black font-bold rounded-lg hover:from-yellow-300 hover:to-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${
+                isCompleted
+                  ? "bg-emerald-500 text-white"
+                  : "bg-gradient-to-r from-yellow-400 to-orange-500 text-black hover:from-yellow-300 hover:to-orange-400"
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              {saving ? "Сохранение..." : isCompleted ? "Завершено ✓" : "Сохранить"}
+              {saving ? "..." : isCompleted ? "Готово ✓" : "Сохранить"}
             </button>
           </div>
         </div>
