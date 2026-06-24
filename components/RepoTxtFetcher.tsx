@@ -105,68 +105,89 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "types/database.types",
     ].filter(Boolean), []);
 
-    // docXagent preset: Files for ZAI web agent to recreate doc generation system
-    // Organized into logical groups for better agent context
-    const docXagentFiles = useMemo(() => [
-        // === SKILLS ===
+    // DocX file presets: Organized by functional workflow for ZAI web agent
+    // Each preset represents a complete doc generation flow
+
+    // Rental Docs: Complete rental contract generation flow
+    const docXRentalFiles = useMemo(() => [
         "skills/rental-contract-from-photos/SKILL.md",
-        "skills/deal-contract-from-photos/SKILL.md",
-        "skills/subrent-contract-from-photos/SKILL.md",
-        "skills/commercial-proposal-from-offer/SKILL.md",
-        "skills/concat-files/SKILL.md",
-        "skills/send-document-by-email/SKILL.md",
-
-        // === TEMPLATES (docs/) ===
-        "docs/RENTAL_DEAL_TEMPLATE.html",
-        "docs/SALE_DEAL_TEMPLATE.html",
-        "docs/SUBRENTAL_DEAL_TEMPLATE.html",
-        "docs/COMMERCIAL_PROPOSAL_TEMPLATE.html",
-
-        // === SCRIPTS (doc generation) ===
         "scripts/make-rental-contract-skill.mjs",
+        "docs/RENTAL_DEAL_TEMPLATE.html",
+        "lib/rental-date-utils.ts",
+        "lib/rental-pricing-calculator.ts",
+        "app/lib/rental-contract-vars.ts",
+        "app/lib/user-rental-secrets.ts",
+        "supabase/migrations/20260601000000_user_rental_secrets.sql",
+        "supabase/migrations/20260612000000_fix_rental_contract_artifacts.sql",
+        "supabase/migrations/20260617000000_rental_sts_pledge.sql",
+    ].filter(Boolean), []);
+
+    // Sale Docs: Complete sale contract generation flow
+    const docXSaleFiles = useMemo(() => [
+        "skills/deal-contract-from-photos/SKILL.md",
         "scripts/make-deal-contract-skill.mjs",
+        "docs/SALE_DEAL_TEMPLATE.html",
+        "supabase/migrations/20260607000000_create_sale_contract_artifacts.sql",
+    ].filter(Boolean), []);
+
+    // Subrent Docs: Complete subrent contract generation flow
+    const docXSubrentFiles = useMemo(() => [
+        "skills/subrent-contract-from-photos/SKILL.md",
         "scripts/make-subrent-contract-skill.mjs",
+        "docs/SUBRENTAL_DEAL_TEMPLATE.html",
+        "supabase/migrations/20260624000000_create_subrent_contract_artifacts.sql",
+    ].filter(Boolean), []);
+
+    // Commercial Docs: Complete commercial proposal generation flow
+    const docXCommercialFiles = useMemo(() => [
+        "skills/commercial-proposal-from-offer/SKILL.md",
         "scripts/make-commercial-proposal-skill.mjs",
-        "scripts/send-document-by-email.mjs",
+        "docs/COMMERCIAL_PROPOSAL_TEMPLATE.html",
+    ].filter(Boolean), []);
+
+    // DocX Core: Core utilities shared across all doc flows
+    const docXCoreFiles = useMemo(() => [
+        "lib/htmlToDocx.mjs",
         "scripts/concat.sh",
         "scripts/codex-notify.mjs",
         "scripts/supabase-access-skill.mjs",
+        "scripts/send-document-by-email.mjs",
+        "skills/concat-files/SKILL.md",
+        "skills/send-document-by-email/SKILL.md",
+    ].filter(Boolean), []);
 
-        // === LIB HELPERS ===
-        "lib/htmlToDocx.mjs",
-        "lib/rental-date-utils.ts",
-        "lib/rental-pricing-calculator.ts",
-
-        // === DATABASE MIGRATIONS (doc system tables) ===
-        // Core init + private scheme
-        "supabase/migrations/20240101000000_init.sql",
-        "supabase/migrations/20260304_private_scheme.sql",
-        "supabase/migrations/20260508090000_repair_private_crew_secrets.sql",
-        // Rental contract artifacts
-        "supabase/migrations/20260601000000_user_rental_secrets.sql",
-        "supabase/migrations/20260607000000_create_sale_contract_artifacts.sql",
-        "supabase/migrations/20260612000000_fix_rental_contract_artifacts.sql",
-        "supabase/migrations/20260617000000_rental_sts_pledge.sql",
-        // Subrent contract artifacts
-        "supabase/migrations/20260624000000_create_subrent_contract_artifacts.sql",
-
-        // === APP INTEGRATION ===
-        // Contract variable generators
-        "app/lib/rental-contract-vars.ts",
-        "app/lib/user-rental-secrets.ts",
-        // Dashboard for viewing generated docs
+    // DocX App: App integration (dashboard, API, server actions)
+    const docXAppFiles = useMemo(() => [
         "app/franchize/[slug]/rentals-analytics/page.tsx",
         "app/franchize/[slug]/rentals-analytics/RentalsAnalyticsClient.tsx",
         "app/franchize/server-actions/rentals-dashboard.ts",
-        // Forward-telegram API (for sending files when blocked)
         "app/api/forward-telegram/route.ts",
+    ].filter(Boolean), []);
 
-        // === DOCUMENTATION ===
+    // DocX Migrations: Core database migrations
+    const docXMigrationsFiles = useMemo(() => [
+        "supabase/migrations/20240101000000_init.sql",
+        "supabase/migrations/20260304_private_scheme.sql",
+        "supabase/migrations/20260508090000_repair_private_crew_secrets.sql",
+    ].filter(Boolean), []);
+
+    // DocX Docs: Documentation and seed data
+    const docXDocsFiles = useMemo(() => [
         "DOC_SKILL_FULL_INSTALLER.md",
         "docs/skill_installer/ZAI_AGENT_INSTRUCTIONS.md",
-
-        // === SEED DATA (for testing) ===
         "docs/sql/cars_rows_12bikes_june5.csv",
+    ].filter(Boolean), []);
+
+    // Combined DocX files (for legacy support)
+    const docXagentFiles = useMemo(() => [
+        ...docXRentalFiles,
+        ...docXSaleFiles,
+        ...docXSubrentFiles,
+        ...docXCommercialFiles,
+        ...docXCoreFiles,
+        ...docXAppFiles,
+        ...docXMigrationsFiles,
+        ...docXDocsFiles,
     ].filter(Boolean), []);
 
     const effectiveBranchDisplay = useMemo(() => targetBranchName || manualBranchName || "default", [targetBranchName, manualBranchName]);
@@ -196,6 +217,14 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         selectHighlightedFiles,
         handleAddImportantFiles,
         handleAddDocXagentFiles,
+        handleAddDocXRentalFiles,
+        handleAddDocXSaleFiles,
+        handleAddDocXSubrentFiles,
+        handleAddDocXCommercialFiles,
+        handleAddDocXCoreFiles,
+        handleAddDocXAppFiles,
+        handleAddDocXMigrationsFiles,
+        handleAddDocXDocsFiles,
         handleSelectAll,
         handleDeselectAll,
     } = useFileSelection({
@@ -204,6 +233,14 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         secondaryHighlightedPaths,
         importantFiles,
         docXagentFiles,
+        docXRentalFiles,
+        docXSaleFiles,
+        docXSubrentFiles,
+        docXCommercialFiles,
+        docXCoreFiles,
+        docXAppFiles,
+        docXMigrationsFiles,
+        docXDocsFiles,
         imageReplaceTaskActive: !!imageReplaceTask || !!iconReplaceTask,
     });
 
@@ -466,6 +503,38 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              logger.debug(`[Imperative] handleAddDocXagentFiles called.`);
              handleAddDocXagentFiles();
         },
+        handleAddDocXRentalFiles: () => {
+             logger.debug(`[Imperative] handleAddDocXRentalFiles called.`);
+             handleAddDocXRentalFiles();
+        },
+        handleAddDocXSaleFiles: () => {
+             logger.debug(`[Imperative] handleAddDocXSaleFiles called.`);
+             handleAddDocXSaleFiles();
+        },
+        handleAddDocXSubrentFiles: () => {
+             logger.debug(`[Imperative] handleAddDocXSubrentFiles called.`);
+             handleAddDocXSubrentFiles();
+        },
+        handleAddDocXCommercialFiles: () => {
+             logger.debug(`[Imperative] handleAddDocXCommercialFiles called.`);
+             handleAddDocXCommercialFiles();
+        },
+        handleAddDocXCoreFiles: () => {
+             logger.debug(`[Imperative] handleAddDocXCoreFiles called.`);
+             handleAddDocXCoreFiles();
+        },
+        handleAddDocXAppFiles: () => {
+             logger.debug(`[Imperative] handleAddDocXAppFiles called.`);
+             handleAddDocXAppFiles();
+        },
+        handleAddDocXMigrationsFiles: () => {
+             logger.debug(`[Imperative] handleAddDocXMigrationsFiles called.`);
+             handleAddDocXMigrationsFiles();
+        },
+        handleAddDocXDocsFiles: () => {
+             logger.debug(`[Imperative] handleAddDocXDocsFiles called.`);
+             handleAddDocXDocsFiles();
+        },
         handleAddFullTree: () => {
              logger.debug(`[Imperative] handleAddFullTree called.`);
              handleAddFullTree();
@@ -481,7 +550,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     }), [
         handleFetchManual, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll,
         kworkInputValue,
-        handleAddImportantFiles, handleAddDocXagentFiles, handleAddFullTree, handleSelectAll, handleDeselectAll, logger
+        handleAddImportantFiles, handleAddDocXagentFiles, handleAddDocXRentalFiles, handleAddDocXSaleFiles,
+        handleAddDocXSubrentFiles, handleAddDocXCommercialFiles, handleAddDocXCoreFiles, handleAddDocXAppFiles,
+        handleAddDocXMigrationsFiles, handleAddDocXDocsFiles, handleAddFullTree, handleSelectAll, handleDeselectAll, logger
     ]);
 
      const handleManualBranchChange = useCallback((branch: string) => {
@@ -658,11 +729,27 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                              secondaryHighlightedPaths={secondaryHighlightedPaths}
                              importantFiles={importantFiles}
                              docXagentFiles={docXagentFiles}
+                             docXRentalFiles={docXRentalFiles}
+                             docXSaleFiles={docXSaleFiles}
+                             docXSubrentFiles={docXSubrentFiles}
+                             docXCommercialFiles={docXCommercialFiles}
+                             docXCoreFiles={docXCoreFiles}
+                             docXAppFiles={docXAppFiles}
+                             docXMigrationsFiles={docXMigrationsFiles}
+                             docXDocsFiles={docXDocsFiles}
                              isLoading={isFetchLoading}
                              isActionDisabled={isActionDisabled}
                              toggleFileSelection={toggleFileSelection}
                              onAddImportant={handleAddImportantFiles}
                              onAddDocXagent={handleAddDocXagentFiles}
+                             onAddDocXRental={handleAddDocXRentalFiles}
+                             onAddDocXSale={handleAddDocXSaleFiles}
+                             onAddDocXSubrent={handleAddDocXSubrentFiles}
+                             onAddDocXCommercial={handleAddDocXCommercialFiles}
+                             onAddDocXCore={handleAddDocXCoreFiles}
+                             onAddDocXApp={handleAddDocXAppFiles}
+                             onAddDocXMigrations={handleAddDocXMigrationsFiles}
+                             onAddDocXDocs={handleAddDocXDocsFiles}
                              onSelectHighlighted={selectHighlightedFiles}
                              onSelectAll={handleSelectAll}
                              onDeselectAll={handleDeselectAll}

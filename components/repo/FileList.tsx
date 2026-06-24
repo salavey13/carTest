@@ -3,7 +3,7 @@
 import React from 'react';
 // Added FaListCheck and FaSquareXmark for new buttons
 import { FaSquareCheck, FaRegSquare, FaPlus, FaCodeBranch, FaStar, FaHighlighter, FaKey, FaTree, FaFileLines, FaListCheck, FaSquareXmark, FaRobot } from 'react-icons/fa6';
-import { FileNode, ImportCategory } from '../RepoTxtFetcher';
+import { FileNode, ImportCategory } from '@/contexts/RepoXmlPageContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Interface defining the props expected by FileList
@@ -15,12 +15,28 @@ interface FileListProps {
     secondaryHighlightedPaths: Record<ImportCategory, string[]>;
     importantFiles: string[];
     docXagentFiles: string[];
+    docXRentalFiles: string[];
+    docXSaleFiles: string[];
+    docXSubrentFiles: string[];
+    docXCommercialFiles: string[];
+    docXCoreFiles: string[];
+    docXAppFiles: string[];
+    docXMigrationsFiles: string[];
+    docXDocsFiles: string[];
     isLoading: boolean;
     isActionDisabled: boolean;
     toggleFileSelection: (path: string) => void;
     onAddSelected: () => void;
     onAddImportant: () => void;
     onAddDocXagent: () => void;
+    onAddDocXRental: () => void;
+    onAddDocXSale: () => void;
+    onAddDocXSubrent: () => void;
+    onAddDocXCommercial: () => void;
+    onAddDocXCore: () => void;
+    onAddDocXApp: () => void;
+    onAddDocXMigrations: () => void;
+    onAddDocXDocs: () => void;
     onAddTree: () => void;
     onSelectHighlighted: () => void;
     // --- NEW PROPS for bulk actions ---
@@ -38,7 +54,11 @@ const groupFilesByFolder = (files: FileNode[]) => { const g: { folder: string; f
 
 const FileList: React.FC<FileListProps> = React.memo(({ // Memoize the component
     id, files, selectedFiles, primaryHighlightedPath, secondaryHighlightedPaths, importantFiles, docXagentFiles,
+    docXRentalFiles, docXSaleFiles, docXSubrentFiles, docXCommercialFiles, docXCoreFiles, docXAppFiles,
+    docXMigrationsFiles, docXDocsFiles,
     isLoading, isActionDisabled, toggleFileSelection, onAddSelected, onAddImportant, onAddDocXagent,
+    onAddDocXRental, onAddDocXSale, onAddDocXSubrent, onAddDocXCommercial, onAddDocXCore, onAddDocXApp,
+    onAddDocXMigrations, onAddDocXDocs,
     onAddTree, onSelectHighlighted, onSelectAll, onDeselectAll, // Destructure new props
 }) => {
 
@@ -62,9 +82,28 @@ const FileList: React.FC<FileListProps> = React.memo(({ // Memoize the component
                  {hasHighlightableFiles && unselectedHighlightCount > 0 && ( <motion.button onClick={onSelectHighlighted} disabled={isActionDisabled} className="flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md bg-cyan-600/30 text-cyan-300 hover:bg-cyan-500/40 hover:text-cyan-200 transition-colors border border-cyan-500/50 disabled:opacity-50" whileHover={{ scale: isActionDisabled ? 1 : 1.05 }} whileTap={{ scale: isActionDisabled ? 1 : 0.95 }} title={`Выбрать ${unselectedHighlightCount} связанных`}> <FaHighlighter size={10}/> Связанные ({unselectedHighlightCount}) </motion.button> )}
             </div>
              <div className="flex flex-wrap gap-2 mb-3 text-xs flex-shrink-0">
+                 {/* Core actions */}
                  <motion.button onClick={onAddSelected} disabled={selectedCount === 0 || isActionDisabled} className={`flex items-center justify-center gap-1 px-2.5 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-500 transition-all shadow-md shadow-purple-500/30 ${(selectedCount === 0 || isActionDisabled) ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-indigo-500/40'}`} whileHover={{ scale: (selectedCount === 0 || isActionDisabled) ? 1 : 1.03 }} whileTap={{ scale: (selectedCount === 0 || isActionDisabled) ? 1 : 0.97 }}> <FaFileLines /> Добавить ({selectedCount}) </motion.button>
                  <motion.button onClick={onAddImportant} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2.5 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-500 transition-all shadow-md shadow-cyan-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-teal-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }}> <FaKey /> Важные </motion.button>
-                 <motion.button onClick={onAddDocXagent} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2.5 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-violet-600 to-fuchsia-500 transition-all shadow-md shadow-fuchsia-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-fuchsia-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="DocXagent: ZAI doc recreation files"> <FaRobot /> DocX </motion.button>
+
+                 {/* DocX Presets - grouped by workflow */}
+                 <div className="flex flex-wrap gap-1 border-l border-gray-700 pl-2">
+                     <span className="text-[10px] text-gray-500 flex items-center px-1">DocX:</span>
+                     <motion.button onClick={onAddDocXRental} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-green-600 to-teal-500 transition-all shadow-md shadow-teal-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-green-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="Rental contract generation flow"> Rental </motion.button>
+                     <motion.button onClick={onAddDocXSale} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-orange-600 to-amber-500 transition-all shadow-md shadow-amber-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-orange-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="Sale contract generation flow"> Sale </motion.button>
+                     <motion.button onClick={onAddDocXSubrent} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-purple-600 to-pink-500 transition-all shadow-md shadow-pink-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-purple-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="Subrent contract generation flow"> Subrent </motion.button>
+                     <motion.button onClick={onAddDocXCommercial} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-500 transition-all shadow-md shadow-indigo-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-blue-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="Commercial proposal generation flow"> Prop </motion.button>
+                 </div>
+
+                 <div className="flex flex-wrap gap-1 border-l border-gray-700 pl-2">
+                     <motion.button onClick={onAddDocXCore} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-slate-600 to-gray-500 transition-all shadow-md shadow-gray-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-slate-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="Core utilities (htmlToDocx, concat, notify)"> Core </motion.button>
+                     <motion.button onClick={onAddDocXApp} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-cyan-600 to-sky-500 transition-all shadow-md shadow-sky-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-cyan-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="App integration (dashboard, API)"> App </motion.button>
+                     <motion.button onClick={onAddDocXMigrations} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-red-600 to-rose-500 transition-all shadow-md shadow-rose-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-red-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="Database migrations"> Migrations </motion.button>
+                     <motion.button onClick={onAddDocXDocs} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-yellow-600 to-lime-500 transition-all shadow-md shadow-lime-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-yellow-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="Documentation & seed data"> Docs </motion.button>
+                     <motion.button onClick={onAddDocXagent} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-violet-600 to-fuchsia-500 transition-all shadow-md shadow-fuchsia-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-fuchsia-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="All DocX files combined"> <FaRobot /> All </motion.button>
+                 </div>
+
+                 {/* Tree & bulk actions */}
                  <motion.button onClick={onAddTree} disabled={allFilesCount === 0 || isActionDisabled} className={`flex items-center justify-center gap-1 px-2.5 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-red-600 to-orange-500 transition-all shadow-md shadow-orange-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-red-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }}> <FaTree /> Дерево </motion.button>
                  {/* --- NEW Buttons --- */}
                  <motion.button onClick={onSelectAll} disabled={!canSelectAll || isActionDisabled} className={`flex items-center justify-center gap-1 px-2.5 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-green-600 to-emerald-500 transition-all shadow-md shadow-emerald-500/30 ${(!canSelectAll || isActionDisabled) ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-green-500/40'}`} whileHover={{ scale: (!canSelectAll || isActionDisabled) ? 1 : 1.03 }} whileTap={{ scale: (!canSelectAll || isActionDisabled) ? 1 : 0.97 }} title="Выбрать все файлы"> <FaListCheck /> Все </motion.button>

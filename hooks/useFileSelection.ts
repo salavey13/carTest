@@ -12,6 +12,14 @@ interface UseFileSelectionProps {
     secondaryHighlightedPaths: Record<ImportCategory, string[]>;
     importantFiles: string[];
     docXagentFiles: string[];
+    docXRentalFiles: string[];
+    docXSaleFiles: string[];
+    docXSubrentFiles: string[];
+    docXCommercialFiles: string[];
+    docXCoreFiles: string[];
+    docXAppFiles: string[];
+    docXMigrationsFiles: string[];
+    docXDocsFiles: string[];
     imageReplaceTaskActive: boolean;
 }
 
@@ -20,6 +28,14 @@ interface UseFileSelectionReturn {
     selectHighlightedFiles: () => void;
     handleAddImportantFiles: () => void;
     handleAddDocXagentFiles: () => void;
+    handleAddDocXRentalFiles: () => void;
+    handleAddDocXSaleFiles: () => void;
+    handleAddDocXSubrentFiles: () => void;
+    handleAddDocXCommercialFiles: () => void;
+    handleAddDocXCoreFiles: () => void;
+    handleAddDocXAppFiles: () => void;
+    handleAddDocXMigrationsFiles: () => void;
+    handleAddDocXDocsFiles: () => void;
     handleSelectAll: () => void;
     handleDeselectAll: () => void;
 }
@@ -30,6 +46,14 @@ export const useFileSelection = ({
     secondaryHighlightedPaths,
     importantFiles,
     docXagentFiles,
+    docXRentalFiles,
+    docXSaleFiles,
+    docXSubrentFiles,
+    docXCommercialFiles,
+    docXCoreFiles,
+    docXAppFiles,
+    docXMigrationsFiles,
+    docXDocsFiles,
     imageReplaceTaskActive,
 }: UseFileSelectionProps): UseFileSelectionReturn => {
     logger.debug("[useFileSelection] Hook initialized");
@@ -175,6 +199,54 @@ export const useFileSelection = ({
 
     }, [docXagentFiles, files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]);
 
+    // Generic handler for adding DocX preset files
+    const createDocXPresetHandler = useCallback((presetFiles: string[], presetName: string, achievementKey: string) => {
+        return useCallback(async () => {
+            if (imageReplaceTaskActive) {
+                logger.warn(`[File Selection] Add ${presetName} skipped: Image replace task active.`);
+                toastWarning("Выбор файлов недоступен во время задачи замены картинки.");
+                return;
+            }
+            const availableFiles = presetFiles.filter(p => files.some(f => f.path === p));
+            if (availableFiles.length === 0) {
+                toastWarning(`${presetName} файлы не найдены в текущем списке файлов репозитория.`);
+                logger.warn(`[File Selection] No ${presetName} files found in current file list.`);
+                return;
+            }
+
+            logger.info(`[File Selection] Adding ${availableFiles.length} ${presetName} files to selection.`);
+            setSelectedFetcherFiles(prev => {
+                const newSet = new Set(prev);
+                availableFiles.forEach(p => {
+                    if (!newSet.has(p)) logger.debug(`[File Selection] Adding ${presetName}: ${p}`);
+                    newSet.add(p);
+                });
+                return newSet;
+            });
+            toastSuccess(`Добавлено ${availableFiles.length} файлов ${presetName} к выделению.`);
+
+            if (dbUser?.user_id) {
+                logger.debug(`[File Selection] Attempting to log '${achievementKey}' for user ${dbUser.user_id}.`);
+                const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, achievementKey);
+                newAchievements?.forEach(ach => {
+                    addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
+                    logger.info(`[File Selection] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`);
+                });
+            } else {
+                logger.warn(`[File Selection] Cannot log '${achievementKey}': dbUser.user_id is missing.`);
+            }
+        }, [presetFiles, files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]);
+    }, [files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]);
+
+    const handleAddDocXRentalFiles = createDocXPresetHandler(docXRentalFiles, "Rental Docs", "usedAddDocXRentalFiles");
+    const handleAddDocXSaleFiles = createDocXPresetHandler(docXSaleFiles, "Sale Docs", "usedAddDocXSaleFiles");
+    const handleAddDocXSubrentFiles = createDocXPresetHandler(docXSubrentFiles, "Subrent Docs", "usedAddDocXSubrentFiles");
+    const handleAddDocXCommercialFiles = createDocXPresetHandler(docXCommercialFiles, "Commercial Docs", "usedAddDocXCommercialFiles");
+    const handleAddDocXCoreFiles = createDocXPresetHandler(docXCoreFiles, "DocX Core", "usedAddDocXCoreFiles");
+    const handleAddDocXAppFiles = createDocXPresetHandler(docXAppFiles, "DocX App", "usedAddDocXAppFiles");
+    const handleAddDocXMigrationsFiles = createDocXPresetHandler(docXMigrationsFiles, "DocX Migrations", "usedAddDocXMigrationsFiles");
+    const handleAddDocXDocsFiles = createDocXPresetHandler(docXDocsFiles, "DocX Docs", "usedAddDocXDocsFiles");
+
     const handleSelectAll = useCallback(async () => { 
         if (imageReplaceTaskActive) {
              logger.warn("[File Selection] Select All skipped: Image replace task active.");
@@ -231,6 +303,14 @@ export const useFileSelection = ({
         selectHighlightedFiles,
         handleAddImportantFiles,
         handleAddDocXagentFiles,
+        handleAddDocXRentalFiles,
+        handleAddDocXSaleFiles,
+        handleAddDocXSubrentFiles,
+        handleAddDocXCommercialFiles,
+        handleAddDocXCoreFiles,
+        handleAddDocXAppFiles,
+        handleAddDocXMigrationsFiles,
+        handleAddDocXDocsFiles,
         handleSelectAll,
         handleDeselectAll,
     };
