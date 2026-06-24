@@ -8,6 +8,7 @@ import { FaUsers, FaGift, FaLink, FaCopy } from "react-icons/fa6";
 import { toast } from "sonner";
 import { useState } from "react";
 import Modal from "@/components/ui/Modal";
+import { SubrentForm } from "./components/SubrentForm";
 
 export default function PartnerPage() {
   const { user, dbUser } = useAppContext();
@@ -134,6 +135,16 @@ export default function PartnerPage() {
         )}
         <p className="mt-4 text-xs text-brand-yellow font-mono animate-pulse text-center">Эта функция находится в стадии альфа-тестирования...</p>
       </Modal>
+
+      {/* Subrental Form Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="container mx-auto max-w-4xl mt-12"
+      >
+        <SubrentForm />
+      </motion.div>
     </div>
   );
 }
