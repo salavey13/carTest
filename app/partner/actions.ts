@@ -177,13 +177,9 @@ export async function createSubrentContract(formData: SubrentFormData, userId: s
       templateMode: "html",
     });
 
-    if (!result.success) {
-      return { success: false, error: result.error || "Failed to generate document" };
-    }
-
     // Calculate SHA256 for deduplication
-    const docBuffer = result.data;
-    const fileHash = createHash("sha256").update(docBuffer).digest("hex");
+    const docBuffer = result.bytes;
+    const fileHash = result.sha256 || createHash("sha256").update(docBuffer).digest("hex");
 
     // Store contract artifact
     const { data: artifact, error: dbError } = await privateSchema()
