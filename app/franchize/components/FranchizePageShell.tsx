@@ -7,7 +7,7 @@ type FranchizePageShellProps = {
   children: ReactNode;
   className?: string;
   contentClassName?: string;
-  width?: "content" | "wide";
+  width?: "content" | "wide" | "full";
 };
 
 type FranchizeShellVars = CSSProperties & {
@@ -84,15 +84,22 @@ export function FranchizePageShell({
     "--input": isAuto ? "hsl(var(--input))" : palette.bgBase,
     "--ring": isAuto ? "hsl(var(--ring))" : palette.accentMain,
   } as CSSProperties;
-  const maxWidthClass = width === "wide" ? "max-w-6xl" : "max-w-5xl";
+  // Full-width: no max-width constraint and minimal padding
+  // Wide: max-w-6xl with standard padding
+  // Content: max-w-5xl with standard padding
+  const isFull = width === "full";
+  const maxWidthClass = isFull ? "" : width === "wide" ? "max-w-6xl" : "max-w-5xl";
+  const paddingClass = isFull ? "px-2 py-3 sm:px-3 sm:py-4" : "px-3 py-5 sm:px-4 sm:py-8";
+  const innerPadding = isFull ? "p-2 sm:p-3" : "p-4 sm:p-6";
+  const roundedClass = isFull ? "rounded-xl sm:rounded-2xl" : "rounded-[2rem]";
 
   return (
     <section
-      className={`mx-auto w-full ${maxWidthClass} px-3 py-5 sm:px-4 sm:py-8 ${className}`}
+      className={`mx-auto w-full ${maxWidthClass} ${paddingClass} ${className}`}
       style={shellVars}
     >
       <div
-        className={`relative overflow-hidden rounded-[2rem] border p-4 backdrop-blur sm:p-6 ${contentClassName}`}
+        className={`relative overflow-hidden ${roundedClass} border ${innerPadding} backdrop-blur ${contentClassName}`}
         style={{
           background:
             "radial-gradient(circle at top right, color-mix(in srgb, var(--franchize-shell-accent) 15%, transparent), transparent 34rem), color-mix(in srgb, var(--franchize-shell-card) 90%, transparent)",

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { FranchizePageShell } from "@/app/franchize/components/FranchizePageShell";
 import { getFranchizeBySlug } from "@/app/franchize/actions";
@@ -48,15 +47,15 @@ export default async function FranchizeSlugRentalsAnalyticsPage({
         crew={crew}
         activePath={activePath}
         groupLinks={[]}
+        showRail={false}
       />
-      <FranchizePageShell theme={crew.theme} contentClassName="space-y-4">
+      <FranchizePageShell theme={crew.theme} contentClassName="space-y-4" width="full">
         <RentalsAnalyticsClient
           initialSlug={resolvedSlug}
           initialDate={selectedDate}
           crew={crew}
         />
       </FranchizePageShell>
-      <CrewFooter crew={crew} />
     </main>
   );
 }
