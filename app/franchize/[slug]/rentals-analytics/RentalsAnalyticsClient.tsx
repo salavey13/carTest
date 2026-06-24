@@ -27,9 +27,12 @@ import {
   getRentalsDashboard,
   getRentalsDateRange,
   getRentalsForExport,
+  getSalesDashboard,
   validateAnalyticsPassword,
   type RentalDashboardItem,
   type RentalDashboardSummary,
+  type SaleDashboardItem,
+  type SalesDashboardResult,
 } from "@/app/franchize/server-actions/rentals-dashboard";
 import { useSupabaseRealtime } from "@/app/franchize/hooks/useSupabaseRealtime";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
@@ -101,6 +104,10 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const [verificationFilter, setVerificationFilter] = useState<"all" | "verified" | "pending" | "revoked">("all");
   const [rentals, setRentals] = useState<RentalDashboardItem[]>([]);
   const [summary, setSummary] = useState<RentalDashboardSummary | null>(null);
+  // Sales data
+  const [sales, setSales] = useState<SaleDashboardItem[]>([]);
+  const [salesSummary, setSalesSummary] = useState<SalesDashboardResult["summary"] | null>(null);
+  const [loadingSales, setLoadingSales] = useState(true);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dateRange, setDateRange] = useState<{ minDate: string; maxDate: string } | null>(null);
@@ -196,6 +203,30 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
       }
     } catch (error) {
       console.error("[Analytics] Date range error:", error);
+    }
+  }, [getActorUserId, initialSlug, passwordAuthOwnerId]);
+
+  const loadSales = useCallback(async (date: string) => {
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
+
+    setLoadingSales(true);
+    try {
+      const result = await getSalesDashboard({
+        slug: initialSlug?.trim() || "vip-bike",
+        actorUserId,
+        date,
+        isPasswordAuth: !!passwordAuthOwnerId,
+      });
+
+      if (result.success && result.data) {
+        setSales(result.data.items || []);
+        setSalesSummary(result.data.summary || null);
+      }
+    } catch (error) {
+      console.error("[Analytics] Sales load error:", error);
+    } finally {
+      setLoadingSales(false);
     }
   }, [getActorUserId, initialSlug, passwordAuthOwnerId]);
 
@@ -326,6 +357,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   useEffect(() => {
     if (getActorUserId()) {
       void loadRentals(selectedDate);
+      void loadSales(selectedDate);
       void loadDateRange();
       void loadChecklistStates();
       void loadTodos();
@@ -335,6 +367,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   useEffect(() => {
     if (getActorUserId() && !authLoading) {
       void loadRentals(selectedDate, true);
+      void loadSales(selectedDate);
     }
   }, [selectedDate, verificationFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -347,7 +380,10 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   // ─── Calculations ───────────────────────────────────────────────────────────────
 
   const totalRentals = rentals.length;
-  const totalRevenue = rentals.reduce((sum, r) => sum + (r.total_cost || 0), 0);
+  const rentalRevenue = rentals.reduce((sum, r) => sum + (r.total_cost || 0), 0);
+  const totalSales = sales.length;
+  const salesRevenue = salesSummary?.totalRevenue || 0;
+  const totalRevenue = rentalRevenue + salesRevenue;
   const activeRentals = rentals.filter(r => r.status === "active").length;
   const completedRentals = rentals.filter(r => r.status === "completed").length;
   const completionRate = totalRentals > 0 ? Math.round((completedRentals / totalRentals) * 100) : 0;
@@ -562,7 +598,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
           <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
 
             {/* STATS ROW */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               {/* Total rentals */}
               <div className="relative group">
                 <div className="absolute inset-0 rounded-2xl blur-xl group-hover:blur-2xl transition-all" style={{ backgroundColor: withAlpha(accentMain, 0.12) }} />
@@ -595,6 +631,24 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                   <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: textSecondary }}>
                     <Zap className="w-3 h-3" />
                     Общий доход
+                  </div>
+                </div>
+              </div>
+
+              {/* Sales */}
+              <div className="relative group">
+                <div className="absolute inset-0 rounded-2xl blur-xl group-hover:blur-2xl transition-all" style={{ backgroundColor: withAlpha("#8b5cf6", 0.12) }} />
+                <div className="relative rounded-2xl p-5 border transition-all" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha("#8b5cf6", 0.15) }}>
+                      <TrendingUp className="w-5 h-5" style={{ color: "#a78bfa" }} />
+                    </div>
+                    <span className="text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Продажи</span>
+                  </div>
+                  <div className="text-3xl font-black" style={{ color: "#a78bfa" }}>{totalSales}</div>
+                  <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: textSecondary }}>
+                    <Zap className="w-3 h-3" style={{ color: "#a78bfa" }} />
+                    {formatRubles(salesRevenue)}
                   </div>
                 </div>
               </div>
@@ -962,6 +1016,64 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                       })}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {/* SALES LIST */}
+              {sales.length > 0 && (
+                <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.3), borderColor: withAlpha(borderSoft, 0.3) }}>
+                  <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha("#8b5cf6", 0.15) }}>
+                        <TrendingUp className="w-5 h-5" style={{ color: "#a78bfa" }} />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" style={{ color: textPrimary }}>Продажи</h3>
+                        <p className="text-xs" style={{ color: textSecondary }}>{totalSales} {totalSales === 1 ? "сделка" : totalSales > 1 && totalSales < 5 ? "сделки" : "сделок"}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold" style={{ color: "#a78bfa" }}>{formatRubles(salesRevenue)}</div>
+                      <div className="text-xs" style={{ color: textSecondary }}>Общая сумма</div>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr style={{ backgroundColor: withAlpha(borderSoft, 0.1) }}>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Время</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Покупатель</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Мотоцикл</th>
+                          <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Сумма</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
+                        {sales.map((sale) => (
+                          <tr key={sale.id} className="hover:bg-opacity-50 transition-all" style={{ hoverBackgroundColor: withAlpha(accentMain, 0.05) }}>
+                            <td className="px-5 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium" style={{ color: textPrimary }}>{formatRussianDate(sale.created_at)}</div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium" style={{ color: textPrimary }}>{sale.buyer_full_name || "—"}</span>
+                                {sale.buyer_email && (
+                                  <span className="text-xs" style={{ color: textSecondary }}>{sale.buyer_email}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="text-sm font-medium" style={{ color: textPrimary }}>
+                                {sale.vehicle ? `${sale.vehicle.make} ${sale.vehicle.model}` : "—"}
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 text-right">
+                              <div className="text-sm font-bold" style={{ color: "#a78bfa" }}>{formatRubles(parseInt((sale.sale_price || "0").replace(/\s/g, ""), 10) || 0)}</div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
