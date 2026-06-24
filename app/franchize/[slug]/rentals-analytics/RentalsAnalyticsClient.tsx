@@ -928,7 +928,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
               {datePickerOpen && (
                 <div
                   ref={datePickerRef}
-                  className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-50 rounded-xl md:rounded-2xl border shadow-2xl p-3 md:p-4"
+                  className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-[9999] rounded-xl md:rounded-2xl border shadow-2xl p-3 md:p-4"
                   style={{
                     backgroundColor: bgCard,
                     borderColor: withAlpha(accentMain, 0.3),
