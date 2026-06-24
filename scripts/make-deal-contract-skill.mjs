@@ -766,7 +766,7 @@ if (dealType === 'rent') {
   const safeName = s => String(s || '').replace(/[^a-zA-Zа-яА-Я0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   docFileName = `rental-contract-${safeName(bike.make)}-${safeName(bike.model)}-${startDate}.docx`;
 
-} else {
+} else if (dealType === 'sale') {
   // ══════════════════════════════════════════════════════════════════════
   // SALE FLOW
   // ══════════════════════════════════════════════════════════════════════
