@@ -33,6 +33,10 @@ interface SubrentFlowClientProps {
 interface SubrentFormData {
   // Bike selection
   bikeId?: string;
+  bikePlate?: string;
+  bikeVin?: string;
+  bikeYear?: string;
+  bikeValue?: string;
 
   // Owner info
   ownerFullName: string;
@@ -85,6 +89,10 @@ export function SubrentFlowClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<SubrentFormData>({
     bikeId: undefined,
+    bikePlate: "",
+    bikeVin: "",
+    bikeYear: "",
+    bikeValue: "",
     ownerFullName: "",
     ownerPhone: "",
     ownerEmail: "",
@@ -293,6 +301,8 @@ export function SubrentFlowClient({
               bikes={bikes}
               selectedBikeId={formData.bikeId}
               onSelect={(bikeId) => setFormData({ ...formData, bikeId })}
+              formData={formData}
+              onChange={setFormData}
               theme={theme}
               accentText={accentText}
             />
@@ -400,7 +410,11 @@ export function SubrentFlowClient({
 function canProgressToStep(formData: SubrentFormData, nextStepId: string): boolean {
   switch (nextStepId) {
     case "owner":
-      return !!formData.bikeId;
+      return !!formData.bikeId &&
+             !!formData.bikePlate &&
+             !!formData.bikeVin &&
+             !!formData.bikeYear &&
+             !!formData.bikeValue;
     case "payment":
       return !!formData.ownerFullName &&
              !!formData.ownerPhone &&
@@ -418,6 +432,10 @@ function canProgressToStep(formData: SubrentFormData, nextStepId: string): boole
 
 function isFormValid(formData: SubrentFormData): boolean {
   return !!formData.bikeId &&
+         !!formData.bikePlate &&
+         !!formData.bikeVin &&
+         !!formData.bikeYear &&
+         !!formData.bikeValue &&
          !!formData.ownerFullName &&
          !!formData.ownerPhone &&
          !!formData.ownerBirthDate &&
@@ -437,17 +455,25 @@ function BikeSelectionStep({
   bikes,
   selectedBikeId,
   onSelect,
+  formData,
+  onChange,
   theme,
   accentText,
 }: {
   bikes: CatalogItemVM[];
   selectedBikeId?: string;
   onSelect: (bikeId: string) => void;
+  formData: SubrentFormData;
+  onChange: (data: SubrentFormData) => void;
   theme: FranchizeTheme;
   accentText: string;
 }) {
+  const updateField = (field: keyof SubrentFormData, value: string) => {
+    onChange({ ...formData, [field]: value });
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
         <h3 className="text-xl font-bold mb-2">Выберите мотоцикл</h3>
         <p className="text-sm opacity-70">
@@ -492,6 +518,74 @@ function BikeSelectionStep({
         <div className="text-center p-8 rounded-xl border border-dashed" style={{ borderColor: theme.palette.borderSoft }}>
           <Bike className="w-12 h-12 mx-auto mb-3 opacity-40" />
           <p className="text-sm opacity-60">В каталоге пока нет мотоциклов</p>
+        </div>
+      )}
+
+      {/* Bike details for contract */}
+      {selectedBikeId && (
+        <div className="p-4 rounded-xl border" style={{
+          backgroundColor: withAlpha(theme.palette.accentMain, 0.08),
+          borderColor: withAlpha(theme.palette.accentMain, 0.3),
+        }}>
+          <h4 className="font-semibold mb-4" style={{ color: theme.palette.accentMain }}>Данные мотоцикла для договора</h4>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium mb-2">Гос. номер *</label>
+              <input
+                type="text"
+                value={formData.bikePlate}
+                onChange={(e) => updateField("bikePlate", e.target.value)}
+                placeholder="А123БВ777"
+                className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 uppercase"
+                style={{
+                  backgroundColor: withAlpha(theme.palette.bgCard, 0.5),
+                  borderColor: theme.palette.borderSoft,
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">VIN *</label>
+              <input
+                type="text"
+                value={formData.bikeVin}
+                onChange={(e) => updateField("bikeVin", e.target.value)}
+                placeholder="XXXXXXXXXXXXXXXXX"
+                className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 uppercase"
+                style={{
+                  backgroundColor: withAlpha(theme.palette.bgCard, 0.5),
+                  borderColor: theme.palette.borderSoft,
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Год выпуска *</label>
+              <input
+                type="text"
+                value={formData.bikeYear}
+                onChange={(e) => updateField("bikeYear", e.target.value)}
+                placeholder="2023"
+                className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2"
+                style={{
+                  backgroundColor: withAlpha(theme.palette.bgCard, 0.5),
+                  borderColor: theme.palette.borderSoft,
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Стоимость (₽) *</label>
+              <input
+                type="number"
+                value={formData.bikeValue}
+                onChange={(e) => updateField("bikeValue", e.target.value)}
+                placeholder="500000"
+                className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2"
+                style={{
+                  backgroundColor: withAlpha(theme.palette.bgCard, 0.5),
+                  borderColor: theme.palette.borderSoft,
+                }}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -923,6 +1017,24 @@ function ConfirmStep({
           {selectedBike?.subtitle && (
             <div className="text-sm opacity-60">{selectedBike.subtitle}</div>
           )}
+          <div className="mt-2 pt-2 border-t space-y-1" style={{ borderColor: theme.palette.borderSoft }}>
+            <div className="flex justify-between text-sm">
+              <span className="opacity-60">Гос. номер:</span>
+              <span className="font-medium">{formData.bikePlate || "—"}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="opacity-60">VIN:</span>
+              <span className="font-medium">{formData.bikeVin || "—"}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="opacity-60">Год:</span>
+              <span className="font-medium">{formData.bikeYear || "—"}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="opacity-60">Стоимость:</span>
+              <span className="font-medium">{formData.bikeValue ? Number(formData.bikeValue).toLocaleString("ru-RU") + " ₽" : "—"}</span>
+            </div>
+          </div>
         </div>
 
         {/* Owner info */}
