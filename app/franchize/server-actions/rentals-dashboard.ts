@@ -60,6 +60,38 @@ export interface RentalDashboardResult {
   selectedDate: string;
 }
 
+// ─── Sales Dashboard Types ───────────────────────────────────────────────────────
+
+export interface SaleDashboardItem {
+  id: string;
+  contract_key: string;
+  buyer_full_name: string | null;
+  buyer_passport_number: string | null;
+  buyer_email: string | null;
+  sale_price: string | null;
+  price_words: string | null;
+  warranty_months: string | null;
+  created_at: string;
+  vehicle: {
+    id: string;
+    make: string;
+    model: string;
+    crew_id: string;
+    type: string;
+  } | null;
+}
+
+export interface SaleDashboardSummary {
+  totalCount: number;
+  totalRevenue: number;
+}
+
+export interface SalesDashboardResult {
+  items: SaleDashboardItem[];
+  summary: SaleDashboardSummary;
+  selectedDate: string;
+}
+
 export interface RentalDocumentDetail {
   secret: {
     id: string;
@@ -365,6 +397,166 @@ export async function getRentalsDashboard(input: {
     };
   } catch (error) {
     console.error("[rentals-dashboard] Error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Get sales dashboard data for a specific crew and date.
+ * Returns sales + summary statistics from private.sale_contract_artifacts.
+ */
+export async function getSalesDashboard(input: {
+  slug: string;
+  actorUserId: string;
+  date: string; // ISO date string (YYYY-MM-DD)
+  isPasswordAuth?: boolean;
+}): Promise<{ success: boolean; data?: SalesDashboardResult; error?: string }> {
+  try {
+    const parsed = z.object({
+      slug: z.string().trim().min(1),
+      actorUserId: z.string().trim().min(1),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      isPasswordAuth: z.boolean().optional(),
+    }).safeParse(input);
+
+    if (!parsed.success) {
+      return { success: false, error: "Некорректный запрос." };
+    }
+
+    const { slug, actorUserId, date, isPasswordAuth = false } = parsed.data;
+
+    // Get crew and verify access
+    const { data: crew, error: crewError } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id")
+      .eq("slug", slug.trim())
+      .maybeSingle();
+
+    if (crewError || !crew) {
+      console.error("[sales-dashboard] Crew not found for slug:", slug);
+      return { success: false, error: "Экипаж не найден." };
+    }
+
+    // Auth check (same logic as rentals)
+    if (!isPasswordAuth) {
+      const { data: user } = await supabaseAdmin
+        .from("users")
+        .select("metadata, username")
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+
+      const userMetadata = user?.metadata as Record<string, unknown> | null;
+      const userUsername = user?.username as string | null;
+      const isAdmin = userMetadata?.role === "admin";
+      const isOwner = crew.owner_id === actorUserId;
+      const isOrudjov = userUsername?.toLowerCase().includes("orud");
+
+      if (!isOwner && !isAdmin && !isOrudjov) {
+        return { success: false, error: "Недостаточно прав для просмотра." };
+      }
+    }
+
+    // Parse date boundaries for the selected day (UTC)
+    const startOfDay = new Date(`${date}T00:00:00.000Z`).toISOString();
+    const endOfDay = new Date(`${date}T23:59:59.999Z`).toISOString();
+
+    // Query sales from private.sale_contract_artifacts
+    // Join with cars to filter by crew_id and get bike details
+    const { data: sales, error: salesError } = await privateSchema()
+      .from("sale_contract_artifacts")
+      .select(`
+        id,
+        contract_key,
+        buyer_full_name,
+        buyer_passport_number,
+        buyer_email,
+        sale_price,
+        price_words,
+        warranty_months,
+        created_at,
+        resolved_bike_id
+      `)
+      .gte("created_at", startOfDay)
+      .lte("created_at", endOfDay)
+      .order("created_at", { ascending: false });
+
+    if (salesError) {
+      console.error("[sales-dashboard] Query error:", salesError);
+      return { success: false, error: salesError.message };
+    }
+
+    // Fetch bike details for all sales and filter by crew
+    const bikeIds = (sales || []).map(s => s.resolved_bike_id).filter(Boolean) as string[];
+    const bikeDetailsBy_id = new Map<string, { id: string; make: string; model: string; crew_id: string; type: string }>();
+
+    if (bikeIds.length > 0) {
+      const { data: bikes } = await supabaseAdmin
+        .from("cars")
+        .select("id, make, model, crew_id, type")
+        .in("id", bikeIds);
+
+      for (const bike of bikes || []) {
+        bikeDetailsBy_id.set(bike.id, bike);
+      }
+    }
+
+    // DEDUPLICATION: Handle multiple sales for same transaction
+    // Same buyer, same bike = same transaction, keep latest by created_at
+    const seenBuyerBikePairs = new Set<string>();
+    let items: SaleDashboardItem[] = [];
+
+    for (const sale of sales || []) {
+      const bikeId = sale.resolved_bike_id || "";
+      const bike = bikeDetailsBy_id.get(bikeId);
+
+      // Skip if bike doesn't belong to this crew
+      if (bike && bike.crew_id !== crew.id) {
+        continue;
+      }
+
+      // Dedupe key: buyer_name + bike_id (using buyer_full_name as identifier)
+      const dedupeKey = `${sale.buyer_full_name || "unknown"}::${bikeId}`;
+      if (!seenBuyerBikePairs.has(dedupeKey)) {
+        seenBuyerBikePairs.add(dedupeKey);
+        items.push({
+          id: sale.id,
+          contract_key: sale.contract_key,
+          buyer_full_name: sale.buyer_full_name,
+          buyer_passport_number: sale.buyer_passport_number,
+          buyer_email: sale.buyer_email,
+          sale_price: sale.sale_price,
+          price_words: sale.price_words,
+          warranty_months: sale.warranty_months,
+          created_at: sale.created_at,
+          vehicle: bike || null,
+        });
+      }
+    }
+
+    // Calculate summary statistics
+    const summary: SaleDashboardSummary = {
+      totalCount: items.length,
+      totalRevenue: items.reduce((sum, s) => {
+        // Parse sale_price (format: "390 000" -> 390000)
+        const priceStr = (s.sale_price || "0").replace(/\s/g, "");
+        const price = parseInt(priceStr, 10) || 0;
+        return sum + price;
+      }, 0),
+    };
+
+    return {
+      success: true,
+      data: {
+        items,
+        summary,
+        selectedDate: date,
+      },
+    };
+  } catch (error) {
+    console.error("[sales-dashboard] Error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),

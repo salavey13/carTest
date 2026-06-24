@@ -377,10 +377,10 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             </>
           ) : null}
 
-          {userCrewInfo?.slug && (
+          {effectiveSlug && (
             <>
               <DropdownMenuItem asChild>
-                <Link href={`/franchize/${userCrewInfo.slug}/rentals-analytics`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                <Link href={`/franchize/${effectiveSlug}/rentals-analytics`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
                   <BarChart3 className="mr-2 h-4 w-4" />
                   <span className="truncate">Аналитика аренд</span>
                 </Link>
