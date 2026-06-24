@@ -35,6 +35,10 @@ const subrentSchema = z.object({
   crewId: z.string().uuid(),
   crewSlug: z.string().min(1),
   bikeId: z.string().uuid(),
+  bikePlate: z.string().min(1),
+  bikeVin: z.string().min(1),
+  bikeYear: z.string().min(1),
+  bikeValue: z.string().min(1),
   ownerFullName: z.string().min(2),
   ownerPhone: z.string().min(10),
   ownerEmail: z.string().email().optional(),
@@ -122,14 +126,14 @@ export async function POST(request: NextRequest) {
     const birthDateRussian = toRussianDate(data.ownerBirthDate);
     const passportIssueDateRussian = toRussianDate(data.ownerPassportIssueDate);
 
-    // Get additional bike details
-    const bikeSpecs = bike.specs as Record<string, unknown> || {};
+    // Get bike details - use form-submitted values for contract-required fields
     const bikeMake = bike.make || "Не указан";
     const bikeModel = bike.model || "";
-    const bikeVin = (bikeSpecs.vin as string) || "";
-    const bikePlate = (bikeSpecs.plate as string) || "";
-    const bikeYear = (bikeSpecs.year as string) || "";
-    const bikeValue = (bikeSpecs.value_rub as string) || "";
+    // Use form-submitted bike details since bike may not exist in DB yet
+    const bikeVin = data.bikeVin || "";
+    const bikePlate = data.bikePlate || "";
+    const bikeYear = data.bikeYear || "";
+    const bikeValue = data.bikeValue || "";
     const bikeValueNum = Number(bikeValue) || 0;
 
     // Store the application in subrent_contract_artifacts (existing table)
@@ -168,10 +172,20 @@ export async function POST(request: NextRequest) {
         min_daily_price_rub: String(data.minDailyPrice),
         min_daily_price_text: numberToRussianWords(data.minDailyPrice),
 
-        // Default hourly prices
-        hourly_3h_price_rub: String(Math.round(data.minDailyPrice * 0.6)),
-        hourly_6h_price_rub: String(Math.round(data.minDailyPrice * 0.75)),
-        hourly_12h_price_rub: String(Math.round(data.minDailyPrice * 0.9)),
+        // Default hourly prices (aligned with /subrent command)
+        hourly_3h_price_rub: "6000",
+        hourly_6h_price_rub: "7000",
+        hourly_12h_price_rub: "8000",
+        weekday_daily_price_rub: "14000",
+        weekend_daily_price_rub: "16000",
+        regular_client_deposit_rub: "10000",
+        new_client_deposit_rub: "20000",
+        daily_km_allowance: "200",
+        extra_km_fee_rub: "30",
+        downtime_compensation_daily_rub: "4000",
+        reporting_period: "неделя",
+        payment_deadline_days: "2",
+        late_penalty_percent: "0.2",
 
         // Contract terms
         contract_start_date: startDateRussian,
