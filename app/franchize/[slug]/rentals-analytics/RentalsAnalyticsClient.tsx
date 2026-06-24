@@ -54,6 +54,12 @@ import {
   type SubrentContractsResult,
 } from "@/app/franchize/server-actions/rentals-dashboard";
 import {
+  getSubrentApplications,
+  approveSubrentApplication,
+  declineSubrentApplication,
+  type SubrentApplicationItem,
+} from "@/app/franchize/server-actions/subrent-approval";
+import {
   getMessageTemplates,
   sendTemplateMessage,
 } from "@/app/franchize/server-actions/message-templates";
@@ -143,6 +149,11 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const [subrents, setSubrents] = useState<SubrentContractItem[]>([]);
   const [subrentsSummary, setSubrentsSummary] = useState<SubrentContractsResult["summary"] | null>(null);
   const [loadingSubrents, setLoadingSubrents] = useState(true);
+
+  // Pending subrent applications
+  const [pendingApplications, setPendingApplications] = useState<SubrentApplicationItem[]>([]);
+  const [loadingApplications, setLoadingApplications] = useState(true);
+  const [processingApplication, setProcessingApplication] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -355,6 +366,84 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
       setLoadingSubrents(false);
     }
   }, [getActorUserId, initialSlug, passwordAuthOwnerId]);
+
+  const loadPendingApplications = useCallback(async () => {
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
+
+    setLoadingApplications(true);
+    try {
+      const result = await getSubrentApplications({
+        slug: initialSlug?.trim() || "vip-bike",
+        actorUserId,
+        status: "pending",
+        isPasswordAuth: !!passwordAuthOwnerId,
+      });
+
+      if (result.success && result.data) {
+        setPendingApplications(result.data.items || []);
+      }
+    } catch (error) {
+      console.error("[Analytics] Pending applications load error:", error);
+    } finally {
+      setLoadingApplications(false);
+    }
+  }, [getActorUserId, initialSlug, passwordAuthOwnerId]);
+
+  const handleApproveApplication = async (applicationId: string) => {
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
+
+    setProcessingApplication(applicationId);
+    try {
+      const result = await approveSubrentApplication({
+        slug: initialSlug?.trim() || "vip-bike",
+        actorUserId,
+        applicationId,
+        isPasswordAuth: !!passwordAuthOwnerId,
+      });
+
+      if (result.success) {
+        toast.success("Договор сгенерирован и отправлен!");
+        await loadPendingApplications();
+        await loadSubrentContracts(selectedDate);
+      } else {
+        toast.error(result.error || "Не удалось одобрить заявку");
+      }
+    } catch (error) {
+      console.error("[Approve application] Error:", error);
+      toast.error("Ошибка одобрения заявки");
+    } finally {
+      setProcessingApplication(null);
+    }
+  };
+
+  const handleDeclineApplication = async (applicationId: string) => {
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
+
+    setProcessingApplication(applicationId);
+    try {
+      const result = await declineSubrentApplication({
+        slug: initialSlug?.trim() || "vip-bike",
+        actorUserId,
+        applicationId,
+        isPasswordAuth: !!passwordAuthOwnerId,
+      });
+
+      if (result.success) {
+        toast.success("Заявка отклонена");
+        await loadPendingApplications();
+      } else {
+        toast.error(result.error || "Не удалось отклонить заявку");
+      }
+    } catch (error) {
+      console.error("[Decline application] Error:", error);
+      toast.error("Ошибка отклонения заявки");
+    } finally {
+      setProcessingApplication(null);
+    }
+  };
 
   const loadChecklistStates = useCallback(async () => {
     const actorUserId = getActorUserId();
@@ -682,6 +771,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
       void loadSales(selectedDate);
       void loadCommercialProposals(selectedDate);
       void loadSubrentContracts(selectedDate);
+      void loadPendingApplications();
       void loadDateRange();
       void loadChecklistStates();
       void loadTodos();
@@ -2223,6 +2313,100 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+              )}
+
+              {/* PENDING SUBRENT APPLICATIONS */}
+              {!loadingApplications && pendingApplications.length > 0 && (
+                <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha("#f59e0b", 0.08), borderColor: withAlpha("#f59e0b", 0.4), borderWidth: "2px" }}>
+                  <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: withAlpha(borderSoft, 0.2), background: `linear-gradient(to right, ${withAlpha("#f59e0b", 0.1)}, transparent)` }}>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg relative" style={{ backgroundColor: withAlpha("#f59e0b", 0.2) }}>
+                        <AlertCircle className="w-5 h-5" style={{ color: "#f59e0b" }} />
+                        <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full animate-ping" style={{ backgroundColor: "#f59e0b" }} />
+                        <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full" style={{ backgroundColor: "#f59e0b" }} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold" style={{ color: textPrimary }}>Заявки на субаренду</h3>
+                        <p className="text-xs" style={{ color: textSecondary }}>{pendingApplications.length} {pendingApplications.length === 1 ? "заявка ожидает рассмотрения" : "заявки ожидают рассмотрения"}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="divide-y" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
+                    {pendingApplications.map((app) => (
+                      <div key={app.id} className="p-4 md:p-5 hover:bg-opacity-50 transition-all" style={{ hoverBackgroundColor: withAlpha("#f59e0b", 0.05) }}>
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ backgroundColor: withAlpha("#f59e0b", 0.2), color: "#f59e0b" }}>
+                                НОВАЯ
+                              </span>
+                              <span className="text-xs" style={{ color: textSecondary }}>
+                                {formatRussianDate(app.created_at)}
+                              </span>
+                            </div>
+                            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+                              <div>
+                                <p className="text-sm font-semibold" style={{ color: textPrimary }}>{app.owner_full_name}</p>
+                                <p className="text-xs" style={{ color: textSecondary }}>{app.owner_phone}</p>
+                              </div>
+                              <div className="hidden md:block w-px h-8" style={{ backgroundColor: borderSoft }} />
+                              <div>
+                                <p className="text-sm font-medium" style={{ color: textPrimary }}>{app.bike_make} {app.bike_model}</p>
+                                <p className="text-xs" style={{ color: textSecondary }}>Процент: {app.owner_percentage}% • Мин. цена: {app.min_daily_price_rub} ₽</p>
+                              </div>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-3 text-xs" style={{ color: textSecondary }}>
+                              <span>📅 {app.contract_start_date} — {app.contract_end_date}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => void handleDeclineApplication(app.id)}
+                              disabled={processingApplication === app.id}
+                              className="relative px-4 py-2 rounded-lg text-sm font-bold transition-all duration-300 disabled:opacity-50 overflow-hidden"
+                              style={{
+                                backgroundColor: processingApplication === app.id
+                                  ? withAlpha("#f87171", 0.25)
+                                  : withAlpha("#f87171", 0.15),
+                                borderColor: withAlpha("#f87171", 0.4),
+                                color: "#f87171",
+                                border: "1.5px solid"
+                              }}
+                            >
+                              {processingApplication === app.id ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <XCircle className="w-4 h-4" />
+                              )}
+                              <span className="ml-1.5 hidden sm:inline">Отклонить</span>
+                            </button>
+                            <button
+                              onClick={() => void handleApproveApplication(app.id)}
+                              disabled={processingApplication === app.id}
+                              className="relative px-4 py-2 rounded-lg text-sm font-bold transition-all duration-300 disabled:opacity-50 overflow-hidden"
+                              style={{
+                                backgroundColor: processingApplication === app.id
+                                  ? withAlpha("#10b981", 0.25)
+                                  : `linear-gradient(135deg, ${withAlpha("#10b981", 0.2)}, ${withAlpha("#10b981", 0.1)})`,
+                                borderColor: withAlpha("#10b981", 0.4),
+                                color: "#10b981",
+                                border: "1.5px solid",
+                                boxShadow: `0 4px 12px ${withAlpha("#10b981", 0.3)}`
+                              }}
+                            >
+                              {processingApplication === app.id ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="w-4 h-4" />
+                              )}
+                              <span className="ml-1.5 hidden sm:inline">Одобрить</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

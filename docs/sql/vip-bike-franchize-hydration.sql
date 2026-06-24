@@ -34,7 +34,7 @@ values (
   'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/1000033868-a2e57b7e-5ed8-4440-9304-f3f54f63cc46.jpg',
   '356282674',
   'vip-bike',
-  '56.297654,43.947218',
+  '56.2963, 43.9462',
   '{}'::jsonb,
   now(),
   now()
@@ -123,8 +123,7 @@ set
           'logoHref', '/',
           'menuLinks', jsonb_build_array(
             jsonb_build_object('label', 'Каталог', 'href', '/franchize/{slug}'),
-            jsonb_build_object('label', 'Тест-драйв', 'href', '/franchize/{slug}#test-drive'),
-            jsonb_build_object('label', 'Покатушки', 'href', '/franchize/{slug}/map-riders'),
+            jsonb_build_object('label', 'Карта', 'href', '/franchize/{slug}/map-riders'),
             jsonb_build_object('label', 'Каталог-electro', 'href', '/franchize/{slug}/electro-enduro'),
             jsonb_build_object('label', 'Конфигуратор', 'href', '/franchize/{slug}/configurator'),
             jsonb_build_object('label', 'О нас', 'href', '/franchize/{slug}/about'),
