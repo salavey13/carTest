@@ -239,9 +239,15 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     setPasswordError(null);
 
     try {
-      const result = await validateAnalyticsPassword({ password: passwordInput, crewSlug: initialSlug?.trim() || "vip-bike" });
+      const result = await validateAnalyticsPassword({ password: passwordInput });
       if (!result.success) {
         setPasswordError(result.error || "Неверный пароль");
+        return;
+      }
+
+      // Verify the returned slug matches the current crew
+      if (result.data?.slug && result.data.slug !== initialSlug?.trim()) {
+        setPasswordError(`Пароль для другого экипажа: ${result.data.slug}`);
         return;
       }
 
