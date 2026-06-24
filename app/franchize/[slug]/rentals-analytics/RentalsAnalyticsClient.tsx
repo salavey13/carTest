@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -29,10 +29,16 @@ import {
   getRentalsForExport,
   getSalesDashboard,
   validateAnalyticsPassword,
+  getCommercialProposalsDashboard,
+  getSubrentContractsDashboard,
   type RentalDashboardItem,
   type RentalDashboardSummary,
   type SaleDashboardItem,
   type SalesDashboardResult,
+  type CommercialProposalItem,
+  type CommercialProposalsResult,
+  type SubrentContractItem,
+  type SubrentContractsResult,
 } from "@/app/franchize/server-actions/rentals-dashboard";
 import { useSupabaseRealtime } from "@/app/franchize/hooks/useSupabaseRealtime";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
@@ -101,6 +107,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const theme = useFranchizeTheme(crew.theme);
 
   const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [verificationFilter, setVerificationFilter] = useState<"all" | "verified" | "pending" | "revoked">("all");
   const [rentals, setRentals] = useState<RentalDashboardItem[]>([]);
   const [summary, setSummary] = useState<RentalDashboardSummary | null>(null);
@@ -108,6 +115,17 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const [sales, setSales] = useState<SaleDashboardItem[]>([]);
   const [salesSummary, setSalesSummary] = useState<SalesDashboardResult["summary"] | null>(null);
   const [loadingSales, setLoadingSales] = useState(true);
+
+  // Commercial proposals data
+  const [proposals, setProposals] = useState<CommercialProposalItem[]>([]);
+  const [proposalsSummary, setProposalsSummary] = useState<CommercialProposalsResult["summary"] | null>(null);
+  const [loadingProposals, setLoadingProposals] = useState(true);
+
+  // Subrent contracts data
+  const [subrents, setSubrents] = useState<SubrentContractItem[]>([]);
+  const [subrentsSummary, setSubrentsSummary] = useState<SubrentContractsResult["summary"] | null>(null);
+  const [loadingSubrents, setLoadingSubrents] = useState(true);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dateRange, setDateRange] = useState<{ minDate: string; maxDate: string } | null>(null);
@@ -138,6 +156,20 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const mainContentRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef(0);
   const currentYRef = useRef(0);
+  const datePickerRef = useRef<HTMLDivElement>(null);
+
+  // Close date picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setDatePickerOpen(false);
+      }
+    };
+    if (datePickerOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [datePickerOpen]);
 
   // ─── Realtime subscriptions ───────────────────────────────────────────────────
 
@@ -236,6 +268,54 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
       console.error("[Analytics] Sales load error:", error);
     } finally {
       setLoadingSales(false);
+    }
+  }, [getActorUserId, initialSlug, passwordAuthOwnerId]);
+
+  const loadCommercialProposals = useCallback(async (date: string) => {
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
+
+    setLoadingProposals(true);
+    try {
+      const result = await getCommercialProposalsDashboard({
+        slug: initialSlug?.trim() || "vip-bike",
+        actorUserId,
+        date,
+        isPasswordAuth: !!passwordAuthOwnerId,
+      });
+
+      if (result.success && result.data) {
+        setProposals(result.data.items || []);
+        setProposalsSummary(result.data.summary || null);
+      }
+    } catch (error) {
+      console.error("[Analytics] Commercial proposals load error:", error);
+    } finally {
+      setLoadingProposals(false);
+    }
+  }, [getActorUserId, initialSlug, passwordAuthOwnerId]);
+
+  const loadSubrentContracts = useCallback(async (date: string) => {
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
+
+    setLoadingSubrents(true);
+    try {
+      const result = await getSubrentContractsDashboard({
+        slug: initialSlug?.trim() || "vip-bike",
+        actorUserId,
+        date,
+        isPasswordAuth: !!passwordAuthOwnerId,
+      });
+
+      if (result.success && result.data) {
+        setSubrents(result.data.items || []);
+        setSubrentsSummary(result.data.summary || null);
+      }
+    } catch (error) {
+      console.error("[Analytics] Subrent contracts load error:", error);
+    } finally {
+      setLoadingSubrents(false);
     }
   }, [getActorUserId, initialSlug, passwordAuthOwnerId]);
 
@@ -367,6 +447,8 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     if (getActorUserId()) {
       void loadRentals(selectedDate);
       void loadSales(selectedDate);
+      void loadCommercialProposals(selectedDate);
+      void loadSubrentContracts(selectedDate);
       void loadDateRange();
       void loadChecklistStates();
       void loadTodos();
@@ -377,6 +459,8 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     if (getActorUserId() && !authLoading) {
       void loadRentals(selectedDate, true);
       void loadSales(selectedDate);
+      void loadCommercialProposals(selectedDate);
+      void loadSubrentContracts(selectedDate);
     }
   }, [selectedDate, verificationFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -392,7 +476,10 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const rentalRevenue = rentals.reduce((sum, r) => sum + (r.total_cost || 0), 0);
   const totalSales = sales.length;
   const salesRevenue = salesSummary?.totalRevenue || 0;
-  const totalRevenue = rentalRevenue + salesRevenue;
+  const totalProposals = proposals.length;
+  const proposalsRevenue = proposals.reduce((sum, p) => sum + (p.total_price || 0), 0);
+  const totalSubrents = subrents.length;
+  const totalRevenue = rentalRevenue + salesRevenue + proposalsRevenue;
   const activeRentals = rentals.filter(r => r.status === "active").length;
   const completedRentals = rentals.filter(r => r.status === "completed").length;
   const completionRate = totalRentals > 0 ? Math.round((completedRentals / totalRentals) * 100) : 0;
@@ -576,12 +663,21 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                   <ChevronLeft className="w-4 h-4 md:w-5 md:h-5 transition-colors" style={{ color: textSecondary }} />
                 </button>
 
-                <div className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl border">
+                <button
+                  onClick={() => setDatePickerOpen(!datePickerOpen)}
+                  className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl border transition-all hover:scale-105"
+                  style={{
+                    backgroundColor: withAlpha(bgCard, 0.5),
+                    borderColor: borderSoft,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = accentMain; e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.1); }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = borderSoft; e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.5); }}
+                >
                   <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" style={{ color: accentMain }} />
                   <span className="text-xs md:text-sm font-medium" style={{ color: textPrimary }}>
                     {formatRussianDateOnly(selectedDate)}
                   </span>
-                </div>
+                </button>
 
                 <button
                   onClick={() => navigateDate(1)}
@@ -594,6 +690,63 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                   <ChevronRight className="w-4 h-4 md:w-5 md:h-5 transition-colors" style={{ color: textSecondary }} />
                 </button>
               </div>
+
+              {/* Date picker popup */}
+              {datePickerOpen && (
+                <div
+                  ref={datePickerRef}
+                  className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-50 rounded-xl md:rounded-2xl border shadow-2xl p-3 md:p-4"
+                  style={{
+                    backgroundColor: bgCard,
+                    borderColor: withAlpha(accentMain, 0.3),
+                    backdropFilter: "blur(16px)",
+                  }}
+                >
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setSelectedDate(e.target.value);
+                        setDatePickerOpen(false);
+                      }
+                    }}
+                    className="px-3 py-2 rounded-lg text-sm font-medium focus:outline-none focus:ring-2"
+                    style={{
+                      backgroundColor: withAlpha(bgBase, 0.5),
+                      color: textPrimary,
+                      border: `1px solid ${borderSoft}`,
+                      fontFamily: "'Onest', sans-serif",
+                    }}
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => setDatePickerOpen(false)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                      style={{
+                        backgroundColor: withAlpha(borderSoft, 0.3),
+                        color: textSecondary,
+                      }}
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedDate(new Date().toISOString().split("T")[0]);
+                        setDatePickerOpen(false);
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                      style={{
+                        backgroundColor: withAlpha(accentMain, 0.2),
+                        color: accentMain,
+                        border: `1px solid ${withAlpha(accentMain, 0.3)}`,
+                      }}
+                    >
+                      Сегодня
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right section - actions */}
@@ -646,7 +799,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
           <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 space-y-4 md:space-y-6">
 
             {/* STATS ROW */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 md:gap-3 lg:gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-7 gap-2 md:gap-3 lg:gap-4">
               {/* Total rentals */}
               <div className="relative group">
                 <div
@@ -823,6 +976,84 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                   <div className="mt-1.5 md:mt-2 flex items-center gap-1 text-[10px] md:text-xs" style={{ color: textSecondary, opacity: 0.7 }}>
                     <CheckCircle2 className="w-2.5 h-2.5 md:w-3 md:h-3" />
                     {completedRentals} из {totalRentals}
+                  </div>
+                </div>
+              </div>
+
+              {/* Commercial proposals */}
+              <div className="relative group">
+                <div
+                  className="absolute inset-0 rounded-xl md:rounded-2xl blur-lg md:blur-xl group-hover:blur-xl md:group-hover:blur-2xl transition-all duration-500"
+                  style={{
+                    background: `radial-gradient(circle at center, ${withAlpha("#f59e0b", 0.15)}, transparent 70%)`,
+                    backgroundColor: withAlpha("#f59e0b", 0.08)
+                  }}
+                />
+                <div
+                  className="relative rounded-xl md:rounded-2xl p-3 md:p-5 border transition-all duration-300 group-hover:scale-[1.02] group-hover:border-opacity-30"
+                  style={{
+                    backgroundColor: withAlpha(bgCard, 0.6),
+                    borderColor: withAlpha("#f59e0b", 0.2),
+                    backdropFilter: "blur(12px)",
+                    borderWidth: "1.5px"
+                  }}
+                >
+                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                    <div
+                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110"
+                      style={{
+                        background: `linear-gradient(135deg, ${withAlpha("#f59e0b", 0.2)}, ${withAlpha("#f59e0b", 0.05)})`,
+                        border: "1px solid",
+                        borderColor: withAlpha("#f59e0b", 0.3)
+                      }}
+                    >
+                      <TrendingUp className="w-4 h-4 md:w-5 md:h-5" style={{ color: "#f59e0b" }} />
+                    </div>
+                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.8 }}>КП</span>
+                  </div>
+                  <div className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: "#f59e0b" }}>{totalProposals}</div>
+                  <div className="mt-1.5 md:mt-2 flex items-center gap-1 text-[10px] md:text-xs" style={{ color: textSecondary, opacity: 0.7 }}>
+                    <Zap className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                    {formatRubles(proposalsRevenue)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Subrent contracts */}
+              <div className="relative group">
+                <div
+                  className="absolute inset-0 rounded-xl md:rounded-2xl blur-lg md:blur-xl group-hover:blur-xl md:group-hover:blur-2xl transition-all duration-500"
+                  style={{
+                    background: `radial-gradient(circle at center, ${withAlpha("#06b6d4", 0.15)}, transparent 70%)`,
+                    backgroundColor: withAlpha("#06b6d4", 0.08)
+                  }}
+                />
+                <div
+                  className="relative rounded-xl md:rounded-2xl p-3 md:p-5 border transition-all duration-300 group-hover:scale-[1.02] group-hover:border-opacity-30"
+                  style={{
+                    backgroundColor: withAlpha(bgCard, 0.6),
+                    borderColor: withAlpha("#06b6d4", 0.2),
+                    backdropFilter: "blur(12px)",
+                    borderWidth: "1.5px"
+                  }}
+                >
+                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                    <div
+                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110"
+                      style={{
+                        background: `linear-gradient(135deg, ${withAlpha("#06b6d4", 0.2)}, ${withAlpha("#06b6d4", 0.05)})`,
+                        border: "1px solid",
+                        borderColor: withAlpha("#06b6d4", 0.3)
+                      }}
+                    >
+                      <ShieldCheck className="w-4 h-4 md:w-5 md:h-5" style={{ color: "#06b6d4" }} />
+                    </div>
+                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.8 }}>Субаренда</span>
+                  </div>
+                  <div className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: "#06b6d4" }}>{totalSubrents}</div>
+                  <div className="mt-1.5 md:mt-2 flex items-center gap-1 text-[10px] md:text-xs" style={{ color: textSecondary, opacity: 0.7 }}>
+                    <RefreshCw className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                    {subrentsSummary?.activeCount || 0} активных
                   </div>
                 </div>
               </div>
@@ -1448,6 +1679,136 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                             </td>
                             <td className="px-5 py-4 text-right">
                               <div className="text-sm font-bold" style={{ color: "#a78bfa" }}>{formatRubles(parseInt((sale.sale_price || "0").replace(/\s/g, ""), 10) || 0)}</div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* COMMERCIAL PROPOSALS LIST */}
+              {proposals.length > 0 && (
+                <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.3), borderColor: withAlpha("#f59e0b", 0.3) }}>
+                  <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha("#f59e0b", 0.15) }}>
+                        <TrendingUp className="w-5 h-5" style={{ color: "#f59e0b" }} />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" style={{ color: textPrimary }}>Коммерческие предложения</h3>
+                        <p className="text-xs" style={{ color: textSecondary }}>{totalProposals} {totalProposals === 1 ? "КП" : totalProposals > 1 && totalProposals < 5 ? "КП" : "КП"}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold" style={{ color: "#f59e0b" }}>{formatRubles(proposalsRevenue)}</div>
+                      <div className="text-xs" style={{ color: textSecondary }}>Общая сумма</div>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr style={{ backgroundColor: withAlpha(borderSoft, 0.1) }}>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Время</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Клиент</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Тип</th>
+                          <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Сумма</th>
+                          <th className="px-5 py-3 text-center text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>QR</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
+                        {proposals.map((proposal) => (
+                          <tr key={proposal.id} className="hover:bg-opacity-50 transition-all" style={{ hoverBackgroundColor: withAlpha("#f59e0b", 0.05) }}>
+                            <td className="px-5 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium" style={{ color: textPrimary }}>{formatRussianDate(proposal.created_at)}</div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium" style={{ color: textPrimary }}>{proposal.client_name}</span>
+                                {proposal.client_phone && (
+                                  <span className="text-xs" style={{ color: textSecondary }}>{proposal.client_phone}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <span className="inline-flex items-center px-2 py-1 rounded text-xs font-semibold" style={{ backgroundColor: withAlpha("#f59e0b", 0.15), color: "#f59e0b" }}>
+                                {proposal.offer_type}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4 text-right">
+                              <div className="text-sm font-bold" style={{ color: "#f59e0b" }}>{formatRubles(proposal.total_price)}</div>
+                            </td>
+                            <td className="px-5 py-4 text-center">
+                              {proposal.qr_included ? (
+                                <span className="text-base" style={{ color: "#34d399" }}>✓</span>
+                              ) : (
+                                <span style={{ color: borderSoft }}>—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* SUBRENT CONTRACTS LIST */}
+              {subrents.length > 0 && (
+                <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.3), borderColor: withAlpha("#06b6d4", 0.3) }}>
+                  <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha("#06b6d4", 0.15) }}>
+                        <ShieldCheck className="w-5 h-5" style={{ color: "#06b6d4" }} />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" style={{ color: textPrimary }}>Субарендные договоры</h3>
+                        <p className="text-xs" style={{ color: textSecondary }}>{totalSubrents} {totalSubrents === 1 ? "договор" : totalSubrents > 1 && totalSubrents < 5 ? "договора" : "договоров"}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold" style={{ color: "#06b6d4" }}>{subrentsSummary?.activeCount || 0}</div>
+                      <div className="text-xs" style={{ color: textSecondary }}>Активных</div>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr style={{ backgroundColor: withAlpha(borderSoft, 0.1) }}>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Время</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Собственник</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Мотоцикл</th>
+                          <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>%</th>
+                          <th className="px-5 py-3 text-center text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Период</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
+                        {subrents.map((subrent) => (
+                          <tr key={subrent.id} className="hover:bg-opacity-50 transition-all" style={{ hoverBackgroundColor: withAlpha("#06b6d4", 0.05) }}>
+                            <td className="px-5 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium" style={{ color: textPrimary }}>{formatRussianDate(subrent.created_at)}</div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium" style={{ color: textPrimary }}>{subrent.owner_full_name || "—"}</span>
+                                {subrent.owner_phone && (
+                                  <span className="text-xs" style={{ color: textSecondary }}>{subrent.owner_phone}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="text-sm font-medium" style={{ color: textPrimary }}>
+                                {subrent.bike_make} {subrent.bike_model}
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 text-right">
+                              <span className="text-sm font-bold" style={{ color: "#06b6d4" }}>{subrent.owner_percentage}%</span>
+                            </td>
+                            <td className="px-5 py-4 text-center">
+                              <span className="text-xs" style={{ color: textSecondary }}>
+                                {subrent.contract_start_date} - {subrent.contract_end_date}
+                              </span>
                             </td>
                           </tr>
                         ))}

@@ -1329,3 +1329,320 @@ export async function validateAnalyticsPassword(input: {
     };
   }
 }
+
+// ─── Commercial Proposals Dashboard ───────────────────────────────────────────────
+
+export interface CommercialProposalItem {
+  id: string;
+  proposal_key: string;
+  crew_slug: string;
+  client_name: string;
+  client_inn: string | null;
+  client_phone: string | null;
+  client_email: string | null;
+  offer_type: string;
+  offer_summary: string | null;
+  total_price: number | null;
+  validity_days: number;
+  payment_terms: string | null;
+  delivery_terms: string | null;
+  special_conditions: string | null;
+  bike_filter: string | null;
+  bike_catalog_count: number;
+  telegram_chat_id: string | null;
+  telegram_message_id: number | null;
+  qr_included: boolean;
+  created_at: string;
+}
+
+export interface CommercialProposalsResult {
+  items: CommercialProposalItem[];
+  summary: {
+    totalCount: number;
+    byType: Record<string, number>;
+    withQr: number;
+  };
+  selectedDate: string;
+}
+
+/**
+ * Get commercial proposals dashboard data for a specific crew and date.
+ * Returns proposals + summary statistics from private.commercial_proposal_artifacts.
+ */
+export async function getCommercialProposalsDashboard(input: {
+  slug: string;
+  actorUserId: string;
+  date: string;
+  isPasswordAuth?: boolean;
+}): Promise<{ success: boolean; data?: CommercialProposalsResult; error?: string }> {
+  try {
+    const parsed = z.object({
+      slug: z.string().trim().min(1),
+      actorUserId: z.string().trim().min(1),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      isPasswordAuth: z.boolean().optional(),
+    }).safeParse(input);
+
+    if (!parsed.success) {
+      return { success: false, error: "Некорректный запрос." };
+    }
+
+    const { slug, actorUserId, date, isPasswordAuth = false } = parsed.data;
+
+    // Get crew and verify access
+    const { data: crew, error: crewError } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id")
+      .eq("slug", slug.trim())
+      .maybeSingle();
+
+    if (crewError || !crew) {
+      console.error("[commercial-dashboard] Crew not found for slug:", slug);
+      return { success: false, error: "Экипаж не найден." };
+    }
+
+    // Auth check
+    if (!isPasswordAuth) {
+      const { data: user } = await supabaseAdmin
+        .from("users")
+        .select("metadata, username")
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+
+      const userMetadata = user?.metadata as Record<string, unknown> | null;
+      const userUsername = user?.username as string | null;
+      const isAdmin = userMetadata?.role === "admin";
+      const isOwner = crew.owner_id === actorUserId;
+      const isOrudjov = userUsername?.toLowerCase().includes("orud");
+
+      if (!isOwner && !isAdmin && !isOrudjov) {
+        return { success: false, error: "Недостаточно прав для просмотра." };
+      }
+    }
+
+    // Parse date boundaries for the selected day (UTC)
+    const startOfDay = new Date(`${date}T00:00:00.000Z`).toISOString();
+    const endOfDay = new Date(`${date}T23:59:59.999Z`).toISOString();
+
+    // Query proposals from private.commercial_proposal_artifacts
+    const { data: proposals, error: proposalsError } = await privateSchema()
+      .from("commercial_proposal_artifacts")
+      .select("*")
+      .eq("crew_slug", slug.trim())
+      .gte("created_at", startOfDay)
+      .lte("created_at", endOfDay)
+      .order("created_at", { ascending: false });
+
+    if (proposalsError) {
+      console.error("[commercial-dashboard] Query error:", proposalsError);
+      return { success: false, error: proposalsError.message };
+    }
+
+    const items: CommercialProposalItem[] = (proposals || []).map(p => ({
+      id: p.id,
+      proposal_key: p.proposal_key,
+      crew_slug: p.crew_slug,
+      client_name: p.client_name,
+      client_inn: p.client_inn,
+      client_phone: p.client_phone,
+      client_email: p.client_email,
+      offer_type: p.offer_type,
+      offer_summary: p.offer_summary,
+      total_price: p.total_price ? Number(p.total_price) : null,
+      validity_days: p.validity_days,
+      payment_terms: p.payment_terms,
+      delivery_terms: p.delivery_terms,
+      special_conditions: p.special_conditions,
+      bike_filter: p.bike_filter,
+      bike_catalog_count: p.bike_catalog_count || 0,
+      telegram_chat_id: p.telegram_chat_id,
+      telegram_message_id: p.telegram_message_id,
+      qr_included: p.qr_included || false,
+      created_at: p.created_at,
+    }));
+
+    // Calculate summary
+    const summary = {
+      totalCount: items.length,
+      byType: {} as Record<string, number>,
+      withQr: items.filter(p => p.qr_included).length,
+    };
+
+    for (const item of items) {
+      const type = item.offer_type || "unknown";
+      summary.byType[type] = (summary.byType[type] || 0) + 1;
+    }
+
+    return {
+      success: true,
+      data: {
+        items,
+        summary,
+        selectedDate: date,
+      },
+    };
+  } catch (error) {
+    console.error("[commercial-dashboard] Error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+// ─── Subrent Contracts Dashboard ──────────────────────────────────────────────────
+
+export interface SubrentContractItem {
+  id: string;
+  contract_key: string;
+  requested_bike_id: string | null;
+  resolved_bike_id: string | null;
+  telegram_chat_id: string | null;
+  owner_full_name: string | null;
+  owner_phone: string | null;
+  owner_email: string | null;
+  bike_make: string | null;
+  bike_model: string | null;
+  bike_vin: string | null;
+  bike_plate: string | null;
+  owner_percentage: string | null;
+  min_daily_price_rub: string | null;
+  contract_start_date: string | null;
+  contract_end_date: string | null;
+  crew_id: string | null;
+  created_at: string;
+}
+
+export interface SubrentContractsResult {
+  items: SubrentContractItem[];
+  summary: {
+    totalCount: number;
+    activeCount: number;
+  };
+  selectedDate: string;
+}
+
+/**
+ * Get subrent contracts dashboard data for a specific crew and date.
+ * Returns contracts + summary statistics from private.subrent_contract_artifacts.
+ */
+export async function getSubrentContractsDashboard(input: {
+  slug: string;
+  actorUserId: string;
+  date: string;
+  isPasswordAuth?: boolean;
+}): Promise<{ success: boolean; data?: SubrentContractsResult; error?: string }> {
+  try {
+    const parsed = z.object({
+      slug: z.string().trim().min(1),
+      actorUserId: z.string().trim().min(1),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      isPasswordAuth: z.boolean().optional(),
+    }).safeParse(input);
+
+    if (!parsed.success) {
+      return { success: false, error: "Некорректный запрос." };
+    }
+
+    const { slug, actorUserId, date, isPasswordAuth = false } = parsed.data;
+
+    // Get crew and verify access
+    const { data: crew, error: crewError } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id")
+      .eq("slug", slug.trim())
+      .maybeSingle();
+
+    if (crewError || !crew) {
+      console.error("[subrent-dashboard] Crew not found for slug:", slug);
+      return { success: false, error: "Экипаж не найден." };
+    }
+
+    // Auth check
+    if (!isPasswordAuth) {
+      const { data: user } = await supabaseAdmin
+        .from("users")
+        .select("metadata, username")
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+
+      const userMetadata = user?.metadata as Record<string, unknown> | null;
+      const userUsername = user?.username as string | null;
+      const isAdmin = userMetadata?.role === "admin";
+      const isOwner = crew.owner_id === actorUserId;
+      const isOrudjov = userUsername?.toLowerCase().includes("orud");
+
+      if (!isOwner && !isAdmin && !isOrudjov) {
+        return { success: false, error: "Недостаточно прав для просмотра." };
+      }
+    }
+
+    // Parse date boundaries for the selected day (UTC)
+    const startOfDay = new Date(`${date}T00:00:00.000Z`).toISOString();
+    const endOfDay = new Date(`${date}T23:59:59.999Z`).toISOString();
+
+    // Query contracts from private.subrent_contract_artifacts
+    const { data: contracts, error: contractsError } = await privateSchema()
+      .from("subrent_contract_artifacts")
+      .select("*")
+      .eq("crew_id", slug.trim())
+      .gte("created_at", startOfDay)
+      .lte("created_at", endOfDay)
+      .order("created_at", { ascending: false });
+
+    if (contractsError) {
+      console.error("[subrent-dashboard] Query error:", contractsError);
+      return { success: false, error: contractsError.message };
+    }
+
+    const today = new Date();
+    const items: SubrentContractItem[] = (contracts || []).map(c => {
+      const startDate = c.contract_start_date ? new Date(c.contract_start_date.split('.').reverse().join('-')) : null;
+      const endDate = c.contract_end_date ? new Date(c.contract_end_date.split('.').reverse().join('-')) : null;
+      const isActive = startDate && endDate && today >= startDate && today <= endDate;
+
+      return {
+        id: c.id,
+        contract_key: c.contract_key,
+        requested_bike_id: c.requested_bike_id,
+        resolved_bike_id: c.resolved_bike_id,
+        telegram_chat_id: c.telegram_chat_id,
+        owner_full_name: c.owner_full_name,
+        owner_phone: c.owner_phone,
+        owner_email: c.owner_email,
+        bike_make: c.bike_make,
+        bike_model: c.bike_model,
+        bike_vin: c.bike_vin,
+        bike_plate: c.bike_plate,
+        owner_percentage: c.owner_percentage,
+        min_daily_price_rub: c.min_daily_price_rub,
+        contract_start_date: c.contract_start_date,
+        contract_end_date: c.contract_end_date,
+        crew_id: c.crew_id,
+        created_at: c.created_at,
+        isActive,
+      } as SubrentContractItem;
+    });
+
+    // Calculate summary
+    const summary = {
+      totalCount: items.length,
+      activeCount: items.filter(c => (c as any).isActive).length,
+    };
+
+    return {
+      success: true,
+      data: {
+        items,
+        summary,
+        selectedDate: date,
+      },
+    };
+  } catch (error) {
+    console.error("[subrent-dashboard] Error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
