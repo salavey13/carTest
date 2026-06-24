@@ -1051,9 +1051,9 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                     borderWidth: "1.5px"
                   }}
                 >
-                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3 min-w-0">
                     <div
-                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110"
+                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110 flex-shrink-0"
                       style={{
                         background: `linear-gradient(135deg, ${withAlpha(accentMain, 0.2)}, ${withAlpha(accentMain, 0.05)})`,
                         border: "1px solid",
@@ -1062,7 +1062,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                     >
                       <Eye className="w-4 h-4 md:w-5 md:h-5" style={{ color: accentMain }} />
                     </div>
-                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.8 }}>Всего аренд</span>
+                    <span className="text-[10px] md:text-xs font-black uppercase tracking-wide truncate" style={{ color: textSecondary, opacity: 0.8 }}>Всего аренд</span>
                   </div>
                   <div className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: textPrimary }}>
                     {totalRentals}
@@ -1070,8 +1070,8 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                     <span className="absolute inset-0 blur-xl opacity-50" style={{ backgroundColor: withAlpha(accentMain, 0.1) }} />
                   </div>
                   <div className="mt-1.5 md:mt-2 flex items-center gap-1 text-[10px] md:text-xs" style={{ color: textSecondary, opacity: 0.7 }}>
-                    <Calendar className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                    За выбранный день
+                    <Calendar className="w-2.5 h-2.5 md:w-3 md:h-3 flex-shrink-0" />
+                    <span className="truncate">За выбранный день</span>
                   </div>
                 </div>
               </div>
@@ -1094,9 +1094,9 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                     borderWidth: "1.5px"
                   }}
                 >
-                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3 min-w-0">
                     <div
-                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110"
+                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110 flex-shrink-0"
                       style={{
                         background: `linear-gradient(135deg, ${withAlpha("#10b981", 0.2)}, ${withAlpha("#10b981", 0.05)})`,
                         border: "1px solid",
@@ -1105,14 +1105,14 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                     >
                       <TrendingUp className="w-4 h-4 md:w-5 md:h-5" style={{ color: "#34d399" }} />
                     </div>
-                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.8 }}>Выручка</span>
+                    <span className="text-[10px] md:text-xs font-black uppercase tracking-wide truncate" style={{ color: textSecondary, opacity: 0.8 }}>Выручка</span>
                   </div>
                   <div className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: "#34d399" }}>
                     {formatRubles(totalRevenue)}
                   </div>
                   <div className="mt-1.5 md:mt-2 flex items-center gap-1 text-[10px] md:text-xs" style={{ color: textSecondary, opacity: 0.7 }}>
-                    <Zap className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                    Общий доход
+                    <Zap className="w-2.5 h-2.5 md:w-3 md:h-3 flex-shrink-0" />
+                    <span className="truncate">Общий доход</span>
                   </div>
                 </div>
               </div>
@@ -1121,16 +1121,16 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
               <div className="relative group">
                 <div className="absolute inset-0 rounded-2xl blur-xl group-hover:blur-2xl transition-all" style={{ backgroundColor: withAlpha("#8b5cf6", 0.12) }} />
                 <div className="relative rounded-2xl p-5 border transition-all" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha("#8b5cf6", 0.15) }}>
+                  <div className="flex items-center gap-3 mb-3 min-w-0">
+                    <div className="p-2 rounded-lg flex-shrink-0" style={{ backgroundColor: withAlpha("#8b5cf6", 0.15) }}>
                       <TrendingUp className="w-5 h-5" style={{ color: "#a78bfa" }} />
                     </div>
-                    <span className="text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Продажи</span>
+                    <span className="text-xs font-medium uppercase tracking-wide truncate" style={{ color: textSecondary }}>Продажи</span>
                   </div>
-                  <div className="text-3xl font-black" style={{ color: "#a78bfa" }}>{totalSales}</div>
+                  <div className="text-3xl font-black truncate" style={{ color: "#a78bfa" }}>{totalSales}</div>
                   <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: textSecondary }}>
-                    <Zap className="w-3 h-3" style={{ color: "#a78bfa" }} />
-                    {formatRubles(salesRevenue)}
+                    <Zap className="w-3 h-3 flex-shrink-0" style={{ color: "#a78bfa" }} />
+                    <span className="truncate">{formatRubles(salesRevenue)}</span>
                   </div>
                 </div>
               </div>
@@ -1153,9 +1153,9 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                     borderWidth: "1.5px"
                   }}
                 >
-                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3 min-w-0">
                     <div
-                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110"
+                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110 flex-shrink-0"
                       style={{
                         background: `linear-gradient(135deg, ${withAlpha("#3b82f6", 0.2)}, ${withAlpha("#3b82f6", 0.05)})`,
                         border: "1px solid",
@@ -1164,12 +1164,12 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                     >
                       <Clock className="w-4 h-4 md:w-5 md:h-5" style={{ color: "#60a5fa" }} />
                     </div>
-                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.8 }}>Активных</span>
+                    <span className="text-[10px] md:text-xs font-black uppercase tracking-wide truncate" style={{ color: textSecondary, opacity: 0.8 }}>Активных</span>
                   </div>
                   <div className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: "#60a5fa" }}>{activeRentals}</div>
                   <div className="mt-1.5 md:mt-2 flex items-center gap-1 text-[10px] md:text-xs" style={{ color: textSecondary, opacity: 0.7 }}>
-                    <Sparkles className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                    Сейчас на выезде
+                    <Sparkles className="w-2.5 h-2.5 md:w-3 md:h-3 flex-shrink-0" />
+                    <span className="truncate">Сейчас на выезде</span>
                   </div>
                 </div>
               </div>
@@ -1192,9 +1192,9 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                     borderWidth: "1.5px"
                   }}
                 >
-                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3 min-w-0">
                     <div
-                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110"
+                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110 flex-shrink-0"
                       style={{
                         background: `linear-gradient(135deg, ${withAlpha(accentMain, 0.2)}, ${withAlpha(accentMain, 0.05)})`,
                         border: "1px solid",
@@ -1203,12 +1203,12 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                     >
                       <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5" style={{ color: accentMain }} />
                     </div>
-                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.8 }}>Завершено</span>
+                    <span className="text-[10px] md:text-xs font-black uppercase tracking-wide truncate" style={{ color: textSecondary, opacity: 0.8 }}>Завершено</span>
                   </div>
                   <div className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: accentMain }}>{completionRate}%</div>
                   <div className="mt-1.5 md:mt-2 flex items-center gap-1 text-[10px] md:text-xs" style={{ color: textSecondary, opacity: 0.7 }}>
-                    <CheckCircle2 className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                    {completedRentals} из {totalRentals}
+                    <CheckCircle2 className="w-2.5 h-2.5 md:w-3 md:h-3 flex-shrink-0" />
+                    <span className="truncate">{completedRentals} из {totalRentals}</span>
                   </div>
                 </div>
               </div>
@@ -1231,9 +1231,9 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                     borderWidth: "1.5px"
                   }}
                 >
-                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3 min-w-0">
                     <div
-                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110"
+                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110 flex-shrink-0"
                       style={{
                         background: `linear-gradient(135deg, ${withAlpha("#f59e0b", 0.2)}, ${withAlpha("#f59e0b", 0.05)})`,
                         border: "1px solid",
@@ -1242,12 +1242,12 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                     >
                       <TrendingUp className="w-4 h-4 md:w-5 md:h-5" style={{ color: "#f59e0b" }} />
                     </div>
-                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.8 }}>КП</span>
+                    <span className="text-[10px] md:text-xs font-black uppercase tracking-wide truncate" style={{ color: textSecondary, opacity: 0.8 }}>КП</span>
                   </div>
                   <div className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: "#f59e0b" }}>{totalProposals}</div>
                   <div className="mt-1.5 md:mt-2 flex items-center gap-1 text-[10px] md:text-xs" style={{ color: textSecondary, opacity: 0.7 }}>
-                    <Zap className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                    {formatRubles(proposalsRevenue)}
+                    <Zap className="w-2.5 h-2.5 md:w-3 md:h-3 flex-shrink-0" />
+                    <span className="truncate">{formatRubles(proposalsRevenue)}</span>
                   </div>
                 </div>
               </div>
@@ -1270,9 +1270,9 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                     borderWidth: "1.5px"
                   }}
                 >
-                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3 min-w-0">
                     <div
-                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110"
+                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110 flex-shrink-0"
                       style={{
                         background: `linear-gradient(135deg, ${withAlpha("#06b6d4", 0.2)}, ${withAlpha("#06b6d4", 0.05)})`,
                         border: "1px solid",
@@ -1281,12 +1281,12 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                     >
                       <ShieldCheck className="w-4 h-4 md:w-5 md:h-5" style={{ color: "#06b6d4" }} />
                     </div>
-                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.8 }}>Субаренда</span>
+                    <span className="text-[10px] md:text-xs font-black uppercase tracking-wide truncate" style={{ color: textSecondary, opacity: 0.8 }}>Субаренда</span>
                   </div>
                   <div className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: "#06b6d4" }}>{totalSubrents}</div>
                   <div className="mt-1.5 md:mt-2 flex items-center gap-1 text-[10px] md:text-xs" style={{ color: textSecondary, opacity: 0.7 }}>
-                    <RefreshCw className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                    {subrentsSummary?.activeCount || 0} активных
+                    <RefreshCw className="w-2.5 h-2.5 md:w-3 md:h-3 flex-shrink-0" />
+                    <span className="truncate">{subrentsSummary?.activeCount || 0} активных</span>
                   </div>
                 </div>
               </div>
