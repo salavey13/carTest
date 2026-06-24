@@ -120,6 +120,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "supabase/migrations/20260601000000_user_rental_secrets.sql",
         "supabase/migrations/20260612000000_fix_rental_contract_artifacts.sql",
         "supabase/migrations/20260617000000_rental_sts_pledge.sql",
+        "supabase/migrations/20260625000000_add_qr_status_tracking.sql",
     ].filter(Boolean), []);
 
     // Sale Docs: Complete sale contract generation flow
@@ -128,14 +129,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "scripts/make-deal-contract-skill.mjs",
         "docs/SALE_DEAL_TEMPLATE.html",
         "supabase/migrations/20260607000000_create_sale_contract_artifacts.sql",
-    ].filter(Boolean), []);
-
-    // Subrent Docs: Complete subrent contract generation flow
-    const docXSubrentFiles = useMemo(() => [
-        "skills/subrent-contract-from-photos/SKILL.md",
-        "scripts/make-subrent-contract-skill.mjs",
-        "docs/SUBRENTAL_DEAL_TEMPLATE.html",
-        "supabase/migrations/20260624000000_create_subrent_contract_artifacts.sql",
     ].filter(Boolean), []);
 
     // Commercial Docs: Complete commercial proposal generation flow
@@ -148,12 +141,26 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     // DocX Core: Core utilities shared across all doc flows
     const docXCoreFiles = useMemo(() => [
         "lib/htmlToDocx.mjs",
+        "lib/htmlToDocx.ts",
+        "app/franchize/lib/docx-capability.ts",
+        "app/franchize/lib/rental-contract-types.ts",
+        "app/franchize/lib/rental-contract-vars.ts",
+        "app/franchize/lib/pricing-calculator.ts",
+        "app/franchize/lib/theme.ts",
+        "app/franchize/lib/theme-resolver.ts",
         "scripts/concat.sh",
         "scripts/codex-notify.mjs",
         "scripts/supabase-access-skill.mjs",
         "scripts/send-document-by-email.mjs",
         "skills/concat-files/SKILL.md",
         "skills/send-document-by-email/SKILL.md",
+    ].filter(Boolean), []);
+
+    // Subrent Docs: Complete subrent contract generation flow
+    // Note: skill/script files not created yet, template exists
+    const docXSubrentFiles = useMemo(() => [
+        "docs/SUBRENTAL_DEAL_TEMPLATE.html",
+        "supabase/migrations/20260624000000_create_subrent_contract_artifacts.sql",
     ].filter(Boolean), []);
 
     // DocX App: App integration (dashboard, API, server actions)

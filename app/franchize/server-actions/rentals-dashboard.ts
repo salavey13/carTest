@@ -39,6 +39,14 @@ export interface RentalDashboardItem {
     renter_full_name: string | null;
     source_rental_id: string | null;
     created_at?: string; // Timestamp for deduplication
+    // QR status tracking fields
+    chat_id?: string | null;  // Initially crew_owner_id, changes to renter_user_id when claimed
+    is_web_app_flow?: boolean | null;
+    qr_generated_at?: string | null;
+    qr_first_viewed_at?: string | null;
+    qr_claimed_at?: string | null;  // Set when renter claims the secret (primary indicator)
+    qr_regeneration_count?: number | null;
+    original_doc_sha256?: string | null;
   } | null;
   // Handoff data from rental_handoffs table
   odometerStart?: number | null;
@@ -288,7 +296,7 @@ export async function getRentalsDashboard(input: {
       // Fetch all secrets ordered by created_at DESC (newest first)
       const { data: secrets } = await privateSchema()
         .from("user_rental_secrets")
-        .select("source_rental_id, doc_sha256, verification_status, renter_full_name, renter_passport, created_at")
+        .select("source_rental_id, doc_sha256, verification_status, renter_full_name, renter_passport, created_at, chat_id, is_web_app_flow, qr_generated_at, qr_first_viewed_at, qr_claimed_at, qr_regeneration_count, original_doc_sha256")
         .in("source_rental_id", rentalIds)
         .order("created_at", { ascending: false });
 
@@ -306,6 +314,13 @@ export async function getRentalsDashboard(input: {
             renter_full_name: secret.renter_full_name,
             source_rental_id: secret.source_rental_id,
             created_at: secret.created_at,
+            chat_id: secret.chat_id,
+            is_web_app_flow: secret.is_web_app_flow,
+            qr_generated_at: secret.qr_generated_at,
+            qr_first_viewed_at: secret.qr_first_viewed_at,
+            qr_claimed_at: secret.qr_claimed_at,
+            qr_regeneration_count: secret.qr_regeneration_count,
+            original_doc_sha256: secret.original_doc_sha256,
           } as RentalDashboardItem["documentSecret"] & { created_at: string });
         }
       }
@@ -1208,7 +1223,7 @@ export async function getRentalsForExport(input: {
         .in("vehicle_id", vehicleIds),
       privateSchema()
         .from("user_rental_secrets")
-        .select("source_rental_id, verification_status, created_at")
+        .select("source_rental_id, verification_status, created_at, chat_id, is_web_app_flow, qr_claimed_at")
         .in("source_rental_id", rentalIds)
         .order("created_at", { ascending: false }), // Latest first for dedupe
     ]);
@@ -1235,6 +1250,7 @@ export async function getRentalsForExport(input: {
       const vehicle = rental.vehicle;
       const user = rental.user;
       const checklist = checklistMap.get(rental.vehicle_id);
+      const docSecret = rental.documentSecret;
 
       return {
         rental_id: rental.rental_id,
@@ -1254,6 +1270,8 @@ export async function getRentalsForExport(input: {
         checklist_status: checklist?.status || "not_started",
         checklist_updated_at: checklist?.updated_at || null,
         document_verified: verifiedSet.has(rental.rental_id),
+        qr_claimed: !!docSecret?.qr_claimed_at,  // qr_claimed_at IS NOT NULL means renter claimed
+        is_web_app_flow: docSecret?.is_web_app_flow || false,
       };
     });
 
@@ -1640,6 +1658,579 @@ export async function getSubrentContractsDashboard(input: {
     };
   } catch (error) {
     console.error("[subrent-dashboard] Error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+// ─── Regenerate QR Code ───────────────────────────────────────────────────────────────
+
+/**
+ * Regenerate QR code for a rental by marking it for regeneration.
+ * This updates the user_rental_secrets row to track regeneration and increment counter.
+ * The actual QR will be regenerated on next access via resend or new document generation.
+ */
+export async function regenerateRentalQr(input: {
+  slug: string;
+  actorUserId: string;
+  rentalId: string;
+  isPasswordAuth?: boolean;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const parsed = z.object({
+      slug: z.string().trim().min(1),
+      actorUserId: z.string().trim().min(1),
+      rentalId: z.string().uuid(),
+      isPasswordAuth: z.boolean().optional(),
+    }).safeParse(input);
+
+    if (!parsed.success) {
+      return { success: false, error: "Некорректный запрос." };
+    }
+
+    const { slug, actorUserId, rentalId, isPasswordAuth = false } = parsed.data;
+
+    // Get crew and verify access
+    const { data: crew, error: crewError } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id")
+      .eq("slug", slug.trim())
+      .maybeSingle();
+
+    if (crewError || !crew) {
+      console.error("[regenerate-qr] Crew not found for slug:", slug);
+      return { success: false, error: "Экипаж не найден." };
+    }
+
+    // Auth check - allow owners, admins, orudjov, and crew members
+    if (!isPasswordAuth) {
+      const userMetadata = (await supabaseAdmin
+        .from("users")
+        .select("metadata, username")
+        .eq("user_id", actorUserId)
+        .maybeSingle()
+      ).data?.metadata as Record<string, unknown> | null;
+
+      const userUsername = (await supabaseAdmin
+        .from("users")
+        .select("username")
+        .eq("user_id", actorUserId)
+        .maybeSingle()
+      ).data?.username as string | null;
+
+      const isAdmin = userMetadata?.role === "admin";
+      const isOwner = crew.owner_id === actorUserId;
+      const isOrudjov = userUsername?.toLowerCase().includes("orud");
+
+      // Check if user is a crew member
+      const { data: crewMember } = await supabaseAdmin
+        .from("crew_members")
+        .select("user_id")
+        .eq("crew_id", crew.id)
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+
+      const isCrewMember = !!crewMember;
+
+      if (!isOwner && !isAdmin && !isOrudjov && !isCrewMember) {
+        return { success: false, error: "Недостаточно прав для регенерации QR." };
+      }
+    }
+
+    // Get the latest document secret for this rental
+    const { data: secret, error: secretError } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("source_rental_id", rentalId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (secretError || !secret) {
+      console.error("[regenerate-qr] Secret not found:", secretError);
+      return { success: false, error: "Документ не найден." };
+    }
+
+    // Update the secret to mark for regeneration
+    // Store original doc_sha256 if not already stored, increment counter
+    const { error: updateError } = await privateSchema()
+      .from("user_rental_secrets")
+      .update({
+        original_doc_sha256: secret.original_doc_sha256 || secret.doc_sha256,
+        qr_regeneration_count: (secret.qr_regeneration_count || 0) + 1,
+        qr_generated_at: new Date().toISOString(),
+        // Reset claim status - user needs to reclaim the regenerated QR
+        qr_claimed_at: null,
+        // Note: We keep chat_id as is (crew owner or current user)
+        // The claim process will update it to the new claimant
+      })
+      .eq("id", secret.id);
+
+    if (updateError) {
+      console.error("[regenerate-qr] Update error:", updateError);
+      return { success: false, error: updateError.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("[regenerate-qr] Error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+// ─── Update Rental Status ───────────────────────────────────────────────────────────
+
+export async function updateRentalStatus(input: {
+  slug: string;
+  actorUserId: string;
+  rentalId: string;
+  status: "pending_confirmation" | "confirmed" | "active" | "completed" | "cancelled" | "disputed";
+  isPasswordAuth?: boolean;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const parsed = z.object({
+      slug: z.string().trim().min(1),
+      actorUserId: z.string().trim().min(1),
+      rentalId: z.string().uuid(),
+      status: z.enum(["pending_confirmation", "confirmed", "active", "completed", "cancelled", "disputed"]),
+      isPasswordAuth: z.boolean().optional(),
+    }).safeParse(input);
+
+    if (!parsed.success) {
+      return { success: false, error: "Некорректный запрос." };
+    }
+
+    const { slug, actorUserId, rentalId, status, isPasswordAuth = false } = parsed.data;
+
+    // Get crew and verify access
+    const { data: crew, error: crewError } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id")
+      .eq("slug", slug.trim())
+      .maybeSingle();
+
+    if (crewError || !crew) {
+      console.error("[update-rental-status] Crew not found for slug:", slug);
+      return { success: false, error: "Экипаж не найден." };
+    }
+
+    // Auth check - allow owners, admins, orudjov, and crew members
+    if (!isPasswordAuth) {
+      const userMetadata = (await supabaseAdmin
+        .from("users")
+        .select("metadata, username")
+        .eq("user_id", actorUserId)
+        .maybeSingle()
+      ).data?.metadata as Record<string, unknown> | null;
+
+      const userUsername = (await supabaseAdmin
+        .from("users")
+        .select("username")
+        .eq("user_id", actorUserId)
+        .maybeSingle()
+      ).data?.username as string | null;
+
+      const isAdmin = userMetadata?.role === "admin";
+      const isOwner = crew.owner_id === actorUserId;
+      const isOrudjov = userUsername?.toLowerCase().includes("orud");
+
+      // Check if user is a crew member
+      const { data: crewMember } = await supabaseAdmin
+        .from("crew_members")
+        .select("user_id")
+        .eq("crew_id", crew.id)
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+
+      const isCrewMember = !!crewMember;
+
+      if (!isOwner && !isAdmin && !isOrudjov && !isCrewMember) {
+        return { success: false, error: "Недостаточно прав для обновления статуса." };
+      }
+    }
+
+    // Update rental status
+    const { error: updateError } = await supabaseAdmin
+      .from("rentals")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("rental_id", rentalId);
+
+    if (updateError) {
+      console.error("[update-rental-status] Update error:", updateError);
+      return { success: false, error: updateError.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("[update-rental-status] Error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+// ─── Send Rental Document via Email ───────────────────────────────────────────────
+
+/**
+ * Send rental contract + QR via email to crew's configured email.
+ * Generates the DOCX contract and QR code, then sends them as email attachments.
+ */
+export async function sendRentalDocByEmail(input: {
+  slug: string;
+  actorUserId: string;
+  rentalId: string;
+  isPasswordAuth?: boolean;
+}): Promise<{ success: boolean; data?: { email: string; messageId?: string }; error?: string }> {
+  try {
+    const parsed = z.object({
+      slug: z.string().trim().min(1),
+      actorUserId: z.string().trim().min(1),
+      rentalId: z.string().uuid(),
+      isPasswordAuth: z.boolean().optional(),
+    }).safeParse(input);
+
+    if (!parsed.success) {
+      return { success: false, error: "Некорректный запрос." };
+    }
+
+    const { slug, actorUserId, rentalId, isPasswordAuth = false } = parsed.data;
+
+    // Get crew and verify access
+    const { data: crew, error: crewError } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id, slug, name, metadata")
+      .eq("slug", slug.trim())
+      .maybeSingle();
+
+    if (crewError || !crew) {
+      console.error("[send-doc-email] Crew not found for slug:", slug);
+      return { success: false, error: "Экипаж не найден." };
+    }
+
+    // Auth check - allow owners, admins, orudjov, and crew members
+    if (!isPasswordAuth) {
+      const userMetadata = (await supabaseAdmin
+        .from("users")
+        .select("metadata, username")
+        .eq("user_id", actorUserId)
+        .maybeSingle()
+      ).data?.metadata as Record<string, unknown> | null;
+
+      const userUsername = (await supabaseAdmin
+        .from("users")
+        .select("username")
+        .eq("user_id", actorUserId)
+        .maybeSingle()
+      ).data?.username as string | null;
+
+      const isAdmin = userMetadata?.role === "admin";
+      const isOwner = crew.owner_id === actorUserId;
+      const isOrudjov = userUsername?.toLowerCase().includes("orud");
+
+      // Check if user is a crew member
+      const { data: crewMember } = await supabaseAdmin
+        .from("crew_members")
+        .select("user_id")
+        .eq("crew_id", crew.id)
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+
+      const isCrewMember = !!crewMember;
+
+      if (!isOwner && !isAdmin && !isOrudjov && !isCrewMember) {
+        return { success: false, error: "Недостаточно прав для отправки." };
+      }
+    }
+
+    // Get crew email from metadata
+    const crewMetadata = crew.metadata as Record<string, unknown> | null;
+    const contactsEmail = crewMetadata?.franchize?.contacts?.email as string | undefined;
+    let recipientEmail = contactsEmail;
+
+    // Fallback: try owner's user email
+    if (!recipientEmail && crew.owner_id) {
+      const { data: owner } = await supabaseAdmin
+        .from("users")
+        .select("metadata")
+        .eq("user_id", crew.owner_id)
+        .maybeSingle();
+
+      if (owner?.metadata) {
+        const ownerMetadata = owner.metadata as Record<string, unknown>;
+        recipientEmail = ownerMetadata.email as string | undefined;
+      }
+    }
+
+    if (!recipientEmail) {
+      return { success: false, error: "Email экипажа не настроен. Укажите email в настройках экипажа." };
+    }
+
+    // Get rental details
+    const { data: rental, error: rentalError } = await supabaseAdmin
+      .from("rentals")
+      .select(`
+        rental_id,
+        agreed_start_date,
+        agreed_end_date,
+        total_cost,
+        vehicle:cars!inner(id, make, model, specs, type, crew_id),
+        user:users!rentals_user_id_fkey(user_id, full_name, username)
+      `)
+      .eq("rental_id", rentalId)
+      .maybeSingle();
+
+    if (rentalError || !rental) {
+      return { success: false, error: "Аренда не найдена." };
+    }
+
+    // Get document secret
+    const { data: secret } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("source_rental_id", rentalId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!secret) {
+      return { success: false, error: "Документ не найден. Необходимо создать договор." };
+    }
+
+    // Generate DOCX contract
+    const { buildFranchizeDocxFromTemplate } = await import("@/app/franchize/lib/docx-capability");
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+
+    const vehicle = rental.vehicle as any;
+    const renter = rental.user as any;
+    const secretData = secret as any;
+
+    const now = new Date();
+    const vars: Record<string, string> = {
+      contract_number: `${now.getDate()}.${now.getMonth() + 1}/${vehicle.id}`,
+      day: String(now.getDate()).padStart(2, "0"),
+      month: now.toLocaleString("ru-RU", { month: "long" }),
+      month_num: String(now.getMonth() + 1).padStart(2, "0"),
+      year: String(now.getFullYear()),
+      renter_full_name: secretData.renter_full_name || renter?.full_name || "",
+      renter_birth_date: secretData.renter_birth_date || "",
+      renter_phone: secretData.renter_phone || "",
+      renter_email: secretData.renter_email || "",
+      renter_address: secretData.renter_address || secretData.renter_registration || "",
+      renter_driver_license: secretData.renter_driver_license || "",
+      renter_passport: secretData.renter_passport || "",
+      renter_passport_issue_date: secretData.renter_passport_issue_date || "",
+      renter_registration: secretData.renter_registration || "",
+      bike_make_model: `${vehicle.make || ""} ${vehicle.model || ""}`.trim(),
+      bike_make: vehicle.make || "уточняется",
+      bike_model: vehicle.model || "уточняется",
+      bike_vin: vehicle.specs?.vin || vehicle.specs?.frame || "уточняется",
+      bike_category: vehicle.specs?.category || "A/L3",
+      rent_start_date: rental.agreed_start_date?.split("T")[0] || now.toISOString().split("T")[0],
+      rent_end_date: rental.agreed_end_date?.split("T")[0] || now.toISOString().split("T")[0],
+      daily_price_rub: String(rental.total_cost || "10000"),
+      deposit_rub: String(vehicle.specs?.deposit_rub || "20000"),
+      document_key: secretData.source_doc_key || `rental-${vehicle.id}-${Date.now()}`,
+      bike_vehicle_type_label: vehicle.type === "ebike" ? "ЭЛЕКТРОМОТОЦИКЛА" : "МОТОЦИКЛА",
+      bike_plate: vehicle.specs?.plate || "уточняется",
+      bike_color: vehicle.specs?.color || "уточняется",
+      bike_year: vehicle.specs?.year || "уточняется",
+      signature_timestamp: now.toLocaleString("ru-RU"),
+      renter_signature: "электронная отправка",
+    };
+
+    // Load rental HTML template
+    const templatePath = join(process.cwd(), "docs", "RENTAL_DEAL_TEMPLATE.html");
+    let htmlTemplate: string;
+    try {
+      htmlTemplate = readFileSync(templatePath, "utf8");
+    } catch (readErr) {
+      console.error("[send-doc-email] Failed to read rental HTML template", readErr);
+      return { success: false, error: "Шаблон договора не найден." };
+    }
+
+    const docFileName = `rental-contract-${vehicle.make}-${vehicle.model}-${now.toISOString().split("T")[0]}.docx`
+      .replace(/[^a-zA-Zа-яА-Я0-9.\-]/g, "-")
+      .replace(/-+/g, "-");
+
+    // Generate DOCX
+    const docResult = await buildFranchizeDocxFromTemplate({
+      integrationScope: "dashboard-rental-email",
+      uploadedBy: "dashboard",
+      documentKey: vars.document_key,
+      fileName: docFileName,
+      template: htmlTemplate,
+      variables: vars,
+      flowType: "rental",
+      templateMode: "html",
+    });
+
+    const docxBuf = docResult.bytes;
+    const docSha256 = docResult.sha256;
+
+    // Generate QR code
+    const botUsername = crewMetadata?.franchize?.contacts?.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot";
+    const qrDeepLink = `https://t.me/${botUsername}/app?startapp=rent_${vehicle.id}_${docSha256}`;
+    const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
+
+    let qrPngBuffer: Buffer | null = null;
+    try {
+      const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
+      if (qrRes.ok) {
+        qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
+      }
+    } catch {}
+
+    // Configure SMTP
+    const SMTP_HOST = process.env.SMTP_YANDEX_HOST || process.env.SMTP_GMAIL_HOST || "smtp.yandex.ru";
+    const SMTP_PORT = Number(process.env.SMTP_YANDEX_PORT || process.env.SMTP_GMAIL_PORT) || 465;
+    const SMTP_USER = process.env.SMTP_YANDEX_USER || process.env.SMTP_GMAIL_USER;
+    const SMTP_PASS = process.env.SMTP_YANDEX_PASS || process.env.SMTP_GMAIL_PASS;
+    const EMAIL_FROM = process.env.EMAIL_FROM || SMTP_USER;
+
+    if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
+      console.error("[send-doc-email] SMTP configuration missing");
+      return { success: false, error: "Email service not configured" };
+    }
+
+    // Import nodemailer dynamically (server-only)
+    const nodemailer = await import("nodemailer");
+
+    // Create transporter
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS,
+      },
+    });
+
+    // Verify connection
+    try {
+      await transporter.verify();
+    } catch (verifyErr) {
+      console.error("[send-doc-email] SMTP verification failed:", verifyErr);
+      return { success: false, error: "Email authentication failed" };
+    }
+
+    // Prepare attachments
+    const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [
+      {
+        filename: docFileName,
+        content: docxBuf,
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      },
+    ];
+
+    if (qrPngBuffer) {
+      attachments.push({
+        filename: `qr-${vehicle.id}.png`,
+        content: qrPngBuffer,
+        contentType: "image/png",
+      });
+    }
+
+    // Format dates for email
+    const formatDate = (dateStr: string) => {
+      if (!dateStr) return "—";
+      const d = new Date(dateStr);
+      return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
+    };
+
+    // Send email
+    const mailOptions = {
+      from: `${crew.name} <${EMAIL_FROM}>`,
+      to: recipientEmail,
+      subject: `Договор аренды: ${vehicle.make} ${vehicle.model} — ${secretData.renter_full_name || renter?.full_name}`,
+      text: `Здравствуйте!
+
+Во вложении находится договор аренды и QR-код для быстрого доступа.
+
+Техника: ${vehicle.make} ${vehicle.model}
+Клиент: ${secretData.renter_full_name || renter?.full_name || "—"}
+Период: ${formatDate(rental.agreed_start_date)} — ${formatDate(rental.agreed_end_date)}
+Стоимость: ${rental.total_cost} ₽
+
+QR-код для быстрой аренды:
+${qrDeepLink}
+
+---
+С уважением,
+${crew.name}`,
+      html: `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
+    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+    .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+    .info-label { font-weight: 600; color: #666; }
+    .info-value { font-weight: bold; color: #333; }
+    .qr-section { text-align: center; margin: 20px 0; padding: 20px; background: white; border-radius: 8px; border: 2px dashed #667eea; }
+    .footer { margin-top: 20px; font-size: 12px; color: #666; text-align: center; }
+    .attachment-hint { background: #e3f2fd; padding: 15px; border-radius: 6px; margin: 20px 0; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📄 Договор аренды</h1>
+    </div>
+    <div class="content">
+      <h2 style="color: #667eea;">${vehicle.make} ${vehicle.model}</h2>
+
+      <div class="info-row">
+        <span class="info-label">Клиент:</span>
+        <span class="info-value">${secretData.renter_full_name || renter?.full_name || "—"}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Период:</span>
+        <span class="info-value">${formatDate(rental.agreed_start_date)} — ${formatDate(rental.agreed_end_date)}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Стоимость:</span>
+        <span class="info-value">${rental.total_cost} ₽</span>
+      </div>
+
+      <div class="attachment-hint">
+        📎 Договор и QR-код во вложениях
+      </div>
+
+      <div class="qr-section">
+        <p style="margin: 0 0 10px 0; color: #666;">QR-код для быстрой аренды:</p>
+        <a href="${qrDeepLink}" style="color: #667eea; font-weight: bold; word-break: break-all;">${qrDeepLink}</a>
+      </div>
+    </div>
+    <div class="footer">
+      <p>С уважением,<br>${crew.name}</p>
+    </div>
+  </div>
+</body>
+</html>`,
+      attachments,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+
+    console.log("[send-doc-email] Email sent:", info.messageId);
+
+    return {
+      success: true,
+      data: { email: recipientEmail, messageId: info.messageId },
+    };
+  } catch (error) {
+    console.error("[send-doc-email] Error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),

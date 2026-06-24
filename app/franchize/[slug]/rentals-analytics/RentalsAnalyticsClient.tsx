@@ -20,6 +20,12 @@ import {
   TrendingUp,
   Zap,
   Eye,
+  QrCode,
+  Edit,
+  MoreVertical,
+  Phone,
+  Globe,
+  Mail,
 } from "lucide-react";
 
 import { useAppContext } from "@/contexts/AppContext";
@@ -31,6 +37,9 @@ import {
   validateAnalyticsPassword,
   getCommercialProposalsDashboard,
   getSubrentContractsDashboard,
+  updateRentalStatus,
+  regenerateRentalQr,
+  sendRentalDocByEmail,
   type RentalDashboardItem,
   type RentalDashboardSummary,
   type SaleDashboardItem,
@@ -140,6 +149,13 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const [handoffModalOpen, setHandoffModalOpen] = useState(false);
   const [handoffModalPhase, setHandoffModalPhase] = useState<"handout" | "return">("handout");
   const [handoffModalRental, setHandoffModalRental] = useState<RentalDashboardItem | null>(null);
+
+  // Rental status change state
+  const [statusChangeModalOpen, setStatusChangeModalOpen] = useState(false);
+  const [statusChangeRental, setStatusChangeRental] = useState<RentalDashboardItem | null>(null);
+  const [updatingRentalStatus, setUpdatingRentalStatus] = useState<string | null>(null);
+  const [regeneratingQr, setRegeneratingQr] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
 
   // Password auth
   const [showPasswordEntry, setShowPasswordEntry] = useState(false);
@@ -412,6 +428,90 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     const date = new Date(selectedDate);
     date.setDate(date.getDate() + delta);
     setSelectedDate(date.toISOString().split("T")[0]);
+  };
+
+  // Handle rental status change
+  const handleStatusChange = async (rental: RentalDashboardItem, newStatus: RentalDashboardItem["status"]) => {
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
+
+    setUpdatingRentalStatus(rental.rental_id);
+    try {
+      const result = await updateRentalStatus({
+        slug: initialSlug?.trim() || "vip-bike",
+        actorUserId,
+        rentalId: rental.rental_id,
+        status: newStatus,
+        isPasswordAuth: !!passwordAuthOwnerId,
+      });
+
+      if (result.success) {
+        toast.success(`Статус изменён на ${newStatus}`);
+        await loadRentals(selectedDate, true);
+      } else {
+        toast.error(result.error || "Не удалось изменить статус");
+      }
+    } catch (error) {
+      console.error("[Status change] Error:", error);
+      toast.error("Ошибка изменения статуса");
+    } finally {
+      setUpdatingRentalStatus(null);
+    }
+  };
+
+  // Handle QR regeneration
+  const handleQrRegeneration = async (rental: RentalDashboardItem) => {
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
+
+    setRegeneratingQr(rental.rental_id);
+    try {
+      const result = await regenerateRentalQr({
+        slug: initialSlug?.trim() || "vip-bike",
+        actorUserId,
+        rentalId: rental.rental_id,
+        isPasswordAuth: !!passwordAuthOwnerId,
+      });
+
+      if (result.success) {
+        toast.success("QR код будет перегенерирован");
+        await loadRentals(selectedDate, true);
+      } else {
+        toast.error(result.error || "Не удалось перегенерировать QR");
+      }
+    } catch (error) {
+      console.error("[QR regeneration] Error:", error);
+      toast.error("Ошибка регенерации QR");
+    } finally {
+      setRegeneratingQr(null);
+    }
+  };
+
+  // Handle email sending
+  const handleSendEmail = async (rental: RentalDashboardItem) => {
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
+
+    setSendingEmail(rental.rental_id);
+    try {
+      const result = await sendRentalDocByEmail({
+        slug: initialSlug?.trim() || "vip-bike",
+        actorUserId,
+        rentalId: rental.rental_id,
+        isPasswordAuth: !!passwordAuthOwnerId,
+      });
+
+      if (result.success) {
+        toast.success(`Отправлено на ${result.data?.email || "email"}`);
+      } else {
+        toast.error(result.error || "Не удалось отправить email");
+      }
+    } catch (error) {
+      console.error("[Send email] Error:", error);
+      toast.error("Ошибка отправки email");
+    } finally {
+      setSendingEmail(null);
+    }
   };
 
   const exportToExcel = async () => {
@@ -1497,6 +1597,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                         <th className="px-3 md:px-5 py-2 md:py-3 text-left text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.7 }}>Клиент / Техника</th>
                         <th className="px-3 md:px-5 py-2 md:py-3 text-right text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.7 }}>Сумма</th>
                         <th className="px-3 md:px-5 py-2 md:py-3 text-center text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.7 }}>Статус</th>
+                        <th className="px-3 md:px-5 py-2 md:py-3 text-center text-[10px] md:text-xs font-black uppercase tracking-widest hidden sm:table-cell" style={{ color: textSecondary, opacity: 0.7 }}>QR</th>
                         <th className="px-3 md:px-5 py-2 md:py-3 text-center text-[10px] md:text-xs font-black uppercase tracking-widest hidden sm:table-cell" style={{ color: textSecondary, opacity: 0.7 }}>Док</th>
                         <th className="px-3 md:px-5 py-2 md:py-3 text-center text-[10px] md:text-xs font-black uppercase tracking-widest hidden md:table-cell" style={{ color: textSecondary, opacity: 0.7 }}>Одометр</th>
                         <th className="px-3 md:px-5 py-2 md:py-3 text-center text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.7 }}>Действия</th>
@@ -1549,6 +1650,27 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                               </span>
                             </td>
                             <td className="px-3 md:px-5 py-3 md:py-4 text-center hidden sm:table-cell">
+                              {rental.documentSecret ? (
+                                <div className="flex items-center justify-center gap-1">
+                                  {rental.documentSecret.is_web_app_flow ? (
+                                    <div className="flex items-center gap-1" title="Web App Flow">
+                                      <Globe className="w-3 h-3 md:w-3.5 md:h-3.5" style={{ color: "#3b82f6" }} />
+                                    </div>
+                                  ) : rental.documentSecret.qr_claimed_at ? (
+                                    <div className="flex items-center gap-1" title="QR claimed by renter">
+                                      <QrCode className="w-3 h-3 md:w-3.5 md:h-3.5" style={{ color: "#10b981" }} />
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1" title="QR not claimed yet">
+                                      <QrCode className="w-3 h-3 md:w-3.5 md:h-3.5 opacity-40" style={{ color: textSecondary }} />
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span style={{ color: borderSoft }}>—</span>
+                              )}
+                            </td>
+                            <td className="px-3 md:px-5 py-3 md:py-4 text-center hidden sm:table-cell">
                               <span className="text-base md:text-lg font-bold" style={{ color: rental.documentSecret ? "#34d399" : borderSoft }}>
                                 {rental.documentSecret ? "✓" : "—"}
                               </span>
@@ -1563,7 +1685,8 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                               )}
                             </td>
                             <td className="px-3 md:px-5 py-3 md:py-4 text-center">
-                              <div className="flex items-center justify-center gap-1 md:gap-1.5">
+                              <div className="flex items-center justify-center gap-1 md:gap-1.5 flex-wrap">
+                                {/* Handout button */}
                                 <button
                                   onClick={() => {
                                     setHandoffModalRental(rental);
@@ -1592,6 +1715,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                                   )}
                                   <span className="relative z-10">→</span>
                                 </button>
+                                {/* Return button */}
                                 <button
                                   onClick={() => {
                                     setHandoffModalRental(rental);
@@ -1620,6 +1744,72 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                                   )}
                                   <span className="relative z-10">←</span>
                                 </button>
+                                {/* QR Regenerate button */}
+                                {rental.documentSecret && (
+                                  <button
+                                    onClick={() => void handleQrRegeneration(rental)}
+                                    disabled={regeneratingQr === rental.rental_id}
+                                    className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group disabled:opacity-50"
+                                    style={{
+                                      backgroundColor: regeneratingQr === rental.rental_id
+                                        ? withAlpha("#f59e0b", 0.25)
+                                        : withAlpha("#f59e0b", 0.15),
+                                      borderColor: withAlpha("#f59e0b", 0.4),
+                                      color: "#f59e0b",
+                                      border: "1.5px solid"
+                                    }}
+                                  >
+                                    {regeneratingQr === rental.rental_id ? (
+                                      <RefreshCw className="w-3 h-3 md:w-3.5 md:h-3.5 animate-spin relative z-10" />
+                                    ) : (
+                                      <QrCode className="w-3 h-3 md:w-3.5 md:h-3.5 relative z-10" />
+                                    )}
+                                  </button>
+                                )}
+                                {/* Status change button */}
+                                <button
+                                  onClick={() => {
+                                    setStatusChangeRental(rental);
+                                    setStatusChangeModalOpen(true);
+                                  }}
+                                  disabled={updatingRentalStatus === rental.rental_id}
+                                  className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group disabled:opacity-50"
+                                  style={{
+                                    backgroundColor: withAlpha(accentMain, 0.15),
+                                    borderColor: withAlpha(accentMain, 0.4),
+                                    color: accentMain,
+                                    border: "1.5px solid"
+                                  }}
+                                >
+                                  {updatingRentalStatus === rental.rental_id ? (
+                                    <RefreshCw className="w-3 h-3 md:w-3.5 md:h-3.5 animate-spin relative z-10" />
+                                  ) : (
+                                    <Edit className="w-3 h-3 md:w-3.5 md:h-3.5 relative z-10" />
+                                  )}
+                                </button>
+                                {/* Email button */}
+                                {rental.documentSecret && (
+                                  <button
+                                    onClick={() => void handleSendEmail(rental)}
+                                    disabled={sendingEmail === rental.rental_id}
+                                    className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group disabled:opacity-50 hidden sm:block"
+                                    style={{
+                                      backgroundColor: sendingEmail === rental.rental_id
+                                        ? withAlpha("#06b6d4", 0.25)
+                                        : withAlpha("#06b6d4", 0.15),
+                                      borderColor: withAlpha("#06b6d4", 0.4),
+                                      color: "#06b6d4",
+                                      border: "1.5px solid"
+                                    }}
+                                    title="Отправить на email"
+                                  >
+                                    {sendingEmail === rental.rental_id ? (
+                                      <RefreshCw className="w-3 h-3 md:w-3.5 md:h-3.5 animate-spin relative z-10" />
+                                    ) : (
+                                      <Mail className="w-3 h-3 md:w-3.5 md:h-3.5 relative z-10" />
+                                    )}
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1869,6 +2059,114 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
           isPasswordAuth={!!passwordAuthOwnerId}
           crewTheme={crew.theme}
         />
+      )}
+
+      {/* Status Change Modal */}
+      {statusChangeModalOpen && statusChangeRental && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 backdrop-blur-sm"
+            style={{ backgroundColor: withAlpha("#000000", 0.5) }}
+            onClick={() => setStatusChangeModalOpen(false)}
+          />
+
+          {/* Modal */}
+          <div
+            className="relative rounded-2xl p-6 max-w-sm w-full"
+            style={{
+              backgroundColor: bgCard,
+              borderColor: withAlpha(borderSoft, 0.5),
+              borderWidth: "1px",
+              boxShadow: `0 20px 60px ${withAlpha("#000000", 0.3)}`,
+            }}
+          >
+            <h3 className="text-lg font-black mb-4" style={{ color: textPrimary }}>
+              Изменить статус
+            </h3>
+            <p className="text-sm mb-4" style={{ color: textSecondary }}>
+              {statusChangeRental.vehicle?.make} {statusChangeRental.vehicle?.model}
+              <br />
+              <span className="text-xs">{statusChangeRental.user?.full_name || statusChangeRental.user?.username}</span>
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {([
+                { value: "pending_confirmation", label: "Ожидает", icon: AlertCircle, color: "#fbbf24" },
+                { value: "confirmed", label: "Подтв.", icon: CheckCircle2, color: "#34d399" },
+                { value: "active", label: "Активна", icon: Clock, color: "#60a5fa" },
+                { value: "completed", label: "Завершена", icon: CheckCircle2, color: "#4ade80" },
+                { value: "cancelled", label: "Отменена", icon: XCircle, color: "#f87171" },
+                { value: "disputed", label: "Спор", icon: AlertCircle, color: "#ef4444" },
+              ] as const).map((status) => {
+                const Icon = status.icon;
+                const isSelected = statusChangeRental?.status === status.value;
+                const isUpdating = updatingRentalStatus === statusChangeRental.rental_id;
+
+                return (
+                  <button
+                    key={status.value}
+                    onClick={() => void handleStatusChange(statusChangeRental, status.value)}
+                    disabled={isUpdating}
+                    className="relative px-3 py-2 rounded-lg text-xs font-bold transition-all duration-300 disabled:opacity-50 overflow-hidden"
+                    style={
+                      isSelected
+                        ? {
+                            backgroundColor: `linear-gradient(135deg, ${withAlpha(status.color, 0.25)}, ${withAlpha(status.color, 0.15)})`,
+                            borderColor: withAlpha(status.color, 0.4),
+                            color: status.color,
+                            borderWidth: "1.5px",
+                            boxShadow: `0 0 15px ${withAlpha(status.color, 0.2)}`
+                          }
+                        : {
+                            backgroundColor: withAlpha(bgCard, 0.6),
+                            borderColor: borderSoft,
+                            color: textSecondary,
+                            borderWidth: "1px"
+                          }
+                    }
+                    onMouseEnter={(e) => {
+                      if (!isSelected && !isUpdating) {
+                        e.currentTarget.style.borderColor = status.color;
+                        e.currentTarget.style.color = status.color;
+                        e.currentTarget.style.backgroundColor = withAlpha(status.color, 0.1);
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected && !isUpdating) {
+                        e.currentTarget.style.borderColor = borderSoft;
+                        e.currentTarget.style.color = textSecondary;
+                        e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.6);
+                      }
+                    }}
+                  >
+                    {isUpdating ? (
+                      <RefreshCw className="w-4 h-4 mx-auto animate-spin" style={{ color: status.color }} />
+                    ) : (
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Icon className="w-3.5 h-3.5" style={{ color: isSelected ? status.color : textSecondary }} />
+                        <span>{status.label}</span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setStatusChangeModalOpen(false)}
+              className="w-full px-4 py-2 rounded-lg text-sm font-bold transition-all"
+              style={{
+                backgroundColor: withAlpha(borderSoft, 0.2),
+                color: textSecondary,
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = withAlpha(borderSoft, 0.3)}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = withAlpha(borderSoft, 0.2)}
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

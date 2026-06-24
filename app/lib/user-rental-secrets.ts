@@ -276,6 +276,7 @@ export async function claimRentalSecretsByDocSha(
       .from("user_rental_secrets")
       .update({
         chat_id: normalizedChatId,
+        qr_claimed_at: new Date().toISOString(),  // Track when renter claimed
         updated_at: new Date().toISOString(),
       })
       .eq("doc_sha256", normalizedDocSha256)
