@@ -1028,7 +1028,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
         </header>
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto overflow-x-visible">
           <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 space-y-4 md:space-y-6">
 
             {/* STATS ROW */}
@@ -1293,7 +1293,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
             </div>
 
             {/* FILTER BAR */}
-            <div className="flex items-center gap-2 md:gap-3 overflow-x-auto pb-2 px-1">
+            <div className="flex items-center gap-2 md:gap-3 overflow-x-visible pb-2 px-1 flex-wrap">
               <span className="text-[10px] md:text-xs font-black uppercase tracking-widest whitespace-nowrap" style={{ color: textSecondary, opacity: 0.7 }}>Фильтр:</span>
               {[
                 { value: "all", label: "Все", icon: Eye },
