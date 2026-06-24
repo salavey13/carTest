@@ -1032,7 +1032,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
           <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 space-y-4 md:space-y-6">
 
             {/* STATS ROW */}
-            <div className="grid grid-cols-2 lg:grid-cols-7 gap-2 md:gap-3 lg:gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 md:gap-3 lg:gap-4">
               {/* Total rentals */}
               <div className="relative group">
                 <div
