@@ -3,7 +3,7 @@
 import React from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { FileNode } from '../RepoTxtFetcher'; // Import FileNode interface
+import { FileNode } from '@/contexts/RepoXmlPageContext';
 
 interface SelectedFilesPreviewProps {
     selectedFiles: Set<string>;
