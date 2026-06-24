@@ -870,8 +870,8 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
       <div className="relative z-10 h-screen flex flex-col">
         {/* HEADER */}
-        <header className="flex-shrink-0 px-4 md:px-6 py-3 md:py-4 border-b backdrop-blur-xl" style={{ borderColor: withAlpha(borderSoft, 0.5), backgroundColor: withAlpha(bgCard, 0.5) }}>
-          <div className="flex items-center justify-between max-w-7xl mx-auto gap-4">
+        <header className="flex-shrink-0 px-2 md:px-4 py-2 md:py-3 border-b relative z-10" style={{ borderColor: withAlpha(borderSoft, 0.5), backgroundColor: withAlpha(bgCard, 0.5) }}>
+          <div className="flex items-center justify-between gap-2 md:gap-4">
             {/* Left section */}
             <div className="flex items-center gap-4 md:gap-6 min-w-0">
               <div className="min-w-0">
@@ -928,7 +928,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
               {datePickerOpen && (
                 <div
                   ref={datePickerRef}
-                  className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-[9999] rounded-xl md:rounded-2xl border shadow-2xl p-3 md:p-4"
+                  className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-[100000] rounded-xl md:rounded-2xl border shadow-2xl p-3 md:p-4"
                   style={{
                     backgroundColor: bgCard,
                     borderColor: withAlpha(accentMain, 0.3),
@@ -1028,7 +1028,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
         </header>
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 overflow-y-auto overflow-x-visible">
+        <main className="flex-1 overflow-y-auto overflow-x-visible relative z-0">
           <div className="w-full px-2 md:px-4 py-4 md:py-6 space-y-4 md:space-y-6">
 
             {/* STATS ROW */}
