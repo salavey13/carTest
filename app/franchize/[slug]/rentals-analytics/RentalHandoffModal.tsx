@@ -115,8 +115,9 @@ export function RentalHandoffModal({
   const { dbUser, passwordAuthOwnerId } = useAppContext();
   const actorUserId = dbUser?.user_id || passwordAuthOwnerId || "";
 
-  // Get theme colors
-  const cssVars = crewTheme ? useFranchizeTheme(crewTheme).cssVars : {
+  // Get theme colors - always call the hook, then conditionally use the value
+  const themeResult = useFranchizeTheme(crewTheme || {});
+  const cssVars = crewTheme ? themeResult.cssVars : {
     backgroundColor: "#0A0A0A",
     cardBackground: "#1A1A1A",
     accentColor: "#FFD700",
