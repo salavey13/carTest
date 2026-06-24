@@ -79,7 +79,7 @@ const FEATURED_BIKES = [
   },
   {
     id: "nibbler-regumoto-4v",
-    make: "Regulmoto",
+    make: "Regumoto",
     model: "Nibbler 300 4V",
     dailyPrice: 6000,
     imageUrl:
@@ -116,20 +116,20 @@ export function BikeShowcase() {
     <section id="catalog" className="py-20 px-4" style={{ backgroundColor: "#0A0A0A" }}>
       <div className="container mx-auto max-w-6xl">
         {/* Section header */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-12 md:mb-16">
           <h2
-            className="text-4xl md:text-5xl font-bold mb-4"
+            className="text-3xl md:text-4xl lg:text-5xl font-black mb-4 tracking-tight"
             style={{ color: "#FFD700" }}
           >
             Наши байки
           </h2>
           {/* Filter buttons */}
-          <div className="flex justify-center gap-3 mb-4">
+          <div className="flex justify-center gap-2 md:gap-3 mb-4">
             {filterButtons.map(({ key, label, color }) => (
               <button
                 key={key}
                 onClick={() => setFilter(key)}
-                className="px-6 py-2 rounded-full font-semibold text-sm transition-all hover:scale-105"
+                className="px-5 md:px-6 py-2 rounded-full font-bold text-sm transition-all hover:scale-105"
                 style={{
                   backgroundColor: filter === key ? color : "transparent",
                   color: filter === key ? "#0A0A0A" : color,
@@ -141,13 +141,13 @@ export function BikeShowcase() {
               </button>
             ))}
           </div>
-          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+          <p className="text-gray-400 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
             Электрические и бензиновые мотоциклы для аренды и тест-драйва
           </p>
         </div>
 
         {/* Bike grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-12">
           {filteredBikes.map((bike) => (
             <Link
               key={bike.id}
@@ -182,7 +182,7 @@ export function BikeShowcase() {
                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                         </svg>
-                        <span style={{ color: "#38BDF8" }}>ЭЛЕКТРО</span>
+                        <span>ЭЛЕКТРО</span>
                       </div>
                     ) : (
                       <div
@@ -204,20 +204,20 @@ export function BikeShowcase() {
                 </div>
 
                 {/* Content */}
-                <div className="p-5 space-y-3">
+                <div className="p-4 md:p-5 space-y-3">
                   <h3
-                    className="text-lg font-bold"
+                    className="text-base md:text-lg font-black tracking-tight leading-tight"
                     style={{ color: "#FFFAF0" }}
                   >
                     {bike.make} {bike.model}
                   </h3>
 
                   {/* Specs */}
-                  <div className="space-y-1 text-sm">
+                  <div className="space-y-1.5 text-sm">
                     {Object.entries(bike.specs).map(([key, value]) => (
-                      <div key={key} className="flex justify-between">
-                        <span className="text-gray-400">{bike.specLabels[key]}:</span>
-                        <span className="font-medium" style={{ color: "#D4AF37" }}>
+                      <div key={key} className="flex justify-between items-baseline">
+                        <span className="text-gray-400 text-xs md:text-sm">{bike.specLabels[key]}:</span>
+                        <span className="font-semibold" style={{ color: "#D4AF37" }}>
                           {value}
                         </span>
                       </div>
@@ -227,25 +227,25 @@ export function BikeShowcase() {
                   {/* Price */}
                   <div className="pt-3 border-t border-gray-700">
                     {bike.pricingType === "hourly" ? (
-                      <>
+                      <div className="flex items-baseline gap-2">
                         <span
-                          className="text-xl font-bold"
+                          className="text-lg md:text-xl font-black"
                           style={{ color: "#FFD700" }}
                         >
                           {formatPrice(bike.hourlyPrice)} ₽
                         </span>
-                        <span className="text-gray-400 text-sm"> / час (от {bike.minHours} ч)</span>
-                      </>
+                        <span className="text-gray-400 text-xs md:text-sm"> / час (от {bike.minHours} ч)</span>
+                      </div>
                     ) : (
-                      <>
+                      <div className="flex items-baseline gap-2">
                         <span
-                          className="text-xl font-bold"
+                          className="text-lg md:text-xl font-black"
                           style={{ color: "#FFD700" }}
                         >
                           {formatPrice(bike.dailyPrice)} ₽
                         </span>
-                        <span className="text-gray-400 text-sm"> / сутки</span>
-                      </>
+                        <span className="text-gray-400 text-xs md:text-sm"> / сутки</span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -258,7 +258,7 @@ export function BikeShowcase() {
         <div className="text-center">
           <Link
             href={CATALOG_HREF}
-            className="inline-block px-8 py-4 rounded-lg font-semibold text-lg transition-transform hover:scale-105"
+            className="inline-block px-6 md:px-8 py-3 md:py-4 rounded-lg font-bold text-base md:text-lg transition-transform hover:scale-105"
             style={{
               backgroundColor: "#FFD700",
               color: "#0A0A0A",
