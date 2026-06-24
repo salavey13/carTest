@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { FaMotorcycle, FaUser, FaPassport, FaCalendar, FaMoneyBillWave, FaClock, FaCheckCircle } from "react-icons/fa6";
+import { FaMotorcycle, FaUser, FaPassport, FaCalendar, FaMoneyBillWave, FaClock, FaCircleCheck } from "react-icons/fa6";
 import { createSubrentContract, getAvailableBikes, type SubrentFormData } from "../actions";
 
 type FormStep = "bike" | "owner" | "payment" | "duration" | "confirm" | "success";
@@ -521,7 +521,7 @@ export function SubrentForm() {
   const renderConfirmStep = () => (
     <div className="space-y-4">
       <div className="flex items-center gap-3 mb-4">
-        <FaCheckCircle className="text-3xl text-brand-green" />
+        <FaCircleCheck className="text-3xl text-brand-green" />
         <h3 className="text-xl font-orbitron text-brand-green">Подтверждение</h3>
       </div>
 
@@ -575,7 +575,7 @@ export function SubrentForm() {
         className="flex justify-center"
       >
         <div className="w-20 h-20 rounded-full bg-brand-green/20 flex items-center justify-center">
-          <FaCheckCircle className="text-5xl text-brand-green" />
+          <FaCircleCheck className="text-5xl text-brand-green" />
         </div>
       </motion.div>
 
