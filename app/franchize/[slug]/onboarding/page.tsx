@@ -7,6 +7,7 @@ import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
 import { crewPaletteForSurface, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
+import { SubrentFlowClient } from "./SubrentFlowClient";
 
 interface PartnerOnboardingPageProps {
   params: Promise<{ slug: string }>;
@@ -134,6 +135,15 @@ export default async function PartnerOnboardingPage({ params }: PartnerOnboardin
             </div>
           </div>
         </section>
+
+        {/* Subrent flow - for bike owners who want to join existing crew */}
+        <SubrentFlowClient
+          crew={crew}
+          crewSlug={crewSlug}
+          bikes={items}
+          theme={crew.theme}
+          accentText={accentText}
+        />
       </div>
       <CrewFooter crew={crew} />
     </main>
