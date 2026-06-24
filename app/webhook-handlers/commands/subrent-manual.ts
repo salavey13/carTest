@@ -407,26 +407,43 @@ function numberToRussianWords(num: number): string {
   const teens = ["десять", "одиннадцать", "двенадцать", "тринадцать", "четырнадцать", "пятнадцать", "шестнадцать", "семнадцать", "восемнадцать", "девятнадцать"];
   const tens = ["", "", "двадцать", "тридцать", "сорок", "пятьдесят", "шестьдесят", "семьдесят", "восемьдесят", "девяносто"];
   const hundreds = ["", "сто", "двести", "триста", "четыреста", "пятьсот", "шестьсот", "семьсот", "восемьсот", "девятьсот"];
+  const thousands = ["", "тысяча", "тысячи", "тысяч"];
 
   if (num === 0) return "ноль";
 
-  const convertHundreds = (n: number): string => {
-    const h = Math.floor(n / 100);
-    const rest = n % 100;
-    let result = hundreds[h] || "";
-    if (rest > 0) result += " " + convertTens(rest);
-    return result.trim();
-  };
+  let words: string[] = [];
+  let n = num;
 
-  const convertTens = (n: number): string => {
-    if (n < 10) return ones[n];
-    if (n < 20) return teens[n - 10];
-    const t = Math.floor(n / 10);
-    const o = n % 10;
-    return tens[t] + (o ? " " + ones[o] : "");
-  };
+  // Thousands
+  if (n >= 1000) {
+    const t = Math.floor(n / 1000);
+    if (t === 1) words.push("одна тысяча");
+    else if (t === 2) words.push("две тысячи");
+    else if (t < 5) words.push(`${ones[t]} тысячи`);
+    else words.push(`${ones[t]} тысяч`);
+    n %= 1000;
+  }
 
-  return convertHundreds(num);
+  // Hundreds
+  if (n >= 100) {
+    words.push(hundreds[Math.floor(n / 100)]);
+    n %= 100;
+  }
+
+  // Tens and ones
+  if (n >= 20) {
+    words.push(tens[Math.floor(n / 10)]);
+    n %= 10;
+  }
+  if (n >= 10) {
+    words.push(teens[n - 10]);
+    n = 0;
+  }
+  if (n > 0) {
+    words.push(ones[n]);
+  }
+
+  return words.join(" ") || String(num);
 }
 
 // ── State management ─────────────────────────────────────────────────────────────
@@ -436,7 +453,7 @@ async function getState(userId: string): Promise<SubrentFlowContext | null> {
     .from("user_states")
     .select("state, context, created_at")
     .eq("user_id", userId)
-    .eq("state", "like", "subrent_%")
+    .like("state", "subrent_%")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -445,7 +462,7 @@ async function getState(userId: string): Promise<SubrentFlowContext | null> {
 
   const age = Date.now() - new Date(data.created_at).getTime();
   if (age > STATE_EXPIRY_MINUTES * 60 * 1000) {
-    await supabaseAdmin.from("user_states").delete().eq("user_id", userId).eq("state", "like", "subrent_%");
+    await supabaseAdmin.from("user_states").delete().eq("user_id", userId).like("state", "subrent_%");
     return null;
   }
 
@@ -464,7 +481,7 @@ async function saveState(userId: string, context: SubrentFlowContext): Promise<v
 }
 
 async function clearState(userId: string): Promise<void> {
-  await supabaseAdmin.from("user_states").delete().eq("user_id", userId).eq("state", "like", "subrent_%");
+  await supabaseAdmin.from("user_states").delete().eq("user_id", userId).like("state", "subrent_%");
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────────
@@ -531,7 +548,9 @@ export async function handleSubrentManualCommand(params: {
 }
 
 async function handleCallback(context: SubrentFlowContext, callbackData: string, userId: string, messageId: number): Promise<void> {
-  const [action, value] = callbackData.split("_");
+  const parts = callbackData.split("_");
+  const action = parts[0];
+  const value = parts.slice(1).join("_"); // Capture everything after first underscore
 
   switch (action) {
     case "cancel":
@@ -667,7 +686,16 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
       break;
 
     case "dur":
-      const endDate = calculateEndDate(context.contractStartDate!, context.contractStartTime!, callbackData);
+      if (!context.contractStartDate || !context.contractStartTime) {
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "❌ Ошибка: дата начала не указана. Попробуйте /subrent заново.",
+        });
+        await clearState(userId);
+        break;
+      }
+      const endDate = calculateEndDate(context.contractStartDate, context.contractStartTime, callbackData);
       context.contractEndDate = endDate.date;
       context.contractEndTime = endDate.time;
 
@@ -1094,6 +1122,11 @@ ${context.weekdayPrice ? `Сезон: будни=${context.weekdayPrice}₽ вы
 
 async function generateAndSendContract(context: SubrentFlowContext, userId: string): Promise<void> {
   try {
+    // Validate required fields
+    if (!context.contractStartDate || !context.contractStartTime) {
+      throw new Error("Missing contract start date or time");
+    }
+
     // Load crew secrets
     const crewId = context.crewId || "default";
     const { data: crewSecrets } = await privateSchema()
@@ -1107,8 +1140,8 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
     const now = new Date();
 
     // Parse dates
-    const [day, month, year] = context.contractStartDate!.split('.');
-    const [startHour, startMin] = context.contractStartTime!.split(':');
+    const [day, month, year] = context.contractStartDate.split('.');
+    const [startHour, startMin] = context.contractStartTime.split(':');
 
     // Build template variables
     const variables = {
@@ -1210,13 +1243,9 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
       templateMode: "html",
     });
 
-    if (!result.success) {
-      throw new Error(result.error || "Failed to generate document");
-    }
-
     // Send document
-    const docBuffer = result.data;
-    const fileHash = createHash("sha256").update(docBuffer).digest("hex");
+    const docBuffer = result.bytes;
+    const fileHash = result.sha256 || createHash("sha256").update(docBuffer).digest("hex");
 
     await sendTelegramDocument({
       chatId: userId,
