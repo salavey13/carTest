@@ -123,6 +123,15 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const [isPasswordValidating, setIsPasswordValidating] = useState(false);
   const [passwordAuthOwnerId, setPasswordAuthOwnerId] = useState<string | null>(null);
 
+  // Pull-to-refresh state
+  const [pullState, setPullState] = useState<"idle" | "pulling" | "refreshing">("idle");
+  const [pullDistance, setPullDistance] = useState(0);
+  const pullThreshold = 80;
+  const maxPullDistance = 120;
+  const mainContentRef = useRef<HTMLDivElement>(null);
+  const startYRef = useRef(0);
+  const currentYRef = useRef(0);
+
   // ─── Realtime subscriptions ───────────────────────────────────────────────────
 
   useSupabaseRealtime({
@@ -361,7 +370,24 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: bgBase }}>
         <div className="relative">
-          <div className="w-16 h-16 border-4 rounded-full animate-spin" style={{ borderColor: withAlpha(accentMain, 0.3), borderTopColor: accentMain }} />
+          {/* Outer glow ring */}
+          <div
+            className="absolute inset-0 rounded-full blur-xl animate-pulse"
+            style={{ backgroundColor: withAlpha(accentMain, 0.2) }}
+          />
+          {/* Main spinner */}
+          <div className="relative w-12 h-12 md:w-16 md:h-16">
+            <div className="absolute inset-0 rounded-full border-3 md:border-4" style={{ borderColor: withAlpha(accentMain, 0.15) }} />
+            <div
+              className="absolute inset-0 rounded-full border-3 md:border-4 border-t-transparent animate-spin"
+              style={{ borderColor: accentMain, borderTopColor: "transparent" }}
+            />
+            {/* Center dot */}
+            <div
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full animate-pulse"
+              style={{ backgroundColor: accentMain }}
+            />
+          </div>
         </div>
       </div>
     );
@@ -373,28 +399,28 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
         <div className="w-full max-w-sm relative">
           {/* Animated glow effect */}
           <div
-            className="absolute -inset-4 rounded-full blur-3xl animate-pulse"
+            className="absolute -inset-3 md:-inset-4 rounded-full blur-2xl md:blur-3xl animate-pulse"
             style={{ backgroundColor: withAlpha(accentMain, 0.15) }}
           />
 
           <div
-            className="relative rounded-3xl p-8 border shadow-2xl"
+            className="relative rounded-2xl md:rounded-3xl p-6 md:p-8 border shadow-xl md:shadow-2xl"
             style={{ backgroundColor: bgCard, borderColor: borderSoft }}
           >
-            <div className="text-center mb-8">
+            <div className="text-center mb-6 md:mb-8">
               <div
-                className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center shadow-lg"
+                className="w-16 h-16 md:w-20 md:h-20 mx-auto mb-4 md:mb-6 rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg"
                 style={{
                   background: `linear-gradient(135deg, ${accentMain}, ${accentHover})`,
                   boxShadow: `0 10px 40px ${withAlpha(accentMain, 0.3)}`,
                 }}
               >
-                <ShieldCheck className="w-10 h-10" style={{ color: "#FFFFFF" }} />
+                <ShieldCheck className="w-8 h-8 md:w-10 md:h-10" style={{ color: "#FFFFFF" }} />
               </div>
-              <h1 className="text-3xl font-black tracking-tight" style={{ backgroundImage: `linear-gradient(to right, ${accentMain}, ${accentHover})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+              <h1 className="text-2xl md:text-3xl font-black tracking-tight" style={{ backgroundImage: `linear-gradient(to right, ${accentMain}, ${accentHover})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                 Аналитика
               </h1>
-              <p className="text-sm mt-2" style={{ color: textSecondary }}>Введите пароль для доступа</p>
+              <p className="text-xs md:text-sm mt-1.5 md:mt-2" style={{ color: textSecondary }}>Введите пароль для доступа</p>
             </div>
 
             <div className="relative">
@@ -405,18 +431,17 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                 onKeyDown={(e) => e.key === "Enter" && void handlePasswordSubmit()}
                 placeholder="••••••••"
                 disabled={isPasswordValidating}
-                className="w-full px-6 py-4 rounded-xl border-2 text-center tracking-widest text-lg transition-all focus:outline-none focus:ring-2"
+                className="w-full px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl border-2 text-center tracking-widest text-base md:text-lg transition-all focus:outline-none focus:ring-2"
                 style={{
                   backgroundColor: withAlpha(bgCard, 0.5),
                   borderColor: borderSoft,
                   color: textPrimary,
-                  placeholderColor: textSecondary,
                 }}
                 autoFocus
               />
               {passwordError && (
-                <p className="mt-3 text-center text-sm flex items-center justify-center gap-2" style={{ color: "#ef4444" }}>
-                  <AlertCircle className="w-4 h-4" />
+                <p className="mt-2 md:mt-3 text-center text-xs md:text-sm flex items-center justify-center gap-1.5 md:gap-2" style={{ color: "#ef4444" }}>
+                  <AlertCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />
                   {passwordError}
                 </p>
               )}
@@ -425,7 +450,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
             <button
               onClick={handlePasswordSubmit}
               disabled={isPasswordValidating || !passwordInput.trim()}
-              className="w-full mt-6 px-6 py-4 font-bold rounded-xl transition-all hover:scale-[1.02] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+              className="w-full mt-4 md:mt-6 px-4 md:px-6 py-3 md:py-4 font-bold rounded-lg md:rounded-xl transition-all hover:scale-[1.02] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-1.5 md:gap-2 text-sm md:text-base relative overflow-hidden"
               style={{
                 background: `linear-gradient(to right, ${accentMain}, ${accentHover})`,
                 boxShadow: `0 4px 20px ${withAlpha(accentMain, 0.4)}`,
@@ -434,12 +459,21 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
             >
               {isPasswordValidating ? (
                 <>
-                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  <div className="relative">
+                    <RefreshCw className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
+                    {/* Spinner glow */}
+                    <div className="absolute inset-0 blur-lg" style={{ backgroundColor: withAlpha("#FFFFFF", 0.3) }} />
+                  </div>
                   Проверка...
+                  {/* Shimmer effect */}
+                  <div
+                    className="absolute inset-0 -translate-x-full animate-[shimmer_1s_infinite]"
+                    style={{ background: `linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)` }}
+                  />
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-5 h-5" />
+                  <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
                   Войти
                 </>
               )}
@@ -474,35 +508,35 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
       <div className="relative z-10 h-screen flex flex-col">
         {/* HEADER */}
-        <header className="flex-shrink-0 px-6 py-4 border-b backdrop-blur-xl" style={{ borderColor: withAlpha(borderSoft, 0.5), backgroundColor: withAlpha(bgCard, 0.5) }}>
-          <div className="flex items-center justify-between max-w-7xl mx-auto">
+        <header className="flex-shrink-0 px-4 md:px-6 py-3 md:py-4 border-b backdrop-blur-xl" style={{ borderColor: withAlpha(borderSoft, 0.5), backgroundColor: withAlpha(bgCard, 0.5) }}>
+          <div className="flex items-center justify-between max-w-7xl mx-auto gap-4">
             {/* Left section */}
-            <div className="flex items-center gap-6">
-              <div>
-                <h1 className="text-xl font-black tracking-tight" style={{ backgroundImage: `linear-gradient(to right, ${accentMain}, ${accentHover})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+            <div className="flex items-center gap-4 md:gap-6 min-w-0">
+              <div className="min-w-0">
+                <h1 className="text-lg md:text-xl font-black tracking-tight" style={{ backgroundImage: `linear-gradient(to right, ${accentMain}, ${accentHover})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                   Аналитика
                 </h1>
-                <p className="text-xs mt-0.5" style={{ color: textSecondary }}>{crew.name}</p>
+                <p className="text-xs mt-0.5 truncate" style={{ color: textSecondary }}>{crew.name}</p>
               </div>
 
-              <div className="h-8 w-px" style={{ backgroundColor: withAlpha(borderSoft, 0.5) }} />
+              <div className="h-6 md:h-8 w-px flex-shrink-0" style={{ backgroundColor: withAlpha(borderSoft, 0.5) }} />
 
               {/* Date navigation */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 md:gap-3">
                 <button
                   onClick={() => navigateDate(-1)}
                   disabled={loading}
-                  className="p-2 rounded-xl border transition-all group"
+                  className="p-1.5 md:p-2 rounded-lg md:rounded-xl border transition-all group"
                   style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = accentMain; e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.1); }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = borderSoft; e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.5); }}
                 >
-                  <ChevronLeft className="w-5 h-5 transition-colors group-hover:text-[var(--hover-color)]" style={{ color: textSecondary, '--hover-color': accentMain } as React.CSSProperties} />
+                  <ChevronLeft className="w-4 h-4 md:w-5 md:h-5 transition-colors" style={{ color: textSecondary }} />
                 </button>
 
-                <div className="flex items-center gap-2 px-4 py-2 rounded-xl border">
-                  <Calendar className="w-4 h-4" style={{ color: accentMain }} />
-                  <span className="text-sm font-medium" style={{ color: textPrimary }}>
+                <div className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl border">
+                  <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" style={{ color: accentMain }} />
+                  <span className="text-xs md:text-sm font-medium" style={{ color: textPrimary }}>
                     {formatRussianDateOnly(selectedDate)}
                   </span>
                 </div>
@@ -510,32 +544,45 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                 <button
                   onClick={() => navigateDate(1)}
                   disabled={loading}
-                  className="p-2 rounded-xl border transition-all group"
+                  className="p-1.5 md:p-2 rounded-lg md:rounded-xl border transition-all group"
                   style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = accentMain; e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.1); }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = borderSoft; e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.5); }}
                 >
-                  <ChevronRight className="w-5 h-5 transition-colors" style={{ color: textSecondary, '--hover-color': accentMain } as React.CSSProperties} />
+                  <ChevronRight className="w-4 h-4 md:w-5 md:h-5 transition-colors" style={{ color: textSecondary }} />
                 </button>
               </div>
             </div>
 
             {/* Right section - actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 md:gap-2">
               <button
                 onClick={() => void loadRentals(selectedDate, true)}
                 disabled={refreshing}
-                className="p-2.5 rounded-xl border transition-all group"
-                style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#34d399"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = borderSoft; }}
+                className="p-1.5 md:p-2.5 rounded-lg md:rounded-xl border transition-all group relative"
+                style={{
+                  backgroundColor: refreshing ? withAlpha("#34d399", 0.15) : withAlpha(bgCard, 0.5),
+                  borderColor: refreshing ? withAlpha("#34d399", 0.3) : borderSoft,
+                }}
+                onMouseEnter={(e) => { if (!refreshing) e.currentTarget.style.borderColor = "#34d399"; }}
+                onMouseLeave={(e) => { if (!refreshing) e.currentTarget.style.borderColor = borderSoft; }}
               >
-                <RefreshCw className={`w-5 h-5 transition-colors ${refreshing ? "animate-spin" : ""}`} style={{ color: textSecondary }} />
+                <RefreshCw
+                  className={`w-4 h-4 md:w-5 md:h-5 transition-colors ${refreshing ? "animate-spin" : ""}`}
+                  style={{ color: refreshing ? "#34d399" : textSecondary }}
+                />
+                {/* Refresh glow when active */}
+                {refreshing && (
+                  <div
+                    className="absolute inset-0 rounded-lg md:rounded-xl blur-md animate-pulse"
+                    style={{ backgroundColor: withAlpha("#34d399", 0.2) }}
+                  />
+                )}
               </button>
 
               <button
                 onClick={exportToExcel}
-                className="px-4 py-2.5 rounded-xl border font-medium transition-all flex items-center gap-2 text-sm"
+                className="hidden sm:flex px-3 md:px-4 py-1.5 md:py-2.5 rounded-lg md:rounded-xl border font-semibold transition-all items-center gap-1.5 md:gap-2 text-xs md:text-sm"
                 style={{
                   backgroundColor: withAlpha("#10b981", 0.15),
                   borderColor: withAlpha("#10b981", 0.3),
@@ -544,8 +591,9 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = withAlpha("#10b981", 0.25); e.currentTarget.style.borderColor = withAlpha("#10b981", 0.4); }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = withAlpha("#10b981", 0.15); e.currentTarget.style.borderColor = withAlpha("#10b981", 0.3); }}
               >
-                <Download className="w-4 h-4" />
-                Экспорт
+                <Download className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <span className="hidden md:inline">Экспорт</span>
+                <span className="md:hidden">XLS</span>
               </button>
             </div>
           </div>
@@ -553,23 +601,48 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
         {/* MAIN CONTENT */}
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 space-y-4 md:space-y-6">
 
             {/* STATS ROW */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4">
               {/* Total rentals */}
               <div className="relative group">
-                <div className="absolute inset-0 rounded-2xl blur-xl group-hover:blur-2xl transition-all" style={{ backgroundColor: withAlpha(accentMain, 0.12) }} />
-                <div className="relative rounded-2xl p-5 border transition-all" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha(accentMain, 0.15) }}>
-                      <Eye className="w-5 h-5" style={{ color: accentMain }} />
+                <div
+                  className="absolute inset-0 rounded-xl md:rounded-2xl blur-lg md:blur-xl group-hover:blur-xl md:group-hover:blur-2xl transition-all duration-500"
+                  style={{
+                    background: `radial-gradient(circle at center, ${withAlpha(accentMain, 0.15)}, transparent 70%)`,
+                    backgroundColor: withAlpha(accentMain, 0.08)
+                  }}
+                />
+                <div
+                  className="relative rounded-xl md:rounded-2xl p-3 md:p-5 border transition-all duration-300 group-hover:scale-[1.02] group-hover:border-opacity-30"
+                  style={{
+                    backgroundColor: withAlpha(bgCard, 0.6),
+                    borderColor: withAlpha(accentMain, 0.2),
+                    backdropFilter: "blur(12px)",
+                    borderWidth: "1.5px"
+                  }}
+                >
+                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                    <div
+                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110"
+                      style={{
+                        background: `linear-gradient(135deg, ${withAlpha(accentMain, 0.2)}, ${withAlpha(accentMain, 0.05)})`,
+                        border: "1px solid",
+                        borderColor: withAlpha(accentMain, 0.3)
+                      }}
+                    >
+                      <Eye className="w-4 h-4 md:w-5 md:h-5" style={{ color: accentMain }} />
                     </div>
-                    <span className="text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Всего аренд</span>
+                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.8 }}>Всего аренд</span>
                   </div>
-                  <div className="text-3xl font-black" style={{ color: textPrimary }}>{totalRentals}</div>
-                  <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: textSecondary }}>
-                    <Calendar className="w-3 h-3" />
+                  <div className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: textPrimary }}>
+                    {totalRentals}
+                    {/* Subtle glow on value */}
+                    <span className="absolute inset-0 blur-xl opacity-50" style={{ backgroundColor: withAlpha(accentMain, 0.1) }} />
+                  </div>
+                  <div className="mt-1.5 md:mt-2 flex items-center gap-1 text-[10px] md:text-xs" style={{ color: textSecondary, opacity: 0.7 }}>
+                    <Calendar className="w-2.5 h-2.5 md:w-3 md:h-3" />
                     За выбранный день
                   </div>
                 </div>
@@ -577,17 +650,40 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
               {/* Revenue */}
               <div className="relative group">
-                <div className="absolute inset-0 rounded-2xl blur-xl group-hover:blur-2xl transition-all" style={{ backgroundColor: withAlpha("#10b981", 0.12) }} />
-                <div className="relative rounded-2xl p-5 border transition-all" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha("#10b981", 0.15) }}>
-                      <TrendingUp className="w-5 h-5" style={{ color: "#34d399" }} />
+                <div
+                  className="absolute inset-0 rounded-xl md:rounded-2xl blur-lg md:blur-xl group-hover:blur-xl md:group-hover:blur-2xl transition-all duration-500"
+                  style={{
+                    background: `radial-gradient(circle at center, ${withAlpha("#10b981", 0.15)}, transparent 70%)`,
+                    backgroundColor: withAlpha("#10b981", 0.08)
+                  }}
+                />
+                <div
+                  className="relative rounded-xl md:rounded-2xl p-3 md:p-5 border transition-all duration-300 group-hover:scale-[1.02] group-hover:border-opacity-30"
+                  style={{
+                    backgroundColor: withAlpha(bgCard, 0.6),
+                    borderColor: withAlpha("#10b981", 0.2),
+                    backdropFilter: "blur(12px)",
+                    borderWidth: "1.5px"
+                  }}
+                >
+                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                    <div
+                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110"
+                      style={{
+                        background: `linear-gradient(135deg, ${withAlpha("#10b981", 0.2)}, ${withAlpha("#10b981", 0.05)})`,
+                        border: "1px solid",
+                        borderColor: withAlpha("#10b981", 0.3)
+                      }}
+                    >
+                      <TrendingUp className="w-4 h-4 md:w-5 md:h-5" style={{ color: "#34d399" }} />
                     </div>
-                    <span className="text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Выручка</span>
+                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.8 }}>Выручка</span>
                   </div>
-                  <div className="text-3xl font-black" style={{ color: "#34d399" }}>{formatRubles(totalRevenue)}</div>
-                  <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: textSecondary }}>
-                    <Zap className="w-3 h-3" />
+                  <div className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: "#34d399" }}>
+                    {formatRubles(totalRevenue)}
+                  </div>
+                  <div className="mt-1.5 md:mt-2 flex items-center gap-1 text-[10px] md:text-xs" style={{ color: textSecondary, opacity: 0.7 }}>
+                    <Zap className="w-2.5 h-2.5 md:w-3 md:h-3" />
                     Общий доход
                   </div>
                 </div>
@@ -595,17 +691,38 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
               {/* Active rentals */}
               <div className="relative group">
-                <div className="absolute inset-0 rounded-2xl blur-xl group-hover:blur-2xl transition-all" style={{ backgroundColor: withAlpha("#3b82f6", 0.12) }} />
-                <div className="relative rounded-2xl p-5 border transition-all" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha("#3b82f6", 0.15) }}>
-                      <Clock className="w-5 h-5" style={{ color: "#60a5fa" }} />
+                <div
+                  className="absolute inset-0 rounded-xl md:rounded-2xl blur-lg md:blur-xl group-hover:blur-xl md:group-hover:blur-2xl transition-all duration-500"
+                  style={{
+                    background: `radial-gradient(circle at center, ${withAlpha("#3b82f6", 0.15)}, transparent 70%)`,
+                    backgroundColor: withAlpha("#3b82f6", 0.08)
+                  }}
+                />
+                <div
+                  className="relative rounded-xl md:rounded-2xl p-3 md:p-5 border transition-all duration-300 group-hover:scale-[1.02] group-hover:border-opacity-30"
+                  style={{
+                    backgroundColor: withAlpha(bgCard, 0.6),
+                    borderColor: withAlpha("#3b82f6", 0.2),
+                    backdropFilter: "blur(12px)",
+                    borderWidth: "1.5px"
+                  }}
+                >
+                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                    <div
+                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110"
+                      style={{
+                        background: `linear-gradient(135deg, ${withAlpha("#3b82f6", 0.2)}, ${withAlpha("#3b82f6", 0.05)})`,
+                        border: "1px solid",
+                        borderColor: withAlpha("#3b82f6", 0.3)
+                      }}
+                    >
+                      <Clock className="w-4 h-4 md:w-5 md:h-5" style={{ color: "#60a5fa" }} />
                     </div>
-                    <span className="text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Активных</span>
+                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.8 }}>Активных</span>
                   </div>
-                  <div className="text-3xl font-black" style={{ color: "#60a5fa" }}>{activeRentals}</div>
-                  <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: textSecondary }}>
-                    <Sparkles className="w-3 h-3" />
+                  <div className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: "#60a5fa" }}>{activeRentals}</div>
+                  <div className="mt-1.5 md:mt-2 flex items-center gap-1 text-[10px] md:text-xs" style={{ color: textSecondary, opacity: 0.7 }}>
+                    <Sparkles className="w-2.5 h-2.5 md:w-3 md:h-3" />
                     Сейчас на выезде
                   </div>
                 </div>
@@ -613,17 +730,38 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
               {/* Completion rate */}
               <div className="relative group">
-                <div className="absolute inset-0 rounded-2xl blur-xl group-hover:blur-2xl transition-all" style={{ backgroundColor: withAlpha(accentMain, 0.12) }} />
-                <div className="relative rounded-2xl p-5 border transition-all" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha(accentMain, 0.15) }}>
-                      <CheckCircle2 className="w-5 h-5" style={{ color: accentMain }} />
+                <div
+                  className="absolute inset-0 rounded-xl md:rounded-2xl blur-lg md:blur-xl group-hover:blur-xl md:group-hover:blur-2xl transition-all duration-500"
+                  style={{
+                    background: `radial-gradient(circle at center, ${withAlpha(accentMain, 0.15)}, transparent 70%)`,
+                    backgroundColor: withAlpha(accentMain, 0.08)
+                  }}
+                />
+                <div
+                  className="relative rounded-xl md:rounded-2xl p-3 md:p-5 border transition-all duration-300 group-hover:scale-[1.02] group-hover:border-opacity-30"
+                  style={{
+                    backgroundColor: withAlpha(bgCard, 0.6),
+                    borderColor: withAlpha(accentMain, 0.2),
+                    backdropFilter: "blur(12px)",
+                    borderWidth: "1.5px"
+                  }}
+                >
+                  <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                    <div
+                      className="p-1.5 md:p-2 rounded-lg transition-all duration-300 group-hover:scale-110"
+                      style={{
+                        background: `linear-gradient(135deg, ${withAlpha(accentMain, 0.2)}, ${withAlpha(accentMain, 0.05)})`,
+                        border: "1px solid",
+                        borderColor: withAlpha(accentMain, 0.3)
+                      }}
+                    >
+                      <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5" style={{ color: accentMain }} />
                     </div>
-                    <span className="text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Завершено</span>
+                    <span className="text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.8 }}>Завершено</span>
                   </div>
-                  <div className="text-3xl font-black" style={{ color: accentMain }}>{completionRate}%</div>
-                  <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: textSecondary }}>
-                    <CheckCircle2 className="w-3 h-3" />
+                  <div className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: accentMain }}>{completionRate}%</div>
+                  <div className="mt-1.5 md:mt-2 flex items-center gap-1 text-[10px] md:text-xs" style={{ color: textSecondary, opacity: 0.7 }}>
+                    <CheckCircle2 className="w-2.5 h-2.5 md:w-3 md:h-3" />
                     {completedRentals} из {totalRentals}
                   </div>
                 </div>
@@ -631,8 +769,8 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
             </div>
 
             {/* FILTER BAR */}
-            <div className="flex items-center gap-3 overflow-x-auto pb-2">
-              <span className="text-xs font-medium uppercase tracking-wider whitespace-nowrap" style={{ color: textSecondary }}>Фильтр:</span>
+            <div className="flex items-center gap-2 md:gap-3 overflow-x-auto pb-2 px-1">
+              <span className="text-[10px] md:text-xs font-black uppercase tracking-widest whitespace-nowrap" style={{ color: textSecondary, opacity: 0.7 }}>Фильтр:</span>
               {[
                 { value: "all", label: "Все", icon: Eye },
                 { value: "verified", label: "Проверены", icon: CheckCircle2 },
@@ -644,130 +782,256 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                   <button
                     key={filter.value}
                     onClick={() => setVerificationFilter(isActive ? "all" : (filter.value as any))}
-                    className="px-4 py-2 rounded-xl border flex items-center gap-2 text-sm font-medium transition-all whitespace-nowrap"
+                    className="relative px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl border flex items-center gap-1.5 md:gap-2 text-xs md:text-sm font-bold transition-all duration-300 whitespace-nowrap group"
                     style={
                       isActive
-                        ? { background: withAlpha(accentMain, 0.15), borderColor: withAlpha(accentMain, 0.3), color: accentMain }
-                        : { backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft, color: textSecondary }
+                        ? {
+                            background: `linear-gradient(135deg, ${withAlpha(accentMain, 0.2)}, ${withAlpha(accentMain, 0.1)})`,
+                            borderColor: withAlpha(accentMain, 0.4),
+                            color: accentMain,
+                            borderWidth: "1.5px",
+                            boxShadow: `0 0 20px ${withAlpha(accentMain, 0.15)}`
+                          }
+                        : {
+                            backgroundColor: withAlpha(bgCard, 0.5),
+                            borderColor: borderSoft,
+                            color: textSecondary,
+                            borderWidth: "1px"
+                          }
                     }
                     onMouseEnter={(e) => {
                       if (!isActive) {
-                        e.currentTarget.style.borderColor = withAlpha(borderSoft, 0.8);
+                        e.currentTarget.style.borderColor = withAlpha(borderSoft, 1);
                         e.currentTarget.style.color = textPrimary;
+                        e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.7);
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isActive) {
                         e.currentTarget.style.borderColor = borderSoft;
                         e.currentTarget.style.color = textSecondary;
+                        e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.5);
                       }
                     }}
                   >
-                    <Icon className="w-4 h-4" />
-                    {filter.label}
+                    {/* Active glow effect */}
+                    {isActive && (
+                      <div className="absolute inset-0 rounded-lg md:rounded-xl blur-md animate-pulse" style={{ backgroundColor: withAlpha(accentMain, 0.2) }} />
+                    )}
+                    <Icon className="w-3.5 h-3.5 md:w-4 md:h-4 relative z-10" />
+                    <span className="relative z-10">{filter.label}</span>
                   </button>
                 );
               })}
             </div>
 
             {/* CHECKLISTS & TODOS */}
-            <div className="grid lg:grid-cols-2 gap-4">
+            <div className="grid lg:grid-cols-2 gap-3 md:gap-4">
               {/* Handout checklist */}
-              <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.3), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
-                <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: withAlpha(borderSoft, 0.3) }}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span className="text-sm font-bold" style={{ color: textPrimary }}>ВЫДАЧА</span>
-                    <span style={{ color: textSecondary }}>→</span>
+              <div
+                className="rounded-xl md:rounded-2xl border overflow-hidden transition-all duration-300"
+                style={{
+                  backgroundColor: withAlpha(bgCard, 0.4),
+                  borderColor: withAlpha(borderSoft, 0.5),
+                  backdropFilter: "blur(12px)",
+                  borderWidth: "1px"
+                }}
+              >
+                <div
+                  className="px-4 md:px-5 py-2.5 md:py-3 border-b flex items-center justify-between"
+                  style={{
+                    borderColor: withAlpha(borderSoft, 0.3),
+                    background: `linear-gradient(to right, ${withAlpha("#10b981", 0.05)}, transparent)`
+                  }}
+                >
+                  <div className="flex items-center gap-1.5 md:gap-2">
+                    <div
+                      className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full shadow-lg animate-pulse"
+                      style={{ backgroundColor: "#10b981", boxShadow: `0 0 10px ${withAlpha("#10b981", 0.5)}` }}
+                    />
+                    <span className="text-xs md:text-sm font-black tracking-tight" style={{ color: textPrimary }}>ВЫДАЧА</span>
+                    <span className="text-sm md:text-base" style={{ color: textSecondary, opacity: 0.7 }}>→</span>
                   </div>
-                  <span className="text-xs" style={{ color: textSecondary }}>
+                  <span className="text-[10px] md:text-xs font-bold px-2 py-0.5 rounded-full" style={{
+                    backgroundColor: withAlpha("#10b981", 0.15),
+                    color: "#34d399",
+                    border: "1px solid",
+                    borderColor: withAlpha("#10b981", 0.3)
+                  }}>
                     {checklistStates.handout?.items.filter(i => i.checked).length || 0} / {checklistStates.handout?.items.length || 0}
                   </span>
                 </div>
-                <div className="p-4 flex flex-wrap gap-2">
+                <div className="p-3 md:p-4 flex flex-wrap gap-1.5 md:gap-2">
                   {checklistStates.handout?.items.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => void toggleChecklistItem("handout", item.id)}
                       disabled={updatingChecklist === item.id}
-                      className="px-3 py-1.5 rounded-lg border text-xs font-medium transition-all whitespace-nowrap"
+                      className="relative px-2.5 md:px-3 py-1 md:py-1.5 rounded-lg border text-[10px] md:text-xs font-bold transition-all duration-300 whitespace-nowrap overflow-hidden group"
                       style={
-                        item.checked
-                          ? { backgroundColor: withAlpha("#10b981", 0.2), borderColor: withAlpha("#10b981", 0.3), color: "#34d399" }
-                          : { backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft, color: textSecondary }
+                        updatingChecklist === item.id
+                          ? { backgroundColor: withAlpha("#10b981", 0.1), borderColor: withAlpha("#10b981", 0.3), color: "#34d399", borderWidth: "1.5px" }
+                          : item.checked
+                          ? {
+                              backgroundColor: `linear-gradient(135deg, ${withAlpha("#10b981", 0.25)}, ${withAlpha("#10b981", 0.15)})`,
+                              borderColor: withAlpha("#10b981", 0.4),
+                              color: "#34d399",
+                              borderWidth: "1.5px",
+                              boxShadow: `0 2px 8px ${withAlpha("#10b981", 0.2)}`
+                            }
+                          : {
+                              backgroundColor: withAlpha(bgCard, 0.6),
+                              borderColor: borderSoft,
+                              color: textSecondary,
+                              borderWidth: "1px"
+                            }
                       }
                       onMouseEnter={(e) => {
-                        if (!item.checked) {
-                          e.currentTarget.style.borderColor = withAlpha(borderSoft, 0.8);
+                        if (!item.checked && updatingChecklist !== item.id) {
+                          e.currentTarget.style.borderColor = withAlpha(borderSoft, 1);
                           e.currentTarget.style.color = textPrimary;
+                          e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.8);
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (!item.checked) {
+                        if (!item.checked && updatingChecklist !== item.id) {
                           e.currentTarget.style.borderColor = borderSoft;
                           e.currentTarget.style.color = textSecondary;
+                          e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.6);
                         }
                       }}
                     >
-                      {item.checked && <CheckCircle2 className="w-3 h-3 inline mr-1" />}
-                      {item.text}
+                      {updatingChecklist === item.id ? (
+                        <>
+                          <RefreshCw className="w-2.5 h-2.5 md:w-3 md:h-3 inline animate-spin mr-0.5 md:mr-1" />
+                          {item.text}
+                        </>
+                      ) : (
+                        <>
+                          {item.checked && <CheckCircle2 className="w-2.5 h-2.5 md:w-3 md:h-3 inline mr-0.5 md:mr-1" />}
+                          {item.text}
+                        </>
+                      )}
                     </button>
                   ))}
                 </div>
               </div>
 
               {/* Return checklist */}
-              <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.3), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
-                <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: withAlpha(borderSoft, 0.3) }}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-400" />
-                    <span className="text-sm font-bold" style={{ color: textPrimary }}>ВОЗВРАТ</span>
-                    <span style={{ color: textSecondary }}>←</span>
+              <div
+                className="rounded-xl md:rounded-2xl border overflow-hidden transition-all duration-300"
+                style={{
+                  backgroundColor: withAlpha(bgCard, 0.4),
+                  borderColor: withAlpha(borderSoft, 0.5),
+                  backdropFilter: "blur(12px)",
+                  borderWidth: "1px"
+                }}
+              >
+                <div
+                  className="px-4 md:px-5 py-2.5 md:py-3 border-b flex items-center justify-between"
+                  style={{
+                    borderColor: withAlpha(borderSoft, 0.3),
+                    background: `linear-gradient(to right, ${withAlpha("#3b82f6", 0.05)}, transparent)`
+                  }}
+                >
+                  <div className="flex items-center gap-1.5 md:gap-2">
+                    <div
+                      className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full shadow-lg animate-pulse"
+                      style={{ backgroundColor: "#3b82f6", boxShadow: `0 0 10px ${withAlpha("#3b82f6", 0.5)}` }}
+                    />
+                    <span className="text-xs md:text-sm font-black tracking-tight" style={{ color: textPrimary }}>ВОЗВРАТ</span>
+                    <span className="text-sm md:text-base" style={{ color: textSecondary, opacity: 0.7 }}>←</span>
                   </div>
-                  <span className="text-xs" style={{ color: textSecondary }}>
+                  <span className="text-[10px] md:text-xs font-bold px-2 py-0.5 rounded-full" style={{
+                    backgroundColor: withAlpha("#3b82f6", 0.15),
+                    color: "#60a5fa",
+                    border: "1px solid",
+                    borderColor: withAlpha("#3b82f6", 0.3)
+                  }}>
                     {checklistStates.return?.items.filter(i => i.checked).length || 0} / {checklistStates.return?.items.length || 0}
                   </span>
                 </div>
-                <div className="p-4 flex flex-wrap gap-2">
+                <div className="p-3 md:p-4 flex flex-wrap gap-1.5 md:gap-2">
                   {checklistStates.return?.items.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => void toggleChecklistItem("return", item.id)}
                       disabled={updatingChecklist === item.id}
-                      className="px-3 py-1.5 rounded-lg border text-xs font-medium transition-all whitespace-nowrap"
+                      className="relative px-2.5 md:px-3 py-1 md:py-1.5 rounded-lg border text-[10px] md:text-xs font-bold transition-all duration-300 whitespace-nowrap overflow-hidden group"
                       style={
-                        item.checked
-                          ? { backgroundColor: withAlpha("#3b82f6", 0.2), borderColor: withAlpha("#3b82f6", 0.3), color: "#60a5fa" }
-                          : { backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft, color: textSecondary }
+                        updatingChecklist === item.id
+                          ? { backgroundColor: withAlpha("#3b82f6", 0.1), borderColor: withAlpha("#3b82f6", 0.3), color: "#60a5fa", borderWidth: "1.5px" }
+                          : item.checked
+                          ? {
+                              backgroundColor: `linear-gradient(135deg, ${withAlpha("#3b82f6", 0.25)}, ${withAlpha("#3b82f6", 0.15)})`,
+                              borderColor: withAlpha("#3b82f6", 0.4),
+                              color: "#60a5fa",
+                              borderWidth: "1.5px",
+                              boxShadow: `0 2px 8px ${withAlpha("#3b82f6", 0.2)}`
+                            }
+                          : {
+                              backgroundColor: withAlpha(bgCard, 0.6),
+                              borderColor: borderSoft,
+                              color: textSecondary,
+                              borderWidth: "1px"
+                            }
                       }
                       onMouseEnter={(e) => {
-                        if (!item.checked) {
-                          e.currentTarget.style.borderColor = withAlpha(borderSoft, 0.8);
+                        if (!item.checked && updatingChecklist !== item.id) {
+                          e.currentTarget.style.borderColor = withAlpha(borderSoft, 1);
                           e.currentTarget.style.color = textPrimary;
+                          e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.8);
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (!item.checked) {
+                        if (!item.checked && updatingChecklist !== item.id) {
                           e.currentTarget.style.borderColor = borderSoft;
                           e.currentTarget.style.color = textSecondary;
+                          e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.6);
                         }
                       }}
                     >
-                      {item.checked && <CheckCircle2 className="w-3 h-3 inline mr-1" />}
-                      {item.text}
+                      {updatingChecklist === item.id ? (
+                        <>
+                          <RefreshCw className="w-2.5 h-2.5 md:w-3 md:h-3 inline animate-spin mr-0.5 md:mr-1" />
+                          {item.text}
+                        </>
+                      ) : (
+                        <>
+                          {item.checked && <CheckCircle2 className="w-2.5 h-2.5 md:w-3 md:h-3 inline mr-0.5 md:mr-1" />}
+                          {item.text}
+                        </>
+                      )}
                     </button>
                   ))}
                 </div>
               </div>
 
               {/* Todos */}
-              <div className="lg:col-span-2 rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.3), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
-                <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: withAlpha(borderSoft, 0.3) }}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: accentMain }} />
-                    <span className="text-sm font-bold" style={{ color: textPrimary }}>ЗАДАЧИ</span>
+              <div
+                className="lg:col-span-2 rounded-xl md:rounded-2xl border overflow-hidden transition-all duration-300"
+                style={{
+                  backgroundColor: withAlpha(bgCard, 0.4),
+                  borderColor: withAlpha(borderSoft, 0.5),
+                  backdropFilter: "blur(12px)",
+                  borderWidth: "1px"
+                }}
+              >
+                <div
+                  className="px-4 md:px-5 py-2.5 md:py-3 border-b flex items-center justify-between flex-wrap gap-2"
+                  style={{
+                    borderColor: withAlpha(borderSoft, 0.3),
+                    background: `linear-gradient(to right, ${withAlpha(accentMain, 0.05)}, transparent)`
+                  }}
+                >
+                  <div className="flex items-center gap-1.5 md:gap-2">
+                    <div
+                      className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full flex-shrink-0 shadow-lg animate-pulse"
+                      style={{ backgroundColor: accentMain, boxShadow: `0 0 10px ${withAlpha(accentMain, 0.5)}` }}
+                    />
+                    <span className="text-xs md:text-sm font-black tracking-tight" style={{ color: textPrimary }}>ЗАДАЧИ</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
                     {[
                       { value: "all", label: "Все" },
                       { value: "pending", label: "Ожидают" },
@@ -777,52 +1041,88 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                       <button
                         key={filter.value}
                         onClick={() => setTodoFilter(todoFilter === filter.value ? "all" : (filter.value as any))}
-                        className="px-2.5 py-1 rounded-lg text-xs font-medium transition-all"
+                        className="relative px-2 md:px-2.5 py-1 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden"
                         style={
                           todoFilter === filter.value
-                            ? { backgroundColor: withAlpha(accentMain, 0.2), color: accentMain }
+                            ? {
+                                backgroundColor: `linear-gradient(135deg, ${withAlpha(accentMain, 0.25)}, ${withAlpha(accentMain, 0.15)})`,
+                                color: accentMain,
+                                border: "1.5px solid",
+                                borderColor: withAlpha(accentMain, 0.3)
+                              }
                             : { color: textSecondary }
                         }
                         onMouseEnter={(e) => {
-                          if (todoFilter !== filter.value) e.currentTarget.style.color = textPrimary;
+                          if (todoFilter !== filter.value) {
+                            e.currentTarget.style.color = textPrimary;
+                            e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.5);
+                          }
                         }}
                         onMouseLeave={(e) => {
-                          if (todoFilter !== filter.value) e.currentTarget.style.color = textSecondary;
+                          if (todoFilter !== filter.value) {
+                            e.currentTarget.style.color = textSecondary;
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }
                         }}
                       >
-                        {filter.label}
+                        {todoFilter === filter.value && (
+                          <div className="absolute inset-0 rounded-lg blur-md animate-pulse" style={{ backgroundColor: withAlpha(accentMain, 0.15) }} />
+                        )}
+                        <span className="relative z-10">{filter.label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
-                <div className="p-4">
+                <div className="p-3 md:p-4">
                   {todos.length === 0 ? (
-                    <div className="text-center py-6 text-sm" style={{ color: textSecondary }}>Нет активных задач</div>
+                    <div className="text-center py-6 md:py-8">
+                      <div
+                        className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center"
+                        style={{
+                          backgroundColor: withAlpha(accentMain, 0.1),
+                          border: "1px dashed",
+                          borderColor: withAlpha(accentMain, 0.3)
+                        }}
+                      >
+                        <CheckCircle2 className="w-6 h-6" style={{ color: withAlpha(accentMain, 0.5) }} />
+                      </div>
+                      <p className="text-xs md:text-sm" style={{ color: textSecondary }}>Нет активных задач</p>
+                    </div>
                   ) : (
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-2">
                       {todos.slice(0, 6).map((todo) => {
                         const statusColor =
                           todo.status === "done" ? "#10b981" :
                           todo.status === "in_progress" ? "#f59e0b" :
-                          withAlpha(borderSoft, 2);
+                          borderSoft;
                         return (
                           <div
                             key={todo.id}
-                            className="p-3 rounded-xl border transition-all"
+                            className="p-2.5 md:p-3 rounded-lg md:rounded-xl border transition-all duration-300 group hover:scale-[1.02]"
                             style={{
-                              backgroundColor: todo.status === "done" ? withAlpha("#10b981", 0.1) : todo.status === "in_progress" ? withAlpha("#f59e0b", 0.1) : withAlpha(bgCard, 0.5),
-                              borderColor: todo.status === "done" ? withAlpha("#10b981", 0.2) : todo.status === "in_progress" ? withAlpha("#f59e0b", 0.2) : borderSoft,
+                              backgroundColor: todo.status === "done"
+                                ? `linear-gradient(135deg, ${withAlpha("#10b981", 0.15)}, ${withAlpha("#10b981", 0.08)})`
+                                : todo.status === "in_progress"
+                                ? `linear-gradient(135deg, ${withAlpha("#f59e0b", 0.15)}, ${withAlpha("#f59e0b", 0.08)})`
+                                : withAlpha(bgCard, 0.6),
+                              borderColor: todo.status === "done"
+                                ? withAlpha("#10b981", 0.3)
+                                : todo.status === "in_progress"
+                                ? withAlpha("#f59e0b", 0.3)
+                                : borderSoft,
+                              borderWidth: "1px"
                             }}
                           >
-                            <div className="flex items-start gap-2">
+                            <div className="flex items-start gap-1.5 md:gap-2">
                               <div
-                                className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
+                                className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full mt-1 md:mt-1.5 flex-shrink-0 shadow-sm"
                                 style={{
                                   backgroundColor: statusColor,
                                   animation: todo.status === "in_progress" ? "pulse 2s infinite" : undefined,
+                                  boxShadow: todo.status === "in_progress" ? `0 0 8px ${statusColor}` : undefined
                                 }}
                               />
-                              <span className="text-sm" style={{ color: textPrimary }}>{todo.title}</span>
+                              <span className="text-xs md:text-sm leading-snug font-medium" style={{ color: textPrimary }}>{todo.title}</span>
                             </div>
                           </div>
                         );
@@ -834,34 +1134,81 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
             </div>
 
             {/* RENTALS TABLE */}
-            <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.3), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
-              <div className="px-5 py-3 border-b" style={{ borderColor: withAlpha(borderSoft, 0.3) }}>
-                <span className="text-sm font-bold" style={{ color: textPrimary }}>АРЕНДЫ</span>
+            <div
+              className="rounded-xl md:rounded-2xl border overflow-hidden transition-all duration-300"
+              style={{
+                backgroundColor: withAlpha(bgCard, 0.4),
+                borderColor: withAlpha(borderSoft, 0.5),
+                backdropFilter: "blur(12px)",
+                borderWidth: "1px"
+              }}
+            >
+              <div
+                className="px-4 md:px-5 py-2.5 md:py-3 border-b flex items-center gap-2"
+                style={{
+                  borderColor: withAlpha(borderSoft, 0.3),
+                  background: `linear-gradient(to right, ${withAlpha(accentMain, 0.05)}, transparent)`
+                }}
+              >
+                <div
+                  className="w-1 h-4 md:h-5 rounded-full"
+                  style={{ backgroundColor: accentMain }}
+                />
+                <span className="text-xs md:text-sm font-black tracking-tight" style={{ color: textPrimary }}>АРЕНДЫ</span>
               </div>
 
               {loading ? (
-                <div className="p-12 text-center">
-                  <div className="w-10 h-10 border-3 rounded-full animate-spin mx-auto mb-4" style={{ borderColor: withAlpha(accentMain, 0.3), borderTopColor: accentMain }} />
-                  <p className="text-sm" style={{ color: textSecondary }}>Загрузка...</p>
+                <div className="p-4 md:p-6 space-y-4">
+                  {/* Skeleton rows */}
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg animate-pulse"
+                      style={{ backgroundColor: withAlpha(bgCard, 0.3) }}
+                    >
+                      {/* Time skeleton */}
+                      <div className="w-16 md:w-20 h-4 rounded" style={{ backgroundColor: withAlpha(borderSoft, 0.5) }} />
+                      {/* Client skeleton */}
+                      <div className="flex-1">
+                        <div className="w-24 md:w-32 h-4 rounded mb-2" style={{ backgroundColor: withAlpha(borderSoft, 0.5) }} />
+                        <div className="w-16 md:w-24 h-3 rounded" style={{ backgroundColor: withAlpha(borderSoft, 0.3) }} />
+                      </div>
+                      {/* Amount skeleton */}
+                      <div className="w-16 md:w-20 h-4 rounded" style={{ backgroundColor: withAlpha(borderSoft, 0.5) }} />
+                      {/* Status skeleton */}
+                      <div className="w-16 md:w-20 h-6 rounded-full" style={{ backgroundColor: withAlpha(borderSoft, 0.5) }} />
+                      {/* Actions skeleton */}
+                      <div className="flex gap-2">
+                        <div className="w-8 h-8 rounded-lg" style={{ backgroundColor: withAlpha(borderSoft, 0.5) }} />
+                        <div className="w-8 h-8 rounded-lg" style={{ backgroundColor: withAlpha(borderSoft, 0.5) }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : rentals.length === 0 ? (
-                <div className="p-12 text-center">
-                  <Calendar className="w-12 h-12 mx-auto mb-4" style={{ color: borderSoft }} />
-                  <p className="text-sm" style={{ color: textSecondary }}>Нет аренд за этот день</p>
-                  <p className="text-xs mt-1" style={{ color: textSecondary }}>Выберите другую дату</p>
+                <div className="p-8 md:p-12 text-center">
+                  <Calendar className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-3 md:mb-4" style={{ color: borderSoft }} />
+                  <p className="text-xs md:text-sm" style={{ color: textSecondary }}>Нет аренд за этот день</p>
+                  <p className="text-[10px] md:text-xs mt-1" style={{ color: textSecondary }}>Выберите другую дату</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b" style={{ borderColor: withAlpha(borderSoft, 0.3) }}>
-                        <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Время</th>
-                        <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Клиент / Техника</th>
-                        <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Сумма</th>
-                        <th className="px-5 py-3 text-center text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Статус</th>
-                        <th className="px-5 py-3 text-center text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Док</th>
-                        <th className="px-5 py-3 text-center text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Одометр</th>
-                        <th className="px-5 py-3 text-center text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Действия</th>
+                      <tr
+                        className="border-b"
+                        style={{
+                          borderColor: withAlpha(borderSoft, 0.3),
+                          background: `linear-gradient(to bottom, ${withAlpha(bgCard, 0.5)}, transparent)`
+                        }}
+                      >
+                        <th className="px-3 md:px-5 py-2 md:py-3 text-left text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.7 }}>Время</th>
+                        <th className="px-3 md:px-5 py-2 md:py-3 text-left text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.7 }}>Клиент / Техника</th>
+                        <th className="px-3 md:px-5 py-2 md:py-3 text-right text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.7 }}>Сумма</th>
+                        <th className="px-3 md:px-5 py-2 md:py-3 text-center text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.7 }}>Статус</th>
+                        <th className="px-3 md:px-5 py-2 md:py-3 text-center text-[10px] md:text-xs font-black uppercase tracking-widest hidden sm:table-cell" style={{ color: textSecondary, opacity: 0.7 }}>Док</th>
+                        <th className="px-3 md:px-5 py-2 md:py-3 text-center text-[10px] md:text-xs font-black uppercase tracking-widest hidden md:table-cell" style={{ color: textSecondary, opacity: 0.7 }}>Одометр</th>
+                        <th className="px-3 md:px-5 py-2 md:py-3 text-center text-[10px] md:text-xs font-black uppercase tracking-widest" style={{ color: textSecondary, opacity: 0.7 }}>Действия</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
@@ -871,68 +1218,88 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                         return (
                           <tr
                             key={rental.rental_id}
-                            className="transition-colors"
+                            className="transition-all duration-200"
                             style={{ backgroundColor: withAlpha(accentMain, 0.02) }}
-                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.05); }}
-                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.02); }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.06);
+                              e.currentTarget.style.transform = "scale(1.002)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.02);
+                              e.currentTarget.style.transform = "scale(1)";
+                            }}
                           >
-                            <td className="px-5 py-4 whitespace-nowrap">
-                              <span className="text-sm font-mono" style={{ color: textPrimary }}>
+                            <td className="px-3 md:px-5 py-3 md:py-4 whitespace-nowrap">
+                              <span className="text-xs md:text-sm font-mono font-medium" style={{ color: textPrimary }}>
                                 {formatRussianDate(rental.agreed_start_date || rental.created_at).split(",")[1]?.trim() || "—"}
                               </span>
                             </td>
-                            <td className="px-5 py-4">
-                              <div className="text-sm font-medium" style={{ color: textPrimary }}>{rental.user?.full_name || rental.user?.username || "—"}</div>
-                              <div className="text-xs mt-0.5" style={{ color: textSecondary }}>
+                            <td className="px-3 md:px-5 py-3 md:py-4">
+                              <div className="text-xs md:text-sm font-semibold leading-tight" style={{ color: textPrimary }}>{rental.user?.full_name || rental.user?.username || "—"}</div>
+                              <div className="text-[10px] md:text-xs mt-0.5" style={{ color: textSecondary }}>
                                 {rental.vehicle?.make} {rental.vehicle?.model}
                               </div>
                             </td>
-                            <td className="px-5 py-4 text-right">
-                              <span className="text-sm font-mono" style={{ color: "#34d399" }}>{formatRubles(rental.total_cost)}</span>
+                            <td className="px-3 md:px-5 py-3 md:py-4 text-right">
+                              <span className="text-xs md:text-sm font-mono font-bold" style={{ color: "#34d399" }}>{formatRubles(rental.total_cost)}</span>
                             </td>
-                            <td className="px-5 py-4 text-center">
+                            <td className="px-3 md:px-5 py-3 md:py-4 text-center">
                               <span
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all"
+                                className="inline-flex items-center gap-1 md:gap-1.5 px-2 md:px-2.5 py-1 rounded-lg text-[10px] md:text-xs font-semibold border transition-all"
                                 style={{
                                   backgroundColor: withAlpha(statusStyle.color, 0.15),
                                   borderColor: withAlpha(statusStyle.color, 0.3),
                                   color: statusStyle.color,
                                 }}
                               >
-                                <StatusIcon className="w-3.5 h-3.5" />
-                                {statusStyle.label}
+                                <StatusIcon className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                                <span className="hidden sm:inline">{statusStyle.label}</span>
+                                <span className="sm:hidden">{statusStyle.label.slice(0, 4)}</span>
                               </span>
                             </td>
-                            <td className="px-5 py-4 text-center">
-                              <span className="text-lg" style={{ color: rental.documentSecret ? "#34d399" : borderSoft }}>
+                            <td className="px-3 md:px-5 py-3 md:py-4 text-center hidden sm:table-cell">
+                              <span className="text-base md:text-lg font-bold" style={{ color: rental.documentSecret ? "#34d399" : borderSoft }}>
                                 {rental.documentSecret ? "✓" : "—"}
                               </span>
                             </td>
-                            <td className="px-5 py-4 text-center">
+                            <td className="px-3 md:px-5 py-3 md:py-4 text-center hidden md:table-cell">
                               {rental.odometerStart || rental.odometerEnd ? (
-                                <span className="text-sm font-mono" style={{ color: "#34d399" }}>
+                                <span className="text-xs md:text-sm font-mono font-semibold" style={{ color: "#34d399" }}>
                                   {rental.odometerStart || "?"}→{rental.odometerEnd || "?"}
                                 </span>
                               ) : (
                                 <span style={{ color: borderSoft }}>—</span>
                               )}
                             </td>
-                            <td className="px-5 py-4 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
+                            <td className="px-3 md:px-5 py-3 md:py-4 text-center">
+                              <div className="flex items-center justify-center gap-1 md:gap-1.5">
                                 <button
                                   onClick={() => {
                                     setHandoffModalRental(rental);
                                     setHandoffModalPhase("handout");
                                     setHandoffModalOpen(true);
                                   }}
-                                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+                                  className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group"
                                   style={
                                     rental.handoutCompleted
-                                      ? { backgroundColor: "#10b981", color: "white", boxShadow: `0 4px 12px ${withAlpha("#10b981", 0.3)}` }
-                                      : { backgroundColor: withAlpha("#10b981", 0.15), borderColor: withAlpha("#10b981", 0.3), color: "#34d399", border: "1px solid" }
+                                      ? {
+                                          backgroundColor: `linear-gradient(135deg, #10b981, #059669)`,
+                                          color: "white",
+                                          boxShadow: `0 4px 12px ${withAlpha("#10b981", 0.4)}`,
+                                          border: "none"
+                                        }
+                                      : {
+                                          backgroundColor: withAlpha("#10b981", 0.15),
+                                          borderColor: withAlpha("#10b981", 0.4),
+                                          color: "#34d399",
+                                          border: "1.5px solid"
+                                        }
                                   }
                                 >
-                                  →
+                                  {rental.handoutCompleted && (
+                                    <div className="absolute inset-0 bg-white/20 blur-sm" />
+                                  )}
+                                  <span className="relative z-10">→</span>
                                 </button>
                                 <button
                                   onClick={() => {
@@ -940,14 +1307,27 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                                     setHandoffModalPhase("return");
                                     setHandoffModalOpen(true);
                                   }}
-                                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+                                  className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group"
                                   style={
                                     rental.returnCompleted
-                                      ? { backgroundColor: "#3b82f6", color: "white", boxShadow: `0 4px 12px ${withAlpha("#3b82f6", 0.3)}` }
-                                      : { backgroundColor: withAlpha("#3b82f6", 0.15), borderColor: withAlpha("#3b82f6", 0.3), color: "#60a5fa", border: "1px solid" }
+                                      ? {
+                                          backgroundColor: `linear-gradient(135deg, #3b82f6, #2563eb)`,
+                                          color: "white",
+                                          boxShadow: `0 4px 12px ${withAlpha("#3b82f6", 0.4)}`,
+                                          border: "none"
+                                        }
+                                      : {
+                                          backgroundColor: withAlpha("#3b82f6", 0.15),
+                                          borderColor: withAlpha("#3b82f6", 0.4),
+                                          color: "#60a5fa",
+                                          border: "1.5px solid"
+                                        }
                                   }
                                 >
-                                  ←
+                                  {rental.returnCompleted && (
+                                    <div className="absolute inset-0 bg-white/20 blur-sm" />
+                                  )}
+                                  <span className="relative z-10">←</span>
                                 </button>
                               </div>
                             </td>
@@ -961,8 +1341,8 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
             </div>
 
             {/* Footer */}
-            <div className="text-center py-4">
-              <p className="text-xs" style={{ color: textSecondary }}>
+            <div className="text-center py-3 md:py-4">
+              <p className="text-[10px] md:text-xs" style={{ color: textSecondary }}>
                 CarTest Analytics • {new Date().getFullYear()}
               </p>
             </div>
@@ -984,6 +1364,10 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
         @keyframes orb-3 {
           0%, 100% { transform: translate(0, 0) scale(1); }
           50% { transform: translate(-30px, 50px) scale(1.1); }
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
         }
         .animate-orb-1 { animation: orb-1 20s ease-in-out infinite; }
         .animate-orb-2 { animation: orb-2 25s ease-in-out infinite; }

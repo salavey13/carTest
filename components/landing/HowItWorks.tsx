@@ -96,7 +96,7 @@ const HOW_IT_WORKS_STEPS = [
   {
     n: "04",
     title: "Покатался",
-    desc: "Отдал байк, получил залог. Если всё ок —_feedback в чат, следующий раз со скидкой.",
+    desc: "Отдал байк, получил залог. Если всё ок — feedback в чат, следующий раз со скидкой.",
     icon: StepIcons.ride,
   },
 ];
@@ -110,9 +110,9 @@ export function HowItWorks() {
     >
       <div className="container mx-auto max-w-6xl relative z-10">
         {/* Header */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-12 md:mb-16">
           <span
-            className="inline-block px-4 py-2 rounded-full text-sm font-semibold mb-4"
+            className="inline-block px-4 py-2 rounded-full text-sm font-bold mb-4 tracking-wide"
             style={{
               backgroundColor: "rgba(255, 215, 0, 0.1)",
               color: "#FFD700",
@@ -121,11 +121,11 @@ export function HowItWorks() {
           >
             Как это работает
           </span>
-          <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: "#FFFAF0" }}>
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-black mb-4 tracking-tight leading-tight" style={{ color: "#FFFAF0" }}>
             Забери. Покатайся.{" "}
             <span style={{ color: "#FFD700" }}>Верни.</span>
           </h2>
-          <p className="text-lg max-w-2xl mx-auto" style={{ color: "#D4AF37" }}>
+          <p className="text-base md:text-lg max-w-2xl mx-auto leading-relaxed" style={{ color: "#D4AF37" }}>
             От «хочу» до «катюсь» — 15 минут. Без очередей, без бумажной
             волокиты, без звонков «а можно забронировать?».
           </p>
@@ -145,7 +145,7 @@ export function HowItWorks() {
           {HOW_IT_WORKS_STEPS.map((step) => (
             <div key={step.n} className="relative z-10 text-center">
               <div
-                className="relative w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-5 text-4xl transition-transform hover:scale-110"
+                className="relative w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-5 text-3xl md:text-4xl transition-transform hover:scale-110"
                 style={{
                   background:
                     "linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 215, 0, 0.05))",
@@ -155,7 +155,7 @@ export function HowItWorks() {
               >
                 {step.icon}
                 <span
-                  className="absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+                  className="absolute -top-2 -right-2 w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center text-xs md:text-sm font-black"
                   style={{
                     backgroundColor: "#FFD700",
                     color: "#0A0A0A",
@@ -164,7 +164,7 @@ export function HowItWorks() {
                   {step.n}
                 </span>
               </div>
-              <h3 className="text-lg font-bold mb-2" style={{ color: "#FFFAF0" }}>
+              <h3 className="text-base md:text-lg font-black mb-2 tracking-tight" style={{ color: "#FFFAF0" }}>
                 {step.title}
               </h3>
               <p className="text-sm leading-relaxed" style={{ color: "#D4AF37" }}>
@@ -175,10 +175,10 @@ export function HowItWorks() {
         </div>
 
         {/* CTA */}
-        <div className="text-center mt-14">
+        <div className="text-center mt-12 md:mt-14">
           <Link
             href={BOT_HREF}
-            className="inline-flex items-center px-8 py-4 rounded-lg font-semibold text-lg transition-all hover:scale-105"
+            className="inline-flex items-center px-6 md:px-8 py-3 md:py-4 rounded-lg font-bold text-base md:text-lg transition-all hover:scale-105"
             style={{
               backgroundColor: "#FFD700",
               color: "#0A0A0A",

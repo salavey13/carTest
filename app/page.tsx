@@ -5,6 +5,7 @@
  * Uses hardcoded bike data (6 bikes) with fixed pricing (от 6 000 ₽)
  *
  * Components:
+ * - LazyCrewHeader: Lazy-loaded CrewHeader from franchize system (vip-bike)
  * - Hero: Main hero section with CTA
  * - SocialBanner: Social media links (VK, Instagram, Telegram)
  * - BikeShowcase: 6 featured bikes (Electric + ICE)
@@ -20,6 +21,8 @@ import { Services } from "@/components/landing/Services";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { FAQ } from "@/components/landing/FAQ";
 import { Footer } from "@/components/landing/Footer";
+import { LazyCrewHeader } from "@/components/landing/LazyCrewHeader";
+import { getFranchizeBySlug } from "@/app/franchize/actions";
 
 export const metadata = {
   title: "VIP BIKE ELECTRO — Аренда электробайков в Нижнем Новгороде",
@@ -46,9 +49,15 @@ export const metadata = {
   },
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Fetch vip-bike crew data server-side
+  const { crew } = await getFranchizeBySlug("vip-bike");
+
   return (
     <>
+      {/* Lazy-loaded CrewHeader from franchize system */}
+      <LazyCrewHeader crew={crew} />
+
       {/* Hero section */}
       <Hero />
 
