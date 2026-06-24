@@ -146,6 +146,7 @@ CREATE OR REPLACE FUNCTION render_template(
 DECLARE
   v_template TEXT;
   v_result TEXT;
+  var_key TEXT;
 BEGIN
   SELECT body INTO v_template
   FROM public.message_templates
@@ -158,12 +159,13 @@ BEGIN
   v_result := v_template;
 
   -- Replace variables in order: longest keys first to avoid partial replacements
-  FOR var_rec IN SELECT key FROM jsonb_object_keys(p_variables) ORDER BY length(key) DESC
+  FOR var_key IN
+    SELECT key FROM jsonb_object_keys(p_variables) ORDER BY length(key) DESC
   LOOP
     v_result := regexp_replace(
       v_result,
-      '{' || var_rec.key || '}',
-      COALESCE(p_variables->>var_rec.key, ''),
+      '{' || var_key || '}',
+      COALESCE(p_variables->>var_key, ''),
       'g'
     );
   END LOOP;
