@@ -24,6 +24,7 @@ import { shiftCommand } from "./shift";
 import { wbCommand } from "./wb";
 import { codexCommand } from "./codex";
 import { docCommand, handleDocText, handleDocCallback } from "./doc-manual";
+import { handleSubrentManualCommand } from "./subrent-manual";
 import { analyticsPassCommand } from "./analytics-pass";
 
 import { escapeTelegramMarkdown } from "@/lib/utils"; // Helper для Markdown escape
@@ -40,6 +41,21 @@ export async function handleCommand(update: any) {
         const args = parts.slice(1);
 
         logger.info(`[Command Handler] Received: '${text}' from User: ${userIdStr}`);
+
+        // Handle callback queries for /subrent flow
+        if (update.callback_query && (
+            text.startsWith("bike_") ||
+            text.startsWith("pct_") ||
+            text.startsWith("price_") ||
+            text.startsWith("hourly_") ||
+            text.startsWith("seasonal_") ||
+            text.startsWith("dur_") ||
+            text.startsWith("edit_") ||
+            text === "yes" || text === "no" // For subrent yes/no prompts
+        )) {
+            await handleSubrentManualCommand({ userId: userIdStr, userName: username, text: undefined, callbackData: text, messageId: update.callback_query.message.message_id, crewId: undefined });
+            return;
+        }
 
         // Handle callback queries for /doc flow
         if (update.callback_query && (
@@ -132,11 +148,19 @@ export async function handleCommand(update: any) {
                 const documentFiles = update.message?.document ? [update.message.document] : [];
                 return codexCommand(chatId, userIdStr, username, text, bestPhotoVariant, documentFiles);
             },
+            "/subrent": () => {
+                const bestPhotoVariant = update.message?.photo?.length
+                    ? [update.message.photo[update.message.photo.length - 1]]
+                    : [];
+                const documentFiles = update.message?.document ? [update.message.document] : [];
+                return handleSubrentManualCommand({ userId: userIdStr, userName: username, text, callbackData: undefined, crewId: undefined });
+            },
         };
 
         const commandFunction = commandMap[command]
             || (command.startsWith("/codex@") ? commandMap["/codex"] : undefined)
-            || (command.startsWith("/doc@") ? commandMap["/doc"] : undefined);
+            || (command.startsWith("/doc@") ? commandMap["/doc"] : undefined)
+            || (command.startsWith("/subrent@") ? commandMap["/subrent"] : undefined);
 
         if (commandFunction) {
             logger.info(`[Command Handler] Executing command: ${command}`);
@@ -149,6 +173,17 @@ export async function handleCommand(update: any) {
             // Check if user is in /doc flow (awaiting bike selection or schedule)
             const docHandled = await handleDocText(userIdStr, chatId, text);
             if (docHandled) return;
+
+            // Check if user is in /subrent flow
+            const { data: subrentState } = await supabaseAnon.from("user_states")
+                .select("state")
+                .eq("user_id", userIdStr)
+                .like("state", "subrent_%")
+                .maybeSingle();
+            if (subrentState) {
+                await handleSubrentManualCommand({ userId: userIdStr, userName: username, text, callbackData: undefined, crewId: undefined });
+                return;
+            }
 
             const shiftActionMap: { [key: string]: string } = {
                 "✅ Начать Смену": "clock_in", "❌ Завершить Смену": "clock_out",
