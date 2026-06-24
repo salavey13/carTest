@@ -26,6 +26,8 @@ import {
   Phone,
   Globe,
   Mail,
+  MessageSquare,
+  Send,
 } from "lucide-react";
 
 import { useAppContext } from "@/contexts/AppContext";
@@ -49,6 +51,10 @@ import {
   type SubrentContractItem,
   type SubrentContractsResult,
 } from "@/app/franchize/server-actions/rentals-dashboard";
+import {
+  getMessageTemplates,
+  sendTemplateMessage,
+} from "@/app/franchize/server-actions/message-templates";
 import { useSupabaseRealtime } from "@/app/franchize/hooks/useSupabaseRealtime";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import {
@@ -156,6 +162,11 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const [updatingRentalStatus, setUpdatingRentalStatus] = useState<string | null>(null);
   const [regeneratingQr, setRegeneratingQr] = useState<string | null>(null);
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+
+  // Message template state
+  const [messageMenuOpen, setMessageMenuOpen] = useState<string | null>(null);
+  const [messageTemplates, setMessageTemplates] = useState<Array<{ id: string; key: string; name: string }>>([]);
+  const [sendingMessage, setSendingMessage] = useState<string | null>(null);
 
   // Password auth
   const [showPasswordEntry, setShowPasswordEntry] = useState(false);
@@ -538,6 +549,74 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
       toast.success("Экспорт выполнен");
     } catch (error) {
       toast.error("Ошибка экспорта");
+    }
+  };
+
+  // ─── Message templates ───────────────────────────────────────────────────────────
+
+  const loadMessageTemplates = useCallback(async () => {
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
+
+    try {
+      const result = await getMessageTemplates({
+        slug: initialSlug?.trim() || "vip-bike",
+        actorUserId,
+        channel: "telegram",
+      });
+
+      if (result.success && result.data) {
+        // Group templates by category (prefix before underscore)
+        const grouped: Record<string, typeof result.data> = {};
+        for (const template of result.data) {
+          const category = template.template_key.split('_')[0]; // e.g., "return" from "return_reminder_24h"
+          if (!grouped[category]) grouped[category] = [];
+          grouped[category].push({
+            id: template.id,
+            key: template.template_key,
+            name: template.name,
+          });
+        }
+        setMessageTemplates(result.data.map(t => ({ id: t.id, key: t.template_key, name: t.name })));
+      }
+    } catch (error) {
+      console.error("[Load templates] Error:", error);
+    }
+  }, [getActorUserId, initialSlug]);
+
+  // Load templates on mount
+  useEffect(() => {
+    void loadMessageTemplates();
+  }, [loadMessageTemplates]);
+
+  const handleSendMessage = async (rental: RentalDashboardItem, templateKey: string) => {
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
+
+    setSendingMessage(rental.rental_id);
+    setMessageMenuOpen(null);
+
+    try {
+      const result = await sendTemplateMessage({
+        slug: initialSlug?.trim() || "vip-bike",
+        actorUserId,
+        rentalId: rental.rental_id,
+        templateKey,
+        isPasswordAuth: !!passwordAuthOwnerId,
+      });
+
+      if (result.success && result.data?.sent) {
+        toast.success("Сообщение отправлено");
+      } else if (result.success && result.data?.linked === false) {
+        toast.warning("Клиент не связан (не отсканировал QR)");
+      } else {
+        toast.error(result.error || "Не удалось отправить сообщение");
+      }
+    } catch (error) {
+      console.error("[Send message] Error:", error);
+      toast.error("Ошибка отправки сообщения");
+    } finally {
+      setSendingMessage(null);
     }
   };
 
@@ -1787,6 +1866,73 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                                     <Edit className="w-3 h-3 md:w-3.5 md:h-3.5 relative z-10" />
                                   )}
                                 </button>
+                                {/* Message button with dropdown */}
+                                {rental.documentSecret && (
+                                  <div className="relative">
+                                    <button
+                                      onClick={() => setMessageMenuOpen(messageMenuOpen === rental.rental_id ? null : rental.rental_id)}
+                                      disabled={sendingMessage === rental.rental_id}
+                                      className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group disabled:opacity-50"
+                                      style={{
+                                        backgroundColor: sendingMessage === rental.rental_id
+                                          ? withAlpha("#8b5cf6", 0.25)
+                                          : withAlpha("#8b5cf6", 0.15),
+                                        borderColor: withAlpha("#8b5cf6", 0.4),
+                                        color: "#8b5cf6",
+                                        border: "1.5px solid"
+                                      }}
+                                      title="Отправить сообщение"
+                                    >
+                                      {sendingMessage === rental.rental_id ? (
+                                        <RefreshCw className="w-3 h-3 md:w-3.5 md:h-3.5 animate-spin relative z-10" />
+                                      ) : (
+                                        <MessageSquare className="w-3 h-3 md:w-3.5 md:h-3.5 relative z-10" />
+                                      )}
+                                    </button>
+
+                                    {/* Dropdown menu */}
+                                    {messageMenuOpen === rental.rental_id && (
+                                      <>
+                                        {/* Backdrop */}
+                                        <div
+                                          className="fixed inset-0 z-40"
+                                          onClick={() => setMessageMenuOpen(null)}
+                                        />
+                                        {/* Menu */}
+                                        <div
+                                          className="absolute right-0 top-full mt-1 z-50 rounded-lg shadow-xl py-1 min-w-[200px]"
+                                          style={{
+                                            backgroundColor: bgCard,
+                                            borderColor: borderSoft,
+                                            borderWidth: "1px",
+                                          }}
+                                        >
+                                          <div className="px-2 py-1.5 border-b text-xs font-bold" style={{ borderColor: withAlpha(borderSoft, 0.3), color: textSecondary }}>
+                                            Быстрые сообщения
+                                          </div>
+                                          {messageTemplates.map((template) => (
+                                            <button
+                                              key={template.id}
+                                              onClick={() => void handleSendMessage(rental, template.key)}
+                                              className="w-full px-3 py-2 text-left text-xs hover:opacity-80 transition-colors flex items-center gap-2"
+                                              style={{ color: textPrimary }}
+                                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.1)}
+                                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                                            >
+                                              <Send className="w-3 h-3 flex-shrink-0" style={{ color: "#8b5cf6" }} />
+                                              <span className="truncate">{template.name}</span>
+                                            </button>
+                                          ))}
+                                          {messageTemplates.length === 0 && (
+                                            <div className="px-3 py-2 text-xs" style={{ color: textSecondary }}>
+                                              Нет шаблонов
+                                            </div>
+                                          )}
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                                 {/* Email button */}
                                 {rental.documentSecret && (
                                   <button
