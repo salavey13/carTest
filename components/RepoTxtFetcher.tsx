@@ -106,50 +106,67 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     ].filter(Boolean), []);
 
     // docXagent preset: Files for ZAI web agent to recreate doc generation system
+    // Organized into logical groups for better agent context
     const docXagentFiles = useMemo(() => [
-        // Core skills
+        // === SKILLS ===
         "skills/rental-contract-from-photos/SKILL.md",
         "skills/deal-contract-from-photos/SKILL.md",
+        "skills/subrent-contract-from-photos/SKILL.md",
         "skills/commercial-proposal-from-offer/SKILL.md",
         "skills/concat-files/SKILL.md",
         "skills/send-document-by-email/SKILL.md",
-        // CLI scripts
-        "scripts/make-rental-contract-skill.mjs",
-        "scripts/make-deal-contract-skill.mjs",
-        "scripts/make-commercial-proposal-skill.mjs",
-        "scripts/supabase-access-skill.mjs",
-        "scripts/send-document-by-email.mjs",
-        "scripts/codex-notify.mjs",
-        "scripts/concat.sh",
-        // HTML → DOCX converter
-        "lib/htmlToDocx.mjs",
-        // Contract templates
+
+        // === TEMPLATES (docs/) ===
         "docs/RENTAL_DEAL_TEMPLATE.html",
         "docs/SALE_DEAL_TEMPLATE.html",
+        "docs/SUBRENTAL_DEAL_TEMPLATE.html",
         "docs/COMMERCIAL_PROPOSAL_TEMPLATE.html",
-        // Vars
+
+        // === SCRIPTS (doc generation) ===
+        "scripts/make-rental-contract-skill.mjs",
+        "scripts/make-deal-contract-skill.mjs",
+        "scripts/make-subrent-contract-skill.mjs",
+        "scripts/make-commercial-proposal-skill.mjs",
+        "scripts/send-document-by-email.mjs",
+        "scripts/concat.sh",
+        "scripts/codex-notify.mjs",
+        "scripts/supabase-access-skill.mjs",
+
+        // === LIB HELPERS ===
+        "lib/htmlToDocx.mjs",
         "lib/rental-date-utils.ts",
-        "app/lib/rental-contract-vars.ts",
-        "app/lib/user-rental-secrets.ts",
-        // Database schema (private schema + secrets) - specific migrations only
+        "lib/rental-pricing-calculator.ts",
+
+        // === DATABASE MIGRATIONS (doc system tables) ===
+        // Core init + private scheme
         "supabase/migrations/20240101000000_init.sql",
         "supabase/migrations/20260304_private_scheme.sql",
+        "supabase/migrations/20260508090000_repair_private_crew_secrets.sql",
+        // Rental contract artifacts
         "supabase/migrations/20260601000000_user_rental_secrets.sql",
         "supabase/migrations/20260607000000_create_sale_contract_artifacts.sql",
-        "supabase/migrations/20260508090000_repair_private_crew_secrets.sql",
         "supabase/migrations/20260612000000_fix_rental_contract_artifacts.sql",
         "supabase/migrations/20260617000000_rental_sts_pledge.sql",
-        // Forward-telegram API (for sending files when blocked)
-        "app/api/forward-telegram/route.ts",
-        // Dashboard components (for viewing generated docs)
+        // Subrent contract artifacts
+        "supabase/migrations/20260624000000_create_subrent_contract_artifacts.sql",
+
+        // === APP INTEGRATION ===
+        // Contract variable generators
+        "app/lib/rental-contract-vars.ts",
+        "app/lib/user-rental-secrets.ts",
+        // Dashboard for viewing generated docs
         "app/franchize/[slug]/rentals-analytics/page.tsx",
         "app/franchize/[slug]/rentals-analytics/RentalsAnalyticsClient.tsx",
         "app/franchize/server-actions/rentals-dashboard.ts",
-        // Seed data (12 bikes)
-        "docs/sql/cars_rows_12bikes_june5.csv",
-        // Documentation
+        // Forward-telegram API (for sending files when blocked)
+        "app/api/forward-telegram/route.ts",
+
+        // === DOCUMENTATION ===
         "DOC_SKILL_FULL_INSTALLER.md",
         "docs/skill_installer/ZAI_AGENT_INSTRUCTIONS.md",
+
+        // === SEED DATA (for testing) ===
+        "docs/sql/cars_rows_12bikes_june5.csv",
     ].filter(Boolean), []);
 
     const effectiveBranchDisplay = useMemo(() => targetBranchName || manualBranchName || "default", [targetBranchName, manualBranchName]);
