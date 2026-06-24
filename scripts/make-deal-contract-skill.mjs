@@ -4,15 +4,16 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // USAGE:
-//   node make-deal-contract-skill.mjs --dealType rent  --phrase "..." --passportJson ./p.json --licenseJson ./l.json --telegramChatId 123
-//   node make-deal-contract-skill.mjs --dealType sale  --phrase "..." --passportJson ./p.json --price 390000 --telegramChatId 123
+//   node make-deal-contract-skill.mjs --dealType rent    --phrase "..." --passportJson ./p.json --licenseJson ./l.json --telegramChatId 123
+//   node make-deal-contract-skill.mjs --dealType sale    --phrase "..." --passportJson ./p.json --price 390000 --telegramChatId 123
+//   node make-deal-contract-skill.mjs --dealType subrent --ownerName "..." --passportJson ./p.json --bikeMake "Yamaha" --bikeModel "R7" --telegramChatId 123
 //
 // ─── SUPPORTED CLI FLAGS ───────────────────────────────────────────────────
-//   --dealType          (REQUIRED) "rent" or "sale"
+//   --dealType          (REQUIRED) "rent", "sale", or "subrent"
 //   --phrase            Trigger phrase (contains bike id + schedule for rent)
 //   --bikeId            Alternative bike identifier (if phrase not used)
-//   --passportJson      Path to passport OCR JSON (REQUIRED for both)
-//   --licenseJson       Path to driver-license OCR JSON (REQUIRED for rent, NOT for sale)
+//   --passportJson      Path to passport OCR JSON (REQUIRED for all deal types)
+//   --licenseJson       Path to driver-license OCR JSON (REQUIRED for rent, NOT for sale/subrent)
 //   --buyerAddress      Manual override for buyer registration address.
 //                       USE WHEN: VLM/OCR yields only city-level precision for the
 //                       registration field on passport page 2 (cursive handwriting).
@@ -59,6 +60,29 @@
 //   --saveMetadata      Set to "1" to write metadata to Supabase
 //   --metadataTable     Override metadata table name
 //
+// ─── SUBRENT-SPECIFIC FLAGS ───────────────────────────────────────────────────
+//   --ownerName         (REQUIRED) Full name of bike owner (subrent only)
+//   --ownerBirthDate    Owner birth date DD.MM.YYYY (subrent only)
+//   --ownerPhone        Owner phone number (subrent only)
+//   --ownerEmail        Owner email (subrent only, optional)
+//   --ownerAddress      Owner registration address (subrent only)
+//   --bikeMake          (REQUIRED) Bike make (subrent only)
+//   --bikeModel         (REQUIRED) Bike model (subrent only)
+//   --bikeVin           Bike VIN (subrent only)
+//   --bikePlate         Bike license plate (subrent only)
+//   --bikeYear          Bike year (subrent only)
+//   --bikeValue         Bike value in rubles (subrent only)
+//   --ownerPercentage   Owner revenue share percentage (subrent only, default 50)
+//   --minDailyPrice     Minimum daily rental price (subrent only, default 9000)
+//   --hourly3hPrice     3-hour rental price (subrent only, default 6000)
+//   --hourly6hPrice     6-hour rental price (subrent only, default 7000)
+//   --hourly12hPrice    12-hour rental price (subrent only, default 8000)
+//   --weekdayPrice      Weekday daily price (subrent only, default 14000)
+//   --weekendPrice      Weekend daily price (subrent only, default 16000)
+//   --contractStartDate Contract start date DD.MM.YYYY (subrent only)
+//   --contractStartTime Contract start time HH:MM (subrent only, default 10:00)
+//   --contractDuration  Contract duration: 3m, 6m, or 1y (subrent only, default 6m)
+//
 // ─── FLAGS THAT DO NOT EXIST (anti-hallucination) ──────────────────────────
 //   --skipTelegram      DOES NOT EXIST. Telegram delivery is always built-in.
 //   --outPath           DOES NOT EXIST. No local file output option.
@@ -86,8 +110,8 @@ function hasFlag(name) { return process.argv.includes(`--${name}`); }
 
 // ── Deal type validation ────────────────────────────────────────────────
 const dealType = String(arg('dealType', '')).trim().toLowerCase();
-if (dealType !== 'rent' && dealType !== 'sale') {
-  const payload = { ok: false, stage: 'deal_type', reason: 'missing_or_invalid_dealType', details: { expected: '"rent" or "sale"', received: dealType || '(empty)' } };
+if (dealType !== 'rent' && dealType !== 'sale' && dealType !== 'subrent') {
+  const payload = { ok: false, stage: 'deal_type', reason: 'missing_or_invalid_dealType', details: { expected: '"rent", "sale", or "subrent"', received: dealType || '(empty)' } };
   console.error(JSON.stringify(payload, null, 2));
   process.exit(2);
 }
@@ -96,6 +120,7 @@ if (dealType !== 'rent' && dealType !== 'sale') {
 const RENTAL_DOC_HTML_TEMPLATE_PATH = 'docs/RENTAL_DEAL_TEMPLATE.html';
 const RENTAL_DOC_MD_TEMPLATE_PATH   = 'docs/RENTAL_DEAL_TEMPLATE.md';
 const SALE_DOC_HTML_TEMPLATE_PATH   = 'docs/SALE_DEAL_TEMPLATE.html';
+const SUBRENTAL_DOC_HTML_TEMPLATE_PATH = 'docs/SUBRENTAL_DEAL_TEMPLATE.html';
 
 const RENTAL_DOC_TEMPLATE_MODE = String(process.env.RENTAL_DOC_TEMPLATE_MODE || 'html').trim().toLowerCase();
 
@@ -885,6 +910,160 @@ if (dealType === 'rent') {
   // Filename
   const safeName = s => String(s || '').replace(/[^a-zA-Zа-яА-Я0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   docFileName = `sale-contract-${safeName(bike.make)}-${safeName(bike.model)}-${formatRuDate(now)}.docx`;
+
+} else if (dealType === 'subrent') {
+  // ══════════════════════════════════════════════════════════════════════
+  // SUBRENT FLOW
+  // ══════════════════════════════════════════════════════════════════════
+
+  // Owner details
+  const ownerName = String(arg('ownerName', '')).trim();
+  const ownerBirthDate = String(arg('ownerBirthDate', '')).trim();
+  const ownerPhone = String(arg('ownerPhone', '')).trim();
+  const ownerEmail = String(arg('ownerEmail', '')).trim();
+  const ownerAddress = String(arg('ownerAddress', '')).trim();
+
+  // Passport from passportJson (reuse same OCR structure)
+  const ownerPassportSeries = String(passportJson.series || '').trim();
+  const ownerPassportNumber = String(passportJson.number || '').trim();
+  const ownerPassportIssuedBy = String(passportJson.issuedBy || '').trim();
+  const ownerPassportIssueDate = String(passportJson.issueDate || '').trim();
+
+  if (!ownerName) failStage('owner_parse', 'missing_owner_name');
+  if (!ownerPhone) failStage('owner_parse', 'missing_owner_phone');
+  if (!ownerPassportSeries || !ownerPassportNumber) failStage('owner_parse', 'missing_passport_data');
+
+  // Bike details
+  const bikeMake = String(arg('bikeMake', '')).trim();
+  const bikeModel = String(arg('bikeModel', '')).trim();
+  const bikeVin = String(arg('bikeVin', '')).trim();
+  const bikePlate = String(arg('bikePlate', '')).trim();
+  const bikeYear = String(arg('bikeYear', '')).trim();
+  const bikeValue = String(arg('bikeValue', '')).trim();
+
+  if (!bikeMake) failStage('bike_parse', 'missing_bike_make');
+  if (!bikeModel) failStage('bike_parse', 'missing_bike_model');
+
+  // Payment terms (defaults from example contract)
+  const ownerPercentage = Number(arg('ownerPercentage', '50'));
+  const minDailyPrice = Number(arg('minDailyPrice', '9000'));
+  const hourly3hPrice = Number(arg('hourly3hPrice', '6000'));
+  const hourly6hPrice = Number(arg('hourly6hPrice', '7000'));
+  const hourly12hPrice = Number(arg('hourly12hPrice', '8000'));
+  const weekdayPrice = Number(arg('weekdayPrice', '14000'));
+  const weekendPrice = Number(arg('weekendPrice', '16000'));
+
+  // Contract duration
+  const contractStartDate = String(arg('contractStartDate', formatRuDate(new Date()))).trim();
+  const contractStartTime = String(arg('contractStartTime', '10:00')).trim();
+  const contractDuration = String(arg('contractDuration', '6m')).trim();
+
+  // Calculate end date
+  const startDP = parseRuDateParts(contractStartDate);
+  let endDate = '';
+  if (startDP) {
+    const endDateObj = new Date(startDP.y, startDP.mo, startDP.d);
+    let months = 0;
+    if (contractDuration === '3m') months = 3;
+    else if (contractDuration === '6m') months = 6;
+    else if (contractDuration === '1y') months = 12;
+    endDateObj.setMonth(endDateObj.getMonth() + months);
+    endDate = formatRuDate(endDateObj);
+  }
+
+  // Contract date
+  const contractDP = parseRuDateParts(contractStartDate);
+  if (contractDP) {
+    const dd = new Date(contractDP.y, contractDP.mo, contractDP.d);
+    vars.day = String(dd.getDate()).padStart(2, '0');
+    vars.month_num = String(dd.getMonth() + 1).padStart(2, '0');
+    vars.year = String(dd.getFullYear());
+    vars.contract_number = `${dd.getDate()}.${dd.getMonth() + 1}/SUB-${Date.now().toString().slice(-4)}`;
+  }
+
+  // Build subrental variables
+  vars = {
+    // Contract metadata
+    contract_number: vars.contract_number,
+    day: vars.day,
+    month_num: vars.month_num,
+    year: vars.year,
+
+    // Park/crew details
+    organization_name: crewOrgName,
+    organization_short: crewOrgShort,
+    organization_representative: crewOrgRepresentative,
+    legal_address: crewLegalAddress,
+    ogrnip: crewOgrnip,
+    inn: crewInn,
+    bank_account: crewBankAccount,
+    bank_name: crewBankName,
+    bank_city: crewBankCity,
+    bank_corr_account: crewBankCorrAccount,
+    email: crewEmail,
+
+    // Owner details
+    owner_full_name: ownerName,
+    owner_birth_date: ownerBirthDate,
+    owner_passport_series: ownerPassportSeries,
+    owner_passport_number: ownerPassportNumber,
+    owner_passport_issued_by: ownerPassportIssuedBy,
+    owner_passport_issue_date: ownerPassportIssueDate,
+    owner_registration: ownerAddress,
+    owner_phone: ownerPhone,
+    owner_email: ownerEmail,
+
+    // Bike details
+    bike_make: bikeMake,
+    bike_model: bikeModel,
+    bike_vin: bikeVin,
+    bike_plate: bikePlate,
+    bike_year: bikeYear,
+    bike_value_rub: bikeValue,
+
+    // Payment terms
+    owner_percentage: String(ownerPercentage),
+    owner_percentage_text: numberToRussianWords(ownerPercentage),
+    min_daily_price_rub: String(minDailyPrice),
+    min_daily_price_text: numberToRussianWords(minDailyPrice),
+    hourly_3h_price_rub: String(hourly3hPrice),
+    hourly_6h_price_rub: String(hourly6hPrice),
+    hourly_12h_price_rub: String(hourly12hPrice),
+    weekday_daily_price_rub: String(weekdayPrice),
+    weekend_daily_price_rub: String(weekendPrice),
+    reporting_period: 'неделя',
+    payment_deadline_days: '2',
+    payment_deadline_days_text: 'двух',
+    late_penalty_percent: '0.2',
+
+    // Contract duration
+    contract_start_date: contractStartDate,
+    contract_start_time: contractStartTime,
+    contract_end_date: endDate,
+    contract_end_time: '19:00',
+
+    // Deposits and terms
+    regular_client_deposit_rub: '10000',
+    regular_client_deposit_text: numberToRussianWords(10000),
+    new_client_deposit_rub: '20000',
+    new_client_deposit_text: numberToRussianWords(20000),
+    daily_km_allowance: '200',
+    extra_km_fee_rub: '30',
+    downtime_compensation_daily_rub: '4000',
+    downtime_compensation_daily_text: numberToRussianWords(4000),
+
+    // Return address
+    return_address: crewLegalAddress || 'г. Нижний Новгород',
+
+    // Territory
+    insurance_territory: crewTerritory || 'Нижегородской области',
+
+    document_key: `subrent-${bikeMake}-${bikeModel}-${Date.now()}`,
+  };
+
+  // Filename
+  const safeName = s => String(s || '').replace(/[^a-zA-Zа-яА-Я0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  docFileName = `subrental-contract-${safeName(bikeMake)}-${safeName(bikeModel)}-${contractStartDate}.docx`;
 }
 
 // ── Build Document ──────────────────────────────────────────────────────
@@ -946,6 +1125,44 @@ if (dealType === 'rent') {
     // MD mode: plain text → simple paragraphs
     const rendered = renderTemplateWithVars(mdTemplate, vars);
     doc = new Document({sections:[{children: rendered.split('\n').map(line=>new Paragraph({children:[new TextRun({ text: line, font: 'Times New Roman' })]}))}]});
+  }
+
+} else if (dealType === 'subrent') {
+  // SUBRENT: HTML only (no MD fallback)
+  let htmlTemplate;
+  try {
+    htmlTemplate = readFileSync(SUBRENTAL_DOC_HTML_TEMPLATE_PATH, 'utf8');
+  } catch (readError) {
+    failStage('template_read', 'subrent_html_template_missing', { path: SUBRENTAL_DOC_HTML_TEMPLATE_PATH, error: String(readError?.message || readError) });
+  }
+
+  try {
+    const renderedHtml = renderTemplateWithVars(htmlTemplate, vars);
+    const children = htmlToDocxElements(renderedHtml);
+    doc = new Document({
+      sections: [{
+        properties: {
+          page: {
+            margin: {
+              top: 1134,
+              right: 1134,
+              bottom: 1134,
+              left: 1701,
+            },
+          },
+        },
+        children,
+      }],
+    });
+    console.error('[subrent-doc] HTML→DOCX: proper cheerio-based conversion (formatting preserved)');
+  } catch (error) {
+    console.warn(`[subrent-doc] html→docx failed, trying legacy adapter: ${String(error?.message || error)}`);
+    try {
+      const text = renderHtmlTemplateAdapterLegacy(htmlTemplate, vars);
+      doc = new Document({sections:[{children: text.split('\n').map(line=>new Paragraph({children:[new TextRun({ text: line, font: 'Times New Roman' })]}))}]});
+    } catch (e2) {
+      failStage('doc_generation', 'subrent_doc_generation_failed', { htmlError: String(error?.message || error), legacyError: String(e2?.message || e2) });
+    }
   }
 
 } else {
@@ -1029,7 +1246,7 @@ if (!json.ok) {
     chat_id: telegramChatId,
     method: 'sendDocument',
     payload: {
-      caption: `Договор ${dealType === 'sale' ? 'купли-продажи' : 'аренды'} ${bike.id} — ${docFileName}`,
+      caption: `Договор ${dealType === 'sale' ? 'купли-продажи' : dealType === 'subrent' ? 'субаренды' : 'аренды'} ${dealType === 'subrent' ? vars.bike_make + ' ' + vars.bike_model : bike.id} — ${docFileName}`,
       parse_mode: 'HTML',
     },
     files: {
@@ -1114,7 +1331,7 @@ if (dealType === 'rent') {
 
 // ── Metadata persistence ────────────────────────────────────────────────
 const saveMetadata = arg('saveMetadata', '0') !== '0';
-const defaultMetadataTable = dealType === 'rent' ? 'rental_contract_artifacts' : 'sale_contract_artifacts';
+const defaultMetadataTable = dealType === 'rent' ? 'rental_contract_artifacts' : dealType === 'sale' ? 'sale_contract_artifacts' : 'private.subrent_contract_artifacts';
 const metadataTable = arg('metadataTable', defaultMetadataTable);
 
 if (saveMetadata) {
@@ -1151,6 +1368,31 @@ if (saveMetadata) {
       payload.sts_pledge_return_days = Number(stsPledgeReturnDays);
       payload.deposit_amount_skipped = vars.sts_deposit_amount_skipped;
     }
+  } else if (dealType === 'subrent') {
+    // Subrental uses private schema, handle separately
+    payload.owner_full_name = vars.owner_full_name;
+    payload.owner_birth_date = vars.owner_birth_date;
+    payload.owner_passport_series = vars.owner_passport_series;
+    payload.owner_passport_number = vars.owner_passport_number;
+    payload.owner_passport_issued_by = vars.owner_passport_issued_by;
+    payload.owner_passport_issue_date = vars.owner_passport_issue_date;
+    payload.owner_registration = vars.owner_registration;
+    payload.owner_phone = vars.owner_phone;
+    payload.owner_email = vars.owner_email;
+    payload.bike_make = vars.bike_make;
+    payload.bike_model = vars.bike_model;
+    payload.bike_vin = vars.bike_vin;
+    payload.bike_plate = vars.bike_plate;
+    payload.bike_value_rub = vars.bike_value_rub;
+    payload.owner_percentage = vars.owner_percentage;
+    payload.min_daily_price_rub = vars.min_daily_price_rub;
+    payload.contract_start_date = vars.contract_start_date;
+    payload.contract_start_time = vars.contract_start_time;
+    payload.contract_end_date = vars.contract_end_date;
+    payload.contract_end_time = vars.contract_end_time;
+    // Remove bike-related fields that don't apply to subrent
+    delete payload.requested_bike_id;
+    delete payload.resolved_bike_id;
   } else {
     payload.buyer_full_name = vars.buyer_full_name;
     payload.sale_price = vars.price_digits;
