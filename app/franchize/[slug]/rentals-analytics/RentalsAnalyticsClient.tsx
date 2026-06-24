@@ -28,6 +28,8 @@ import {
   Mail,
   MessageSquare,
   Send,
+  List,
+  Share2,
 } from "lucide-react";
 
 import { useAppContext } from "@/contexts/AppContext";
@@ -69,6 +71,7 @@ import {
   type TodoStatus,
 } from "@/app/franchize/server-actions/crew-todos";
 import { RentalHandoffModal } from "./RentalHandoffModal";
+import { RentalsCalendar } from "./RentalsCalendar";
 import { withAlpha } from "@/app/franchize/lib/theme";
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────────
@@ -167,6 +170,13 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const [messageMenuOpen, setMessageMenuOpen] = useState<string | null>(null);
   const [messageTemplates, setMessageTemplates] = useState<Array<{ id: string; key: string; name: string }>>([]);
   const [sendingMessage, setSendingMessage] = useState<string | null>(null);
+
+  // Rental completion state
+  const [completingRental, setCompletingRental] = useState<string | null>(null);
+  const [qrShareOpen, setQrShareOpen] = useState<string | null>(null);
+
+  // View mode state
+  const [analyticsView, setAnalyticsView] = useState<"table" | "calendar">("table");
 
   // Password auth
   const [showPasswordEntry, setShowPasswordEntry] = useState(false);
@@ -618,6 +628,50 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     } finally {
       setSendingMessage(null);
     }
+  };
+
+  const handleMarkComplete = async (rental: RentalDashboardItem) => {
+    const actorUserId = getActorUserId();
+    if (!actorUserId) return;
+
+    setCompletingRental(rental.rental_id);
+    try {
+      const result = await updateRentalStatus({
+        slug: initialSlug?.trim() || "vip-bike",
+        actorUserId,
+        rentalId: rental.rental_id,
+        status: "completed",
+        isPasswordAuth: !!passwordAuthOwnerId,
+      });
+
+      if (result.success) {
+        toast.success("Аренда завершена");
+        // Trigger refresh
+        window.dispatchEvent(new CustomEvent("franchize-rentals-updated"));
+      } else {
+        toast.error(result.error || "Не удалось завершить аренду");
+      }
+    } catch (error) {
+      console.error("[Mark complete] Error:", error);
+      toast.error("Ошибка завершения аренды");
+    } finally {
+      setCompletingRental(null);
+    }
+  };
+
+  const handleShareQr = (rental: RentalDashboardItem) => {
+    // Generate deep link using startparam format: rental_{slug}_{rentalId}
+    const slug = initialSlug?.trim() || "vip-bike";
+    const startParam = `rental_${slug}_${rental.rental_id}`;
+    const deepLink = `https://t.me/oneBikePlsBot/app?startapp=${startParam}`;
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(deepLink).then(() => {
+      toast.success("Ссылка скопирована! Отправьте её другому члену команды");
+    }).catch(() => {
+      toast.error("Не удалось скопировать ссылку");
+    });
+    setQrShareOpen(null);
   };
 
   // ─── Initial load ─────────────────────────────────────────────────────────────
@@ -1613,6 +1667,52 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                 borderWidth: "1px"
               }}
             >
+              {/* View toggle buttons */}
+              <div className="px-4 md:px-5 pt-2.5 md:pt-3 flex items-center gap-2">
+                <button
+                  onClick={() => setAnalyticsView("table")}
+                  className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all flex items-center gap-1.5 md:gap-2 ${
+                    analyticsView === "table" ? "opacity-100" : "opacity-60"
+                  }`}
+                  style={{
+                    backgroundColor: analyticsView === "table" ? withAlpha(accentMain, 0.2) : "transparent",
+                    borderColor: analyticsView === "table" ? withAlpha(accentMain, 0.3) : borderSoft,
+                    borderWidth: "1px",
+                    color: analyticsView === "table" ? accentMain : textSecondary,
+                  }}
+                >
+                  <List className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                  <span className="hidden sm:inline">Таблица</span>
+                </button>
+                <button
+                  onClick={() => setAnalyticsView("calendar")}
+                  className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all flex items-center gap-1.5 md:gap-2 ${
+                    analyticsView === "calendar" ? "opacity-100" : "opacity-60"
+                  }`}
+                  style={{
+                    backgroundColor: analyticsView === "calendar" ? withAlpha(accentMain, 0.2) : "transparent",
+                    borderColor: analyticsView === "calendar" ? withAlpha(accentMain, 0.3) : borderSoft,
+                    borderWidth: "1px",
+                    color: analyticsView === "calendar" ? accentMain : textSecondary,
+                  }}
+                >
+                  <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                  <span className="hidden sm:inline">Календарь</span>
+                </button>
+              </div>
+
+              {analyticsView === "calendar" ? (
+                <div className="px-4 md:px-5 pb-4 md:pb-6">
+                  <RentalsCalendar
+                    slug={initialSlug}
+                    crewId={crew.id}
+                    crewTheme={crew.theme}
+                    isPasswordAuth={!!passwordAuthOwnerId}
+                    passwordAuthOwnerId={passwordAuthOwnerId}
+                  />
+                </div>
+              ) : (
+                <>
               <div
                 className="px-4 md:px-5 py-2.5 md:py-3 border-b flex items-center gap-2"
                 style={{
@@ -1956,6 +2056,43 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                                     )}
                                   </button>
                                 )}
+                                {/* Mark as complete button */}
+                                {rental.status !== "completed" && (
+                                  <button
+                                    onClick={() => void handleMarkComplete(rental)}
+                                    disabled={completingRental === rental.rental_id}
+                                    className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group disabled:opacity-50"
+                                    style={{
+                                      backgroundColor: completingRental === rental.rental_id
+                                        ? withAlpha("#10b981", 0.25)
+                                        : withAlpha("#10b981", 0.15),
+                                      borderColor: withAlpha("#10b981", 0.4),
+                                      color: "#10b981",
+                                      border: "1.5px solid"
+                                    }}
+                                    title="Завершить аренду"
+                                  >
+                                    {completingRental === rental.rental_id ? (
+                                      <RefreshCw className="w-3 h-3 md:w-3.5 md:h-3.5 animate-spin relative z-10" />
+                                    ) : (
+                                      <CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5 relative z-10" />
+                                    )}
+                                  </button>
+                                )}
+                                {/* QR Share button - for crew members to quickly access rental */}
+                                <button
+                                  onClick={() => handleShareQr(rental)}
+                                  className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group"
+                                  style={{
+                                    backgroundColor: withAlpha("#8b5cf6", 0.15),
+                                    borderColor: withAlpha("#8b5cf6", 0.4),
+                                    color: "#8b5cf6",
+                                    border: "1.5px solid"
+                                  }}
+                                  title="Скопировать ссылку для быстрого доступа"
+                                >
+                                  <Share2 className="w-3 h-3 md:w-3.5 md:h-3.5 relative z-10" />
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -1965,6 +2102,8 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                   </table>
                 </div>
               )}
+              </> // End table view
+              )} {/* End calendar/table conditional */}
 
               {/* SALES LIST */}
               {sales.length > 0 && (
