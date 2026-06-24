@@ -202,7 +202,17 @@ export async function getRentalsDashboard(input: {
       // Special case: orudjov (and variations) always have access
       const isOrudjov = userUsername?.toLowerCase().includes("orud");
 
-      if (!isOwner && !isAdmin && !isOrudjov) {
+      // Check if user is a crew member
+      const { data: crewMember } = await supabaseAdmin
+        .from("crew_members")
+        .select("user_id")
+        .eq("crew_id", crew.id)
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+
+      const isCrewMember = !!crewMember;
+
+      if (!isOwner && !isAdmin && !isOrudjov && !isCrewMember) {
         return { success: false, error: "Недостаточно прав для просмотра." };
       }
     }
@@ -212,6 +222,7 @@ export async function getRentalsDashboard(input: {
     const endOfDay = new Date(`${date}T23:59:59.999Z`).toISOString();
 
     // Query rentals for the day
+    console.log("[rentals-dashboard] Querying rentals for crew:", crew.id, "date:", date, "range:", { startOfDay, endOfDay });
     const { data: rentals, error: rentalsError } = await supabaseAdmin
       .from("rentals")
       .select(`
@@ -239,6 +250,8 @@ export async function getRentalsDashboard(input: {
       console.error("[rentals-dashboard] Query error:", rentalsError);
       return { success: false, error: rentalsError.message };
     }
+
+    console.log("[rentals-dashboard] Found rentals:", rentals?.length || 0);
 
     // DEDUPLICATION: Handle multiple rental generations for same transaction
     // When user re-uploads documents (same date, same bike, same dude), a NEW rental_id
@@ -402,6 +415,12 @@ export async function getRentalsDashboard(input: {
       summary.byPaymentStatus[paymentStatus] = (summary.byPaymentStatus[paymentStatus] || 0) + 1;
     }
 
+    console.log("[rentals-dashboard] Returning result:", {
+      itemsCount: items.length,
+      summary: { totalCount: summary.totalCount, totalRevenue: summary.totalRevenue },
+      selectedDate: date,
+    });
+
     return {
       success: true,
       data: {
@@ -469,7 +488,17 @@ export async function getSalesDashboard(input: {
       const isOwner = crew.owner_id === actorUserId;
       const isOrudjov = userUsername?.toLowerCase().includes("orud");
 
-      if (!isOwner && !isAdmin && !isOrudjov) {
+      // Check if user is a crew member
+      const { data: crewMember } = await supabaseAdmin
+        .from("crew_members")
+        .select("user_id")
+        .eq("crew_id", crew.id)
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+
+      const isCrewMember = !!crewMember;
+
+      if (!isOwner && !isAdmin && !isOrudjov && !isCrewMember) {
         return { success: false, error: "Недостаточно прав для просмотра." };
       }
     }
@@ -754,7 +783,17 @@ export async function getRentalsDateRange(input: {
       const isAdmin = userMetadata?.role === "admin";
       const isOrudjov = userUsername?.toLowerCase().includes("orud");
 
-      if (!isOwner && !isAdmin && !isOrudjov) {
+      // Check if user is a crew member
+      const { data: crewMember } = await supabaseAdmin
+        .from("crew_members")
+        .select("user_id")
+        .eq("crew_id", crew.id)
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+
+      const isCrewMember = !!crewMember;
+
+      if (!isOwner && !isAdmin && !isOrudjov && !isCrewMember) {
         return { success: false, error: "Недостаточно прав." };
       }
     }
@@ -1433,7 +1472,17 @@ export async function getCommercialProposalsDashboard(input: {
       const isOwner = crew.owner_id === actorUserId;
       const isOrudjov = userUsername?.toLowerCase().includes("orud");
 
-      if (!isOwner && !isAdmin && !isOrudjov) {
+      // Check if user is a crew member
+      const { data: crewMember } = await supabaseAdmin
+        .from("crew_members")
+        .select("user_id")
+        .eq("crew_id", crew.id)
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+
+      const isCrewMember = !!crewMember;
+
+      if (!isOwner && !isAdmin && !isOrudjov && !isCrewMember) {
         return { success: false, error: "Недостаточно прав для просмотра." };
       }
     }
@@ -1590,7 +1639,17 @@ export async function getSubrentContractsDashboard(input: {
       const isOwner = crew.owner_id === actorUserId;
       const isOrudjov = userUsername?.toLowerCase().includes("orud");
 
-      if (!isOwner && !isAdmin && !isOrudjov) {
+      // Check if user is a crew member
+      const { data: crewMember } = await supabaseAdmin
+        .from("crew_members")
+        .select("user_id")
+        .eq("crew_id", crew.id)
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+
+      const isCrewMember = !!crewMember;
+
+      if (!isOwner && !isAdmin && !isOrudjov && !isCrewMember) {
         return { success: false, error: "Недостаточно прав для просмотра." };
       }
     }
