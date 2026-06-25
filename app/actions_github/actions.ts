@@ -287,13 +287,13 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
     const octokit = new Octokit({ auth: token });
     const allowedRootFiles = new Set(['package.json','tailwind.config.ts','tsconfig.json','next.config.js','next.config.mjs','vite.config.ts','vite.config.js','README.md','AI_MAP.md','AGENTS.md','AGENT_ENTRY.md','seed.sql','autoresearch.md']);
     const allowedPrefixes = ['app/','components/','contexts/','hooks/','lib/','styles/','types/','utils/','data/','core/','docs/','skills/','scripts/','infrastructure/','system/','supabase/migrations/'];
-    const excludedExactPaths = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'app/bio30/', 'app/elon/', 'app/arbitrage-live-scanner/', 'app/arbitrage-notdummies/', 'app/arbitrage-test-agent/', 'app/bullshitdetector/', 'app/csv-compare/', 'app/doc-verifier/', 'app/expmind/', 'app/zai-docx-instructions/']);
+    const excludedExactPaths = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'app/bio30/', 'app/elon/', 'app/arbitrage-live-scanner/', 'app/arbitrage-notdummies/', 'app/arbitrage-test-agent/', 'app/bullshitdetector/', 'app/csv-compare/', 'app/doc-verifier/', 'app/expmind/', 'components/vpr', 'components/streamer', 'components/stickyChat_components', 'components/assistant_components']);
     const excludedPrefixes = [
       '.git/','node_modules/','.next/','dist/','build/','out/','public/','Configame/','components/ui/','.vscode/','.idea/',
       'coverage/','storybook-static/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/',
       // Experimental/archived projects
       'app/bio30/','app/elon/','app/arbitrage-live-scanner/','app/arbitrage-notdummies/','app/arbitrage-test-agent/','app/arbitrage-explained/',
-      'app/bullshitdetector/','app/csv-compare/','app/doc-verifier/','app/expmind/',
+      'app/bullshitdetector/','app/csv-compare/','app/doc-verifier/','app/expmind/', 'app/topdf/components/steps',
       // Client-specific directories
       'app/pavele0903/','app/sly13/','app/svarprofi/','app/paddock/','app/greenbox/',
       // Standalone apps/features
