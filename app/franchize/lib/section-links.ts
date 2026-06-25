@@ -7,7 +7,9 @@ export interface FranchizeSectionLink {
 const FRANCHIZE_INTENT_LINKS: Array<{ label: string; path: string }> = [
   { label: "Каталог", path: "" },
   { label: "Продажи", path: "/sales" },
+  { label: "Коммерческие", path: "/commercial-offers" },
   { label: "Аренды", path: "/rentals" },
+  { label: "Аналитика аренд", path: "/rentals-analytics" },
   { label: "Карта", path: "/map-riders" },
   { label: "Сообщество", path: "/community" },
   { label: "Партнёрам", path: "/onboarding" },

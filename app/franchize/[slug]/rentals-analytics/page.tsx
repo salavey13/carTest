@@ -4,6 +4,7 @@ import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { FranchizePageShell } from "@/app/franchize/components/FranchizePageShell";
 import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
+import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
 import { buildFranchizeSectionMetadata } from "../metadata";
 import { RentalsAnalyticsClient } from "./RentalsAnalyticsClient";
 
@@ -47,7 +48,7 @@ export default async function FranchizeSlugRentalsAnalyticsPage({
         crew={crew}
         activePath={activePath}
         groupLinks={[]}
-        showRail={false}
+        sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath)}
       />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4" width="full">
         <RentalsAnalyticsClient

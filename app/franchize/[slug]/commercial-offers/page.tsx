@@ -8,28 +8,28 @@ import { FranchizeErrorBoundary } from "../../components/ErrorBoundary";
 import { buildFranchizeIntentLinks } from "../../lib/section-links";
 import { crewPaletteWithCssVars } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
-import { SalesClient } from "./SalesClient";
+import { CommercialOffersClient } from "./CommercialOffersClient";
 
-interface FranchizeSalesPageProps {
+interface FranchizeCommercialOffersPageProps {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ date?: string }>;
 }
 
-export async function generateMetadata({ params }: FranchizeSalesPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: FranchizeCommercialOffersPageProps): Promise<Metadata> {
   const { slug } = await params;
   return buildFranchizeSectionMetadata(slug, {
-    sectionTitle: "Продажи",
-    sectionDescription: "Раздел управления продажами экипажа: договоры купли-продажи, выручка и контакты покупателей.",
-    pathSuffix: "/sales",
+    sectionTitle: "Коммерческие предложения",
+    sectionDescription: "Список коммерческих предложений экипажа: клиенты, типы оферт, суммы и сроки действия.",
+    pathSuffix: "/commercial-offers",
   });
 }
 
-export default async function FranchizeSalesPage({ params, searchParams }: FranchizeSalesPageProps) {
+export default async function FranchizeCommercialOffersPage({ params, searchParams }: FranchizeCommercialOffersPageProps) {
   const { slug } = await params;
   const { date: dateParam } = await searchParams;
   const { crew } = await getFranchizeBySlug(slug);
   const resolvedSlug = crew.slug || slug;
-  const activePath = `/franchize/${resolvedSlug}/sales`;
+  const activePath = `/franchize/${resolvedSlug}/commercial-offers`;
   const surface = crewPaletteWithCssVars(crew.theme);
 
   const today = new Date().toISOString().split("T")[0];
@@ -45,19 +45,19 @@ export default async function FranchizeSalesPage({ params, searchParams }: Franc
       />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4" width="full">
         <FranchizeHero
-          eyebrow={`/franchize/${resolvedSlug}/sales · control-center`}
-          title="Продажи"
-          subcopy="Список договоров купли-продажи за выбранный день: покупатель, техника, сумма, гарантия. Источник — private.sale_contract_artifacts."
+          eyebrow={`/franchize/${resolvedSlug}/commercial-offers · control-center`}
+          title="Коммерческие предложения"
+          subcopy="Список КП за выбранный день: клиент, тип оферты, сумма, срок действия, QR. Источник — private.commercial_proposal_artifacts."
           primaryCta={{ label: "Вернуться в каталог", href: `/franchize/${resolvedSlug}` }}
           secondaryCta={{ label: "К аналитике аренд", href: `/franchize/${resolvedSlug}/rentals-analytics` }}
         />
         <FranchizeErrorBoundary
           resetKey={slug}
-          fallbackTitle="Раздел продаж временно недоступен"
-          fallbackHref={`/franchize/${resolvedSlug}/sales`}
-          fallbackLinkLabel="Перезагрузить раздел продаж"
+          fallbackTitle="Раздел КП временно недоступен"
+          fallbackHref={`/franchize/${resolvedSlug}/commercial-offers`}
+          fallbackLinkLabel="Перезагрузить раздел КП"
         >
-          <SalesClient initialSlug={resolvedSlug} initialDate={selectedDate} crew={crew} />
+          <CommercialOffersClient initialSlug={resolvedSlug} initialDate={selectedDate} crew={crew} />
         </FranchizeErrorBoundary>
       </FranchizePageShell>
       <CrewFooter crew={crew} />
