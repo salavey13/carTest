@@ -511,7 +511,7 @@ export async function handleSubrentManualCommand(params: {
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
-        text: `🏍 *Субаренда мотоцикла в парк*\n\nВыберите мотоцикл, который собственник передаёт в аренду вашему парку:`,
+        text: `🏍 *Субаренда мотоцикла в парк* (1/7)\n\nВыберите мотоцикл, который собственник передаёт в аренду вашему парку:`,
         parseMode: "Markdown",
         replyMarkup: JSON.stringify({ inline_keyboard: buildBikeKeyboard(bikes) }),
       });
@@ -567,7 +567,8 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: "📝 Введите данные мотоцикла в формате:\n\nМарка Модель\nVIN\nГос. номер\nГод\nСтоимость",
+          text: `📝 *Субаренда мотоцикла в парк* (2/7)\n\nВведите данные мотоцикла:\n\n*Марка Модель*\n_Yamaha R7_\n\n*VIN*\n_JYA2... (17 символов)_\n\n*Гос. номер*\n_А123БВ777_\n\n*Год*\n_2023_\n\n*Стоимость (₽)*\n_500000_\n\n📋 Каждое поле с новой строки:`,
+          parseMode: "Markdown",
         });
         context.step = "bike_new";
         await saveState(userId, context);
@@ -581,7 +582,8 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
           await sendComplexMessage({
             botToken: TELEGRAM_BOT_TOKEN,
             chatId: userId,
-            text: `✅ Выбран: ${bike.make} ${bike.model}\n\n👤 Введите ФИО собственника (полностью):`,
+            text: `✅ *Субаренда мотоцикла в парк* (3/7)\n\nВыбран: *${bike.make} ${bike.model}*\n\n👤 Введите ФИО собственника (полностью):`,
+            parseMode: "Markdown",
           });
 
           context.step = "owner_name";
@@ -796,6 +798,16 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
         context.bikeValue = bikeLines[5] || "";
       }
 
+      // Validate required fields
+      if (!context.bikeMake || !context.bikeModel) {
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "❌ Марка и модель обязательны. Попробуйте еще раз:",
+        });
+        return;
+      }
+
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
@@ -811,7 +823,8 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
-        text: "📄 Введите паспортные данные (серия номер дата выдачи кем выдано):\n\nПример: 4509 123456 15.03.2020 ОМВД по Н.Новгороду",
+        text: `📄 *Субаренда мотоцикла в парк* (4/7)\n\nВведите паспортные данные:\n\n*Серия Номер*\n_4509 123456_\n\n*Дата выдачи*\n_15.03.2020_\n\n*Кем выдано*\n_ОМВД по Н.Новгороду_\n\n📋 Пример в одну строку:\n_4509 123456 15.03.2020 ОМВД по Н.Новгороду_`,
+        parseMode: "Markdown",
       });
       context.step = "owner_passport";
       await saveState(userId, context);
@@ -828,7 +841,8 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: "📅 Введите дату рождения собственника (ДД.ММ.ГГГГ):",
+          text: `📅 *Субаренда мотоцикла в парк* (5/7)\n\nВведите дату рождения собственника:\n\n*ДД.ММ.ГГГГ*\n_01.01.1990_`,
+          parseMode: "Markdown",
         });
         context.step = "owner_birth";
         await saveState(userId, context);
@@ -848,7 +862,8 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: "🏠 Введите адрес регистрации собственника:",
+          text: `🏠 *Субаренда мотоцикла в парк* (6/7)\n\nВведите адрес регистрации собственника:\n\n_г. Нижний Новгород, ул. Примерная, д. 1, кв. 1_`,
+          parseMode: "Markdown",
         });
         context.step = "owner_address";
         await saveState(userId, context);
@@ -856,7 +871,7 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: "❌ Неверный формат даты. Используйте ДД.ММ.ГГГГ",
+          text: "❌ Неверный формат даты. Используйте ДД.ММ.ГГГГ (например: 01.01.1990)",
         });
       }
       break;
@@ -866,7 +881,8 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
-        text: "📱 Введите телефон собственника:",
+        text: `📱 *Субаренда мотоцикла в парк* (7/7)\n\nВведите телефон собственника:\n\n_+7 (999) 123-45-67_`,
+        parseMode: "Markdown",
       });
       context.step = "owner_phone";
       await saveState(userId, context);
