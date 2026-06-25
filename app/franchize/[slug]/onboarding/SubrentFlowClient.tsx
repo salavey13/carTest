@@ -527,65 +527,109 @@ function BikeSelectionStep({
           backgroundColor: withAlpha(theme.palette.accentMain, 0.08),
           borderColor: withAlpha(theme.palette.accentMain, 0.3),
         }}>
-          <h4 className="font-semibold mb-4" style={{ color: theme.palette.accentMain }}>Данные мотоцикла для договора</h4>
+          <h4 className="font-semibold mb-2" style={{ color: theme.palette.accentMain }}>Данные мотоцикла для договора</h4>
+          <p className="text-sm opacity-70 mb-4">Эти данные нужны для оформления договора субаренды. Их можно взять из СТС мотоцикла.</p>
+
           <div className="grid gap-4 md:grid-cols-2">
-            <div>
+            <div className="relative">
               <label className="block text-sm font-medium mb-2">Гос. номер *</label>
               <input
                 type="text"
                 value={formData.bikePlate}
-                onChange={(e) => updateField("bikePlate", e.target.value)}
+                onChange={(e) => updateField("bikePlate", e.target.value.toUpperCase())}
                 placeholder="А123БВ777"
-                className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 uppercase"
+                maxLength={10}
+                className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 uppercase pr-10"
                 style={{
                   backgroundColor: withAlpha(theme.palette.bgCard, 0.5),
-                  borderColor: theme.palette.borderSoft,
+                  borderColor: formData.bikePlate && formData.bikePlate.length >= 6
+                    ? theme.palette.accentMain
+                    : theme.palette.borderSoft,
                 }}
               />
+              {formData.bikePlate && formData.bikePlate.length >= 6 && (
+                <Check className="absolute right-3 top-[2.6rem] w-5 h-5" style={{ color: theme.palette.accentMain }} />
+              )}
+              <p className="text-xs opacity-50 mt-1">Формат: А123БВ777</p>
             </div>
-            <div>
+            <div className="relative">
               <label className="block text-sm font-medium mb-2">VIN *</label>
               <input
                 type="text"
                 value={formData.bikeVin}
-                onChange={(e) => updateField("bikeVin", e.target.value)}
-                placeholder="XXXXXXXXXXXXXXXXX"
-                className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 uppercase"
+                onChange={(e) => updateField("bikeVin", e.target.value.toUpperCase())}
+                placeholder="JYA2..."
+                maxLength={17}
+                className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 uppercase pr-10"
                 style={{
                   backgroundColor: withAlpha(theme.palette.bgCard, 0.5),
-                  borderColor: theme.palette.borderSoft,
+                  borderColor: formData.bikeVin && formData.bikeVin.length >= 10
+                    ? theme.palette.accentMain
+                    : theme.palette.borderSoft,
                 }}
               />
+              {formData.bikeVin && formData.bikeVin.length >= 10 && (
+                <Check className="absolute right-3 top-[2.6rem] w-5 h-5" style={{ color: theme.palette.accentMain }} />
+              )}
+              <p className="text-xs opacity-50 mt-1">17 символов, можно найти в СТС</p>
             </div>
-            <div>
+            <div className="relative">
               <label className="block text-sm font-medium mb-2">Год выпуска *</label>
               <input
                 type="text"
                 value={formData.bikeYear}
-                onChange={(e) => updateField("bikeYear", e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  updateField("bikeYear", val);
+                }}
                 placeholder="2023"
-                className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2"
+                maxLength={4}
+                className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 pr-10"
                 style={{
                   backgroundColor: withAlpha(theme.palette.bgCard, 0.5),
-                  borderColor: theme.palette.borderSoft,
+                  borderColor: formData.bikeYear && formData.bikeYear.length === 4
+                    ? theme.palette.accentMain
+                    : theme.palette.borderSoft,
                 }}
               />
+              {formData.bikeYear && formData.bikeYear.length === 4 && (
+                <Check className="absolute right-3 top-[2.6rem] w-5 h-5" style={{ color: theme.palette.accentMain }} />
+              )}
+              <p className="text-xs opacity-50 mt-1">Год выпуска мотоцикла</p>
             </div>
-            <div>
+            <div className="relative">
               <label className="block text-sm font-medium mb-2">Стоимость (₽) *</label>
               <input
                 type="number"
                 value={formData.bikeValue}
                 onChange={(e) => updateField("bikeValue", e.target.value)}
                 placeholder="500000"
-                className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2"
+                min="0"
+                step="1000"
+                className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 pr-10"
                 style={{
                   backgroundColor: withAlpha(theme.palette.bgCard, 0.5),
-                  borderColor: theme.palette.borderSoft,
+                  borderColor: formData.bikeValue && Number(formData.bikeValue) > 0
+                    ? theme.palette.accentMain
+                    : theme.palette.borderSoft,
                 }}
               />
+              {formData.bikeValue && Number(formData.bikeValue) > 0 && (
+                <Check className="absolute right-3 top-[2.6rem] w-5 h-5" style={{ color: theme.palette.accentMain }} />
+              )}
+              <p className="text-xs opacity-50 mt-1">Примерная стоимость для расчёта износа</p>
             </div>
           </div>
+
+          {/* Validation hint */}
+          {(!formData.bikePlate || !formData.bikeVin || !formData.bikeYear || !formData.bikeValue) && (
+            <div className="flex items-center gap-2 mt-4 p-2 rounded-lg" style={{
+              backgroundColor: withAlpha(theme.palette.accentMain, 0.1),
+            }}>
+              <AlertCircle className="w-4 h-4" style={{ color: theme.palette.accentMain }} />
+              <span className="text-sm">Заполните все поля мотоцикла для продолжения</span>
+            </div>
+          )}
         </div>
       )}
     </div>

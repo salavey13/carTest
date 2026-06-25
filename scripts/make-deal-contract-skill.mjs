@@ -929,9 +929,11 @@ if (dealType === 'rent') {
   const ownerPassportIssuedBy = String(passportJson.issuedBy || '').trim();
   const ownerPassportIssueDate = String(passportJson.issueDate || '').trim();
 
-  if (!ownerName) failStage('owner_parse', 'missing_owner_name');
-  if (!ownerPhone) failStage('owner_parse', 'missing_owner_phone');
-  if (!ownerPassportSeries || !ownerPassportNumber) failStage('owner_parse', 'missing_passport_data');
+  if (!ownerName) failStage('owner_parse', 'missing_owner_name', { hint: 'Pass --ownerName "Иванов Иван Иванович"' });
+  if (!ownerPhone) failStage('owner_parse', 'missing_owner_phone', { hint: 'Pass --ownerPhone "+7 (999) 123-45-67"' });
+  if (!ownerBirthDate) failStage('owner_parse', 'missing_owner_birth_date', { hint: 'Pass --ownerBirthDate "01.01.1990" (DD.MM.YYYY)' });
+  if (!ownerPassportSeries || !ownerPassportNumber) failStage('owner_parse', 'missing_passport_data', { hint: 'Ensure passportJson contains series and number fields' });
+  if (!ownerAddress) console.warn('[subrent] WARNING: ownerAddress not provided — contract will have empty registration address');
 
   // Bike details
   const bikeMake = String(arg('bikeMake', '')).trim();
@@ -941,8 +943,14 @@ if (dealType === 'rent') {
   const bikeYear = String(arg('bikeYear', '')).trim();
   const bikeValue = String(arg('bikeValue', '')).trim();
 
-  if (!bikeMake) failStage('bike_parse', 'missing_bike_make');
-  if (!bikeModel) failStage('bike_parse', 'missing_bike_model');
+  if (!bikeMake) failStage('bike_parse', 'missing_bike_make', { hint: 'Pass --bikeMake "Yamaha"' });
+  if (!bikeModel) failStage('bike_parse', 'missing_bike_model', { hint: 'Pass --bikeModel "R7"' });
+
+  // Optional but important bike details - warn if missing
+  if (!bikeVin) console.warn('[subrent] WARNING: bikeVin not provided — contract will have empty VIN field');
+  if (!bikePlate) console.warn('[subrent] WARNING: bikePlate not provided — contract will have empty license plate field');
+  if (!bikeYear) console.warn('[subrent] WARNING: bikeYear not provided — contract will have empty year field');
+  if (!bikeValue) console.warn('[subrent] WARNING: bikeValue not provided — loss compensation calculations may be incomplete');
 
   // Payment terms (defaults from example contract)
   const ownerPercentage = Number(arg('ownerPercentage', '50'));
@@ -1056,7 +1064,7 @@ if (dealType === 'rent') {
     return_address: crewLegalAddress || 'г. Нижний Новгород',
 
     // Territory
-    insurance_territory: crewTerritory || 'Нижегородской области',
+    insurance_territory: contractDefaults.insuranceTerritory || 'Нижегородской области',
 
     document_key: `subrent-${bikeMake}-${bikeModel}-${Date.now()}`,
   };
