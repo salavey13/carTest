@@ -30,6 +30,8 @@ import {
   Send,
   List,
   Share2,
+  Plus,
+  X,
 } from "lucide-react";
 
 import { useAppContext } from "@/contexts/AppContext";
@@ -73,8 +75,11 @@ import {
 import {
   getCrewTodos,
   getCrewTodoStats,
+  createCrewTodo,
+  getCrewMembersForTodos,
   type CrewTodo,
   type TodoStatus,
+  type TodoPriority,
 } from "@/app/franchize/server-actions/crew-todos";
 import { RentalHandoffModal } from "./RentalHandoffModal";
 import { RentalsCalendar } from "./RentalsCalendar";
@@ -165,6 +170,14 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const [loadingTodos, setLoadingTodos] = useState(true);
   const [todoFilter, setTodoFilter] = useState<TodoStatus | "all">("all");
 
+  // New todo form state
+  const [showTodoForm, setShowTodoForm] = useState(false);
+  const [newTodoTitle, setNewTodoTitle] = useState("");
+  const [newTodoPriority, setNewTodoPriority] = useState<TodoPriority>("medium");
+  const [newTodoAssignee, setNewTodoAssignee] = useState<string | null>(null);
+  const [crewMembers, setCrewMembers] = useState<Array<{ user_id: string; full_name: string | null; username: string | null }>>([]);
+  const [creatingTodo, setCreatingTodo] = useState(false);
+
   // Handoff modal state
   const [handoffModalOpen, setHandoffModalOpen] = useState(false);
   const [handoffModalPhase, setHandoffModalPhase] = useState<"handout" | "return">("handout");
@@ -240,7 +253,13 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
   const loadRentals = useCallback(async (date: string, showRefresh = false) => {
     const actorUserId = getActorUserId();
-    if (!actorUserId) return;
+    if (!actorUserId) {
+      // Never get stuck in the initial loading state — flip the flag off
+      // so the UI can show the empty state / date nav remains clickable.
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
 
     if (showRefresh) setRefreshing(true);
     else setLoading(true);
@@ -277,7 +296,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
   const loadDateRange = useCallback(async () => {
     const actorUserId = getActorUserId();
-    if (!actorUserId) return;
+    if (!actorUserId) return; // no loading flag to reset for dateRange
 
     try {
       const result = await getRentalsDateRange({
@@ -297,7 +316,10 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
   const loadSales = useCallback(async (date: string) => {
     const actorUserId = getActorUserId();
-    if (!actorUserId) return;
+    if (!actorUserId) {
+      setLoadingSales(false);
+      return;
+    }
 
     setLoadingSales(true);
     try {
@@ -321,7 +343,10 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
   const loadCommercialProposals = useCallback(async (date: string) => {
     const actorUserId = getActorUserId();
-    if (!actorUserId) return;
+    if (!actorUserId) {
+      setLoadingProposals(false);
+      return;
+    }
 
     setLoadingProposals(true);
     try {
@@ -345,7 +370,10 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
   const loadSubrentContracts = useCallback(async (date: string) => {
     const actorUserId = getActorUserId();
-    if (!actorUserId) return;
+    if (!actorUserId) {
+      setLoadingSubrents(false);
+      return;
+    }
 
     setLoadingSubrents(true);
     try {
@@ -369,7 +397,10 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
   const loadPendingApplications = useCallback(async () => {
     const actorUserId = getActorUserId();
-    if (!actorUserId) return;
+    if (!actorUserId) {
+      setLoadingApplications(false);
+      return;
+    }
 
     setLoadingApplications(true);
     try {
@@ -447,7 +478,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
   const loadChecklistStates = useCallback(async () => {
     const actorUserId = getActorUserId();
-    if (!actorUserId) return;
+    if (!actorUserId) return; // no loading flag to reset
 
     try {
       const result = await getAllChecklistStates({ actorUserId, isPasswordAuth: !!passwordAuthOwnerId });
@@ -459,7 +490,10 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
   const loadTodos = useCallback(async () => {
     const actorUserId = getActorUserId();
-    if (!actorUserId || !crew.id) return;
+    if (!actorUserId || !crew.id) {
+      setLoadingTodos(false);
+      return;
+    }
 
     setLoadingTodos(true);
     try {
@@ -475,6 +509,65 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
       setLoadingTodos(false);
     }
   }, [getActorUserId, crew.id, todoFilter, passwordAuthOwnerId]);
+
+  // Load crew members for the todo assignee dropdown (called once when form opens)
+  const loadCrewMembers = useCallback(async () => {
+    const actorUserId = getActorUserId();
+    if (!actorUserId || !crew.id) return;
+    try {
+      const result = await getCrewMembersForTodos({
+        actorUserId,
+        crewId: crew.id,
+        isPasswordAuth: !!passwordAuthOwnerId,
+      });
+      if (result.success && result.data) setCrewMembers(result.data);
+    } catch (error) {
+      console.error("[Analytics] Crew members load error:", error);
+    }
+  }, [getActorUserId, crew.id, passwordAuthOwnerId]);
+
+  // Create a new todo via server action
+  const handleCreateTodo = async () => {
+    const title = newTodoTitle.trim();
+    if (!title) {
+      toast.error("Введите название задачи");
+      return;
+    }
+    const actorUserId = getActorUserId();
+    if (!actorUserId || !crew.id) {
+      toast.error("Нет авторизации");
+      return;
+    }
+    setCreatingTodo(true);
+    try {
+      const result = await createCrewTodo({
+        actorUserId,
+        todo: {
+          crewId: crew.id,
+          title,
+          assignedTo: newTodoAssignee,
+          priority: newTodoPriority,
+          category: "general",
+        },
+        isPasswordAuth: !!passwordAuthOwnerId,
+      });
+      if (result.success) {
+        toast.success("Задача добавлена");
+        setNewTodoTitle("");
+        setNewTodoPriority("medium");
+        setNewTodoAssignee(null);
+        setShowTodoForm(false);
+        await loadTodos();
+      } else {
+        toast.error(result.error || "Не удалось создать задачу");
+      }
+    } catch (error) {
+      console.error("[Analytics] Create todo error:", error);
+      toast.error("Ошибка создания задачи");
+    } finally {
+      setCreatingTodo(false);
+    }
+  };
 
   // ─── Password handling ─────────────────────────────────────────────────────────
 
@@ -977,11 +1070,11 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
               <div className="flex items-center gap-2 md:gap-3">
                 <button
                   onClick={() => navigateDate(-1)}
-                  disabled={loading}
                   className="p-1.5 md:p-2 rounded-lg md:rounded-xl border transition-all group"
                   style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = accentMain; e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.1); }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = borderSoft; e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.5); }}
+                  aria-label="Предыдущий день"
                 >
                   <ChevronLeft className="w-4 h-4 md:w-5 md:h-5 transition-colors" style={{ color: textSecondary }} />
                 </button>
@@ -1004,11 +1097,11 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
                 <button
                   onClick={() => navigateDate(1)}
-                  disabled={loading}
                   className="p-1.5 md:p-2 rounded-lg md:rounded-xl border transition-all group"
                   style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = accentMain; e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.1); }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = borderSoft; e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.5); }}
+                  aria-label="Следующий день"
                 >
                   <ChevronRight className="w-4 h-4 md:w-5 md:h-5 transition-colors" style={{ color: textSecondary }} />
                 </button>
@@ -1683,8 +1776,123 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                         <span className="relative z-10">{filter.label}</span>
                       </button>
                     ))}
+                    <button
+                      onClick={() => {
+                        setShowTodoForm((v) => {
+                          const next = !v;
+                          if (next && crewMembers.length === 0) {
+                            void loadCrewMembers();
+                          }
+                          return next;
+                        });
+                      }}
+                      className="ml-1 flex items-center gap-1 px-2 md:px-2.5 py-1 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300"
+                      style={{
+                        backgroundColor: withAlpha(accentMain, 0.15),
+                        color: accentMain,
+                        border: "1.5px solid",
+                        borderColor: withAlpha(accentMain, 0.4),
+                      }}
+                      aria-label="Добавить задачу"
+                    >
+                      <Plus className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                      <span className="hidden sm:inline">Добавить</span>
+                    </button>
                   </div>
                 </div>
+
+                {/* Inline "add todo" form */}
+                {showTodoForm && (
+                  <div
+                    className="px-4 md:px-5 py-3 md:py-4 border-b space-y-2.5 md:space-y-3"
+                    style={{
+                      borderColor: withAlpha(borderSoft, 0.3),
+                      backgroundColor: withAlpha(accentMain, 0.04),
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={newTodoTitle}
+                        onChange={(e) => setNewTodoTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !creatingTodo) void handleCreateTodo();
+                          if (e.key === "Escape") setShowTodoForm(false);
+                        }}
+                        placeholder="Что нужно сделать?"
+                        autoFocus
+                        className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
+                        style={{
+                          backgroundColor: bgCard,
+                          border: `1px solid ${borderSoft}`,
+                          color: textPrimary,
+                        }}
+                      />
+                      <button
+                        onClick={() => setShowTodoForm(false)}
+                        className="p-2 rounded-lg"
+                        style={{ color: textSecondary, border: `1px solid ${borderSoft}` }}
+                        aria-label="Закрыть форму"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Priority selector */}
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] md:text-xs font-bold uppercase tracking-wide" style={{ color: textSecondary }}>Приоритет:</span>
+                        {(["low", "medium", "high"] as TodoPriority[]).map((p) => (
+                          <button
+                            key={p}
+                            onClick={() => setNewTodoPriority(p)}
+                            className="px-2 py-1 rounded-md text-[10px] md:text-xs font-bold transition-all"
+                            style={
+                              newTodoPriority === p
+                                ? { backgroundColor: withAlpha(accentMain, 0.25), color: accentMain, border: `1px solid ${withAlpha(accentMain, 0.4)}` }
+                                : { color: textSecondary, border: `1px solid ${borderSoft}` }
+                            }
+                          >
+                            {p === "low" ? "Низкий" : p === "medium" ? "Средний" : "Высокий"}
+                          </button>
+                        ))}
+                      </div>
+                      {/* Assignee selector */}
+                      <div className="flex items-center gap-1 ml-auto">
+                        <span className="text-[10px] md:text-xs font-bold uppercase tracking-wide" style={{ color: textSecondary }}>Кому:</span>
+                        <select
+                          value={newTodoAssignee || ""}
+                          onChange={(e) => setNewTodoAssignee(e.target.value || null)}
+                          className="px-2 py-1 rounded-md text-[10px] md:text-xs outline-none"
+                          style={{
+                            backgroundColor: bgCard,
+                            border: `1px solid ${borderSoft}`,
+                            color: textPrimary,
+                          }}
+                        >
+                          <option value="">Без исполнителя</option>
+                          {crewMembers.map((m) => (
+                            <option key={m.user_id} value={m.user_id}>
+                              {m.full_name || m.username || m.user_id}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {/* Submit */}
+                      <button
+                        onClick={() => void handleCreateTodo()}
+                        disabled={creatingTodo || !newTodoTitle.trim()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                        style={{
+                          backgroundColor: accentMain,
+                          color: "#ffffff",
+                        }}
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        {creatingTodo ? "Создание..." : "Создать"}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div className="p-3 md:p-4">
                   {todos.length === 0 ? (
                     <div className="text-center py-6 md:py-8">
