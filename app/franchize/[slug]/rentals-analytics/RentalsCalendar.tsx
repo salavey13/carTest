@@ -72,7 +72,11 @@ export function RentalsCalendar({ slug, crewId, crewTheme, isPasswordAuth, passw
   useEffect(() => {
     const loadRentals = async () => {
       const actorUserId = getActorUserId();
-      if (!actorUserId) return;
+      if (!actorUserId) {
+        // Never get stuck in the initial loading state.
+        setLoading(false);
+        return;
+      }
 
       setLoading(true);
       try {
