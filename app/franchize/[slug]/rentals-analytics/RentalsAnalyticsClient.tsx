@@ -585,12 +585,12 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
       }
 
       // Verify the returned slug matches the current crew
-      if (result.data?.slug && result.data.slug !== initialSlug?.trim()) {
-        setPasswordError(`Пароль для другого экипажа: ${result.data.slug}`);
+      if (result.slug && result.slug !== initialSlug?.trim()) {
+        setPasswordError(`Пароль для другого экипажа: ${result.slug}`);
         return;
       }
 
-      setPasswordAuthOwnerId(result.data?.ownerId || null);
+      setPasswordAuthOwnerId(result.ownerId || null);
       setShowPasswordEntry(false);
       setPasswordInput("");
       toast.success("Доступ разрешён");
