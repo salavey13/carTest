@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { ru } from "date-fns/locale";
+import { formatRussianDate, formatRussianDateOnly, formatRubles } from "../rentals-analytics/analytics-utils";
 import {
   Calendar,
   ChevronLeft,
@@ -28,35 +27,7 @@ import {
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { withAlpha } from "@/app/franchize/lib/theme";
 
-const formatRubles = (amount: number | string | null | undefined): string => {
-  if (amount == null) return "—";
-  const n = typeof amount === "string" ? Number(amount.replace(/\s/g, "")) : amount;
-  if (!Number.isFinite(n)) return "—";
-  return new Intl.NumberFormat("ru-RU", {
-    style: "currency",
-    currency: "RUB",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(n);
-};
-
-const formatRussianDate = (dateStr: string | null): string => {
-  if (!dateStr) return "—";
-  try {
-    return format(new Date(dateStr), "dd MMM yyyy, HH:mm", { locale: ru });
-  } catch {
-    return "—";
-  }
-};
-
-const formatRussianDateOnly = (dateStr: string | null): string => {
-  if (!dateStr) return "—";
-  try {
-    return format(new Date(dateStr), "dd MMM yyyy", { locale: ru });
-  } catch {
-    return "—";
-  }
-};
+// Formatting utils imported from shared module
 
 interface SalesAnalyticsClientProps {
   initialSlug: string;
