@@ -125,6 +125,12 @@ export function SaleBikeLandingClient({
     setMounted(true);
   }, []);
 
+  // Video support: show promo video instead of hero image if available
+  const videoUrl = useMemo(
+    () => (item.rawSpecs?.video_url as string | undefined) || (item.rawSpecs?.video as string | undefined) || null,
+    [item.rawSpecs],
+  );
+
   const gallery = useMemo(() => {
     const raw = item.mediaUrls?.filter(Boolean)?.length
       ? item.mediaUrls.filter(Boolean)
@@ -757,24 +763,62 @@ export function SaleBikeLandingClient({
         >
           <div className="relative aspect-[9/16] sm:aspect-square w-full overflow-hidden rounded-2xl bg-black/30">
             <Image
-              src={safeGallery[selectedImage] ?? heroImage}
-              alt={item.title}
-              fill
-              sizes="(max-width: 1024px) 100vw, 100vw"
-              loading="lazy"
-              className="object-cover"
-              onError={() => {
-                const broken = safeGallery[selectedImage];
-                if (!broken) return;
-                setBrokenGalleryUrls((prev) => ({
-                  ...prev,
-                  [broken]: true,
-                }));
-              }}
-            />
+              {videoUrl && selectedImage === 0 ? (
+                <video
+                  src={videoUrl.includes("supabase.co") ? videoUrl.replace(/.*\/storage\/v1\/object\/public\//, "/supabase-mirror/") : videoUrl}
+                  poster={heroImage.includes("supabase.co") ? heroImage.replace(/.*\/storage\/v1\/object\/public\//, "/supabase-mirror/") : heroImage}
+                  controls
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onError={(e) => {
+                    // Fallback to Supabase URL if local mirror fails
+                    const vid = e.currentTarget;
+                    if (!vid.src.includes("supabase.co") && videoUrl) {
+                      vid.src = videoUrl;
+                    }
+                  }}
+                />
+              ) : (
+                <Image
+                  src={safeGallery[selectedImage] ?? heroImage}
+                  alt={item.title}
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 100vw"
+                  loading="lazy"
+                  className="object-cover"
+                  onError={() => {
+                    const broken = safeGallery[selectedImage];
+                    if (!broken) return;
+                    setBrokenGalleryUrls((prev) => ({
+                      ...prev,
+                      [broken]: true,
+                    }));
+                  }}
+                />
+              )}
           </div>
           <div className="grid grid-cols-5 gap-2 mt-2" suppressHydrationWarning>
+            {videoUrl && (
+              <button
+                key="video-thumb"
+                type="button"
+                onClick={() => setSelectedImage(0)}
+                className="overflow-hidden rounded-xl border transition hover:brightness-110 relative"
+                style={selectedImage === 0 ? { borderColor: crew.theme.palette.accentMain, boxShadow: `0 0 0 1px ${crew.theme.palette.accentMain}` } : {}}
+              >
+                <span className="relative block aspect-[4/3] w-full">
+                  <Image src={heroImage} alt="video" fill sizes="120px" className="object-cover" loading="lazy" />
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/40">
+                    <svg className="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                  </span>
+                </span>
+              </button>
+            )}
             {gallery.slice(0, 5).map((img, i) => {
+              const thumbIdx = videoUrl ? i + 1 : i;
               const isBroken = brokenGalleryUrls[img];
               if (isBroken) return null;
               return (

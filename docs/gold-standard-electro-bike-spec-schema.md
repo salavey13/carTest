@@ -480,6 +480,7 @@ rent_price_label, rent_weekday_hour, rent_weekend_hour
 3. **Set rental pricing:** `dailyPrice`, `price_per_hour`, `rent_weekday`, `rent_weekend` — these are mandatory for rentable bikes
 4. Build `spec_labels` — include ONLY keys that exist in this bike's specs (include all rent category labels)
 5. Add `gallery` array with all Supabase storage URLs
+6. Add `video_url` (string) if a promo video exists — SalePageClient shows it as autoplay hero video instead of first image
 6. If multiple colors with separate gallery sets → add `color_variants`
 7. Set `brand_type`: `official_reseller` | `official_website_data` | `dealer_data` | `community`
 8. Set `source` URL for traceability
