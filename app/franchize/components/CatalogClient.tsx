@@ -14,6 +14,7 @@ import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { upsertFranchizeIntent } from "../actions";
 import { hasRentPrice, hasSalePrice } from "../lib/catalog-utils";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
+import { SHOW_CART } from "@/lib/feature-flags";
 import { ItemModal, type FlowType } from "../modals/Item";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
@@ -269,7 +270,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     (item: CatalogItemVM, stage: "viewed" | "configured", metadata?: Record<string, unknown>) => Promise<unknown>
   >();
   const resolvedSlug = crew.slug || slug;
-  const showFloatingCart = ctaPolicy ? shouldShowFloatingCart(ctaPolicy, { cartRelevant: true }) : true;
+  const showFloatingCart = SHOW_CART && (ctaPolicy ? shouldShowFloatingCart(ctaPolicy, { cartRelevant: true }) : true);
   const carouselRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const promoModules = useMemo(() => {
