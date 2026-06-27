@@ -20,7 +20,11 @@ import { AnalyticsCrossNav } from "../rentals-analytics/analytics-components/Ana
 import { AnalyticsLoading } from "../rentals-analytics/analytics-components/AnalyticsLoading";
 
 const OFFER_TYPE_LABELS: Record<string, string> = {
-  rent: "Аренда", sale: "Продажа", service: "Сервис", lease: "Лизинг", unknown: "Другое",
+  rent: "Аренда",
+  sale: "Продажа",
+  service: "Сервис",
+  lease: "Лизинг",
+  unknown: "Другое",
 };
 
 interface CommercialOffersAnalyticsClientProps {
@@ -61,7 +65,12 @@ export function CommercialOffersAnalyticsClient({ initialSlug, initialDate, crew
   useEffect(() => { if (getActorUserId()) void loadProposals(selectedDate); }, [getActorUserId]);
   useEffect(() => { if (getActorUserId() && !authLoading) void loadProposals(selectedDate, true); }, [selectedDate]);
 
-  const bgBase = "var(--franchize-bg-base)"; const bgCard = "var(--franchize-bg-card)"; const accentMain = "var(--franchize-accent-main)"; const textPrimary = "var(--franchize-text-primary)"; const textSecondary = "var(--franchize-text-secondary)"; const borderSoft = "var(--franchize-border-soft)";
+  const bgBase = "var(--franchize-bg-base)";
+  const bgCard = "var(--franchize-bg-card)";
+  const accentMain = "var(--franchize-accent-main)";
+  const textPrimary = "var(--franchize-text-primary)";
+  const textSecondary = "var(--franchize-text-secondary)";
+  const borderSoft = "var(--franchize-border-soft)";
 
   if (authLoading) return <AnalyticsLoading accentMain={accentMain} bgBase={bgBase} />;
   if (!dbUser && !passwordAuthOwnerId) return <AnalyticsPasswordEntry crewName={crew.name} slug={initialSlug} onAuthenticated={setPasswordAuthOwnerId} />;
@@ -70,7 +79,7 @@ export function CommercialOffersAnalyticsClient({ initialSlug, initialDate, crew
   const withQr = summary?.withQr ?? proposals.filter((p) => p.qr_included).length;
   const totalRevenue = proposals.reduce((sum, p) => sum + (p.total_price || 0), 0);
   const byType = summary?.byType || {};
-  const basePath = ;
+  const basePath = `/franchize/${initialSlug}`;
 
   return (
     <div className="space-y-4">
@@ -79,7 +88,7 @@ export function CommercialOffersAnalyticsClient({ initialSlug, initialDate, crew
       <div className="flex items-center justify-between gap-2 flex-wrap p-3 rounded-xl border" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft }}>
         <AnalyticsDateNav selectedDate={selectedDate} onDateChange={setSelectedDate} accentMain={accentMain} bgCard={bgCard} borderSoft={borderSoft} textPrimary={textPrimary} textSecondary={textSecondary} />
         <button onClick={() => void loadProposals(selectedDate, true)} disabled={refreshing} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold disabled:opacity-50" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft, color: textSecondary }}>
-          <RefreshCw className={} /> Обновить
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} /> Обновить
         </button>
       </div>
 
@@ -91,7 +100,7 @@ export function CommercialOffersAnalyticsClient({ initialSlug, initialDate, crew
       </div>
 
       <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.4), borderColor: borderSoft }}>
-        <div className="px-4 py-3 border-b" style={{ borderColor: borderSoft, background:  }}>
+        <div className="px-4 py-3 border-b" style={{ borderColor: borderSoft, background: `linear-gradient(to right, ${withAlpha(accentMain, 0.05)}, transparent)` }}>
           <h3 className="text-sm font-black tracking-tight" style={{ color: textPrimary }}>КОММЕРЧЕСКИЕ ПРЕДЛОЖЕНИЯ</h3>
         </div>
         {loading ? (
@@ -110,8 +119,8 @@ export function CommercialOffersAnalyticsClient({ initialSlug, initialDate, crew
                     <span className="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase" style={{ backgroundColor: withAlpha(accentMain, 0.15), color: accentMain }}>{OFFER_TYPE_LABELS[p.offer_type] || p.offer_type}</span>
                     {p.qr_included && (<span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: withAlpha("#10b981", 0.15), color: "#10b981" }}><QrCode className="w-3 h-3" /> QR</span>)}
                   </div>
-                  {p.client_phone && (<div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textSecondary }} /><a href={} className="text-xs hover:underline" style={{ color: accentMain }}>{p.client_phone}</a></div>)}
-                  {p.client_email && (<div className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textSecondary }} /><a href={} className="text-xs hover:underline" style={{ color: accentMain }}>{p.client_email}</a></div>)}
+                  {p.client_phone && (<div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textSecondary }} /><a href={`tel:${p.client_phone}`} className="text-xs hover:underline" style={{ color: accentMain }}>{p.client_phone}</a></div>)}
+                  {p.client_email && (<div className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textSecondary }} /><a href={`mailto:${p.client_email}`} className="text-xs hover:underline" style={{ color: accentMain }}>{p.client_email}</a></div>)}
                   {p.offer_summary && (<p className="text-xs mt-1 line-clamp-2" style={{ color: textSecondary }}>{p.offer_summary}</p>)}
                 </div>
                 <div className="flex flex-col md:items-end gap-1">
