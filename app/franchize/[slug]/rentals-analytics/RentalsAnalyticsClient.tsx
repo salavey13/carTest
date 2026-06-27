@@ -219,6 +219,13 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const currentYRef = useRef(0);
   const datePickerRef = useRef<HTMLDivElement>(null);
 
+  // Show password prompt immediately if no auth available
+  useEffect(() => {
+    if (!authLoading && !dbUser && !passwordAuthOwnerId) {
+      setShowPasswordEntry(true);
+    }
+  }, [authLoading, dbUser, passwordAuthOwnerId]);
+
   // Close date picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
