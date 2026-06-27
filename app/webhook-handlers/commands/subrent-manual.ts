@@ -31,6 +31,7 @@ import { createHash } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { privateSchema } from "@/lib/private-secrets";
+import nodemailer from "nodemailer";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026;
@@ -710,26 +711,25 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
       break;
 
     case "edit":
-      await sendComplexMessage({
-        botToken: TELEGRAM_BOT_TOKEN,
-        chatId: userId,
-        text: "🔄 Какой параметр изменить?",
-        replyMarkup: JSON.stringify({
-          inline_keyboard: [
-            [{ text: "👤 Собственник", callback_data: "edit_owner" }],
-            [{ text: "🏍 Мотоцикл", callback_data: "edit_bike" }],
-            [{ text: "💰 Оплата", callback_data: "edit_payment" }],
-            [{ text: "📅 Даты", callback_data: "edit_dates" }],
-            [{ text: "❌ Отменить", callback_data: "cancel" }],
-          ],
-        }),
-      });
-      context.step = "edit_menu";
-      await saveState(userId, context);
-      break;
-
-    case "edit":
-      if (value === "owner") {
+      if (!value || value === "") {
+        // Show edit menu
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: `🔄 Какой параметр изменить?`,
+          replyMarkup: JSON.stringify({
+            inline_keyboard: [
+              [{ text: `👤 Собственник`, callback_data: "edit_owner" }],
+              [{ text: `🏍 Мотоцикл`, callback_data: "edit_bike" }],
+              [{ text: `💰 Оплата`, callback_data: "edit_payment" }],
+              [{ text: `📅 Даты`, callback_data: "edit_dates" }],
+              [{ text: `❌ Отменить`, callback_data: "cancel" }],
+            ],
+          }),
+        });
+        context.step = "edit_menu";
+        await saveState(userId, context);
+      } else if (value === "owner") {
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
@@ -749,11 +749,12 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: "📅 Введите новую дату начала (ДД.ММ.ГГГГ ЧЧ:ММ):",
+          text: `📅 Введите новую дату начала (ДД.ММ.ГГГГ ЧЧ:ММ):`,
         });
         context.step = "edit_start";
         await saveState(userId, context);
       }
+      break;
       break;
 
     case "yes":
@@ -1263,21 +1264,124 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
     const docBuffer = result.bytes;
     const fileHash = result.sha256 || createHash("sha256").update(docBuffer).digest("hex");
 
-    await sendTelegramDocument({
-      chatId: userId,
-      botToken: TELEGRAM_BOT_TOKEN,
-      file: docBuffer,
-      fileName: docFileName,
-      caption: `📄 Договор субаренды №${contractNumber}\n\n${context.bikeMake} ${context.bikeModel}\nСобственник: ${context.ownerFullName}`,
-    });
-
-    // Notify admin
-    await notifyAdmin(`📄 Новый договор субаренды\n\nБайк: ${context.bikeMake} ${context.bikeModel}\nСобственник: ${context.ownerFullName}\nПроцент: ${context.ownerPercentage}%`);
-
+        // Send document via Telegram (positional args)
+    await sendTelegramDocument(String(userId), docBuffer, docFileName);
+    
+    // Send caption as separate message
     await sendComplexMessage({
       botToken: TELEGRAM_BOT_TOKEN,
       chatId: userId,
-      text: "✅ Договор субаренды готов и отправлен!",
+      text: `📄 Договор субаренды №${contractNumber}
+
+${context.bikeMake} ${context.bikeModel}
+Собственник: ${context.ownerFullName}`,
+    });
+    // Notify admin
+    await notifyAdmin(`📄 Новый договор субаренды\n\nБайк: ${context.bikeMake} ${context.bikeModel}\nСобственник: ${context.ownerFullName}\nПроцент: ${context.ownerPercentage}%`);
+
+    // --- Generate QR code for quick access ---
+    let qrPngBuffer = null;
+    try {
+      const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=subrent_${contractNumber}_${fileHash.slice(0, 12)}`;
+      const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const qrRes = await fetch(qrPngUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (qrRes.ok) qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
+    } catch (qrErr) {
+      logger.warn("[subrent] QR generation failed:", qrErr);
+    }
+
+    if (qrPngBuffer) {
+      try {
+        const formData = new FormData();
+        formData.append("chat_id", String(userId));
+        formData.append("photo", new Blob([qrPngBuffer], { type: "image/png" }), "qr.png");
+        formData.append("caption", `📲 QR для быстрого доступа к договору субаренды №${contractNumber}`);
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, { method: "POST", body: formData });
+      } catch (qrSendErr) {
+        logger.warn("[subrent] QR send failed:", qrSendErr);
+      }
+    }
+
+    // --- Save to subrent_contract_artifacts (private schema) ---
+    try {
+      await privateSchema().from("subrent_contract_artifacts").insert({
+        contract_key: `subrent-${contractNumber}-${Date.now()}`,
+        original_sha256: fileHash,
+        telegram_chat_id: String(userId),
+        renter_full_name: context.ownerFullName || null,
+        renter_passport: `${context.ownerPassportSeries || ""} ${context.ownerPassportNumber || ""}`.trim() || null,
+        renter_birth_date: context.ownerBirthDate || null,
+        renter_registration: context.ownerRegistration || null,
+        renter_phone: context.ownerPhone || null,
+        renter_email: context.ownerEmail || null,
+        bike_make: context.bikeMake || null,
+        bike_model: context.bikeModel || null,
+        bike_vin: context.bikeVin || null,
+        bike_plate: context.bikePlate || null,
+        owner_percentage: String(context.ownerPercentage || DEFAULT_OWNER_PERCENTAGE),
+        contract_start_date: context.contractStartDate || null,
+        contract_end_date: context.contractEndDate || null,
+        template_version: 1,
+      });
+      logger.info("[subrent] Contract artifact saved");
+    } catch (dbErr) {
+      logger.error("[subrent] Failed to save contract artifact:", dbErr);
+    }
+
+    // --- Send email notification ---
+    try {
+      const smtpHost = process.env.SMTP_HOST || process.env.SMTP_YANDEX_HOST;
+      const smtpPort = Number(process.env.SMTP_PORT || process.env.SMTP_YANDEX_PORT || 465);
+      const smtpUser = process.env.SMTP_USER || process.env.SMTP_YANDEX_USER;
+      const smtpPass = process.env.SMTP_PASS || process.env.SMTP_YANDEX_PASS;
+      const emailFrom = process.env.EMAIL_FROM || smtpUser;
+
+      if (smtpHost && smtpUser && smtpPass) {
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
+          auth: { user: smtpUser, pass: smtpPass },
+        });
+
+        const emailBody = [
+          `Договор субаренды №${contractNumber}`,
+          ``,
+          `Мотоцикл: ${context.bikeMake} ${context.bikeModel}`,
+          `Собственник: ${context.ownerFullName}`,
+          `Процент собственника: ${context.ownerPercentage}%`,
+          `Период: ${context.contractStartDate} ${context.contractStartTime} -- ${context.contractEndDate} ${context.contractEndTime}`,
+          ``,
+          `Договор сгенерирован в Telegram-боте.`,
+        ].join("\n");
+
+        await transporter.sendMail({
+          from: emailFrom,
+          to: process.env.EMAIL_DEFAULT_TO || "vip-bike@mail.ru",
+          subject: `Договор субаренды №${contractNumber} -- ${context.bikeMake} ${context.bikeModel}`,
+          text: emailBody,
+        });
+        logger.info("[subrent] Email notification sent");
+      }
+    } catch (emailErr) {
+      logger.warn("[subrent] Email send failed (non-fatal):", emailErr);
+    }
+
+    // Success message with details
+    await sendComplexMessage({
+      botToken: TELEGRAM_BOT_TOKEN,
+      chatId: userId,
+      text: `✅ *Договор субаренды №${contractNumber} готов!*
+
+🏍 ${context.bikeMake} ${context.bikeModel}
+👤 ${context.ownerFullName}
+💰 ${context.ownerPercentage}%
+
+📧 Копия отправлена на email администратора.`,
+      parseMode: "Markdown",
     });
 
   } catch (error) {

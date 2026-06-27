@@ -54,6 +54,15 @@ const nextConfig = {
       },
     ]
   },
+  // Чистый URL: корень rental.vip-bike.ru отдаёт каталог аренды без /franchize/vip-bike в адресе.
+  // beforeFiles — чтобы перебить файловый роут app/page.tsx (иначе rewrite не сработает).
+  async rewrites() {
+    return {
+      beforeFiles: [
+        { source: '/', destination: '/franchize/vip-bike' },
+      ],
+    }
+  },
 }
 
 mergeConfig(nextConfig, userConfig)

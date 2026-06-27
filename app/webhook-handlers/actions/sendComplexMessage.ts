@@ -16,8 +16,8 @@ export interface KeyboardButton {
 
 function escapeTelegramMarkdown(text: string): string {
     if (!text) return "";
-    const charsToEscape = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
-    return text.replace(new RegExp(`[${charsToEscape.join('\\')}]`, 'g'), '\\$&');
+    const charsToEscape = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"];
+    return text.replace(new RegExp(`[${charsToEscape.join("\\")}]`, "g"), "\\$&");
 }
 
 async function getRandomUnsplashImage(query: string): Promise<string> {
@@ -37,28 +37,109 @@ async function getRandomUnsplashImage(query: string): Promise<string> {
   }
 }
 
-export async function sendComplexMessage(
+export interface SendComplexMessageObject {
+  botToken?: string;
+  chatId: string | number;
+  text: string;
+  parseMode?: string;
+  replyMarkup?: string;
+  removeKeyboard?: boolean;
+  imageQuery?: string;
+  messageId?: number;
+  keyboardType?: "reply" | "inline";
+  attachment?: { type: "document"; content: string; filename: string };
+}
+
+async function sendComplexMessageRaw(
   chatId: string | number,
   text: string,
-  buttons: KeyboardButton[][] = [],
-  options: {
+  replyMarkupStr?: string,
+  parseMode?: string,
+): Promise<{ success: boolean; error?: string; data?: any }> {
+  if (!TELEGRAM_BOT_TOKEN) {
+    return { success: false, error: "Telegram bot token not configured." };
+  }
+
+  let finalText = text;
+  if ((parseMode || "Markdown") === "MarkdownV2") {
+    finalText = escapeTelegramMarkdown(text);
+  } else if (finalText.length > TELEGRAM_MESSAGE_LIMIT) {
+    finalText = finalText.substring(0, TELEGRAM_MESSAGE_LIMIT) + "\n... (сообщение обрезано)";
+  }
+
+  try {
+    const payload: any = { chat_id: String(chatId), parse_mode: parseMode || "Markdown", text: finalText };
+    if (replyMarkupStr) {
+      try { payload.reply_markup = JSON.parse(replyMarkupStr); } catch { payload.reply_markup = replyMarkupStr; }
+    }
+    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.description || "Failed to sendMessage");
+    return { success: true, data };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Error";
+    logger.error(`[sendComplexMessage-raw] for chat ${chatId}:`, errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+export async function sendComplexMessage(
+  chatIdOrOpts: string | number | SendComplexMessageObject,
+  text?: string,
+  buttons?: KeyboardButton[][],
+  options?: {
     imageQuery?: string;
     messageId?: number;
-    keyboardType?: 'reply' | 'inline';
+    keyboardType?: "reply" | "inline";
     removeKeyboard?: boolean;
-    parseMode?: 'MarkdownV2' | 'HTML' | 'Markdown';
-    attachment?: { type: 'document'; content: string; filename: string };
-  } = {}
+    parseMode?: "MarkdownV2" | "HTML" | "Markdown";
+    attachment?: { type: "document"; content: string; filename: string };
+  }
 ): Promise<{ success: boolean; error?: string; data?: any }> {
-  const { imageQuery, messageId, removeKeyboard = false, parseMode = 'Markdown', attachment, keyboardType = 'reply' } = options;
+  if (typeof chatIdOrOpts === "object" && chatIdOrOpts !== null) {
+    const opts = chatIdOrOpts as SendComplexMessageObject;
+    if (opts.replyMarkup) {
+      return sendComplexMessageRaw(opts.chatId, opts.text, opts.replyMarkup, opts.parseMode);
+    }
+    const b = buttons || [];
+    const o = options || {};
+    return sendComplexMessage(
+      opts.chatId,
+      opts.text,
+      b,
+      {
+        ...o,
+        parseMode: (opts.parseMode || "Markdown") as any,
+        removeKeyboard: opts.removeKeyboard || false,
+        imageQuery: opts.imageQuery,
+        messageId: opts.messageId,
+        keyboardType: opts.keyboardType || "reply",
+        attachment: opts.attachment,
+      }
+    );
+  }
+
+  const chatId = chatIdOrOpts as string | number;
+  const finalText = text || "";
+  const finalButtons = buttons || [];
+  const {
+    imageQuery,
+    messageId,
+    removeKeyboard = false,
+    parseMode = "Markdown",
+    attachment,
+    keyboardType = "reply",
+  } = options || {};
 
   if (!TELEGRAM_BOT_TOKEN) {
     return { success: false, error: "Telegram bot token not configured." };
   }
   
-  let sanitizedText = text;
-  if (parseMode === 'MarkdownV2') {
-    sanitizedText = escapeTelegramMarkdown(text);
+  let sanitizedText = finalText;
+  if (parseMode === "MarkdownV2") {
+    sanitizedText = escapeTelegramMarkdown(finalText);
   } else if (sanitizedText.length > TELEGRAM_MESSAGE_LIMIT) {
     sanitizedText = sanitizedText.substring(0, TELEGRAM_MESSAGE_LIMIT) + "\n... (сообщение обрезано)";
   }
@@ -71,32 +152,28 @@ export async function sendComplexMessage(
     const payload: any = { chat_id: String(chatId), parse_mode: parseMode };
 
     if (removeKeyboard) payload.reply_markup = { remove_keyboard: true };
-    else if (buttons.length > 0) {
-      if (keyboardType === 'inline') {
-        // Inline keyboard with callback_data or url buttons
-        payload.reply_markup = {
-          inline_keyboard: buttons
-        };
+    else if (finalButtons.length > 0) {
+      if (keyboardType === "inline") {
+        payload.reply_markup = { inline_keyboard: finalButtons };
       } else {
-        // Reply keyboard
         payload.reply_markup = {
-          keyboard: buttons,
+          keyboard: finalButtons,
           resize_keyboard: true,
           one_time_keyboard: true,
-          selective: true
+          selective: true,
         };
       }
     }
     
-    let endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
-    if (attachment?.type === 'document') {
-      endpoint = 'sendDocument';
+    let endpoint = imageUrl ? "sendPhoto" : "sendMessage";
+    if (attachment?.type === "document") {
+      endpoint = "sendDocument";
       const formData = new FormData();
-      formData.append('chat_id', String(chatId));
-      formData.append('document', new Blob([attachment.content], { type: 'text/csv;charset=utf-8' }), attachment.filename);
-      formData.append('caption', sanitizedText);
-      if (payload.reply_markup) formData.append('reply_markup', JSON.stringify(payload.reply_markup));
-      if (parseMode) formData.append('parse_mode', parseMode);
+      formData.append("chat_id", String(chatId));
+      formData.append("document", new Blob([attachment.content], { type: "text/csv;charset=utf-8" }), attachment.filename);
+      formData.append("caption", sanitizedText);
+      if (payload.reply_markup) formData.append("reply_markup", JSON.stringify(payload.reply_markup));
+      if (parseMode) formData.append("parse_mode", parseMode);
 
       const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${endpoint}`, {
         method: "POST", body: formData
@@ -142,8 +219,8 @@ export async function editMessage(
     messageId: number,
     newText: string,
     buttons: KeyboardButton[][] = [],
-    options: { imageQuery?: string; keyboardType?: 'reply' | 'inline'; parseMode?: 'MarkdownV2' | 'HTML' | 'Markdown' } = {}
+    options: { imageQuery?: string; keyboardType?: "reply" | "inline"; parseMode?: "MarkdownV2" | "HTML" | "Markdown" } = {}
 ) {
     const deleted = await deleteTelegramMessage(chatId, messageId);
-    return await sendComplexMessage(chatId, newText, buttons, { ...options, keyboardType: options.keyboardType || 'reply', parseMode: options.parseMode || 'Markdown' });
+    return await sendComplexMessage(chatId, newText, buttons, { ...options, keyboardType: options.keyboardType || "reply", parseMode: options.parseMode || "Markdown" });
 }
