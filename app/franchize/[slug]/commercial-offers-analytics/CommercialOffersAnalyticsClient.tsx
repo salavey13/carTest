@@ -90,6 +90,13 @@ export function CommercialOffersAnalyticsClient({ initialSlug, initialDate, crew
 
   const getActorUserId = useCallback((): string | null => dbUser?.user_id || passwordAuthOwnerId, [dbUser?.user_id, passwordAuthOwnerId]);
 
+  // Show password prompt immediately if no auth available
+  useEffect(() => {
+    if (!authLoading && !dbUser && !passwordAuthOwnerId) {
+      setShowPasswordEntry(true);
+    }
+  }, [authLoading, dbUser, passwordAuthOwnerId]);
+
   const navigateDate = (delta: number) => {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + delta);
@@ -159,11 +166,11 @@ export function CommercialOffersAnalyticsClient({ initialSlug, initialDate, crew
         setPasswordError(result.error || "Неверный пароль");
         return;
       }
-      if (result.data?.slug && result.data.slug !== initialSlug?.trim()) {
-        setPasswordError(`Пароль для другого экипажа: ${result.data.slug}`);
+      if (result.slug && result.slug !== initialSlug?.trim()) {
+        setPasswordError(`Пароль для другого экипажа: ${result.slug}`);
         return;
       }
-      setPasswordAuthOwnerId(result.data?.ownerId || null);
+      setPasswordAuthOwnerId(result.ownerId || null);
       setShowPasswordEntry(false);
       setPasswordInput("");
       toast.success("Доступ разрешён");
