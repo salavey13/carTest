@@ -86,6 +86,11 @@ import { withAlpha } from "@/app/franchize/lib/theme";
 // ─── Formatting helpers ─────────────────────────────────────────────────────────
 
 import { formatRubles, formatRussianDate, formatRussianDateOnly } from "./analytics-utils";
+import { RentalsStatsRow } from "./analytics-components/RentalsStatsRow";
+import { SubrentsSection } from "./analytics-components/SubrentsSection";
+import { SalesListSection } from "./analytics-components/SalesListSection";
+import { CommercialProposalsListSection } from "./analytics-components/CommercialProposalsListSection";
+import { TodosSection } from "./analytics-components/TodosSection";
 const getStatusConfig = (accentMain: string) => ({
   confirmed: { icon: CheckCircle2, label: "Подтв", color: "#34d399" },
   active: { icon: Clock, label: "Активна", color: "#60a5fa" },
@@ -1191,263 +1196,22 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
           <div className="w-full px-2 md:px-4 py-4 md:py-6 space-y-4 md:space-y-6">
 
             {/* STATS ROW */}
-            <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-1.5 md:gap-2 lg:gap-3">
-              {/* Total rentals */}
-              <div className="relative group">
-                <div
-                  className="absolute inset-0 rounded-lg md:rounded-xl blur-md group-hover:blur-lg transition-all duration-500"
-                  style={{
-                    background: `radial-gradient(circle at center, ${withAlpha(accentMain, 0.15)}, transparent 70%)`,
-                    backgroundColor: withAlpha(accentMain, 0.08)
-                  }}
-                />
-                <div
-                  className="relative rounded-lg md:rounded-xl p-2 md:p-3 border transition-all duration-300 group-hover:scale-[1.02] group-hover:border-opacity-30"
-                  style={{
-                    backgroundColor: withAlpha(bgCard, 0.6),
-                    borderColor: withAlpha(accentMain, 0.2),
-                    backdropFilter: "blur(12px)",
-                    borderWidth: "1.5px"
-                  }}
-                >
-                  <div className="flex flex-col items-center gap-1 mb-2">
-                    <div
-                      className="p-1.5 rounded-lg transition-all duration-300 group-hover:scale-110 flex-shrink-0"
-                      style={{
-                        background: `linear-gradient(135deg, ${withAlpha(accentMain, 0.2)}, ${withAlpha(accentMain, 0.05)})`,
-                        border: "1px solid",
-                        borderColor: withAlpha(accentMain, 0.3)
-                      }}
-                    >
-                      <Eye className="w-3 h-3" style={{ color: accentMain }} />
-                    </div>
-                    <span className="text-[8px] md:text-[9px] font-black uppercase leading-tight text-center" style={{ color: textSecondary, opacity: 0.8 }}>Всего аренд</span>
-                  </div>
-                  <div className="text-lg md:text-xl font-black tracking-tight text-center" style={{ color: textPrimary }}>
-                    {totalRentals}
-                  </div>
-                  <div className="mt-1 flex items-center justify-center gap-0.5 text-[7px] md:text-[8px]" style={{ color: textSecondary, opacity: 0.7 }}>
-                    <Calendar className="w-2 h-2 flex-shrink-0" />
-                    <span className="leading-tight">За день</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Revenue */}
-              <div className="relative group">
-                <div
-                  className="absolute inset-0 rounded-lg md:rounded-xl blur-md group-hover:blur-lg transition-all duration-500"
-                  style={{
-                    background: `radial-gradient(circle at center, ${withAlpha("#10b981", 0.15)}, transparent 70%)`,
-                    backgroundColor: withAlpha("#10b981", 0.08)
-                  }}
-                />
-                <div
-                  className="relative rounded-lg md:rounded-xl p-2 md:p-3 border transition-all duration-300 group-hover:scale-[1.02] group-hover:border-opacity-30"
-                  style={{
-                    backgroundColor: withAlpha(bgCard, 0.6),
-                    borderColor: withAlpha("#10b981", 0.2),
-                    backdropFilter: "blur(12px)",
-                    borderWidth: "1.5px"
-                  }}
-                >
-                  <div className="flex flex-col items-center gap-1 mb-2">
-                    <div
-                      className="p-1.5 rounded-lg transition-all duration-300 group-hover:scale-110 flex-shrink-0"
-                      style={{
-                        background: `linear-gradient(135deg, ${withAlpha("#10b981", 0.2)}, ${withAlpha("#10b981", 0.05)})`,
-                        border: "1px solid",
-                        borderColor: withAlpha("#10b981", 0.3)
-                      }}
-                    >
-                      <TrendingUp className="w-3 h-3" style={{ color: "#34d399" }} />
-                    </div>
-                    <span className="text-[8px] md:text-[9px] font-black uppercase leading-tight text-center" style={{ color: textSecondary, opacity: 0.8 }}>Выручка</span>
-                  </div>
-                  <div className="text-lg md:text-xl font-black tracking-tight text-center" style={{ color: "#34d399" }}>
-                    {formatRubles(totalRevenue)}
-                  </div>
-                  <div className="mt-1 flex items-center justify-center gap-0.5 text-[7px] md:text-[8px]" style={{ color: textSecondary, opacity: 0.7 }}>
-                    <Zap className="w-2 h-2 flex-shrink-0" />
-                    <span className="leading-tight">Доход</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sales */}
-              <div className="relative group">
-                <div className="absolute inset-0 rounded-lg md:rounded-xl blur-md group-hover:blur-lg transition-all" style={{ backgroundColor: withAlpha("#8b5cf6", 0.12) }} />
-                <div className="relative rounded-lg md:rounded-xl p-2 md:p-3 border transition-all" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: withAlpha(borderSoft, 0.5), backdropFilter: "blur(12px)" }}>
-                  <div className="flex flex-col items-center gap-1 mb-2">
-                    <div className="p-1 md:p-1.5 rounded-lg flex-shrink-0" style={{ backgroundColor: withAlpha("#8b5cf6", 0.15) }}>
-                      <TrendingUp className="w-3 h-3" style={{ color: "#a78bfa" }} />
-                    </div>
-                    <span className="text-[9px] md:text-[10px] font-black uppercase leading-tight text-center" style={{ color: textSecondary }}>Продажи</span>
-                  </div>
-                  <div className="text-lg md:text-xl font-black text-center" style={{ color: "#a78bfa" }}>{totalSales}</div>
-                  <div className="mt-1 md:mt-1.5 flex items-center justify-center gap-0.5 text-[8px] md:text-[10px]" style={{ color: textSecondary }}>
-                    <Zap className="w-2 h-2 md:w-2.5 md:h-2.5 flex-shrink-0" style={{ color: "#a78bfa" }} />
-                    <span className="leading-tight">{formatRubles(salesRevenue)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Active rentals */}
-              <div className="relative group">
-                <div
-                  className="absolute inset-0 rounded-lg md:rounded-xl blur-md group-hover:blur-lg transition-all duration-500"
-                  style={{
-                    background: `radial-gradient(circle at center, ${withAlpha("#3b82f6", 0.15)}, transparent 70%)`,
-                    backgroundColor: withAlpha("#3b82f6", 0.08)
-                  }}
-                />
-                <div
-                  className="relative rounded-lg md:rounded-xl p-2 md:p-3 border transition-all duration-300 group-hover:scale-[1.02] group-hover:border-opacity-30"
-                  style={{
-                    backgroundColor: withAlpha(bgCard, 0.6),
-                    borderColor: withAlpha("#3b82f6", 0.2),
-                    backdropFilter: "blur(12px)",
-                    borderWidth: "1.5px"
-                  }}
-                >
-                  <div className="flex flex-col items-center gap-1 mb-2">
-                    <div
-                      className="p-1.5 rounded-lg transition-all duration-300 group-hover:scale-110 flex-shrink-0"
-                      style={{
-                        background: `linear-gradient(135deg, ${withAlpha("#3b82f6", 0.2)}, ${withAlpha("#3b82f6", 0.05)})`,
-                        border: "1px solid",
-                        borderColor: withAlpha("#3b82f6", 0.3)
-                      }}
-                    >
-                      <Clock className="w-3 h-3" style={{ color: "#60a5fa" }} />
-                    </div>
-                    <span className="text-[8px] md:text-[9px] font-black uppercase leading-tight text-center" style={{ color: textSecondary, opacity: 0.8 }}>Активных</span>
-                  </div>
-                  <div className="text-lg md:text-xl font-black tracking-tight text-center" style={{ color: "#60a5fa" }}>{activeRentals}</div>
-                  <div className="mt-1 flex items-center justify-center gap-0.5 text-[7px] md:text-[8px]" style={{ color: textSecondary, opacity: 0.7 }}>
-                    <Sparkles className="w-2 h-2 flex-shrink-0" />
-                    <span className="leading-tight">На выезде</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Completion rate */}
-              <div className="relative group">
-                <div
-                  className="absolute inset-0 rounded-lg md:rounded-xl blur-md group-hover:blur-lg transition-all duration-500"
-                  style={{
-                    background: `radial-gradient(circle at center, ${withAlpha(accentMain, 0.15)}, transparent 70%)`,
-                    backgroundColor: withAlpha(accentMain, 0.08)
-                  }}
-                />
-                <div
-                  className="relative rounded-lg md:rounded-xl p-2 md:p-3 border transition-all duration-300 group-hover:scale-[1.02] group-hover:border-opacity-30"
-                  style={{
-                    backgroundColor: withAlpha(bgCard, 0.6),
-                    borderColor: withAlpha(accentMain, 0.2),
-                    backdropFilter: "blur(12px)",
-                    borderWidth: "1.5px"
-                  }}
-                >
-                  <div className="flex flex-col items-center gap-1 mb-2">
-                    <div
-                      className="p-1.5 rounded-lg transition-all duration-300 group-hover:scale-110 flex-shrink-0"
-                      style={{
-                        background: `linear-gradient(135deg, ${withAlpha(accentMain, 0.2)}, ${withAlpha(accentMain, 0.05)})`,
-                        border: "1px solid",
-                        borderColor: withAlpha(accentMain, 0.3)
-                      }}
-                    >
-                      <CheckCircle2 className="w-3 h-3" style={{ color: accentMain }} />
-                    </div>
-                    <span className="text-[8px] md:text-[9px] font-black uppercase leading-tight text-center" style={{ color: textSecondary, opacity: 0.8 }}>Завершено</span>
-                  </div>
-                  <div className="text-lg md:text-xl font-black tracking-tight text-center" style={{ color: accentMain }}>{completionRate}%</div>
-                  <div className="mt-1 flex items-center justify-center gap-0.5 text-[7px] md:text-[8px]" style={{ color: textSecondary, opacity: 0.7 }}>
-                    <CheckCircle2 className="w-2 h-2 flex-shrink-0" />
-                    <span className="leading-tight">{completedRentals}/{totalRentals}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Commercial proposals */}
-              <div className="relative group">
-                <div
-                  className="absolute inset-0 rounded-lg md:rounded-xl blur-md group-hover:blur-lg transition-all duration-500"
-                  style={{
-                    background: `radial-gradient(circle at center, ${withAlpha("#f59e0b", 0.15)}, transparent 70%)`,
-                    backgroundColor: withAlpha("#f59e0b", 0.08)
-                  }}
-                />
-                <div
-                  className="relative rounded-lg md:rounded-xl p-2 md:p-3 border transition-all duration-300 group-hover:scale-[1.02] group-hover:border-opacity-30"
-                  style={{
-                    backgroundColor: withAlpha(bgCard, 0.6),
-                    borderColor: withAlpha("#f59e0b", 0.2),
-                    backdropFilter: "blur(12px)",
-                    borderWidth: "1.5px"
-                  }}
-                >
-                  <div className="flex flex-col items-center gap-1 mb-2">
-                    <div
-                      className="p-1.5 rounded-lg transition-all duration-300 group-hover:scale-110 flex-shrink-0"
-                      style={{
-                        background: `linear-gradient(135deg, ${withAlpha("#f59e0b", 0.2)}, ${withAlpha("#f59e0b", 0.05)})`,
-                        border: "1px solid",
-                        borderColor: withAlpha("#f59e0b", 0.3)
-                      }}
-                    >
-                      <TrendingUp className="w-3 h-3" style={{ color: "#f59e0b" }} />
-                    </div>
-                    <span className="text-[8px] md:text-[9px] font-black uppercase leading-tight text-center" style={{ color: textSecondary, opacity: 0.8 }}>КП</span>
-                  </div>
-                  <div className="text-lg md:text-xl font-black tracking-tight text-center" style={{ color: "#f59e0b" }}>{totalProposals}</div>
-                  <div className="mt-1 flex items-center justify-center gap-0.5 text-[7px] md:text-[8px]" style={{ color: textSecondary, opacity: 0.7 }}>
-                    <Zap className="w-2 h-2 flex-shrink-0" />
-                    <span className="leading-tight">{formatRubles(proposalsRevenue)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Subrent contracts */}
-              <div className="relative group">
-                <div
-                  className="absolute inset-0 rounded-lg md:rounded-xl blur-md group-hover:blur-lg transition-all duration-500"
-                  style={{
-                    background: `radial-gradient(circle at center, ${withAlpha("#06b6d4", 0.15)}, transparent 70%)`,
-                    backgroundColor: withAlpha("#06b6d4", 0.08)
-                  }}
-                />
-                <div
-                  className="relative rounded-lg md:rounded-xl p-2 md:p-3 border transition-all duration-300 group-hover:scale-[1.02] group-hover:border-opacity-30"
-                  style={{
-                    backgroundColor: withAlpha(bgCard, 0.6),
-                    borderColor: withAlpha("#06b6d4", 0.2),
-                    backdropFilter: "blur(12px)",
-                    borderWidth: "1.5px"
-                  }}
-                >
-                  <div className="flex flex-col items-center gap-1 mb-2">
-                    <div
-                      className="p-1.5 rounded-lg transition-all duration-300 group-hover:scale-110 flex-shrink-0"
-                      style={{
-                        background: `linear-gradient(135deg, ${withAlpha("#06b6d4", 0.2)}, ${withAlpha("#06b6d4", 0.05)})`,
-                        border: "1px solid",
-                        borderColor: withAlpha("#06b6d4", 0.3)
-                      }}
-                    >
-                      <ShieldCheck className="w-3 h-3" style={{ color: "#06b6d4" }} />
-                    </div>
-                    <span className="text-[8px] md:text-[9px] font-black uppercase leading-tight text-center" style={{ color: textSecondary, opacity: 0.8 }}>Субаренда</span>
-                  </div>
-                  <div className="text-lg md:text-xl font-black tracking-tight text-center" style={{ color: "#06b6d4" }}>{totalSubrents}</div>
-                  <div className="mt-1 flex items-center justify-center gap-0.5 text-[7px] md:text-[8px]" style={{ color: textSecondary, opacity: 0.7 }}>
-                    <RefreshCw className="w-2 h-2 flex-shrink-0" />
-                    <span className="leading-tight">{subrentsSummary?.activeCount || 0} актив.</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+              <RentalsStatsRow
+                stats={[
+                  { label: "Аренд", value: String(summary?.totalRentals ?? rentals.length), icon: <Eye className="w-3 h-3" />, color: accentMain },
+                  { label: "Выручка", value: formatRubles(summary?.totalRevenue ?? 0), icon: <TrendingUp className="w-3 h-3" />, color: "#10b981" },
+                  { label: "Средний", value: summary?.totalRentals ? formatRubles((summary?.totalRevenue ?? 0) / summary.totalRentals) : "—", icon: <BarChart3 className="w-3 h-3" />, color: "#8b5cf6" },
+                  { label: "Активны", value: String(summary?.activeRentals ?? 0), icon: <Clock className="w-3 h-3" />, color: "#f59e0b" },
+                  { label: "Завершены", value: String(summary?.completedRentals ?? 0), icon: <CheckCircle2 className="w-3 h-3" />, color: "#34d399" },
+                  { label: "Продажи", value: String(sales.length), icon: <Tag className="w-3 h-3" />, color: "#10b981" },
+                  { label: "КП", value: String(proposals.length), icon: <FileText className="w-3 h-3" />, color: "#8b5cf6" },
+                ]}
+                accentMain={accentMain}
+                bgCard={bgCard}
+                borderSoft={borderSoft}
+                textPrimary={textPrimary}
+                textSecondary={textSecondary}
+              />
 
             {/* FILTER BAR */}
             <div className="flex items-center gap-2 md:gap-3 overflow-x-visible pb-2 px-1 flex-wrap">
@@ -1689,29 +1453,49 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
               </div>
 
               {/* Todos */}
-              <div
-                className="lg:col-span-2 rounded-xl md:rounded-2xl border overflow-hidden transition-all duration-300"
-                style={{
-                  backgroundColor: withAlpha(bgCard, 0.4),
-                  borderColor: withAlpha(borderSoft, 0.5),
-                  backdropFilter: "blur(12px)",
-                  borderWidth: "1px"
+              <TodosSection
+                todos={todos}
+                todoStats={todoStats}
+                loadingTodos={loadingTodos}
+                todoFilter={todoFilter}
+                onFilterChange={setTodoFilter}
+                showTodoForm={showTodoForm}
+                onToggleForm={() => {
+                  setShowTodoForm((v) => {
+                    const next = !v;
+                    if (next && crewMembers.length === 0) void loadCrewMembers();
+                    return next;
+                  });
                 }}
-              >
-                <div
-                  className="px-4 md:px-5 py-2.5 md:py-3 border-b flex items-center justify-between flex-wrap gap-2"
-                  style={{
-                    borderColor: withAlpha(borderSoft, 0.3),
-                    background: `linear-gradient(to right, ${withAlpha(accentMain, 0.05)}, transparent)`
-                  }}
-                >
-                  <div className="flex items-center gap-1.5 md:gap-2">
-                    <div
-                      className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full flex-shrink-0 shadow-lg animate-pulse"
-                      style={{ backgroundColor: accentMain, boxShadow: `0 0 10px ${withAlpha(accentMain, 0.5)}` }}
-                    />
-                    <span className="text-xs md:text-sm font-black tracking-tight" style={{ color: textPrimary }}>ЗАДАЧИ</span>
-                  </div>
+                creatingTodo={creatingTodo}
+                onCreateTodo={async (title, prio, assignee) => {
+                  if (!title) return;
+                  setCreatingTodo(true);
+                  try {
+                    const result = await createCrewTodo({
+                      actorUserId: getActorUserId()!,
+                      crewId: crew.id,
+                      title,
+                      priority: prio,
+                      assignedTo: assignee,
+                      isPasswordAuth: !!passwordAuthOwnerId,
+                    });
+                    if (result.success) { toast.success("Задача создана"); void loadTodos(); }
+                    else toast.error(result.error || "Ошибка создания задачи");
+                  } catch { toast.error("Ошибка"); }
+                  finally { setCreatingTodo(false); setShowTodoForm(false); setNewTodoTitle(""); }
+                }}
+                crewMembers={crewMembers}
+                textPrimary={textPrimary}
+                textSecondary={textSecondary}
+                accentMain={accentMain}
+                bgCard={bgCard}
+                borderSoft={borderSoft}
+              />
+
+            </div>
+
+            
                   <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
                     {[
                       { value: "all", label: "Все" },
@@ -2378,289 +2162,39 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
               )} {/* End calendar/table conditional */}
 
               {/* SALES LIST */}
-              {sales.length > 0 && (
-                <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.3), borderColor: withAlpha(borderSoft, 0.3) }}>
-                  <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha("#8b5cf6", 0.15) }}>
-                        <TrendingUp className="w-5 h-5" style={{ color: "#a78bfa" }} />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold" style={{ color: textPrimary }}>Продажи</h3>
-                        <p className="text-xs" style={{ color: textSecondary }}>{totalSales} {totalSales === 1 ? "сделка" : totalSales > 1 && totalSales < 5 ? "сделки" : "сделок"}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold" style={{ color: "#a78bfa" }}>{formatRubles(salesRevenue)}</div>
-                      <div className="text-xs" style={{ color: textSecondary }}>Общая сумма</div>
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr style={{ backgroundColor: withAlpha(borderSoft, 0.1) }}>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Время</th>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Покупатель</th>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Мотоцикл</th>
-                          <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Сумма</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
-                        {sales.map((sale) => (
-                          <tr key={sale.id} className="hover:bg-opacity-50 transition-all" style={{ hoverBackgroundColor: withAlpha(accentMain, 0.05) }}>
-                            <td className="px-5 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium" style={{ color: textPrimary }}>{formatRussianDate(sale.created_at)}</div>
-                            </td>
-                            <td className="px-5 py-4">
-                              <div className="flex flex-col">
-                                <span className="text-sm font-medium" style={{ color: textPrimary }}>{sale.buyer_full_name || "—"}</span>
-                                {sale.buyer_email && (
-                                  <span className="text-xs" style={{ color: textSecondary }}>{sale.buyer_email}</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-5 py-4">
-                              <div className="text-sm font-medium" style={{ color: textPrimary }}>
-                                {sale.vehicle ? `${sale.vehicle.make} ${sale.vehicle.model}` : "—"}
-                              </div>
-                            </td>
-                            <td className="px-5 py-4 text-right">
-                              <div className="text-sm font-bold" style={{ color: "#a78bfa" }}>{formatRubles(parseInt((sale.sale_price || "0").replace(/\s/g, ""), 10) || 0)}</div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+              <SalesListSection
+                sales={sales}
+                textPrimary={textPrimary}
+                textSecondary={textSecondary}
+                accentMain={accentMain}
+                bgCard={bgCard}
+                borderSoft={borderSoft}
+              />
 
               {/* COMMERCIAL PROPOSALS LIST */}
-              {proposals.length > 0 && (
-                <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.3), borderColor: withAlpha("#f59e0b", 0.3) }}>
-                  <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha("#f59e0b", 0.15) }}>
-                        <TrendingUp className="w-5 h-5" style={{ color: "#f59e0b" }} />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold" style={{ color: textPrimary }}>Коммерческие предложения</h3>
-                        <p className="text-xs" style={{ color: textSecondary }}>{totalProposals} {totalProposals === 1 ? "КП" : totalProposals > 1 && totalProposals < 5 ? "КП" : "КП"}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold" style={{ color: "#f59e0b" }}>{formatRubles(proposalsRevenue)}</div>
-                      <div className="text-xs" style={{ color: textSecondary }}>Общая сумма</div>
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr style={{ backgroundColor: withAlpha(borderSoft, 0.1) }}>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Время</th>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Клиент</th>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Тип</th>
-                          <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Сумма</th>
-                          <th className="px-5 py-3 text-center text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>QR</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
-                        {proposals.map((proposal) => (
-                          <tr key={proposal.id} className="hover:bg-opacity-50 transition-all" style={{ hoverBackgroundColor: withAlpha("#f59e0b", 0.05) }}>
-                            <td className="px-5 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium" style={{ color: textPrimary }}>{formatRussianDate(proposal.created_at)}</div>
-                            </td>
-                            <td className="px-5 py-4">
-                              <div className="flex flex-col">
-                                <span className="text-sm font-medium" style={{ color: textPrimary }}>{proposal.client_name}</span>
-                                {proposal.client_phone && (
-                                  <span className="text-xs" style={{ color: textSecondary }}>{proposal.client_phone}</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-5 py-4">
-                              <span className="inline-flex items-center px-2 py-1 rounded text-xs font-semibold" style={{ backgroundColor: withAlpha("#f59e0b", 0.15), color: "#f59e0b" }}>
-                                {proposal.offer_type}
-                              </span>
-                            </td>
-                            <td className="px-5 py-4 text-right">
-                              <div className="text-sm font-bold" style={{ color: "#f59e0b" }}>{formatRubles(proposal.total_price)}</div>
-                            </td>
-                            <td className="px-5 py-4 text-center">
-                              {proposal.qr_included ? (
-                                <span className="text-base" style={{ color: "#34d399" }}>✓</span>
-                              ) : (
-                                <span style={{ color: borderSoft }}>—</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+              <CommercialProposalsListSection
+                proposals={proposals}
+                textPrimary={textPrimary}
+                textSecondary={textSecondary}
+                bgCard={bgCard}
+                borderSoft={borderSoft}
+              />
 
-              {/* PENDING SUBRENT APPLICATIONS */}
-              {!loadingApplications && pendingApplications.length > 0 && (
-                <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha("#f59e0b", 0.08), borderColor: withAlpha("#f59e0b", 0.4), borderWidth: "2px" }}>
-                  <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: withAlpha(borderSoft, 0.2), background: `linear-gradient(to right, ${withAlpha("#f59e0b", 0.1)}, transparent)` }}>
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg relative" style={{ backgroundColor: withAlpha("#f59e0b", 0.2) }}>
-                        <AlertCircle className="w-5 h-5" style={{ color: "#f59e0b" }} />
-                        <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full animate-ping" style={{ backgroundColor: "#f59e0b" }} />
-                        <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full" style={{ backgroundColor: "#f59e0b" }} />
-                      </div>
-                      <div>
-                        <h3 className="font-bold" style={{ color: textPrimary }}>Заявки на субаренду</h3>
-                        <p className="text-xs" style={{ color: textSecondary }}>{pendingApplications.length} {pendingApplications.length === 1 ? "заявка ожидает рассмотрения" : "заявки ожидают рассмотрения"}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="divide-y" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
-                    {pendingApplications.map((app) => (
-                      <div key={app.id} className="p-4 md:p-5 hover:bg-opacity-50 transition-all" style={{ hoverBackgroundColor: withAlpha("#f59e0b", 0.05) }}>
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ backgroundColor: withAlpha("#f59e0b", 0.2), color: "#f59e0b" }}>
-                                НОВАЯ
-                              </span>
-                              <span className="text-xs" style={{ color: textSecondary }}>
-                                {formatRussianDate(app.created_at)}
-                              </span>
-                            </div>
-                            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-                              <div>
-                                <p className="text-sm font-semibold" style={{ color: textPrimary }}>{app.owner_full_name}</p>
-                                <p className="text-xs" style={{ color: textSecondary }}>{app.owner_phone}</p>
-                              </div>
-                              <div className="hidden md:block w-px h-8" style={{ backgroundColor: borderSoft }} />
-                              <div>
-                                <p className="text-sm font-medium" style={{ color: textPrimary }}>{app.bike_make} {app.bike_model}</p>
-                                <p className="text-xs" style={{ color: textSecondary }}>Процент: {app.owner_percentage}% • Мин. цена: {app.min_daily_price_rub} ₽</p>
-                              </div>
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-3 text-xs" style={{ color: textSecondary }}>
-                              <span>📅 {app.contract_start_date} — {app.contract_end_date}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => void handleDeclineApplication(app.id)}
-                              disabled={processingApplication === app.id}
-                              className="relative px-4 py-2 rounded-lg text-sm font-bold transition-all duration-300 disabled:opacity-50 overflow-hidden"
-                              style={{
-                                backgroundColor: processingApplication === app.id
-                                  ? withAlpha("#f87171", 0.25)
-                                  : withAlpha("#f87171", 0.15),
-                                borderColor: withAlpha("#f87171", 0.4),
-                                color: "#f87171",
-                                border: "1.5px solid"
-                              }}
-                            >
-                              {processingApplication === app.id ? (
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <XCircle className="w-4 h-4" />
-                              )}
-                              <span className="ml-1.5 hidden sm:inline">Отклонить</span>
-                            </button>
-                            <button
-                              onClick={() => void handleApproveApplication(app.id)}
-                              disabled={processingApplication === app.id}
-                              className="relative px-4 py-2 rounded-lg text-sm font-bold transition-all duration-300 disabled:opacity-50 overflow-hidden"
-                              style={{
-                                backgroundColor: processingApplication === app.id
-                                  ? withAlpha("#10b981", 0.25)
-                                  : `linear-gradient(135deg, ${withAlpha("#10b981", 0.2)}, ${withAlpha("#10b981", 0.1)})`,
-                                borderColor: withAlpha("#10b981", 0.4),
-                                color: "#10b981",
-                                border: "1.5px solid",
-                                boxShadow: `0 4px 12px ${withAlpha("#10b981", 0.3)}`
-                              }}
-                            >
-                              {processingApplication === app.id ? (
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <CheckCircle2 className="w-4 h-4" />
-                              )}
-                              <span className="ml-1.5 hidden sm:inline">Одобрить</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* PENDING SUBRENT APPLICATIONS + SUBRENT CONTRACTS */}
+              <SubrentsSection
+                pendingApplications={pendingApplications}
+                processingApplication={processingApplication}
+                onApprove={handleApproveApplication}
+                onDecline={handleDeclineApplication}
+                subrents={subrents}
+                subrentsSummary={subrentsSummary}
+                textPrimary={textPrimary}
+                textSecondary={textSecondary}
+                bgCard={bgCard}
+                borderSoft={borderSoft}
+              />
 
-              {/* SUBRENT CONTRACTS LIST */}
-              {subrents.length > 0 && (
-                <div className="rounded-2xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.3), borderColor: withAlpha("#06b6d4", 0.3) }}>
-                  <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg" style={{ backgroundColor: withAlpha("#06b6d4", 0.15) }}>
-                        <ShieldCheck className="w-5 h-5" style={{ color: "#06b6d4" }} />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold" style={{ color: textPrimary }}>Субарендные договоры</h3>
-                        <p className="text-xs" style={{ color: textSecondary }}>{totalSubrents} {totalSubrents === 1 ? "договор" : totalSubrents > 1 && totalSubrents < 5 ? "договора" : "договоров"}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold" style={{ color: "#06b6d4" }}>{subrentsSummary?.activeCount || 0}</div>
-                      <div className="text-xs" style={{ color: textSecondary }}>Активных</div>
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr style={{ backgroundColor: withAlpha(borderSoft, 0.1) }}>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Время</th>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Собственник</th>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Мотоцикл</th>
-                          <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>%</th>
-                          <th className="px-5 py-3 text-center text-xs font-medium uppercase tracking-wider" style={{ color: textSecondary }}>Период</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y" style={{ borderColor: withAlpha(borderSoft, 0.2) }}>
-                        {subrents.map((subrent) => (
-                          <tr key={subrent.id} className="hover:bg-opacity-50 transition-all" style={{ hoverBackgroundColor: withAlpha("#06b6d4", 0.05) }}>
-                            <td className="px-5 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium" style={{ color: textPrimary }}>{formatRussianDate(subrent.created_at)}</div>
-                            </td>
-                            <td className="px-5 py-4">
-                              <div className="flex flex-col">
-                                <span className="text-sm font-medium" style={{ color: textPrimary }}>{subrent.owner_full_name || "—"}</span>
-                                {subrent.owner_phone && (
-                                  <span className="text-xs" style={{ color: textSecondary }}>{subrent.owner_phone}</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-5 py-4">
-                              <div className="text-sm font-medium" style={{ color: textPrimary }}>
-                                {subrent.bike_make} {subrent.bike_model}
-                              </div>
-                            </td>
-                            <td className="px-5 py-4 text-right">
-                              <span className="text-sm font-bold" style={{ color: "#06b6d4" }}>{subrent.owner_percentage}%</span>
-                            </td>
-                            <td className="px-5 py-4 text-center">
-                              <span className="text-xs" style={{ color: textSecondary }}>
-                                {subrent.contract_start_date} - {subrent.contract_end_date}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
+                        {/* Footer */}
             <div className="text-center py-3 md:py-4">
               <p className="text-[10px] md:text-xs" style={{ color: textSecondary }}>
                 CarTest Analytics • {new Date().getFullYear()}
