@@ -130,7 +130,7 @@ const supabaseRestSelect = (from, to) => {
   return JSON.parse(curl.stdout || '[]');
 };
 
-function supabaseRestRequest(pathAndQuery, { method = 'GET', body = null, prefer = '' } = {}) {
+function supabaseRestRequest(pathAndQuery, { method = 'GET', body = null, prefer = '', schema = 'public' } = {}) {
   const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!baseUrl || !serviceKey) {
@@ -146,6 +146,13 @@ function supabaseRestRequest(pathAndQuery, { method = 'GET', body = null, prefer
     '-H', 'Content-Type: application/json',
   ];
   if (prefer) args.push('-H', `Prefer: ${prefer}`);
+  if (schema && schema !== 'public') {
+    if (method === 'GET') {
+      args.push('-H', `Accept-Profile: ${schema}`);
+    } else {
+      args.push('-H', `Content-Profile: ${schema}`);
+    }
+  }
   if (body) args.push('--data', JSON.stringify(body));
 
   const curl = spawnSync('curl', args, { encoding: 'utf8' });
@@ -823,24 +830,24 @@ const rentalSecretsPayload = {
   template_version: CURRENT_RENTAL_TEMPLATE_VERSION,
 };
 
+// Save rental secrets via direct Supabase REST (avoids use server import issues in CLI)
 try {
-  const { saveUserRentalSecrets } = await import('../app/lib/user-rental-secrets.ts');
-  const saved = await saveUserRentalSecrets(rentalSecretsPayload);
-  if (!saved) throw new Error('saveUserRentalSecrets returned null');
-  result.rentalSecretsSaved = true;
-} catch (err) {
-  try {
-    const { error: fallbackError } = await supabase
-      .schema('private')
-      .from('user_rental_secrets')
-      .insert({ ...rentalSecretsPayload, updated_at: new Date().toISOString() });
-    if (fallbackError) throw fallbackError;
+  const restPayload = { ...rentalSecretsPayload, updated_at: new Date().toISOString() };
+  const restResult = supabaseRestRequest('user_rental_secrets?select=id', {
+    method: 'POST',
+    body: restPayload,
+    prefer: 'return=representation',
+    schema: 'private',
+  });
+  if (restResult && (restResult.id || (Array.isArray(restResult) && restResult[0]?.id))) {
     result.rentalSecretsSaved = true;
-    result.rentalSecretsSaveFallback = true;
-  } catch (fallbackErr) {
-    console.error('[make-rental-contract-skill] failed to save rental secrets:', fallbackErr?.message || fallbackErr, 'primary:', err?.message || err);
+  } else {
+    console.error('[make-rental-contract-skill] rental secrets REST insert returned no id:', JSON.stringify(restResult));
     result.rentalSecretsSaved = false;
   }
+} catch (restErr) {
+  console.error('[make-rental-contract-skill] failed to save rental secrets via REST:', restErr?.message || restErr);
+  result.rentalSecretsSaved = false;
 }
 
 console.log(JSON.stringify(result, null, 2));
