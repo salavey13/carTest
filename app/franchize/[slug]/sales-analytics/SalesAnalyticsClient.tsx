@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Tag, Mail, User, Bike, Shield, Calendar, BarChart3, RefreshCw } from "lucide-react";
+import { Tag, Mail, User, Bike, Shield, Calendar, RefreshCw } from "lucide-react";
 
 import { useAppContext } from "@/contexts/AppContext";
 import {
@@ -58,14 +58,19 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
   useEffect(() => { if (getActorUserId()) void loadSales(selectedDate); }, [getActorUserId]);
   useEffect(() => { if (getActorUserId() && !authLoading) void loadSales(selectedDate, true); }, [selectedDate]);
 
-  const bgBase = "var(--franchize-bg-base)"; const bgCard = "var(--franchize-bg-card)"; const accentMain = "var(--franchize-accent-main)"; const accentHover = "var(--franchize-accent-hover)"; const textPrimary = "var(--franchize-text-primary)"; const textSecondary = "var(--franchize-text-secondary)"; const borderSoft = "var(--franchize-border-soft)";
+  const bgBase = "var(--franchize-bg-base)";
+  const bgCard = "var(--franchize-bg-card)";
+  const accentMain = "var(--franchize-accent-main)";
+  const textPrimary = "var(--franchize-text-primary)";
+  const textSecondary = "var(--franchize-text-secondary)";
+  const borderSoft = "var(--franchize-border-soft)";
 
   if (authLoading) return <AnalyticsLoading accentMain={accentMain} bgBase={bgBase} />;
   if (!dbUser && !passwordAuthOwnerId) return <AnalyticsPasswordEntry crewName={crew.name} slug={initialSlug} onAuthenticated={setPasswordAuthOwnerId} />;
 
   const totalRevenue = summary?.totalRevenue || 0;
   const totalCount = summary?.totalCount ?? sales.length;
-  const basePath = ;
+  const basePath = `/franchize/${initialSlug}`;
 
   return (
     <div className="space-y-4">
@@ -74,7 +79,7 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
       <div className="flex items-center justify-between gap-2 flex-wrap p-3 rounded-xl border" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft }}>
         <AnalyticsDateNav selectedDate={selectedDate} onDateChange={setSelectedDate} accentMain={accentMain} bgCard={bgCard} borderSoft={borderSoft} textPrimary={textPrimary} textSecondary={textSecondary} />
         <button onClick={() => void loadSales(selectedDate, true)} disabled={refreshing} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold disabled:opacity-50" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft, color: textSecondary }}>
-          <RefreshCw className={} /> Обновить
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} /> Обновить
         </button>
       </div>
 
@@ -86,7 +91,7 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
       </div>
 
       <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: withAlpha(bgCard, 0.4), borderColor: borderSoft }}>
-        <div className="px-4 py-3 border-b" style={{ borderColor: borderSoft, background:  }}>
+        <div className="px-4 py-3 border-b" style={{ borderColor: borderSoft, background: `linear-gradient(to right, ${withAlpha(accentMain, 0.05)}, transparent)` }}>
           <h3 className="text-sm font-black tracking-tight" style={{ color: textPrimary }}>ДОГОВОРЫ КУПЛИ-ПРОДАЖИ</h3>
         </div>
         {loading ? (
@@ -99,8 +104,8 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
               <div key={sale.id} className="p-4 flex flex-col md:flex-row md:items-center gap-3" style={{ borderColor: borderSoft }}>
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2"><User className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textSecondary }} /><span className="text-sm font-semibold" style={{ color: textPrimary }}>{sale.buyer_full_name || "Без имени"}</span></div>
-                  {sale.buyer_email && (<div className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textSecondary }} /><a href={} className="text-xs hover:underline" style={{ color: accentMain }}>{sale.buyer_email}</a></div>)}
-                  <div className="flex items-center gap-2"><Bike className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textSecondary }} /><span className="text-xs" style={{ color: textSecondary }}>{sale.vehicle ? .trim() : "Техника не определена"}</span></div>
+                  {sale.buyer_email && (<div className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textSecondary }} /><a href={`mailto:${sale.buyer_email}`} className="text-xs hover:underline" style={{ color: accentMain }}>{sale.buyer_email}</a></div>)}
+                  <div className="flex items-center gap-2"><Bike className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textSecondary }} /><span className="text-xs" style={{ color: textSecondary }}>{sale.vehicle ? `${sale.vehicle.make || ""} ${sale.vehicle.model || ""}`.trim() : "Техника не определена"}</span></div>
                 </div>
                 <div className="flex flex-col md:items-end gap-1">
                   <div className="text-lg font-black" style={{ color: accentMain }}>{formatRubles(sale.sale_price)}</div>
