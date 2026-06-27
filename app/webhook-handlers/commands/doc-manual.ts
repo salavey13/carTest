@@ -44,7 +44,7 @@ import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessag
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { deriveUserAccessTier, getAccessTierLabel } from "@/app/lib/derive-access-tier";
 import type { AccessTier } from "@/app/lib/ocr-constants";
-import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
+import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
 import { createHash } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -1080,6 +1080,25 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
     const docxBuf = Buffer.from(docResult.bytes);
     const docSha256 = docResult.sha256;
 
+    // --- Upload DOCX to Supabase Storage (rental-contracts bucket) ---
+    let docStoragePath: string | null = null;
+    try {
+      const uploadResult = await uploadDocxToStorage({
+        crewSlug: "vip-bike",
+        contractKey: vars.document_key,
+        buffer: docxBuf,
+        metadata: {
+          source: `telegram-doc-${isRent ? 'rental' : 'sale'}`,
+          bike_id: bike.id,
+          client: context.mpFullName || "",
+        },
+      });
+      docStoragePath = uploadResult.storagePath;
+      logger.info("[/doc] DOCX uploaded to storage:", docStoragePath);
+    } catch (uploadErr) {
+      logger.warn("[/doc] Storage upload failed (non-fatal):", uploadErr);
+    }
+
     const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${bike.id}_${docSha256}`;
     const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff`;
 
@@ -1166,6 +1185,7 @@ ${qrDeepLink}`);
 
       const rentInsert: Record<string, any> = {
         contract_key: vars.document_key,
+        storage_path: docStoragePath,
         original_sha256: docSha256,
         requested_bike_id: context.bikeId,
         resolved_bike_id: bike.id,
@@ -1218,6 +1238,7 @@ ${qrDeepLink}`);
       // sale_contract_artifacts is in private schema — use explicit columns only
       const { error: saleError } = await privateSchema().from("sale_contract_artifacts").insert({
         contract_key: vars.document_key,
+        storage_path: docStoragePath,
         original_sha256: docSha256,
         requested_bike_id: context.bikeId,
         resolved_bike_id: bike.id,
