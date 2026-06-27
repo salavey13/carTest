@@ -51,6 +51,7 @@ import { join } from "path";
 import { convertTextDateToTimestamp, resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets } from "@/app/lib/rental-contract-vars";
 import { privateSchema } from "@/lib/private-secrets";
+import nodemailer from "nodemailer";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026; // 👍 Fixed current year
@@ -1084,7 +1085,6 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
 
     let qrPngBuffer: Buffer | null = null;
     try {
-      // AbortSignal.timeout is Node 22+ / experimental, use manual timeout for compatibility
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
       const qrRes = await fetch(qrPngUrl, { signal: controller.signal });
@@ -1094,49 +1094,28 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       logger.warn("[/doc] QR failed:", qrErr);
     }
 
-    // ── Send document via Telegram ──────────────────────────────
-    let docSent = false;
-    const caption = `${isRent ? 'Аренда' : 'Продажа'}: ${bike.make} ${bike.model}\n\n🔗 Быстрая повторная аренда:\n${qrDeepLink}`;
+    // Send DOCX via Telegram directly (no media group, separate send)
+    try {
+      await sendTelegramDocument(String(chatId), docxBuf, docFileName);
+      logger.info("[/doc] DOCX sent via sendTelegramDocument");
+    } catch (e) {
+      logger.error("[/doc] sendTelegramDocument failed:", e);
+    }
 
+    // Send QR as separate photo (if available)
     if (qrPngBuffer) {
-      // Try sending DOCX + QR as a media group
-      const token = process.env.TELEGRAM_BOT_TOKEN;
       try {
-        const form = new FormData();
-        form.append('chat_id', String(chatId));
-        form.append('media', JSON.stringify([
-          { type: 'document', media: 'attach://docx', parse_mode: 'HTML' },
-          { type: 'photo', media: 'attach://qr', caption: `📲 <b>QR для повторной аренды</b>\n${qrDeepLink}`, parse_mode: 'HTML' },
-        ]));
-        form.append('docx', new Blob([docxBuf], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), docFileName);
-        form.append('qr', new Blob([qrPngBuffer], {type:'image/png'}), `qr.png`);
-
-        const res = await fetch(`https://api.telegram.org/bot${token}/sendMediaGroup`, {method:'POST', body: form});
-        const resBody = await res.json();
-        if (resBody?.ok) {
-          docSent = true;
-          logger.info("[/doc] DOCX + QR sent as media group");
-        } else {
-          logger.warn("[/doc] sendMediaGroup failed:", resBody?.description);
-        }
-      } catch (e) {
-        logger.warn("[/doc] sendMediaGroup exception:", e);
+        const formData = new FormData();
+        formData.append("chat_id", String(chatId));
+        formData.append("photo", new Blob([qrPngBuffer], { type: "image/png" }), "qr.png");
+        formData.append("caption", `📲 QR для быстрой повторной аренды
+${qrDeepLink}`);
+        formData.append("parse_mode", "HTML");
+        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN}/sendPhoto`, { method: "POST", body: formData });
+        logger.info("[/doc] QR photo sent");
+      } catch (qrSendErr) {
+        logger.warn("[/doc] QR photo send failed:", qrSendErr);
       }
-    }
-
-    // Fallback: send DOCX alone
-    if (!docSent) {
-      try {
-        await sendTelegramDocument(String(chatId), docxBuf, docFileName);
-        docSent = true;
-        logger.info("[/doc] DOCX sent via sendTelegramDocument");
-      } catch (e) {
-        logger.error("[/doc] sendTelegramDocument also failed:", e);
-      }
-    }
-
-    if (!docSent) {
-      logger.error("[/doc] All document delivery methods failed!");
     }
 
     let rentalId: string | null = null;
@@ -1273,6 +1252,47 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       (isRent ? `\nCats: ${(context.mlCategories || []).join(", ")}` : "") +
       (!isRent ? `\nPrice: ${Number(context.salePrice || 0).toLocaleString("ru-RU")} ₽` : ""),
     );
+
+
+    // --- Send email notification ---
+    try {
+      const smtpHost = process.env.SMTP_HOST || process.env.SMTP_YANDEX_HOST;
+      const smtpPort = Number(process.env.SMTP_PORT || process.env.SMTP_YANDEX_PORT || 465);
+      const smtpUser = process.env.SMTP_USER || process.env.SMTP_YANDEX_USER;
+      const smtpPass = process.env.SMTP_PASS || process.env.SMTP_YANDEX_PASS;
+      const emailFrom = process.env.EMAIL_FROM || smtpUser;
+
+      if (smtpHost && smtpUser && smtpPass) {
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
+          auth: { user: smtpUser, pass: smtpPass },
+        });
+
+        const docType = isRent ? "аренды" : "купли-продажи";
+        const emailBody = [
+          `Договор ${docType} №${vars.document_key || vars.contract_number || bike.id}`,
+          ``,
+          `Байк: ${bike.make} ${bike.model}`,
+          `Клиент: ${context.mpFullName || "—"}`,
+          ``,
+          isRent ? `Период: ${context.rentStartDate || "?"} ${context.rentStartTime || ""} — ${context.rentEndDate || "?"} ${context.rentEndTime || ""}` : `Цена: ${Number(context.salePrice || 0).toLocaleString("ru-RU")} ₽`,
+          ``,
+          `Договор сгенерирован в Telegram-боте.`,
+        ].filter(Boolean).join("\n");
+
+        await transporter.sendMail({
+          from: emailFrom,
+          to: process.env.EMAIL_DEFAULT_TO || "vip-bike@mail.ru",
+          subject: `Договор ${docType} — ${bike.make} ${bike.model}`,
+          text: emailBody,
+        });
+        logger.info("[/doc] Email notification sent");
+      }
+    } catch (emailErr) {
+      logger.warn("[/doc] Email send failed (non-fatal):", emailErr);
+    }
 
     return true;
   } catch (error) {
