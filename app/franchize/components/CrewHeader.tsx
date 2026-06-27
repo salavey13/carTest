@@ -15,6 +15,7 @@ import { toCategoryId } from "../lib/navigation";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
 import { readablePaletteTextOnColor, withAlpha } from "../lib/theme";
+import { SHOW_CART } from "@/lib/feature-flags";
 import {
   ensureSpookyKeyframes,
   getFirstLetter,
@@ -110,6 +111,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
     if (pathname !== mainCatalogPath && sectionLinks.length > 0) {
       const normalizedSectionLinks = sectionLinks
         .filter((link) => link.label.trim() && link.href.trim())
+        .filter((link) => SHOW_CART || link.label.toLowerCase() !== "корзина")
         .map((link) => ({ ...link, categoryLabel: link.label }));
 
       if (normalizedSectionLinks.length > 0) return normalizedSectionLinks;
@@ -379,17 +381,19 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                 currentSlug={crew.slug}
               />
             </CrewButtonErrorBoundary>
-            <FloatingCartIconLinkBySlug
-              slug={crew.slug}
-              href={`/franchize/${crew.slug}/cart`}
-              items={items}
-              accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain}
-              textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
-              borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}
-              theme={crew.theme}
-              mode="inline-icon"
-              className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl no-underline"
-            />
+            {SHOW_CART && (
+              <FloatingCartIconLinkBySlug
+                slug={crew.slug}
+                href={`/franchize/${crew.slug}/cart`}
+                items={items}
+                accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain}
+                textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
+                borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}
+                theme={crew.theme}
+                mode="inline-icon"
+                className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl no-underline"
+              />
+            )}
           </div>
         </div>
       </div>
