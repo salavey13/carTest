@@ -1228,7 +1228,7 @@ ${qrDeepLink}`);
 
       const { error: rentError } = await privateSchema()
         .from("rental_contract_artifacts")
-        .insert(rentInsert);
+        .upsert(rentInsert, { onConflict: "contract_key", ignoreDuplicates: false });
       if (rentError) {
         logger.error("[/doc] Failed to save rental_contract_artifacts:", rentError);
       }
@@ -1236,7 +1236,7 @@ ${qrDeepLink}`);
       const salePrice = context.salePrice || String(bike.specs?.sale_price || bike.specs?.price_rub || "390000");
 
       // sale_contract_artifacts is in private schema — use explicit columns only
-      const { error: saleError } = await privateSchema().from("sale_contract_artifacts").insert({
+      const { error: saleError } = await privateSchema().from("sale_contract_artifacts").upsert({
         contract_key: vars.document_key,
         storage_path: docStoragePath,
         original_sha256: docSha256,

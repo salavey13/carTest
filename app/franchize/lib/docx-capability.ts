@@ -232,7 +232,7 @@ export async function uploadDocxToStorage(params: {
     .from(STORAGE_BUCKET)
     .upload(storagePath, params.buffer, {
       contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      upsert: false,
+      upsert: true,
       ...(params.metadata ? { options: { metadata: params.metadata } } : {}),
     });
 
