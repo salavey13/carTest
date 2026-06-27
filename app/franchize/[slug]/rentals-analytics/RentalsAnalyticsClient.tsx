@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { ru } from "date-fns/locale";
 import * as XLSX from "xlsx";
 import {
   Calendar,
@@ -87,36 +85,7 @@ import { withAlpha } from "@/app/franchize/lib/theme";
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────────
 
-const formatRubles = (amount: number | null | undefined): string => {
-  if (amount == null || !Number.isFinite(amount)) return "—";
-  return new Intl.NumberFormat("ru-RU", {
-    style: "currency",
-    currency: "RUB",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
-
-const formatRussianDate = (dateStr: string | null): string => {
-  if (!dateStr) return "—";
-  try {
-    return format(new Date(dateStr), "dd MMM yyyy, HH:mm", { locale: ru });
-  } catch {
-    return "—";
-  }
-};
-
-const formatRussianDateOnly = (dateStr: string | null): string => {
-  if (!dateStr) return "—";
-  try {
-    return format(new Date(dateStr), "dd MMM yyyy", { locale: ru });
-  } catch {
-    return "—";
-  }
-};
-
-// ─── Status configs (will be themed dynamically) ───────────────────────────────
-
+import { formatRubles, formatRussianDate, formatRussianDateOnly } from "./analytics-utils";
 const getStatusConfig = (accentMain: string) => ({
   confirmed: { icon: CheckCircle2, label: "Подтв", color: "#34d399" },
   active: { icon: Clock, label: "Активна", color: "#60a5fa" },

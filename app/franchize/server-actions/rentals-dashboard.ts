@@ -1126,8 +1126,9 @@ export async function resendRentalContract(input: {
 export async function getRentalsForExport(input: {
   slug: string;
   actorUserId: string;
-  startDate: string; // ISO date string (YYYY-MM-DD)
-  endDate: string; // ISO date string (YYYY-MM-DD)
+  startDate?: string; // ISO date string (YYYY-MM-DD) — optional, defaults to today
+  endDate?: string; // ISO date string (YYYY-MM-DD) — optional, defaults to today
+  date?: string; // Alternative: single date (YYYY-MM-DD), used by RentalsAnalyticsClient
 }): Promise<{ success: boolean; data?: Array<{
   // Rental info
   rental_id: string;
