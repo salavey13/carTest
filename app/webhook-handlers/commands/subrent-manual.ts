@@ -26,7 +26,7 @@ import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
-import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
+import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
 import { createHash } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -1263,6 +1263,22 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
     const docBuffer = result.bytes;
     const fileHash = result.sha256 || createHash("sha256").update(docBuffer).digest("hex");
 
+    // --- Upload DOCX to Supabase Storage (rental-contracts bucket) ---
+    let storagePath: string | null = null;
+    try {
+      const contractKey = `subrent-${contractNumber}-${Date.now()}`;
+      const uploadResult = await uploadDocxToStorage({
+        crewSlug: "vip-bike",
+        contractKey,
+        buffer: Buffer.from(docBuffer),
+        metadata: { source: "subrent-telegram", owner: context.ownerFullName || "" },
+      });
+      storagePath = uploadResult.storagePath;
+      logger.info("[subrent] DOCX uploaded to storage:", storagePath);
+    } catch (uploadErr) {
+      logger.warn("[subrent] Storage upload failed (non-fatal):", uploadErr);
+    }
+
         // Send document via Telegram (positional args)
     await sendTelegramDocument(String(userId), docBuffer, docFileName);
     
@@ -1309,6 +1325,7 @@ ${context.bikeMake} ${context.bikeModel}
     try {
       await privateSchema().from("subrent_contract_artifacts").insert({
         contract_key: `subrent-${contractNumber}-${Date.now()}`,
+        storage_path: storagePath,
         original_sha256: fileHash,
         telegram_chat_id: String(userId),
         owner_full_name: context.ownerFullName || null,
