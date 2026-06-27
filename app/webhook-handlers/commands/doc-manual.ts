@@ -1226,35 +1226,74 @@ ${qrDeepLink}`);
         });
       }
 
-      const { error: rentError } = await privateSchema()
+      // Dedup by semantic key: same renter + same bike + same start date = duplicate (retry)
+      const dedupRentKey = [
+        (context.mpFullName || "").trim().toUpperCase(),
+        context.bikeId,
+        context.rentStartDate,
+      ].join("|");
+      const { data: existingRental } = await privateSchema()
         .from("rental_contract_artifacts")
-        .upsert(rentInsert, { onConflict: "contract_key", ignoreDuplicates: false });
-      if (rentError) {
-        logger.error("[/doc] Failed to save rental_contract_artifacts:", rentError);
+        .select("id, storage_path")
+        .eq("renter_full_name", context.mpFullName || "")
+        .eq("requested_bike_id", context.bikeId)
+        .eq("rent_start_date", context.rentStartDate || "")
+        .maybeSingle();
+
+      if (existingRental) {
+        logger.info("[/doc] Duplicate rental detected (same renter+bike+date), skipping. existing id:", existingRental.id, "key:", dedupRentKey);
+        // Backfill storage_path on existing record if missing
+        if (!existingRental.storage_path && docStoragePath) {
+          await privateSchema().from("rental_contract_artifacts").update({ storage_path: docStoragePath }).eq("id", existingRental.id);
+          logger.info("[/doc] Backfilled storage_path on existing rental artifact");
+        }
+      } else {
+        const { error: rentError } = await privateSchema()
+          .from("rental_contract_artifacts")
+          .insert(rentInsert);
+        if (rentError) {
+          logger.error("[/doc] Failed to save rental_contract_artifacts:", rentError);
+        }
       }
     } else {
       const salePrice = context.salePrice || String(bike.specs?.sale_price || bike.specs?.price_rub || "390000");
 
-      // sale_contract_artifacts is in private schema — use explicit columns only
-      const { error: saleError } = await privateSchema().from("sale_contract_artifacts").upsert({
-        contract_key: vars.document_key,
-        storage_path: docStoragePath,
-        original_sha256: docSha256,
-        requested_bike_id: context.bikeId,
-        resolved_bike_id: bike.id,
-        telegram_chat_id: String(userId),
-        telegram_message_id: null,
-        buyer_full_name: context.mpFullName || null,
-        buyer_passport_number: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
-        buyer_passport_issued_by: context.mpIssuedBy || null,
-        buyer_passport_issue_date: context.mpIssueDate || null,
-        buyer_registration: context.mpRegistration || null,
-        sale_price: salePrice,
-        warranty_months: "0", // Sold "as-is", no warranty
-        template_version: 1,
-      });
-      if (saleError) {
-        logger.error("[/doc] Failed to save sale_contract_artifacts:", saleError);
+      // Dedup by semantic key: same buyer + same bike = duplicate (retry)
+      const { data: existingSale } = await privateSchema()
+        .from("sale_contract_artifacts")
+        .select("id, storage_path")
+        .eq("buyer_full_name", context.mpFullName || "")
+        .eq("requested_bike_id", context.bikeId)
+        .maybeSingle();
+
+      if (existingSale) {
+        logger.info("[/doc] Duplicate sale detected (same buyer+bike), skipping. existing id:", existingSale.id);
+        if (!existingSale.storage_path && docStoragePath) {
+          await privateSchema().from("sale_contract_artifacts").update({ storage_path: docStoragePath }).eq("id", existingSale.id);
+          logger.info("[/doc] Backfilled storage_path on existing sale artifact");
+        }
+      } else {
+        // sale_contract_artifacts is in private schema — use explicit columns only
+        const { error: saleError } = await privateSchema().from("sale_contract_artifacts").insert({
+          contract_key: vars.document_key,
+          storage_path: docStoragePath,
+          original_sha256: docSha256,
+          requested_bike_id: context.bikeId,
+          resolved_bike_id: bike.id,
+          telegram_chat_id: String(userId),
+          telegram_message_id: null,
+          buyer_full_name: context.mpFullName || null,
+          buyer_passport_number: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
+          buyer_passport_issued_by: context.mpIssuedBy || null,
+          buyer_passport_issue_date: context.mpIssueDate || null,
+          buyer_registration: context.mpRegistration || null,
+          sale_price: salePrice,
+          warranty_months: "0", // Sold "as-is", no warranty
+          template_version: 1,
+        });
+        if (saleError) {
+          logger.error("[/doc] Failed to save sale_contract_artifacts:", saleError);
+        }
       }
     }
 

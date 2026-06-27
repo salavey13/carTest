@@ -1323,41 +1323,59 @@ ${context.bikeMake} ${context.bikeModel}
     // --- Save to subrent_contract_artifacts (private schema) ---
     // CRITICAL: schema uses owner_* columns (NOT renter_*), see migration 20260624000000
     try {
-      await privateSchema().from("subrent_contract_artifacts").upsert({
-        contract_key: `subrent-${contractNumber}-${Date.now()}`,
-        storage_path: storagePath,
-        original_sha256: fileHash,
-        telegram_chat_id: String(userId),
-        owner_full_name: context.ownerFullName || null,
-        owner_passport_series: context.ownerPassportSeries || null,
-        owner_passport_number: context.ownerPassportNumber || null,
-        owner_passport_issued_by: context.ownerPassportIssuedBy || null,
-        owner_passport_issue_date: context.ownerPassportIssueDate || null,
-        owner_birth_date: context.ownerBirthDate || null,
-        owner_registration: context.ownerRegistration || null,
-        owner_phone: context.ownerPhone || null,
-        owner_email: context.ownerEmail || null,
-        bike_make: context.bikeMake || null,
-        bike_model: context.bikeModel || null,
-        bike_vin: context.bikeVin || null,
-        bike_plate: context.bikePlate || null,
-        bike_year: context.bikeYear || null,
-        bike_value_rub: context.bikeValue || null,
-        owner_percentage: String(context.ownerPercentage || DEFAULT_OWNER_PERCENTAGE),
-        min_daily_price_rub: String(context.minDailyPrice || DEFAULT_MIN_DAILY_PRICE),
-        hourly_3h_price_rub: String(context.hourly3hPrice || DEFAULT_HOURLY_PRICES["3h"]),
-        hourly_6h_price_rub: String(context.hourly6hPrice || DEFAULT_HOURLY_PRICES["6h"]),
-        hourly_12h_price_rub: String(context.hourly12hPrice || DEFAULT_HOURLY_PRICES["12h"]),
-        weekday_daily_price_rub: String(context.weekdayPrice || DEFAULT_SEASONAL_PRICES.weekday),
-        weekend_daily_price_rub: String(context.weekendPrice || DEFAULT_SEASONAL_PRICES.weekend),
-        contract_start_date: context.contractStartDate || null,
-        contract_start_time: context.contractStartTime || null,
-        contract_end_date: context.contractEndDate || null,
-        contract_end_time: context.contractEndTime || null,
-        crew_id: context.crewId || null,
-        template_version: 1,
-      });
-      logger.info("[subrent] Contract artifact saved");
+      // Dedup by semantic key: same owner + same bike + same start date = duplicate (retry)
+      const { data: existingSubrent } = await privateSchema()
+        .from("subrent_contract_artifacts")
+        .select("id, storage_path")
+        .eq("owner_full_name", context.ownerFullName || "")
+        .eq("bike_make", context.bikeMake || "")
+        .eq("bike_model", context.bikeModel || "")
+        .eq("contract_start_date", context.contractStartDate || "")
+        .maybeSingle();
+
+      if (existingSubrent) {
+        logger.info("[subrent] Duplicate detected (same owner+bike+date), skipping. existing id:", existingSubrent.id);
+        if (!existingSubrent.storage_path && storagePath) {
+          await privateSchema().from("subrent_contract_artifacts").update({ storage_path: storagePath }).eq("id", existingSubrent.id);
+          logger.info("[subrent] Backfilled storage_path on existing artifact");
+        }
+      } else {
+        await privateSchema().from("subrent_contract_artifacts").insert({
+          contract_key: `subrent-${contractNumber}-${Date.now()}`,
+          storage_path: storagePath,
+          original_sha256: fileHash,
+          telegram_chat_id: String(userId),
+          owner_full_name: context.ownerFullName || null,
+          owner_passport_series: context.ownerPassportSeries || null,
+          owner_passport_number: context.ownerPassportNumber || null,
+          owner_passport_issued_by: context.ownerPassportIssuedBy || null,
+          owner_passport_issue_date: context.ownerPassportIssueDate || null,
+          owner_birth_date: context.ownerBirthDate || null,
+          owner_registration: context.ownerRegistration || null,
+          owner_phone: context.ownerPhone || null,
+          owner_email: context.ownerEmail || null,
+          bike_make: context.bikeMake || null,
+          bike_model: context.bikeModel || null,
+          bike_vin: context.bikeVin || null,
+          bike_plate: context.bikePlate || null,
+          bike_year: context.bikeYear || null,
+          bike_value_rub: context.bikeValue || null,
+          owner_percentage: String(context.ownerPercentage || DEFAULT_OWNER_PERCENTAGE),
+          min_daily_price_rub: String(context.minDailyPrice || DEFAULT_MIN_DAILY_PRICE),
+          hourly_3h_price_rub: String(context.hourly3hPrice || DEFAULT_HOURLY_PRICES["3h"]),
+          hourly_6h_price_rub: String(context.hourly6hPrice || DEFAULT_HOURLY_PRICES["6h"]),
+          hourly_12h_price_rub: String(context.hourly12hPrice || DEFAULT_HOURLY_PRICES["12h"]),
+          weekday_daily_price_rub: String(context.weekdayPrice || DEFAULT_SEASONAL_PRICES.weekday),
+          weekend_daily_price_rub: String(context.weekendPrice || DEFAULT_SEASONAL_PRICES.weekend),
+          contract_start_date: context.contractStartDate || null,
+          contract_start_time: context.contractStartTime || null,
+          contract_end_date: context.contractEndDate || null,
+          contract_end_time: context.contractEndTime || null,
+          crew_id: context.crewId || null,
+          template_version: 1,
+        });
+        logger.info("[subrent] Contract artifact saved");
+      }
     } catch (dbErr) {
       logger.error("[subrent] Failed to save contract artifact:", dbErr);
     }
