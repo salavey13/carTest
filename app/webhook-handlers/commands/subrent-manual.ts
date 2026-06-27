@@ -1323,7 +1323,7 @@ ${context.bikeMake} ${context.bikeModel}
     // --- Save to subrent_contract_artifacts (private schema) ---
     // CRITICAL: schema uses owner_* columns (NOT renter_*), see migration 20260624000000
     try {
-      await privateSchema().from("subrent_contract_artifacts").insert({
+      await privateSchema().from("subrent_contract_artifacts").upsert({
         contract_key: `subrent-${contractNumber}-${Date.now()}`,
         storage_path: storagePath,
         original_sha256: fileHash,
