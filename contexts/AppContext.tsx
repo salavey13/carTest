@@ -8,6 +8,7 @@ import { useAppToast } from "@/hooks/useAppToast";
 import { supabaseAnon } from "@/hooks/supabase";
 import type { Database } from "@/types/database.types";
 import { refreshDbUserAction, fetchActiveGameAction, fetchUserRuntimeSnapshotAction } from "./actions";
+import { IS_VPS_DEPLOYMENT } from "@/lib/feature-flags";
 
 export type UserCrewInfo = {
   id: string;
@@ -185,6 +186,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- UX toast side-effects stay isolated from data providers ---
   const appToast = useAppToast();
   useEffect(() => {
+    // VPS has no Telegram by design (blocked in RF) — TG auth is EXPECTED to
+    // be unavailable there, so the "Авторизация..." (15s) + "Ошибка: Telegram
+    // authentication failed" (5s) toasts are pure noise. Worse, because the
+    // WebApp SDK load + auth flow can take a few seconds before resolving to
+    // the no-context state, the toasts lingered for what looked like a ~30s
+    // timeout. Suppress the whole auth-toast flow on VPS deployments.
+    if (IS_VPS_DEPLOYMENT) {
+      appToast.dismiss("auth-loading-toast");
+      appToast.dismiss("auth-error-toast");
+      appToast.dismiss("auth-success-toast");
+      return;
+    }
+
     let loadingTimer: NodeJS.Timeout | null = null;
     const shouldShowLoading = (isTelegramLoading || isTelegramAuthenticating) && !dbUser;
 
