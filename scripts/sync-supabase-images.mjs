@@ -68,8 +68,12 @@ mkdirSync(MIRROR_DIR, { recursive: true });
 let allPaths = [];
 
 if (DO_BIKES) {
-  const bikes = supabaseRest('cars?select=id,image_url,specs,rawSpecs&crew_id=eq.2d5fde70-1dd3-4f0d-8d72-66ccf6908746&type=in.(bike,ebike)');
+  const bikesRaw = supabaseRest('cars?select=id,image_url,specs&crew_id=eq.2d5fde70-1dd3-4f0d-8d72-66ccf6908746&type=in.(bike,ebike)');
+  const bikes = Array.isArray(bikesRaw) ? bikesRaw : [];
   console.log(`📦 ${bikes.length} bikes found\n`);
+  if (!Array.isArray(bikesRaw)) {
+    console.error('⚠️  Supabase response was not an array:', typeof bikesRaw);
+  }
 
   const urls = new Set();
   for (const b of bikes) {
@@ -77,9 +81,8 @@ if (DO_BIKES) {
     const specs = typeof b.specs === 'string' ? JSON.parse(b.specs) : (b.specs || {});
     if (Array.isArray(specs.gallery)) specs.gallery.forEach(g => g && urls.add(g));
     
-    // Extract video URLs from rawSpecs (video promo files)
-    const raw = typeof b.rawSpecs === 'string' ? JSON.parse(b.rawSpecs) : (b.rawSpecs || {});
-    const vidUrl = raw.video_url || raw.video || null;
+    // Extract video URLs from specs (promo video files)
+    const vidUrl = specs.video_url || specs.video || null;
     if (vidUrl && typeof vidUrl === 'string') urls.add(vidUrl);
   }
   const bikePaths = [...urls].map(extractStoragePath).filter(Boolean);
