@@ -40,7 +40,8 @@ function resolveSalePrice(item: CatalogItemVM | null): number {
   return Math.round(raw);
 }
 
-function isBuyFlow(options: { package: string; duration: string; perk: string; auction: string; buyConfigId?: string; buyPriceDelta?: number }): boolean {
+function isBuyFlow(options: { package: string; duration: string; perk: string; auction: string; action?: string; buyConfigId?: string; buyPriceDelta?: number }): boolean {
+  if (options.action === "buy") return true;
   if (typeof options.buyConfigId === "string" && options.buyConfigId.trim().length > 0) return true;
   if (typeof options.buyPriceDelta === "number" && options.buyPriceDelta > 0) return true;
 
