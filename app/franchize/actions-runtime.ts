@@ -65,6 +65,21 @@ type RentalAvailabilityRow = {
   requested_end_date: string | null;
 };
 
+/**
+ * Grace window added to a rental's agreed_end_date before we treat the bike
+ * as available again. Absorbs three real-world cases:
+ *   1. Late returns — renter due at 14:00, actually returns at 18:00.
+ *   2. Bare-date storage — agreed_end_date stored as a calendar date
+ *      ("2026-06-16") parses as midnight UTC, so end-of-day on the 16th
+ *      would otherwise look "past" by 23:59 the same day.
+ *   3. Timezone fuzz between client entry and server interpretation.
+ *
+ * The status column alone is NOT authoritative: operators often forget to
+ * flip rentals from "active" to "completed" after return, so this date-based
+ * gate (with grace) is what actually decides availability in the catalog.
+ */
+const RENTAL_END_GRACE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 export type { FranchizeTheme } from "@/lib/franchize-config";
 
 export interface FranchizeHeaderVM {
@@ -660,8 +675,24 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
           : Number.NaN;
       const rentalStatus = typeof rental.status === "string" ? rental.status : "pending_confirmation";
 
-      const isActiveNow = rentalStatus === "active" || (!Number.isNaN(startTs) && startTs <= nowTs && (Number.isNaN(endTs) || endTs >= nowTs));
-      const isUpcomingBooking = ["pending_confirmation", "confirmed"].includes(rentalStatus) && (Number.isNaN(endTs) || endTs >= nowTs);
+      // ── Robustness fix: stale "active" rentals ──
+      // We can NOT trust `status === "active"` alone. Operators frequently
+      // forget to flip a rental to "completed" after the renter returns the
+      // bike, so the table accumulates "active" rows whose agreed_end_date
+      // is days/weeks in the past. The previous logic short-circuited on
+      // status === "active" and skipped the date check entirely, which made
+      // those bikes display "В аренде до 16.06" on 27.06 — clearly wrong.
+      // (DB snapshot on 2026-06-28: 7 of 8 "active" rentals were stale.)
+      //
+      // New rule: a rental makes the bike busy only while its end date
+      // (plus a grace window that absorbs late returns and the
+      // bare-date-as-midnight storage quirk) is still effectively in the
+      // future. A stale "active" rental with a past end date is treated as
+      // ended → the bike becomes available again automatically.
+      const hasOpenEnd = Number.isNaN(endTs) || endTs + RENTAL_END_GRACE_MS >= nowTs;
+      const isActiveNow = rentalStatus === "active" && hasOpenEnd;
+      const isUpcomingBooking =
+        ["pending_confirmation", "confirmed"].includes(rentalStatus) && hasOpenEnd;
       const isBusy = isActiveNow || isUpcomingBooking;
       if (!isBusy) continue;
 
