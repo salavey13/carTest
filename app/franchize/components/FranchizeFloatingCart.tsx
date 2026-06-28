@@ -1,5 +1,6 @@
 "use client";
 
+import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 
@@ -15,6 +16,12 @@ interface FranchizeFloatingCartProps {
 }
 
 export function FranchizeFloatingCart({ slug, href, items, accentColor, textColor, borderColor, theme, className }: FranchizeFloatingCartProps) {
+  const { isInTelegramContext } = useAppContext();
+  
+  if (!isInTelegramContext) {
+    return null;
+  }
+  
   return (
     <FloatingCartIconLinkBySlug
       slug={slug}
