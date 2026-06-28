@@ -96,6 +96,33 @@ export function handleImageError(originalUrl: string | null | undefined) {
  */
 import React from 'react';
 
+/**
+ * Convert a Supabase storage URL to a local mirror path for videos.
+ * Same logic as localImageSrc, but with a more descriptive name for video use.
+ */
+export function localVideoSrc(supabaseUrl: string | null | undefined): string {
+  return localImageSrc(supabaseUrl);
+}
+
+/**
+ * onError handler for <video> tags.
+ * Falls back to Supabase URL when local video fails to load.
+ * 
+ * Usage:
+ *   <video src={localVideoSrc(url)} onError={handleVideoError(url)} />
+ */
+export function handleVideoError(originalUrl: string | null | undefined) {
+  return (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const vid = e.currentTarget;
+    const fallbackSrc = supabaseUrlFromLocal(originalUrl);
+    
+    // Prevent infinite loop: only fallback once
+    if (vid.src !== fallbackSrc && fallbackSrc) {
+      vid.src = fallbackSrc;
+    }
+  };
+}
+
 export function SmartImage({ 
   src, 
   alt = '', 
