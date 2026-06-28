@@ -13,7 +13,6 @@ import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { toCategoryId } from "../lib/navigation";
-import { useAppContext } from "@/contexts/AppContext";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
 import { readablePaletteTextOnColor, withAlpha } from "../lib/theme";
@@ -52,7 +51,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
 
   const activePillText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
   const { itemCount } = useFranchizeCart(crew.slug);
-  const { isInTelegramContext } = useAppContext();
 
   // Track whether user is manually scrolling the rail (to prevent auto-scroll from fighting it)
   const isUserScrollingRef = useRef(false);
@@ -386,7 +384,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                 currentSlug={crew.slug}
               />
             </CrewButtonErrorBoundary>
-            {SHOW_CART && isInTelegramContext && (
+            {SHOW_CART && (
               <FloatingCartIconLinkBySlug
                 slug={crew.slug}
                 href={`/franchize/${crew.slug}/cart`}
