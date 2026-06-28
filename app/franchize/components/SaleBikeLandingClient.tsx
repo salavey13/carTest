@@ -762,8 +762,7 @@ export function SaleBikeLandingClient({
           style={surface.card}
         >
           <div className="relative aspect-[9/16] sm:aspect-square w-full overflow-hidden rounded-2xl bg-black/30">
-            <Image
-              {videoUrl && selectedImage === 0 ? (
+            {videoUrl && selectedImage === 0 ? (
                 <video
                   src={videoUrl.includes("supabase.co") ? videoUrl.replace(/.*\/storage\/v1\/object\/public\//, "/supabase-mirror/") : videoUrl}
                   poster={heroImage.includes("supabase.co") ? heroImage.replace(/.*\/storage\/v1\/object\/public\//, "/supabase-mirror/") : heroImage}
