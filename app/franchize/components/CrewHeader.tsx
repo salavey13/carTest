@@ -310,40 +310,42 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                 backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase,
               }}
             >
-              {logoUrl && !brokenLogoUrls[logoUrl] ? (
-                <>
-                  <Image
-                    src={localImageSrc(logoUrl)}
-                    alt={`${crew.header.brandName} logo`}
-                    fill
-                    sizes="48px"
-                    className="object-cover"
-                    onLoad={() => setLogoLoaded(true)}
-                    onError={() => {
-                      if (!logoUrl) return;
-                      setBrokenLogoUrls((prev) => ({ ...prev, [logoUrl]: true }));
-                    }}
-                  />
-                  {!logoDissolved && (
-                    <span
-                      className="absolute inset-0 z-10 flex items-center justify-center text-2xl font-bold select-none"
-                      style={{
-                        color: accentMain,
-                        [SPOOKY_ACCENT_VAR as string]: sanitizeAccentColor(accentMain),
-                        animation: logoLoaded
-                          ? "ghostDissolve 0.8s ease-out forwards"
-                          : "spookyPulse 3s ease-in-out infinite, spookyFlicker 5s steps(1) infinite",
+              {logoUrl ? (
+                !brokenLogoUrls[localImageSrc(logoUrl)] ? (
+                  <>
+                    <Image
+                      src={localImageSrc(logoUrl)}
+                      alt={`${crew.header.brandName} logo`}
+                      fill
+                      sizes="48px"
+                      className="object-cover"
+                      onLoad={() => setLogoLoaded(true)}
+                      onError={() => {
+                        const localSrc = localImageSrc(logoUrl);
+                        setBrokenLogoUrls((prev) => ({ ...prev, [localSrc]: true }));
                       }}
-                      onAnimationEnd={() => {
-                        if (logoLoaded) setLogoDissolved(true);
-                      }}
-                    >
-                      {getFirstLetter(crew.header.brandName)}
-                    </span>
-                  )}
-                </>
-              ) : logoUrl && brokenLogoUrls[logoUrl] ? (
-                <SpookyLetter letter={getFirstLetter(crew.header.brandName)} color={accentMain} sizeClass="text-2xl" />
+                    />
+                    {!logoDissolved && (
+                      <span
+                        className="absolute inset-0 z-10 flex items-center justify-center text-2xl font-bold select-none"
+                        style={{
+                          color: accentMain,
+                          [SPOOKY_ACCENT_VAR as string]: sanitizeAccentColor(accentMain),
+                          animation: logoLoaded
+                            ? "ghostDissolve 0.8s ease-out forwards"
+                            : "spookyPulse 3s ease-in-out infinite, spookyFlicker 5s steps(1) infinite",
+                        }}
+                        onAnimationEnd={() => {
+                          if (logoLoaded) setLogoDissolved(true);
+                        }}
+                      >
+                        {getFirstLetter(crew.header.brandName)}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <SpookyLetter letter={getFirstLetter(crew.header.brandName)} color={accentMain} sizeClass="text-2xl" />
+                )
               ) : (
                 <div
                   className="flex h-full w-full items-center justify-center px-2 text-[10px] font-semibold uppercase tracking-wide"

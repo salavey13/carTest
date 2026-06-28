@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { FranchizeCrewVM, FranchizeTheme } from "../actions";
+import { localImageSrc } from "@/lib/image-fallback";
 
 interface FranchizeCatalogHeroProps {
   crew: FranchizeCrewVM;
@@ -25,7 +26,7 @@ export function FranchizeCatalogHero({ crew, slug, variant = "main" }: Franchize
       {/* Background Image with Overlay */}
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-gray-900 md:aspect-[3/1] md:rounded-2xl">
         <Image
-          src={HERO_BG_IMAGE}
+          src={localImageSrc(HERO_BG_IMAGE)}
           alt={`${brandName} - мотоциклы в Нижнем Новгороде`}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1536px) 90vw, 1600px"
