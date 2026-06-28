@@ -264,13 +264,13 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const [carouselParallaxByItem, setCarouselParallaxByItem] = useState<Record<string, { x: number; y: number }>>({});
   const [carouselLoadedByItem, setCarouselLoadedByItem] = useState<Record<string, true>>({});
   const searchParams = useSearchParams();
-  const { user, dbUser, isInTelegramContext } = useAppContext();
+  const { user, dbUser } = useAppContext();
   const lastQueryViewedVehicleRef = useRef<string>("");
   const recordRentIntentRef = useRef<
     (item: CatalogItemVM, stage: "viewed" | "configured", metadata?: Record<string, unknown>) => Promise<unknown>
   >();
   const resolvedSlug = crew.slug || slug;
-  const showFloatingCart = SHOW_CART && isInTelegramContext && (ctaPolicy ? shouldShowFloatingCart(ctaPolicy, { cartRelevant: true }) : true);
+  const showFloatingCart = SHOW_CART && (ctaPolicy ? shouldShowFloatingCart(ctaPolicy, { cartRelevant: true }) : true);
   const carouselRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const promoModules = useMemo(() => {

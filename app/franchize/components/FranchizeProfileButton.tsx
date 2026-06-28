@@ -378,13 +378,22 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           ) : null}
 
           {effectiveSlug && (
+            <DropdownMenuItem asChild>
+              <Link href={`/franchize/${effectiveSlug}/rentals-analytics`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                <BarChart3 className="mr-2 h-4 w-4" />
+                <span className="truncate">Аналитика аренд</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
+
+          {/* FIX: Crew-management links require userCrewInfo to be loaded.
+              Previous code conditionally wrapped on `effectiveSlug` but the
+              body accessed `userCrewInfo.slug` directly — when userCrewInfo
+              was null (user not in any crew, or snapshot still loading),
+              this threw TypeError and triggered CrewButtonErrorBoundary →
+              the "?" fallback button was rendered instead of the profile. */}
+          {userCrewInfo?.slug && (
             <>
-              <DropdownMenuItem asChild>
-                <Link href={`/franchize/${effectiveSlug}/rentals-analytics`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  <span className="truncate">Аналитика аренд</span>
-                </Link>
-              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href={`/crews/${userCrewInfo.slug}`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
                   <Palette className="mr-2 h-4 w-4" />
