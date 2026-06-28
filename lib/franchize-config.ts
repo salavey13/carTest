@@ -41,21 +41,32 @@ export type FranchizeShowcaseGroup = {
   maxPrice?: number;
 };
 
-// FIX: De-biked default theme. The theme itself (dark amber) is the VIP BIKE
-// palette — it's still used as the DEFAULT fallback when a crew has no theme
-// metadata. This is intentional: the first tenant (vip-bike) gets its colors
-// by default. Other tenants (svarprofi, etc.) MUST have their own palette in
-// SQL metadata — the resolver reads from there and only falls back here.
+// DEFAULT_FRANCHIZE_THEME — the fallback palette used when a crew has no
+// theme metadata, and the value returned by getEarlyFranchizeThemeHint()
+// before the full crew row is fetched.
+//
+// Seeded from vip-bike's dark palette (docs/sql/vip-bike-franchize-hydration.sql
+// → theme.palettes.dark). vip-bike is the primary tenant on rental.vip-bike.ru
+// (next.config rewrites "/" → "/franchize/vip-bike"), so making the default
+// match its dark variant means:
+//   • the SSR/early-hint colors equal the final colors for the main tenant,
+//     eliminating the "strange default colors → real palette" flash;
+//   • other tenants (svarprofi, …) still override this via their own SQL
+//     metadata — the resolver reads from there and only falls back here.
+//
+// NOTE: keep these values in sync with the `:root`/`.dark` --franchize-*
+// defaults in app/globals.css (the CSS-level fallback for the very first
+// paint of isAuto crew pages, before useFranchizeTheme hydrates).
 export const DEFAULT_FRANCHIZE_THEME: FranchizeTheme = {
-  mode: "pepperolli_dark",
+  mode: "vip_bike_dark",
   palette: {
-    bgBase: "#0B0C10",
-    bgCard: "#111217",
-    accentMain: "#D99A00",
-    accentMainHover: "#E2A812",
-    textPrimary: "#F2F2F3",
-    textSecondary: "#A7ABB4",
-    borderSoft: "#24262E",
+    bgBase: "#0A0A0A",
+    bgCard: "#1A1A1A",
+    accentMain: "#FFD700",
+    accentMainHover: "#FFC125",
+    textPrimary: "#FFFAF0",
+    textSecondary: "#D4AF37",
+    borderSoft: "#2A2A2A",
   },
 };
 

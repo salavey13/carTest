@@ -127,15 +127,15 @@ describe('franchize early theme hints', () => {
     const { getEarlyFranchizeThemeHint } = await import('@/app/franchize/lib/early-theme-hints');
 
     expect(getEarlyFranchizeThemeHint('vip-bike')).toMatchObject({
-      mode: 'pepperolli_dark',
+      mode: 'vip_bike_dark',
       palette: {
-        bgBase: '#0B0C10',
-        bgCard: '#111217',
-        accentMain: '#D99A00',
-        accentMainHover: '#E2A812',
-        textPrimary: '#F2F2F3',
-        textSecondary: '#A7ABB4',
-        borderSoft: '#24262E',
+        bgBase: '#0A0A0A',
+        bgCard: '#1A1A1A',
+        accentMain: '#FFD700',
+        accentMainHover: '#FFC125',
+        textPrimary: '#FFFAF0',
+        textSecondary: '#D4AF37',
+        borderSoft: '#2A2A2A',
       },
     });
   });
