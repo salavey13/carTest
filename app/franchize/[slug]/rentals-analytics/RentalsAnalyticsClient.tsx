@@ -91,6 +91,11 @@ import { withAlpha } from "@/app/franchize/lib/theme";
 // ─── Formatting helpers ─────────────────────────────────────────────────────────
 
 import { formatRubles, formatRussianDate, formatRussianDateOnly } from "./analytics-utils";
+import { RentalsStatsRow } from "./analytics-components/RentalsStatsRow";
+import { SubrentsSection } from "./analytics-components/SubrentsSection";
+import { SalesListSection } from "./analytics-components/SalesListSection";
+import { CommercialProposalsListSection } from "./analytics-components/CommercialProposalsListSection";
+import { TodosSection } from "./analytics-components/TodosSection";
 const getStatusConfig = (accentMain: string) => ({
   confirmed: { icon: CheckCircle2, label: "Подтв", color: "#34d399" },
   active: { icon: Clock, label: "Активна", color: "#60a5fa" },
