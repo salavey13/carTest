@@ -48,6 +48,7 @@ import {
   type PrebuyIntentType,
 } from "@/app/franchize/lib/sale-config";
 import { buildCandidateImageUrls } from "@/app/franchize/lib/media";
+import { localImageSrc, localVideoSrc, handleVideoError, supabaseUrlFromLocal } from "@/lib/image-fallback";
 import { getTelegramWebAppFallbackHref } from "@/app/franchize/lib/telegram-links";
 import { useFranchizeCart } from "@/app/franchize/hooks/useFranchizeCart";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
@@ -761,24 +762,18 @@ export function SaleBikeLandingClient({
           className="overflow-hidden rounded-3xl border p-2 sm:p-3"
           style={surface.card}
         >
-          <div className="relative aspect-[9/16] sm:aspect-square w-full overflow-hidden rounded-2xl bg-black/30">
+          <div className="relative aspect-[9/16] sm:aspect-video w-full overflow-hidden rounded-2xl bg-black/30">
             {videoUrl && selectedImage === 0 ? (
                 <video
-                  src={videoUrl.includes("supabase.co") ? videoUrl.replace(/.*\/storage\/v1\/object\/public\//, "/supabase-mirror/") : videoUrl}
-                  poster={heroImage.includes("supabase.co") ? heroImage.replace(/.*\/storage\/v1\/object\/public\//, "/supabase-mirror/") : heroImage}
+                  src={localVideoSrc(videoUrl)}
+                  poster={localImageSrc(heroImage)}
                   controls
                   autoPlay
                   muted
                   loop
                   playsInline
                   className="absolute inset-0 h-full w-full object-cover"
-                  onError={(e) => {
-                    // Fallback to Supabase URL if local mirror fails
-                    const vid = e.currentTarget;
-                    if (!vid.src.includes("supabase.co") && videoUrl) {
-                      vid.src = videoUrl;
-                    }
-                  }}
+                  onError={handleVideoError(videoUrl)}
                 />
               ) : (
                 <Image
@@ -809,7 +804,7 @@ export function SaleBikeLandingClient({
                 style={selectedImage === 0 ? { borderColor: crew.theme.palette.accentMain, boxShadow: `0 0 0 1px ${crew.theme.palette.accentMain}` } : {}}
               >
                 <span className="relative block aspect-[4/3] w-full">
-                  <Image src={heroImage} alt="video" fill sizes="120px" className="object-cover" loading="lazy" />
+                  <Image src={localImageSrc(heroImage)} alt="video" fill sizes="120px" className="object-cover" loading="lazy" />
                   <span className="absolute inset-0 flex items-center justify-center bg-black/40">
                     <svg className="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                   </span>
