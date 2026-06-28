@@ -121,12 +121,24 @@ set
           'title', 'VIP BIKE ELECTRO',
           'subtitle', 'Премиальный прокат в Нижнем Новгороде',
           'logoHref', '/',
+          -- NOTE: header.menuLinks (the hamburger menu) is intentionally a
+          -- rich list — Каталог, Карта, Каталог-electro, Конфигуратор, О нас,
+          -- Контакты, Корзина, Мои аренды, Сообщество, Партнёрам, Продажи.
+          -- A prior cleanup (027d72dc) trimmed this down to 5 entries together
+          -- with the footer, but the hamburger menu needs the full navigation.
+          -- Only the FOOTER columns were meant to be slimmed. Do not trim this.
           'menuLinks', jsonb_build_array(
             jsonb_build_object('label', 'Каталог', 'href', '/franchize/{slug}'),
-            jsonb_build_object('label', 'Тест-драйв', 'href', '/franchize/{slug}#test-drive'),
+            jsonb_build_object('label', 'Карта', 'href', '/franchize/{slug}/map-riders'),
+            jsonb_build_object('label', 'Каталог-electro', 'href', '/franchize/{slug}/electro-enduro'),
+            jsonb_build_object('label', 'Конфигуратор', 'href', '/franchize/{slug}/configurator'),
             jsonb_build_object('label', 'О нас', 'href', '/franchize/{slug}/about'),
             jsonb_build_object('label', 'Контакты', 'href', '/franchize/{slug}/contacts'),
-            jsonb_build_object('label', 'Корзина', 'href', '/franchize/{slug}/cart')
+            jsonb_build_object('label', 'Корзина', 'href', '/franchize/{slug}/cart'),
+            jsonb_build_object('label', 'Мои аренды', 'href', '/franchize/{slug}/rentals'),
+            jsonb_build_object('label', 'Сообщество', 'href', '/franchize/{slug}/community'),
+            jsonb_build_object('label', 'Партнёрам', 'href', '/franchize/{slug}/onboarding'),
+            jsonb_build_object('label', 'Продажи', 'href', '/franchize/{slug}/sales')
           ),
           'quickActions', jsonb_build_array(
             jsonb_build_object('label', 'Тест-драйв', 'href', '/franchize/{slug}#test-drive', 'icon', 'FaMotorcycle')

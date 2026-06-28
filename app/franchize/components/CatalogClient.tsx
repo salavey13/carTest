@@ -19,6 +19,7 @@ import { ItemModal, type FlowType } from "../modals/Item";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
+import { getCatalogPropulsionSegment } from "../lib/catalog-propulsion";
 
 interface CatalogClientProps {
   crew: FranchizeCrewVM;
@@ -180,21 +181,135 @@ function specIconForKey(key: string): string {
   return "";
 }
 
+// ── Spec chip builders ──
+// The catalog card shows up to 3 spec chips. The OLD logic just took
+// Object.entries(rawSpecs).slice(0,3) — which landed on whatever fields
+// happened to be first in the JSON (year, chain type, rental count, …)
+// regardless of how informative they were. These builders deliberately
+// pick the three most decision-relevant specs, split by propulsion:
+//   electric → power (kW), range (km), battery (А·ч)
+//   gas/ICE  → power (л.с.), engine (см³), top speed (км/ч)
+// Fallbacks fill the remaining slots so we still show 3 chips when a
+// primary field is missing (e.g. electric bike with no range → show
+// top speed instead). Falls back to the raw specs array only if the
+// bike has none of the known keys at all.
+
+type SpecChipDef = {
+  keys: string[];
+  icon: string;
+  /** format the matched value into chip text */
+  format: (raw: string | number) => string;
+  /** optional: extract a sub-value from a rich string (e.g. "120Ah" out of "72V 120Ah (Li-ion)") */
+  extract?: (raw: string) => string | null;
+};
+
+/** Parse a numeric spec, tolerating Russian units / ranges. Returns the
+ *  rounded integer as a string, or — for range-like values like "90-150"
+ *  or unparseable strings — the original string unchanged. */
+function formatSpecNum(raw: string | number): string {
+  if (typeof raw === "number" && Number.isFinite(raw)) return String(Math.round(raw));
+  const s = String(raw).trim();
+  if (!s) return s;
+  // Range-like ("90-150", "70–110", "90 to 150") → keep verbatim
+  if (/[-–]\d/.test(s) || /\s(to|до)\s/i.test(s)) return s;
+  const cleaned = s.replace(",", ".").replace(/[^\d.]/g, "");
+  const n = Number(cleaned);
+  return cleaned && Number.isFinite(n) ? String(Math.round(n)) : s;
+}
+
+/** Pull the Ah figure out of a battery string like "72V 120Ah (Li-ion, съёмная)". */
+function extractAh(raw: string): string | null {
+  const m = raw.match(/(\d+(?:[.,]\d+)?)\s*[AaАа]\s*[HhЧч]/);
+  if (!m) return null;
+  const ah = Number(m[1].replace(",", "."));
+  return Number.isFinite(ah) ? `${Math.round(ah)} А·ч` : null;
+}
+
+function pickChip(rawSpecs: Record<string, unknown>, def: SpecChipDef): { icon: string; text: string } | null {
+  for (const key of def.keys) {
+    if (!(key in rawSpecs)) continue;
+    const v = rawSpecs[key];
+    if (v === undefined || v === null || v === "") continue;
+    if (typeof v === "object") continue; // skip nested (battery_options, etc.)
+    const s = typeof v === "string" ? v.trim() : String(v);
+    if (!s) continue;
+    if (def.extract) {
+      const extracted = def.extract(s);
+      if (extracted) return { icon: def.icon, text: extracted };
+      continue; // extraction failed → try next key
+    }
+    return { icon: def.icon, text: def.format(s) };
+  }
+  return null;
+}
+
+// Electric: power → range → battery, with top speed / charge time as fillers.
+const ELECTRIC_CHIP_DEFS: SpecChipDef[] = [
+  { keys: ["power_kw", "motor_nominal_kw", "motor_kw", "motor_peak_kw"], icon: "⚡", format: (v) => `${formatSpecNum(v)} кВт` },
+  { keys: ["power_w"], icon: "⚡", format: (v) => `${Math.round((Number(String(v).replace(/[^\d.]/g, "")) || 0) / 1000)} кВт` },
+  { keys: ["range_km", "max_range_km"], icon: "📍", format: (v) => `${formatSpecNum(v)} км` },
+  { keys: ["battery", "battery_capacity", "battery_capacity_kwh"], icon: "🔋", format: (v) => v, extract: extractAh },
+  { keys: ["top_speed_kmh", "max_speed_kmh"], icon: "🚀", format: (v) => `${formatSpecNum(v)} км/ч` },
+  { keys: ["charge_time_h", "charging_time_h"], icon: "🔌", format: (v) => `${formatSpecNum(v)} ч` },
+];
+
+// Gas/ICE: power → displacement → top speed, with torque as filler.
+const GAS_CHIP_DEFS: SpecChipDef[] = [
+  { keys: ["power_hp", "horsepower", "hp", "bike_power_hp"], icon: "⚡", format: (v) => `${formatSpecNum(v)} л.с.` },
+  { keys: ["engine_cc", "bike_engine_cc", "displacement_cc", "cc"], icon: "🔧", format: (v) => `${formatSpecNum(v)} см³` },
+  { keys: ["top_speed_kmh", "max_speed_kmh"], icon: "🚀", format: (v) => `${formatSpecNum(v)} км/ч` },
+  { keys: ["torque_nm"], icon: "🔩", format: (v) => `${formatSpecNum(v)} Н·м` },
+];
+
+function buildChipsFromDefs(rawSpecs: Record<string, unknown>, defs: SpecChipDef[]): Array<{ icon: string; text: string }> {
+  const chips: Array<{ icon: string; text: string }> = [];
+  for (const def of defs) {
+    if (chips.length >= 3) break;
+    const chip = pickChip(rawSpecs, def);
+    // Skip if extraction failed, OR if an earlier def already produced the
+    // same text (e.g. a bike exposes BOTH power_kw=3 and power_w=3000, which
+    // both render as "3 кВт" — keep only the first).
+    if (chip && !chips.some((c) => c.text === chip.text)) chips.push(chip);
+  }
+  return chips;
+}
+
 function getVisibleSpecChips(item: CatalogItemVM): Array<{ icon: string; text: string }> {
   type ItemWithSpecs = CatalogItemVM & {
     specs?: Array<{ key?: string; label?: string; value?: string; icon?: string }>;
-    rawSpecs?: Record<string, string>;
+    rawSpecs?: Record<string, unknown>;
     specChips?: Array<{ icon: string; text: string }>;
+    subtitle?: string;
+    category?: string;
   };
 
   const withSpecs = item as ItemWithSpecs;
 
-  // 1. Pre-formatted specChips (if pipeline ever provides them)
+  // 1. Pre-formatted specChips (explicit override from the data pipeline)
   if (Array.isArray(withSpecs.specChips) && withSpecs.specChips.length > 0) {
     return withSpecs.specChips.slice(0, 3);
   }
 
-  // 2. Structured specs array — build chips from key/label + value
+  const rawSpecs =
+    withSpecs.rawSpecs && typeof withSpecs.rawSpecs === "object"
+      ? (withSpecs.rawSpecs as Record<string, unknown>)
+      : {};
+
+  // 2. Propulsion-aware deliberate picks (power / range-or-cc / battery-or-speed)
+  if (Object.keys(rawSpecs).length > 0) {
+    const propulsion = getCatalogPropulsionSegment({
+      title: item.title,
+      subtitle: withSpecs.subtitle,
+      description: item.description,
+      category: withSpecs.category,
+      rawSpecs,
+    });
+    const defs = propulsion === "gas" ? GAS_CHIP_DEFS : ELECTRIC_CHIP_DEFS;
+    const chips = buildChipsFromDefs(rawSpecs, defs);
+    if (chips.length > 0) return chips;
+  }
+
+  // 3. Last-resort fallback: structured specs array (label/value pairs)
   if (Array.isArray(withSpecs.specs) && withSpecs.specs.length > 0) {
     return withSpecs.specs
       .filter((s) => s.value || s.label)
@@ -202,17 +317,6 @@ function getVisibleSpecChips(item: CatalogItemVM): Array<{ icon: string; text: s
       .map((s) => ({
         icon: s.icon ?? specIconForKey(s.key ?? s.label ?? ""),
         text: s.value ?? s.label ?? "",
-      }));
-  }
-
-  // 3. rawSpecs key-value map — map keys to icons
-  if (withSpecs.rawSpecs && typeof withSpecs.rawSpecs === "object" && Object.keys(withSpecs.rawSpecs).length > 0) {
-    return Object.entries(withSpecs.rawSpecs)
-      .filter(([, v]) => Boolean(v))
-      .slice(0, 3)
-      .map(([key, value]) => ({
-        icon: specIconForKey(key),
-        text: value,
       }));
   }
 
@@ -860,7 +964,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         type="button"
                         aria-label={`Открыть карточку ${item.title}: ${item.rentPriceLabel}`}
                         data-catalog-item-button="true"
-                        className="block w-full text-left"
+                        className="flex h-full w-full flex-col text-left"
                         onClick={() => openItem(item)}
                         onFocus={() => setFocusedItemId(item.id)}
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
@@ -915,7 +1019,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         </div>
 
                         {/* ── Info + CTA area (rentalbikes-style: highlight on hover, unified container to avoid gap) ── */}
-                        <div className="rounded-b-2xl bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]">
+                        {/* flex-1 + flex-col fills the card height so the hover border aligns. */}
+                        <div className="flex flex-1 flex-col rounded-b-2xl bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]">
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
                             {item.isHot && (
@@ -1002,7 +1107,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         type="button"
                         aria-label={`Открыть карточку ${item.title}: ${item.rentPriceLabel}`}
                         data-catalog-item-button="true"
-                        className="block w-full text-left"
+                        className="flex h-full w-full flex-col text-left"
                         onClick={() => openItem(item)}
                         onFocus={() => setFocusedItemId(item.id)}
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
@@ -1034,7 +1139,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         </div>
 
                         {/* ── Info + CTA area (rentalbikes-style: highlight on hover, unified container) ── */}
-                        <div className="rounded-b-2xl bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]">
+                        {/* flex-1 + flex-col so this area grows to fill the card height (the
+                            image is fixed aspect-[9/16]). Without this, shorter cards left a
+                            gap between the content and the article border, so the hover border
+                            looked misaligned on shorter cards in a stretched grid/carousel row. */}
+                        <div className="flex flex-1 flex-col rounded-b-2xl bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]">
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
                             {item.isHot && (
