@@ -11,7 +11,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, existsSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, existsSync, statSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://inmctohsodgdohamhzag.supabase.co';
@@ -43,11 +43,17 @@ function downloadFile(storagePath) {
   mkdirSync(dirname(localPath), { recursive: true });
   const r = spawnSync('curl', ['-sS', '-L', '-o', localPath,
     `${SUPABASE_URL}/storage/v1/object/public/${storagePath}`], { encoding: 'utf8' });
-  if (r.status !== 0 || !existsSync(localPath) || statSync(localPath).size === 0) {
-    console.error(`  ✗ ${storagePath}`); failed++; return false;
+  if (r.status !== 0 || !existsSync(localPath)) {
+    console.error(`  ✗ ${storagePath}`); rmSync(localPath, { force: true }); failed++; return false;
+  }
+  const size = statSync(localPath).size;
+  // Skip files < 1 KB — likely error responses, not real media
+  if (size < 1024) {
+    console.error(`  ✗ ${storagePath} (${size} B — too small, likely error)`);
+    rmSync(localPath, { force: true }); failed++; return false;
   }
   downloaded++;
-  const kb = (statSync(localPath).size / 1024).toFixed(1);
+  const kb = (size / 1024).toFixed(1);
   console.log(`  ✓ ${storagePath} (${kb} KB)`);
   return true;
 }
