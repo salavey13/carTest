@@ -30,6 +30,9 @@ import {
   Share2,
   Plus,
   X,
+  BarChart3,
+  Tag,
+  FileText,
 } from "lucide-react";
 
 import { useAppContext } from "@/contexts/AppContext";
