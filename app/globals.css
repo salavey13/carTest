@@ -113,6 +113,27 @@
     /* Homework solution page */
     --homework-bg: 240 5% 98%;
     --homework-text: 240 10% 12%;
+
+    /* ── Franchize crew theme (light defaults = vip-bike light palette) ──
+       These 8 vars are consumed via var(--franchize-*) by every isAuto
+       crew page (catalog, analytics, sales, community, profile …).
+       useFranchizeTheme() overrides them in a client useLayoutEffect
+       AFTER hydration, but the SSR HTML already references them — so
+       without these defaults the very first paint resolves the vars to
+       nothing and the browser falls back to its initial colors
+       (transparent bg / black text), producing the "strange colors"
+       flash on rental.vip-bike.ru before the real palette applies.
+       Mirroring the pattern above: light values live here in :root,
+       dark values in the .dark block. Both are seeded from vip-bike's
+       canonical palettes (docs/sql/vip-bike-franchize-hydration.sql). */
+    --franchize-bg-base: #FAFAFA;
+    --franchize-bg-card: #FFFFFF;
+    --franchize-accent-main: #0891B2;
+    --franchize-accent-hover: #0E7490;
+    --franchize-text-primary: #1A1A1A;
+    --franchize-text-secondary: #4A4A4A;
+    --franchize-border-soft: #CCFBF1;
+    --franchize-accent-subtle: color-mix(in srgb, var(--franchize-accent-main) 12%, transparent);
   }
 
   .dark {
@@ -180,6 +201,21 @@
     /* Homework solution page */
     --homework-bg: 228 35% 8%;
     --homework-text: 240 5% 96%;
+
+    /* ── Franchize crew theme (dark = vip-bike dark palette) ──
+       Dark overrides for the franchize CSS vars defined in :root above.
+       vip-bike's catalog defaults to dark theme (ThemeInitializer
+       defaultTheme="dark"), so this is the palette users see on first
+       visit; the values match vip-bike's dark variant exactly
+       (docs/sql/vip-bike-franchize-hydration.sql → theme.palettes.dark). */
+    --franchize-bg-base: #0A0A0A;
+    --franchize-bg-card: #1A1A1A;
+    --franchize-accent-main: #FFD700;
+    --franchize-accent-hover: #FFC125;
+    --franchize-text-primary: #FFFAF0;
+    --franchize-text-secondary: #D4AF37;
+    --franchize-border-soft: #2A2A2A;
+    --franchize-accent-subtle: color-mix(in srgb, var(--franchize-accent-main) 12%, transparent);
   }
 
   body {
