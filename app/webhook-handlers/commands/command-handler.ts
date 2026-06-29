@@ -67,10 +67,13 @@ export async function handleCommand(update: any) {
             text.startsWith("e_") ||     // <<< FIX: end date callbacks (e_tomorrow_10, e_2days_10, e_custom)
             text.startsWith("p_") ||
             text.startsWith("s_") ||
+            text.startsWith("dep_") ||   // <<< FIX: deposit choice callbacks (dep_confirm, dep_custom, dep_sts)
+            text.startsWith("sr_") ||    // <<< FIX: СТС owner-relation callbacks (sr_self, sr_wife, sr_father, sr_mother, sr_power_of_attorney, sr_custom)
             text === "cdone" ||
             text === "cancel" ||
             text === "ok" ||
-            text === "restart"
+            text === "restart" ||
+            text === "sts_skip"          // <<< FIX: skip optional СТС field (vehicle model / VIN)
         )) {
             const handled = await handleDocCallback(userIdStr, chatId, text, update.callback_query.id);
             if (handled) return;
