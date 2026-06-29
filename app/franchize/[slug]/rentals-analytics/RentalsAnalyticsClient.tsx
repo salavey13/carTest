@@ -218,9 +218,17 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   }, [datePickerOpen]);
 
   // ─── Realtime subscriptions ───────────────────────────────────────────────────
+  // Gated on auth state: when not logged in, the hook is a no-op (no
+  // WebSocket created). This prevents the 7GB memory leak caused by
+  // unauthenticated visitors leaving the page open — each unauth'd
+  // subscription was churning in an infinite resubscribe loop.
+  // The hook itself also stabilises onData/onError via refs now, so
+  // even authenticated users don't get the render-loop leak.
+  const isAuthed = !!(dbUser?.user_id || passwordAuthOwnerId);
 
   useSupabaseRealtime({
     tableName: "checklist_state",
+    enabled: isAuthed,
     onData: () => void loadChecklistStates(),
     onError: (error) => console.error("[Analytics] Checklist error:", error),
   });
@@ -228,6 +236,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   useSupabaseRealtime({
     tableName: "crew_todos",
     filter: crew.id ? `crew_id=eq.${crew.id}` : undefined,
+    enabled: isAuthed,
     onData: () => void loadTodos(),
     onError: (error) => console.error("[Analytics] Todos error:", error),
   });
