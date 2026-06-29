@@ -1478,10 +1478,13 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                   try {
                     const result = await createCrewTodo({
                       actorUserId: getActorUserId()!,
-                      crewId: crew.id,
-                      title,
-                      priority: prio,
-                      assignedTo: assignee,
+                      todo: {
+                        crewId: crew.id,
+                        title,
+                        priority: prio,
+                        assignedTo: assignee,
+                        category: "general",
+                      },
                       isPasswordAuth: !!passwordAuthOwnerId,
                     });
                     if (result.success) { toast.success("Задача создана"); void loadTodos(); }
