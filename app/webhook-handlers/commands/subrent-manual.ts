@@ -223,6 +223,29 @@ interface SubrentFlowContext {
 
 // ── Helper functions ─────────────────────────────────────────────────────────────
 
+/**
+ * Capitalize each word in a full name (ФИО) for proper document formatting.
+ * Mirrors the same function in doc-manual.ts — kept duplicated rather than
+ * shared because both modules are independent server-only files that don't
+ * import from each other, and the function is tiny.
+ *
+ *   "иванов иван иванович" → "Иванов Иван Иванович"
+ *   "оруджов-салавеев"      → "Оруджов-Салавеев"
+ */
+function capitalizeFullName(text: string): string {
+  return text
+    .trim()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map(word =>
+      word
+        .toLowerCase()
+        .replace(/(^|-)([a-zа-яё])/gi, (_m, prefix: string, char: string) => prefix + char.toUpperCase())
+    )
+    .join(' ');
+}
+
 async function resolveBikeById(bikeId: string): Promise<any> {
   const { data: exactMatch } = await supabaseAdmin
     .from("cars")
@@ -819,7 +842,7 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       break;
 
     case "owner_name":
-      context.ownerFullName = text;
+      context.ownerFullName = capitalizeFullName(text);
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
@@ -1008,7 +1031,7 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       break;
 
     case "edit_owner_name":
-      context.ownerFullName = text;
+      context.ownerFullName = capitalizeFullName(text);
       await showConfirmation(context, userId);
       break;
 

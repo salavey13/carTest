@@ -198,26 +198,43 @@ function buildStartKeyboard(): KeyboardButton[][] {
 }
 
 /**
- * Build end-date keyboard — defaults to same time as start
- * If startTime is "15:30", shows "Завтра 15:30" and "Послезавтра 15:30"
+ * Build end-date keyboard — shows quick-pick options.
+ *
+ * If startTime is known, shows a "Сегодня <start+3h>" button for short
+ * hourly rentals (most common same-day scenario: start at 18:00, end at
+ * 21:00). The +3h suggestion is only shown if start+3h doesn't cross
+ * midnight (endH <= 23); otherwise the button is omitted and the
+ * operator falls through to "✏️ Свое время".
+ *
+ * Remaining buttons default to the same time-of-day as the start for
+ * next-day and day-after-next returns.
  */
 function buildEndKeyboard(startTime?: string): KeyboardButton[][] {
   const timeLabel = startTime || "10:00";
   // Encode time as HHMM for callback_data (e.g. "15:30" → "1530")
   const timeCode = timeLabel.replace(":", "");
 
-  return [
-    [
-      { text: `📅 Завтра ${timeLabel}`, callback_data: `e_tomorrow_${timeCode}` },
-      { text: `📅 Послезавтра ${timeLabel}`, callback_data: `e_2days_${timeCode}` },
-    ],
-    [
-      { text: "📅 Завтра 10:00", callback_data: "e_tomorrow_1000" },
-    ],
-    [
-      { text: "✏️ Свое время", callback_data: "e_custom" },
-    ],
-  ];
+  const rows: KeyboardButton[][] = [];
+
+  // Smart same-day suggestion: start + 3 hours (common short-rental duration)
+  if (startTime) {
+    const [h, m] = startTime.split(':').map(Number);
+    const endH = h + 3;
+    if (endH <= 23) {
+      const sameDayTime = `${String(endH).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+      const sameDayCode = sameDayTime.replace(":", "");
+      rows.push([{ text: `📅 Сегодня ${sameDayTime} (3 ч)`, callback_data: `e_today_${sameDayCode}` }]);
+    }
+  }
+
+  rows.push([
+    { text: `📅 Завтра ${timeLabel}`, callback_data: `e_tomorrow_${timeCode}` },
+    { text: `📅 Послезавтра ${timeLabel}`, callback_data: `e_2days_${timeCode}` },
+  ]);
+  rows.push([{ text: "📅 Завтра 10:00", callback_data: "e_tomorrow_1000" }]);
+  rows.push([{ text: "✏️ Свое время", callback_data: "e_custom" }]);
+
+  return rows;
 }
 
 function buildHasLicenseKeyboard(): KeyboardButton[][] {
@@ -616,6 +633,33 @@ function parseDate(text: string, requireYear = true): string | null {
 // ── Schedule parsers ─────────────────────────────────────────────────────────
 
 /**
+ * Capitalize each word in a full name (ФИО) for proper document formatting.
+ * Converts any input case to Russian Title Case, which is the convention
+ * for formal contracts:
+ *   "иванов иван иванович" → "Иванов Иван Иванович"
+ *   "ИВАНОВ"               → "Иванов"
+ *   "оруджов-салавеев"      → "Оруджов-Салавеев"
+ *   "pavel"                → "Pavel"
+ *
+ * Handles hyphenated names (capitalises after each hyphen), collapses
+ * extra whitespace, and works for both Cyrillic and Latin alphabets.
+ */
+function capitalizeFullName(text: string): string {
+  return text
+    .trim()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map(word =>
+      word
+        .toLowerCase()
+        // Capitalise first char and any char that follows a hyphen
+        .replace(/(^|-)([a-zа-яё])/gi, (_m, prefix: string, char: string) => prefix + char.toUpperCase())
+    )
+    .join(' ');
+}
+
+/**
  * Decode callback_data time format to HH:MM
  * Supports: "1800" → "18:00", "10" → "10:00", "1530" → "15:30"
  */
@@ -670,8 +714,9 @@ function parseStartDate(text: string): { date: string; time: string } | null {
 }
 
 /**
- * Parse end date only: "завтра 10", "послезавтра 10", "16.06 10", "16.06.2026 10:00"
- * startDate is the rent start date (DD.MM.YYYY) used to resolve relative dates
+ * Parse end date only: "сегодня 21", "завтра 10", "послезавтра 10", "16.06 10", "16.06.2026 10:00"
+ * startDate is the rent start date (DD.MM.YYYY) used to resolve relative dates.
+ * "сегодня" = same calendar day as the start date (for short hourly rentals).
  */
 function parseEndDate(text: string, startDate?: string): { date: string; time: string } | null {
   const t = text.trim().toLowerCase();
@@ -685,6 +730,14 @@ function parseEndDate(text: string, startDate?: string): { date: string; time: s
   }
 
   const formatDate = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+
+  // "сегодня 21" or "сегодня 21:00" — same day as start date (short hourly rentals)
+  const todayMatch = t.match(/сегодня\s+(\d{1,2})(:(\d{2}))?/);
+  if (todayMatch) {
+    const hour = todayMatch[1].padStart(2, '0');
+    const min = todayMatch[3] || '00';
+    return { date: formatDate(startRef), time: `${hour}:${min}` };
+  }
 
   // "завтра 10" or "завтра 10:00" — relative to start date
   const tomorrowMatch = t.match(/завтра\s+(\d{1,2})(:(\d{2}))?/);
@@ -1693,6 +1746,8 @@ const START_DATE_EXAMPLES = `*Когда начинаем?*
 const END_DATE_EXAMPLES = `*Когда заканчиваем?*
 
 Примеры:
+• сегодня 21
+• сегодня 21:30
 • завтра 10
 • завтра 15:30
 • послезавтра 10
@@ -1722,7 +1777,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
   }
 
   if (state === "name") {
-    context.mpFullName = text.trim();
+    context.mpFullName = capitalizeFullName(text);
     await setState(userId, "passport", context);
     await sendComplexMessage(
       chatId,
@@ -1893,7 +1948,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
   }
 
   if (state === "sts_owner") {
-    const owner = text.trim();
+    const owner = capitalizeFullName(text);
     if (owner.length < 5) {
       await sendComplexMessage(chatId, "❌ Введите ФИО собственника полностью", [], { removeKeyboard: true });
       return true;
@@ -2227,7 +2282,11 @@ export async function handleDocCallback(
 
     const timeStr = decodeCallbackTime(rawTime);
 
-    if (when === "tomorrow") {
+    if (when === "today") {
+      // Same calendar day as start — short hourly rental (e.g. 18:00→21:00)
+      context.rentEndDate = fmt(startRef);
+      context.rentEndTime = timeStr;
+    } else if (when === "tomorrow") {
       const end = new Date(startRef);
       end.setDate(startRef.getDate() + 1);
       context.rentEndDate = fmt(end);
