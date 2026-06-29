@@ -6,19 +6,19 @@
 // USAGE:
 //   node send-document-by-email.mjs \
 //     --document ./contract.docx \
-//     --to vip-bike@mail.ru \
+//     --to vip_bike@mail.ru \
 //     --subject "Договор купли-продажи Y-VOLT" \
 //     --body "Во вложении договор."
 //
 // REQUIRED env (in .env):
 //   SMTP_HOST=smtp.mail.ru
 //   SMTP_PORT=465
-//   SMTP_USER=vip-bike@mail.ru
+//   SMTP_USER=vip_bike@mail.ru
 //   SMTP_PASS=<16-char app password from mail.ru>
 //
 // OPTIONAL env:
-//   EMAIL_FROM=vip-bike@mail.ru  (defaults to SMTP_USER)
-//   EMAIL_DEFAULT_TO=vip-bike@mail.ru  (used if --to not passed)
+//   EMAIL_FROM=vip_bike@mail.ru  (defaults to SMTP_USER)
+//   EMAIL_DEFAULT_TO=vip_bike@mail.ru  (used if --to not passed)
 
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { basename, extname } from 'node:path';
@@ -78,7 +78,7 @@ const SMTP_PORT = Number(process.env[`${PROVIDER_PREFIX}PORT`] || process.env.SM
 const SMTP_USER = process.env[`${PROVIDER_PREFIX}USER`] || process.env.SMTP_USER || '';
 const SMTP_PASS = process.env[`${PROVIDER_PREFIX}PASS`] || process.env.SMTP_PASS || '';
 const EMAIL_FROM = process.env[`${PROVIDER_EMAIL_PREFIX}FROM`] || process.env.EMAIL_FROM || SMTP_USER;
-const EMAIL_DEFAULT_TO = process.env[`${PROVIDER_EMAIL_PREFIX}DEFAULT_TO`] || process.env.EMAIL_DEFAULT_TO || 'vip-bike@mail.ru';
+const EMAIL_DEFAULT_TO = process.env[`${PROVIDER_EMAIL_PREFIX}DEFAULT_TO`] || process.env.EMAIL_DEFAULT_TO || 'vip_bike@mail.ru';
 
 console.error(`[send-email] Using provider=${provider} — host=${SMTP_HOST}:${SMTP_PORT} user=${SMTP_USER}`);
 
