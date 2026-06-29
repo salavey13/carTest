@@ -27,12 +27,16 @@
  *         /skills/rental-contract-from-photos/SKILL.md §"СТС-вместо-депозита").
  *   → Done!
  *
- * Flow (SALE) - 5 steps:
+ * Flow (SALE) - 7 steps:
  *   1. Full name
  *   2. Passport → "4509 123456 15.03 ОМВД"
  *   3. Birth → "15.03.1990"
  *   4. Address → free text
- *   5. Price → inline keyboard or "390000"
+ *   5. Color → inline keyboard (confirm bike.specs.color or input custom)
+ *   6. VIN → inline keyboard (confirm bike.specs.vin, input custom, or skip)
+ *      └─ Skip is useful when selling used bikes whose frame/VIN is unknown
+ *         — the contract then renders "уточняется" via the template fallback.
+ *   7. Price → inline keyboard or "390000"
  *   → Done!
  */
 
@@ -236,6 +240,40 @@ function buildConfirmKeyboard(): KeyboardButton[][] {
 }
 
 /**
+ * Build the final SALE confirmation summary shown before contract generation.
+ *
+ * Includes color / VIN rows so the operator can do a last sanity check on
+ * the values collected in steps 5-6. Falls back to "—" if the operator
+ * skipped VIN entry, mirroring the "уточняется" that will appear in the
+ * generated contract.
+ */
+function buildSaleSummary(context: DocFlowContext, price: string | number): string {
+  const colorLine = context.saleColor
+    ? `🎨 Цвет: ${context.saleColor}`
+    : `🎨 Цвет: (не указан — в договоре будет «уточняется»)`;
+  const vinLine = context.saleVinSkipped
+    ? `🔢 VIN: пропущен (в договоре будет «уточняется»)`
+    : (context.saleVin
+        ? `🔢 VIN: ${context.saleVin}`
+        : `🔢 VIN: (из карточки ТС)`);
+  return [
+    "*📋 Продажа — проверьте:*",
+    "",
+    `👤 ${context.mpFullName}`,
+    `🪪 ${context.mpSeries} ${context.mpNumber}`,
+    `📅 ${context.mpBirthDate}`,
+    `🏠 ${context.mpRegistration}`,
+    "",
+    colorLine,
+    vinLine,
+    "",
+    `💰 ${Number(price).toLocaleString("ru-RU")} ₽`,
+    "",
+    "Всё верно?",
+  ].join("\n");
+}
+
+/**
  * Build deposit-choice keyboard — 3 options:
  *   1. Confirm the bike's spec.deposit_rub as cash deposit
  *   2. Override with custom cash amount (free text input)
@@ -254,6 +292,51 @@ function buildDepositChoiceKeyboard(depositAmount: string, bike?: any): Keyboard
     [{ text: `🪪 СТС вместо депозита`, callback_data: "dep_sts" }],
     [{ text: "❌ Отменить", callback_data: "cancel" }],
   ];
+}
+
+/**
+ * Build sale-color keyboard.
+ *
+ * Two modes depending on whether the bike card has a color:
+ *   - hasColor=true:  [✅ Цвет: <color>] [✏️ Свой цвет] [❌ Отменить]
+ *   - hasColor=false: [✏️ Ввести цвет] [❌ Отменить]
+ *
+ * The "Ввести цвет" path keeps the user in the sale_color state but clears
+ * the inline keyboard — the operator then types the color as free text,
+ * handled by the sale_color text-input branch.
+ */
+function buildSaleColorKeyboard(bikeColor: string): KeyboardButton[][] {
+  const rows: KeyboardButton[][] = [];
+  if (bikeColor) {
+    rows.push([{ text: `✅ Цвет: ${bikeColor}`, callback_data: "salecol_confirm" }]);
+  }
+  rows.push([{ text: "✏️ Свой цвет", callback_data: "salecol_custom" }]);
+  rows.push([{ text: "❌ Отменить", callback_data: "cancel" }]);
+  return rows;
+}
+
+/**
+ * Build sale-VIN keyboard.
+ *
+ * Three modes depending on whether the bike card has a VIN/frame:
+ *   - hasVin=true:  [✅ VIN: <vin>] [✏️ Свой VIN] [⏭ Пропустить] [❌ Отменить]
+ *   - hasVin=false: [✏️ Ввести VIN] [⏭ Пропустить] [❌ Отменить]
+ *
+ * "Пропустить" leaves context.saleVin unset and sets saleVinSkipped=true,
+ * so the contract falls through to bike.specs.vin (also empty) → template
+ * renders "уточняется". This is intentional for used bikes sold as-is.
+ */
+function buildSaleVinKeyboard(bikeVin: string): KeyboardButton[][] {
+  const rows: KeyboardButton[][] = [];
+  if (bikeVin) {
+    // Truncate display label to keep button text readable on mobile
+    const display = bikeVin.length > 20 ? `${bikeVin.slice(0, 18)}…` : bikeVin;
+    rows.push([{ text: `✅ VIN: ${display}`, callback_data: "salevin_confirm" }]);
+  }
+  rows.push([{ text: "✏️ Свой VIN", callback_data: "salevin_custom" }]);
+  rows.push([{ text: "⏭ Пропустить VIN", callback_data: "salevin_skip" }]);
+  rows.push([{ text: "❌ Отменить", callback_data: "cancel" }]);
+  return rows;
 }
 
 /**
@@ -363,6 +446,16 @@ interface DocFlowContext {
   stsPledgeReturnDays?: number; // default 3
   depositAmountSkipped?: string; // cash deposit that was replaced by СТС (for analytics)
   depositOverride?: string;     // if user picked "own amount" instead of bike.specs.deposit_rub
+
+  // ── Sale flow overrides (added 2026-06-29) ────────────────────────────────
+  // Sale flow has two extra steps where the operator can override the bike's
+  // catalog color / VIN at contract-generation time. This is essential when
+  // selling used bikes whose Supabase card lacks a color or VIN (very common
+  // for trade-ins), and useful even when the card has them — lets the
+  // operator double-check the values on the physical bike before signing.
+  saleColor?: string;        // operator-confirmed or custom color
+  saleVin?: string;          // operator-confirmed or custom VIN/frame
+  saleVinSkipped?: boolean;  // operator chose to skip VIN entry (no override)
 }
 
 // ── Bike resolution ─────────────────────────────────────────────────────
@@ -986,6 +1079,24 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
     } else {
       // Sale contract still uses manual construction (TODO: could be extracted too)
       const salePrice = context.salePrice || String(bike.specs?.sale_price || bike.specs?.price_rub || "390000");
+      // Effective color/VIN: prefer operator overrides collected in steps 5-6,
+      // fall back to bike.specs, finally to the template's "уточняется".
+      // Override resolution rules:
+      //   - saleColor set     → use operator-confirmed/entered color
+      //   - saleColor unset   → fall back to bike.specs.color
+      //   - saleVin set       → use operator-confirmed/entered VIN
+      //   - saleVinSkipped    → empty string (forces "уточняется" downstream)
+      //   - neither (confirm) → fall back to bike.specs.vin || frame
+      const effectiveColor = context.saleColor != null && context.saleColor !== ""
+        ? context.saleColor
+        : (bike.specs?.color || "уточняется");
+      const bikeCatalogVin = String(bike.specs?.vin || bike.specs?.frame || bike.specs?.vin_number || "").trim();
+      const effectiveVin = context.saleVinSkipped
+        ? "уточняется"
+        : (context.saleVin != null && context.saleVin !== ""
+            ? context.saleVin
+            : (bikeCatalogVin || "уточняется"));
+      logger.info(`[/doc] SALE overrides: color=${effectiveColor} vin=${effectiveVin} (saleColor=${context.saleColor ?? "<unset>"} saleVin=${context.saleVin ?? "<unset>"} skipped=${!!context.saleVinSkipped})`);
       vars = {
         contract_number: `${now.getDate()}.${now.getMonth() + 1}/${bike.id}`,
         day: String(now.getDate()).padStart(2, "0"),
@@ -1005,11 +1116,11 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         buyer_registration: context.mpRegistration || "",
         buyer_email: "",
         product_name: isElectric ? "Электромотоцикл" : "Мотоцикл",
-        product_color: bike.specs?.color || "уточняется",
+        product_color: effectiveColor,
         product_type: bike.specs?.bike_subtype || (isElectric ? "Электромотоцикл" : "Мотоцикл"),
         product_motor_type: isElectric ? "Электрический двигатель" : "ДВС",
         product_motor_power: bike.specs?.power_kw ? `${bike.specs.power_kw} кВт` : (bike.specs?.engine_cc ? `рабочий объем ${bike.specs.engine_cc} куб.см` : ""),
-        product_vin: bike.specs?.vin || bike.specs?.frame || "уточняется",
+        product_vin: effectiveVin,
         product_year: String(bike.specs?.year || "уточняется"),
         product_unit: "шт.",
         spec_number: `${now.getDate()}.${now.getMonth() + 1}/${bike.id}`,
@@ -1038,9 +1149,9 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         document_key: `sale-${bike.id}-${Date.now()}`,
         bike_make: bike.make || "уточняется",
         bike_model: bike.model || "уточняется",
-        bike_vin: bike.specs?.vin || bike.specs?.frame || "уточняется",
+        bike_vin: effectiveVin,
         bike_category: bike.specs?.category || "A/L3",
-        bike_color: bike.specs?.color || "уточняется",
+        bike_color: effectiveColor,
         bike_year: bike.specs?.year || "уточняется",
         bike_engine_cc: String(bike.specs?.engine_cc || bike.specs?.displacement_cc || "0"),
         bike_power_hp: String(bike.specs?.power_hp || bike.specs?.max_power_hp || "0"),
@@ -1428,6 +1539,70 @@ async function gotoDepositChoice(chatId: number, userId: string, context: DocFlo
 }
 
 /**
+ * Sale flow step 5: confirm or override the bike's catalog color.
+ *
+ * Pulled into its own router so the same prompt can be invoked from:
+ *   - the address state handler (the normal sale entry path)
+ *   - the salecol_custom callback (re-prompt after user asked for custom
+ *     input but typed something invalid)
+ *
+ * NB: bike is re-fetched here (not passed in) because by the time we
+ * reach this step the operator may have spent several minutes on the
+ * previous steps — re-fetching guards against the bike card being
+ * updated mid-flow (rare, but cheap to defend against).
+ */
+async function gotoSaleColor(chatId: number, userId: string, context: DocFlowContext): Promise<void> {
+  const bike = await resolveBikeById(context.bikeId);
+  const bikeColor = String(bike?.specs?.color || "").trim();
+  await setState(userId, "sale_color", context);
+  await sendComplexMessage(
+    chatId,
+    `🎨 *Цвет ТС*\n\n` +
+    (bikeColor
+      ? `Цвет из карточки ТС: *${bikeColor}*\n\nПодтвердите или введите свой:`
+      : `В карточке ТС цвет не указан — введите цвет вручную:`),
+    buildSaleColorKeyboard(bikeColor),
+    { keyboardType: 'inline', parseMode: 'Markdown' },
+  );
+}
+
+/**
+ * Sale flow step 6: confirm, override, or skip the bike's VIN/frame.
+ *
+ * "Skip" is the explicit "I don't know the VIN and don't want to enter
+ * one" path — the contract will render "уточняется" via the template
+ * fallback. This is the right behaviour for trade-ins / used bikes sold
+ * as-is where the frame number is undocumented.
+ */
+async function gotoSaleVin(chatId: number, userId: string, context: DocFlowContext): Promise<void> {
+  const bike = await resolveBikeById(context.bikeId);
+  const bikeVin = String(bike?.specs?.vin || bike?.specs?.frame || bike?.specs?.vin_number || "").trim();
+  await setState(userId, "sale_vin", context);
+  await sendComplexMessage(
+    chatId,
+    `🔢 *VIN / № рамы ТС*\n\n` +
+    (bikeVin
+      ? `VIN из карточки ТС: \`${bikeVin}\`\n\nПодтвердите, введите свой или пропустите:`
+      : `В карточке ТС VIN не указан — введите свой или пропустите:`),
+    buildSaleVinKeyboard(bikeVin),
+    { keyboardType: 'inline', parseMode: 'Markdown' },
+  );
+}
+
+/**
+ * Sale flow step 7: price selection.
+ *
+ * Extracted into a router because it's now called from three different
+ * end-points (sale_vin callback confirm / sale_vin text input / sale_vin
+ * skip). Previously the price prompt was inline in the address handler.
+ */
+async function gotoPrice(chatId: number, userId: string, context: DocFlowContext): Promise<void> {
+  await setState(userId, "price", context);
+  const priceKeyboard = await buildPriceKeyboard();
+  await sendComplexMessage(chatId, "💰 Цена:", priceKeyboard, { keyboardType: 'inline' });
+}
+
+/**
  * Mark СТС sub-flow as complete and route to confirm step.
  * Sets stsPledgeUsed=true, clears any cash-deposit override, and snapshots
  * the cash deposit that was replaced by СТС (for analytics / audit in DB).
@@ -1587,9 +1762,10 @@ export async function handleDocText(userId: string, chatId: number, text: string
         { keyboardType: 'inline', parseMode: "Markdown" },
       );
     } else {
-      await setState(userId, "price", context);
-      const priceKeyboard = await buildPriceKeyboard();
-      await sendComplexMessage(chatId, "💰 Цена:", priceKeyboard, { keyboardType: 'inline' });
+      // Sale flow: collect color + VIN before price so the contract's
+      // bike section is filled correctly even when the Supabase card is
+      // missing these fields (common for used/trade-in bikes).
+      await gotoSaleColor(chatId, userId, context);
     }
     return true;
   }
@@ -1828,6 +2004,48 @@ export async function handleDocText(userId: string, chatId: number, text: string
     return true;
   }
 
+  // ── Sale color text input (state=sale_color) ─────────────────────────────
+  // Reached when the operator types a custom color instead of pressing one
+  // of the inline buttons. We accept any non-empty trimmed string ≥ 2 chars
+  // (filtering fat-finger single-char sends) and advance to the VIN step.
+  if (state === "sale_color") {
+    const color = text.trim();
+    if (color.length < 2) {
+      logger.info(`[/doc] sale_color: ${userId} → too-short input "${text.slice(0,40)}"`);
+      await sendComplexMessage(chatId, "❌ Введите цвет (минимум 2 символа)", [], { removeKeyboard: true });
+      return true;
+    }
+    context.saleColor = color;
+    logger.info(`[/doc] sale_color (text): ${userId} → color="${color}"`);
+    await gotoSaleVin(chatId, userId, context);
+    return true;
+  }
+
+  // ── Sale VIN text input (state=sale_vin) ─────────────────────────────────
+  // VIN validation is intentionally lenient — bike frame numbers vary in
+  // length (some are 17-char ISO VINs, some are shorter frame stamps), so
+  // we only require a sensible minimum (5 chars) and basic alnum+dashes
+  // composition. Operators are responsible for entering what's physically
+  // on the bike.
+  if (state === "sale_vin") {
+    const vin = text.trim().toUpperCase();
+    if (vin.length < 5) {
+      logger.info(`[/doc] sale_vin: ${userId} → too-short input "${text.slice(0,40)}"`);
+      await sendComplexMessage(
+        chatId,
+        "❌ VIN слишком короткий (минимум 5 символов)\n\nИли нажмите «Пропустить».",
+        buildSaleVinKeyboard(""),
+        { keyboardType: 'inline', parseMode: "Markdown" },
+      );
+      return true;
+    }
+    context.saleVin = vin;
+    context.saleVinSkipped = false;
+    logger.info(`[/doc] sale_vin (text): ${userId} → vin="${vin}"`);
+    await gotoPrice(chatId, userId, context);
+    return true;
+  }
+
   if (state === "price_custom") {
     const price = text.replace(/\D/g, '');
     if (!price || parseInt(price) < 10000) {
@@ -1835,18 +2053,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
       return true;
     }
     context.salePrice = price;
-    const summary = [
-      "*📋 Продажа - проверьте:*",
-      "",
-      `👤 ${context.mpFullName}`,
-      `🪪 ${context.mpSeries} ${context.mpNumber}`,
-      `📅 ${context.mpBirthDate}`,
-      `🏠 ${context.mpRegistration}`,
-      "",
-      `💰 ${Number(price).toLocaleString("ru-RU")} ₽`,
-      "",
-      "Всё верно?",
-    ].join("\n");
+    const summary = buildSaleSummary(context, price);
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
@@ -2063,6 +2270,62 @@ export async function handleDocCallback(
     return true;
   }
 
+  // ── Sale color callbacks (salecol_*) — sale flow step 5 ─────────────────
+  if (callbackData === "salecol_confirm") {
+    // Operator confirms the bike's catalog color
+    const bike = await resolveBikeById(context.bikeId);
+    context.saleColor = String(bike?.specs?.color || "").trim();
+    logger.info(`[/doc] salecol_confirm: ${userId} → color="${context.saleColor}"`);
+    await gotoSaleVin(chatId, userId, context);
+    return true;
+  }
+
+  if (callbackData === "salecol_custom") {
+    // Operator wants to type a custom color — keep state=sale_color, drop
+    // the inline keyboard, and ask for free-text input. The sale_color
+    // text-input branch picks up the next message.
+    logger.info(`[/doc] salecol_custom: ${userId} → asking for custom color`);
+    await sendComplexMessage(
+      chatId,
+      "*Введите цвет ТС*",
+      [], { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  // ── Sale VIN callbacks (salevin_*) — sale flow step 6 ───────────────────
+  if (callbackData === "salevin_confirm") {
+    // Operator confirms the bike's catalog VIN/frame
+    const bike = await resolveBikeById(context.bikeId);
+    context.saleVin = String(bike?.specs?.vin || bike?.specs?.frame || bike?.specs?.vin_number || "").trim();
+    context.saleVinSkipped = false;
+    logger.info(`[/doc] salevin_confirm: ${userId} → vin="${context.saleVin}"`);
+    await gotoPrice(chatId, userId, context);
+    return true;
+  }
+
+  if (callbackData === "salevin_custom") {
+    // Operator wants to type a custom VIN — keep state=sale_vin, drop the
+    // inline keyboard, and ask for free-text input.
+    logger.info(`[/doc] salevin_custom: ${userId} → asking for custom VIN`);
+    await sendComplexMessage(
+      chatId,
+      "*Введите VIN / № рамы ТС*\n\n17 символов (латиница + цифры) или короче для номера рамы.",
+      [], { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  if (callbackData === "salevin_skip") {
+    // Operator chooses not to enter a VIN — leave saleVin unset, mark
+    // skipped. Contract will render "уточняется" via template fallback.
+    context.saleVin = undefined;
+    context.saleVinSkipped = true;
+    logger.info(`[/doc] salevin_skip: ${userId} → VIN entry skipped`);
+    await gotoPrice(chatId, userId, context);
+    return true;
+  }
+
   // ── СТС-owner-relation callbacks (sr_*) ─────────────────────────────────
   // We use enum codes (sr_self, sr_wife, sr_father, ...) in callback_data
   // and look up the human-readable label via STS_RELATION_LABELS. See the
@@ -2146,18 +2409,7 @@ export async function handleDocCallback(
       return true;
     }
     context.salePrice = price;
-    const summary = [
-      "*📋 Продажа - проверьте:*",
-      "",
-      `👤 ${context.mpFullName}`,
-      `🪪 ${context.mpSeries} ${context.mpNumber}`,
-      `📅 ${context.mpBirthDate}`,
-      `🏠 ${context.mpRegistration}`,
-      "",
-      `💰 ${Number(price).toLocaleString("ru-RU")} ₽`,
-      "",
-      "Всё верно?",
-    ].join("\n");
+    const summary = buildSaleSummary(context, price);
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;

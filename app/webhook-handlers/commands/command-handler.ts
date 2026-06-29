@@ -69,6 +69,8 @@ export async function handleCommand(update: any) {
             text.startsWith("s_") ||
             text.startsWith("dep_") ||   // <<< FIX: deposit choice callbacks (dep_confirm, dep_custom, dep_sts)
             text.startsWith("sr_") ||    // <<< FIX: СТС owner-relation callbacks (sr_self, sr_wife, sr_father, sr_mother, sr_power_of_attorney, sr_custom)
+            text.startsWith("salecol_") || // <<< FIX: sale flow color callbacks (salecol_confirm, salecol_custom)
+            text.startsWith("salevin_") || // <<< FIX: sale flow VIN callbacks (salevin_confirm, salevin_custom, salevin_skip)
             text === "cdone" ||
             text === "cancel" ||
             text === "ok" ||
