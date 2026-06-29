@@ -121,7 +121,7 @@ export async function handleCommand(update: any) {
             "/shift": () => shiftCommand(chatId, userIdStr, username),
             "/actions": () => actionsCommand(chatId, userIdStr),
             "/sos": () => sosCommand(chatId, userIdStr),
-            "/rage": () => rageCommand(chatId, userId, text),
+            "/rage": () => rageCommand(chatId, userId),
             "/settings": () => rageSettingsCommand(chatId, userId, text),
             "/sim": () => simCommand(chatId, userIdStr, args),
             "/sim_god": () => simGodCommand(chatId, userIdStr, args),
@@ -278,21 +278,31 @@ async function handleDecline(id: string, chatId: number, userId: string, type: s
 
 async function handleAccept(id: string, chatId: number, userId: string) {
   // Rigger check: убедиться, что userId == rigger_id
-  const { data: rental } = await supabaseAnon.from('rentals').select('metadata->>rigger_id').eq('rental_id', id).single();
-  if (rental.metadata.rigger_id !== userId) {
+  // Select the full metadata object (not metadata->>rigger_id which
+  // returns only { rigger_id: string } and makes rental.metadata undefined).
+  const { data: rental } = await supabaseAnon.from('rentals').select('metadata, user_id').eq('rental_id', id).maybeSingle();
+  if (!rental) {
+    await sendComplexMessage(chatId, 'Аренда не найдена.', []);
+    return;
+  }
+  const metadata = (rental.metadata || {}) as Record<string, any>;
+  if (metadata.rigger_id !== userId) {
     await sendComplexMessage(chatId, 'Access denied.', []);
     return;
   }
 
   const { error } = await supabaseAnon.from('rentals').update({
-    metadata: { ...rental.metadata, rigger_confirmed: true }
+    metadata: { ...metadata, rigger_confirmed: true }
   }).eq('rental_id', id);
 
   if (!error) {
     const summaryMd = escapeTelegramMarkdown(`You accepted the booking!`);
     await sendComplexMessage(chatId, summaryMd, [], { parseMode: 'MarkdownV2' });
     // Notify admin/user
-    await sendComplexMessage(process.env.ADMIN_CHAT_ID, `Rigger accepted ${id}.`, []);
+    const adminChatId = process.env.ADMIN_CHAT_ID;
+    if (adminChatId) {
+      await sendComplexMessage(adminChatId, `Rigger accepted ${id}.`, []);
+    }
   } else {
     await sendComplexMessage(chatId, 'Error accepting.', []);
   }
@@ -300,24 +310,35 @@ async function handleAccept(id: string, chatId: number, userId: string) {
 
 async function handleRiggerDecline(id: string, chatId: number, userId: string) {
   // Аналогично accept, но decline: notify admin to reassign
-  const { data: rental } = await supabaseAnon.from('rentals').select('metadata->>rigger_id').eq('rental_id', id).single();
-  if (rental.metadata.rigger_id !== userId) {
+  const { data: rental } = await supabaseAnon.from('rentals').select('metadata, user_id').eq('rental_id', id).maybeSingle();
+  if (!rental) {
+    await sendComplexMessage(chatId, 'Аренда не найдена.', []);
+    return;
+  }
+  const metadata = (rental.metadata || {}) as Record<string, any>;
+  if (metadata.rigger_id !== userId) {
     await sendComplexMessage(chatId, 'Access denied.', []);
     return;
   }
 
   const { error } = await supabaseAnon.from('rentals').update({
     status: 'pending_reassign', // Или cancelled, по логике
-    metadata: { ...rental.metadata, rigger_confirmed: false }
+    metadata: { ...metadata, rigger_confirmed: false }
   }).eq('rental_id', id);
 
   if (!error) {
     await sendComplexMessage(chatId, 'Declined.', []);
     // Notify admin
-    await sendComplexMessage(process.env.ADMIN_CHAT_ID, `Rigger declined ${id}. Reassign?`, [[{ text: '/reassign_' + id }]]);
+    const adminChatId = process.env.ADMIN_CHAT_ID;
+    if (adminChatId) {
+      await sendComplexMessage(adminChatId, `Rigger declined ${id}. Reassign?`, [[{ text: '/reassign_' + id }]]);
+    }
     // Notify user
     const summaryMd = escapeTelegramMarkdown(`Rigger declined. Admin will reassign.`);
-    await sendComplexMessage(rental.user_id, summaryMd, [], { parseMode: 'MarkdownV2' });
+    const renterChatId = rental.user_id;
+    if (renterChatId) {
+      await sendComplexMessage(renterChatId, summaryMd, [], { parseMode: 'MarkdownV2' });
+    }
   } else {
     await sendComplexMessage(chatId, 'Error declining.', []);
   }

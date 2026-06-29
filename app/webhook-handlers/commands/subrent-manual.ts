@@ -527,13 +527,13 @@ export async function handleSubrentManualCommand(params: {
 
     // Handle callback
     if (callbackData) {
-      await handleCallback(context, callbackData, userId, messageId);
+      await handleCallback(context, callbackData, userId, messageId ?? 0);
       return;
     }
 
     // Handle text input
     if (text) {
-      await handleTextInput(context, text, userId, messageId);
+      await handleTextInput(context, text, userId, messageId ?? 0);
       return;
     }
 
@@ -1160,7 +1160,11 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
     const [startHour, startMin] = context.contractStartTime.split(':');
 
     // Build template variables
-    const variables = {
+    // Typed as Record<string, string | number> to satisfy the
+    // TemplateVariables contract in docx-capability.ts. All optional
+    // context fields get || "" fallbacks so undefined never leaks into
+    // the template (where it would render as literal "undefined").
+    const variables: Record<string, string | number> = {
       // Contract metadata
       contract_number: String(contractNumber),
       day: day.padStart(2, '0'),
@@ -1181,19 +1185,19 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
       email: crewSecrets?.email || "",
 
       // Owner details
-      owner_full_name: context.ownerFullName,
-      owner_birth_date: context.ownerBirthDate,
-      owner_passport_series: context.ownerPassportSeries,
-      owner_passport_number: context.ownerPassportNumber,
-      owner_passport_issued_by: context.ownerPassportIssuedBy,
-      owner_passport_issue_date: context.ownerPassportIssueDate,
-      owner_registration: context.ownerRegistration,
-      owner_phone: context.ownerPhone,
+      owner_full_name: context.ownerFullName || "",
+      owner_birth_date: context.ownerBirthDate || "",
+      owner_passport_series: context.ownerPassportSeries || "",
+      owner_passport_number: context.ownerPassportNumber || "",
+      owner_passport_issued_by: context.ownerPassportIssuedBy || "",
+      owner_passport_issue_date: context.ownerPassportIssueDate || "",
+      owner_registration: context.ownerRegistration || "",
+      owner_phone: context.ownerPhone || "",
       owner_email: context.ownerEmail || "",
 
       // Bike details
-      bike_make: context.bikeMake,
-      bike_model: context.bikeModel,
+      bike_make: context.bikeMake || "",
+      bike_model: context.bikeModel || "",
       bike_vin: context.bikeVin || "",
       bike_plate: context.bikePlate || "",
       bike_year: context.bikeYear || "",
@@ -1217,10 +1221,10 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
       late_penalty_percent: String(DEFAULT_LATE_PENALTY_PERCENT),
 
       // Contract duration
-      contract_start_date: context.contractStartDate,
-      contract_start_time: context.contractStartTime,
-      contract_end_date: context.contractEndDate,
-      contract_end_time: context.contractEndTime,
+      contract_start_date: context.contractStartDate || "",
+      contract_start_time: context.contractStartTime || "",
+      contract_end_date: context.contractEndDate || "",
+      contract_end_time: context.contractEndTime || "",
 
       // Deposits and terms
       regular_client_deposit_rub: String(DEFAULT_REGULAR_DEPOSIT),
@@ -1419,7 +1423,7 @@ ${context.bikeMake} ${context.bikeModel}
           text: emailBody,
           attachments: [{
             filename: docFileName,
-            content: docBuffer,
+            content: Buffer.from(docBuffer),
             contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           }],
         });
