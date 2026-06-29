@@ -1426,12 +1426,26 @@ ${qrDeepLink}`);
 
 
     // --- Send email notification ---
+    // TO priority: explicit env override (for testing / redirection) →
+    // crew's actual email from Supabase crew_secrets → hardcoded fallback.
+    //
+    // BUG HISTORY: the fallback here used to be 'vip-bike@mail.ru' (HYPHEN),
+    // which does not exist on mail.ru. The crew's real address is
+    // 'vip_bike@mail.ru' (UNDERSCORE). The mismatch silently broke every
+    // notification email — mail.ru rejected the non-existent recipient.
+    // Now we prefer crewSecrets.email (loaded from Supabase at the top of
+    // generateContract) so the correct address is always used in production,
+    // and the hardcoded fallback matches the rest of the codebase.
+    //
+    // We also attach the generated DOCX so the crew receives the actual
+    // contract in their inbox, not just a text notification.
     try {
       const smtpHost = process.env.SMTP_HOST || process.env.SMTP_YANDEX_HOST;
       const smtpPort = Number(process.env.SMTP_PORT || process.env.SMTP_YANDEX_PORT || 465);
       const smtpUser = process.env.SMTP_USER || process.env.SMTP_YANDEX_USER;
       const smtpPass = process.env.SMTP_PASS || process.env.SMTP_YANDEX_PASS;
       const emailFrom = process.env.EMAIL_FROM || smtpUser;
+      const emailTo = process.env.EMAIL_DEFAULT_TO || crewSecrets.email || "vip_bike@mail.ru";
 
       if (smtpHost && smtpUser && smtpPass) {
         const transporter = nodemailer.createTransport({
@@ -1451,15 +1465,21 @@ ${qrDeepLink}`);
           isRent ? `Период: ${context.rentStartDate || "?"} ${context.rentStartTime || ""} — ${context.rentEndDate || "?"} ${context.rentEndTime || ""}` : `Цена: ${Number(context.salePrice || 0).toLocaleString("ru-RU")} ₽`,
           ``,
           `Договор сгенерирован в Telegram-боте.`,
+          `Документ во вложении.`,
         ].filter(Boolean).join("\n");
 
         await transporter.sendMail({
           from: emailFrom,
-          to: process.env.EMAIL_DEFAULT_TO || "vip-bike@mail.ru",
+          to: emailTo,
           subject: `Договор ${docType} — ${bike.make} ${bike.model}`,
           text: emailBody,
+          attachments: [{
+            filename: docFileName,
+            content: docxBuf,
+            contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          }],
         });
-        logger.info("[/doc] Email notification sent");
+        logger.info(`[/doc] Email with DOCX sent to ${emailTo}`);
       }
     } catch (emailErr) {
       logger.warn("[/doc] Email send failed (non-fatal):", emailErr);

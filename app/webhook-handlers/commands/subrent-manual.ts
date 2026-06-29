@@ -1381,12 +1381,16 @@ ${context.bikeMake} ${context.bikeModel}
     }
 
     // --- Send email notification ---
+    // Same TO-priority + DOCX-attachment fix as /doc (see doc-manual.ts for
+    // full bug history): env override → crewSecrets.email → underscore fallback.
+    // Previously used the nonexistent 'vip-bike@mail.ru' (HYPHEN) fallback.
     try {
       const smtpHost = process.env.SMTP_HOST || process.env.SMTP_YANDEX_HOST;
       const smtpPort = Number(process.env.SMTP_PORT || process.env.SMTP_YANDEX_PORT || 465);
       const smtpUser = process.env.SMTP_USER || process.env.SMTP_YANDEX_USER;
       const smtpPass = process.env.SMTP_PASS || process.env.SMTP_YANDEX_PASS;
       const emailFrom = process.env.EMAIL_FROM || smtpUser;
+      const emailTo = process.env.EMAIL_DEFAULT_TO || crewSecrets?.email || "vip_bike@mail.ru";
 
       if (smtpHost && smtpUser && smtpPass) {
         const transporter = nodemailer.createTransport({
@@ -1405,15 +1409,21 @@ ${context.bikeMake} ${context.bikeModel}
           `Период: ${context.contractStartDate} ${context.contractStartTime} -- ${context.contractEndDate} ${context.contractEndTime}`,
           ``,
           `Договор сгенерирован в Telegram-боте.`,
+          `Документ во вложении.`,
         ].join("\n");
 
         await transporter.sendMail({
           from: emailFrom,
-          to: process.env.EMAIL_DEFAULT_TO || "vip-bike@mail.ru",
+          to: emailTo,
           subject: `Договор субаренды №${contractNumber} -- ${context.bikeMake} ${context.bikeModel}`,
           text: emailBody,
+          attachments: [{
+            filename: docFileName,
+            content: docBuffer,
+            contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          }],
         });
-        logger.info("[subrent] Email notification sent");
+        logger.info(`[subrent] Email with DOCX sent to ${emailTo}`);
       }
     } catch (emailErr) {
       logger.warn("[subrent] Email send failed (non-fatal):", emailErr);
