@@ -1237,7 +1237,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       try {
         const formData = new FormData();
         formData.append("chat_id", String(chatId));
-        formData.append("photo", new Blob([qrPngBuffer], { type: "image/png" }), "qr.png");
+        formData.append("photo", new Blob([new Uint8Array(qrPngBuffer)], { type: "image/png" }), "qr.png");
         formData.append("caption", `📲 QR для быстрой повторной аренды
 ${qrDeepLink}`);
         formData.append("parse_mode", "HTML");
