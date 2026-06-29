@@ -28,7 +28,52 @@ function readCurrentRentalTemplateVersion() {
 const CURRENT_RENTAL_TEMPLATE_VERSION = readCurrentRentalTemplateVersion();
 
 function renderTemplateWithVars(template, vars) {
-  return template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_,k)=> String(vars[k] ?? ''));
+  // First pass: strip HTML comments so that any {{#if}}/{{else}}/{{/if}} or
+  // {{var}} text used as documentation inside <!-- ... --> is NOT processed
+  // as real template syntax. (Comments are not preserved in the final DOCX
+  // anyway — htmlToDocxElements drops them.)
+  let out = template.replace(/<!--[\s\S]*?-->/g, '');
+
+  // Truthy: any non-empty string that is not "0"/"false"/"no"/"null"/"undefined".
+  // Numbers > 0 are truthy; booleans as-is. Mirrors make-deal-contract-skill.mjs
+  // so CLI skill and Telegram /doc flow agree on conditional behaviour.
+  const isTruthy = (v) => {
+    if (v === null || v === undefined) return false;
+    if (typeof v === 'number') return v > 0;
+    if (typeof v === 'boolean') return v;
+    const s = String(v).trim().toLowerCase();
+    if (s === '' || s === '0' || s === 'false' || s === 'no' || s === 'null' || s === 'undefined') return false;
+    return true;
+  };
+
+  // Process INNERMOST conditional blocks first: a block whose body contains
+  // NO nested {{#if}} opener and NO nested {{/if}} closer. The negated
+  // lookahead ((?:(?!\{\{#if\s|\{\{\/if\}\}).)*?) matches one char at a
+  // time, failing fast if it sees either marker — so the body cannot
+  // contain a nested conditional. Both with-else and without-else forms
+  // are supported: if the body contains "{{else}}", the part before it
+  // is the if-branch and the part after is the else-branch; otherwise
+  // the whole body is the if-branch and the else-branch is "".
+  const blockRe = /\{\{#if\s+([a-zA-Z0-9_]+)\s*\}\}((?:(?!\{\{#if\s|\{\{\/if\}\}).)*?)\{\{\/if\}\}/gs;
+  let guard = 0;
+  while (guard++ < 100) {
+    let replaced = false;
+    out = out.replace(blockRe, (full, varName, body) => {
+      replaced = true;
+      let ifBranch = body, elseBranch = '';
+      const elseIdx = body.indexOf('{{else}}');
+      if (elseIdx >= 0) {
+        ifBranch = body.slice(0, elseIdx);
+        elseBranch = body.slice(elseIdx + '{{else}}'.length);
+      }
+      return isTruthy(vars[varName]) ? ifBranch : elseBranch;
+    });
+    if (!replaced) break;
+  }
+
+  // Final pass: simple {{var}} interpolation
+  out = out.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_,k)=> String(vars[k] ?? ''));
+  return out;
 }
 
 /**
