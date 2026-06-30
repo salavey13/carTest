@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { buildCandidateImageUrls } from "@/app/franchize/lib/media";
+import { buildCandidateImageUrls, imageUrl4x3 } from "@/app/franchize/lib/media";
 
 export interface ItemGalleryProps {
   images: string[];
@@ -19,6 +19,10 @@ export interface ItemGalleryProps {
   className?: string;
   /** Optional close button to render in bottom-right of main image */
   closeButton?: React.ReactNode;
+  /** When true, images are loaded as their _4x3 landscape variant (AI-outpainted)
+   *  which fits the wider gallery containers better than the default 9:16.
+   *  Falls back to the original URL if the _4x3 variant 404s. */
+  prefer4x3?: boolean;
 }
 
 export function ItemGallery({
@@ -34,9 +38,22 @@ export function ItemGallery({
   disableKeyboardNav = false,
   className = "",
   closeButton,
+  prefer4x3 = false,
 }: ItemGalleryProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [failedUrls, setFailedUrls] = useState<Record<string, true>>({});
+  /** Tracks original URLs whose _4x3 variant failed (so we fall back to original). */
+  const [failed4x3, setFailed4x3] = useState<Record<string, true>>({});
+
+  /** Returns the _4x3 variant URL when prefer4x3 is active and the variant
+   *  hasn't already failed; otherwise returns the original URL unchanged. */
+  const srcFor = useCallback(
+    (url: string): string => {
+      if (!prefer4x3 || !url || failed4x3[url]) return url;
+      return imageUrl4x3(url);
+    },
+    [prefer4x3, failed4x3],
+  );
 
   const resolvedImages = useMemo(() => {
     const out: string[] = [];
@@ -107,13 +124,19 @@ export function ItemGallery({
         style={{ backgroundColor: "var(--item-card-bg, #000)" }}
       >
         <Image
-          src={resolvedImages[0]}
+          src={srcFor(resolvedImages[0])}
           alt={`${altText} 1`}
           fill
           sizes="(max-width: 1024px) 100vw, 42vw"
           className="object-cover"
           loading="eager"
           priority
+          onError={() => {
+            const orig = resolvedImages[0];
+            if (prefer4x3 && orig && !failed4x3[orig]) {
+              setFailed4x3((prev) => ({ ...prev, [orig]: true }));
+            }
+          }}
         />
         {closeButton && (
           <div className="absolute bottom-3 right-3 z-30">
@@ -135,7 +158,7 @@ export function ItemGallery({
       {/* Main Image Container - FIXED: Added explicit aspect ratio class */}
       <div className={`relative w-full bg-black/25 ${getAspectRatioClass()}`}>
         <Image
-          src={resolvedImages[activeIndex]}
+          src={srcFor(resolvedImages[activeIndex])}
           alt={`${altText} ${activeIndex + 1}`}
           fill
           sizes="(max-width: 1024px) 100vw, 42vw"
@@ -143,9 +166,12 @@ export function ItemGallery({
           loading="eager"
           priority={activeIndex === 0}
           onError={() => {
-            const failed = resolvedImages[activeIndex];
-            if (!failed) return;
-            setFailedUrls((prev) => ({ ...prev, [failed]: true }));
+            const orig = resolvedImages[activeIndex];
+            if (prefer4x3 && orig && !failed4x3[orig]) {
+              setFailed4x3((prev) => ({ ...prev, [orig]: true }));
+            } else if (orig) {
+              setFailedUrls((prev) => ({ ...prev, [orig]: true }));
+            }
           }}
         />
 
@@ -207,13 +233,19 @@ export function ItemGallery({
                 }}
               >
                 <Image
-                  src={url}
+                  src={srcFor(url)}
                   alt={`${altText} ${index + 1}`}
                   fill
                   sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 120px"
                   className="object-cover"
                   loading="lazy"
-                  onError={() => setFailedUrls((prev) => ({ ...prev, [url]: true }))}
+                  onError={() => {
+                    if (prefer4x3 && !failed4x3[url]) {
+                      setFailed4x3((prev) => ({ ...prev, [url]: true }));
+                    } else {
+                      setFailedUrls((prev) => ({ ...prev, [url]: true }));
+                    }
+                  }}
                 />
                 {isActive && (
                   <div

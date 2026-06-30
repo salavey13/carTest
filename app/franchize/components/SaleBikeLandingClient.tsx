@@ -47,7 +47,7 @@ import {
   type PrebuyComparisonOption,
   type PrebuyIntentType,
 } from "@/app/franchize/lib/sale-config";
-import { buildCandidateImageUrls } from "@/app/franchize/lib/media";
+import { buildCandidateImageUrls, imageUrl4x3 } from "@/app/franchize/lib/media";
 import { localImageSrc, localVideoSrc, handleVideoError, supabaseUrlFromLocal } from "@/lib/image-fallback";
 import { getTelegramWebAppFallbackHref } from "@/app/franchize/lib/telegram-links";
 import { useFranchizeCart } from "@/app/franchize/hooks/useFranchizeCart";
@@ -776,22 +776,30 @@ export function SaleBikeLandingClient({
                   onError={handleVideoError(videoUrl)}
                 />
               ) : (
-                <Image
-                  src={safeGallery[selectedImage] ?? heroImage}
-                  alt={item.title}
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 100vw"
-                  loading="lazy"
-                  className="object-cover"
-                  onError={() => {
-                    const broken = safeGallery[selectedImage];
-                    if (!broken) return;
-                    setBrokenGalleryUrls((prev) => ({
-                      ...prev,
-                      [broken]: true,
-                    }));
-                  }}
-                />
+                <>
+                  {/* Mobile: original 9:16 image */}
+                  <img
+                    src={localImageSrc(safeGallery[selectedImage] ?? heroImage)}
+                    alt={item.title}
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full object-cover sm:hidden"
+                    onError={() => {
+                      const broken = safeGallery[selectedImage];
+                      if (!broken) return;
+                      setBrokenGalleryUrls((prev) => ({ ...prev, [broken]: true }));
+                    }}
+                  />
+                  {/* Desktop: 4:3 landscape variant (AI-outpainted), falls back to original */}
+                  <img
+                    src={imageUrl4x3(localImageSrc(safeGallery[selectedImage] ?? heroImage))}
+                    alt={item.title}
+                    loading="lazy"
+                    className="absolute inset-0 hidden h-full w-full object-cover sm:block"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = localImageSrc(safeGallery[selectedImage] ?? heroImage);
+                    }}
+                  />
+                </>
               )}
           </div>
           <div className="grid grid-cols-5 gap-2 mt-2" suppressHydrationWarning>
