@@ -849,6 +849,7 @@ export function ItemModal({
             accentColor={theme.palette.accentMain}
             bgColor={theme.palette.bgBase}
             mainAspectRatio="16/11"
+            prefer4x3
             disableKeyboardNav={false}
             closeButton={
               <button
