@@ -37,6 +37,14 @@ function extractStoragePath(url) {
   return m ? m[1] : null;
 }
 
+/** Generate the _4x3 variant storage path for a given path.
+ *  carpix/bike/image_1.jpg → carpix/bike/image_1_4x3.jpg
+ *  Returns null if the path doesn't look like a media file. */
+function to4x3Path(storagePath) {
+  if (!storagePath) return null;
+  return storagePath.replace(/(\.[a-zA-Z0-9]+)$/, '_4x3$1');
+}
+
 function downloadFile(storagePath) {
   const localPath = join(MIRROR_DIR, storagePath);
   if (existsSync(localPath) && statSync(localPath).size > 0) { skipped++; return true; }
@@ -92,8 +100,15 @@ if (DO_BIKES) {
     if (vidUrl && typeof vidUrl === 'string') urls.add(vidUrl);
   }
   const bikePaths = [...urls].map(extractStoragePath).filter(Boolean);
-  console.log(`📸 ${bikePaths.length} media files (images + videos)\n`);
-  allPaths.push(...bikePaths);
+  console.log(`📸 ${bikePaths.length} media files (images + videos)`);
+
+  // Also generate _4x3 variant paths for landscape gallery use
+  const paths4x3 = bikePaths
+    .map(to4x3Path)
+    .filter(Boolean);
+  console.log(`📐 ${paths4x3.length} _4x3 variant candidates\n`);
+
+  allPaths.push(...bikePaths, ...paths4x3);
 }
 
 if (DO_LOGOS) {
