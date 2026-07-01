@@ -1448,16 +1448,27 @@ function ContactsSection() {
 
               <div className="space-y-4">
                 {[
-                  { icon: Phone, label: "+7 929 042-04-20", sub: "Пн–Сб 08:00–20:00" },
-                  { icon: MapPin, label: "Нижний Новгород и область", sub: "Быстрый выезд на объект" },
-                  { icon: Send, label: "Telegram: @mister_x_420", sub: "Напишите в любой момент" },
+                  { icon: Phone, label: "+7 929 042-04-20", sub: "Пн–Сб 08:00–20:00", href: "tel:+79290420420" },
+                  { icon: MapPin, label: "Нижний Новгород и область", sub: "Быстрый выезд на объект", href: null },
+                  { icon: Send, label: "Telegram: @mister_x_420", sub: "Напишите в любой момент", href: "https://t.me/mister_x_420" },
                 ].map((c, i) => (
                   <div key={i} className="flex items-start gap-4">
                     <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center flex-shrink-0">
                       <c.icon className="w-4 h-4 text-volt/60" />
                     </div>
-                    <div>
-                      <div className="text-white text-sm font-medium">{c.label}</div>
+                    <div className="flex-1">
+                      {c.href ? (
+                        <a
+                          href={c.href}
+                          target={c.href.startsWith('http') ? '_blank' : undefined}
+                          rel={c.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                          className="text-white text-sm font-medium hover:text-volt transition-colors"
+                        >
+                          {c.label}
+                        </a>
+                      ) : (
+                        <div className="text-white text-sm font-medium">{c.label}</div>
+                      )}
                       {c.sub && <div className="text-white/25 text-xs mt-0.5">{c.sub}</div>}
                     </div>
                   </div>
