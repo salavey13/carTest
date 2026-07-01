@@ -163,7 +163,7 @@ function Header() {
               </a>
             ))}
             <a href="#contacts">
-              <Button className="ml-3 bg-volt text-[#0a0a0a] font-bold hover:bg-volt-hover tracking-wide uppercase text-xs px-5">
+              <Button className="ml-3 bg-volt text-charcoal font-bold hover:bg-volt-hover hover:text-charcoal tracking-wide uppercase text-xs px-5">
                 Вызвать электрика
               </Button>
             </a>
@@ -198,7 +198,7 @@ function Header() {
                 </a>
               ))}
               <a href="#contacts" onClick={() => setMobileOpen(false)}>
-                <Button className="w-full mt-2 bg-volt text-[#0a0a0a] font-bold hover:bg-volt-hover tracking-wide uppercase text-xs">
+                <Button className="w-full mt-2 bg-volt text-charcoal font-bold hover:bg-volt-hover hover:text-charcoal tracking-wide uppercase text-xs">
                   Вызвать электрика
                 </Button>
               </a>
@@ -243,11 +243,12 @@ function HeroSection() {
             initial={{ opacity: 0, y: 25 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.3 }}
-            className="text-4xl sm:text-5xl lg:text-7xl font-black text-white leading-[0.95] tracking-tight mb-6"
+            className="text-4xl sm:text-5xl lg:text-7xl font-black text-white leading-tight sm:leading-[1.05] tracking-tight mb-6"
           >
             NN VOLT —{" "}
-            <span className="text-volt text-glow-yellow">Электромонтаж</span>
-            <br />
+            <span className="text-volt">Электромонтаж</span>
+            <br className="sm:hidden" />
+            <span className="hidden sm:inline"> </span>
             <span className="text-white/50 text-3xl sm:text-4xl lg:text-5xl font-light tracking-wide">
               любой сложности. Под ключ.
             </span>
@@ -273,7 +274,7 @@ function HeroSection() {
             <a href="#contacts">
               <Button
                 size="lg"
-                className="bg-volt text-[#0a0a0a] font-bold hover:bg-volt-hover tracking-wider uppercase text-sm px-8 py-6 glow-yellow"
+                className="bg-volt text-charcoal font-bold hover:bg-volt-hover hover:text-charcoal tracking-wider uppercase text-sm px-8 py-6 shadow-volt-glow"
               >
                 Вызвать электрика
                 <ArrowRight className="ml-2 w-4 h-4" />
@@ -654,7 +655,7 @@ function TeamSection() {
             </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight">
               5 специалистов —{" "}
-              <span className="text-volt text-glow-yellow">одна команда</span>
+              <span className="text-volt text-shadow-volt-glow">одна команда</span>
             </h2>
             <p className="text-white/35 mt-4 max-w-xl mx-auto">
               Каждый член бригады — сертифицированный специалист со своей зоной ответственности.
@@ -683,7 +684,7 @@ function TeamSection() {
                 >
                   {/* Collapsed Header */}
                   <div className="flex items-center gap-4 p-4 sm:p-5">
-                    <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 border border-white/10">
+                    <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 border border-white/10">
                       <img
                         src={m.photo}
                         alt={m.name}
@@ -721,7 +722,7 @@ function TeamSection() {
                         <div className="px-4 sm:px-5 pb-5">
                           <div className="flex flex-col sm:flex-row gap-5">
                             {/* Photo */}
-                            <div className="w-full sm:w-48 h-40 sm:h-44 rounded-xl overflow-hidden flex-shrink-0 border border-white/5">
+                            <div className="w-full sm:w-48 aspect-square sm:aspect-auto sm:h-44 rounded-xl overflow-hidden flex-shrink-0 border border-white/5">
                               <img
                                 src={m.photo}
                                 alt={m.name}
@@ -990,7 +991,7 @@ function PriceCalculator() {
                     <a href="#contacts">
                       <Button
                         size="lg"
-                        className="bg-volt text-[#0a0a0a] font-bold hover:bg-volt-hover tracking-wider uppercase text-sm px-6 glow-yellow"
+                        className="bg-volt text-charcoal font-bold hover:bg-volt-hover hover:text-charcoal tracking-wider uppercase text-sm px-6 shadow-volt-glow"
                       >
                         Получить точную смету
                         <ArrowRight className="ml-2 w-4 h-4" />
@@ -1259,7 +1260,7 @@ function PriceCalculator() {
                     <a href="#contacts">
                       <Button
                         size="lg"
-                        className="bg-volt text-[#0a0a0a] font-bold hover:bg-volt-hover tracking-wider uppercase text-sm px-6 glow-yellow"
+                        className="bg-volt text-charcoal font-bold hover:bg-volt-hover hover:text-charcoal tracking-wider uppercase text-sm px-6 shadow-volt-glow"
                       >
                         Получить точную смету
                         <ArrowRight className="ml-2 w-4 h-4" />
@@ -1367,11 +1368,31 @@ function ContactsSection() {
     message: "",
   });
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 4000);
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const { submitContactForm } = await import("@/app/nnvolt/actions");
+      const result = await submitContactForm(form);
+
+      if (result.success) {
+        setSubmitted(true);
+        setForm({ name: "", phone: "", message: "" });
+        setTimeout(() => setSubmitted(false), 5000);
+      } else {
+        setError(result.error || "Failed to send message");
+      }
+    } catch (err) {
+      setError("Failed to send message. Please try again.");
+      console.error("Form submission error:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -1499,11 +1520,23 @@ function ContactsSection() {
                     <Button
                       type="submit"
                       size="lg"
-                      className="w-full bg-volt text-[#0a0a0a] font-bold hover:bg-volt-hover tracking-wider uppercase text-sm glow-yellow"
+                      disabled={isSubmitting}
+                      className="w-full bg-volt text-charcoal font-bold hover:bg-volt-hover hover:text-charcoal tracking-wider uppercase text-sm shadow-volt-glow disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Отправить заявку
-                      <ArrowRight className="ml-2 w-4 h-4" />
+                      {isSubmitting ? (
+                        <>Отправка...</>
+                      ) : (
+                        <>
+                          Отправить заявку
+                          <ArrowRight className="ml-2 w-4 h-4" />
+                        </>
+                      )}
                     </Button>
+                    {error && (
+                      <p className="text-red-500 text-xs text-center mt-2">
+                        {error}
+                      </p>
+                    )}
                     <p className="text-center text-[11px] text-white/15">
                       Нажимая кнопку, вы соглашаетесь с обработкой персональных данных.
                     </p>
@@ -1826,7 +1859,7 @@ function PriceListDrawer() {
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 1.3, type: "spring", stiffness: 200 }}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-5 py-3.5 bg-volt text-[#0a0a0a] font-bold rounded-2xl shadow-lg shadow-volt/20 hover:shadow-volt/40 hover:bg-volt-hover transition-all duration-300 group"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-5 py-3.5 bg-volt text-charcoal font-bold rounded-2xl shadow-lg shadow-volt/20 hover:shadow-volt/40 hover:bg-volt-hover transition-all duration-300 group"
       >
         <Download className="w-5 h-5 group-hover:scale-110 transition-transform" />
         <span className="text-sm tracking-wide hidden sm:inline">Скачать прайс</span>
@@ -1895,7 +1928,7 @@ function PriceListDrawer() {
 
               <div className="pt-4 border-t border-white/5">
                 <a href="/pricelist-nn-volt.xlsx" download>
-                  <Button className="w-full bg-volt text-[#0a0a0a] font-bold hover:bg-volt-hover tracking-wider uppercase text-sm glow-yellow">
+                  <Button className="w-full bg-volt text-charcoal font-bold hover:bg-volt-hover hover:text-charcoal tracking-wider uppercase text-sm shadow-volt-glow">
                     <Download className="mr-2 w-4 h-4" />
                     Скачать прайс-лист (Excel)
                   </Button>
