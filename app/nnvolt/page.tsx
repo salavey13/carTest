@@ -235,7 +235,7 @@ function HeroSection() {
           >
             <div className="w-2 h-2 rounded-full bg-volt animate-pulse" />
             <span className="text-volt text-xs font-bold tracking-[0.25em] uppercase">
-              СРО &bull; Допуск до 10 кВ &bull; Гарантия 3 года
+              СРО &bull; Допуск до 10 кВ &bull; Гарантия 2 года
             </span>
           </motion.div>
 
@@ -302,7 +302,7 @@ function HeroSection() {
               { value: 15, suffix: "+", label: "Лет опыта" },
               { value: 20, suffix: "+", label: "Объектов сдано" },
               { value: 5, suffix: "", label: "Специалистов" },
-              { value: 3, suffix: " года", label: "Гарантия" },
+              { value: 2, suffix: " года", label: "Гарантия" },
             ].map((s, i) => (
               <div key={i}>
                 <div className="text-2xl sm:text-3xl font-black text-volt">
@@ -380,10 +380,10 @@ function Services() {
           </div>
         </Anim>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {services.map((s, i) => (
             <Anim key={i} delay={i * 0.1}>
-              <Card className="group relative overflow-hidden bg-[#111] border-white/5 hover:border-volt/20 transition-all duration-500 h-full">
+              <Card className="group relative overflow-hidden bg-[#111] border-white/5 hover:border-volt/20 hover:shadow-lg hover:shadow-volt/5 transition-all duration-500 h-full">
                 <div className="relative h-48 sm:h-56 overflow-hidden">
                   <img
                     src={s.image}
@@ -393,7 +393,7 @@ function Services() {
                   <div className="absolute inset-0 bg-gradient-to-t from-[#111] via-[#111]/40 to-transparent" />
                   <div className="absolute top-4 left-4">
                     <div
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${
                         s.accent === "volt"
                           ? "bg-volt/10 text-volt"
                           : "bg-electric-blue/10 text-electric-blue"
@@ -403,9 +403,9 @@ function Services() {
                     </div>
                   </div>
                 </div>
-                <CardContent className="pt-0 pb-6 px-6">
-                  <h3 className="text-xl font-bold text-white mb-3">{s.title}</h3>
-                  <p className="text-white/40 text-sm leading-relaxed mb-4">{s.pitch}</p>
+                <CardContent className="pt-0 pb-5 sm:pb-6 px-4 sm:px-6">
+                  <h3 className="text-lg sm:text-xl font-bold text-white mb-2 sm:mb-3">{s.title}</h3>
+                  <p className="text-white/40 text-sm leading-relaxed mb-3 sm:mb-4">{s.pitch}</p>
                   <div className="grid grid-cols-2 gap-2">
                     {s.tags.map((tag, j) => (
                       <div key={j} className="flex items-center gap-2 text-xs text-white/50">
@@ -449,7 +449,7 @@ function WorkSteps() {
       num: "04",
       icon: CheckCircle2,
       title: "Сдача и гарантия",
-      text: "Проверка работы всех систем, инструктаж заказчика и подписание акта сдачи-приёмки с гарантией 3 года.",
+      text: "Проверка работы всех систем, инструктаж заказчика и подписание акта сдачи-приёмки с гарантией 2 года.",
     },
   ];
 
@@ -472,17 +472,17 @@ function WorkSteps() {
           </div>
         </Anim>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {steps.map((s, i) => (
             <Anim key={i} delay={i * 0.12}>
-              <div className="relative h-full p-6 bg-[#111] border border-white/5 rounded-2xl hover:border-volt/15 transition-all duration-300 group">
-                <div className="text-volt/10 text-6xl font-black absolute top-3 right-4 leading-none select-none">
+              <div className="relative h-full p-5 sm:p-6 bg-[#111] border border-white/5 rounded-2xl hover:border-volt/15 hover:shadow-lg hover:shadow-volt/5 hover:-translate-y-1 transition-all duration-300 group">
+                <div className="text-volt/10 text-5xl sm:text-6xl font-black absolute top-3 right-3 sm:right-4 leading-none select-none">
                   {s.num}
                 </div>
-                <div className="w-12 h-12 rounded-xl bg-volt/5 border border-volt/10 flex items-center justify-center mb-5 group-hover:bg-volt/10 transition-colors duration-300">
+                <div className="w-12 h-12 rounded-xl bg-volt/5 border border-volt/10 flex items-center justify-center mb-4 sm:mb-5 group-hover:bg-volt/10 group-hover:scale-110 transition-all duration-300">
                   <s.icon className="w-5 h-5 text-volt/70" />
                 </div>
-                <h3 className="text-white font-bold text-lg mb-2">{s.title}</h3>
+                <h3 className="text-white font-bold text-base sm:text-lg mb-1.5 sm:mb-2">{s.title}</h3>
                 <p className="text-white/35 text-sm leading-relaxed">{s.text}</p>
               </div>
             </Anim>
@@ -555,11 +555,11 @@ function Portfolio() {
           </div>
         </Anim>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {projects.map((p, i) => (
             <Anim key={i} delay={i * 0.08}>
-              <Card className="group relative overflow-hidden bg-[#111] border-white/5 hover:border-volt/15 transition-all duration-500 cursor-pointer">
-                <div className="relative h-60 sm:h-64 overflow-hidden">
+              <Card className="group relative overflow-hidden bg-[#111] border-white/5 hover:border-volt/15 hover:shadow-lg hover:shadow-volt/5 transition-all duration-500 cursor-pointer">
+                <div className="relative h-56 sm:h-60 lg:h-64 overflow-hidden">
                   <img
                     src={p.image}
                     alt={p.title}
@@ -663,7 +663,7 @@ function TeamSection() {
           </div>
         </Anim>
 
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {members.map((m, i) => {
             const isOpen = openIndex === i;
             return (
@@ -909,7 +909,7 @@ function PriceCalculator() {
 
         <Anim delay={0.15}>
           <Card className="bg-[#111] border-white/5 max-w-4xl mx-auto">
-            <CardContent className="p-6 sm:p-8">
+            <CardContent className="p-4 sm:p-6 lg:p-8">
               {/* Mode Toggle */}
               <div className="flex items-center justify-center gap-3 mb-8">
                 <button
@@ -1294,7 +1294,7 @@ function FAQSection() {
     },
     {
       q: "Какие гарантии вы даёте?",
-      a: "Мы предоставляем гарантию 3 года на все выполненные монтажные работы. При обнаружении дефектов в гарантийный срок — устраняем бесплатно в течение 48 часов.",
+      a: "Мы предоставляем гарантию 2 года на все выполненные монтажные работы. При обнаружении дефектов в гарантийный срок — устраняем бесплатно в течение 48 часов.",
     },
     {
       q: "Вы работаете с высоким напряжением?",
@@ -1418,18 +1418,18 @@ function ContactsSection() {
           </div>
         </Anim>
 
-        <div className="grid lg:grid-cols-5 gap-8 lg:gap-12">
+        <div className="grid lg:grid-cols-5 gap-6 sm:gap-8 lg:gap-12">
           {/* Info */}
           <Anim className="lg:col-span-2">
-            <div className="space-y-6">
-              <div className="p-5 bg-volt/5 border border-volt/15 rounded-2xl">
-                <h3 className="text-volt font-bold text-lg mb-2">Вызвать электрика</h3>
+            <div className="space-y-4 sm:space-y-6">
+              <div className="p-4 sm:p-5 bg-volt/5 border border-volt/15 rounded-2xl">
+                <h3 className="text-volt font-bold text-base sm:text-lg mb-2">Вызвать электрика</h3>
                 <p className="text-white/40 text-sm">
                   Бригадир выедет на объект, сделает замеры и составит точную смету — бесплатно.
                 </p>
               </div>
 
-              <div className="p-5 bg-electric-blue/5 border border-electric-blue/15 rounded-2xl">
+              <div className="p-4 sm:p-5 bg-electric-blue/5 border border-electric-blue/15 rounded-2xl">
                 <h3 className="text-electric-blue font-bold text-lg mb-2">Запросить смету</h3>
                 <p className="text-white/40 text-sm">
                   Отправьте описание объекта — подготовим предварительный расчёт стоимости.
@@ -1556,8 +1556,8 @@ function Footer() {
     <footer className="relative bg-[#070707] border-t border-white/5 mt-auto">
       <div className="h-1 hazard-stripe" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 lg:gap-12">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
             <div className="flex items-center gap-2 mb-4">
