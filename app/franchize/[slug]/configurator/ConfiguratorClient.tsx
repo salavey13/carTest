@@ -310,15 +310,30 @@ export function ConfiguratorClient({ crew, slug }: Props) {
 
   return (
     <>
+      {/* ── Theme sync: map franchize CSS vars to configurator vars ── */}
+      <style jsx global>{`
+        .cfg-root {
+          /* Map franchize theme variables to configurator variables */
+          --cfg-bg: var(--franchize-bg-base, #09090b);
+          --cfg-surface: var(--franchize-bg-card, #111113);
+          --cfg-surface-raised: var(--franchize-bg-card, #1a1a1f);
+          --cfg-border: var(--franchize-border-soft, #27272a);
+          --cfg-border-hover: var(--franchize-border-soft, #3f3f46);
+          --cfg-text: var(--franchize-text-primary, #fafafa);
+          --cfg-text-muted: var(--franchize-text-secondary, #a1a1aa);
+          --cfg-text-dim: var(--franchize-text-secondary, #71717a);
+          --cfg-accent: var(--franchize-accent-main, #00ffea);
+          --cfg-accent-hover: var(--franchize-accent-hover, #33ffed);
+          --cfg-accent-dim: color-mix(in srgb, var(--cfg-accent) 30%, transparent);
+          --cfg-accent-glow: color-mix(in srgb, var(--cfg-accent) 15%, transparent);
+          --cfg-danger: #ef4444;
+        }
+      `}</style>
+
       {/* ── Configurator-scoped styles ── */}
       <style jsx>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
         .cfg-root {
-          --cfg-bg: #09090b; --cfg-surface: #111113; --cfg-surface-raised: #1a1a1f;
-          --cfg-border: #27272a; --cfg-border-hover: #3f3f46;
-          --cfg-text: #fafafa; --cfg-text-muted: #a1a1aa; --cfg-text-dim: #71717a;
-          --cfg-accent: #00ffea; --cfg-accent-dim: #00ffea30; --cfg-accent-glow: #00ffea15;
-          --cfg-danger: #ef4444;
           font-family: 'Inter', system-ui, sans-serif; background: var(--cfg-bg); color: var(--cfg-text); -webkit-font-smoothing: antialiased;
         }
         .cfg-mono { font-family: 'JetBrains Mono', monospace; }
@@ -341,8 +356,8 @@ export function ConfiguratorClient({ crew, slug }: Props) {
         .cfg-grain::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E"); pointer-events: none; z-index: 9999; }
         .cfg-root::-webkit-scrollbar { width: 6px; }
         .cfg-root::-webkit-scrollbar-track { background: transparent; }
-        .cfg-root::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
-        .cfg-img-wrap { background: radial-gradient(circle at 50% 42%, rgba(0,255,234,0.22), transparent 36%), linear-gradient(145deg, #f4f4f5 0%, #d4d4d8 46%, #18181b 47%, #09090b 100%); }
+        .cfg-root::-webkit-scrollbar-thumb { background: var(--cfg-border); border-radius: 3px; }
+        .cfg-img-wrap { background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--cfg-accent) 22%, transparent), transparent 36%), linear-gradient(145deg, color-mix(in srgb, var(--cfg-bg) 85%, white) 0%, color-mix(in srgb, var(--cfg-bg) 70%, white) 46%, var(--cfg-surface) 47%, var(--cfg-bg) 100%); }
         @keyframes shimmer { to { background-position: -200% 0; } }
         .cfg-stagger > * { opacity: 0; animation: cfgFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .cfg-stagger > *:nth-child(1)  { animation-delay: 0.02s; } .cfg-stagger > *:nth-child(2)  { animation-delay: 0.06s; }
@@ -361,17 +376,20 @@ export function ConfiguratorClient({ crew, slug }: Props) {
 
       <section className="cfg-root cfg-grain relative min-h-screen">
         {/* ── HERO ── */}
-        <div className="relative overflow-hidden border-b border-[#27272a]">
-          <div className="absolute -top-40 left-1/2 h-[500px] w-[800px] -translate-x-1/2 rounded-full opacity-20" style={{ background: 'radial-gradient(ellipse, #00ffea 0%, transparent 70%)' }} />
+        <div className="relative overflow-hidden border-b border-[var(--cfg-border)]">
+          <div
+            className="absolute -top-40 left-1/2 h-[500px] w-[800px] -translate-x-1/2 rounded-full opacity-20"
+            style={{ background: 'radial-gradient(ellipse, var(--cfg-accent) 0%, transparent 70%)' }}
+          />
           <div className="relative mx-auto max-w-7xl px-4 pb-8 pt-10 sm:pt-14 2xl:max-w-[1600px]">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="cfg-mono mb-2 text-[11px] font-medium uppercase tracking-[0.25em] text-[#00ffea]">Конфигуратор</p>
+                <p className="cfg-mono mb-2 text-[11px] font-medium uppercase tracking-[0.25em] text-[var(--cfg-accent)]">Конфигуратор</p>
                 <h1 className="text-3xl font-black leading-[1.1] tracking-tight sm:text-5xl">
                   Собери свой<br />
-                  <span className="text-[#00ffea]">электробайк</span>
+                  <span className="text-[var(--cfg-accent)]">электробайк</span>
                 </h1>
-                <p className="mt-3 max-w-md text-sm leading-relaxed text-[#a1a1aa]">
+                <p className="mt-3 max-w-md text-sm leading-relaxed text-[var(--cfg-text-muted)]">
                   Выбери модель, настрой мотор и батарею, добавь опции — получи точную цену за секунды.
                 </p>
               </div>
@@ -387,33 +405,33 @@ export function ConfiguratorClient({ crew, slug }: Props) {
           {/* ═══ STEP 1: MODEL ═══ */}
           {tab === 'model' && (
             <div className="cfg-fade-in space-y-6">
-              <div className="rounded-2xl border border-[#27272a] bg-[#111113] p-5">
+              <div className="rounded-2xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-5">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs font-medium uppercase tracking-widest text-[#71717a]">Диапазон цены</Label>
-                  <span className="cfg-mono text-sm font-bold text-[#00ffea]">{formatPrice(priceRange[0])} — {formatPrice(priceRange[1])}</span>
+                  <Label className="text-xs font-medium uppercase tracking-widest text-[var(--cfg-text-dim)]">Диапазон цены</Label>
+                  <span className="cfg-mono text-sm font-bold text-[var(--cfg-accent)]">{formatPrice(priceRange[0])} — {formatPrice(priceRange[1])}</span>
                 </div>
                 <Slider value={priceRange} onValueChange={setPriceRange} min={100000} max={500000} step={10000} className="cfg-slider mt-4" />
-                <div className="mt-2 flex justify-between text-[10px] text-[#71717a]"><span>100 000 ₽</span><span>500 000 ₽</span></div>
+                <div className="mt-2 flex justify-between text-[10px] text-[var(--cfg-text-dim)]"><span>100 000 ₽</span><span>500 000 ₽</span></div>
               </div>
-              <p className="cfg-mono text-xs text-[#71717a]">Найдено: <span className="font-bold text-white">{filteredBikes.length}</span> моделей</p>
+              <p className="cfg-mono text-xs text-[var(--cfg-text-dim)]">Найдено: <span className="font-bold text-white">{filteredBikes.length}</span> моделей</p>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 cfg-stagger">
                 {filteredBikes.map((bike) => {
                   const isSelected = selectedBikeId === bike.id
                   return (
-                    <article key={bike.id} className={['group relative overflow-hidden rounded-2xl border bg-[#111113] cfg-card-hover', isSelected ? 'cfg-selected-ring border-[#00ffea]' : 'border-[#27272a]'].join(' ')}>
+                    <article key={bike.id} className={['group relative overflow-hidden rounded-2xl border bg-[var(--cfg-surface)] cfg-card-hover', isSelected ? 'cfg-selected-ring border-[var(--cfg-accent)]' : 'border-[var(--cfg-border)]'].join(' ')}>
                       <button type="button" className="block w-full text-left" onClick={() => selectBike(bike.id)}>
                         <div className="cfg-img-wrap relative aspect-[4/3] w-full overflow-hidden lg:aspect-square">
                           <ConfiguratorBikeImage src={bike.image_url} alt={`${bike.make} ${bike.model}`} sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 25vw" className="group-hover:scale-105" />
-                          <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-transparent to-transparent opacity-60" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-[var(--cfg-bg)] via-transparent to-transparent opacity-60" />
                           <div className="absolute left-3 top-3"><TierBadge tier={bike.specs.tier} /></div>
-                          {isSelected && <div className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-[#00ffea] shadow-lg shadow-[#00ffea]/30"><Check className="h-4 w-4 text-black" /></div>}
+                          {isSelected && <div className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--cfg-accent)] shadow-lg shadow-[var(--cfg-accent)]/30"><Check className="h-4 w-4 text-black" /></div>}
                           <div className="absolute bottom-3 left-3 right-3"><p className="cfg-mono text-xl font-bold text-white drop-shadow-lg">{formatPrice(bike.daily_price)}</p></div>
                         </div>
                         <div className="p-4">
                           <h3 className="mb-1.5 text-sm font-bold tracking-tight text-white">{bike.make} {bike.model}</h3>
-                          <p className="line-clamp-2 text-xs leading-relaxed text-[#a1a1aa]">{bike.description}</p>
-                          <div className="mt-3 flex items-center gap-3 text-[10px] uppercase tracking-widest text-[#71717a]">
+                          <p className="line-clamp-2 text-xs leading-relaxed text-[var(--cfg-text-muted)]">{bike.description}</p>
+                          <div className="mt-3 flex items-center gap-3 text-[10px] uppercase tracking-widest text-[var(--cfg-text-dim)]">
                             <span className="flex items-center gap-1"><Zap className="h-3 w-3" />{bike.specs.power_w}W</span>
                             <span className="flex items-center gap-1"><Gauge className="h-3 w-3" />{bike.specs.max_speed_kmh} км/ч</span>
                           </div>
@@ -424,9 +442,9 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                 })}
               </div>
               {filteredBikes.length === 0 && (
-                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#27272a] py-16">
-                  <p className="text-sm text-[#71717a]">Нет моделей в этом диапазоне цен</p>
-                  <Button variant="ghost" className="mt-3 text-xs text-[#a1a1aa]" onClick={() => setPriceRange([100000, 500000])}>Сбросить фильтр</Button>
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--cfg-border)] py-16">
+                  <p className="text-sm text-[var(--cfg-text-dim)]">Нет моделей в этом диапазоне цен</p>
+                  <Button variant="ghost" className="mt-3 text-xs text-[var(--cfg-text-muted)]" onClick={() => setPriceRange([100000, 500000])}>Сбросить фильтр</Button>
                 </div>
               )}
             </div>
@@ -435,41 +453,41 @@ export function ConfiguratorClient({ crew, slug }: Props) {
           {/* ═══ STEP 2: CONFIG ═══ */}
           {tab === 'config' && selectedBike && (
             <div className="cfg-fade-in space-y-6">
-              <div className="overflow-hidden rounded-2xl border border-[#27272a] bg-[#111113]">
+              <div className="overflow-hidden rounded-2xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)]">
                 <div className="relative aspect-[21/9] w-full overflow-hidden sm:aspect-[3/1]">
                   <ConfiguratorBikeImage src={selectedBike.image_url} alt={`${selectedBike.make} ${selectedBike.model}`} sizes="(max-width: 1024px) 100vw, 66vw" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#09090b] via-[#09090b]/60 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-[var(--cfg-bg)] via-[var(--cfg-bg)]/60 to-transparent" />
                   <div className="absolute bottom-0 left-0 p-6 sm:p-8">
                     <TierBadge tier={selectedBike.specs.tier} />
                     <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-4xl">{selectedBike.make} {selectedBike.model}</h2>
-                    <p className="mt-1 max-w-lg text-sm text-[#a1a1aa]">{selectedBike.description}</p>
+                    <p className="mt-1 max-w-lg text-sm text-[var(--cfg-text-muted)]">{selectedBike.description}</p>
                   </div>
                 </div>
                 {selectedBike.specs.gallery && selectedBike.specs.gallery.length > 0 && (
-                  <div className="flex gap-2 overflow-x-auto border-t border-[#27272a] p-3">
+                  <div className="flex gap-2 overflow-x-auto border-t border-[var(--cfg-border)] p-3">
                     {[selectedBike.image_url, ...selectedBike.specs.gallery].map((img, i) => (
-                      <div key={img + i} className="relative h-16 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-[#27272a]"><ConfiguratorBikeImage src={img} alt={`${selectedBike.make} ${selectedBike.model} фото ${i + 1}`} sizes="96px" /></div>
+                      <div key={img + i} className="relative h-16 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-[var(--cfg-border)]"><ConfiguratorBikeImage src={img} alt={`${selectedBike.make} ${selectedBike.model} фото ${i + 1}`} sizes="96px" /></div>
                     ))}
                   </div>
                 )}
               </div>
 
               {/* Motor */}
-              <div className="rounded-2xl border border-[#27272a] bg-[#111113] p-5 sm:p-6">
+              <div className="rounded-2xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-5 sm:p-6">
                 <div className="mb-4 flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#00ffea]/10"><Zap className="h-4 w-4 text-[#00ffea]" /></div>
-                  <div><h3 className="text-sm font-bold">Мощность мотора</h3><p className="text-[11px] text-[#71717a]">Влияет на динамику и максимальную скорость</p></div>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--cfg-accent)]/10"><Zap className="h-4 w-4 text-[var(--cfg-accent)]" /></div>
+                  <div><h3 className="text-sm font-bold">Мощность мотора</h3><p className="text-[11px] text-[var(--cfg-text-dim)]">Влияет на динамику и максимальную скорость</p></div>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {availableMotors.map((motor) => {
                     const active = motorPower === motor.value
                     return (
-                      <label key={motor.value} className={['cfg-option flex items-center justify-between rounded-xl border p-4', active ? 'cfg-option-active' : 'border-[#27272a]'].join(' ')}>
+                      <label key={motor.value} className={['cfg-option flex items-center justify-between rounded-xl border p-4', active ? 'cfg-option-active' : 'border-[var(--cfg-border)]'].join(' ')}>
                         <span className="flex items-center gap-3">
                           <input type="radio" name="motor" className="cfg-radio-dot" value={motor.value} checked={active} onChange={() => setMotorPower(motor.value)} aria-label={`Мощность мотора ${motor.value}W`} />
-                          <span><span className="block text-sm font-semibold">{motor.value}W</span><span className="block text-[11px] text-[#71717a]">{motor.extra === 0 ? 'Базовая комплектация' : `+${formatPrice(motor.extra)}`}</span></span>
+                          <span><span className="block text-sm font-semibold">{motor.value}W</span><span className="block text-[11px] text-[var(--cfg-text-dim)]">{motor.extra === 0 ? 'Базовая комплектация' : `+${formatPrice(motor.extra)}`}</span></span>
                         </span>
-                        {motor.extra > 0 && <span className="cfg-mono text-xs font-medium text-[#a1a1aa]">+{formatPrice(motor.extra)}</span>}
+                        {motor.extra > 0 && <span className="cfg-mono text-xs font-medium text-[var(--cfg-text-muted)]">+{formatPrice(motor.extra)}</span>}
                       </label>
                     )
                   })}
@@ -478,16 +496,16 @@ export function ConfiguratorClient({ crew, slug }: Props) {
 
               {/* Battery */}
               {selectedBike.model !== 'A4' && (
-                <div className="rounded-2xl border border-[#27272a] bg-[#111113] p-5 sm:p-6">
+                <div className="rounded-2xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-5 sm:p-6">
                   <div className="mb-4 flex items-center gap-2">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10"><Battery className="h-4 w-4 text-emerald-400" /></div>
-                    <div><h3 className="text-sm font-bold">Аккумулятор</h3><p className="text-[11px] text-[#71717a]">Тип и ёмкость определяют запас хода</p></div>
+                    <div><h3 className="text-sm font-bold">Аккумулятор</h3><p className="text-[11px] text-[var(--cfg-text-dim)]">Тип и ёмкость определяют запас хода</p></div>
                   </div>
-                  <div className="mb-4 inline-flex rounded-xl border border-[#27272a] bg-[#09090b] p-1">
+                  <div className="mb-4 inline-flex rounded-xl border border-[var(--cfg-border)] bg-[var(--cfg-bg)] p-1">
                     {(['regular', 'lithium'] as const).map((mode) => (
                       <button key={mode} type="button" onClick={() => { setBatteryMode(mode); setBatteryCapacity((mode === 'regular' ? regularBatteries[0] : lithiumBatteries[0])?.capacity ?? '') }}
                         aria-label={`Тип аккумулятора ${mode === 'regular' ? 'Regular' : 'Lithium'}`}
-                        className={['rounded-lg px-4 py-2 text-xs font-semibold transition-all', batteryMode === mode ? 'bg-[#00ffea] text-black shadow-md' : 'text-[#71717a] hover:text-white'].join(' ')}>
+                        className={['rounded-lg px-4 py-2 text-xs font-semibold transition-all', batteryMode === mode ? 'bg-[var(--cfg-accent)] text-black shadow-md' : 'text-[var(--cfg-text-dim)] hover:text-white'].join(' ')}>
                         {mode === 'regular' ? 'Regular' : 'Lithium'}
                       </button>
                     ))}
@@ -496,12 +514,12 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                     {(batteryMode === 'regular' ? regularBatteries : lithiumBatteries).map((battery) => {
                       const active = batteryCapacity === battery.capacity
                       return (
-                        <label key={`${batteryMode}-${battery.capacity}`} className={['cfg-option flex items-center justify-between rounded-xl border p-4', active ? 'cfg-option-active' : 'border-[#27272a]'].join(' ')}>
+                        <label key={`${batteryMode}-${battery.capacity}`} className={['cfg-option flex items-center justify-between rounded-xl border p-4', active ? 'cfg-option-active' : 'border-[var(--cfg-border)]'].join(' ')}>
                           <span className="flex items-center gap-3">
                             <input type="radio" name="battery" className="cfg-radio-dot" value={battery.capacity} checked={active} onChange={() => setBatteryCapacity(battery.capacity)} aria-label={`Аккумулятор ${battery.capacity}`} />
-                            <span><span className="block text-sm font-semibold">{battery.capacity}</span><span className="block text-[11px] text-[#71717a]">Запас хода: {battery.range_km} км</span></span>
+                            <span><span className="block text-sm font-semibold">{battery.capacity}</span><span className="block text-[11px] text-[var(--cfg-text-dim)]">Запас хода: {battery.range_km} км</span></span>
                           </span>
-                          <span className="cfg-mono text-xs font-medium text-[#a1a1aa]">{battery.battery_price === 0 ? 'Вкл.' : `+${formatPrice(battery.battery_price)}`}</span>
+                          <span className="cfg-mono text-xs font-medium text-[var(--cfg-text-muted)]">{battery.battery_price === 0 ? 'Вкл.' : `+${formatPrice(battery.battery_price)}`}</span>
                         </label>
                       )
                     })}
@@ -509,10 +527,10 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                 </div>
               )}
 
-              <div className="rounded-2xl border border-[#27272a] bg-[#111113] p-5 sm:p-6">
+              <div className="rounded-2xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-5 sm:p-6">
                 <div className="mb-4 flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#00ffea]/10"><Sparkles className="h-4 w-4 text-[#00ffea]" /></div>
-                  <div><h3 className="text-sm font-bold">Цвет</h3><p className="text-[11px] text-[#71717a]">Цвет попадёт в заказ и DOCX с factory ID</p></div>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--cfg-accent)]/10"><Sparkles className="h-4 w-4 text-[var(--cfg-accent)]" /></div>
+                  <div><h3 className="text-sm font-bold">Цвет</h3><p className="text-[11px] text-[var(--cfg-text-dim)]">Цвет попадёт в заказ и DOCX с factory ID</p></div>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {FACTORY_COLORS.map((color) => {
@@ -525,14 +543,14 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                         aria-label={`Цвет рамы ${color.label}`}
                         className={[
                           'cfg-option flex items-center justify-between rounded-xl border p-4 text-left',
-                          active ? 'cfg-option-active' : 'border-[#27272a]',
+                          active ? 'cfg-option-active' : 'border-[var(--cfg-border)]',
                         ].join(' ')}
                       >
                         <span className="flex items-center gap-3">
                           <span className="h-5 w-5 rounded-full border border-white/20" style={{ backgroundColor: color.hex ?? '#6b7280' }} />
                           <span>
                             <span className="block text-sm font-semibold">{color.label}</span>
-                            <span className="block text-[11px] text-[#71717a]">Factory ID: {color.factoryId}</span>
+                            <span className="block text-[11px] text-[var(--cfg-text-dim)]">Factory ID: {color.factoryId}</span>
                           </span>
                         </span>
                       </button>
@@ -543,8 +561,8 @@ export function ConfiguratorClient({ crew, slug }: Props) {
 
 
               <div className="flex gap-3">
-                <Button variant="ghost" onClick={() => setTab('model')} className="text-[#71717a] hover:text-white">← Назад</Button>
-                <Button onClick={() => setTab('addons')} className="cfg-glow-btn flex-1 bg-[#00ffea] font-bold text-black hover:bg-[#33ffed] sm:flex-none">Дальше: опции<ChevronRight className="ml-1 h-4 w-4" /></Button>
+                <Button variant="ghost" onClick={() => setTab('model')} className="text-[var(--cfg-text-dim)] hover:text-white">← Назад</Button>
+                <Button onClick={() => setTab('addons')} className="cfg-glow-btn flex-1 bg-[var(--cfg-accent)] font-bold text-black hover:bg-[var(--cfg-accent-hover)] sm:flex-none">Дальше: опции<ChevronRight className="ml-1 h-4 w-4" /></Button>
               </div>
             </div>
           )}
@@ -555,21 +573,21 @@ export function ConfiguratorClient({ crew, slug }: Props) {
               {Object.entries(partsByCategory).map(([category, categoryParts]) => {
                 const Icon = _PART_ICONS[category] || Sparkles
                 return (
-                  <div key={category} className="rounded-2xl border border-[#27272a] bg-[#111113] p-5 sm:p-6">
+                  <div key={category} className="rounded-2xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-5 sm:p-6">
                     <div className="mb-4 flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5"><Icon className="h-4 w-4 text-[#a1a1aa]" /></div>
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5"><Icon className="h-4 w-4 text-[var(--cfg-text-muted)]" /></div>
                       <h3 className="text-sm font-bold">{CATEGORY_LABELS[category] ?? category}</h3>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {categoryParts.map((part) => {
                         const checked = selectedAccessories.includes(part.id)
                         return (
-                          <label key={part.id} className={['cfg-option flex items-start justify-between gap-3 rounded-xl border p-4', checked ? 'cfg-option-active' : 'border-[#27272a]'].join(' ')}>
+                          <label key={part.id} className={['cfg-option flex items-start justify-between gap-3 rounded-xl border p-4', checked ? 'cfg-option-active' : 'border-[var(--cfg-border)]'].join(' ')}>
                             <span className="flex items-start gap-3">
                               <input type="checkbox" className="cfg-check mt-0.5" checked={checked} onChange={() => setSelectedAccessories((prev) => prev.includes(part.id) ? prev.filter((id) => id !== part.id) : [...prev, part.id])} aria-label={`Аксессуар ${part.model}`} />
-                              <span><span className="block text-sm font-semibold">{part.model}</span><span className="mt-0.5 block text-[11px] leading-relaxed text-[#71717a]">{part.description}</span></span>
+                              <span><span className="block text-sm font-semibold">{part.model}</span><span className="mt-0.5 block text-[11px] leading-relaxed text-[var(--cfg-text-dim)]">{part.description}</span></span>
                             </span>
-                            <span className="cfg-mono whitespace-nowrap text-xs font-medium text-[#a1a1aa]">+{formatPrice(part.daily_price)}</span>
+                            <span className="cfg-mono whitespace-nowrap text-xs font-medium text-[var(--cfg-text-muted)]">+{formatPrice(part.daily_price)}</span>
                           </label>
                         )
                       })}
@@ -578,14 +596,14 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                 )
               })}
               {selectedAccessories.length > 0 && (
-                <div className="flex items-center justify-between rounded-xl border border-[#00ffea]/20 bg-[#00ffea]/5 px-4 py-3">
-                  <span className="text-sm text-[#a1a1aa]">Выбрано опций: <span className="font-bold text-white">{selectedAccessories.length}</span></span>
-                  <span className="cfg-mono text-sm font-bold text-[#00ffea]">+{formatPrice(accessoriesTotal)}</span>
+                <div className="flex items-center justify-between rounded-xl border border-[var(--cfg-accent)]/20 bg-[var(--cfg-accent)]/5 px-4 py-3">
+                  <span className="text-sm text-[var(--cfg-text-muted)]">Выбрано опций: <span className="font-bold text-white">{selectedAccessories.length}</span></span>
+                  <span className="cfg-mono text-sm font-bold text-[var(--cfg-accent)]">+{formatPrice(accessoriesTotal)}</span>
                 </div>
               )}
               <div className="flex gap-3">
-                <Button variant="ghost" onClick={() => setTab('config')} className="text-[#71717a] hover:text-white">← Назад</Button>
-                <Button onClick={() => setTab('summary')} className="cfg-glow-btn flex-1 bg-[#00ffea] font-bold text-black hover:bg-[#33ffed] sm:flex-none">Дальше: итог<ChevronRight className="ml-1 h-4 w-4" /></Button>
+                <Button variant="ghost" onClick={() => setTab('config')} className="text-[var(--cfg-text-dim)] hover:text-white">← Назад</Button>
+                <Button onClick={() => setTab('summary')} className="cfg-glow-btn flex-1 bg-[var(--cfg-accent)] font-bold text-black hover:bg-[var(--cfg-accent-hover)] sm:flex-none">Дальше: итог<ChevronRight className="ml-1 h-4 w-4" /></Button>
               </div>
             </div>
           )}
@@ -595,8 +613,8 @@ export function ConfiguratorClient({ crew, slug }: Props) {
             <div className="cfg-fade-in space-y-6">
               <div className="grid gap-6 lg:grid-cols-5">
                 <div className="lg:col-span-3 space-y-4">
-                  <div className="overflow-hidden rounded-2xl border border-[#27272a] bg-[#111113]">
-                    <div className="relative aspect-[16/7] w-full overflow-hidden"><ConfiguratorBikeImage src={selectedBike.image_url} alt={`${selectedBike.make} ${selectedBike.model}`} sizes="(max-width: 1280px) 100vw, 60vw" /><div className="absolute inset-0 bg-gradient-to-t from-[#111113] via-transparent to-transparent" /></div>
+                  <div className="overflow-hidden rounded-2xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)]">
+                    <div className="relative aspect-[16/7] w-full overflow-hidden"><ConfiguratorBikeImage src={selectedBike.image_url} alt={`${selectedBike.make} ${selectedBike.model}`} sizes="(max-width: 1280px) 100vw, 60vw" /><div className="absolute inset-0 bg-gradient-to-t from-[var(--cfg-surface)] via-transparent to-transparent" /></div>
                     <div className="p-5"><TierBadge tier={selectedBike.specs.tier} /><h2 className="mt-2 text-xl font-black">{selectedBike.make} {selectedBike.model}</h2></div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -607,17 +625,17 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                       { icon: Sparkles, label: 'Цвет', value: selectedColor?.label ?? '—' },
                       { icon: Shield, label: 'Запас хода', value: activeBattery ? `${activeBattery.range_km} км` : '—' },
                     ].map(({ icon: Icon, label, value }) => (
-                      <div key={label} className="rounded-xl border border-[#27272a] bg-[#111113] p-3"><Icon className="mb-1.5 h-4 w-4 text-[#71717a]" /><p className="cfg-mono text-lg font-bold">{value}</p><p className="text-[10px] uppercase tracking-widest text-[#71717a]">{label}</p></div>
+                      <div key={label} className="rounded-xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-3"><Icon className="mb-1.5 h-4 w-4 text-[var(--cfg-text-dim)]" /><p className="cfg-mono text-lg font-bold">{value}</p><p className="text-[10px] uppercase tracking-widest text-[var(--cfg-text-dim)]">{label}</p></div>
                     ))}
                   </div>
                   {selectedAccessories.length > 0 && (
-                    <div className="rounded-xl border border-[#27272a] bg-[#111113] p-4">
-                      <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-[#71717a]">Доп. опции</h4>
+                    <div className="rounded-xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-4">
+                      <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-[var(--cfg-text-dim)]">Доп. опции</h4>
                       <div className="space-y-2">
                         {selectedAccessories.map((id) => {
                           const part = parts.find((p) => p.id === id)
                           if (!part) return null
-                          return <div key={id} className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 text-[#a1a1aa]"><Check className="h-3.5 w-3.5 text-[#00ffea]" />{part.model}</span><span className="cfg-mono text-xs">+{formatPrice(part.daily_price)}</span></div>
+                          return <div key={id} className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 text-[var(--cfg-text-muted)]"><Check className="h-3.5 w-3.5 text-[var(--cfg-accent)]" />{part.model}</span><span className="cfg-mono text-xs">+{formatPrice(part.daily_price)}</span></div>
                         })}
                       </div>
                     </div>
@@ -626,28 +644,28 @@ export function ConfiguratorClient({ crew, slug }: Props) {
 
                 <div className="lg:col-span-2">
                   <div className="sticky top-6 space-y-4">
-                    <div className="rounded-2xl border border-[#27272a] bg-[#111113] p-5 sm:p-6">
-                      <h3 className="mb-4 text-sm font-bold uppercase tracking-widest text-[#71717a]">Расчёт стоимости</h3>
+                    <div className="rounded-2xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-5 sm:p-6">
+                      <h3 className="mb-4 text-sm font-bold uppercase tracking-widest text-[var(--cfg-text-dim)]">Расчёт стоимости</h3>
                       <div className="space-y-3 text-sm">
-                        <div className="flex justify-between"><span className="text-[#a1a1aa]">{selectedBike.make} {selectedBike.model}</span><span className="cfg-mono font-medium">{formatPrice(basePrice)}</span></div>
-                        <div className="flex justify-between"><span className="text-[#a1a1aa]">Цвет (Factory ID)</span><span className="cfg-mono text-xs font-medium">{selectedColor?.factoryId ?? 'UNKNOWN-FACTORY-COLOR'}</span></div>
-                        {motorExtra > 0 && <div className="flex justify-between"><span className="text-[#a1a1aa]">Мотор {selectedMotor?.value}W</span><span className="cfg-mono font-medium">+{formatPrice(motorExtra)}</span></div>}
-                        {batteryPrice > 0 && <div className="flex justify-between"><span className="text-[#a1a1aa]">Батарея {activeBattery?.capacity}</span><span className="cfg-mono font-medium">+{formatPrice(batteryPrice)}</span></div>}
-                        {accessoriesTotal > 0 && <div className="flex justify-between"><span className="text-[#a1a1aa]">Опции ({selectedAccessories.length})</span><span className="cfg-mono font-medium">+{formatPrice(accessoriesTotal)}</span></div>}
-                        {deliveryApplied && <div className="flex justify-between"><span className="text-[#a1a1aa]">Доставка</span><span className="cfg-mono font-medium">+{formatPrice(DELIVERY_AVERAGE)}</span></div>}
+                        <div className="flex justify-between"><span className="text-[var(--cfg-text-muted)]">{selectedBike.make} {selectedBike.model}</span><span className="cfg-mono font-medium">{formatPrice(basePrice)}</span></div>
+                        <div className="flex justify-between"><span className="text-[var(--cfg-text-muted)]">Цвет (Factory ID)</span><span className="cfg-mono text-xs font-medium">{selectedColor?.factoryId ?? 'UNKNOWN-FACTORY-COLOR'}</span></div>
+                        {motorExtra > 0 && <div className="flex justify-between"><span className="text-[var(--cfg-text-muted)]">Мотор {selectedMotor?.value}W</span><span className="cfg-mono font-medium">+{formatPrice(motorExtra)}</span></div>}
+                        {batteryPrice > 0 && <div className="flex justify-between"><span className="text-[var(--cfg-text-muted)]">Батарея {activeBattery?.capacity}</span><span className="cfg-mono font-medium">+{formatPrice(batteryPrice)}</span></div>}
+                        {accessoriesTotal > 0 && <div className="flex justify-between"><span className="text-[var(--cfg-text-muted)]">Опции ({selectedAccessories.length})</span><span className="cfg-mono font-medium">+{formatPrice(accessoriesTotal)}</span></div>}
+                        {deliveryApplied && <div className="flex justify-between"><span className="text-[var(--cfg-text-muted)]">Доставка</span><span className="cfg-mono font-medium">+{formatPrice(DELIVERY_AVERAGE)}</span></div>}
                       </div>
-                      <Separator className="my-4 bg-[#27272a]" />
-                      <div className="flex items-baseline justify-between"><span className="text-sm font-bold uppercase tracking-widest text-[#71717a]">Итого</span><span className="cfg-mono text-3xl font-black text-[#00ffea]">{formatPrice(total)}</span></div>
-                      <button onClick={() => setDeliveryApplied((v) => !v)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#27272a] py-3 text-xs text-[#71717a] transition-all hover:border-[#00ffea]/30 hover:text-white">
+                      <Separator className="my-4 bg-[var(--cfg-border)]" />
+                      <div className="flex items-baseline justify-between"><span className="text-sm font-bold uppercase tracking-widest text-[var(--cfg-text-dim)]">Итого</span><span className="cfg-mono text-3xl font-black text-[var(--cfg-accent)]">{formatPrice(total)}</span></div>
+                      <button onClick={() => setDeliveryApplied((v) => !v)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--cfg-border)] py-3 text-xs text-[var(--cfg-text-dim)] transition-all hover:border-[var(--cfg-accent)]/30 hover:text-white">
                         <Truck className="h-4 w-4" />{deliveryApplied ? 'Убрать доставку' : `Добавить доставку (+${formatPrice(DELIVERY_AVERAGE)})`}
                       </button>
                     </div>
                     <div className="space-y-2">
-                      <Button onClick={submitLead} disabled={isPending} className="cfg-glow-btn w-full bg-[#00ffea] py-6 text-sm font-bold text-black hover:bg-[#33ffed]"><MessageCircle className="mr-2 h-4 w-4" />Отправить в Telegram</Button>
-                      <Button asChild variant="outline" className="w-full border-[#27272a] bg-transparent py-6 text-sm font-semibold text-white hover:bg-white/5 hover:text-white"><a href="https://t.me/I_O_S_NN" target="_blank" rel="noopener noreferrer">Оформить покупку</a></Button>
-                      <Button asChild variant="ghost" className="w-full text-xs text-[#71717a] hover:text-white"><Link href={`/franchize/${crew.slug || slug}/contacts`}>Контакты франшизы</Link></Button>
+                      <Button onClick={submitLead} disabled={isPending} className="cfg-glow-btn w-full bg-[var(--cfg-accent)] py-6 text-sm font-bold text-black hover:bg-[var(--cfg-accent-hover)]"><MessageCircle className="mr-2 h-4 w-4" />Отправить в Telegram</Button>
+                      <Button asChild variant="outline" className="w-full border-[var(--cfg-border)] bg-transparent py-6 text-sm font-semibold text-white hover:bg-white/5 hover:text-white"><a href="https://t.me/I_O_S_NN" target="_blank" rel="noopener noreferrer">Оформить покупку</a></Button>
+                      <Button asChild variant="ghost" className="w-full text-xs text-[var(--cfg-text-dim)] hover:text-white"><Link href={`/franchize/${crew.slug || slug}/contacts`}>Контакты франшизы</Link></Button>
                     </div>
-                    <Button variant="ghost" onClick={() => setTab('addons')} className="w-full text-[#71717a] hover:text-white">← Вернуться к опциям</Button>
+                    <Button variant="ghost" onClick={() => setTab('addons')} className="w-full text-[var(--cfg-text-dim)] hover:text-white">← Вернуться к опциям</Button>
                   </div>
                 </div>
               </div>
@@ -657,10 +675,10 @@ export function ConfiguratorClient({ crew, slug }: Props) {
 
         {/* ── MOBILE STICKY BAR ── */}
         {selectedBike && (
-          <div className="cfg-sticky-bar fixed inset-x-0 bottom-0 z-50 border-t border-[#27272a] bg-[#09090b]/90 px-4 py-3 sm:hidden">
+          <div className="cfg-sticky-bar fixed inset-x-0 bottom-0 z-50 border-t border-[var(--cfg-border)] bg-[var(--cfg-bg)]/90 px-4 py-3 sm:hidden">
             <div className="flex items-center justify-between">
-              <div><p className="text-[10px] uppercase tracking-widest text-[#71717a]">{selectedBike.make} {selectedBike.model}</p><p className="cfg-mono text-xl font-black text-[#00ffea]">{formatPrice(total)}</p></div>
-              <Button onClick={() => setTab('summary')} size="sm" className="bg-[#00ffea] font-bold text-black">Итог<ChevronRight className="ml-1 h-4 w-4" /></Button>
+              <div><p className="text-[10px] uppercase tracking-widest text-[var(--cfg-text-dim)]">{selectedBike.make} {selectedBike.model}</p><p className="cfg-mono text-xl font-black text-[var(--cfg-accent)]">{formatPrice(total)}</p></div>
+              <Button onClick={() => setTab('summary')} size="sm" className="bg-[var(--cfg-accent)] font-bold text-black">Итог<ChevronRight className="ml-1 h-4 w-4" /></Button>
             </div>
           </div>
         )}
