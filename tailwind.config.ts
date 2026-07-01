@@ -89,6 +89,12 @@ const config: Config = {
         "spa-blue": "hsl(200, 80%, 70%)",
         "spa-green": "hsl(150, 60%, 80%)",
         "spa-lavender": "hsl(270, 70%, 85%)",
+
+        // NN Volt specific colors - yellow (#FACC15) and electric blue (#3B82F6)
+        volt: "#FACC15",
+        "volt-hover": "#EAB308",
+        "electric-blue": "#3B82F6",
+        charcoal: "#0A0A0A",
       },
       fontFamily: {
         sans: ["Inter", ...fontFamily.sans],
@@ -112,6 +118,10 @@ const config: Config = {
         "primary-glow": "0 0 10px hsl(var(--primary))",
         // Spa glow: Soft ambient
         "spa-glow": "0 4px 20px hsla(200, 50%, 50%, 0.3)",
+        // NN Volt glows
+        "volt-glow": "0 0 30px rgba(250, 204, 21, 0.2), 0 0 80px rgba(250, 204, 21, 0.06)",
+        "volt-glow-strong": "0 0 40px rgba(250, 204, 21, 0.3), 0 0 100px rgba(250, 204, 21, 0.1)",
+        "electric-glow": "0 0 30px rgba(59, 130, 246, 0.2), 0 0 80px rgba(59, 130, 246, 0.06)",
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
