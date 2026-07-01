@@ -594,7 +594,7 @@ function TeamSection() {
 
   const members = [
     {
-      name: "Электрик 1",
+      name: "Слаботочник",
       role: "Электромонтажник 4 разряда",
       perk: "Слаботочные сети",
       description: "Специалист по слаботочным системам: видеонаблюдение, СКС, охранно-пожарная сигнализация, СКУД. Монтаж и пусконаладка.",
@@ -603,7 +603,7 @@ function TeamSection() {
       icon: Cable,
     },
     {
-      name: "Электрик 2",
+      name: "Щиточник",
       role: "Электромонтажник 4 разряда",
       perk: "Сборка электрощитов",
       description: "Профессиональная сборка распределительных щитов любой сложности. Работает с ABB, Schneider, Legrand. Чистота монтажа — визитная карточка.",
@@ -612,7 +612,7 @@ function TeamSection() {
       icon: Cpu,
     },
     {
-      name: "Электрик 3",
+      name: "Монтажник",
       role: "Электромонтажник 3 разряда",
       perk: "Штробление и прокладка",
       description: "Мастер штробления и прокладки кабельных трасс. Работает с бетоном, кирпичом, гипсом. Быстро и аккуратно — без лишней пыли и повреждений.",
@@ -621,8 +621,8 @@ function TeamSection() {
       icon: Hammer,
     },
     {
-      name: "Электрик 4",
-      role: "Контроль качества",
+      name: "Контролёр",
+      role: "Электромонтажник 5 разряда",
       perk: "Приёмка и проверка",
       description: "Отвечает за контроль качества выполненных работ. Проверяет соответствие ПУЭ, замеряет сопротивление изоляции, оформляет акты скрытых работ.",
       photo: "/images/work-ceiling-lights.png",
@@ -630,7 +630,7 @@ function TeamSection() {
       icon: Eye,
     },
     {
-      name: "Администратор сайта",
+      name: "Администратор",
       role: "Электромонтажник 5 разряда",
       perk: "Прием заявок и связь с клиентами",
       description: "Обрабатывает входящие заявки, координирует выезд бригады на объект. Первичная консультация и запись на замеры.",
@@ -1857,7 +1857,7 @@ function PriceListDrawer() {
       >
         <Download className="w-5 h-5 group-hover:scale-110 transition-transform" />
         <span className="text-sm tracking-wide hidden sm:inline">Скачать прайс</span>
-        <span className="text-sm tracking-wide sm:hidden">PDF</span>
+        <span className="text-sm tracking-wide sm:hidden">XLSX</span>
       </motion.a>
 
       <motion.button
