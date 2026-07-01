@@ -86,7 +86,13 @@ export function CrewFooter({ crew }: CrewFooterProps) {
           </h3>
           <ul className="mt-3 space-y-1 text-sm">
             {crew.header.menuLinks.map((link) => {
-              const internalHref = toInternalHref(link.href);
+              // Safety net: replace any unsubstituted {slug} with actual crew slug.
+              // The main hydration path (actions-runtime.ts:728) calls withSlug(),
+              // but some code paths (line 1196) skip it — this catches both.
+              const resolvedHref = link.href.includes("{slug}")
+                ? link.href.replaceAll("{slug}", crew.slug || "")
+                : link.href;
+              const internalHref = toInternalHref(resolvedHref);
               return (
                 <li
                   key={`${link.href}-${link.label}`}
@@ -94,7 +100,7 @@ export function CrewFooter({ crew }: CrewFooterProps) {
                 >
                   {internalHref === null ? (
                     <a
-                      href={link.href}
+                      href={resolvedHref}
                       className="flex items-center gap-2 py-2 transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                       target="_blank"
                       rel="noreferrer"
