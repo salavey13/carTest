@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
-import { GeistSans, GeistMono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./styles.css";
 import { Toaster } from "@/components/ui/toaster";
 
-const geistSans = GeistSans({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
-const geistMono = GeistMono({
-  variable: "--font-geist-mono",
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
 });
 
@@ -31,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="ru" className="dark" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`${inter.variable} ${jetbrainsMono.variable} antialiased bg-background text-foreground`}
       >
         {children}
         <Toaster />
