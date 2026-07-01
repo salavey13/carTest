@@ -1431,9 +1431,17 @@ function ContactsSection() {
 
               <div className="p-4 sm:p-5 bg-electric-blue/5 border border-electric-blue/15 rounded-2xl">
                 <h3 className="text-electric-blue font-bold text-lg mb-2">Запросить смету</h3>
-                <p className="text-white/40 text-sm">
+                <p className="text-white/40 text-sm mb-4">
                   Отправьте описание объекта — подготовим предварительный расчёт стоимости.
                 </p>
+                <a
+                  href="/zapros-smeti-nn-volt.txt"
+                  download
+                  className="inline-flex items-center gap-2 text-xs font-medium text-electric-blue hover:text-white transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Скачать бланк заявки
+                </a>
               </div>
 
               <div className="h-px bg-white/5" />
@@ -1925,6 +1933,15 @@ function PriceListDrawer() {
                   <Button className="w-full bg-volt text-charcoal font-bold hover:bg-volt-hover hover:text-charcoal tracking-wider uppercase text-sm shadow-volt-glow">
                     <Download className="mr-2 w-4 h-4" />
                     Скачать прайс-лист (Excel)
+                  </Button>
+                </a>
+                <a href="/zapros-smeti-nn-volt.txt" download>
+                  <Button
+                    variant="outline"
+                    className="w-full mt-2 border-white/10 text-electric-blue/60 hover:text-electric-blue hover:border-electric-blue/30 tracking-wider uppercase text-sm"
+                  >
+                    <Download className="mr-2 w-4 h-4" />
+                    Скачать бланк заявки
                   </Button>
                 </a>
                 <a href="#calculator" onClick={() => setOpen(false)}>
