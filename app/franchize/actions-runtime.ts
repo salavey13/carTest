@@ -1193,7 +1193,10 @@ async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promis
     textSecondary: readPath(franchize, ["theme", "palettes", "light", "textSecondary"], readPath(franchize, ["theme", "palette", "light", "textSecondary"], defaultFranchizeConfig.lightTextSecondary)),
     borderSoft: readPath(franchize, ["theme", "palettes", "light", "borderSoft"], readPath(franchize, ["theme", "palette", "light", "borderSoft"], defaultFranchizeConfig.lightBorderSoft)),
   };
-  const menuLinks = readArrayPath<UnknownRecord>(franchize, ["header", "menuLinks"], fallbackMenuLinks(slug));
+  const menuLinks = readArrayPath<UnknownRecord>(franchize, ["header", "menuLinks"], fallbackMenuLinks(slug)).map((link) => ({
+    label: readPath(link, ["label"], "Ссылка"),
+    href: withSlug(readPath(link, ["href"], `/franchize/${slug}`), slug),
+  }));
 
   const crewSecrets = await getCrewSensitiveDataOrDefault(slug, { source: "toFranchizeConfigInput" });
   const contractDefaults = (crewSecrets.contractDefaults ?? {}) as UnknownRecord;

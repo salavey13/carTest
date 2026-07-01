@@ -46,6 +46,63 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
         <FranchizeCatalogHero crew={crew} slug={slug} variant="main" />
         <CatalogClient crew={crew} slug={slug} items={items} ctaPolicy={ctaPolicy} />
       </FranchizeErrorBoundary>
+
+      {/* ── Test Drive Section ── Anchor target for /franchize/{slug}#test-drive */}
+      <section
+        id="test-drive"
+        className="mx-auto w-full max-w-7xl scroll-mt-20 px-4 py-10 2xl:max-w-[1600px]"
+        style={surface.card}
+      >
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl">
+            <h2 className="text-2xl font-bold uppercase tracking-tight md:text-3xl" style={{ color: "var(--franchize-text-primary, inherit)" }}>
+              Тест-драйв
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed md:text-base" style={{ color: "var(--franchize-text-secondary, inherit)" }}>
+              Попробуйте электромотоцикл перед покупкой. Покатаемся по центру Нижнего Новгорода,
+              ответим на вопросы, поможем определиться с моделью. Шоурум открыт ежедневно.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-4 text-sm" style={{ color: "var(--franchize-text-secondary, inherit)" }}>
+              {crew.contacts.address && (
+                <span className="flex items-center gap-1.5">📍 {crew.contacts.address}</span>
+              )}
+              {crew.contacts.workingHours && (
+                <span className="flex items-center gap-1.5">🕐 {crew.contacts.workingHours}</span>
+              )}
+              {crew.contacts.phone && (
+                <span className="flex items-center gap-1.5">📞 {crew.contacts.phone}</span>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row md:flex-col">
+            {crew.contacts.telegramBotUsername && (
+              <a
+                href={`https://t.me/${crew.contacts.telegramBotUsername}`}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold uppercase tracking-wide transition active:scale-95"
+                style={{
+                  background: "var(--franchize-accent-main, #f59e0b)",
+                  color: "var(--franchize-accent-contrast, #16130A)",
+                }}
+              >
+                Записаться на тест-драйв
+              </a>
+            )}
+            <a
+              href={`/franchize/${crew.slug || slug}#catalog-sections`}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 px-6 py-3 text-sm font-bold uppercase tracking-wide transition hover:opacity-80 active:scale-95"
+              style={{
+                borderColor: "var(--franchize-accent-main, #f59e0b)",
+                color: "var(--franchize-accent-main, #f59e0b)",
+              }}
+            >
+              Выбрать байк
+            </a>
+          </div>
+        </div>
+      </section>
+
       <CrewFooter crew={crew} />
     </main>
   );
