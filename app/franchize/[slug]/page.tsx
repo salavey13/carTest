@@ -75,20 +75,18 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
             </div>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row md:flex-col">
-            {crew.contacts.telegramBotUsername && (
-              <a
-                href={`https://t.me/${crew.contacts.telegramBotUsername}`}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold uppercase tracking-wide transition active:scale-95"
-                style={{
-                  background: "var(--franchize-accent-main, #f59e0b)",
-                  color: "var(--franchize-accent-contrast, #16130A)",
-                }}
-              >
-                Записаться на тест-драйв
-              </a>
-            )}
+            <a
+              href="https://t.me/I_O_S_NN"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold uppercase tracking-wide transition active:scale-95"
+              style={{
+                background: "var(--franchize-accent-main, #f59e0b)",
+                color: "var(--franchize-accent-contrast, #16130A)",
+              }}
+            >
+              Записаться на тест-драйв
+            </a>
             <a
               href={`/franchize/${crew.slug || slug}#catalog-sections`}
               className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 px-6 py-3 text-sm font-bold uppercase tracking-wide transition hover:opacity-80 active:scale-95"
