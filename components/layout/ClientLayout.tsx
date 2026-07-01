@@ -90,6 +90,13 @@ const THEME_CONFIG = {
     BottomNav: null,
     isTransparent: false,
   },
+  nnvolt: {
+    paths: ["/nnvolt"],
+    Header: null,           // NNvolt page has its own layout
+    Footer: null,           // NNvolt page has its own layout
+    BottomNav: null,
+    isTransparent: false,
+  },
   // PATCH: svarprofi theme — standalone landing at /svarprofi
   // Renders its own SvarProfiHeader + SvarProfiFooter internally.
   svarprofi: {
@@ -119,6 +126,9 @@ const getThemeForPath = (pathname: string) => {
   // PATCH: svarprofi — check BEFORE franchize (more specific)
   if (pathname.startsWith("/svarprofi")) {
     return THEME_CONFIG.svarprofi;
+  }
+  if (pathname.startsWith("/nnvolt")) {
+    return THEME_CONFIG.nnvolt;
   }
   if (pathname.startsWith("/franchize/")) {
     return THEME_CONFIG.franchize;
