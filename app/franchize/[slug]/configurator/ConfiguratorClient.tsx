@@ -663,7 +663,6 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                     <div className="space-y-2">
                       <Button onClick={submitLead} disabled={isPending} className="cfg-glow-btn w-full bg-[var(--cfg-accent)] py-6 text-sm font-bold text-black hover:bg-[var(--cfg-accent-hover)]"><MessageCircle className="mr-2 h-4 w-4" />Отправить в Telegram</Button>
                       <Button asChild variant="outline" className="w-full border-[var(--cfg-border)] bg-transparent py-6 text-sm font-semibold text-white hover:bg-white/5 hover:text-white"><a href="https://t.me/I_O_S_NN" target="_blank" rel="noopener noreferrer">Оформить покупку</a></Button>
-                      <Button asChild variant="ghost" className="w-full text-xs text-[var(--cfg-text-dim)] hover:text-white"><Link href={`/franchize/${crew.slug || slug}/contacts`}>Контакты франшизы</Link></Button>
                     </div>
                     <Button variant="ghost" onClick={() => setTab('addons')} className="w-full text-[var(--cfg-text-dim)] hover:text-white">← Вернуться к опциям</Button>
                   </div>
