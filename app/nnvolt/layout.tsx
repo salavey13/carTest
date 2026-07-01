@@ -22,18 +22,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default function NNVoltLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru" className="dark" suppressHydrationWarning>
-      <body
-        className={`${inter.variable} ${jetbrainsMono.variable} antialiased bg-background text-foreground`}
-      >
-        {children}
-      </body>
-    </html>
+    <div className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}>
+      {children}
+    </div>
   );
 }
