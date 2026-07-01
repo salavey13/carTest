@@ -39,6 +39,12 @@ export const CATALOG_VS_SPECS: CatalogVsSpec[] = [
     unit: "кг",
     lowerIsBetter: true,
   },
+  {
+    label: "Цена",
+    keys: ["sale_price", "price_rub", "price"],
+    unit: "₽",
+    lowerIsBetter: true,
+  },
 ];
 
 export const getCatalogVsSpecValue = (
@@ -82,7 +88,7 @@ function ValueCell({
 }) {
   return (
     <div
-      className={`rounded-xl px-2.5 py-2 text-sm transition ${isWinner ? "bg-white/5 text-emerald-400 font-bold" : isLoser ? "text-white/40" : "text-white"}`}
+      className={`rounded-xl px-2.5 py-2 text-sm transition ${isWinner ? "bg-emerald-500/10 text-emerald-500 font-bold" : isLoser ? "text-[var(--item-muted-text)] opacity-60" : "text-[var(--item-text)]"}`}
     >
       {children}
     </div>
@@ -116,7 +122,7 @@ export function VsSpecRow({
       <ValueCell isWinner={aWins} isLoser={bWins}>
         {formatValue(valueA, unit)}
       </ValueCell>
-      <div className="min-w-[5.5rem] text-center text-[10px] uppercase tracking-[0.12em] text-white/55 sm:min-w-28">
+      <div className="min-w-[5.5rem] text-center text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)] sm:min-w-28">
         {label}
       </div>
       <ValueCell isWinner={bWins} isLoser={aWins}>
