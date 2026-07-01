@@ -2,7 +2,7 @@
 
 import { sendMessage } from "@/gateway/telegram/sendMessage";
 
-const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || "6216799537";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 export interface ContactFormData {

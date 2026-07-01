@@ -1441,9 +1441,8 @@ function ContactsSection() {
               <div className="space-y-4">
                 {[
                   { icon: Phone, label: "+7 929 042-04-20", sub: "Пн–Сб 08:00–20:00" },
-                  { icon: Mail, label: "info@nnvolt.ru", sub: "Ответ в течение 2 часов" },
-                  { icon: MapPin, label: "Выезд по всему городу и области", sub: "" },
-                  { icon: Send, label: "Telegram: @nnvolt", sub: "Быстрая связь" },
+                  { icon: MapPin, label: "Нижний Новгород и область", sub: "Быстрый выезд на объект" },
+                  { icon: Send, label: "Telegram: @mister_x_420", sub: "Напишите в любой момент" },
                 ].map((c, i) => (
                   <div key={i} className="flex items-start gap-4">
                     <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center flex-shrink-0">
@@ -1605,8 +1604,8 @@ function Footer() {
             <h4 className="text-white font-bold text-sm tracking-wider uppercase mb-4">Связь</h4>
             <ul className="space-y-2">
               <li>
-                <a href="https://t.me/nnvolt" target="_blank" rel="noopener noreferrer" className="text-white/25 text-sm hover:text-volt transition-colors flex items-center gap-2">
-                  <Send className="w-3.5 h-3.5" /> Telegram: @nnvolt
+                <a href="https://t.me/mister_x_420" target="_blank" rel="noopener noreferrer" className="text-white/25 text-sm hover:text-volt transition-colors flex items-center gap-2">
+                  <Send className="w-3.5 h-3.5" /> Telegram: @mister_x_420
                 </a>
               </li>
               <li>
@@ -1614,13 +1613,8 @@ function Footer() {
                   <Phone className="w-3.5 h-3.5" /> +7 929 042-04-20
                 </a>
               </li>
-              <li>
-                <a href="mailto:info@nnvolt.ru" className="text-white/25 text-sm hover:text-volt transition-colors flex items-center gap-2">
-                  <Mail className="w-3.5 h-3.5" /> info@nnvolt.ru
-                </a>
-              </li>
               <li className="text-white/25 text-sm flex items-center gap-2">
-                <MapPin className="w-3.5 h-3.5" /> Выезд по городу и области
+                <MapPin className="w-3.5 h-3.5" /> Нижний Новгород и область
               </li>
             </ul>
           </div>
