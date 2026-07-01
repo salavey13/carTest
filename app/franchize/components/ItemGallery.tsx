@@ -130,10 +130,10 @@ export function ItemGallery({
           fill
           sizes="(max-width: 1024px) 100vw, 42vw"
           className="object-cover"
-          onError={handleImageError(srcFor(resolvedImages[0]))}
           loading="eager"
           priority
-          onError={() => {
+          onError={(e) => {
+            handleImageError(srcFor(resolvedImages[0]))(e);
             const orig = resolvedImages[0];
             if (prefer4x3 && orig && !failed4x3[orig]) {
               setFailed4x3((prev) => ({ ...prev, [orig]: true }));
@@ -165,10 +165,10 @@ export function ItemGallery({
           fill
           sizes="(max-width: 1024px) 100vw, 42vw"
           className="object-cover"
-          onError={handleImageError(srcFor(resolvedImages[activeIndex]))}
           loading="eager"
           priority={activeIndex === 0}
-          onError={() => {
+          onError={(e) => {
+            handleImageError(srcFor(resolvedImages[activeIndex]))(e);
             const orig = resolvedImages[activeIndex];
             if (prefer4x3 && orig && !failed4x3[orig]) {
               setFailed4x3((prev) => ({ ...prev, [orig]: true }));
@@ -241,9 +241,9 @@ export function ItemGallery({
                   fill
                   sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 120px"
                   className="object-cover"
-                  onError={handleImageError(srcFor(url))}
                   loading="lazy"
-                  onError={() => {
+                  onError={(e) => {
+                    handleImageError(srcFor(url))(e);
                     if (prefer4x3 && !failed4x3[url]) {
                       setFailed4x3((prev) => ({ ...prev, [url]: true }));
                     } else {
