@@ -1119,7 +1119,7 @@ export function ItemModal({
                     className="mt-3 rounded-2xl border border-white/10 p-3"
                     style={surface.subtleCard}
                   >
-                    <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center text-xs font-semibold">
+                    <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center text-xs font-semibold text-[var(--item-text)]">
                       <span>
                         {item.title}
                         <span className="mt-0.5 block text-[10px] uppercase tracking-[0.12em] opacity-55">
