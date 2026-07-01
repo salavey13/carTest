@@ -4,6 +4,7 @@ import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildCandidateImageUrls, imageUrl4x3 } from "@/app/franchize/lib/media";
+import { localImageSrc, handleImageError } from "@/lib/image-fallback";
 
 export interface ItemGalleryProps {
   images: string[];
@@ -124,11 +125,12 @@ export function ItemGallery({
         style={{ backgroundColor: "var(--item-card-bg, #000)" }}
       >
         <Image
-          src={srcFor(resolvedImages[0])}
+          src={localImageSrc(srcFor(resolvedImages[0]))}
           alt={`${altText} 1`}
           fill
           sizes="(max-width: 1024px) 100vw, 42vw"
           className="object-cover"
+          onError={handleImageError(srcFor(resolvedImages[0]))}
           loading="eager"
           priority
           onError={() => {
@@ -158,11 +160,12 @@ export function ItemGallery({
       {/* Main Image Container - FIXED: Added explicit aspect ratio class */}
       <div className={`relative w-full bg-black/25 ${getAspectRatioClass()}`}>
         <Image
-          src={srcFor(resolvedImages[activeIndex])}
+          src={localImageSrc(srcFor(resolvedImages[activeIndex]))}
           alt={`${altText} ${activeIndex + 1}`}
           fill
           sizes="(max-width: 1024px) 100vw, 42vw"
           className="object-cover"
+          onError={handleImageError(srcFor(resolvedImages[activeIndex]))}
           loading="eager"
           priority={activeIndex === 0}
           onError={() => {
@@ -233,11 +236,12 @@ export function ItemGallery({
                 }}
               >
                 <Image
-                  src={srcFor(url)}
+                  src={localImageSrc(srcFor(url))}
                   alt={`${altText} ${index + 1}`}
                   fill
                   sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 120px"
                   className="object-cover"
+                  onError={handleImageError(srcFor(url))}
                   loading="lazy"
                   onError={() => {
                     if (prefer4x3 && !failed4x3[url]) {

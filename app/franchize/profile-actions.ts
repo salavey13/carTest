@@ -308,7 +308,7 @@ export async function saveFranchizeNotificationPreferencesAction(params: {
 export async function getFranchizeActivityDigestAction(params: { userId: string; slug: string }): Promise<{ success: boolean; data?: FranchizeActivityDigest; error?: string }> {
   const { data: rentals, error: rentalsError } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id,status,vehicle_id,vehicle:cars(make,model)")
+    .select("rental_id,status,payment_status,vehicle_id,metadata,vehicle:cars(make,model)")
     .or(`user_id.eq.${params.userId},owner_id.eq.${params.userId}`)
     .order("created_at", { ascending: false })
     .limit(20);
@@ -329,6 +329,8 @@ export async function getFranchizeActivityDigestAction(params: { userId: string;
       rentals: (rentals || []).map((r: any) => ({
         rentalId: r.rental_id,
         status: r.status || "unknown",
+        paymentStatus: r.payment_status || "",
+        isTestRide: r.metadata?.flowType === "sale" || r.payment_status === "interest_paid",
         vehicleId: r.vehicle_id || "",
         vehicleLabel: `${r.vehicle?.make || "Bike"} ${r.vehicle?.model || ""}`.trim(),
         docLink: `/rentals/${r.rental_id}`,

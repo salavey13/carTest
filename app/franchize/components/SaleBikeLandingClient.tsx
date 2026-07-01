@@ -29,6 +29,7 @@ import {
 
 import type { CatalogItemVM, FranchizeCrewVM } from "@/app/franchize/actions";
 import {
+  checkFranchizeCarsAvailability,
   createFranchizeOrderInvoice,
   getFranchizeOperatorDashboardAccess,
   sendFranchizeBuyPrintPdf,
@@ -648,6 +649,20 @@ export function SaleBikeLandingClient({
       return;
     }
 
+    // Check availability before creating invoice (prevent double-booking)
+    const today = new Date().toISOString().split("T")[0];
+    const weekLater = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+    const availability = await checkFranchizeCarsAvailability({
+      carIds: [item.id],
+      rentalStartDate: today,
+      rentalEndDate: weekLater,
+    });
+    if ((availability.unavailableCarIds?.length ?? 0) > 0) {
+      setReservationState("error");
+      setCartMessage("Этот байк уже забронирован для тест-драйва. Выберите другую модель или свяжитесь с нами.");
+      return;
+    }
+
     void recordSaleIntent({
       intentType: "test_ride",
       stage: "test_ride_requested",
@@ -781,7 +796,7 @@ export function SaleBikeLandingClient({
                   <img
                     src={localImageSrc(safeGallery[selectedImage] ?? heroImage)}
                     alt={item.title}
-                    loading="lazy"
+                    loading="eager"
                     className="absolute inset-0 h-full w-full object-cover sm:hidden"
                     onError={() => {
                       const broken = safeGallery[selectedImage];
@@ -793,7 +808,7 @@ export function SaleBikeLandingClient({
                   <img
                     src={imageUrl4x3(localImageSrc(safeGallery[selectedImage] ?? heroImage))}
                     alt={item.title}
-                    loading="lazy"
+                    loading="eager"
                     className="absolute inset-0 hidden h-full w-full object-cover sm:block"
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).src = localImageSrc(safeGallery[selectedImage] ?? heroImage);
@@ -1250,7 +1265,7 @@ export function SaleBikeLandingClient({
                 <button
                   type="button"
                   onClick={handleReserveTestDrive}
-                  disabled={!isHydrated || reservationState === "loading"}
+                  disabled={!isHydrated || reservationState === "loading" || reservationState === "success"}
                   className="rounded-xl px-4 py-3 text-center font-semibold transition hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                   aria-live="polite"
                   style={{
@@ -1486,7 +1501,7 @@ export function SaleBikeLandingClient({
           <button
             type="button"
             onClick={handleReserveTestDrive}
-            disabled={!isHydrated || reservationState === "loading"}
+            disabled={!isHydrated || reservationState === "loading" || reservationState === "success"}
             className="rounded-xl px-4 py-3 text-sm font-semibold"
             style={{ background: crew.theme.palette.accentMain, color: "#111" }}
           >

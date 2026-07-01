@@ -481,10 +481,17 @@ export function FranchizeProfileClient({
                         <span className="font-semibold text-[var(--fr-profile-text)]">
                           {r.vehicleLabel}
                         </span>
-                        <MapPin className="h-3 w-3 text-[var(--fr-profile-muted)]" />
+                        {r.isTestRide ? (
+                          <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-600">
+                            Тест-драйв
+                          </span>
+                        ) : (
+                          <MapPin className="h-3 w-3 text-[var(--fr-profile-muted)]" />
+                        )}
                       </div>
                       <div className="mt-1 flex items-center gap-2 text-xs text-[var(--fr-profile-muted)]">
                         <span>{r.status}</span>
+                        {r.paymentStatus && <span>· {r.paymentStatus}</span>}
                       </div>
                     </Link>
                   ))}

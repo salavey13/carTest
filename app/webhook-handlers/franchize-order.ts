@@ -92,6 +92,10 @@ export const franchizeOrderHandler: WebhookHandler = {
         payment_status: "interest_paid",
         interest_amount: interestStars,
         total_cost: totalRub,
+        agreed_start_date: metadata?.rentalStartDate || new Date().toISOString(),
+        agreed_end_date: metadata?.rentalEndDate || new Date(Date.now() + 7 * 86400000).toISOString(),
+        requested_start_date: metadata?.rentalStartDate || new Date().toISOString(),
+        requested_end_date: metadata?.rentalEndDate || new Date(Date.now() + 7 * 86400000).toISOString(),
         metadata: {
           ...(metadata || {}),
           source: "franchize_order",

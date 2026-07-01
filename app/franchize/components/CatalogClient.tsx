@@ -20,6 +20,7 @@ import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 import { getCatalogPropulsionSegment } from "../lib/catalog-propulsion";
+import { localImageSrc, handleImageError } from "@/lib/image-fallback";
 
 interface CatalogClientProps {
   crew: FranchizeCrewVM;
@@ -989,13 +990,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           )}
                           {item.imageUrl ? (
                             <Image
-                              src={item.imageUrl}
+                              src={localImageSrc(item.imageUrl)}
                               alt={item.title}
                               fill
                               sizes="(max-width: 1279px) 46vw, 260px"
                               className="object-cover transition-transform duration-300 ease-out"
                               style={{ transform: `scale(1.04) translate3d(${parallax.x * 4}px, ${parallax.y * 4}px, 0)` }}
                               onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
+                              onError={handleImageError(item.imageUrl)}
                             />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается</div>
@@ -1116,7 +1118,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         {/* ── Image area (9:16 portrait) with spec badges ── */}
                         <div className="relative aspect-[9/16] w-full">
                           {item.imageUrl ? (
-                            <Image src={item.imageUrl} alt={item.title} fill sizes="(max-width: 1279px) 50vw, (max-width: 1535px) 33vw, 25vw" className="object-cover" />
+                            <Image
+                              src={localImageSrc(item.imageUrl)}
+                              alt={item.title}
+                              fill
+                              sizes="(max-width: 1279px) 50vw, (max-width: 1535px) 33vw, 25vw"
+                              className="object-cover"
+                              onError={handleImageError(item.imageUrl)}
+                            />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается</div>
                           )}
