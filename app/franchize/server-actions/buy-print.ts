@@ -1133,43 +1133,69 @@ export async function generateBuyPdf(input: {
   });
 
   // ── QR Codes (buy link + VK, side by side) ────────────────────────────
+  // Helper: fetch QR with delay between requests to avoid rate limiting
+  let qrFetchIndex = 0;
+  async function fetchQrCode(url: string, label: string): Promise<ArrayBuffer | null> {
+    try {
+      // Add delay between QR fetches to avoid rate limiting (skip first)
+      if (qrFetchIndex > 0) {
+        await new Promise(resolve => setTimeout(resolve, 300)); // 300ms delay between QRs
+      }
+      qrFetchIndex++;
+
+      logger.info(`[franchize] Fetching QR ${qrFetchIndex}: ${label}`);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        logger.warn(`[franchize] QR fetch failed (${label}): HTTP ${response.status}`);
+        return null;
+      }
+
+      return await response.arrayBuffer();
+    } catch (error) {
+      logger.warn(`[franchize] QR fetch error (${label}):`, error);
+      return null;
+    }
+  }
 
   // Buy QR
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      FETCH_TIMEOUT_MS,
-    );
-
-    const qrBytes = await fetch(
+    const qrBytes = await fetchQrCode(
       `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
         buyLink,
       )}&color=000000&bgcolor=ffffff&margin=1`,
-      { signal: controller.signal },
-    ).then((response) => response.arrayBuffer());
+      `buy-${input.item.id}`
+    );
 
-    clearTimeout(timeout);
+    if (qrBytes) {
 
-    const qr = await pdfDoc.embedPng(qrBytes);
+      const qr = await pdfDoc.embedPng(qrBytes);
 
-    page.drawImage(qr, {
-      x: QR_X,
-      y: QR_Y,
-      width: layout.qrSize,
-      height: layout.qrSize,
-    });
+      page.drawImage(qr, {
+        x: QR_X,
+        y: QR_Y,
+        width: layout.qrSize,
+        height: layout.qrSize,
+      });
 
-    // Label under buy QR
-    const buyLabel = "Купить/Арендовать";
-    const buyLabelWidth = font.widthOfTextAtSize(buyLabel, QR_LABEL_FONT_SIZE);
-    page.drawText(buyLabel, {
-      x: QR_X + (layout.qrSize - buyLabelWidth) / 2,
-      y: QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE,
-      size: QR_LABEL_FONT_SIZE,
-      font,
-      color: COLORS.muted,
-    });
+      // Label under buy QR
+      const buyLabel = "Купить/Арендовать";
+      const buyLabelWidth = font.widthOfTextAtSize(buyLabel, QR_LABEL_FONT_SIZE);
+      page.drawText(buyLabel, {
+        x: QR_X + (layout.qrSize - buyLabelWidth) / 2,
+        y: QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE,
+        size: QR_LABEL_FONT_SIZE,
+        font,
+        color: COLORS.muted,
+      });
+    } else {
+      logger.warn(`[franchize] Failed to fetch buy QR for bike ${input.item.id}`);
+    }
   } catch (error) {
     logger.warn("[franchize] failed to generate buy QR", error);
   }
@@ -1177,40 +1203,37 @@ export async function generateBuyPdf(input: {
   // vip-bike.ru QR (website QR code - middle position)
   const siteLink = "https://vip-bike.ru";
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      FETCH_TIMEOUT_MS,
-    );
-
-    const siteQrBytes = await fetch(
+    const siteQrBytes = await fetchQrCode(
       `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
         siteLink,
       )}&color=000000&bgcolor=ffffff&margin=1`,
-      { signal: controller.signal },
-    ).then((response) => response.arrayBuffer());
+      `site-${input.item.id}`
+    );
 
-    clearTimeout(timeout);
+    if (siteQrBytes) {
 
-    const siteQr = await pdfDoc.embedPng(siteQrBytes);
+      const siteQr = await pdfDoc.embedPng(siteQrBytes);
 
-    page.drawImage(siteQr, {
-      x: SITE_QR_X,
-      y: QR_Y,
-      width: layout.siteQrSize,
-      height: layout.siteQrSize,
-    });
+      page.drawImage(siteQr, {
+        x: SITE_QR_X,
+        y: QR_Y,
+        width: layout.siteQrSize,
+        height: layout.siteQrSize,
+      });
 
-    // Label under site QR
-    const siteLabel = "vip-bike.ru";
-    const siteLabelWidth = font.widthOfTextAtSize(siteLabel, QR_LABEL_FONT_SIZE);
-    page.drawText(siteLabel, {
-      x: SITE_QR_X + (layout.siteQrSize - siteLabelWidth) / 2,
-      y: QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE,
-      size: QR_LABEL_FONT_SIZE,
-      font,
-      color: COLORS.muted,
-    });
+      // Label under site QR
+      const siteLabel = "vip-bike.ru";
+      const siteLabelWidth = font.widthOfTextAtSize(siteLabel, QR_LABEL_FONT_SIZE);
+      page.drawText(siteLabel, {
+        x: SITE_QR_X + (layout.siteQrSize - siteLabelWidth) / 2,
+        y: QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE,
+        size: QR_LABEL_FONT_SIZE,
+        font,
+        color: COLORS.muted,
+      });
+    } else {
+      logger.warn(`[franchize] Failed to fetch site QR for bike ${input.item.id}`);
+    }
   } catch (error) {
     logger.warn("[franchize] failed to generate site QR", error);
   }
@@ -1219,40 +1242,37 @@ export async function generateBuyPdf(input: {
   const vkLink = input.vkLink;
   if (vkLink) {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(),
-        FETCH_TIMEOUT_MS,
-      );
-
-      const vkQrBytes = await fetch(
+      const vkQrBytes = await fetchQrCode(
         `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
           vkLink,
         )}&color=000000&bgcolor=ffffff&margin=1`,
-        { signal: controller.signal },
-      ).then((response) => response.arrayBuffer());
+        `vk-${input.item.id}`
+      );
 
-      clearTimeout(timeout);
+      if (vkQrBytes) {
 
-    const vkQr = await pdfDoc.embedPng(vkQrBytes);
+        const vkQr = await pdfDoc.embedPng(vkQrBytes);
 
-    page.drawImage(vkQr, {
-      x: VK_QR_X,
-      y: QR_Y,
-      width: layout.vkQrSize,
-      height: layout.vkQrSize,
-    });
+        page.drawImage(vkQr, {
+          x: VK_QR_X,
+          y: QR_Y,
+          width: layout.vkQrSize,
+          height: layout.vkQrSize,
+        });
 
-    // Label under VK QR
-    const vkLabel = "Мы ВКонтакте";
-    const vkLabelWidth = font.widthOfTextAtSize(vkLabel, QR_LABEL_FONT_SIZE);
-    page.drawText(vkLabel, {
-      x: VK_QR_X + (layout.vkQrSize - vkLabelWidth) / 2,
-      y: QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE,
-      size: QR_LABEL_FONT_SIZE,
-      font,
-      color: COLORS.muted,
-    });
+        // Label under VK QR
+        const vkLabel = "Мы ВКонтакте";
+        const vkLabelWidth = font.widthOfTextAtSize(vkLabel, QR_LABEL_FONT_SIZE);
+        page.drawText(vkLabel, {
+          x: VK_QR_X + (layout.vkQrSize - vkLabelWidth) / 2,
+          y: QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE,
+          size: QR_LABEL_FONT_SIZE,
+          font,
+          color: COLORS.muted,
+        });
+      } else {
+        logger.warn(`[franchize] Failed to fetch VK QR for bike ${input.item.id}`);
+      }
     } catch (error) {
       logger.warn("[franchize] failed to generate VK QR", error);
     }
