@@ -78,6 +78,7 @@ const SPEC_PRIORITY = [
   'motor_nominal_kw', 'Номинальная мощность',
   'torque_nm', 'torque_motor_nm', 'Крутящий момент',
   'battery', 'Батарея',
+  'removable_battery', 'Съемный аккумулятор',
   'range_km', 'range_120ah_km', 'range_100ah_km', 'Запас хода',
   'top_speed_kmh', 'Макс. скорость',
   'acceleration_0_100_s', 'Разгон 0-100',
@@ -87,7 +88,13 @@ const SPEC_PRIORITY = [
   'frame_type', 'Рама',
   'charge_time_h', 'Зарядка',
   'license_class', 'Класс прав',
-  'removable_battery', 'Съемный аккумулятор',
+  'price_per_hour', '1 час',
+  'price_per_3h', '3 часа',
+  'price_per_6h', '6 часов',
+  'price_per_12h', '12 часов',
+  'rent_weekday', 'Будни',
+  'rent_weekend', 'Выходные',
+  'dailyPrice', 'daily_price', 'Цена/день',
 ];
 
 // ── Fetch franchize data ─────────────────────────────────────────────────
@@ -145,12 +152,17 @@ function normalizeSpecKey(key) {
 // ── Get all unique spec keys across all bikes ───────────────────────────────────
 function getAllSpecKeys(bikes) {
   const keySet = new Set();
+  const excludedKeys = new Set([
+    'gallery', 'features', 'buy_colors', 'buy_options', 'spec_labels', 'sale',
+    'sale_price', 'purchase_price', // Pricing is shown in first column
+    'price_per_hour', 'price_per_3h', 'price_per_6h', 'price_per_12h', 'rent_weekday', 'rent_weekend', // These are added at the end
+  ]);
 
   bikes.forEach(bike => {
     const specs = bike.specs || {};
     Object.keys(specs).forEach(key => {
-      // Exclude internal fields
-      if (!['gallery', 'features', 'buy_colors', 'buy_options', 'spec_labels', 'sale'].includes(key)) {
+      // Exclude internal fields and pricing (added separately)
+      if (!excludedKeys.has(key)) {
         keySet.add(key);
       }
     });
@@ -259,23 +271,32 @@ async function generateComparisonPdf(bikes, crew, outputPath) {
     throw new Error('DejaVuSans fonts not found. Make sure server-assets/fonts/DejaVuSans.ttf exists.');
   }
 
-  const page = pdfDoc.addPage([842, 595]); // A4 landscape
+  // Custom wide page format for spacious table
+  // Page size: 2400pt width × 900pt height (much wider than A4 landscape)
+  // This allows comfortable column widths for many specs
+  const pageWidth = 2400;
+  const pageHeight = 900;
+  const page = pdfDoc.addPage([pageWidth, pageHeight]);
 
-  // Page settings
-  const margin = 40;
-  const headerHeight = 50;
-  const rowHeight = Math.max(18, fontSize + 6);
+  // Page settings (wider margins for spacious feel)
+  const margin = 60;
+  const headerHeight = 70;
+  const rowHeight = Math.max(28, fontSize + 12);
   const tableTop = page.getHeight() - margin - headerHeight;
   const tableWidth = page.getWidth() - 2 * margin;
 
   // Get all spec keys (columns)
   const specKeys = getAllSpecKeys(bikes);
 
-  // Calculate column widths
-  // First column: bike name (wider)
-  const bikeNameWidth = Math.min(180, tableWidth / (specKeys.length + 1));
+  // Add rental pricing columns to the end
+  const pricingColumns = ['price_per_hour', 'price_per_3h', 'price_per_6h', 'price_per_12h', 'rent_weekday', 'rent_weekend'];
+  const pricingLabels = ['1 час', '3 часа', '6 часов', '12 часов', 'Будни/сутки', 'Выходные/сутки'];
+
+  // Calculate column widths - much more spacious now
+  // First column: bike name and price (wider)
+  const bikeNameWidth = 320;
   const remainingWidth = tableWidth - bikeNameWidth;
-  const specColumnWidth = remainingWidth / specKeys.length;
+  const specColumnWidth = remainingWidth / (specKeys.length + pricingColumns.length);
 
   // Background
   page.drawRectangle({
@@ -296,24 +317,27 @@ async function generateComparisonPdf(bikes, crew, outputPath) {
   });
 
   const headerTitle = `${(crew.header?.brandName || crew.name || 'VIP BIKE').toUpperCase()} — Сравнение моделей`;
-  const titleWidth = boldFont.widthOfTextAtSize(headerTitle, 16);
+  const titleWidth = boldFont.widthOfTextAtSize(headerTitle, 20);
 
   page.drawText(headerTitle, {
     x: margin,
-    y: page.getHeight() - 30,
-    size: 16,
+    y: page.getHeight() - 42,
+    size: 20,
     font: boldFont,
     color: COLORS.accent,
   });
 
-  // Subtitle with bike count
-  page.drawText(`Всего моделей: ${bikes.length}`, {
-    x: margin,
-    y: page.getHeight() - 45,
-    size: 10,
-    font: font,
-    color: COLORS.muted,
-  });
+  // Subtitle with bike count and column count
+  page.drawText(
+    `Всего моделей: ${bikes.length}   |   Характеристик: ${specKeys.length}   |   Цены аренды: ${pricingColumns.length} колонок`,
+    {
+      x: margin,
+      y: page.getHeight() - 62,
+      size: 12,
+      font: font,
+      color: COLORS.muted,
+    }
+  );
 
   // Draw table header row
   let currentX = margin;
@@ -343,17 +367,25 @@ async function generateComparisonPdf(bikes, crew, outputPath) {
   });
 
   // Draw header cells
-  const headers = ['Модель', ...specKeys.map(k => normalizeSpecKey(k))];
-  const columnWidths = [bikeNameWidth, ...specKeys.map(() => specColumnWidth)];
+  const headers = [
+    'Модель (цена продажи)',
+    ...specKeys.map(k => normalizeSpecKey(k)),
+    ...pricingLabels
+  ];
+  const columnWidths = [
+    bikeNameWidth,
+    ...specKeys.map(() => specColumnWidth),
+    ...pricingColumns.map(() => specColumnWidth)
+  ];
 
   headers.forEach((header, i) => {
     const colWidth = columnWidths[i];
-    const text = truncateText(header, colWidth - 8, boldFont, 8);
+    const text = truncateText(header, colWidth - 16, boldFont, 11);
 
     page.drawText(text, {
-      x: currentX + 4,
-      y: currentY - rowHeight / 2 - 3,
-      size: 8,
+      x: currentX + 8,
+      y: currentY - rowHeight / 2 - 5,
+      size: 11,
       font: boldFont,
       color: COLORS.white,
     });
@@ -383,18 +415,18 @@ async function generateComparisonPdf(bikes, crew, outputPath) {
     const price = bike.salePrice ? `${bike.salePrice.toLocaleString('ru-RU')} ₽` : 'по запросу';
 
     // First column: bike name with price
-    page.drawText(truncateText(bikeName, bikeNameWidth / 2, boldFont, fontSize), {
-      x: currentX + 4,
-      y: currentY - rowHeight / 2 + 2,
-      size: fontSize + 1,
+    page.drawText(truncateText(bikeName, bikeNameWidth - 16, boldFont, fontSize + 2), {
+      x: currentX + 8,
+      y: currentY - rowHeight / 2 + 3,
+      size: fontSize + 2,
       font: boldFont,
       color: COLORS.text,
     });
 
-    page.drawText(truncateText(price, bikeNameWidth / 2 - 8, font, fontSize - 1), {
-      x: currentX + 4,
-      y: currentY - rowHeight / 2 - 6,
-      size: fontSize - 1,
+    page.drawText(truncateText(price, bikeNameWidth - 16, font, fontSize), {
+      x: currentX + 8,
+      y: currentY - rowHeight / 2 - 10,
+      size: fontSize,
       font: font,
       color: COLORS.accent,
     });
@@ -404,14 +436,48 @@ async function generateComparisonPdf(bikes, crew, outputPath) {
     // Spec columns
     specKeys.forEach((key) => {
       const value = formatSpecValue(key, specs[key]);
-      const text = truncateText(value, specColumnWidth - 8, font, fontSize);
+      const text = truncateText(value, specColumnWidth - 16, font, fontSize + 1);
 
       page.drawText(text, {
-        x: currentX + 4,
-        y: currentY - rowHeight / 2 - 2,
-        size: fontSize,
+        x: currentX + 8,
+        y: currentY - rowHeight / 2 - 3,
+        size: fontSize + 1,
         font: font,
         color: COLORS.text,
+      });
+
+      // Vertical line
+      page.drawLine({
+        start: { x: currentX + specColumnWidth, y: currentY },
+        end: { x: currentX + specColumnWidth, y: currentY - rowHeight },
+        thickness: 0.5,
+        color: COLORS.line,
+      });
+
+      currentX += specColumnWidth;
+    });
+
+    // Pricing columns (rental rates)
+    pricingColumns.forEach((priceKey, i) => {
+      const value = specs[priceKey];
+      let displayValue = '';
+
+      if (value && typeof value === 'number' && value > 0) {
+        displayValue = `${value.toLocaleString('ru-RU')} ₽`;
+      } else if (value && typeof value === 'string' && value.trim()) {
+        displayValue = value.trim();
+      } else {
+        displayValue = '—';
+      }
+
+      const text = truncateText(displayValue, specColumnWidth - 16, font, fontSize + 1);
+
+      page.drawText(text, {
+        x: currentX + 8,
+        y: currentY - rowHeight / 2 - 3,
+        size: fontSize + 1,
+        font: font,
+        color: priceKey.includes('weekend') ? COLORS.accent : COLORS.text,
       });
 
       // Vertical line
