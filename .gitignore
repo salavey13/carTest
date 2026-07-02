@@ -34,3 +34,8 @@ version.ini
 
 #python
 claude_telegram.py
+
+# nnvolt standalone project (deployed to Beget separately)
+nnvolt-static/node_modules/
+nnvolt-static/dist/
+nnvolt-static/.env*

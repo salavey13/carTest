@@ -5,7 +5,7 @@ import { motion, useInView, AnimatePresence } from "framer-motion";
 import {
   Zap,
   Shield,
-  Hospital,
+  Building2,
   GraduationCap,
   Home,
   ChevronDown,
@@ -342,7 +342,7 @@ function Services() {
       accent: "electric-blue",
     },
     {
-      icon: Hospital,
+      icon: Building2,
       title: "Больницы",
       pitch: "Надёжные электрические сети для медицинских учреждений, включая резервные источники питания и ИТ-сети операционных.",
       image: "/images/medical.png",
