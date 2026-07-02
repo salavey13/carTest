@@ -790,11 +790,13 @@ export async function generateBuyPdf(input: {
   });
 
   // Dynamic header title based on bike specs and crew branding:
-  //   sale=true/1 → "{BRAND} ELECTRO" (bike is for sale)
+  //   sale=true/1 → "{BRAND} ELECTRO" (bike is for sale, unless brand already has ELECTRO)
   //   otherwise   → brandName (crew default, or "Экипаж" fallback)
   const baseBrand = input.brandName || "Экипаж";
   const headerTitle = isTruthySpec(specs.sale)
-    ? `${baseBrand.toUpperCase()} ELECTRO`
+    ? baseBrand.toUpperCase().includes("ELECTRO")
+      ? baseBrand.toUpperCase()
+      : `${baseBrand.toUpperCase()} ELECTRO`
     : baseBrand.toUpperCase();
 
   page.drawText(headerTitle, {
