@@ -360,7 +360,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       {isFranchizeMapBottomNavRoute && <FranchizeMapBottomNav pathname={pathname || ""} />}
       
       <Suspense fallback={null}>
-        <StickyChatButton />
+        {!pathname?.startsWith("/nnvolt") && <StickyChatButton />}
       </Suspense>
       {showHeaderAndFooter && CurrentFooter && <CurrentFooter />}
     </>
