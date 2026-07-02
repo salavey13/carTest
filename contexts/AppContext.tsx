@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { useTelegram } from "@/hooks/useTelegram";
 import { debugLogger } from "@/lib/debugLogger";
 import { useAppToast } from "@/hooks/useAppToast";
@@ -64,6 +65,7 @@ const AppCartContext = createContext<AppCartContextData | null>(null);
 const StrikeballLobbyContext = createContext<StrikeballLobbyContextData | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const pathname = usePathname();
   const telegramHookData = useTelegram();
   const { user, dbUser: initialDbUser, isLoading: isTelegramLoading, isAuthenticating: isTelegramAuthenticating, error: telegramError, ...restTelegramData } = telegramHookData;
 
@@ -213,7 +215,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       if (loadingTimer) clearTimeout(loadingTimer);
       appToast.dismiss("auth-loading-toast");
-      if (telegramError) {
+      // Skip telegram error toast on nnvolt pages (regular web page, not Telegram WebApp)
+      if (telegramError && !pathname?.startsWith("/nnvolt")) {
         appToast.error(`Ошибка: ${telegramError.message}`, { id: "auth-error-toast", duration: 5000 });
       }
     }
