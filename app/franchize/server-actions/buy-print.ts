@@ -54,6 +54,7 @@ interface LayoutConstants {
   specRowGap: number;
   qrSize: number;
   vkQrSize: number;
+  siteQrSize: number; // 3rd QR code for vip-bike.ru
   qrPairGap: number;
   qrPairTotalWidth: number;
   qrBottomPadding: number;
@@ -128,8 +129,9 @@ function createLayoutConstants(pageSize: PageSize): LayoutConstants {
 
   const qrSize = Math.round(68 * scale);
   const vkQrSize = Math.round(68 * scale);
+  const siteQrSize = Math.round(68 * scale);
   const qrPairGap = Math.round(16 * scale);
-  const qrPairTotalWidth = qrSize + qrPairGap + vkQrSize;
+  const qrPairTotalWidth = qrSize + qrPairGap + siteQrSize + qrPairGap + vkQrSize; // 3 QR codes: buy + vip-bike + vk
   // A5 gets less bottom padding to move QR codes higher and avoid label overlap
   const qrBottomPadding = Math.round(isA5 ? 8 : 14 * scale);
   // A5 gets minimal gap between image and rental box (optimized for maximum picture size)
@@ -193,6 +195,7 @@ function createLayoutConstants(pageSize: PageSize): LayoutConstants {
     specRowGap,
     qrSize,
     vkQrSize,
+    siteQrSize,
     qrPairGap,
     qrPairTotalWidth,
     qrBottomPadding,
@@ -1035,7 +1038,8 @@ export async function generateBuyPdf(input: {
   // QR_Y is the Y position of the QR code images (bottom edge), labels go below
   const QR_Y = IMAGE_DRAW_Y + QR_BOTTOM_PADDING;
   const QR_X = layout.rightColX + (layout.rightColWidth - layout.qrPairTotalWidth) / 2;
-  const VK_QR_X = QR_X + layout.qrSize + layout.qrPairGap;
+  const SITE_QR_X = QR_X + layout.qrSize + layout.qrPairGap; // vip-bike.ru QR (middle)
+  const VK_QR_X = SITE_QR_X + layout.siteQrSize + layout.qrPairGap; // VK QR (right)
 
   // QR backdrop position (calculated here for drawing later)
   // Backdrop bottom (for drawRectangle) should be below the QR labels with padding
@@ -1168,6 +1172,47 @@ export async function generateBuyPdf(input: {
     });
   } catch (error) {
     logger.warn("[franchize] failed to generate buy QR", error);
+  }
+
+  // vip-bike.ru QR (website QR code - middle position)
+  const siteLink = "https://vip-bike.ru";
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      FETCH_TIMEOUT_MS,
+    );
+
+    const siteQrBytes = await fetch(
+      `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+        siteLink,
+      )}&color=000000&bgcolor=ffffff&margin=1`,
+      { signal: controller.signal },
+    ).then((response) => response.arrayBuffer());
+
+    clearTimeout(timeout);
+
+    const siteQr = await pdfDoc.embedPng(siteQrBytes);
+
+    page.drawImage(siteQr, {
+      x: SITE_QR_X,
+      y: QR_Y,
+      width: layout.siteQrSize,
+      height: layout.siteQrSize,
+    });
+
+    // Label under site QR
+    const siteLabel = "vip-bike.ru";
+    const siteLabelWidth = font.widthOfTextAtSize(siteLabel, QR_LABEL_FONT_SIZE);
+    page.drawText(siteLabel, {
+      x: SITE_QR_X + (layout.siteQrSize - siteLabelWidth) / 2,
+      y: QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE,
+      size: QR_LABEL_FONT_SIZE,
+      font,
+      color: COLORS.muted,
+    });
+  } catch (error) {
+    logger.warn("[franchize] failed to generate site QR", error);
   }
 
   // VK QR (crew-specific social link)
