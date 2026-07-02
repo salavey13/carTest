@@ -5,14 +5,18 @@
 //
 // USAGE:
 //   node bulk-sale-pdf-skill.mjs --slug vip-bike --telegramChatId 123456789
+//   node bulk-sale-pdf-skill.mjs --slug vip-bike --saveToDisk --outputDir ./tmp/pdfs
 //
 // ─── SUPPORTED CLI FLAGS ───────────────────────────────────────────────────
 //   --slug            (REQUIRED) Franchize slug
-//   --telegramChatId   (REQUIRED) Telegram chat ID to send PDFs
+//   --telegramChatId   Telegram chat ID to send PDFs (required unless --saveToDisk)
 //   --bikeIds          Comma-separated bike IDs (default: all with sale pricing)
 //   --pageSize         Page size: "A4" (default) or "A5"
 //   --limit            Max PDFs to generate (default: unlimited)
 //   --delayMs          Delay between PDFs in ms (default: 500)
+//   --saveToDisk       Save PDFs to disk instead of sending to Telegram
+//   --outputDir        Directory to save PDFs (default: ./tmp/bulk-pdfs)
+//   --siteUrl          Next.js site URL (default: NEXT_PUBLIC_SITE_URL or localhost:3000)
 //
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -35,14 +39,17 @@ const bikeIds = arg('bikeIds').split(',').map(id => id.trim()).filter(Boolean);
 const pageSize = arg('pageSize', 'A4') === 'A5' ? 'A5' : 'A4';
 const limit = parseInt(arg('limit', '0'), 10) || 0;
 const delayMs = parseInt(arg('delayMs', '500'), 10) || 500;
+const saveToDisk = hasFlag('saveToDisk');
+const outputDir = arg('outputDir', './tmp/bulk-pdfs');
+const siteUrl = arg('siteUrl') || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
 // ── Validation ───────────────────────────────────────────────────────────
 if (!slug) {
   error('Missing --slug');
 }
 
-if (!telegramChatId) {
-  error('Missing --telegramChatId (PDF delivery to Telegram is currently required)');
+if (!saveToDisk && !telegramChatId) {
+  error('Missing --telegramChatId (required unless --saveToDisk is used)');
 }
 
 if (pageSize !== 'A4' && pageSize !== 'A5') {
@@ -98,78 +105,6 @@ function filterSaleBikes(bikes) {
   });
 }
 
-// ── Rate limiting ─────────────────────────────────────────────────────────
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// ── Send PDF to Telegram via forward-telegram API ─────────────────────────────
-async function sendPdfToTelegram(bike, pageSize, chatId) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-  const forwardApiUrl = process.env.FORWARD_TELEGRAM_API || 'https://v0-car-test.vercel.app/api/forward-telegram';
-
-  // Step 1: Get PDF bytes from the buy/print-pdf API
-  const pdfResponse = await fetch(
-    `${siteUrl}/api/franchize/${slug}/buy/print-pdf`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        slug,
-        bikeId: bike.id,
-        pageSize,
-        serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-        returnBytes: true,  // Get PDF bytes instead of sending to Telegram
-      }),
-    },
-  );
-
-  if (!pdfResponse.ok) {
-    const errorText = await pdfResponse.text();
-    throw new Error(`PDF API error (${pdfResponse.status}): ${errorText}`);
-  }
-
-  const pdfResult = await pdfResponse.json();
-
-  if (!pdfResult.success) {
-    throw new Error(`PDF generation failed: ${pdfResult.error}`);
-  }
-
-  // Step 2: Send PDF via forward-telegram API
-  const forwardResponse = await fetch(
-    `${forwardApiUrl}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        chat_id: chatId,
-        method: 'sendDocument',
-        payload: {
-          caption: `${bike.title} - ${bike.specs?.sale_price || bike.specs?.price_rub || 'N/A'} ₽`,
-        },
-        files: {
-          document: {
-            data: pdfResult.bytes,  // Already base64 from API
-            filename: pdfResult.fileName,
-            contentType: pdfResult.mimeType,
-          },
-        },
-      }),
-    },
-  );
-
-  if (!forwardResponse.ok) {
-    const errorText = await forwardResponse.text();
-    throw new Error(`Forward API error (${forwardResponse.status}): ${errorText}`);
-  }
-
-  return await forwardResponse.json();
-}
-
 // ── Error output ──────────────────────────────────────────────────────────
 function error(message) {
   const payload = { ok: false, error: message };
@@ -185,64 +120,68 @@ function success(result) {
 
 // ── Main flow ─────────────────────────────────────────────────────────────
 async function main() {
-  const { crew, bikes } = await getFranchizeBySlug(slug);
+  console.error(`Using site URL: ${siteUrl}`);
+  console.error(saveToDisk
+    ? `Saving PDFs to disk: ${outputDir}`
+    : `Sending PDFs to Telegram chat: ${telegramChatId}`
+  );
 
-  // Filter bikes that have sale pricing
-  let saleBikes = filterSaleBikes(bikes);
+  const apiUrl = `${siteUrl}/api/franchize/${slug}/buy/print-pdf-bulk`;
+  console.error(`Calling API: ${apiUrl}`);
 
-  // Filter by bikeIds if provided
-  if (bikeIds.length > 0) {
-    saleBikes = saleBikes.filter(bike => bikeIds.includes(bike.id));
+  // Call the bulk PDF API
+  const bulkResponse = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      slug,
+      pageSize,
+      bikeIds: bikeIds.join(','),
+      telegramChatId: saveToDisk ? undefined : telegramChatId,
+      serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      saveToDisk,
+      outputDir,
+      delayMs,
+    }),
+  });
+
+  if (!bulkResponse.ok) {
+    const errorText = await bulkResponse.text();
+    throw new Error(`Bulk API error (${bulkResponse.status}): ${errorText}`);
   }
 
-  // Apply limit
-  if (limit > 0) {
-    saleBikes = saleBikes.slice(0, limit);
+  const bulkResult = await bulkResponse.json();
+
+  if (!bulkResult.success) {
+    throw new Error(bulkResult.error || 'Bulk PDF generation failed');
   }
 
-  console.error(`Found ${saleBikes.length} bikes to generate PDFs for`);
+  console.error(`\n✓ Generated ${bulkResult.sent} PDF${bulkResult.sent > 1 ? 's' : ''} successfully`);
 
-  const results = [];
-  const skipped = [];
+  if (saveToDisk && bulkResult.outputDir) {
+    console.error(`\nOutput directory: ${bulkResult.outputDir}`);
+    console.error(`\nGenerated files:`);
+    bulkResult.files?.forEach((file) => {
+      console.error(`  - ${file.fileName}`);
+    });
+  }
 
-  for (let i = 0; i < saleBikes.length; i++) {
-    const bike = saleBikes[i];
-
-    try {
-      console.error(`[${i + 1}/${saleBikes.length}] Sending PDF for ${bike.id}...`);
-
-      // Send PDF via API (which handles generation + Telegram delivery)
-      const apiResult = await sendPdfToTelegram(bike, pageSize, telegramChatId);
-
-      if (apiResult.success) {
-        results.push({
-          bikeId: bike.id,
-          fileName: apiResult.fileName,
-        });
-        console.error(`  ✓ Sent to Telegram`);
-      } else {
-        throw new Error(apiResult.error || 'Unknown API error');
-      }
-
-      // Rate limiting
-      if (i < saleBikes.length - 1) {
-        await delay(delayMs);
-      }
-    } catch (err) {
-      console.error(`  ✗ Failed: ${err.message}`);
-      skipped.push({
-        bikeId: bike.id,
-        reason: err.message
-      });
-    }
+  if (bulkResult.skipped > 0) {
+    console.error(`\n⚠ Skipped ${bulkResult.skipped} PDF${bulkResult.skipped > 1 ? 's' : ''}:`);
+    bulkResult.skippedDetails?.forEach((detail) => {
+      console.error(`  - ${detail.bikeId}: ${detail.reason}`);
+    });
   }
 
   success({
     ok: true,
-    sent: results,
-    total: results.length,
-    skipped: skipped.length,
-    skippedDetails: skipped
+    sent: bulkResult.sent,
+    total: bulkResult.total,
+    savedToDisk: bulkResult.savedToDisk,
+    outputDir: bulkResult.outputDir,
+    files: bulkResult.files,
+    skipped: bulkResult.skipped,
+    skippedDetails: bulkResult.skippedDetails,
   });
 }
 

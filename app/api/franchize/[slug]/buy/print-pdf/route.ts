@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
         // Return PDF bytes as base64
         const base64 = Buffer.from(bytes).toString("base64");
-        const fileName = `BUY_${bikeId}.pdf`;
+        const fileName = `BUY_${pageSize || "A4"}_${bikeId}.pdf`;
 
         return NextResponse.json({
           success: true,
