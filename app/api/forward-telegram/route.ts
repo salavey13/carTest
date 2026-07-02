@@ -69,6 +69,10 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_FORWARD_ORIGINS?.split(",") || [
   "http://localhost:*",
   "https://v0-car-test.vercel.app",
   "https://car-test-git-*.salavey13.vercel.app",
+  "https://nnvolt.xn--p1ai",
+  "https://www.nnvolt.xn--p1ai",
+  "https://nnvolt.ru",
+  "https://www.nnvolt.ru",
 ];
 
 interface ForwardRequest {

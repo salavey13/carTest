@@ -1,0 +1,16 @@
+# Exclude standalone nnvolt project from Vercel build
+# (it's deployed separately to Beget via FTP)
+nnvolt-static/
+
+# Exclude heavy non-essential directories
+books/
+Configame/
+docs/
+tests/
+tmp/
+skills/
+codex/
+
+# Exclude large data files
+*.csv
+seed.sql
