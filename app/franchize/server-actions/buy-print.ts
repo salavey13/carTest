@@ -115,9 +115,9 @@ function createLayoutConstants(pageSize: PageSize): LayoutConstants {
   const leftColX = pagePadding;
   const leftColWidth = Math.round(248 * scale);
 
-  const specValueFontSize = Math.round(9.4 * scale * 10) / 10;
+  const specValueFontSize = Math.round(11 * scale * 10) / 10; // Reduced to prevent 3-row wrapping with bold font
   const specValueMaxWidth = Math.round(118 * scale);
-  const specLabelFontSize = Math.round(9.3 * scale * 10) / 10;
+  const specLabelFontSize = Math.round(10 * scale * 10) / 10; // Reduced to prevent 3-row wrapping with bold font
   const specLabelMaxWidth = Math.round(82 * scale);
   const specLabelXOffset = Math.round(12 * scale);
   const specLineHeight = Math.round(10 * scale);
@@ -130,12 +130,14 @@ function createLayoutConstants(pageSize: PageSize): LayoutConstants {
   const vkQrSize = Math.round(68 * scale);
   const qrPairGap = Math.round(16 * scale);
   const qrPairTotalWidth = qrSize + qrPairGap + vkQrSize;
-  const qrBottomPadding = Math.round(14 * scale);
-  const imageToRentalGap = Math.round(6 * scale);
+  // A5 gets less bottom padding to move QR codes higher and avoid label overlap
+  const qrBottomPadding = Math.round(isA5 ? 8 : 14 * scale);
+  // A5 gets minimal gap between image and rental box (optimized for maximum picture size)
+  const imageToRentalGap = Math.round(isA5 ? 30 : 6 * scale);
   const qrLabelGap = Math.round(4 * scale);
   const qrLabelFontSize = Math.round(7 * scale);
 
-  const rentalBoxHeight = Math.round(isA5 ? 168 : 148 * scale); // Taller for A5: enlarged prices + proper CTA space
+  const rentalBoxHeight = Math.round(isA5 ? 118 : 148 * scale); // A5: reduced by 30% to avoid QR label overlap
   const rentalBoxX = rightColX;
   const rentalBoxWidth = rightColWidth;
   const rentalHeadingFontSize = Math.round(11 * scale);
@@ -972,8 +974,8 @@ export async function generateBuyPdf(input: {
           x: layout.leftColX + layout.specLabelXOffset,
           y: labelBaseY - index * layout.specLineHeight,
           size: layout.specLabelFontSize,
-          font,
-          color: COLORS.muted,
+          font: boldFont, // Use bold font for better visibility
+          color: COLORS.text, // Changed from COLORS.muted for better visibility
           maxWidth: layout.specLabelMaxWidth,
         });
       });
@@ -984,12 +986,12 @@ export async function generateBuyPdf(input: {
         leftY - rowHeight / 2 + valueHeight / 2 + baselineAdjustment;
 
       wrappedValue.forEach((line, index) => {
-        const lineWidth = font.widthOfTextAtSize(line, layout.specValueFontSize);
+        const lineWidth = boldFont.widthOfTextAtSize(line, layout.specValueFontSize);
         page.drawText(line, {
           x: specValueRightEdge - lineWidth,
           y: textBaseY - index * layout.specLineHeight,
           size: layout.specValueFontSize,
-          font,
+          font: boldFont, // Use bold font for better visibility
           color: COLORS.text,
           maxWidth: layout.specValueMaxWidth,
         });
@@ -1001,11 +1003,27 @@ export async function generateBuyPdf(input: {
 
   // ── Right column layout — compute positions to align CTA bottom with specs bottom
   const specsBottom = leftY;
-  const RENTAL_BOX_Y = specsBottom; // CTA bottom = specs table bottom
+
+  // Image panel: compute from rightColumnTop, will determine QR position, then rental box Y
+  const _imagePanelTop = _rightColumnTop;
+
+  // QR codes: positioned from bottom of image draw area with padding
+  // Calculate QR position first (relative to image bottom)
+  const QR_BOTTOM_PADDING = layout.qrBottomPadding;
+  const QR_LABEL_GAP = layout.qrLabelGap;
+  const QR_LABEL_FONT_SIZE = layout.qrLabelFontSize;
+
+  // QR backdrop dimensions (for spacing calculations)
+  const QR_BACKDROP_PADDING = 8;
+  const QR_BACKDROP_HEIGHT = layout.qrSize + QR_LABEL_GAP + QR_LABEL_FONT_SIZE + QR_BACKDROP_PADDING * 2;
+
+  // Calculate rental box Y position
+  // For A5: move rental box up by 20px to optimize spacing and reduce image panel gap
+  const RENTAL_BOX_Y = isA5 ? specsBottom + 20 : specsBottom;
 
   // Image panel: from rightColumnTop to just above the rental box
   const IMAGE_PANEL_Y = RENTAL_BOX_Y + layout.rentalBoxHeight + layout.imageToRentalGap;
-  const IMAGE_PANEL_HEIGHT = _rightColumnTop - IMAGE_PANEL_Y;
+  const IMAGE_PANEL_HEIGHT = _imagePanelTop - IMAGE_PANEL_Y;
 
   // Image dimensions — A5 gets proportionally larger 9:16 image (centered in available space)
   const imageScaleMultiplier = isA5 ? 1.12 : 1.0; // A5 gets 12% larger image
@@ -1014,9 +1032,14 @@ export async function generateBuyPdf(input: {
   const IMAGE_DRAW_Y = IMAGE_PANEL_Y + (IMAGE_PANEL_HEIGHT - IMAGE_DRAW_HEIGHT) / 2; // Center vertically
 
   // QR codes: positioned from bottom of image draw area with padding
-  const QR_Y = IMAGE_DRAW_Y + layout.qrBottomPadding + layout.qrLabelGap + layout.qrLabelFontSize;
+  // QR_Y is the Y position of the QR code images (bottom edge), labels go below
+  const QR_Y = IMAGE_DRAW_Y + QR_BOTTOM_PADDING;
   const QR_X = layout.rightColX + (layout.rightColWidth - layout.qrPairTotalWidth) / 2;
   const VK_QR_X = QR_X + layout.qrSize + layout.qrPairGap;
+
+  // QR backdrop position (calculated here for drawing later)
+  // Backdrop bottom (for drawRectangle) should be below the QR labels with padding
+  const QR_BACKDROP_Y = QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE - QR_BACKDROP_PADDING;
 
   // ── Image Panel (Right Column) — cover fit ─────────────────────────────
 
@@ -1094,10 +1117,7 @@ export async function generateBuyPdf(input: {
 
   // ── QR backdrop (semi-transparent dark rectangle behind QR pair) ───────
   // Helps QR labels remain readable on top of the bike image.
-
-  const QR_BACKDROP_PADDING = 8;
-  const QR_BACKDROP_Y = QR_Y - layout.qrLabelGap - layout.qrLabelFontSize - QR_BACKDROP_PADDING;
-  const QR_BACKDROP_HEIGHT = layout.qrSize + layout.qrLabelGap + layout.qrLabelFontSize + QR_BACKDROP_PADDING * 2;
+  // Dimensions already calculated above.
 
   page.drawRectangle({
     x: QR_X - QR_BACKDROP_PADDING,
@@ -1138,11 +1158,11 @@ export async function generateBuyPdf(input: {
 
     // Label under buy QR
     const buyLabel = "Купить/Арендовать";
-    const buyLabelWidth = font.widthOfTextAtSize(buyLabel, layout.qrLabelFontSize);
+    const buyLabelWidth = font.widthOfTextAtSize(buyLabel, QR_LABEL_FONT_SIZE);
     page.drawText(buyLabel, {
       x: QR_X + (layout.qrSize - buyLabelWidth) / 2,
-      y: QR_Y - layout.qrLabelGap - layout.qrLabelFontSize,
-      size: layout.qrLabelFontSize,
+      y: QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE,
+      size: QR_LABEL_FONT_SIZE,
       font,
       color: COLORS.muted,
     });
@@ -1180,11 +1200,11 @@ export async function generateBuyPdf(input: {
 
     // Label under VK QR
     const vkLabel = "Мы ВКонтакте";
-    const vkLabelWidth = font.widthOfTextAtSize(vkLabel, layout.qrLabelFontSize);
+    const vkLabelWidth = font.widthOfTextAtSize(vkLabel, QR_LABEL_FONT_SIZE);
     page.drawText(vkLabel, {
       x: VK_QR_X + (layout.vkQrSize - vkLabelWidth) / 2,
-      y: QR_Y - layout.qrLabelGap - layout.qrLabelFontSize,
-      size: layout.qrLabelFontSize,
+      y: QR_Y - QR_LABEL_GAP - QR_LABEL_FONT_SIZE,
+      size: QR_LABEL_FONT_SIZE,
       font,
       color: COLORS.muted,
     });
@@ -1457,7 +1477,7 @@ export async function sendFranchizeBuyPrintPdf(
     });
 
     const fileName =
-      `BUY_${safeFilePart(item.title)}_${safeFilePart(item.id)}.pdf`;
+      `BUY_${pageSize}_${safeFilePart(item.title)}_${safeFilePart(item.id)}.pdf`;
 
     const fileBlob = new Blob(
       [bytes],

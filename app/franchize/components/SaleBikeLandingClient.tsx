@@ -249,6 +249,8 @@ export function SaleBikeLandingClient({
   const [printState, setPrintState] = useState<SaleActionState>("idle");
   const [canPrintBuySheet, setCanPrintBuySheet] = useState(false);
   const [printPageSize, setPrintPageSize] = useState<PageSize>("A4");
+  const [bulkPrintState, setBulkPrintState] = useState<SaleActionState>("idle");
+  const [bulkPrintProgress, setBulkPrintProgress] = useState({ current: 0, total: 0 });
   const [intentActionStates, setIntentActionStates] = useState<
     Partial<Record<string, SaleActionState>>
   >({});
@@ -635,6 +637,54 @@ export function SaleBikeLandingClient({
         error instanceof Error
           ? error.message
           : "Не удалось отправить PDF в Telegram.",
+      );
+    }
+  };
+
+  const handleBulkPrintBuySheets = async () => {
+    if (!telegramUserId) {
+      setCartMessage("Нужна Telegram-сессия для получения PDF-карточек.");
+      return;
+    }
+
+    setBulkPrintState("loading");
+    setBulkPrintProgress({ current: 0, total: otherSaleBikes.length + 1 });
+    setCartMessage("Генерируем PDF-карточки для всех байков...");
+
+    try {
+      const response = await fetch(`/api/franchize/${resolvedSlug}/buy/print-pdf-bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug: resolvedSlug,
+          pageSize: printPageSize,
+          telegramChatId: telegramUserId,
+          serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || "Не удалось отправить PDF-карточки.");
+      }
+
+      setBulkPrintState("success");
+      setCartMessage(
+        `Отправлено ${result.sent} из ${result.total} PDF-карточек в Telegram.` +
+        (result.skipped > 0 ? ` Пропущено: ${result.skipped}` : "")
+      );
+    } catch (error) {
+      console.error("buy/bulk-print-pdf failed", error);
+      setBulkPrintState("error");
+      setCartMessage(
+        error instanceof Error
+          ? error.message
+          : "Не удалось отправить PDF-карточки в Telegram.",
       );
     }
   };
@@ -1062,6 +1112,25 @@ export function SaleBikeLandingClient({
                             : printState === "error"
                               ? "Повторить печать"
                               : "Распечатать"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleBulkPrintBuySheets}
+                        disabled={bulkPrintState === "loading"}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                        style={{
+                          ...surface.subtleCard,
+                          borderColor: crew.theme.palette.accentMain,
+                        }}
+                      >
+                        <Printer className="h-4 w-4" />
+                        {bulkPrintState === "loading"
+                          ? "Все PDF..."
+                          : bulkPrintState === "success"
+                            ? "Все отправлено"
+                            : bulkPrintState === "error"
+                              ? "Повторить все"
+                              : `Все карточки (${otherSaleBikes.length + 1})`}
                       </button>
                     </>
                   ) : null}
