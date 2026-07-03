@@ -986,6 +986,17 @@ async function createRentalFromDocContract(
   docSha256: string
 ): Promise<string | null> {
   try {
+    logger.info('[/doc] createRentalFromDocContract: starting', {
+      chatId,
+      userId,
+      bikeId: bike.id,
+      crewId: bike.crew_id,
+      rentStartDate: context.rentStartDate,
+      rentStartTime: context.rentStartTime,
+      rentEndDate: context.rentEndDate,
+      rentEndTime: context.rentEndTime,
+    });
+
     // Convert TEXT dates to TIMESTAMPTZ
     const startDateIso = context.rentStartDate && context.rentStartTime
       ? convertTextDateToTimestamp(context.rentStartDate, context.rentStartTime, 3)
@@ -995,8 +1006,24 @@ async function createRentalFromDocContract(
       ? convertTextDateToTimestamp(context.rentEndDate, context.rentEndTime, 3)
       : null;
 
+    logger.info('[/doc] createRentalFromDocContract: date conversion', {
+      startDateIso,
+      endDateIso,
+      rentStartDate: context.rentStartDate,
+      rentStartTime: context.rentStartTime,
+      rentEndDate: context.rentEndDate,
+      rentEndTime: context.rentEndTime,
+    });
+
     if (!startDateIso || !endDateIso) {
-      logger.error('[/doc] Date conversion failed', { startDateIso, endDateIso });
+      logger.error('[/doc] Date conversion failed', {
+        startDateIso,
+        endDateIso,
+        rentStartDate: context.rentStartDate,
+        rentStartTime: context.rentStartTime,
+        rentEndDate: context.rentEndDate,
+        rentEndTime: context.rentEndTime,
+      });
       return null;
     }
 
@@ -1009,44 +1036,65 @@ async function createRentalFromDocContract(
     const days = Math.max(1, Math.ceil(hours / 24));
     const totalCost = dailyPrice * days;  // Simplified: always charge full days
 
+    logger.info('[/doc] createRentalFromDocContract: pricing', {
+      dailyPrice,
+      hours,
+      days,
+      totalCost,
+    });
+
     // Resolve crew owner for placeholder user_id
     // Fail if crew owner cannot be resolved - don't fall back to renter
     const crewOwnerChatId = await resolveCrewOwnerChatId(supabaseAdmin, bike.crew_id);
+    
+    logger.info('[/doc] createRentalFromDocContract: crew owner resolution', {
+      crewId: bike.crew_id,
+      crewOwnerChatId,
+    });
+    
     if (!crewOwnerChatId) {
       logger.error('[/doc] No crew owner found for crew_id:', bike.crew_id);
       return null;
     }
 
     // Create rentals row
+    const rentalInsert = {
+      user_id: crewOwnerChatId,
+      owner_id: crewOwnerChatId,
+      vehicle_id: bike.id,
+      requested_start_date: startDateIso,
+      requested_end_date: endDateIso,
+      agreed_start_date: startDateIso,
+      agreed_end_date: endDateIso,
+      status: 'active',
+      payment_status: 'fully_paid',
+      total_cost: Math.round(totalCost),
+      metadata: {
+        source: 'doc_command',
+        daily_price: dailyPrice,
+        created_by: 'doc-manual',
+        doc_sha256: docSha256,
+      },
+    };
+
+    logger.info('[/doc] createRentalFromDocContract: inserting rental', rentalInsert);
+
     const { data: rental, error: rentalError } = await supabaseAdmin
       .from('rentals')
-      .insert({
-        user_id: crewOwnerChatId,
-        owner_id: crewOwnerChatId,
-        vehicle_id: bike.id,
-        requested_start_date: startDateIso,
-        requested_end_date: endDateIso,
-        agreed_start_date: startDateIso,
-        agreed_end_date: endDateIso,
-        status: 'active',
-        payment_status: 'fully_paid',
-        total_cost: Math.round(totalCost),
-        metadata: {
-          source: 'doc_command',
-          daily_price: dailyPrice,
-          created_by: 'doc-manual',
-        },
-      })
+      .insert(rentalInsert)
       .select('rental_id')
       .maybeSingle();
 
     if (rentalError) {
-      logger.error('[/doc] Failed to create rental:', rentalError);
+      logger.error('[/doc] Failed to create rental:', {
+        error: rentalError,
+        insert: rentalInsert,
+      });
       return null;
     }
 
     if (!rental?.rental_id) {
-      logger.error('[/doc] No rental_id returned');
+      logger.error('[/doc] No rental_id returned', { rental });
       return null;
     }
 

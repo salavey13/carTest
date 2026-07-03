@@ -155,9 +155,10 @@ export function useStartParamRouter() {
    * secret so the checkout form can auto-fill from verified data.
    *
    * Returns crewSlug from the claimed secret (for routing) or null on failure.
+   * Also returns rentalId if a rental was created/linked during claim.
    */
   const claimQrRentalSecrets = useCallback(
-    async (docSha256: string): Promise<{ crewSlug: string | null; claimedNow: boolean }> => {
+    async (docSha256: string): Promise<{ crewSlug: string | null; claimedNow: boolean; rentalId?: string }> => {
       if (!dbUser?.user_id) {
         logger.warn("[ClientLayout] Cannot claim rental secrets: no dbUser.user_id");
         return { crewSlug: null, claimedNow: false };
@@ -171,12 +172,18 @@ export function useStartParamRouter() {
 
         if (result.ok) {
           if (result.claimedNow) {
-            logger.info(`[ClientLayout] Successfully claimed rental secrets for doc ${docSha256.slice(0, 12)}...`);
+            logger.info(`[ClientLayout] Successfully claimed rental secrets for doc ${docSha256.slice(0, 12)}...`, {
+              rentalId: result.rentalId,
+            });
             showToast("✅ Ваши данные привязаны! Форма заполнится автоматически.", { duration: 4000 });
           } else {
             logger.info(`[ClientLayout] Rental secrets already linked for doc ${docSha256.slice(0, 12)}...`);
           }
-          return { crewSlug: result.crewSlug ?? null, claimedNow: result.claimedNow ?? false };
+          return { 
+            crewSlug: result.crewSlug ?? null, 
+            claimedNow: result.claimedNow ?? false,
+            rentalId: result.rentalId,
+          };
         }
 
         // Handle specific failure reasons
@@ -307,9 +314,11 @@ export function useStartParamRouter() {
           // ── QR deep-link: rent_{bikeId} or rent_{bikeId}_{docSha256} ──
           const parsed = parseRentDeepLink(paramToProcess);
           if (parsed) {
+            let claimResult: { crewSlug: string | null; claimedNow: boolean; rentalId?: string } | null = null;
+
             // Step 1: If QR includes docSha256, claim rental secrets BEFORE routing
             if (parsed.docSha256 && dbUser?.user_id) {
-              await claimQrRentalSecrets(parsed.docSha256);
+              claimResult = await claimQrRentalSecrets(parsed.docSha256);
             }
 
             // Step 2: Check if user is crew owner (for docSha256 links only)
@@ -334,9 +343,20 @@ export function useStartParamRouter() {
             }
 
             // Step 3: If not crew owner (or check failed), resolve vehicle → route to bike page
+            // Include rentalId in URL params if we got one from the claim
             if (!targetPath) {
               const rentParam = `rent_${parsed.bikeId}`;
-              targetPath = await resolveFranchizeVehicleLink(rentParam, "rent", parsed.docSha256) ?? undefined;
+              const vehiclePath = await resolveFranchizeVehicleLink(rentParam, "rent", parsed.docSha256);
+              
+              if (vehiclePath && claimResult?.rentalId) {
+                // Append rentalId to the URL for tracking
+                const url = new URL(vehiclePath, "https://placeholder.local");
+                url.searchParams.set("rentalId", claimResult.rentalId);
+                targetPath = url.pathname + url.search;
+                logger.info(`[ClientLayout] Routing renter to bike page with rentalId: ${claimResult.rentalId}`);
+              } else {
+                targetPath = vehiclePath ?? undefined;
+              }
             }
           } else {
             // Fallback: couldn't parse, try old behavior
