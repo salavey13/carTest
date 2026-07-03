@@ -37,7 +37,6 @@ seed.sql
 
 app/greenbox/
 app/homework/
-app/tutorials/
 app/lab/
 app/optimapipe/
 app/streamer/
@@ -102,7 +101,6 @@ app/moto-investments/
 app/partner/
 app/p-plan/
 app/paddock/
-app/profile/
 app/settings/
 app/rules/
 app/rental-doc-workflow/
