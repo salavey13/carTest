@@ -25,7 +25,7 @@ const nextConfig = {
   },
   webpack: (config, { isServer }) => {
     // Reduce memory usage during build
-    config.parallelism = 2; // Two workers: balances memory usage (was OOM at full) vs speed (was timeout at 1)
+    config.parallelism = parseInt(process.env.WEBPACK_PARALLELISM || '2', 10); // Vercel=2 (2-core), VPS=1 (Dockerfile sets WEBPACK_PARALLELISM=1)
     config.optimization = {
       ...config.optimization,
       minimize: false, // Skip minification to save memory
