@@ -25,7 +25,7 @@ const nextConfig = {
   },
   webpack: (config, { isServer }) => {
     // Reduce memory usage during build
-    config.parallelism = 1; // Limit parallel builds
+    config.parallelism = 2; // Two workers: balances memory usage (was OOM at full) vs speed (was timeout at 1)
     config.optimization = {
       ...config.optimization,
       minimize: false, // Skip minification to save memory
