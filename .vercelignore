@@ -29,26 +29,18 @@ seed.sql
 
 # ===================================================================
 # Exclude non-rental app pages to reduce build memory (OOM fix)
-# These are standalone apps in the monolith that don't need
-# to be deployed with the rental Vercel project.
-# Rental-essential: franchize/, rentals/, rent-bike/, rent/, api/,
-#   vipbikerental/, vip-bike-*
+# ONLY excluding dirs with NO shared imports from components/contexts/hooks/
+# Kept: bio30/, vpr/, strikeball/, wb/, wblanding/, doc-verifier/,
+#       elon/, god-mode-sandbox/, hotvibes/, repo-xml/, markdown-doc/,
+#       crews/ (all have shared component imports)
 # ===================================================================
 
-# Non-rental app directories (136 pages excluded)
-app/bio30/
-app/vpr/
-app/vpr-test/
-app/vpr-tests/
-app/strikeball/
 app/greenbox/
 app/homework/
 app/tutorials/
 app/lab/
 app/optimapipe/
 app/streamer/
-app/wb/
-app/wblanding/
 app/arbitrage-explained/
 app/arbitrage-live-scanner/
 app/arbitrage-notdummies/
@@ -58,16 +50,11 @@ app/bullshitdetector/
 app/cartest/
 app/cyber-garage/
 app/cybervibe/
-app/doc-verifier/
 app/donate/
-app/elon/
 app/expmind/
 app/game-plan/
-app/god-mode-sandbox/
-app/hotvibes/
 app/hub/
 app/jumpstart/
-app/leads/
 app/nexus/
 app/nnvolt/
 app/nutrition/
@@ -77,7 +64,6 @@ app/pavele0903/
 app/premium/
 app/purpose-profit/
 app/rastabot/
-app/repo-xml/
 app/sauna-rent/
 app/selfdev/
 app/shadow-fleet-admin/
@@ -108,11 +94,9 @@ app/advice-upload/
 app/ai-work-future/
 app/blogger/
 app/buy-subscription/
-app/crews/
 app/csv-compare/
 app/finance-literacy-memo/
 app/invoices/
-app/markdown-doc/
 app/md-doc/
 app/moto-investments/
 app/partner/
