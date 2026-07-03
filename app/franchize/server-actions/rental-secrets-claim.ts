@@ -6,12 +6,17 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
 
 /**
- * Create a rental in public.rentals when a renter claims a QR deep-link.
- * This links the renter to the bike and creates a trackable rental record.
+ * Link a rental to the claiming renter when they scan a QR deep-link.
+ *
+ * Two scenarios:
+ *   A) Rental already exists (created by /doc-manual with operator's user_id)
+ *      → UPDATE user_id from operator → renter
+ *   B) Rental doesn't exist (createRentalFromDocContract failed or wasn't called)
+ *      → CREATE new rental with renter's user_id
  *
  * @param secret - The claimed rental secret with renter data
  * @param renterChatId - The renter's Telegram chat_id
- * @returns The created rental_id, or null if failed
+ * @returns The rental_id (existing or created), or null if failed
  */
 async function createRentalFromClaimedSecret(
   secret: UserRentalSecret,
@@ -24,11 +29,11 @@ async function createRentalFromClaimedSecret(
       crewSlug: secret.crew_slug,
     });
 
-    // Get bike_id from rental_contract_artifacts
+    // Get artifact by doc_sha256
     const { data: artifact, error: artifactError } = await (supabaseAdmin as any)
       .schema('private')
       .from('rental_contract_artifacts')
-      .select('resolved_bike_id, rental_id, daily_price, rent_start_date, rent_end_date')
+      .select('resolved_bike_id, rental_id, daily_price, rent_start_date, rent_end_date, telegram_chat_id')
       .eq('original_sha256', secret.doc_sha256)
       .maybeSingle();
 
@@ -42,11 +47,28 @@ async function createRentalFromClaimedSecret(
       return null;
     }
 
-    // If rental already exists, return it
+    // ── Scenario A: Rental already exists (created by /doc-manual) ──
     if (artifact.rental_id) {
-      console.log('[rental-secrets-claim] Rental already exists:', artifact.rental_id);
+      console.log('[rental-secrets-claim] Rental exists, updating user_id from operator to renter:', artifact.rental_id);
+
+      // Update rentals.user_id from operator → renter
+      const { error: updateError } = await supabaseAdmin
+        .from('rentals')
+        .update({ user_id: renterChatId })
+        .eq('rental_id', artifact.rental_id)
+        .eq('user_id', artifact.telegram_chat_id); // Safety: only if still operator's
+
+      if (updateError) {
+        console.error('[rental-secrets-claim] Failed to update rental user_id:', updateError);
+        return null;
+      }
+
+      console.log('[rental-secrets-claim] Rental user_id updated to renter:', renterChatId);
       return artifact.rental_id;
     }
+
+    // ── Scenario B: Rental doesn't exist — create it ──
+    console.log('[rental-secrets-claim] No rental exists, creating new one for renter');
 
     // Get crew_id from bike
     const { data: bike, error: bikeError } = await supabaseAdmin
@@ -69,9 +91,9 @@ async function createRentalFromClaimedSecret(
 
     // Calculate dates and pricing
     const dailyPrice = Number(artifact.daily_price || bike.specs?.dailyPrice || bike.specs?.rent_weekday || '10000');
-    
+
     // Use dates from artifact if available, otherwise use current date + 1 day
-    const startDate = artifact.rent_start_date 
+    const startDate = artifact.rent_start_date
       ? new Date(artifact.rent_start_date)
       : new Date();
     const endDate = artifact.rent_end_date
@@ -82,7 +104,7 @@ async function createRentalFromClaimedSecret(
     const days = Math.max(1, Math.ceil(hours / 24));
     const totalCost = dailyPrice * days;
 
-    // Create rental
+    // Create rental with renter as user_id
     const { data: rental, error: rentalError } = await supabaseAdmin
       .from('rentals')
       .insert({
@@ -124,13 +146,6 @@ async function createRentalFromClaimedSecret(
       .from('rental_contract_artifacts')
       .update({ rental_id: rental.rental_id })
       .eq('original_sha256', secret.doc_sha256);
-
-    // Update user_rental_secrets with source_rental_id
-    await (supabaseAdmin as any)
-      .schema('private')
-      .from('user_rental_secrets')
-      .update({ source_rental_id: rental.rental_id })
-      .eq('doc_sha256', secret.doc_sha256);
 
     return rental.rental_id;
   } catch (error) {
