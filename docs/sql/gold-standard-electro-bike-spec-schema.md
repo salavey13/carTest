@@ -247,7 +247,75 @@ rent_price_label, rent_weekday_hour, rent_weekend_hour
 
 ---
 
-## 7. File Reference
+## 8. Common Mistakes & Validation Guards
+
+> **⚠️ CRITICAL: Read this section BEFORE adding a new electric bike to prevent data quality issues.**
+
+### 8.1 Pricing Validation (MUST CHECK)
+
+The most common mistake is setting `price_per_hour` too high, which causes 3h/6h/12h rentals to cost MORE than a full day.
+
+**Rule:** `price_per_hour` MUST be ≤ 25% of `dailyPrice` (ideally `dailyPrice / 8`).
+
+```
+✅ GOOD: dailyPrice=12000, price_per_hour=1500 (12.5%)
+❌ BAD:  dailyPrice=12000, price_per_hour=5000 (42%) → 3h=15000 > daily!
+```
+
+**Required pricing ladder (each tier MUST be less than the next):**
+```
+price_per_hour < price_per_3h < price_per_6h < price_per_12h < dailyPrice
+```
+
+**Formula for computing tiers from dailyPrice:**
+```javascript
+price_per_hour = Math.round(dailyPrice / 8);
+price_per_3h   = Math.round(price_per_hour * 3 * 0.9);  // 10% discount
+price_per_6h   = Math.round(price_per_hour * 6 * 0.8);  // 20% discount
+price_per_12h  = Math.min(
+  Math.round(price_per_hour * 12 * 0.7),                // 30% discount
+  Math.round(dailyPrice * 0.85)                         // cap at 85% of daily
+);
+```
+
+### 8.2 Access Tier Deduction
+
+`access_tier` is REQUIRED for all bikes. If missing, deduce automatically:
+
+| Condition | Tier |
+|---|---|
+| `power_kw >= 30` (e.g., Y-VOLT Surge V 35kW) | `pro` |
+| `top_speed_kmh >= 150` AND `power_kw >= 25` | `pro` |
+| Everything else (light electro, category M, ≤30kW) | `entry` |
+
+### 8.3 Chinese Replicas — Frame Type Warning
+
+**⚠️ NEVER claim premium frame types for Chinese replica bikes!**
+
+Chinese replicas (e.g., Ducati Panigale S Electro, various "look-alike" bikes) typically have simple welded steel frames, NOT:
+- ~~Трубчатая рама~~ (tube frame)
+- ~~Периметральная рама~~ (perimeter frame)
+- ~~Диагональная рама~~ (diagonal frame)
+
+**Correct frame_type for replicas:** `"Стальная (китайская реплика)"` or simply `"Стальная сварная"`.
+
+### 8.4 Pre-Insert Checklist
+
+Before adding a new electric bike:
+1. ☐ Read this gold standard document FIRST
+2. ☐ Set `type: "Electric"` (not "bike" or "Electro")
+3. ☐ Verify `price_per_hour ≤ dailyPrice * 0.25`
+4. ☐ Set explicit `price_per_3h`, `price_per_6h`, `price_per_12h` (or verify fallback math)
+5. ☐ Set `access_tier` ("pro" or "entry")
+6. ☐ Verify `frame_type` is honest (no premium claims for replicas)
+7. ☐ Set `charge_time_h` (required for electric bikes!)
+8. ☐ Set `removable_battery` if applicable
+9. ☐ Build complete `spec_labels` for ALL keys present in specs
+10. ☐ Set `brand_type`: `official_reseller` | `official_website_data` | `dealer_data` | `community`
+
+---
+
+## 9. File Reference
 
 | File | Purpose |
 |---|---|
