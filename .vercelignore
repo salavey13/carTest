@@ -1,8 +1,12 @@
+# ===================================================================
 # Exclude standalone nnvolt project from Vercel build
 # (it's deployed separately to Beget via FTP)
+# ===================================================================
 nnvolt-static/
 
-# Exclude heavy non-essential directories
+# ===================================================================
+# Exclude heavy non-essential top-level directories
+# ===================================================================
 books/
 Configame/
 docs/
@@ -10,7 +14,113 @@ tests/
 tmp/
 skills/
 codex/
+supabase/
+backups/
+scripts/
+_snapshots/
+_tmp/
 
+# ===================================================================
 # Exclude large data files
+# ===================================================================
 *.csv
 seed.sql
+*.pdf
+
+# ===================================================================
+# Exclude non-rental app pages to reduce build memory (OOM fix)
+# These are standalone apps in the monolith that don't need
+# to be deployed with the rental Vercel project.
+# Rental-essential: franchize/, rentals/, rent-bike/, rent/, api/,
+#   vipbikerental/, vip-bike-*
+# ===================================================================
+
+# Non-rental app directories (136 pages excluded)
+app/bio30/
+app/vpr/
+app/vpr-test/
+app/vpr-tests/
+app/strikeball/
+app/greenbox/
+app/homework/
+app/tutorials/
+app/lab/
+app/optimapipe/
+app/streamer/
+app/wb/
+app/wblanding/
+app/arbitrage-explained/
+app/arbitrage-live-scanner/
+app/arbitrage-notdummies/
+app/arbitrage-test-agent/
+app/botbusters/
+app/bullshitdetector/
+app/cartest/
+app/cyber-garage/
+app/cybervibe/
+app/doc-verifier/
+app/donate/
+app/elon/
+app/expmind/
+app/game-plan/
+app/god-mode-sandbox/
+app/hotvibes/
+app/hub/
+app/jumpstart/
+app/leads/
+app/nexus/
+app/nnvolt/
+app/nutrition/
+app/onesitepls/
+app/onesiteplsinstructions/
+app/pavele0903/
+app/premium/
+app/purpose-profit/
+app/rastabot/
+app/repo-xml/
+app/sauna-rent/
+app/selfdev/
+app/shadow-fleet-admin/
+app/sly13/
+app/snowboarding/
+app/sql-cheatsheet/
+app/start-training/
+app/style-guide/
+app/supaplan/
+app/supercar-test/
+app/svarprofi/
+app/tasks/
+app/tea-call/
+app/testers/
+app/todoc/
+app/topdf/
+app/veritasium/
+app/vip-bike-dashboard/
+app/vip-bike-electro/
+app/wheel-of-fortune/
+app/youtubeAdmin/
+app/yt/
+app/zai-docx-instructions/
+app/about/
+app/about_en/
+app/advice/
+app/advice-upload/
+app/ai-work-future/
+app/blogger/
+app/buy-subscription/
+app/crews/
+app/csv-compare/
+app/finance-literacy-memo/
+app/invoices/
+app/markdown-doc/
+app/md-doc/
+app/moto-investments/
+app/partner/
+app/p-plan/
+app/paddock/
+app/profile/
+app/settings/
+app/rules/
+app/rental-doc-workflow/
+app/rent-car/
+app/admin/
