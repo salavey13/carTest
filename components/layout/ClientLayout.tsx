@@ -96,6 +96,7 @@ const THEME_CONFIG = {
     Footer: null,           // NNvolt page has its own layout
     BottomNav: null,
     isTransparent: false,
+    hideStickyChat: true,   // NNvolt is a standalone landing — StickyChatButton would be out of place
   },
   // PATCH: svarprofi theme — standalone landing at /svarprofi
   // Renders its own SvarProfiHeader + SvarProfiFooter internally.
@@ -105,6 +106,7 @@ const THEME_CONFIG = {
     Footer: null,           // SvarProfi renders its own footer
     BottomNav: null,        // No bottom nav for metal_stuff landing
     isTransparent: true,
+    hideStickyChat: true,   // Standalone landing — no chat needed
   },
   franchize: {
     paths: ["/franchize/"],
@@ -112,6 +114,7 @@ const THEME_CONFIG = {
     Footer: null,           // Franchize pages render their own CrewFooter
     BottomNav: null,        // Handled separately via FranchizeMapBottomNav (map-riders & leaderboard)
     isTransparent: false,
+    hideStickyChat: true,   // Rental management UI — StickyChatButton would be out of place
   },
   default: {
     paths: [],
@@ -360,7 +363,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       {isFranchizeMapBottomNavRoute && <FranchizeMapBottomNav pathname={pathname || ""} />}
       
       <Suspense fallback={null}>
-        {!pathname?.startsWith("/nnvolt") && <StickyChatButton />}
+        {!theme.hideStickyChat && <StickyChatButton />}
       </Suspense>
       {showHeaderAndFooter && CurrentFooter && <CurrentFooter />}
     </>
