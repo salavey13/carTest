@@ -475,7 +475,7 @@ function extractKeySpecs(specs: UnknownRecord, maxRows: number = 13) {
     ["Крутящий момент", "torque_nm", "torque_motor_nm"],
     ["Батарея", "battery"],
     ["Запас хода", "range_km", "range_120ah_km", "range_100ah_km"],
-    ["Макс скорость", "top_speed_kmh"],
+    ["Скорость", "top_speed_kmh"],
     ["Разгон 0-100", "acceleration_0_100_s"],
     ["Вес", "weight_kg"],
     ["Тормоза", "brake_type"],
