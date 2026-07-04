@@ -7,6 +7,7 @@ export interface BikePricingSpecs {
   price_per_12h?: number;
   dailyPrice?: number;
   rent_weekday?: number;
+  rent_weekend?: number;
   rent_2_4d?: number;
   rent_5_10d?: number;
   rent_11_30d?: number;
@@ -92,8 +93,16 @@ function getHourlyPrice(specs: BikePricingSpecs, hours: number): number {
   return baseHourly * hours;
 }
 
-function getDailyPrice(specs: BikePricingSpecs, days: number): number {
+function getDailyPrice(
+  specs: BikePricingSpecs,
+  days: number,
+  weekendDayCount: number = 0,
+): number {
   if (days === 1) {
+    // For single-day: use weekend rate if available AND the day is a weekend
+    if (weekendDayCount > 0 && specs.rent_weekend) {
+      return specs.rent_weekend;
+    }
     return specs.dailyPrice ?? specs.rent_weekday ?? DEFAULT_DAILY_PRICE;
   }
 
@@ -112,6 +121,23 @@ function getDailyPrice(specs: BikePricingSpecs, days: number): number {
   return (specs.dailyPrice ?? DEFAULT_DAILY_PRICE) * days;
 }
 
+/**
+ * Count how many weekend days (Sat=6, Sun=0) fall within [startDate, endDate].
+ * Used to apply rent_weekend rate proportionally for multi-day rentals.
+ */
+function countWeekendDays(startDate: string, endDate: string): number {
+  const start = new Date(startDate + "T00:00:00");
+  const end = new Date(endDate + "T00:00:00");
+  let count = 0;
+  const d = new Date(start);
+  while (d <= end) {
+    const day = d.getDay(); // 0=Sun, 6=Sat
+    if (day === 0 || day === 6) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
 function getPricingTier(hours: number, days: number): PricingTier {
   if (hours < 24) {
     const normalized = normalizeHourlyRental(hours);
@@ -126,7 +152,12 @@ function getPricingTier(hours: number, days: number): PricingTier {
   return "daily";
 }
 
-function calculateBasePrice(specs: BikePricingSpecs, hours: number, days: number): {
+function calculateBasePrice(
+  specs: BikePricingSpecs,
+  hours: number,
+  days: number,
+  weekendDayCount: number = 0,
+): {
   price: number;
   tier: PricingTier;
   baseDailyRate: number;
@@ -137,7 +168,16 @@ function calculateBasePrice(specs: BikePricingSpecs, hours: number, days: number
     return { price, tier: normalized.tier, baseDailyRate: price / normalized.displayHours };
   }
 
-  const price = getDailyPrice(specs, days);
+  // Multi-day: blend weekend rate for weekend days + weekday rate for weekday days
+  if (days > 1 && weekendDayCount > 0 && specs.rent_weekend && specs.rent_weekday) {
+    const weekdayDayCount = days - weekendDayCount;
+    const price = weekendDayCount * specs.rent_weekend + weekdayDayCount * specs.rent_weekday;
+    const tier = getPricingTier(hours, days);
+    const baseDailyRate = (weekendDayCount * specs.rent_weekend + weekdayDayCount * specs.rent_weekday) / days;
+    return { price, tier, baseDailyRate };
+  }
+
+  const price = getDailyPrice(specs, days, weekendDayCount);
   const tier = getPricingTier(hours, days);
   const baseDailyRate = specs.dailyPrice ?? specs.rent_weekday ?? DEFAULT_DAILY_PRICE;
 
@@ -159,7 +199,13 @@ export function calculatePrice(
   const days = differenceInDays(end, start);
 
   const normalized = normalizeHourlyRental(hours);
-  const { price, tier, baseDailyRate } = calculateBasePrice(specs, normalized.displayHours, days);
+  const weekendDayCount = countWeekendDays(startDate, endDate);
+  const { price, tier, baseDailyRate } = calculateBasePrice(
+    specs,
+    normalized.displayHours,
+    days,
+    weekendDayCount,
+  );
 
   const helmetRub = helmetCount * HELMET_PRICE_RUB;
   const depositRub = specs.deposit_rub ?? DEFAULT_DEPOSIT_RUB;

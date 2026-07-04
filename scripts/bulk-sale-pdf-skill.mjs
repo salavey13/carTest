@@ -94,11 +94,13 @@ async function getFranchizeBySlug(slug) {
 // ── Filter sale bikes ─────────────────────────────────────────────────────
 function filterSaleBikes(bikes) {
   return bikes.filter(bike => {
+    // Skip test/internal bikes (id starts with "vipbike")
+    if (bike.id && bike.id.startsWith("vipbike")) return false;
     // specs is stored as jsonb, so it's already an object
     const specs = bike.specs || {};
 
     // Check if bike has sale=true in specs (exact match for boolean)
-    const hasSale = specs.sale === true || specs.sale === 1;
+    const hasSale = specs.sale === true || specs.sale === 1 || String(specs.sale).toLowerCase() === "true";
 
     // Also require basic data for PDF generation
     return hasSale && bike.title && bike.gallery && bike.gallery.length > 0;

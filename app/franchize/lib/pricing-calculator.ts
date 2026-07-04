@@ -9,6 +9,7 @@ export interface BikePricingSpecs {
   price_per_12h?: number;
   dailyPrice?: number;
   rent_weekday?: number;
+  rent_weekend?: number;
   rent_2_4d?: number;
   rent_5_10d?: number;
   rent_11_30d?: number;
@@ -31,6 +32,32 @@ function isValidDateString(dateStr: string): boolean {
   if (!dateStr) return false;
   const date = new Date(dateStr);
   return !isNaN(date.getTime());
+}
+
+/**
+ * Check if a date is a weekend day (Saturday=6, Sunday=0)
+ */
+function isWeekendDay(dateStr: string): boolean {
+  if (!isValidDateString(dateStr)) return false;
+  const day = new Date(dateStr).getDay();
+  return day === 0 || day === 6;
+}
+
+/**
+ * Count weekend days in a range [startDate, endDate]
+ */
+function countWeekendDays(startDate: string, endDate: string): number {
+  if (!isValidDateString(startDate) || !isValidDateString(endDate)) return 0;
+  const start = new Date(startDate + "T00:00:00");
+  const end = new Date(endDate + "T00:00:00");
+  let count = 0;
+  const d = new Date(start);
+  while (d <= end) {
+    const day = d.getDay();
+    if (day === 0 || day === 6) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
 }
 
 /**
@@ -97,6 +124,8 @@ export function calculatePriceForDuration(
 
   // Daily pricing (more than 12 hours)
   const days = Math.ceil(hours / 24);
+  // Compute weekend days if startDate is available
+  // (calculatePriceForDays doesn't receive dates, so it uses 0 weekend days as fallback)
   return calculatePriceForDays(specs, days);
 }
 
@@ -148,6 +177,12 @@ function calculatePriceForDays(
   const baseDaily = validatePositiveNumber(specs.dailyPrice) ?? 0;
 
   if (days === 1) {
+    // For single-day: use weekend rate if the rental day is a weekend
+    if (isWeekendDay(startDateStr) && validatePositiveNumber(specs.rent_weekend) !== undefined) {
+      perDayRate = specs.rent_weekend!;
+      periodLabel = '/ день (выходные)';
+      return { price: perDayRate, period: periodLabel, rate: perDayRate };
+    }
     // Use weekday rate if available for single day
     perDayRate = validatePositiveNumber(specs.rent_weekday) ?? baseDaily;
     periodLabel = specs.rent_weekday && specs.rent_weekday < baseDaily ? '/ день (будни)' : '/ день';
@@ -181,22 +216,35 @@ export function getDisplayPriceTier(
   const start = new Date(startDate);
   const end = new Date(endDate);
   const hours = Math.max(1, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+  const days = Math.ceil(hours / 24);
+  const weekendDayCount = countWeekendDays(startDate, endDate);
+
+  // For multi-day rentals with weekend days, calculate blended price
+  if (days > 1 && weekendDayCount > 0 && specs.rent_weekend && specs.rent_weekday) {
+    const weekdayDayCount = days - weekendDayCount;
+    const blendedPrice = weekendDayCount * specs.rent_weekend + weekdayDayCount * specs.rent_weekday;
+    const formattedPrice = blendedPrice > 0 ? `${blendedPrice.toLocaleString('ru-RU')} ₽` : 'Цена по запросу';
+    return {
+      label: `Аренда на ${days} дн. (${weekendDayCount} вых.)`,
+      price: formattedPrice,
+      period: `/ ${days} дн.`,
+    };
+  }
 
   const { price, period } = calculatePriceForDuration(specs, hours);
 
   // Format price
-  const formattedPrice = price > 0 ? `${price.toLocaleString('ru-RU')} ₽` : 'Цена по запросу';
+  const formattedPrice2 = price > 0 ? `${price.toLocaleString('ru-RU')} ₽` : 'Цена по запросу';
 
   // Determine label based on duration
   let label = period;
   if (hours <= 24) {
-    label = 'Часовая аренда';
+    label = isWeekendDay(startDate) ? 'Дневная аренда (выходные)' : 'Часовая аренда';
   } else {
-    const days = Math.ceil(hours / 24);
     label = days === 1 ? 'Дневная аренда' : `Аренда на ${days} дн.`;
   }
 
-  return { label, price: formattedPrice, period };
+  return { label, price: formattedPrice2, period };
 }
 
 /**
