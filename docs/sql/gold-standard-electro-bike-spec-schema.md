@@ -267,16 +267,27 @@ The most common mistake is setting `price_per_hour` too high, which causes 3h/6h
 price_per_hour < price_per_3h < price_per_6h < price_per_12h < dailyPrice
 ```
 
-**Formula for computing tiers from dailyPrice:**
+**Formula: "Halve the time, lose 10% of daily" (v2 — operator-approved)**
 ```javascript
-price_per_hour = Math.round(dailyPrice / 8);
-price_per_3h   = Math.round(price_per_hour * 3 * 0.9);  // 10% discount
-price_per_6h   = Math.round(price_per_hour * 6 * 0.8);  // 20% discount
-price_per_12h  = Math.min(
-  Math.round(price_per_hour * 12 * 0.7),                // 30% discount
-  Math.round(dailyPrice * 0.85)                         // cap at 85% of daily
-);
+// Each halving of rental duration costs 10% less than daily.
+// This ensures minimum 70% revenue even for 3h rentals.
+price_per_hour = Math.round(dailyPrice * 0.10);  // 10%
+price_per_3h   = Math.round(dailyPrice * 0.70);  // 70%
+price_per_6h   = Math.round(dailyPrice * 0.80);  // 80%
+price_per_12h  = Math.round(dailyPrice * 0.90);  // 90%
+// dailyPrice stays at 100%
 ```
+
+**Example for dailyPrice=10 000 ₽:**
+| Tier | Price | % of daily |
+|---|---|---|
+| 1h | 1 000 ₽ | 10% |
+| 3h | 7 000 ₽ | 70% |
+| 6h | 8 000 ₽ | 80% |
+| 12h | 9 000 ₽ | 90% |
+| 24h (daily) | 10 000 ₽ | 100% |
+
+**Business rationale:** Each rental requires fixed overhead (prep, paperwork, handover). Short rentals still incur full overhead, so minimum charge = 70% of daily. Upgrading from 3h→6h costs only 1 000 ₽ extra, incentivizing longer rentals.
 
 ### 8.2 Access Tier Deduction
 

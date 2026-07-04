@@ -76,27 +76,23 @@ function computeFixedPricing(specs) {
   if (dp <= 0) return null; // not rentable
 
   const currentPph = Number(specs.price_per_hour) || 0;
-  const expectedPph = Math.round(dp / 8);
 
   // Only fix if current hourly is absurdly high (>25% of daily)
   if (currentPph > 0 && currentPph <= dp * 0.25) {
     return null; // already reasonable
   }
 
-  // Compute tiered pricing with progressive discounts
-  const pph = expectedPph;
-  const p3h = Math.round(pph * 3 * 0.9);  // 10% discount for 3h
-  const p6h = Math.round(pph * 6 * 0.8);  // 20% discount for 6h
-  const p12h = Math.round(pph * 12 * 0.7); // 30% discount for 12h
-
-  // Ensure 12h doesn't exceed daily
-  const finalP12h = Math.min(p12h, Math.round(dp * 0.85));
+  // v2 formula: "halve the time, lose 10% of daily"
+  const pph = Math.round(dp * 0.10);
+  const p3h = Math.round(dp * 0.70);
+  const p6h = Math.round(dp * 0.80);
+  const p12h = Math.round(dp * 0.90);
 
   return {
     price_per_hour: pph,
     price_per_3h: p3h,
     price_per_6h: p6h,
-    price_per_12h: finalP12h,
+    price_per_12h: p12h,
   };
 }
 
