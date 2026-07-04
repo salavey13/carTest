@@ -463,3 +463,114 @@ export async function updateRentalSecretsFromProfileAction(params: {
     };
   }
 }
+
+/**
+ * Save user-entered passport/license data to their profile metadata.
+ *
+ * This is NOT the same as verified rental secrets (which come from
+ * rental_contract_artifacts after a completed rental). This is user-entered
+ * data that gets pre-filled into the checkout/cart flow to speed up
+ * the next rental.
+ *
+ * The data is stored in `users.metadata.rentalDocsPrefill` and is
+ * consumed by the cart/checkout flow.
+ */
+export async function saveRentalDocsPrefillAction(params: {
+  userId: string;
+  slug: string;
+  fullName?: string;
+  phone?: string;
+  birthDate?: string;
+  passportSeries?: string;
+  passportNumber?: string;
+  passportIssuedBy?: string;
+  passportIssueDate?: string;
+  registrationAddress?: string;
+  licenseSeries?: string;
+  licenseNumber?: string;
+  licenseCategories?: string;
+  licenseExpiryDate?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: user, error: userError } = await supabaseAdmin
+      .from("users")
+      .select("metadata")
+      .eq("user_id", params.userId)
+      .maybeSingle();
+
+    if (userError || !user) {
+      return { success: false, error: userError?.message || "User not found" };
+    }
+
+    const metadata = (user?.metadata || {}) as Record<string, any>;
+    const existing = metadata.rentalDocsPrefill || {};
+
+    // Merge new data over existing
+    const prefill = {
+      ...existing,
+      ...(params.fullName !== undefined && { fullName: params.fullName }),
+      ...(params.phone !== undefined && { phone: params.phone }),
+      ...(params.birthDate !== undefined && { birthDate: params.birthDate }),
+      ...(params.passportSeries !== undefined && { passportSeries: params.passportSeries }),
+      ...(params.passportNumber !== undefined && { passportNumber: params.passportNumber }),
+      ...(params.passportIssuedBy !== undefined && { passportIssuedBy: params.passportIssuedBy }),
+      ...(params.passportIssueDate !== undefined && { passportIssueDate: params.passportIssueDate }),
+      ...(params.registrationAddress !== undefined && { registrationAddress: params.registrationAddress }),
+      ...(params.licenseSeries !== undefined && { licenseSeries: params.licenseSeries }),
+      ...(params.licenseNumber !== undefined && { licenseNumber: params.licenseNumber }),
+      ...(params.licenseCategories !== undefined && { licenseCategories: params.licenseCategories }),
+      ...(params.licenseExpiryDate !== undefined && { licenseExpiryDate: params.licenseExpiryDate }),
+      updatedAt: new Date().toISOString(),
+      source: `profile_manual_${params.slug}`,
+    };
+
+    const nextMetadata = { ...metadata, rentalDocsPrefill: prefill };
+
+    const { error: updateError } = await supabaseAdmin
+      .from("users")
+      .update({ metadata: nextMetadata, updated_at: new Date().toISOString() })
+      .eq("user_id", params.userId);
+
+    if (updateError) {
+      return { success: false, error: updateError.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+/**
+ * Get user-entered passport/license data for pre-fill.
+ * Reads from `users.metadata.rentalDocsPrefill` (set by saveRentalDocsPrefillAction).
+ */
+export async function getRentalDocsPrefillAction(params: {
+  userId: string;
+}): Promise<{
+  success: boolean;
+  data?: Record<string, string>;
+}> {
+  try {
+    const { data: user, error } = await supabaseAdmin
+      .from("users")
+      .select("metadata")
+      .eq("user_id", params.userId)
+      .maybeSingle();
+
+    if (error || !user) return { success: false };
+
+    const metadata = (user?.metadata || {}) as Record<string, any>;
+    const prefill = metadata.rentalDocsPrefill;
+    if (!prefill) return { success: true };
+
+    // Strip internal fields
+    const { updatedAt: _u, source: _s, ...userData } = prefill;
+    return { success: true, data: userData };
+  } catch {
+    return { success: false };
+  }
+}

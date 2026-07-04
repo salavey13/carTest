@@ -21,6 +21,8 @@ import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 import { getCatalogPropulsionSegment } from "../lib/catalog-propulsion";
 import { localImageSrc, handleImageError } from "@/lib/image-fallback";
+import { logger } from "@/lib/logger";
+import { decodeStartappState, isStartappStateFresh } from "@/lib/startapp-state";
 
 interface CatalogClientProps {
   crew: FranchizeCrewVM;
@@ -666,6 +668,75 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       };
       setSelectedOptions(defaultOptions);
       void recordRentIntentRef.current?.(target, "viewed", { trigger: "vehicle_query", options: defaultOptions });
+    }
+  }, [auctionTickOptions, items, searchParams]);
+
+  /**
+   * Handle deep-link from Telegram bot (startapp state payload).
+   *
+   * When a bot (/doc, /buy, etc.) has already collected some user choices
+   * (bike, dates, helmet, package), it encodes them in `startapp` and sends
+   * a link. The redirect lands here with `?startappState=…` and companion
+   * query params. We open the modal for the right bike and pre-fill the
+   * already-known options so the user only needs to provide what's left
+   * (e.g. personal info, payment).
+   *
+   * See: app/lib/startapp-state.ts for the encoding format.
+   */
+  useEffect(() => {
+    const startappBikeId = (searchParams.get("startappBikeId") || "").trim();
+    if (!startappBikeId) return;
+
+    // Guard against re-triggering on every re-render — only run once per param set.
+    if (lastQueryViewedVehicleRef.current === startappBikeId) return;
+
+    const target = items.find((item) => item.id === startappBikeId);
+    if (!target) {
+      logger.warn("[startapp-state] bike not found in catalog", { bikeId: startappBikeId });
+      return;
+    }
+
+    lastQueryViewedVehicleRef.current = startappBikeId;
+    setSelectedItem(target);
+
+    // Build pre-filled options from the query params.
+    const prefill: typeof initialSelectedOptions = {
+      package: (searchParams.get("package") || "Базовый") as never,
+      duration: "1 день", // we'll show dates in the modal; the user can re-select
+      perk: (searchParams.get("perk") || "Стандарт") as never,
+      auction: auctionTickOptions[0] ?? "Без аукциона",
+      rentStartDate: searchParams.get("startDate") || "",
+      rentEndDate: searchParams.get("endDate") || "",
+    };
+
+    // Derive a duration label from the dates so the chip looks consistent.
+    if (prefill.rentStartDate && prefill.rentEndDate) {
+      const start = new Date(prefill.rentStartDate + "T00:00:00");
+      const end = new Date(prefill.rentEndDate + "T00:00:00");
+      const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+      if (days === 1) prefill.duration = "1 день";
+      else if (days <= 3) prefill.duration = "3 дня";
+      else if (days <= 7) prefill.duration = "7 дней";
+      else if (days <= 14) prefill.duration = "2 недели";
+      else prefill.duration = "1 месяц";
+    }
+
+    setSelectedOptions(prefill);
+    void recordRentIntentRef.current?.(target, "viewed", {
+      trigger: "startapp_state",
+      options: prefill,
+    });
+
+    // Show a one-time banner in the modal explaining the deep-link.
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(
+        "franchize-startapp-banner",
+        JSON.stringify({
+          ts: Date.now(),
+          bikeId: startappBikeId,
+          source: "telegram_bot",
+        }),
+      );
     }
   }, [auctionTickOptions, items, searchParams]);
 
