@@ -371,7 +371,80 @@ features, buy_colors, gallery
 
 ---
 
-## 8. File Reference
+## 8. Common Mistakes & Validation Guards
+
+> **⚠️ CRITICAL: Read this section BEFORE adding a new ICE bike to prevent data quality issues.**
+
+### 8.1 Pricing Validation (MUST CHECK)
+
+The most common mistake is setting `price_per_hour` too high, which causes 3h/6h/12h rentals to cost MORE than a full day.
+
+**Rule:** `price_per_hour` MUST be ≤ 25% of `dailyPrice` (ideally `dailyPrice / 8`).
+
+```
+✅ GOOD: dailyPrice=10000, price_per_hour=1250 (12.5%)
+❌ BAD:  dailyPrice=10000, price_per_hour=4000 (40%) → 3h=12000 = daily!
+❌ BAD:  dailyPrice=6000, price_per_hour=5000 (83%) → 2h=10000 > daily!
+```
+
+**Required pricing ladder (each tier MUST be less than the next):**
+```
+price_per_hour < price_per_3h < price_per_6h < price_per_12h < dailyPrice
+```
+
+**Formula for computing tiers from dailyPrice:**
+```javascript
+price_per_hour = Math.round(dailyPrice / 8);
+price_per_3h   = Math.round(price_per_hour * 3 * 0.9);  // 10% discount
+price_per_6h   = Math.round(price_per_hour * 6 * 0.8);  // 20% discount
+price_per_12h  = Math.min(
+  Math.round(price_per_hour * 12 * 0.7),                // 30% discount
+  Math.round(dailyPrice * 0.85)                         // cap at 85% of daily
+);
+```
+
+### 8.2 Access Tier Deduction
+
+`access_tier` is REQUIRED for all bikes. If missing, deduce automatically:
+
+| Condition | Tier |
+|---|---|
+| `engine_cc >= 400` OR `power_hp >= 40` | `pro` |
+| `license_class` contains "Категория А" (full A, not A1) | `pro` |
+| `top_speed_kmh >= 150` AND (`engine_cc >= 400` OR `power_kw >= 25`) | `pro` |
+| Everything else (pitbikes, light bikes, category M/A1) | `entry` |
+
+### 8.3 Chinese Replicas — Frame Type Warning
+
+**⚠️ NEVER claim premium frame types for Chinese replica bikes!**
+
+Chinese replicas (e.g., Ducati Panigale S Electro, various "look-alike" bikes) typically have simple welded steel frames, NOT:
+- ~~Трубчатая рама~~ (tube frame)
+- ~~Периметральная рама~~ (perimeter frame)
+- ~~Диагональная рама~~ (diagonal frame)
+
+**Correct frame_type for replicas:** `"Стальная (китайская реплика)"` or simply `"Стальная сварная"`.
+
+### 8.4 Encoding Check (Russian Text)
+
+When importing data from external sources, verify that Russian text renders correctly. Garbled text like `??????` or `Ð¢Ð¸Ð¿` indicates encoding issues. Always use UTF-8.
+
+### 8.5 Pre-Insert Checklist
+
+Before adding a new ICE bike:
+1. ☐ Read this gold standard document FIRST
+2. ☐ Set `type: "ICE"` (not "bike" or "Gas")
+3. ☐ Verify `price_per_hour ≤ dailyPrice * 0.25`
+4. ☐ Set explicit `price_per_3h`, `price_per_6h`, `price_per_12h` (or verify fallback math)
+5. ☐ Set `access_tier` ("pro" or "entry")
+6. ☐ Verify `frame_type` is honest (no premium claims for replicas)
+7. ☐ Check all Russian text renders correctly (no `??????`)
+8. ☐ Set `battery` to fuel description (e.g., "Бензин, 15 л")
+9. ☐ Build complete `spec_labels` for ALL keys present in specs
+
+---
+
+## 9. File Reference
 
 | File | Purpose |
 |---|---|

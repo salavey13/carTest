@@ -1,0 +1,46 @@
+node scripts/bulk-sale-pdf-skill.mjs --slug vip-bike --saveToDisk --outputDir ../my-pdfs --pageSize A5 --siteUrl http://localhost:3000
+
+
+Enhancements Completed
+
+  1. Smart Column Widths
+
+  - Text columns: 29 columns (like "Батарея", "Тормоза", "Подвеска") get 2x width
+  - Number columns: 48 columns (like prices, weights) get base width
+  - PDF grew from 13 to 16 pages due to wider text columns
+
+  2. Data Quality Analysis
+
+  - Total cells: 847 across 11 bikes × 77 spec columns
+  - Empty cells: 338 (39.9%)
+  - Critical missing (🔴 Red): 28 - Required fields like purchase_price, access_type
+  - Warning missing (🟡 Orange): 6 - Type-specific like charge_time_h for electro bikes
+  - Info missing (🔵 Blue): 15 - Price fields that are empty
+
+  3. Bike Type Classification
+
+  The script now classifies bikes as:
+  - Electro: Has battery/range, no engine specs
+  - ICE: Has engine specs, no battery
+  - Hybrid: Has both
+  - Unknown: Neither clearly defined
+
+  4. Cell Highlighting in PDF
+
+  Empty problematic cells are highlighted with:
+  - Red (opacity 0.25) - Critical missing
+  - Orange (opacity 0.25) - Warning
+  - Blue (opacity 0.25) - Info
+
+  Key Findings
+
+  All bikes are missing purchase_price and access_type - these are critical fields that should be filled!
+
+  Electro bikes (Kayo TSD 110, Motoland Breakout, Nibbler 300) are missing charge_time_h and removable_battery specs.
+
+  The generated PDF is at tmp/bikes-comparison-enhanced.pdf with proper highlighting.
+
+✻ Brewed for 1m 18s
+
+> cool! please compose a csv based on your findings and deduce missing fields based on available info and create a summary, list bikes that need critical updates like missing prices (1h, 3h, 6h ,12h, 1-2days,    3-10 days, 11-30 days, weekday price, weekend day price), check for total bullshit as well - like our Ducati is actually chinese replica so it doesn't have frame made from pipes - its simple average frame:)    access tier scpec seems was forgotten for recently added bikes - maybe you can update golden spec standard for electric and ice bikes (see respective MD docs in /docs;)) goal is to reduce frequantly made mistakes by updating instruction docs and create csv for reimport to fix already present critical mistakes;)
+BTW: >Electro bikes (Kayo TSD 110, Motoland Breakout, Nibbler 300) are missing charge_time_h and removable_battery specs. - no, these are ICE bikes, it's ok for them to have no such specs:) Also i have an idea - we need to look at golden standards for respective specs BEFORE googling info about bike before adding it to not miss any nesessary fields;) And deduce access_type on the fly:)

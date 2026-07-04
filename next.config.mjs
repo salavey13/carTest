@@ -25,7 +25,11 @@ const nextConfig = {
   },
   webpack: (config, { isServer }) => {
     // Reduce memory usage during build
-    config.parallelism = 1; // Limit parallel builds
+    config.parallelism = parseInt(process.env.WEBPACK_PARALLELISM || '2', 10); // Vercel=2 (2-core), VPS=1 (Dockerfile sets WEBPACK_PARALLELISM=1)
+    // Disable persistent cache if explicitly asked (VPS host/Docker build — avoids 14GB cache filling disk)
+    if (process.env.WEBPACK_CACHE_DISABLED === '1') {
+      config.cache = false;
+    }
     config.optimization = {
       ...config.optimization,
       minimize: false, // Skip minification to save memory

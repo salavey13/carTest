@@ -1,7 +1,158 @@
 // /app/franchize/server-actions/rental-secrets-claim.ts
 "use server";
 
-import { claimRentalSecretsByDocSha, type ClaimResult } from "@/app/lib/user-rental-secrets";
+import { claimRentalSecretsByDocSha, type ClaimResult, type UserRentalSecret } from "@/app/lib/user-rental-secrets";
+import { supabaseAdmin } from "@/lib/supabase-server";
+import { resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
+
+/**
+ * Link a rental to the claiming renter when they scan a QR deep-link.
+ *
+ * Two scenarios:
+ *   A) Rental already exists (created by /doc-manual with operator's user_id)
+ *      → UPDATE user_id from operator → renter
+ *   B) Rental doesn't exist (createRentalFromDocContract failed or wasn't called)
+ *      → CREATE new rental with renter's user_id
+ *
+ * @param secret - The claimed rental secret with renter data
+ * @param renterChatId - The renter's Telegram chat_id
+ * @returns The rental_id (existing or created), or null if failed
+ */
+async function createRentalFromClaimedSecret(
+  secret: UserRentalSecret,
+  renterChatId: string
+): Promise<string | null> {
+  try {
+    console.log('[rental-secrets-claim] createRentalFromClaimedSecret: starting', {
+      docSha256: secret.doc_sha256.slice(0, 12),
+      renterChatId,
+      crewSlug: secret.crew_slug,
+    });
+
+    // Get artifact by doc_sha256
+    const { data: artifact, error: artifactError } = await (supabaseAdmin as any)
+      .schema('private')
+      .from('rental_contract_artifacts')
+      .select('resolved_bike_id, rental_id, daily_price, rent_start_date, rent_end_date, telegram_chat_id')
+      .eq('original_sha256', secret.doc_sha256)
+      .maybeSingle();
+
+    if (artifactError) {
+      console.error('[rental-secrets-claim] Failed to fetch artifact:', artifactError);
+      return null;
+    }
+
+    if (!artifact?.resolved_bike_id) {
+      console.error('[rental-secrets-claim] No bike_id in artifact');
+      return null;
+    }
+
+    // ── Scenario A: Rental already exists (created by /doc-manual) ──
+    if (artifact.rental_id) {
+      console.log('[rental-secrets-claim] Rental exists, updating user_id from operator to renter:', artifact.rental_id);
+
+      // Update rentals.user_id from operator → renter
+      const { error: updateError } = await supabaseAdmin
+        .from('rentals')
+        .update({ user_id: renterChatId })
+        .eq('rental_id', artifact.rental_id)
+        .eq('user_id', artifact.telegram_chat_id); // Safety: only if still operator's
+
+      if (updateError) {
+        console.error('[rental-secrets-claim] Failed to update rental user_id:', updateError);
+        return null;
+      }
+
+      console.log('[rental-secrets-claim] Rental user_id updated to renter:', renterChatId);
+      return artifact.rental_id;
+    }
+
+    // ── Scenario B: Rental doesn't exist — create it ──
+    console.log('[rental-secrets-claim] No rental exists, creating new one for renter');
+
+    // Get crew_id from bike
+    const { data: bike, error: bikeError } = await supabaseAdmin
+      .from('cars')
+      .select('crew_id, specs')
+      .eq('id', artifact.resolved_bike_id)
+      .maybeSingle();
+
+    if (bikeError || !bike) {
+      console.error('[rental-secrets-claim] Failed to fetch bike:', bikeError);
+      return null;
+    }
+
+    // Get crew owner for owner_id
+    const crewOwnerChatId = await resolveCrewOwnerChatId(supabaseAdmin, bike.crew_id);
+    if (!crewOwnerChatId) {
+      console.error('[rental-secrets-claim] No crew owner found for crew_id:', bike.crew_id);
+      return null;
+    }
+
+    // Calculate dates and pricing
+    const dailyPrice = Number(artifact.daily_price || bike.specs?.dailyPrice || bike.specs?.rent_weekday || '10000');
+
+    // Use dates from artifact if available, otherwise use current date + 1 day
+    const startDate = artifact.rent_start_date
+      ? new Date(artifact.rent_start_date)
+      : new Date();
+    const endDate = artifact.rent_end_date
+      ? new Date(artifact.rent_end_date)
+      : new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const hours = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60) * 10) / 10;
+    const days = Math.max(1, Math.ceil(hours / 24));
+    const totalCost = dailyPrice * days;
+
+    // Create rental with renter as user_id
+    const { data: rental, error: rentalError } = await supabaseAdmin
+      .from('rentals')
+      .insert({
+        user_id: renterChatId,
+        owner_id: crewOwnerChatId,
+        vehicle_id: artifact.resolved_bike_id,
+        requested_start_date: startDate.toISOString(),
+        requested_end_date: endDate.toISOString(),
+        agreed_start_date: startDate.toISOString(),
+        agreed_end_date: endDate.toISOString(),
+        status: 'active',
+        payment_status: 'fully_paid',
+        total_cost: Math.round(totalCost),
+        metadata: {
+          source: 'qr_claim',
+          daily_price: dailyPrice,
+          doc_sha256: secret.doc_sha256,
+          claimed_at: new Date().toISOString(),
+        },
+      })
+      .select('rental_id')
+      .maybeSingle();
+
+    if (rentalError) {
+      console.error('[rental-secrets-claim] Failed to create rental:', rentalError);
+      return null;
+    }
+
+    if (!rental?.rental_id) {
+      console.error('[rental-secrets-claim] No rental_id returned');
+      return null;
+    }
+
+    console.log('[rental-secrets-claim] Created rental:', rental.rental_id);
+
+    // Update rental_contract_artifacts with rental_id
+    await (supabaseAdmin as any)
+      .schema('private')
+      .from('rental_contract_artifacts')
+      .update({ rental_id: rental.rental_id })
+      .eq('original_sha256', secret.doc_sha256);
+
+    return rental.rental_id;
+  } catch (error) {
+    console.error('[rental-secrets-claim] createRentalFromClaimedSecret exception:', error);
+    return null;
+  }
+}
 
 /**
  * Server action wrapper for the QR deep-link claim flow.
@@ -27,6 +178,8 @@ export async function claimRentalSecretsAction(
   crewSlug?: string;
   /** Whether this was a fresh claim (first time linking) */
   claimedNow?: boolean;
+  /** Rental ID created or linked during claim */
+  rentalId?: string;
   error?: string;
 }> {
   if (!chatId || !docSha256) {
@@ -39,10 +192,23 @@ export async function claimRentalSecretsAction(
     return { ok: false, reason: result.reason, error: result.error };
   }
 
+  // If this was a fresh claim, create rental in public.rentals
+  let rentalId: string | undefined;
+  if (result.claimedNow) {
+    const createdRentalId = await createRentalFromClaimedSecret(result.secret, chatId);
+    if (createdRentalId) {
+      rentalId = createdRentalId;
+    }
+  } else {
+    // Already claimed — try to get existing rental_id from secret
+    rentalId = result.secret.source_rental_id || undefined;
+  }
+
   // Return only the crew_slug (needed for routing) — NOT the sensitive data
   return {
     ok: true,
     crewSlug: result.secret.crew_slug,
     claimedNow: result.claimedNow,
+    rentalId,
   };
 }
