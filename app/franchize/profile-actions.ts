@@ -465,15 +465,15 @@ export async function updateRentalSecretsFromProfileAction(params: {
 }
 
 /**
- * Save user-entered passport/license data to their profile metadata.
+ * Save user-entered passport/license data to private.user_rental_secrets.
  *
- * This is NOT the same as verified rental secrets (which come from
- * rental_contract_artifacts after a completed rental). This is user-entered
- * data that gets pre-filled into the checkout/cart flow to speed up
- * the next rental.
+ * Stored with:
+ *   chat_id = user's Telegram user_id (NOT null — user self-entered)
+ *   verification_status = "pending" (self-entered, not operator-verified)
+ *   source_doc_key = "profile_prefill"
+ *   doc_sha256 = deterministic hash (prefill_<userId>_<crewSlug>)
  *
- * The data is stored in `users.metadata.rentalDocsPrefill` and is
- * consumed by the cart/checkout flow.
+ * On subsequent saves, the existing prefill row is updated (UPSERT by doc_sha256).
  */
 export async function saveRentalDocsPrefillAction(params: {
   userId: string;
@@ -492,9 +492,10 @@ export async function saveRentalDocsPrefillAction(params: {
   licenseExpiryDate?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
+    // 1. Get user's chat_id (= Telegram user_id) from users table
     const { data: user, error: userError } = await supabaseAdmin
       .from("users")
-      .select("metadata")
+      .select("user_id, metadata")
       .eq("user_id", params.userId)
       .maybeSingle();
 
@@ -502,37 +503,83 @@ export async function saveRentalDocsPrefillAction(params: {
       return { success: false, error: userError?.message || "User not found" };
     }
 
-    const metadata = (user?.metadata || {}) as Record<string, any>;
-    const existing = metadata.rentalDocsPrefill || {};
+    const chatId = user.user_id; // Telegram user_id is the chat_id in this table
 
-    // Merge new data over existing
-    const prefill = {
-      ...existing,
-      ...(params.fullName !== undefined && { fullName: params.fullName }),
-      ...(params.phone !== undefined && { phone: params.phone }),
-      ...(params.birthDate !== undefined && { birthDate: params.birthDate }),
-      ...(params.passportSeries !== undefined && { passportSeries: params.passportSeries }),
-      ...(params.passportNumber !== undefined && { passportNumber: params.passportNumber }),
-      ...(params.passportIssuedBy !== undefined && { passportIssuedBy: params.passportIssuedBy }),
-      ...(params.passportIssueDate !== undefined && { passportIssueDate: params.passportIssueDate }),
-      ...(params.registrationAddress !== undefined && { registrationAddress: params.registrationAddress }),
-      ...(params.licenseSeries !== undefined && { licenseSeries: params.licenseSeries }),
-      ...(params.licenseNumber !== undefined && { licenseNumber: params.licenseNumber }),
-      ...(params.licenseCategories !== undefined && { licenseCategories: params.licenseCategories }),
-      ...(params.licenseExpiryDate !== undefined && { licenseExpiryDate: params.licenseExpiryDate }),
-      updatedAt: new Date().toISOString(),
-      source: `profile_manual_${params.slug}`,
+    // 2. Build deterministic doc_sha256 for prefill record
+    //    Format: prefill_<chatId>_<crewSlug> — stable across saves
+    const docSha256 = `prefill_${chatId}_${params.slug}`;
+
+    // 3. Build combined passport string (series + number)
+    const passportStr = [params.passportSeries, params.passportNumber]
+      .filter(Boolean)
+      .join(" ");
+
+    // 4. Build combined license string (series + number)
+    const licenseStr = [params.licenseSeries, params.licenseNumber]
+      .filter(Boolean)
+      .join(" ");
+
+    // 5. UPSERT into private.user_rental_secrets
+    //    Using merge=true so existing columns are preserved if not overwritten
+    const upsertData = {
+      chat_id: chatId,
+      crew_slug: params.slug,
+      doc_sha256: docSha256,
+      renter_full_name: params.fullName ?? null,
+      renter_passport: passportStr || null,
+      renter_passport_issue_date: params.passportIssueDate ?? null,
+      renter_passport_issued_by: params.passportIssuedBy ?? null,
+      renter_registration: params.registrationAddress ?? null,
+      renter_driver_license: licenseStr || null,
+      renter_birth_date: params.birthDate ?? null,
+      renter_phone: params.phone ?? null,
+      source_doc_key: "profile_prefill",
+      verification_status: "pending" as const,
+      template_version: 1,
     };
 
-    const nextMetadata = { ...metadata, rentalDocsPrefill: prefill };
+    // Check if a prefill row already exists
+    const { data: existing } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("doc_sha256", docSha256)
+      .maybeSingle();
 
-    const { error: updateError } = await supabaseAdmin
-      .from("users")
-      .update({ metadata: nextMetadata, updated_at: new Date().toISOString() })
-      .eq("user_id", params.userId);
+    if (existing) {
+      // UPDATE existing prefill row — merge new values over existing
+      const merged = {
+        ...upsertData,
+        renter_full_name: upsertData.renter_full_name ?? existing.renter_full_name,
+        renter_passport: upsertData.renter_passport ?? existing.renter_passport,
+        renter_passport_issue_date: upsertData.renter_passport_issue_date ?? existing.renter_passport_issue_date,
+        renter_passport_issued_by: upsertData.renter_passport_issued_by ?? existing.renter_passport_issued_by,
+        renter_registration: upsertData.renter_registration ?? existing.renter_registration,
+        renter_driver_license: upsertData.renter_driver_license ?? existing.renter_driver_license,
+        renter_birth_date: upsertData.renter_birth_date ?? existing.renter_birth_date,
+        renter_phone: upsertData.renter_phone ?? existing.renter_phone,
+        updated_at: new Date().toISOString(),
+      };
 
-    if (updateError) {
-      return { success: false, error: updateError.message };
+      const { error: updateError } = await privateSchema()
+        .from("user_rental_secrets")
+        .update(merged)
+        .eq("doc_sha256", docSha256);
+
+      if (updateError) {
+        return { success: false, error: updateError.message };
+      }
+    } else {
+      // INSERT new prefill row
+      const { error: insertError } = await privateSchema()
+        .from("user_rental_secrets")
+        .insert({
+          ...upsertData,
+          updated_at: new Date().toISOString(),
+        });
+
+      if (insertError) {
+        return { success: false, error: insertError.message };
+      }
     }
 
     return { success: true };
@@ -546,30 +593,91 @@ export async function saveRentalDocsPrefillAction(params: {
 
 /**
  * Get user-entered passport/license data for pre-fill.
- * Reads from `users.metadata.rentalDocsPrefill` (set by saveRentalDocsPrefillAction).
+ * Reads from private.user_rental_secrets WHERE source_doc_key = "profile_prefill".
+ *
+ * Also checks for any verified records (from completed rentals) that might
+ * have more complete data.
  */
 export async function getRentalDocsPrefillAction(params: {
   userId: string;
+  slug: string;
 }): Promise<{
   success: boolean;
-  data?: Record<string, string>;
+  data?: {
+    fullName?: string;
+    phone?: string;
+    birthDate?: string;
+    passportSeries?: string;
+    passportNumber?: string;
+    passportIssuedBy?: string;
+    passportIssueDate?: string;
+    registrationAddress?: string;
+    licenseSeries?: string;
+    licenseNumber?: string;
+    licenseCategories?: string;
+    licenseExpiryDate?: string;
+    verificationStatus?: string;
+    hasVerifiedData?: boolean;
+  };
 }> {
   try {
-    const { data: user, error } = await supabaseAdmin
+    // 1. Get user's chat_id
+    const { data: user } = await supabaseAdmin
       .from("users")
-      .select("metadata")
+      .select("user_id")
       .eq("user_id", params.userId)
       .maybeSingle();
 
-    if (error || !user) return { success: false };
+    if (!user) return { success: false };
 
-    const metadata = (user?.metadata || {}) as Record<string, any>;
-    const prefill = metadata.rentalDocsPrefill;
-    if (!prefill) return { success: true };
+    const chatId = user.user_id;
+    const docSha256 = `prefill_${chatId}_${params.slug}`;
 
-    // Strip internal fields
-    const { updatedAt: _u, source: _s, ...userData } = prefill;
-    return { success: true, data: userData };
+    // 2. Try to get the self-entered prefill record first
+    const { data: prefillRow } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("doc_sha256", docSha256)
+      .maybeSingle();
+
+    // 3. Also check for verified data from previous rentals
+    const { data: verifiedRow } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("chat_id", chatId)
+      .eq("crew_slug", params.slug)
+      .eq("verification_status", "verified")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // 4. Merge: prefer verified data, fall back to prefill
+    const source = verifiedRow || prefillRow;
+    if (!source) return { success: true };
+
+    // Parse passport string back to series + number
+    const passportParts = (source.renter_passport || "").trim().split(/\s+/);
+    const licenseParts = (source.renter_driver_license || "").trim().split(/\s+/);
+
+    return {
+      success: true,
+      data: {
+        fullName: source.renter_full_name || undefined,
+        phone: source.renter_phone || undefined,
+        birthDate: source.renter_birth_date || undefined,
+        passportSeries: passportParts[0] || undefined,
+        passportNumber: passportParts[1] || undefined,
+        passportIssuedBy: source.renter_passport_issued_by || undefined,
+        passportIssueDate: source.renter_passport_issue_date || undefined,
+        registrationAddress: source.renter_registration || undefined,
+        licenseSeries: licenseParts[0] || undefined,
+        licenseNumber: licenseParts[1] || undefined,
+        licenseCategories: undefined, // not stored in user_rental_secrets
+        licenseExpiryDate: undefined, // not stored in user_rental_secrets
+        verificationStatus: source.verification_status,
+        hasVerifiedData: !!verifiedRow,
+      },
+    };
   } catch {
     return { success: false };
   }
