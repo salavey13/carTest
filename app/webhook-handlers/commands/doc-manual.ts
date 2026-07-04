@@ -510,10 +510,13 @@ async function resolveBikeById(bikeId: string): Promise<any> {
 }
 
 async function getAvailableBikes(): Promise<any[]> {
+  // Filter out test/internal bikes whose id starts with "vipbike" (e.g. vipbike-test-001)
+  // These are used for development/testing and should not appear in operator selection.
   const { data } = await supabaseAdmin
     .from("cars")
     .select("id, make, model, specs")
     .in("type", ["bike", "ebike"])
+    .not("id", "like", "vipbike%")
     .order("make", { ascending: true })
     .limit(20);
   return (data || []);

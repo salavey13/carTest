@@ -73,7 +73,10 @@ export async function POST(request: NextRequest) {
     const { crew, items } = await getFranchizeBySlug(slug);
 
     // Filter sale bikes
+    // Excludes test/internal bikes whose id starts with "vipbike"
     const saleBikes = items.filter((item) => {
+      // Skip test/internal bikes
+      if (item.id.startsWith("vipbike")) return false;
       const specs = item.rawSpecs || {};
       const hasSale = specs.sale === true || specs.sale === 1 || String(specs.sale).toLowerCase() === "true";
       return hasSale && item.title && (item.imageUrl || item.mediaUrls?.length);
