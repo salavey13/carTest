@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Info, Swords, X } from "lucide-react";
+import { Calendar, Info, Swords, X, Phone } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
@@ -20,6 +20,7 @@ import { ItemGallery } from "../components/ItemGallery";
 import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 import { crewPaletteForSurface, readableTextOnColor, withAlpha } from "../lib/theme";
 import { FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
+import { buildTelegramDeepLink, type StartappState } from "@/lib/startapp-state";
 
 // ── Russian Label Helper (VIP Bike Landing & Catalog Improvements) ──
 // Helper to get Russian label from spec_labels in rawSpecs
@@ -308,6 +309,8 @@ function DurationShortcuts({
     { label: "1 день", days: 1 },
     { label: "3 дня", days: 3 },
     { label: "7 дней", days: 7 },
+    { label: "2 недели", days: 14 },
+    { label: "1 месяц", days: 30 },
   ];
 
   const handleHourClick = (hours: number) => {
@@ -384,8 +387,10 @@ function PricingTable({
   const fmt = (n: number) => n.toLocaleString("ru-RU");
 
   // Extract all pricing tiers from specs
+  // NOTE: 1h tier intentionally omitted from UI — too short for meaningful test ride,
+  // and the v2 pricing formula puts it at 10% of daily (a "try-me" rate we don't
+  // advertise as a real rental option). Still in specs for backward compatibility.
   const hourly = [
-    { label: "1 час", value: Number(specs.price_per_hour) || 0, key: "1h" },
     { label: "3 часа", value: Number(specs.price_per_3h) || 0, key: "3h" },
     { label: "6 часов", value: Number(specs.price_per_6h) || 0, key: "6h" },
     { label: "12 часов", value: Number(specs.price_per_12h) || 0, key: "12h" },
@@ -422,7 +427,7 @@ function PricingTable({
           <p className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-[var(--item-muted-text)]">
             Часовая аренда
           </p>
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+          <div className="grid grid-cols-3 gap-1.5">
             {hourly.map((tier) => (
               <div
                 key={tier.key}
@@ -635,6 +640,85 @@ function PriceCard({
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
+// Callback Request Form — lead capture for users not ready to commit
+// ───────────────────────────────────────────────────────────────────────────────
+function CallbackRequestForm({
+  bikeTitle,
+  accentColor,
+  onSubmit,
+}: {
+  bikeTitle: string;
+  accentColor: string;
+  onSubmit: (name: string, phone: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (name.trim().length < 2 || phone.trim().length < 6) return;
+    onSubmit(name.trim(), phone.trim());
+    setSubmitted(true);
+  };
+
+  if (submitted) {
+    return (
+      <div className="rounded-2xl border px-3 py-3 text-center" style={{ borderColor: `${accentColor}40`, backgroundColor: `${accentColor}10` }}>
+        <p className="text-sm font-semibold" style={{ color: accentColor }}>✅ Заявка отправлена!</p>
+        <p className="mt-1 text-xs text-[var(--item-muted-text)]">
+          Менеджер перезвонит в течение 15 минут.
+          Документы можно показать при встрече.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded-2xl border p-3" style={{ borderColor: `${accentColor}40`, backgroundColor: `${accentColor}08` }}>
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+        <Phone className="h-3.5 w-3.5" /> Запросить звонок
+      </p>
+      <p className="mb-2 text-[11px] text-[var(--item-muted-text)]">
+        Оставьте контакты — менеджер перезвонит, ответит на вопросы и поможет с оформлением.
+        Документы (паспорт, права) можно показать при встрече.
+      </p>
+      <div className="space-y-2">
+        <input
+          type="text"
+          placeholder="Имя"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full rounded-lg border px-3 py-2 text-sm text-[var(--item-text)] transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
+          style={{ backgroundColor: "rgba(0,0,0,0.25)", borderColor: `${accentColor}30` }}
+          aria-label="Ваше имя"
+          required
+          minLength={2}
+        />
+        <input
+          type="tel"
+          placeholder="Телефон (+7 999 123-45-67)"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          className="w-full rounded-lg border px-3 py-2 text-sm text-[var(--item-text)] transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
+          style={{ backgroundColor: "rgba(0,0,0,0.25)", borderColor: `${accentColor}30` }}
+          aria-label="Номер телефона"
+          required
+          minLength={6}
+        />
+        <button
+          type="submit"
+          className="w-full rounded-lg px-3 py-2 text-sm font-bold transition hover:brightness-110 active:scale-[0.99]"
+          style={{ backgroundColor: accentColor, color: "#fff" }}
+        >
+          Перезвоните мне
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
 // Rounding Warning — shows when hours are messy (4-5h → 6h, 7-11h → 12h)
 // ───────────────────────────────────────────────────────────────────────────────
 function RoundingWarning({
@@ -695,6 +779,9 @@ export function ItemModal({
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [isAdding, setIsAdding] = useState(false);
   const [isBuying, setIsBuying] = useState(false);
+  // Shows a friendly "продолжаем из Telegram" banner when the user came via
+  // a bot deep-link. Consumed from sessionStorage (set by CatalogClient).
+  const [startappBanner, setStartappBanner] = useState<string | null>(null);
   const [vsBike, setVsBike] = useState<CatalogItemVM | null>(null);
 
   // New state for dynamic pricing
@@ -704,6 +791,23 @@ export function ItemModal({
   const [rentEndTime, setRentEndTime] = useState("10:00");
   // Dynamic calculated price from franchize pricing calculator
   const [calculatedPrice, setCalculatedPrice] = useState<{ label: string; price: string; period: string } | null>(null);
+
+  // ── Browser vs Telegram context detection ──
+  // When NOT in Telegram WebApp, CTAs redirect to the bot with startapp state.
+  const [isInTelegram, setIsInTelegram] = useState(true);
+  // Callback request form
+  const [showCallbackForm, setShowCallbackForm] = useState(false);
+  const [callbackName, setCallbackName] = useState("");
+  const [callbackPhone, setCallbackPhone] = useState("");
+  const [callbackSent, setCallbackSent] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const tg = (window as any).Telegram?.WebApp;
+    // If no Telegram WebApp SDK or no initData → user is in a regular browser
+    const inTg = !!(tg && tg.initData && tg.initData.length > 0);
+    setIsInTelegram(inTg);
+  }, [item?.id]);
 
   // Determine which CTAs to show (safe optional chaining — item may be null during close transition)
   const showRentCta = isRental && (item ? hasRentPrice(item) : false);
@@ -734,6 +838,22 @@ export function ItemModal({
     setDescriptionExpanded(false);
     setActiveMediaIndex(0);
     setVsBike(null);
+    setStartappBanner(null);
+    // Detect deep-link from bot (set by CatalogClient) and show a banner.
+    if (typeof window !== "undefined") {
+      try {
+        const raw = sessionStorage.getItem("franchize-startapp-banner");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.bikeId && parsed.bikeId === item?.id) {
+            setStartappBanner("Продолжаем подбор из Telegram — часть данных уже заполнена");
+          }
+          sessionStorage.removeItem("franchize-startapp-banner");
+        }
+      } catch {
+        sessionStorage.removeItem("franchize-startapp-banner");
+      }
+    }
   }, [item?.id]);
 
   // Recalculate price when dates change
@@ -960,18 +1080,76 @@ export function ItemModal({
   const normalizedSpecs = item.specs.length > 0 ? item.specs : fallbackSpecs;
 
   // ── CTA label logic ──
-  // When both rent + sale are available, we show two separate buttons.
-  // When only one is available, we show a single CTA.
-  const rentCtaLabel = isAdding ? "Бронируем..." : "Забронировать";
-  const buyCtaLabel = isBuying ? "Покупаем..." : "Купить";
-  const singleCtaLabel = isAdding
-    ? "Добавляем..."
-    : showRentCta
-      ? rentCtaLabel
-      : "Выбрать";
+  // In Telegram WebApp: normal "Забронировать"/"Купить".
+  // In browser (no TG context): CTAs become "Продолжить в Telegram" with a
+  // deep-link that carries the current selection as startapp state.
+  const botUsername = "oneBikePlsBot"; // VIP Bike bot
 
-  // Determine footer grid layout
+  // Build the deep-link that carries current selections to the web app
+  const buildStartappLink = useCallback(
+    (flowType: "rental" | "sale"): string | null => {
+      if (!item) return null;
+      try {
+        const state: StartappState = {
+          type: flowType === "rental" ? "rental" : "sale",
+          bikeId: item.id,
+          startDate: options.rentStartDate || undefined,
+          endDate: options.rentEndDate || undefined,
+          startTime: rentStartTime || undefined,
+          endTime: rentEndTime || undefined,
+          helmetCount: helmetCount > 0 ? helmetCount : undefined,
+          package: options.package || undefined,
+          perk: options.perk || undefined,
+        };
+        return buildTelegramDeepLink(botUsername, state);
+      } catch {
+        // Payload too long — fall back to plain bot link
+        return `https://t.me/${botUsername}/app`;
+      }
+    },
+    [item, options.rentStartDate, options.rentEndDate, options.package, options.perk, rentStartTime, rentEndTime, helmetCount],
+  );
+
+  const rentCtaLabel = isInTelegram
+    ? (isAdding ? "Бронируем..." : "Забронировать")
+    : "⚡ Забронировать в Telegram";
+  const buyCtaLabel = isInTelegram
+    ? (isBuying ? "Покупаем..." : "Купить")
+    : "⚡ Купить в Telegram";
+  const singleCtaLabel = isInTelegram
+    ? (isAdding ? "Добавляем..." : showRentCta ? "Забронировать" : "Выбрать")
+    : "⚡ Продолжить в Telegram";
+
+  // Determine footer grid layout — wider when callback option is present
   const footerCols = showRentCta && showBuyCta ? 3 : 2;
+
+  // Callback submit handler — sends lead to owner via Telegram
+  const handleCallbackSubmit = useCallback(
+    (name: string, phone: string) => {
+      // Use the forward-telegram API to notify the owner
+      const message = `📞 *Новая заявка на звонок*\n\n` +
+        `🏍 ${item?.title || "Байк"}\n` +
+        `👤 ${name}\n` +
+        `📱 ${phone}\n` +
+        `🌐 Источник: веб-сайт (не Telegram)\n` +
+        `⏰ ${new Date().toLocaleString("ru-RU")}`;
+
+      // Fire-and-forget — don't block the UI
+      fetch("/api/forward-telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          // Owner chat ID for VIP Bike crew
+          chatId: "356282674", // Илья (owner)
+          text: message,
+          parseMode: "Markdown",
+        }),
+      }).catch(() => {
+        // Silent fail — user already saw "submitted"
+      });
+    },
+    [item?.title],
+  );
 
   return (
     <div
@@ -1016,6 +1194,21 @@ export function ItemModal({
 
           {/* Content — rentalbikes-inspired layout */}
           <div className="space-y-4 p-4 sm:p-5">
+            {/* Deep-link banner — shown when arriving from a Telegram bot */}
+            {startappBanner && (
+              <div
+                className="flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs"
+                style={{
+                  borderColor: `${theme.palette.accentMain}40`,
+                  backgroundColor: `${theme.palette.accentMain}15`,
+                  color: theme.palette.accentMain,
+                }}
+                role="status"
+              >
+                <span aria-hidden>⚡</span>
+                <span>{startappBanner}</span>
+              </div>
+            )}
             {/* Title + characteristics row (rentalbikes-style) */}
             <div>
               <h3
@@ -1310,9 +1503,30 @@ export function ItemModal({
                 ) : null}
               </details>
             ) : null}
+
+            {/* Callback request — alternative to direct booking */}
+            {!showCallbackForm && (
+              <button
+                type="button"
+                onClick={() => setShowCallbackForm(true)}
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition hover:opacity-80 active:scale-[0.99]"
+                style={{ borderColor: `${theme.palette.accentMain}40`, color: theme.palette.accentMain }}
+              >
+                <Phone className="h-3.5 w-3.5" />
+                Не готовы бронировать? Запросить звонок менеджера
+              </button>
+            )}
           </div>
 
           {/* Footer Buttons — dual CTA when both rent + sale available */}
+          {/* In browser mode (no TG), CTAs become deep-links to the Telegram bot */}
+          {!isInTelegram && (
+            <div className="shrink-0 border-t p-2 text-center" style={{ ...surface.card, borderColor: theme.palette.borderSoft }}>
+              <p className="mb-1 text-[10px] text-[var(--item-muted-text)]">
+                ⚡ Бронирование и оплата — в Telegram-боте
+              </p>
+            </div>
+          )}
           <div
             className={`grid shrink-0 gap-2 border-t p-3 grid-cols-2 ${footerCols === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
             style={{ ...surface.card, borderColor: theme.palette.borderSoft }}
@@ -1327,51 +1541,99 @@ export function ItemModal({
               Закрыть
             </button>
 
-            {/* Rent CTA — shown when item has rental pricing */}
+            {/* Rent CTA — in TG: add to cart. In browser: deep-link to TG bot. */}
             {showRentCta && (
-              <button
-                type="button"
-                onClick={handleAddToCart}
-                disabled={isAdding}
-                aria-busy={isAdding}
-                aria-label="Забронировать аренду"
-                className="rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-              >
-                {rentCtaLabel}
-              </button>
+              isInTelegram ? (
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  disabled={isAdding}
+                  aria-busy={isAdding}
+                  aria-label="Забронировать аренду"
+                  className="rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                >
+                  {rentCtaLabel}
+                </button>
+              ) : (
+                <a
+                  href={buildStartappLink("rental") || `https://t.me/${botUsername}/app`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Продолжить бронирование в Telegram"
+                  className="flex items-center justify-center gap-1 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                >
+                  {rentCtaLabel}
+                </a>
+              )
             )}
 
-            {/* Buy CTA — shown when item is available for sale */}
+            {/* Buy CTA — same dual mode */}
             {showBuyCta && (
-              <button
-                type="button"
-                onClick={handleBuyItem}
-                disabled={isBuying}
-                aria-busy={isBuying}
-                aria-label="Купить"
-                className={`rounded-xl border-2 px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] ${
-                  showRentCta
-                    ? "border-[var(--item-accent)] text-[var(--item-accent)] hover:bg-[var(--item-accent)] hover:text-[var(--item-accent-contrast)]"
-                    : "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
-                }`}
-              >
-                {buyCtaLabel}
-              </button>
+              isInTelegram ? (
+                <button
+                  type="button"
+                  onClick={handleBuyItem}
+                  disabled={isBuying}
+                  aria-busy={isBuying}
+                  aria-label="Купить"
+                  className={`rounded-xl border-2 px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] ${
+                    showRentCta
+                      ? "border-[var(--item-accent)] text-[var(--item-accent)] hover:bg-[var(--item-accent)] hover:text-[var(--item-accent-contrast)]"
+                      : "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
+                  }`}
+                >
+                  {buyCtaLabel}
+                </button>
+              ) : (
+                <a
+                  href={buildStartappLink("sale") || `https://t.me/${botUsername}/app`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Продолжить покупку в Telegram"
+                  className={`flex items-center justify-center gap-1 rounded-xl border-2 px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] transition hover:brightness-110 active:scale-[0.99] ${
+                    showRentCta
+                      ? "border-[var(--item-accent)] text-[var(--item-accent)] hover:bg-[var(--item-accent)] hover:text-[var(--item-accent-contrast)]"
+                      : "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
+                  }`}
+                >
+                  {buyCtaLabel}
+                </a>
+              )
             )}
 
             {/* Fallback CTA — when neither rent nor sale is flagged */}
             {!showRentCta && !showBuyCta && (
-              <button
-                type="button"
-                onClick={handleAddToCart}
-                disabled={isAdding}
-                aria-busy={isAdding}
-                className="rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-              >
-                {singleCtaLabel}
-              </button>
+              isInTelegram ? (
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  disabled={isAdding}
+                  aria-busy={isAdding}
+                  className="rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                >
+                  {singleCtaLabel}
+                </button>
+              ) : (
+                <a
+                  href={`https://t.me/${botUsername}/app`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99]"
+                >
+                  {singleCtaLabel}
+                </a>
+              )
             )}
           </div>
+
+          {/* Callback form — shown when user toggles it OR always in browser mode */}
+          {showCallbackForm && (
+            <CallbackRequestForm
+              bikeTitle={item.title}
+              accentColor={theme.palette.accentMain}
+              onSubmit={handleCallbackSubmit}
+            />
+          )}
         </div>
       </div>
     </div>
