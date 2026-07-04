@@ -43,7 +43,7 @@ export interface PricingResult {
 const HELMET_PRICE_RUB = 1000;
 const DEFAULT_DEPOSIT_RUB = 20000;
 const DEFAULT_DAILY_PRICE = 10000;
-const DEFAULT_HOURLY_PRICE = 2000;
+const DEFAULT_HOURLY_PRICE = 1000; // v2 formula: 10% of daily
 
 function normalizeHourlyRental(hours: number): {
   tier: PricingTier;
