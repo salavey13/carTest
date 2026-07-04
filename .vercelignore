@@ -1,8 +1,12 @@
+# ===================================================================
 # Exclude standalone nnvolt project from Vercel build
 # (it's deployed separately to Beget via FTP)
+# ===================================================================
 nnvolt-static/
 
-# Exclude heavy non-essential directories
+# ===================================================================
+# Exclude heavy non-essential top-level directories
+# ===================================================================
 books/
 Configame/
 docs/
@@ -10,7 +14,87 @@ tests/
 tmp/
 skills/
 codex/
+supabase/
+backups/
+scripts/
+_snapshots/
+_tmp/
 
+# ===================================================================
 # Exclude large data files
+# ===================================================================
 *.csv
 seed.sql
+*.pdf
+
+# ===================================================================
+# Exclude only the LARGEST standalone non-rental app dirs
+# (verified: no shared imports from components/contexts/hooks/franchize)
+# These are the biggest page-count reducers with zero import risk
+# ===================================================================
+app/greenbox/
+app/homework/
+app/lab/
+app/optimapipe/
+app/streamer/
+app/arbitrage-explained/
+app/arbitrage-live-scanner/
+app/arbitrage-notdummies/
+app/arbitrage-test-agent/
+app/botbusters/
+app/bullshitdetector/
+app/cartest/
+app/cyber-garage/
+app/cybervibe/
+app/donate/
+app/expmind/
+app/game-plan/
+app/hub/
+app/jumpstart/
+app/nexus/
+app/nnvolt/
+app/nutrition/
+app/onesitepls/
+app/onesiteplsinstructions/
+app/pavele0903/
+app/premium/
+app/purpose-profit/
+app/rastabot/
+app/sauna-rent/
+app/selfdev/
+app/shadow-fleet-admin/
+app/sly13/
+app/snowboarding/
+app/sql-cheatsheet/
+app/start-training/
+app/style-guide/
+app/supaplan/
+app/supercar-test/
+app/svarprofi/
+app/tasks/
+app/tea-call/
+app/testers/
+app/todoc/
+app/veritasium/
+app/wheel-of-fortune/
+app/youtubeAdmin/
+app/yt/
+app/zai-docx-instructions/
+app/about/
+app/about_en/
+app/advice/
+app/advice-upload/
+app/ai-work-future/
+app/blogger/
+app/buy-subscription/
+app/csv-compare/
+app/finance-literacy-memo/
+app/md-doc/
+app/moto-investments/
+app/partner/
+app/p-plan/
+app/paddock/
+app/rules/
+app/rental-doc-workflow/
+app/rent-car/
+app/admin/

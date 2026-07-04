@@ -69,6 +69,10 @@ const COLORS = {
   line: rgb(0.18, 0.19, 0.22),
   white: rgb(1, 1, 1),
   highlight: rgb(0.2, 0.25, 0.35),
+  // Data quality highlight colors
+  warning: rgb(0.8, 0.5, 0.1),     // Orange - missing required field
+  info: rgb(0.1, 0.5, 0.7),        // Blue - potentially missing but OK for some types
+  critical: rgb(0.8, 0.15, 0.15),  // Red - definitely missing
 };
 
 // ── Spec priority order (for column ordering) ───────────────────────────────
@@ -96,7 +100,164 @@ const SPEC_PRIORITY = [
   'rent_weekday', 'Будни',
   'rent_weekend', 'Выходные',
   'dailyPrice', 'daily_price', 'Цена/день',
+  'access_type', 'Тип доступа',
+  'rent_5_10d', 'Rent 5 10d',
+  'rent_price_label', 'Rent Price Label',
 ];
+
+// ── Column type classification ──────────────────────────────────────────────
+const TEXT_COLUMNS = new Set([
+  'bike_subtype', 'Тип',
+  'brake_type', 'Тормоза',
+  'suspension_type', 'suspension_front', 'Подвеска',
+  'frame_type', 'Рама',
+  'license_class', 'Класс прав',
+  'battery', 'Батарея',
+  'access_type', 'Тип доступа',
+  'rent_price_label', 'Rent Price Label',
+  'description',
+]);
+
+// ── Bike type classification ─────────────────────────────────────────────────
+// Fields that are expected for each bike type
+const EXPECTED_FIELDS = {
+  electro: ['battery', 'range_km', 'charge_time_h', 'removable_battery', 'power_kw'],
+  ice: ['motor_peak_kw', 'motor_nominal_kw', 'torque_nm'],
+  both: ['weight_kg', 'brake_type', 'suspension_type', 'top_speed_kmh'],
+  required: ['sale_price', 'purchase_price', 'price_per_hour', 'rent_weekday', 'rent_weekend', 'access_type'],
+};
+
+// Price-related fields that should have values
+const PRICE_FIELDS = [
+  'sale_price', 'purchase_price', 'price_per_hour', 'price_per_3h',
+  'price_per_6h', 'price_per_12h', 'rent_weekday', 'rent_weekend', 'rent_5_10d',
+  'dailyPrice', 'daily_price',
+];
+
+// ── Detect if column is text-based or numeric ─────────────────────────────────
+function isTextColumn(key, values) {
+  // Check explicit list
+  if (TEXT_COLUMNS.has(key)) return true;
+  if (TEXT_COLUMNS.has(normalizeSpecKey(key))) return true;
+
+  // Check if majority of non-empty values are text (not numeric)
+  let numericCount = 0;
+  let textCount = 0;
+
+  values.forEach(v => {
+    if (v === null || v === undefined || v === '') return;
+    if (typeof v === 'number') {
+      numericCount++;
+    } else if (typeof v === 'string') {
+      // Check if string is a number
+      const num = parseFloat(v);
+      if (!isNaN(num) && v.trim() !== '' && !isNaN(Number(v))) {
+        numericCount++;
+      } else {
+        textCount++;
+      }
+    }
+  });
+
+  // If >50% are numeric, it's a number column
+  const total = numericCount + textCount;
+  if (total === 0) return false; // Empty column - treat as number by default
+  return textCount > numericCount;
+}
+
+// ── Classify bike as electro or ICE based on specs ─────────────────────────────
+function classifyBikeType(bike) {
+  const specs = bike.specs || {};
+
+  // Check for electro indicators
+  const hasBattery = specs.battery || specs.range_km || specs.charge_time_h;
+  const hasElectricMotor = specs.power_kw && !specs.motor_peak_kw;
+
+  // Check for ICE indicators
+  const hasEngine = specs.motor_peak_kw || specs.motor_nominal_kw || specs.torque_motor_nm;
+
+  if (hasBattery && !hasEngine) return 'electro';
+  if (hasEngine && !hasBattery) return 'ice';
+  if (hasBattery && hasEngine) return 'hybrid';
+  return 'unknown';
+}
+
+// ── Data quality analysis ─────────────────────────────────────────────────────
+function analyzeDataQuality(bikes, specKeys) {
+  const issues = [];
+  const stats = {
+    totalCells: 0,
+    emptyCells: 0,
+    criticalMissing: 0,
+    warningMissing: 0,
+    infoMissing: 0,
+  };
+
+  bikes.forEach(bike => {
+    const specs = bike.specs || {};
+    const bikeType = classifyBikeType(bike);
+    const bikeIssues = [];
+
+    // Check expected fields per bike type
+    if (bikeType === 'electro') {
+      EXPECTED_FIELDS.electro.forEach(field => {
+        const value = specs[field];
+        if (value === null || value === undefined || value === '') {
+          bikeIssues.push({ field, severity: 'warning', reason: `Electro bike missing ${field}` });
+          stats.warningMissing++;
+        }
+      });
+    } else if (bikeType === 'ice') {
+      EXPECTED_FIELDS.ice.forEach(field => {
+        const value = specs[field];
+        if (value === null || value === undefined || value === '') {
+          bikeIssues.push({ field, severity: 'warning', reason: `ICE bike missing ${field}` });
+          stats.warningMissing++;
+        }
+      });
+    }
+
+    // Check required fields (prices, access type)
+    EXPECTED_FIELDS.required.forEach(field => {
+      const value = specs[field];
+      if (value === null || value === undefined || value === '') {
+        bikeIssues.push({ field, severity: 'critical', reason: `Missing required ${field}` });
+        stats.criticalMissing++;
+      }
+    });
+
+    // Check price fields specifically
+    PRICE_FIELDS.forEach(field => {
+      if (specKeys.includes(field)) {
+        const value = specs[field];
+        if (value === null || value === undefined || value === '') {
+          bikeIssues.push({ field, severity: 'info', reason: `Price field ${field} is empty` });
+          stats.infoMissing++;
+        }
+      }
+    });
+
+    issues.push({
+      bikeId: bike.id,
+      bikeTitle: bike.title,
+      bikeType,
+      issues: bikeIssues,
+    });
+  });
+
+  // Calculate cell stats
+  stats.totalCells = bikes.length * specKeys.length;
+  bikes.forEach(bike => {
+    specKeys.forEach(key => {
+      const value = bike.specs?.[key];
+      if (value === null || value === undefined || value === '') {
+        stats.emptyCells++;
+      }
+    });
+  });
+
+  return { issues, stats };
+}
 
 // ── Fetch franchize data ─────────────────────────────────────────────────
 async function getFranchizeBySlug(slug) {
@@ -150,14 +311,14 @@ function normalizeSpecKey(key) {
   return niceLabel;
 }
 
-// ── Get all unique spec keys across all bikes ───────────────────────────────────
-function getAllSpecKeys(bikes) {
+// ── Get all unique spec keys across all bikes with type info ───────────────────
+function getAllSpecKeysWithTypes(bikes) {
   const keySet = new Set();
   const excludedKeys = new Set([
     'gallery', 'features', 'buy_colors', 'buy_options', 'spec_labels', 'sale',
-    'sale_price', 'purchase_price',
   ]);
 
+  // First collect all keys
   bikes.forEach(bike => {
     const specs = bike.specs || {};
     Object.keys(specs).forEach(key => {
@@ -168,6 +329,8 @@ function getAllSpecKeys(bikes) {
   });
 
   const keys = Array.from(keySet);
+
+  // Sort by priority, then alphabetically
   keys.sort((a, b) => {
     const aPriority = SPEC_PRIORITY.indexOf(a);
     const bPriority = SPEC_PRIORITY.indexOf(b);
@@ -180,7 +343,14 @@ function getAllSpecKeys(bikes) {
     return a.localeCompare(b);
   });
 
-  return keys;
+  // Determine column types
+  const columnTypes = {};
+  keys.forEach(key => {
+    const values = bikes.map(bike => bike.specs?.[key]);
+    columnTypes[key] = isTextColumn(key, values);
+  });
+
+  return { keys, columnTypes };
 }
 
 // ── Format spec value for display ────────────────────────────────────────────
@@ -222,8 +392,8 @@ function formatSpecValue(key, value) {
 }
 
 // ── Calculate column width based on content ───────────────────────────────────
-function calculateColumnWidth(header, values, font, headerFont, fontSize, minWidth = 70) {
-  // Calculate header width
+function calculateColumnWidth(header, values, font, headerFont, fontSize, isTextColumn, minWidth = 50) {
+  // Base width from header
   let maxWidth = headerFont.widthOfTextAtSize(header, fontSize + 1) + 16;
 
   // Sample a few values to get an idea (not all, for performance)
@@ -236,12 +406,20 @@ function calculateColumnWidth(header, values, font, headerFont, fontSize, minWid
     }
   });
 
-  // Use a more reasonable maximum - columns shouldn't be too wide
-  return Math.max(minWidth, Math.min(maxWidth, 140)); // Cap at 140pt max for better page usage
+  // Text columns get 2x width, number columns get base width
+  if (isTextColumn) {
+    maxWidth = maxWidth * 2;
+  }
+
+  // Use reasonable min/max bounds
+  const effectiveMin = isTextColumn ? 100 : 50;
+  const effectiveMax = isTextColumn ? 200 : 100;
+
+  return Math.max(effectiveMin, Math.min(maxWidth, effectiveMax));
 }
 
 // ── Generate comparison PDF ─────────────────────────────────────────────────
-async function generateComparisonPdf(bikes, crew, outputPath) {
+async function generateComparisonPdf(bikes, crew, outputPath, columnTypes, dataQuality) {
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
 
@@ -270,13 +448,23 @@ async function generateComparisonPdf(bikes, crew, outputPath) {
   const tableWidth = pageWidth - 2 * margin;
 
   // Get all spec keys
-  const specKeys = getAllSpecKeys(bikes);
+  const { keys: specKeys } = getAllSpecKeysWithTypes(bikes);
 
-  // Calculate column widths for each spec column
+  // Calculate column widths for each spec column (with type info)
   const columnWidths = specKeys.map(key => {
     const header = normalizeSpecKey(key);
     const values = bikes.map(bike => formatSpecValue(key, bike.specs?.[key]));
-    return calculateColumnWidth(header, values, font, boldFont, fontSize);
+    const isText = columnTypes[key] || false;
+    return calculateColumnWidth(header, values, font, boldFont, fontSize, isText);
+  });
+
+  // Build a lookup map for quick issue checking: { bikeId_key: { severity, reason } }
+  const issueMap = {};
+  dataQuality.issues.forEach(bikeIssue => {
+    bikeIssue.issues.forEach(issue => {
+      const key = `${bikeIssue.bikeId}_${issue.field}`;
+      issueMap[key] = issue;
+    });
   });
 
   // Bike name column (fixed width, appears on every page)
@@ -355,16 +543,30 @@ async function generateComparisonPdf(bikes, crew, outputPath) {
     let currentX = startX;
     let currentY = tableTop;
 
-    // Alternating row highlight
+    // Alternating row highlight + data quality cell highlight
     const drawRowBackground = (rowIndex) => {
       if (rowIndex % 2 === 1) {
         page.drawRectangle({
-          x: currentX - 5,
+          x: startX - 5,
           y: currentY - rowHeight,
           width: totalContentWidth + 10,
           height: rowHeight,
           color: COLORS.highlight,
         });
+      }
+    };
+
+    // Get highlight color for a specific cell
+    const getCellHighlightColor = (bikeId, specKey) => {
+      const issueKey = `${bikeId}_${specKey}`;
+      const issue = issueMap[issueKey];
+      if (!issue) return null;
+
+      switch (issue.severity) {
+        case 'critical': return COLORS.critical;
+        case 'warning': return COLORS.warning;
+        case 'info': return COLORS.info;
+        default: return null;
       }
     };
 
@@ -450,6 +652,20 @@ async function generateComparisonPdf(bikes, crew, outputPath) {
         const value = formatSpecValue(key, specs[key]);
         const colWidth = pageColumnWidths[pageColumnIndices.indexOf(specIndex)];
 
+        // Highlight cell if there's a data quality issue
+        const highlightColor = getCellHighlightColor(bike.id, key);
+        if (highlightColor && value === '') {
+          // Only highlight empty cells with issues
+          page.drawRectangle({
+            x: currentX + 1,
+            y: currentY - rowHeight + 1,
+            width: colWidth - 2,
+            height: rowHeight - 2,
+            color: highlightColor,
+            opacity: 0.25,
+          });
+        }
+
         page.drawText(value, {
           x: currentX + 8,
           y: currentY - rowHeight / 2 - 3,
@@ -525,14 +741,41 @@ async function main() {
 
   console.error(`Found ${saleBikes.length} sale bikes`);
 
-  const specKeys = getAllSpecKeys(saleBikes);
+  const { keys: specKeys, columnTypes } = getAllSpecKeysWithTypes(saleBikes);
   console.error(`Total unique spec columns: ${specKeys.length}`);
+  console.error(`Text columns: ${Object.values(columnTypes).filter(v => v).length}, Number columns: ${Object.values(columnTypes).filter(v => !v).length}`);
+
+  // Analyze data quality
+  console.error(`\n🔍 Analyzing data quality...`);
+  const dataQuality = analyzeDataQuality(saleBikes, specKeys);
+
+  // Print data quality summary
+  console.error(`\n📊 Data Quality Report:`);
+  console.error(`   Total cells: ${dataQuality.stats.totalCells}`);
+  console.error(`   Empty cells: ${dataQuality.stats.emptyCells} (${((dataQuality.stats.emptyCells / dataQuality.stats.totalCells) * 100).toFixed(1)}%)`);
+  console.error(`   Critical missing (required): ${dataQuality.stats.criticalMissing}`);
+  console.error(`   Warning missing (type-specific): ${dataQuality.stats.warningMissing}`);
+  console.error(`   Info missing (price fields): ${dataQuality.stats.infoMissing}`);
+
+  // Group issues by bike for cleaner output
+  const bikesWithIssues = dataQuality.issues.filter(b => b.issues.length > 0);
+  if (bikesWithIssues.length > 0) {
+    console.error(`\n⚠️  Bikes with issues (${bikesWithIssues.length}):`);
+    bikesWithIssues.forEach(bikeIssue => {
+      console.error(`   • ${bikeIssue.bikeTitle} (${bikeIssue.bikeType}):`);
+      bikeIssue.issues.forEach(issue => {
+        const icon = issue.severity === 'critical' ? '🔴' : issue.severity === 'warning' ? '🟡' : '🔵';
+        console.error(`      ${icon} ${issue.field}: ${issue.reason}`);
+      });
+    });
+  }
 
   // Generate PDF
   const outputPathResolved = path.resolve(process.cwd(), outputPath);
-  await generateComparisonPdf(saleBikes, crew, outputPathResolved);
+  await generateComparisonPdf(saleBikes, crew, outputPathResolved, columnTypes, dataQuality);
 
   console.error(`\n✓ Comparison table saved to: ${outputPathResolved}`);
+  console.error(`✓ Missing cells highlighted in PDF (Red=critical, Orange=warning, Blue=info)`);
 
   console.log(JSON.stringify({
     ok: true,
@@ -540,10 +783,20 @@ async function main() {
     specColumns: specKeys.length,
     columnsPerPage,
     outputPath: outputPathResolved,
+    dataQuality: {
+      totalCells: dataQuality.stats.totalCells,
+      emptyCells: dataQuality.stats.emptyCells,
+      criticalMissing: dataQuality.stats.criticalMissing,
+      warningMissing: dataQuality.stats.warningMissing,
+      infoMissing: dataQuality.stats.infoMissing,
+      bikesWithIssues: bikesWithIssues.length,
+    },
     bikes: saleBikes.map(b => ({
       id: b.id,
       title: b.title,
       price: b.salePrice,
+      type: classifyBikeType(b),
+      issuesCount: dataQuality.issues.find(i => i.bikeId === b.id)?.issues.length || 0,
     })),
   }, null, 2));
 }

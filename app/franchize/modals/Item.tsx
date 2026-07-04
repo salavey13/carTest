@@ -238,7 +238,7 @@ function RentalDatePickers({
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
-// Duration Shortcuts — quick date/time selection
+// Duration Shortcuts — quick date/time selection with prices
 // ───────────────────────────────────────────────────────────────────────────────
 function DurationShortcuts({
   startDate,
@@ -248,6 +248,7 @@ function DurationShortcuts({
   onEndDateChange,
   onEndTimeChange,
   borderColor,
+  specs,
 }: {
   startDate: string;
   endDate: string;
@@ -256,7 +257,10 @@ function DurationShortcuts({
   onEndDateChange: (v: string) => void;
   onEndTimeChange: (v: string) => void;
   borderColor: string;
+  specs?: Record<string, unknown>;
 }) {
+  const fmt = (n: number) => n.toLocaleString("ru-RU");
+
   // Compute today for default
   const today = (() => {
     const d = new Date();
@@ -277,6 +281,21 @@ function DurationShortcuts({
     const d = new Date(dateStr + "T00:00:00");
     d.setDate(d.getDate() + days);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  // Get price for a duration from specs
+  const getPrice = (hours: number): number => {
+    if (!specs) return 0;
+    if (hours <= 1) return Number(specs.price_per_hour) || 0;
+    if (hours <= 3) return Number(specs.price_per_3h) || (Number(specs.price_per_hour) || 0) * 3;
+    if (hours <= 6) return Number(specs.price_per_6h) || (Number(specs.price_per_hour) || 0) * 6;
+    if (hours <= 12) return Number(specs.price_per_12h) || (Number(specs.price_per_hour) || 0) * 12;
+    // Daily pricing
+    const days = Math.ceil(hours / 24);
+    if (days === 1) return Number(specs.dailyPrice) || Number(specs.rent_weekday) || 0;
+    if (days <= 4) return (Number(specs.rent_2_4d) || Number(specs.dailyPrice) || 0) * days;
+    if (days <= 10) return (Number(specs.rent_5_10d) || Number(specs.dailyPrice) || 0) * days;
+    return (Number(specs.rent_11_30d) || Number(specs.dailyPrice) || 0) * days;
   };
 
   const hourOptions = [
@@ -311,29 +330,161 @@ function DurationShortcuts({
         Быстрый выбор срока
       </p>
       <div className="flex flex-wrap gap-2">
-        {hourOptions.map((opt) => (
-          <button
-            key={opt.label}
-            type="button"
-            onClick={() => handleHourClick(opt.hours)}
-            className="rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-            style={{ borderColor }}
-          >
-            {opt.label}
-          </button>
-        ))}
-        {dayOptions.map((opt) => (
-          <button
-            key={opt.label}
-            type="button"
-            onClick={() => handleDayClick(opt.days)}
-            className="rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-            style={{ borderColor }}
-          >
-            {opt.label}
-          </button>
-        ))}
+        {hourOptions.map((opt) => {
+          const price = getPrice(opt.hours);
+          return (
+            <button
+              key={opt.label}
+              type="button"
+              onClick={() => handleHourClick(opt.hours)}
+              className="flex flex-col items-center rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+              style={{ borderColor }}
+            >
+              <span>{opt.label}</span>
+              {price > 0 && (
+                <span className="text-[10px] font-bold opacity-80">{fmt(price)} ₽</span>
+              )}
+            </button>
+          );
+        })}
+        {dayOptions.map((opt) => {
+          const price = getPrice(opt.days * 24);
+          return (
+            <button
+              key={opt.label}
+              type="button"
+              onClick={() => handleDayClick(opt.days)}
+              className="flex flex-col items-center rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+              style={{ borderColor }}
+            >
+              <span>{opt.label}</span>
+              {price > 0 && (
+                <span className="text-[10px] font-bold opacity-80">{fmt(price)} ₽</span>
+              )}
+            </button>
+          );
+        })}
       </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Pricing Table — shows ALL available rental rates in a grid
+// ───────────────────────────────────────────────────────────────────────────────
+function PricingTable({
+  specs,
+  borderColor,
+  accentColor,
+}: {
+  specs: Record<string, unknown>;
+  borderColor: string;
+  accentColor: string;
+}) {
+  const fmt = (n: number) => n.toLocaleString("ru-RU");
+
+  // Extract all pricing tiers from specs
+  const hourly = [
+    { label: "1 час", value: Number(specs.price_per_hour) || 0, key: "1h" },
+    { label: "3 часа", value: Number(specs.price_per_3h) || 0, key: "3h" },
+    { label: "6 часов", value: Number(specs.price_per_6h) || 0, key: "6h" },
+    { label: "12 часов", value: Number(specs.price_per_12h) || 0, key: "12h" },
+  ].filter((t) => t.value > 0);
+
+  const daily = [
+    { label: "Будни", value: Number(specs.rent_weekday) || Number(specs.dailyPrice) || 0, key: "wd" },
+    { label: "Выходные", value: Number(specs.rent_weekend) || 0, key: "we" },
+  ].filter((t) => t.value > 0);
+
+  const multiDay = [
+    { label: "2–4 дня", value: Number(specs.rent_2_4d) || 0, key: "2-4d", suffix: "₽/сутки" },
+    { label: "5–10 дней", value: Number(specs.rent_5_10d) || 0, key: "5-10d", suffix: "₽/сутки" },
+    { label: "11–30 дней", value: Number(specs.rent_11_30d) || 0, key: "11-30d", suffix: "₽/сутки" },
+  ].filter((t) => t.value > 0);
+
+  // If no pricing data at all, don't render
+  if (hourly.length === 0 && daily.length === 0 && multiDay.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      className="rounded-2xl border bg-[var(--item-border)]/15 p-3"
+      style={{ borderColor }}
+    >
+      <p className="mb-3 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+        💰 Все тарифы аренды
+      </p>
+
+      {/* Hourly tiers */}
+      {hourly.length > 0 && (
+        <div className="mb-3">
+          <p className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-[var(--item-muted-text)]">
+            Часовая аренда
+          </p>
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+            {hourly.map((tier) => (
+              <div
+                key={tier.key}
+                className="rounded-lg border px-2.5 py-2 text-center"
+                style={{ borderColor: `${borderColor}60` }}
+              >
+                <p className="text-[10px] text-[var(--item-muted-text)]">{tier.label}</p>
+                <p className="text-sm font-bold" style={{ color: accentColor }}>
+                  {fmt(tier.value)} ₽
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Daily tiers */}
+      {daily.length > 0 && (
+        <div className="mb-3">
+          <p className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-[var(--item-muted-text)]">
+            Дневная аренда
+          </p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {daily.map((tier) => (
+              <div
+                key={tier.key}
+                className="rounded-lg border px-2.5 py-2 text-center"
+                style={{ borderColor: `${borderColor}60` }}
+              >
+                <p className="text-[10px] text-[var(--item-muted-text)]">{tier.label}</p>
+                <p className="text-sm font-bold" style={{ color: accentColor }}>
+                  {fmt(tier.value)} ₽
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Multi-day tiers */}
+      {multiDay.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-[var(--item-muted-text)]">
+            Мульти-дни (цена за сутки)
+          </p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {multiDay.map((tier) => (
+              <div
+                key={tier.key}
+                className="rounded-lg border px-2 py-2 text-center"
+                style={{ borderColor: `${borderColor}60` }}
+              >
+                <p className="text-[10px] text-[var(--item-muted-text)]">{tier.label}</p>
+                <p className="text-sm font-bold" style={{ color: accentColor }}>
+                  {fmt(tier.value)} ₽
+                </p>
+                <p className="text-[9px] text-[var(--item-muted-text)]">/сутки</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1044,6 +1195,14 @@ export function ItemModal({
                   onEndDateChange={(v) => onChangeOption("rentEndDate", v)}
                   onEndTimeChange={setRentEndTime}
                   borderColor={theme.palette.borderSoft}
+                  specs={item.rawSpecs ?? {}}
+                />
+
+                {/* Full pricing table — shows ALL available rates */}
+                <PricingTable
+                  specs={item.rawSpecs ?? {}}
+                  borderColor={theme.palette.borderSoft}
+                  accentColor={theme.palette.accentMain}
                 />
 
                 <HelmetBalloons

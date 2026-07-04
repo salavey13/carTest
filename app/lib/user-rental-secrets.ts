@@ -71,6 +71,46 @@ export type ClaimResult =
   | { ok: true; secret: UserRentalSecret; claimedNow: boolean }
   | { ok: false; reason: "already_claimed_by_other" | "revoked" | "not_found" | "error"; error?: string };
 
+// ─── Helper: check if chat_id is a crew member ──────────────────────────────
+
+/**
+ * Check if a chat_id belongs to a crew member for the given crew_slug.
+ * Used to allow operators (crew members) to create secrets that renters can later claim.
+ */
+async function isCrewMember(chatId: string, crewSlug: string): Promise<boolean> {
+  try {
+    // First, find crew_id by slug
+    const { data: crew, error: crewError } = await supabaseAdmin
+      .from("crews")
+      .select("id")
+      .eq("slug", crewSlug)
+      .maybeSingle();
+
+    if (crewError || !crew) {
+      console.log(`[user-rental-secrets] isCrewMember: crew not found for slug=${crewSlug}`);
+      return false;
+    }
+
+    // Then check if chat_id is a member of this crew
+    const { data: member, error: memberError } = await supabaseAdmin
+      .from("crew_members")
+      .select("user_id")
+      .eq("crew_id", crew.id)
+      .eq("user_id", chatId)
+      .maybeSingle();
+
+    if (memberError) {
+      console.log(`[user-rental-secrets] isCrewMember: query error`, memberError);
+      return false;
+    }
+
+    return !!member;
+  } catch (error) {
+    console.error(`[user-rental-secrets] isCrewMember exception:`, error);
+    return false;
+  }
+}
+
 // ─── Read operations ─────────────────────────────────────────────────────────
 
 // Get most recent verified rental data for a user in a crew.
@@ -222,7 +262,9 @@ export async function saveUserRentalSecrets(
  *   1. Look up by doc_sha256 + verification_status='verified'
  *   2. If chat_id IS NULL → claim it (SET chat_id = caller's chatId) → return secret
  *   3. If chat_id = caller's chatId → already claimed by same user → return secret
- *   4. If chat_id ≠ NULL AND ≠ caller → DENY (another user already claimed)
+ *   4. If chat_id ≠ NULL AND ≠ caller:
+ *      a. If current chat_id is a crew member (operator) → ALLOW overwrite (renter claiming)
+ *      b. Otherwise → DENY (another renter already claimed)
  *   5. If not found or revoked → return appropriate error
  */
 export async function claimRentalSecretsByDocSha(
@@ -265,9 +307,61 @@ export async function claimRentalSecretsByDocSha(
       return { ok: true, secret, claimedNow: false };
     }
 
-    // Step 4: Claimed by a different user — deny
+    // Step 4: chat_id is set to a different user
     if (secret.chat_id !== null) {
-      return { ok: false, reason: "already_claimed_by_other" };
+      // Step 4a: Check if current chat_id belongs to a crew member (operator)
+      // If yes, allow the renter to claim (overwrite operator's chat_id)
+      const currentChatIdIsCrewMember = await isCrewMember(secret.chat_id, secret.crew_slug);
+      
+      if (!currentChatIdIsCrewMember) {
+        // Current chat_id is NOT a crew member — another renter already claimed
+        console.log(`[user-rental-secrets] claimRentalSecretsByDocSha: denied — chat_id=${secret.chat_id} is not a crew member`);
+        return { ok: false, reason: "already_claimed_by_other" };
+      }
+
+      // Step 4b: Current chat_id IS a crew member (operator) — allow renter to claim
+      console.log(`[user-rental-secrets] claimRentalSecretsByDocSha: operator ${secret.chat_id} → renter ${normalizedChatId} (overwrite allowed)`);
+      
+      const { data: claimed, error: claimError } = await privateSchema()
+        .from("user_rental_secrets")
+        .update({
+          chat_id: normalizedChatId,
+          qr_claimed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("doc_sha256", normalizedDocSha256)
+        .eq("chat_id", secret.chat_id)  // atomic: only if still operator's
+        .select("*")
+        .maybeSingle();
+
+      if (claimError) {
+        logUserRentalSecretsError("claimRentalSecretsByDocSha.overwrite", claimError);
+        return { ok: false, reason: "error", error: claimError.message || String(claimError) };
+      }
+
+      if (!claimed) {
+        // Race condition: someone else updated it between our find and update
+        const { data: rechecked } = await privateSchema()
+          .from("user_rental_secrets")
+          .select("chat_id")
+          .eq("doc_sha256", normalizedDocSha256)
+          .limit(1)
+          .maybeSingle();
+
+        if (rechecked?.chat_id === normalizedChatId) {
+          const { data: fullSecret } = await privateSchema()
+            .from("user_rental_secrets")
+            .select("*")
+            .eq("doc_sha256", normalizedDocSha256)
+            .limit(1)
+            .maybeSingle();
+          return { ok: true, secret: fullSecret as UserRentalSecret, claimedNow: false };
+        }
+
+        return { ok: false, reason: "already_claimed_by_other" };
+      }
+
+      return { ok: true, secret: claimed as UserRentalSecret, claimedNow: true };
     }
 
     // Step 5: chat_id IS NULL — claim it atomically
