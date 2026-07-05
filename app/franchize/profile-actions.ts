@@ -592,11 +592,106 @@ export async function saveRentalDocsPrefillAction(params: {
 }
 
 /**
+ * Auto-verify user's self-entered docs if they have completed rentals.
+ *
+ * Checks two sources:
+ *   1. private.rental_contract_artifacts WHERE telegram_chat_id = chatId
+ *   2. public.rentals WHERE user_id = chatId
+ *
+ * If either has at least one row, upgrades the prefill record from
+ * "pending" → "verified" and copies authoritative data from the
+ * most recent artifact (operator-verified data beats self-entered).
+ *
+ * Returns true if verification was performed (or was already verified).
+ */
+export async function tryVerifyUserRentalDocs(chatId: string, crewSlug: string): Promise<boolean> {
+  try {
+    // 1. Check private.rental_contract_artifacts for contracts created for this user
+    const { data: artifact, error: artifactError } = await privateSchema()
+      .from("rental_contract_artifacts")
+      .select("renter_full_name, renter_passport, renter_passport_issued_by, renter_passport_issue_date, renter_registration, renter_driver_license, renter_birth_date, license_categories, created_at")
+      .eq("telegram_chat_id", chatId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // 2. Check public.rentals for rental records
+    const { data: rental } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id")
+      .eq("user_id", chatId)
+      .limit(1)
+      .maybeSingle();
+
+    const hasContract = !!artifact;
+    const hasRental = !!rental;
+
+    if (!hasContract && !hasRental) {
+      return false; // nothing to verify against
+    }
+
+    // 3. Find the prefill record and upgrade it
+    const docSha256 = `prefill_${chatId}_${crewSlug}`;
+    const { data: prefillRow } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("doc_sha256", docSha256)
+      .maybeSingle();
+
+    if (!prefillRow) {
+      return false; // no prefill to verify
+    }
+
+    // Already verified — nothing to do
+    if (prefillRow.verification_status === "verified") {
+      return true;
+    }
+
+    // 4. Upgrade to verified, enriching with authoritative data from artifact
+    const updateData: Record<string, unknown> = {
+      verification_status: "verified",
+      updated_at: new Date().toISOString(),
+    };
+
+    // If we have a contract artifact, copy its data (operator-verified beats self-entered)
+    if (artifact) {
+      if (artifact.renter_full_name) updateData.renter_full_name = artifact.renter_full_name;
+      if (artifact.renter_passport) updateData.renter_passport = artifact.renter_passport;
+      if (artifact.renter_passport_issued_by) updateData.renter_passport_issued_by = artifact.renter_passport_issued_by;
+      if (artifact.renter_passport_issue_date) updateData.renter_passport_issue_date = artifact.renter_passport_issue_date;
+      if (artifact.renter_registration) updateData.renter_registration = artifact.renter_registration;
+      if (artifact.renter_driver_license) updateData.renter_driver_license = artifact.renter_driver_license;
+      if (artifact.renter_birth_date) updateData.renter_birth_date = artifact.renter_birth_date;
+    }
+
+    const { error: updateError } = await privateSchema()
+      .from("user_rental_secrets")
+      .update(updateData)
+      .eq("doc_sha256", docSha256)
+      .eq("verification_status", "pending"); // only upgrade pending → verified
+
+    if (updateError) {
+      console.error("[tryVerifyUserRentalDocs] update failed:", updateError);
+      return false;
+    }
+
+    console.log("[tryVerifyUserRentalDocs] upgraded prefill to verified", {
+      chatId, crewSlug, hasContract, hasRental,
+    });
+    return true;
+  } catch (error) {
+    console.error("[tryVerifyUserRentalDocs] exception:", error);
+    return false;
+  }
+}
+
+/**
  * Get user-entered passport/license data for pre-fill.
  * Reads from private.user_rental_secrets WHERE source_doc_key = "profile_prefill".
  *
- * Also checks for any verified records (from completed rentals) that might
- * have more complete data.
+ * Also auto-verifies: if the user has completed rentals (in rental_contract_artifacts
+ * or public.rentals), their prefill record is upgraded from "pending" to "verified"
+ * and enriched with operator-verified data.
  */
 export async function getRentalDocsPrefillAction(params: {
   userId: string;
@@ -633,31 +728,51 @@ export async function getRentalDocsPrefillAction(params: {
     const chatId = user.user_id;
     const docSha256 = `prefill_${chatId}_${params.slug}`;
 
-    // 2. Try to get the self-entered prefill record first
+    // 2. Auto-verify: check if user has completed rentals
+    //    If yes, upgrade prefill from "pending" to "verified" with authoritative data
+    await tryVerifyUserRentalDocs(chatId, params.slug);
+
+    // 3. Try to get the (now possibly verified) prefill record
     const { data: prefillRow } = await privateSchema()
       .from("user_rental_secrets")
       .select("*")
       .eq("doc_sha256", docSha256)
       .maybeSingle();
 
-    // 3. Also check for verified data from previous rentals
+    // 4. Also check for other verified data from previous rentals
+    //    (separate rows created by operator during contract generation)
     const { data: verifiedRow } = await privateSchema()
       .from("user_rental_secrets")
       .select("*")
       .eq("chat_id", chatId)
       .eq("crew_slug", params.slug)
       .eq("verification_status", "verified")
+      .neq("doc_sha256", docSha256) // exclude the prefill row (already fetched above)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    // 4. Merge: prefer verified data, fall back to prefill
+    // 5. Merge: prefer verified data from either source
+    const prefillVerified = prefillRow?.verification_status === "verified";
     const source = verifiedRow || prefillRow;
     if (!source) return { success: true };
 
     // Parse passport string back to series + number
     const passportParts = (source.renter_passport || "").trim().split(/\s+/);
     const licenseParts = (source.renter_driver_license || "").trim().split(/\s+/);
+
+    // Try to get license categories from artifact if available
+    let licenseCategories: string | undefined;
+    if (verifiedRow) {
+      const { data: artifact } = await privateSchema()
+        .from("rental_contract_artifacts")
+        .select("license_categories")
+        .eq("telegram_chat_id", chatId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      licenseCategories = artifact?.license_categories || undefined;
+    }
 
     return {
       success: true,
@@ -672,10 +787,10 @@ export async function getRentalDocsPrefillAction(params: {
         registrationAddress: source.renter_registration || undefined,
         licenseSeries: licenseParts[0] || undefined,
         licenseNumber: licenseParts[1] || undefined,
-        licenseCategories: undefined, // not stored in user_rental_secrets
+        licenseCategories,
         licenseExpiryDate: undefined, // not stored in user_rental_secrets
         verificationStatus: source.verification_status,
-        hasVerifiedData: !!verifiedRow,
+        hasVerifiedData: prefillVerified || !!verifiedRow,
       },
     };
   } catch {
