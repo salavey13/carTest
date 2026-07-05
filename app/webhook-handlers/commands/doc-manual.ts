@@ -1564,6 +1564,46 @@ ${qrDeepLink}`);
       (!isRent ? `\nPrice: ${Number(context.salePrice || 0).toLocaleString("ru-RU")} ₽` : ""),
     );
 
+    // --- Create/update lead in franchize_intents ---
+    // This ensures the client appears on the leads page with proper state
+    const leadUserId = context.clientPhone || String(userId);
+    try {
+      // Ensure user exists in users table (for leads page)
+      await supabaseAdmin.from("users").upsert({
+        user_id: leadUserId,
+        full_name: context.mpFullName || null,
+        metadata: {
+          source: isRent ? "rental_contract" : "sale_contract",
+          phone: context.clientPhone || null,
+          bikeId: bike.id,
+          bikeTitle: `${bike.make} ${bike.model}`,
+          updatedAt: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" });
+
+      // Record intent with deal-specific state
+      await supabaseAdmin.from("franchize_intents").upsert({
+        slug: "vip-bike",
+        bike_id: bike.id,
+        intent_type: isRent ? "rental_contract" : "sale_contract",
+        stage: "contract_generated",
+        source_route: "/doc",
+        contact_channel: "telegram_bot",
+        urgency_score: isRent ? 80 : 90,
+        telegram_user_id: leadUserId,
+        metadata: {
+          name: context.mpFullName,
+          phone: context.clientPhone || null,
+          bikeTitle: `${bike.make} ${bike.model}`,
+          dealType: isRent ? "rent" : "sale",
+          operatorId: String(userId),
+        },
+      }, { onConflict: "slug,bike_id,telegram_user_id,intent_type" });
+    } catch (leadErr) {
+      logger.warn("[/doc] Failed to create lead:", leadErr);
+    }
+
 
     // --- Send email notification ---
     // TO priority: explicit env override (for testing / redirection) →
