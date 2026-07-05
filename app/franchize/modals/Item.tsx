@@ -1178,6 +1178,55 @@ export function ItemModal({
       .slice(0, 6);
   }, [item, items]);
 
+  // ── Bot username for deep-links (from crew config) ──
+  const botUsername = (theme as any)?.telegramBotUsername || "oneBikePlsBot";
+
+  // ── buildStartappLink — MUST be before early return (it's a hook) ──
+  const buildStartappLink = useCallback(
+    (flowType: "rental" | "sale"): string | null => {
+      if (!item) return null;
+      try {
+        const state: StartappState = {
+          type: flowType === "rental" ? "rental" : "sale",
+          bikeId: item.id,
+          startDate: options.rentStartDate || undefined,
+          endDate: options.rentEndDate || undefined,
+          startTime: rentStartTime || undefined,
+          endTime: rentEndTime || undefined,
+          helmetCount: helmetCount > 0 ? helmetCount : undefined,
+          extrasGloves: extrasSelection.gloves === true || undefined,
+          extrasNet: extrasSelection.net === true || undefined,
+          extrasBag: extrasSelection.bag === true || undefined,
+          extrasCoat: extrasSelection.coat === true || undefined,
+          package: options.package || undefined,
+          perk: options.perk || undefined,
+        };
+        return buildTelegramDeepLink(botUsername, state);
+      } catch {
+        return `https://t.me/${botUsername}/app`;
+      }
+    },
+    [item, options.rentStartDate, options.rentEndDate, options.package, options.perk, rentStartTime, rentEndTime, helmetCount, extrasSelection, botUsername],
+  );
+
+  // ── handleCallbackSubmit — MUST be before early return (it's a hook) ──
+  const handleCallbackSubmit = useCallback(
+    (name: string, phone: string) => {
+      fetch("/api/franchize/callback-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug,
+          bikeId: item?.id,
+          bikeTitle: item?.title,
+          name,
+          phone,
+        }),
+      }).catch(() => {});
+    },
+    [item?.id, item?.title, slug],
+  );
+
   if (!item) return null;
 
   // Generalized fallback specs — rental vs order
@@ -1223,42 +1272,7 @@ export function ItemModal({
 
   const normalizedSpecs = item.specs.length > 0 ? item.specs : fallbackSpecs;
 
-  // ── CTA label logic ──
-  // In Telegram WebApp: normal "Забронировать"/"Купить".
-  // In browser (no TG context): CTAs become "Продолжить в Telegram" with a
-  // deep-link that carries the current selection as startapp state.
-  // Use crew-configured bot username, fall back to default.
-  const botUsername = (theme as any)?.telegramBotUsername || "oneBikePlsBot";
-
-  // Build the deep-link that carries current selections to the web app
-  const buildStartappLink = useCallback(
-    (flowType: "rental" | "sale"): string | null => {
-      if (!item) return null;
-      try {
-        const state: StartappState = {
-          type: flowType === "rental" ? "rental" : "sale",
-          bikeId: item.id,
-          startDate: options.rentStartDate || undefined,
-          endDate: options.rentEndDate || undefined,
-          startTime: rentStartTime || undefined,
-          endTime: rentEndTime || undefined,
-          helmetCount: helmetCount > 0 ? helmetCount : undefined,
-          extrasGloves: extrasSelection.gloves === true || undefined,
-          extrasNet: extrasSelection.net === true || undefined,
-          extrasBag: extrasSelection.bag === true || undefined,
-          extrasCoat: extrasSelection.coat === true || undefined,
-          package: options.package || undefined,
-          perk: options.perk || undefined,
-        };
-        return buildTelegramDeepLink(botUsername, state);
-      } catch {
-        // Payload too long — fall back to plain bot link
-        return `https://t.me/${botUsername}/app`;
-      }
-    },
-    [item, options.rentStartDate, options.rentEndDate, options.package, options.perk, rentStartTime, rentEndTime, helmetCount, extrasSelection, botUsername],
-  );
-
+  // ── CTA labels (browser vs Telegram) ──
   const rentCtaLabel = isInTelegram
     ? (isAdding ? "Бронируем..." : "Забронировать")
     : "⚡ Забронировать в Telegram";
@@ -1269,30 +1283,8 @@ export function ItemModal({
     ? (isAdding ? "Добавляем..." : showRentCta ? "Забронировать" : "Выбрать")
     : "⚡ Продолжить в Telegram";
 
-  // Determine footer grid layout — wider when callback option is present
+  // Determine footer grid layout
   const footerCols = showRentCta && showBuyCta ? 3 : 2;
-
-  // Callback submit handler — creates user record + notifies owner
-  const handleCallbackSubmit = useCallback(
-    (name: string, phone: string) => {
-      // Single API call that:
-      // 1. Upserts user with phone as user_id (public.users)
-      // 2. Records franchize intent
-      // 3. Notifies owner via forward-telegram
-      fetch("/api/franchize/callback-lead", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slug,
-          bikeId: item?.id,
-          bikeTitle: item?.title,
-          name,
-          phone,
-        }),
-      }).catch(() => {});
-    },
-    [item?.id, item?.title, slug],
-  );
 
   return (
     <div
