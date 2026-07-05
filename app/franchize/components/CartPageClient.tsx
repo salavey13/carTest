@@ -115,7 +115,9 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
     } else {
       await intentPromise;
     }
-    router.push(`/franchize/${slug}/order/demo-order?flow=${flow}`);
+    // Generate a real order ID instead of hardcoded "demo-order"
+    const orderId = `order-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    router.push(`/franchize/${slug}/order/${orderId}?flow=${flow}`);
   };
 
   const handleDelete = useCallback(
