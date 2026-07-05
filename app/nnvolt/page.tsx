@@ -270,7 +270,12 @@ function HeroSection() {
             <br className="sm:hidden" />
             <span className="hidden sm:inline"> </span>
             <span className="text-white/50 text-3xl sm:text-4xl lg:text-5xl font-light tracking-wide">
-              любой сложности. Под ключ.
+              любой сложности.
+            </span>
+            <br className="sm:hidden" />
+            <span className="hidden sm:inline"> </span>
+            <span className="text-white/50 text-3xl sm:text-4xl lg:text-5xl font-light tracking-wide">
+              Под ключ.
             </span>
           </motion.h1>
 
