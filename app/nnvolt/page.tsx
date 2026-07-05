@@ -116,9 +116,9 @@ function Header() {
   }, []);
 
   const links = [
-    { label: "Услуги", href: "#services" },
-    { label: "Портфолио", href: "#portfolio" },
-    { label: "Бригада", href: "#team" },
+    { label: "Услуги", href: "https://nnvolt.ru#services" },
+    { label: "Портфолио", href: "https://nnvolt.ru#portfolio" },
+    { label: "Бригада", href: "https://nnvolt.ru#team" },
     { label: "Калькулятор", href: "#calculator" },
     { label: "FAQ", href: "#faq" },
     { label: "Контакты", href: "#contacts" },
@@ -255,7 +255,7 @@ function HeroSection() {
           >
             <div className="w-2 h-2 rounded-full bg-volt animate-pulse" />
             <span className="text-volt text-xs font-bold tracking-[0.25em] uppercase">
-              СРО &bull; Допуск до 10 кВ &bull; Гарантия 1 год
+              Допуск до 10 кВ &bull; Гарантия 1 год
             </span>
           </motion.div>
 
