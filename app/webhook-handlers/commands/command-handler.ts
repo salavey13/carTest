@@ -189,15 +189,10 @@ export async function handleCommand(update: any) {
             if (docHandled) return;
 
             // Check if user is in /testdrive flow
-            const { data: tdState } = await supabaseAnon.from("user_states")
-                .select("state")
-                .eq("user_id", userIdStr)
-                .like("state", "td_%")
-                .maybeSingle();
-            if (tdState) {
-                const tdHandled = await handleTestDriveText(userIdStr, chatId, text);
-                if (tdHandled) return;
-            }
+            // NOTE: no supabaseAnon pre-check — handleTestDriveText reads state internally
+            // via supabaseAdmin (which bypasses RLS). Safe to call unconditionally.
+            const tdHandled = await handleTestDriveText(userIdStr, chatId, text);
+            if (tdHandled) return;
 
             // Check if user is in /subrent flow
             const { data: subrentState } = await supabaseAnon.from("user_states")

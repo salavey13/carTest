@@ -786,7 +786,7 @@ export async function handleTestDriveText(userId: string, chatId: number, text: 
   if (state === "td_phone") {
     const cleaned = text.replace(/[^\d+]/g, "");
     if (cleaned.length < 10) {
-      await sendComplexMessage(chatId, "❌ Неверный формат. Введите номер телефона.", [], { removeKeyboard: true });
+      await sendComplexMessage(chatId, "❌ Неверный формат.\n\nПример: `+7 987 654 32 10`", [], { removeKeyboard: true, parseMode: "Markdown" });
       return true;
     }
     context.customerPhone = cleaned;
@@ -865,7 +865,7 @@ export async function handleTestDriveText(userId: string, chatId: number, text: 
     }
     context.customerBirthDate = d;
     await setState(userId, "td_address", context);
-    await sendComplexMessage(chatId, `✅ ${d}\n\n*Адрес регистрации*`, [], { removeKeyboard: true, parseMode: "Markdown" });
+    await sendComplexMessage(chatId, `✅ ${d}\n\n*Адрес регистрации*\n\nПример: г. Нижний Новгород, ул. Ленина, д. 1, кв. 1`, [], { removeKeyboard: true, parseMode: "Markdown" });
     return true;
   }
 
@@ -972,7 +972,7 @@ export async function handleTestDriveCallback(
     context.bikeModel = bike.model;
     await setState(userId, "td_phone", context);
     await sendComplexMessage(chatId, `🏍 ${bike.make} ${bike.model}`, [], { removeKeyboard: true });
-    await sendComplexMessage(chatId, "*Тест-драйв — телефон клиента*", [], { parseMode: "Markdown", removeKeyboard: true });
+    await sendComplexMessage(chatId, "*Телефон клиента*\nПример: `+7 987 654 32 10`", [], { parseMode: "Markdown", removeKeyboard: true });
     return true;
   }
 
@@ -982,7 +982,7 @@ export async function handleTestDriveCallback(
     context.needPassport = true;
     context.needLicense = false;
     await setState(userId, "td_name", context);
-    await sendComplexMessage(chatId, "✅ Паспорт\n\n*ФИО*", [], { removeKeyboard: true, parseMode: "Markdown" });
+    await sendComplexMessage(chatId, "✅ Паспорт\n\n*ФИО*\n\nПример: `Иванов Иван Иванович`", [], { removeKeyboard: true, parseMode: "Markdown" });
     return true;
   }
 
@@ -990,7 +990,7 @@ export async function handleTestDriveCallback(
     context.needPassport = false;
     context.needLicense = true;
     await setState(userId, "td_name", context);
-    await sendComplexMessage(chatId, "✅ В/У\n\n*ФИО*", [], { removeKeyboard: true, parseMode: "Markdown" });
+    await sendComplexMessage(chatId, "✅ В/У\n\n*ФИО*\n\nПример: `Иванов Иван Иванович`", [], { removeKeyboard: true, parseMode: "Markdown" });
     return true;
   }
 
@@ -998,7 +998,7 @@ export async function handleTestDriveCallback(
     context.needPassport = true;
     context.needLicense = true;
     await setState(userId, "td_name", context);
-    await sendComplexMessage(chatId, "✅ Оба документа\n\n*ФИО*", [], { removeKeyboard: true, parseMode: "Markdown" });
+    await sendComplexMessage(chatId, "✅ Оба документа\n\n*ФИО*\n\nПример: `Иванов Иван Иванович`", [], { removeKeyboard: true, parseMode: "Markdown" });
     return true;
   }
 
