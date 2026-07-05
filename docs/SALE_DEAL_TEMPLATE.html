@@ -7,6 +7,17 @@
 <tr><td style="border: none; width: 50%;">г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">« {{contract_day}}» {{contract_month_genitive}} {{contract_year}} года</td></tr>
 </table>
 
+<!-- Quick-info box for fast verification -->
+<table style="width: 100%; border: 2px solid #333; margin-top: 12pt; margin-bottom: 12pt; font-size: 11pt;">
+<tr><td style="border: 1px solid #999; padding: 4pt 8pt; font-weight: bold; background: #f0f0f0;" colspan="2">КРАТКАЯ ИНФОРМАЦИЯ</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; width: 40%;">Покупатель:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{buyer_full_name}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Товар:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{bike_make}} {{bike_model}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Цвет:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{product_color}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">VIN / № рамы:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{product_vin}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Цена:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold; font-size: 12pt;">{{price_digits_table}} ₽</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Телефон:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{buyer_phone}}</td></tr>
+</table>
+
 <p style="text-align: justify;">{{organization_name}}, именуем в дальнейшем &quot;Продавец&quot;, в лице {{organization_short}}, действующий на основании ОГРНИП: {{ogrnip}}, с одной стороны и {{buyer_full_name}}, именуемый в дальнейшем &quot;Покупатель&quot;, с другой стороны, совместно именуемые &quot;Стороны&quot;, заключили настоящий Договор о нижеследующем:</p>
 
 <p style="text-align: center; font-weight: bold;">1. Предмет Договора</p>

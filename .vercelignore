@@ -9,7 +9,13 @@ nnvolt-static/
 # ===================================================================
 books/
 Configame/
-docs/
+# ===================================================================
+# Exclude heavy non-essential docs (keep template HTML files!)
+# ===================================================================
+docs/superpowers/
+docs/sql/backups/
+docs/*.md
+docs/TODO*.md
 tests/
 tmp/
 skills/
