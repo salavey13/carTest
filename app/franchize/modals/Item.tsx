@@ -495,7 +495,122 @@ function PricingTable({
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
-// Helmet Balloons — helmet selection (0/1/2)
+// Additional Items — helmets, gloves, net, bag, coat
+// ───────────────────────────────────────────────────────────────────────────────
+
+/** All rentable extras with their prices (per rental, not per day). */
+export const ADDITIONAL_ITEMS = [
+  { key: "helmet", label: "Шлем", icon: "🪖", price: 1000, type: "count" as const, max: 2 },
+  { key: "gloves", label: "Перчатки", icon: "🧤", price: 500, type: "toggle" as const },
+  { key: "net", label: "Сеть (накидка)", icon: "🌐", price: 0, type: "toggle" as const },
+  { key: "bag", label: "Багажная сумка", icon: "👜", price: 500, type: "toggle" as const },
+  { key: "coat", label: "Дождевик", icon: "🧥", price: 500, type: "toggle" as const },
+];
+
+export type AdditionalItemsSelection = Record<string, number | boolean>;
+
+/** Calculate total extras cost from selection. */
+export function calcExtrasTotal(sel: AdditionalItemsSelection): number {
+  return ADDITIONAL_ITEMS.reduce((sum, item) => {
+    const val = sel[item.key];
+    if (item.type === "count") return sum + (typeof val === "number" ? val : 0) * item.price;
+    return sum + (val === true ? item.price : 0);
+  }, 0);
+}
+
+/** Build a human-readable summary of selected extras. */
+export function extrasSummary(sel: AdditionalItemsSelection): string {
+  const parts: string[] = [];
+  for (const item of ADDITIONAL_ITEMS) {
+    const val = sel[item.key];
+    if (item.type === "count" && typeof val === "number" && val > 0) {
+      parts.push(`${item.icon} ${item.label} ×${val}`);
+    } else if (val === true) {
+      parts.push(`${item.icon} ${item.label}`);
+    }
+  }
+  return parts.join(", ");
+}
+
+function AdditionalItems({
+  selection,
+  onChange,
+}: {
+  selection: AdditionalItemsSelection;
+  onChange: (sel: AdditionalItemsSelection) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+        🎒 Доп. оборудование
+      </p>
+      <div className="space-y-2">
+        {ADDITIONAL_ITEMS.map((item) => {
+          if (item.type === "count") {
+            const count = (selection[item.key] as number) || 0;
+            return (
+              <div key={item.key} className="flex items-center justify-between">
+                <span className="text-xs">
+                  {item.icon} {item.label}
+                  {item.price > 0 && <span className="opacity-50"> +{item.price}₽</span>}
+                  {item.price === 0 && <span className="opacity-50"> бесплатно</span>}
+                </span>
+                <div className="flex gap-1.5">
+                  {[0, 1, 2].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => onChange({ ...selection, [item.key]: n })}
+                      aria-pressed={count === n}
+                      className={`h-7 w-7 rounded-full border text-xs font-bold transition hover:opacity-90 active:scale-[0.95] ${
+                        count === n
+                          ? "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
+                          : "border-[var(--item-border)] text-[var(--item-text)]"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+          // toggle
+          const checked = selection[item.key] === true;
+          return (
+            <label
+              key={item.key}
+              className="flex cursor-pointer items-center justify-between rounded-lg border px-2.5 py-1.5 transition hover:opacity-80"
+              style={{ borderColor: checked ? "var(--item-accent)" : "var(--item-border)" }}
+            >
+              <span className="text-xs">
+                {item.icon} {item.label}
+                {item.price > 0 && <span className="opacity-50"> +{item.price}₽</span>}
+                {item.price === 0 && <span className="opacity-50"> бесплатно</span>}
+              </span>
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(e) => onChange({ ...selection, [item.key]: e.target.checked })}
+                className="h-4 w-4 accent-[var(--item-accent)]"
+              />
+            </label>
+          );
+        })}
+      </div>
+      {/* Total extras cost */}
+      {calcExtrasTotal(selection) > 0 && (
+        <p className="mt-2 text-right text-xs font-bold text-[var(--item-accent)]">
+          +{calcExtrasTotal(selection).toLocaleString("ru-RU")} ₽
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Helmet Balloons — DEPRECATED, replaced by AdditionalItems above
+// Kept for backward compatibility with existing cart code
 // ───────────────────────────────────────────────────────────────────────────────
 function HelmetBalloons({
   selected,
@@ -550,6 +665,7 @@ function PriceCard({
   startTime,
   endTime,
   helmetCount,
+  extrasSelection,
   isExpanded,
   onToggleExpand,
   borderColor,
@@ -560,6 +676,7 @@ function PriceCard({
   startTime: string;
   endTime: string;
   helmetCount: number;
+  extrasSelection?: AdditionalItemsSelection;
   isExpanded: boolean;
   onToggleExpand: () => void;
   borderColor: string;
@@ -577,6 +694,13 @@ function PriceCard({
     helmetCount
   );
 
+  // Add non-helmet extras to the total
+  const extrasTotal = extrasSelection ? calcExtrasTotal(extrasSelection) : 0;
+  // Subtract helmet cost from extrasTotal (already counted in result.helmetRub)
+  const helmetFromExtras = extrasSelection ? (typeof extrasSelection.helmet === "number" ? (extrasSelection.helmet as number) * 1000 : 0) : 0;
+  const nonHelmetExtras = extrasTotal - helmetFromExtras;
+  const grandTotal = result.totalRub + nonHelmetExtras;
+
   const fmt = (n: number) => n.toLocaleString("ru-RU");
 
   return (
@@ -588,7 +712,7 @@ function PriceCard({
         <div className="flex items-center gap-2">
           <span className="text-lg">💰</span>
           <span className="text-lg font-bold text-[var(--item-accent)]">
-            {fmt(result.totalRub)} ₽
+            {fmt(grandTotal)} ₽
           </span>
         </div>
         {result.savingsPercent > 0 && (
@@ -604,7 +728,7 @@ function PriceCard({
           onClick={onToggleExpand}
           className="mt-2 text-xs text-[var(--item-accent)] transition hover:opacity-90"
         >
-          Размер при клике
+          Детали стоимости
         </button>
       )}
 
@@ -616,11 +740,26 @@ function PriceCard({
             <p>• Тариф: {result.breakdown.ratePerPeriod}</p>
             <p>• Аренда: {fmt(result.basePriceRub)} ₽</p>
             {result.helmetRub > 0 && <p>• Шлем: {fmt(result.helmetRub)} ₽</p>}
+            {nonHelmetExtras > 0 && extrasSelection && (
+              <>
+                {ADDITIONAL_ITEMS.filter((i) => i.key !== "helmet").map((item) => {
+                  const val = extrasSelection[item.key];
+                  if (val !== true && val !== 1) return null;
+                  return (
+                    <p key={item.key}>
+                      • {item.icon} {item.label}: {item.price > 0 ? `${fmt(item.price)} ₽` : "бесплатно"}
+                    </p>
+                  );
+                })}
+              </>
+            )}
             <p>• Залог: {fmt(result.depositRub)} ₽</p>
           </div>
           <div className="border-t border-[var(--item-border)] pt-2">
             <p className="font-semibold">
-              Итого: {fmt(result.totalRub)} ₽ (аренда{result.helmetRub > 0 ? " + шлем" : ""})
+              Итого: {fmt(grandTotal)} ₽ (аренда
+              {result.helmetRub > 0 ? " + шлем" : ""}
+              {nonHelmetExtras > 0 ? " + доп." : ""})
             </p>
             {result.savingsRub > 0 && (
               <p className="text-[var(--item-muted-text)]">
@@ -786,6 +925,8 @@ export function ItemModal({
 
   // New state for dynamic pricing
   const [helmetCount, setHelmetCount] = useState(0);
+  // Additional items: helmet count + gloves/net/bag/coat toggles
+  const [extrasSelection, setExtrasSelection] = useState<AdditionalItemsSelection>({ helmet: 0 });
   const [priceCardExpanded, setPriceCardExpanded] = useState(false);
   const [rentStartTime, setRentStartTime] = useState("10:00");
   const [rentEndTime, setRentEndTime] = useState("10:00");
@@ -927,9 +1068,11 @@ export function ItemModal({
 
       setIsAdding(true);
       try {
-        // Store helmet count in perk field for cart (e.g., "шлем×2")
-        if (helmetCount > 0) {
-          onChangeOption("perk", `шлем×${helmetCount}`);
+        // Store extras selection in perk field for cart
+        // Format: "шлем×2,перчатки,сумка" or "стандарт" if nothing selected
+        const extrasStr = extrasSummary(extrasSelection);
+        if (extrasStr) {
+          onChangeOption("perk", extrasStr);
         } else {
           onChangeOption("perk", "стандарт");
         }
@@ -1100,6 +1243,10 @@ export function ItemModal({
           startTime: rentStartTime || undefined,
           endTime: rentEndTime || undefined,
           helmetCount: helmetCount > 0 ? helmetCount : undefined,
+          extrasGloves: extrasSelection.gloves === true || undefined,
+          extrasNet: extrasSelection.net === true || undefined,
+          extrasBag: extrasSelection.bag === true || undefined,
+          extrasCoat: extrasSelection.coat === true || undefined,
           package: options.package || undefined,
           perk: options.perk || undefined,
         };
@@ -1109,7 +1256,7 @@ export function ItemModal({
         return `https://t.me/${botUsername}/app`;
       }
     },
-    [item, options.rentStartDate, options.rentEndDate, options.package, options.perk, rentStartTime, rentEndTime, helmetCount],
+    [item, options.rentStartDate, options.rentEndDate, options.package, options.perk, rentStartTime, rentEndTime, helmetCount, extrasSelection, botUsername],
   );
 
   const rentCtaLabel = isInTelegram
@@ -1394,9 +1541,13 @@ export function ItemModal({
                   accentColor={theme.palette.accentMain}
                 />
 
-                <HelmetBalloons
-                  selected={helmetCount}
-                  onSelect={setHelmetCount}
+                <AdditionalItems
+                  selection={extrasSelection}
+                  onChange={(sel) => {
+                    setExtrasSelection(sel);
+                    // Sync helmetCount for backward compat with cart/pricing
+                    setHelmetCount(typeof sel.helmet === "number" ? sel.helmet : 0);
+                  }}
                 />
 
                 {pricingResult && (
@@ -1408,6 +1559,7 @@ export function ItemModal({
                       startTime={rentStartTime}
                       endTime={rentEndTime}
                       helmetCount={helmetCount}
+                      extrasSelection={extrasSelection}
                       isExpanded={priceCardExpanded}
                       onToggleExpand={() => setPriceCardExpanded((v) => !v)}
                       borderColor={theme.palette.borderSoft}

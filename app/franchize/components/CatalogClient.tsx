@@ -700,10 +700,18 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     setSelectedItem(target);
 
     // Build pre-filled options from the query params.
+    const extrasParts: string[] = [];
+    const helmetCount = searchParams.get("helmetCount");
+    if (helmetCount && Number(helmetCount) > 0) extrasParts.push(`🪖 Шлем ×${helmetCount}`);
+    if (searchParams.get("extrasGloves") === "true") extrasParts.push("🧤 Перчатки");
+    if (searchParams.get("extrasNet") === "true") extrasParts.push("🌐 Сеть");
+    if (searchParams.get("extrasBag") === "true") extrasParts.push("👜 Сумка");
+    if (searchParams.get("extrasCoat") === "true") extrasParts.push("🧥 Дождевик");
+
     const prefill: typeof initialSelectedOptions = {
       package: (searchParams.get("package") || "Базовый") as never,
-      duration: "1 день", // we'll show dates in the modal; the user can re-select
-      perk: (searchParams.get("perk") || "Стандарт") as never,
+      duration: "1 день",
+      perk: (extrasParts.length > 0 ? extrasParts.join(", ") : (searchParams.get("perk") || "Стандарт")) as never,
       auction: auctionTickOptions[0] ?? "Без аукциона",
       rentStartDate: searchParams.get("startDate") || "",
       rentEndDate: searchParams.get("endDate") || "",

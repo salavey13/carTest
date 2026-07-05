@@ -62,6 +62,10 @@ export async function handleStartappParam(
     if (state.startTime) params.set('startTime', state.startTime);
     if (state.endTime) params.set('endTime', state.endTime);
     if (state.helmetCount) params.set('helmetCount', String(state.helmetCount));
+    if (state.extrasGloves) params.set('extrasGloves', 'true');
+    if (state.extrasNet) params.set('extrasNet', 'true');
+    if (state.extrasBag) params.set('extrasBag', 'true');
+    if (state.extrasCoat) params.set('extrasCoat', 'true');
     if (state.package) params.set('package', state.package);
     if (state.perk) params.set('perk', state.perk);
     if (state.color) params.set('color', state.color);
