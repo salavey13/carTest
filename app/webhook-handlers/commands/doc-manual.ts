@@ -1037,14 +1037,42 @@ async function createRentalFromDocContract(
       return null;
     }
 
-    // Calculate total cost from daily price × duration
-    // Always round up to full days for simplicity
-    const dailyPrice = Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || '10000');
+    // Calculate total cost with weekend-aware pricing
+    const baseDailyPrice = Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || '10000');
+    const rentWeekend = Number(bike.specs?.rent_weekend) || 0;
     const start = new Date(startDateIso);
     const end = new Date(endDateIso);
     const hours = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10;
     const days = Math.max(1, Math.ceil(hours / 24));
-    const totalCost = dailyPrice * days;  // Simplified: always charge full days
+
+    // Count weekend days for blended pricing
+    let weekendCount = 0;
+    {
+      const d = new Date(start);
+      while (d <= end) {
+        const dow = d.getDay();
+        if (dow === 0 || dow === 6) weekendCount++;
+        d.setDate(d.getDate() + 1);
+      }
+    }
+    const weekdayCount = Math.max(0, days - weekendCount);
+
+    let dailyPrice: number;
+    let totalCost: number;
+    if (days === 1 && weekendCount > 0 && rentWeekend > 0) {
+      // Single weekend day
+      dailyPrice = rentWeekend;
+      totalCost = rentWeekend;
+    } else if (days > 1 && weekendCount > 0 && rentWeekend > 0) {
+      // Multi-day with weekends: blend rates
+      const weekdayRate = Number(bike.specs?.rent_weekday) || baseDailyPrice;
+      dailyPrice = Math.round((weekdayCount * weekdayRate + weekendCount * rentWeekend) / days);
+      totalCost = weekdayCount * weekdayRate + weekendCount * rentWeekend;
+    } else {
+      // All weekdays
+      dailyPrice = baseDailyPrice;
+      totalCost = baseDailyPrice * days;
+    }
 
     logger.info('[/doc] createRentalFromDocContract: pricing', {
       dailyPrice,
