@@ -3,16 +3,20 @@
  * /testdrive command handler — MANUAL INPUT VERSION
  * =============================================================================
  *
- * Flow (8 steps):
- *   1. Phone → "+7 987 654 32 10"
- *   2. Full name → "Иванов Иван Иванович"
- *   3. Passport → "4509 123456 15.03.2020 ОМВД"
- *   4. Birth → "15.03.1990"
- *   5. Address → free text
- *   6. License category → inline keyboard (A / B / нет)
- *   7. Deposit → inline keyboard with default from bike.specs
- *      or custom amount → free text
- *   8. Confirm → generate contract
+ * Enhanced flow (2026-07-05): operator chooses which document to collect.
+ * After phone → doc choice (passport / license / both) → conditional steps.
+ *
+ * Flow:
+ *   1. Bike selection
+ *   2. Phone → "+7 987 654 32 10"
+ *   3. Document choice → inline keyboard (🪪 Passport / 🚗 License / 📋 Both)
+ *      ├─ Passport only: name → passport → birth → address → confirm
+ *      ├─ License only:  name → license → categories → confirm
+ *      └─ Both:          name → passport → birth → address → license → categories → confirm
+ *   4. Confirm → generate DOCX
+ *
+ * Skipped document fields are left blank in the contract ({{#if}} conditionals
+ * in the template omit them entirely).
  */
 
 "use server";
@@ -22,6 +26,7 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
+import { privateSchema } from "@/lib/private-secrets";
 import { createHash } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -45,11 +50,29 @@ interface TestDriveContext {
   customerIssuedBy?: string;
   customerBirthDate?: string;
   customerRegistration?: string;
+  // Document choice flags
+  needPassport?: boolean;       // true = collect passport fields
+  needLicense?: boolean;        // true = collect license fields
+  // License fields
+  licenseSeries?: string;
+  licenseNumber?: string;
   licenseCategory?: string;
-  depositOverride?: string;
 }
 
 // ── Keyboard builders ────────────────────────────────────────────────────────
+
+/**
+ * Document choice keyboard — operator decides which identity document
+ * to collect from the client. Picked value sets needPassport / needLicense.
+ */
+function buildDocChoiceKeyboard(): KeyboardButton[][] {
+  return [
+    [{ text: "🪪 Паспорт", callback_data: "td_doc_passport" }],
+    [{ text: "🚗 Водительское удостоверение", callback_data: "td_doc_license" }],
+    [{ text: "📋 Оба документа", callback_data: "td_doc_both" }],
+    [{ text: "❌ Отменить", callback_data: "td_cancel" }],
+  ];
+}
 
 function buildCategoryKeyboard(selected?: string): KeyboardButton[][] {
   return [
@@ -65,17 +88,6 @@ function buildCategoryKeyboard(selected?: string): KeyboardButton[][] {
   ];
 }
 
-function buildDepositChoiceKeyboard(depositAmount: string, bike?: any): KeyboardButton[][] {
-  const amount = Number(depositAmount) || 20000;
-  const formatted = amount.toLocaleString("ru-RU");
-  const bikeLabel = bike ? ` (${bike.make} ${bike.model})` : "";
-  return [
-    [{ text: `✅ Депозит ${formatted} ₽${bikeLabel}`, callback_data: "td_dep_confirm" }],
-    [{ text: "✏️ Своя сумма", callback_data: "td_dep_custom" }],
-    [{ text: "❌ Отменить", callback_data: "td_cancel" }],
-  ];
-}
-
 function buildConfirmKeyboard(): KeyboardButton[][] {
   return [
     [
@@ -86,7 +98,7 @@ function buildConfirmKeyboard(): KeyboardButton[][] {
   ];
 }
 
-// ── Bike resolution (shared with doc-manual) ────────────────────────────────
+// ── Bike resolution ──────────────────────────────────────────────────────────
 
 async function resolveBikeById(bikeId: string): Promise<any> {
   const { data: exactMatch } = await supabaseAdmin
@@ -199,7 +211,7 @@ async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<CrewSecre
   }
 }
 
-// ── Smart parsers (shared with doc-manual) ──────────────────────────────────
+// ── Smart parsers ────────────────────────────────────────────────────────────
 
 function parsePassport(text: string): { series: string; number: string; issueDate: string; issuedBy: string } | null {
   const parts = text.trim().split(/\s+/);
@@ -217,7 +229,7 @@ function parsePassport(text: string): { series: string; number: string; issueDat
 
   let dateStr = parts[dateIdx];
   const dateParts = dateStr.split('.');
-  if (dateParts.length === 2) return null; // year required
+  if (dateParts.length === 2) return null;
   if (dateParts[2].length === 2) {
     const y = parseInt(dateParts[2]);
     dateParts[2] = y > 50 ? `19${y}` : `20${y}`;
@@ -226,6 +238,85 @@ function parsePassport(text: string): { series: string; number: string; issueDat
 
   const issuedBy = parts.slice(dateIdx + 1).join(' ') || "не указано";
   return { series, number, issueDate: dateStr, issuedBy };
+}
+
+/**
+ * Parse Russian VU (driver's license) series + number.
+ * Accepted formats:
+ *   "99 76 123456"     → series=9976, number=123456  (2+2 = 4-digit series)
+ *   "9976 123456"      → series=9976, number=123456  (4-digit series)
+ *   "99 76 123456 15.03" → same, dates ignored (we don't need them for test-drive)
+ */
+function parseLicenseSimple(text: string): { series: string; number: string } | null {
+  const parts = text.trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return null;
+
+  // Extract all digit sequences
+  const digits: string[] = [];
+  for (const p of parts) {
+    const d = p.replace(/\D/g, '');
+    if (d.length > 0) digits.push(d);
+  }
+
+  if (digits.length < 2) return null;
+
+  let series = "", number = "";
+
+  // Strategy 1: find a 4-digit (series) followed by a 6-digit (number)
+  for (let i = 0; i < digits.length; i++) {
+    if (digits[i].length === 4) {
+      series = digits[i];
+      // Next non-consumed 6-digit = number
+      for (let j = i + 1; j < digits.length; j++) {
+        if (digits[j].length === 6) {
+          number = digits[j];
+          break;
+        }
+      }
+      if (number) break;
+    }
+  }
+
+  // Strategy 2: two consecutive 2-digit tokens = series (e.g. "99 76"), then 6-digit = number
+  if (!series || !number) {
+    for (let i = 0; i < digits.length - 1; i++) {
+      if (digits[i].length === 2 && digits[i + 1].length === 2) {
+        series = digits[i] + digits[i + 1];
+        // Find a 6-digit after these
+        for (let j = i + 2; j < digits.length; j++) {
+          if (digits[j].length === 6) {
+            number = digits[j];
+            break;
+          }
+        }
+        if (number) break;
+      }
+    }
+  }
+
+  // Strategy 3: find any 4+ digit for series, any 6-digit for number
+  if (!series || !number) {
+    for (const d of digits) {
+      if (!series && d.length >= 4) series = d.slice(0, 4);
+      else if (!number && d.length === 6) number = d;
+    }
+  }
+
+  // Strategy 4: "99 76123456" -> 2-char + 8-char (where 8 = 2+6 concatenated)
+  if (!series || !number) {
+    for (let i = 0; i < digits.length - 1; i++) {
+      if (digits[i].length === 2 && digits[i + 1].length === 8) {
+        series = digits[i] + digits[i + 1].slice(0, 2);
+        number = digits[i + 1].slice(2);
+        if (number.length === 6) break;
+        // reset if not valid
+        series = ""; number = "";
+      }
+    }
+  }
+
+  if (!series || !number) return null;
+  return { series, number };
 }
 
 function parseDate(text: string, requireYear = true): string | null {
@@ -267,7 +358,7 @@ function numberToWords(n: number): string {
   const tens = ["", "", "двадцать", "тридцать", "сорок", "пятьдесят", "шестьдесят", "семьдесят", "восемьдесят", "девяносто"];
   const hundreds = ["", "сто", "двести", "триста", "четыреста", "пятьсот", "шестьсот", "семьсот", "восемьсот", "девятьсот"];
 
-  if (n >= 1000000) { /* not expected for test-drive price but keep */ return String(n); }
+  if (n >= 1000000) return String(n);
   if (n >= 1000) {
     const th = Math.floor(n / 1000);
     const r = n % 1000;
@@ -328,16 +419,44 @@ function buildSummary(context: TestDriveContext): string {
     "*📋 Проверьте данные:*",
     "",
     `📱 ${context.customerPhone || "—"}`,
-    `👤 ${context.customerFullName}`,
-    `🪪 ${context.customerSeries} ${context.customerNumber} от ${context.customerIssueDate}`,
-    `📅 ${context.customerBirthDate}`,
-    `🏠 ${context.customerRegistration}`,
-    `🚗 Категория: ${context.licenseCategory || "—"}`,
-    `💰 Депозит: ${Number(context.depositOverride || "20000").toLocaleString("ru-RU")} ₽`,
+    `👤 ${context.customerFullName || "—"}`,
+  ];
+
+  // Show what documents were collected
+  if (context.needPassport && context.customerSeries) {
+    lines.push(
+      `🪪 Паспорт: ${context.customerSeries} ${context.customerNumber}` +
+      `${context.customerIssueDate ? ` от ${context.customerIssueDate}` : ""}`
+    );
+    if (context.customerBirthDate) lines.push(`📅 ${context.customerBirthDate}`);
+    if (context.customerRegistration) lines.push(`🏠 ${context.customerRegistration}`);
+  } else if (context.needPassport) {
+    lines.push(`🪪 Паспорт: не указан`);
+  }
+
+  if (context.needLicense && context.licenseSeries) {
+    lines.push(
+      `🚗 В/У: ${context.licenseSeries} № ${context.licenseNumber}` +
+      `${context.licenseCategory ? ` (${context.licenseCategory})` : ""}`
+    );
+  } else if (context.needLicense) {
+    lines.push(`🚗 В/У: не указано`);
+  }
+
+  lines.push(
     "",
     "Всё верно?",
-  ];
+  );
+
   return lines.join("\n");
+}
+
+// ── Goto helpers ─────────────────────────────────────────────────────────────
+
+async function gotoConfirm(chatId: number, userId: string, context: TestDriveContext): Promise<void> {
+  const summary = buildSummary(context);
+  await setState(userId, "td_confirm", context);
+  await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: "inline", parseMode: "Markdown" });
 }
 
 // ── Contract generation ──────────────────────────────────────────────────────
@@ -353,13 +472,20 @@ async function generateContract(chatId: number, userId: string, context: TestDri
     const crewSecrets = await loadCrewSecrets();
     const now = new Date();
     const price = TESTDRIVE_PRICE;
-    const deposit = Number(context.depositOverride) || Number(bike.specs?.deposit_rub) || 20000;
+    const deposit = 0;  // deposit step removed per client request
 
-    // Build template variables
+    // Build short-name for signature field
     const customerShortName = (context.customerFullName || "")
       .split(' ')
       .map((n, i) => i === 0 ? n : `${n[0]}.`)
       .join(' ');
+
+    // Condense passport fields: build the passport-number string only if we
+    // actually collected it (needPassport + series present). Otherwise leave
+    // empty so the template's {{#if customer_passport_number}} omits the row.
+    const passportNumber = (context.needPassport && context.customerSeries)
+      ? `${context.customerSeries} ${context.customerNumber || ""}`.trim()
+      : "";
 
     const vars: Record<string, string> = {
       contract_number: `${now.getDate()}.${now.getMonth() + 1}/${bike.id}`,
@@ -369,19 +495,26 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       customer_full_name: context.customerFullName || "",
       customer_short_name: customerShortName,
       customer_phone: context.customerPhone || "",
-      customer_passport_number: `${context.customerSeries || ""} ${context.customerNumber || ""}`.trim(),
-      customer_passport_issued_by: context.customerIssuedBy || "",
-      customer_passport_issue_date: context.customerIssueDate || "",
-      customer_birth_date: context.customerBirthDate || "",
-      customer_registration: context.customerRegistration || "",
+      // Passport fields (empty if not collected → {{#if}} omits them in template)
+      customer_passport_number: passportNumber,
+      customer_passport_issued_by: (context.needPassport && context.customerIssuedBy) ? context.customerIssuedBy : "",
+      customer_passport_issue_date: (context.needPassport && context.customerIssueDate) ? context.customerIssueDate : "",
+      customer_birth_date: (context.needPassport && context.customerBirthDate) ? context.customerBirthDate : "",
+      customer_registration: (context.needPassport && context.customerRegistration) ? context.customerRegistration : "",
+      // License fields (empty if not collected → {{#if}} omits them in template)
+      license_series: (context.needLicense && context.licenseSeries) ? context.licenseSeries : "",
+      license_number: (context.needLicense && context.licenseNumber) ? context.licenseNumber : "",
+      license_category: context.licenseCategory || "",
+      // Bike
       bike_make: bike.make || "уточняется",
       bike_model: bike.model || "уточняется",
       bike_color: bike.specs?.color || "уточняется",
       bike_year: String(bike.specs?.year || now.getFullYear()),
-      license_category: context.licenseCategory || "—",
-      price_digits: String(price || 5000),
-      price_words: numberToWords(price || 5000),
+      // Pricing
+      price_digits: String(price),
+      price_words: numberToWords(price),
       deposit_rub: String(deposit),
+      // Crew
       organization_name: crewSecrets.organizationName,
       organization_short: crewSecrets.organizationShort,
       issuer_name: crewSecrets.issuerName,
@@ -390,6 +523,7 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       legal_address: crewSecrets.legalAddress,
       phone: crewSecrets.phone,
       email: crewSecrets.email,
+      // Meta
       signature_timestamp: now.toLocaleString("ru-RU"),
       document_key: `testdrive-${bike.id}-${Date.now()}`,
     };
@@ -417,7 +551,7 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       fileName: docFileName,
       template: htmlTemplate,
       variables: vars,
-      flowType: "test_drive",
+      flowType: "mixed",
       templateMode: "html",
     });
 
@@ -451,6 +585,12 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       logger.error("[/testdrive] sendTelegramDocument failed:", e);
     }
 
+    // Build confirmation message showing what was collected
+    const docList: string[] = [];
+    if (context.needPassport && context.customerSeries) docList.push("🪪 паспорт");
+    if (context.needLicense && context.licenseSeries) docList.push("🚗 В/У");
+    const docStr = docList.length > 0 ? docList.join(" + ") : "без документов";
+
     // Send confirmation
     await sendComplexMessage(
       chatId,
@@ -458,7 +598,8 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       `🛵 ${bike.make} ${bike.model}\n` +
       `👤 ${context.customerFullName}\n` +
       `📱 ${context.customerPhone || "—"}\n` +
-      `💰 ${price.toLocaleString("ru-RU")} ₽ + депозит ${deposit.toLocaleString("ru-RU")} ₽`,
+      `📄 ${docStr}\n` +
+      `💰 ${price.toLocaleString("ru-RU")} ₽`,
       [[{ text: "🚀 Открыть", url: process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app" }]],
       { removeKeyboard: true, parseMode: "Markdown" },
     );
@@ -469,27 +610,95 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       `User: ${userId}\n` +
       `Bike: ${bike.make} ${bike.model}\n` +
       `Client: ${context.customerFullName}\n` +
-      `Phone: ${context.customerPhone || "—"}`,
+      `Phone: ${context.customerPhone || "—"}\n` +
+      `Docs: ${docStr}`,
     );
 
-    // ── Create/update lead in franchize_intents ──
-    const leadUserId = context.customerPhone || String(userId);
+    // ── Save to private tables (like /doc and /subrent do) ──
+    // 1. user_rental_secrets — for 1-click reuse
     try {
-      // Ensure user exists in users table
-      await supabaseAdmin.from("users").upsert({
-        user_id: leadUserId,
-        full_name: context.customerFullName || null,
-        metadata: {
-          source: "test_drive",
-          phone: context.customerPhone || null,
-          bikeId: bike.id,
-          bikeTitle: `${bike.make} ${bike.model}`,
-          updatedAt: new Date().toISOString(),
-        },
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "user_id" });
+      const { error: secretsError } = await privateSchema()
+        .from("user_rental_secrets")
+        .insert({
+          chat_id: String(userId),
+          crew_slug: "vip-bike",
+          doc_sha256: docSha256,
+          renter_full_name: context.customerFullName || null,
+          renter_passport: (context.needPassport && context.customerSeries)
+            ? `${context.customerSeries} ${context.customerNumber || ""}`.trim() : null,
+          renter_passport_issue_date: context.customerIssueDate || null,
+          renter_passport_issued_by: context.customerIssuedBy || null,
+          renter_registration: context.customerRegistration || null,
+          renter_driver_license: (context.needLicense && context.licenseSeries)
+            ? `${context.licenseSeries} ${context.licenseNumber || ""}`.trim() : null,
+          renter_birth_date: context.customerBirthDate || null,
+          renter_phone: context.customerPhone || null,
+          source_doc_key: vars.document_key,
+          verification_status: "verified",
+          template_version: 1,
+        });
+      if (secretsError) {
+        logger.error("[/testdrive] Failed to save user_rental_secrets:", secretsError);
+      }
+    } catch (secretsErr) {
+      logger.warn("[/testdrive] user_rental_secrets save failed (non-fatal):", secretsErr);
+    }
 
-      // Record intent
+    // 2. rental_contract_artifacts (private schema) — dedup by renter+bike
+    try {
+      const { data: existingRental } = await privateSchema()
+        .from("rental_contract_artifacts")
+        .select("id, storage_path")
+        .eq("renter_full_name", context.customerFullName || "")
+        .eq("requested_bike_id", bike.id)
+        .maybeSingle();
+
+      const passportNumber = (context.needPassport && context.customerSeries)
+        ? `${context.customerSeries} ${context.customerNumber || ""}`.trim()
+        : null;
+
+      const driverLicense = (context.needLicense && context.licenseSeries)
+        ? `${context.licenseSeries} ${context.licenseNumber || ""}`.trim()
+        : null;
+
+      if (existingRental) {
+        logger.info("[/testdrive] Duplicate artifact detected (same renter+bike), skipping. id:", existingRental.id);
+        if (!existingRental.storage_path && docStoragePath) {
+          await privateSchema().from("rental_contract_artifacts").update({ storage_path: docStoragePath }).eq("id", existingRental.id);
+        }
+      } else {
+        const { error: rentError } = await privateSchema()
+          .from("rental_contract_artifacts")
+          .insert({
+            contract_key: vars.document_key,
+            storage_path: docStoragePath,
+            original_sha256: docSha256,
+            requested_bike_id: bike.id,
+            resolved_bike_id: bike.id,
+            telegram_chat_id: String(userId),
+            telegram_message_id: null,
+            renter_full_name: context.customerFullName || null,
+            renter_passport: passportNumber,
+            renter_passport_issued_by: context.customerIssuedBy || null,
+            renter_passport_issue_date: context.customerIssueDate || null,
+            renter_registration: context.customerRegistration || null,
+            renter_driver_license: driverLicense,
+            renter_birth_date: context.customerBirthDate || null,
+            license_categories: context.licenseCategory || null,
+            total_sum: price,
+            template_version: 1,
+          });
+        if (rentError) {
+          logger.error("[/testdrive] Failed to save rental_contract_artifacts:", rentError);
+        }
+      }
+    } catch (dbErr) {
+      logger.warn("[/testdrive] rental_contract_artifacts save failed (non-fatal):", dbErr);
+    }
+
+    // 3. Also upsert to franchize_intents for the dashboard pipeline
+    try {
+      const leadUserId = context.customerPhone || String(userId);
       await supabaseAdmin.from("franchize_intents").upsert({
         slug: "vip-bike",
         bike_id: bike.id,
@@ -505,6 +714,8 @@ async function generateContract(chatId: number, userId: string, context: TestDri
           bikeTitle: `${bike.make} ${bike.model}`,
           dealType: "test_drive",
           operatorId: String(userId),
+          hasPassport: !!(context.needPassport && context.customerSeries),
+          hasLicense: !!(context.needLicense && context.licenseSeries),
         },
       }, { onConflict: "slug,bike_id,telegram_user_id,intent_type" });
     } catch (leadErr) {
@@ -539,6 +750,7 @@ async function generateContract(chatId: number, userId: string, context: TestDri
             `Байк: ${bike.make} ${bike.model}`,
             `Клиент: ${context.customerFullName || "—"}`,
             `Телефон: ${context.customerPhone || "—"}`,
+            `Документы: ${docStr}`,
             ``,
             `Договор сгенерирован в Telegram-боте.`,
             `Документ во вложении.`,
@@ -571,6 +783,7 @@ export async function handleTestDriveText(userId: string, chatId: number, text: 
 
   const { state, context } = tdState;
 
+  // ── Bike selection ──
   if (state === "td_bike") {
     const bike = await resolveBikeById(text.trim());
     if (!bike) {
@@ -586,6 +799,7 @@ export async function handleTestDriveText(userId: string, chatId: number, text: 
     return true;
   }
 
+  // ── Phone ──
   if (state === "td_phone") {
     const cleaned = text.replace(/[^\d+]/g, "");
     if (cleaned.length < 10) {
@@ -593,23 +807,52 @@ export async function handleTestDriveText(userId: string, chatId: number, text: 
       return true;
     }
     context.customerPhone = cleaned;
-    await setState(userId, "td_name", context);
-    await sendComplexMessage(chatId, `✅ ${cleaned}\n\n*ФИО*`, [], { parseMode: "Markdown", removeKeyboard: true });
-    return true;
-  }
-
-  if (state === "td_name") {
-    context.customerFullName = capitalizeFullName(text);
-    await setState(userId, "td_passport", context);
+    await setState(userId, "td_doc_choice", context);
     await sendComplexMessage(
       chatId,
-      `✅ ${text}\n\n*Паспорт*\n\n4509 123456 15.03.2020 ОМВД по Н.Новгороду`,
-      [],
-      { removeKeyboard: true, parseMode: "Markdown" },
+      `✅ ${cleaned}\n\n*Какой документ вводим?*\n\nМожно ввести паспорт ИЛИ водительское удостоверение (достаточно одного).`,
+      buildDocChoiceKeyboard(),
+      { keyboardType: "inline", parseMode: "Markdown" },
     );
     return true;
   }
 
+  // ── Doc choice (text fallback — re-prompt with keyboard) ──
+  if (state === "td_doc_choice") {
+    await sendComplexMessage(
+      chatId,
+      "*Какой документ вводим?*\n\nВыберите на клавиатуре:",
+      buildDocChoiceKeyboard(),
+      { keyboardType: "inline", parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  // ── Full name ──
+  if (state === "td_name") {
+    context.customerFullName = capitalizeFullName(text);
+    if (context.needPassport) {
+      await setState(userId, "td_passport", context);
+      await sendComplexMessage(
+        chatId,
+        `✅ ${text}\n\n*Паспорт*\n\n4509 123456 15.03.2020 ОМВД по Н.Новгороду`,
+        [],
+        { removeKeyboard: true, parseMode: "Markdown" },
+      );
+    } else {
+      // License-only path — skip passport, go straight to license input
+      await setState(userId, "td_license", context);
+      await sendComplexMessage(
+        chatId,
+        `✅ ${text}\n\n*Водительское удостоверение*\n\nФормат: серия номер\n\nПримеры:\n• 99 76 123456\n• 9976 123456`,
+        [],
+        { removeKeyboard: true, parseMode: "Markdown" },
+      );
+    }
+    return true;
+  }
+
+  // ── Passport ──
   if (state === "td_passport") {
     const p = parsePassport(text);
     if (!p) {
@@ -630,6 +873,7 @@ export async function handleTestDriveText(userId: string, chatId: number, text: 
     return true;
   }
 
+  // ── Birth date ──
   if (state === "td_birth") {
     const d = parseDate(text, true);
     if (!d) {
@@ -642,34 +886,52 @@ export async function handleTestDriveText(userId: string, chatId: number, text: 
     return true;
   }
 
+  // ── Address ──
   if (state === "td_address") {
     context.customerRegistration = text.trim();
+    // After passport path: if license also needed → go to license; else → confirm
+    if (context.needLicense) {
+      await setState(userId, "td_license", context);
+      await sendComplexMessage(
+        chatId,
+        `✅\n\n*Водительское удостоверение*\n\nФормат: серия номер\n\nПримеры:\n• 99 76 123456\n• 9976 123456`,
+        [],
+        { removeKeyboard: true, parseMode: "Markdown" },
+      );
+    } else {
+      await gotoConfirm(chatId, userId, context);
+    }
+    return true;
+  }
+
+  // ── License input ──
+  if (state === "td_license") {
+    const l = parseLicenseSimple(text);
+    if (!l) {
+      await sendComplexMessage(
+        chatId,
+        "❌ Не удалось распознать. Формат: серия номер\n\nПримеры:\n• 99 76 123456\n• 9976 123456",
+        [],
+        { removeKeyboard: true, parseMode: "Markdown" },
+      );
+      return true;
+    }
+    context.licenseSeries = l.series;
+    context.licenseNumber = l.number;
+    // After license → ask for categories
     await setState(userId, "td_category", context);
     await sendComplexMessage(
       chatId,
-      "✅\n\n*Категория ВУ*\n\nКакая категория открыта у клиента?",
+      `✅ В/У ${l.series} № ${l.number}\n\n*Категория ВУ*`,
       buildCategoryKeyboard(),
       { keyboardType: "inline", parseMode: "Markdown" },
     );
     return true;
   }
 
+  // ── Category (text fallback — re-prompt with keyboard) ──
   if (state === "td_category") {
-    // User typed instead of pressing button — re-prompt
     await sendComplexMessage(chatId, "*Категория ВУ*", buildCategoryKeyboard(), { keyboardType: "inline", parseMode: "Markdown" });
-    return true;
-  }
-
-  if (state === "td_deposit_custom") {
-    const amount = text.replace(/\D/g, '');
-    if (!amount || parseInt(amount) < 1000) {
-      await sendComplexMessage(chatId, "❌ Введите сумму депозита (руб), минимум 1000", [], { removeKeyboard: true });
-      return true;
-    }
-    context.depositOverride = amount;
-    const summary = buildSummary(context);
-    await setState(userId, "td_confirm", context);
-    await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: "inline", parseMode: "Markdown" });
     return true;
   }
 
@@ -689,7 +951,7 @@ export async function handleTestDriveCallback(
 
   const { state, context } = tdState;
 
-  // Answer callback query
+  // Answer callback query to stop loading animation
   if (callbackQueryId) {
     try {
       await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery?callback_query_id=${callbackQueryId}`, { method: "POST" });
@@ -712,9 +974,35 @@ export async function handleTestDriveCallback(
     return true;
   }
 
-  // ── State handlers ──
+  // ── Document choice (state: td_doc_choice) ──
 
-  if (callbackData.startsWith("td_cat_")) {
+  if (state === "td_doc_choice" && callbackData === "td_doc_passport") {
+    context.needPassport = true;
+    context.needLicense = false;
+    await setState(userId, "td_name", context);
+    await sendComplexMessage(chatId, "✅ Паспорт\n\n*ФИО*", [], { removeKeyboard: true, parseMode: "Markdown" });
+    return true;
+  }
+
+  if (state === "td_doc_choice" && callbackData === "td_doc_license") {
+    context.needPassport = false;
+    context.needLicense = true;
+    await setState(userId, "td_name", context);
+    await sendComplexMessage(chatId, "✅ В/У\n\n*ФИО*", [], { removeKeyboard: true, parseMode: "Markdown" });
+    return true;
+  }
+
+  if (state === "td_doc_choice" && callbackData === "td_doc_both") {
+    context.needPassport = true;
+    context.needLicense = true;
+    await setState(userId, "td_name", context);
+    await sendComplexMessage(chatId, "✅ Оба документа\n\n*ФИО*", [], { removeKeyboard: true, parseMode: "Markdown" });
+    return true;
+  }
+
+  // ── License category selection (state: td_category) ──
+
+  if (state === "td_category" && callbackData.startsWith("td_cat_")) {
     const cat = callbackData.replace("td_cat_", "");
     if (cat === "A" || cat === "B" || cat === "none") {
       const label = cat === "none" ? "нет" : cat;
@@ -722,34 +1010,17 @@ export async function handleTestDriveCallback(
       await setState(userId, "td_category", context);
       await sendComplexMessage(chatId, `🏷 ${label}`, buildCategoryKeyboard(label), { keyboardType: "inline" });
     } else if (cat === "done") {
-      // Advance to deposit choice
       if (!context.licenseCategory) {
-        // Force selection
         await sendComplexMessage(chatId, "Выберите категорию:", buildCategoryKeyboard(), { keyboardType: "inline" });
         return true;
       }
-      await gotoDeposit(chatId, userId, context);
+      // Done → advance to confirm
+      await gotoConfirm(chatId, userId, context);
     }
     return true;
   }
 
-  if (state === "td_deposit_choice") {
-    if (callbackData === "td_dep_confirm") {
-      // Use default deposit from bike
-      const bike = await resolveBikeById(context.bikeId);
-      const defaultDeposit = String(bike?.specs?.deposit_rub || "20000");
-      context.depositOverride = defaultDeposit;
-      const summary = buildSummary(context);
-      await setState(userId, "td_confirm", context);
-      await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: "inline", parseMode: "Markdown" });
-      return true;
-    }
-    if (callbackData === "td_dep_custom") {
-      await setState(userId, "td_deposit_custom", context);
-      await sendComplexMessage(chatId, "✏️ Введите сумму депозита (руб):", [], { removeKeyboard: true });
-      return true;
-    }
-  }
+  // ── Confirm ──
 
   if (state === "td_confirm" && callbackData === "td_ok") {
     await sendComplexMessage(chatId, "⏳ Генерирую договор...", [], { removeKeyboard: true });
@@ -761,22 +1032,6 @@ export async function handleTestDriveCallback(
   }
 
   return false;
-}
-
-async function gotoDeposit(chatId: number, userId: string, context: TestDriveContext): Promise<void> {
-  const bike = await resolveBikeById(context.bikeId);
-  const depositAmount = String(bike?.specs?.deposit_rub || "20000");
-  await setState(userId, "td_deposit_choice", context);
-  const formatted = Number(depositAmount).toLocaleString("ru-RU");
-  await sendComplexMessage(
-    chatId,
-    `*Депозит / обеспечительный платёж*\n\n` +
-    `Байк: ${bike ? `${bike.make} ${bike.model}` : context.bikeId}\n` +
-    `Депозит из карточки ТС: *${formatted} ₽*\n\n` +
-    `Выберите вариант:`,
-    buildDepositChoiceKeyboard(depositAmount, bike),
-    { keyboardType: "inline", parseMode: "Markdown" },
-  );
 }
 
 // ── Entry point ─────────────────────────────────────────────────────────────
@@ -810,7 +1065,7 @@ export async function testDriveCommand(
     return;
   }
 
-  // No bike arg — show bike selection
+  // No bike arg — show inline bike selection
   const bikes = await getAvailableBikes();
   if (!bikes.length) {
     await sendComplexMessage(chatId, "🚲 Нет байков.", [], { removeKeyboard: true });
@@ -826,7 +1081,7 @@ export async function testDriveCommand(
   await setState(userIdStr, "td_bike", { bikeId: "" });
   await sendComplexMessage(
     chatId,
-    "🛵 *Тест-драйв — выберите байк*",
+    "🛵 *Тест-драйв — выберите байк*\n\nВведите название или ID, или нажмите на кнопку:",
     buttons,
     { keyboardType: "reply", parseMode: "Markdown" },
   );

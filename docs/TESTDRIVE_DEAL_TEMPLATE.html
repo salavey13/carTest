@@ -1,6 +1,9 @@
 <!-- /docs/TESTDRIVE_DEAL_TEMPLATE.html -->
 <!-- 2026-07-05: Test-drive contract template, hand-cleaned from MS Word export. -->
-<!-- Engine: buildFranchizeDocxFromTemplate() supports {{placeholder}} variables -->
+<!-- Engine: buildFranchizeDocxFromTemplate() supports {{placeholder}} vars      -->
+<!--         and {{#if var}}...{{else}}...{{/if}} conditional blocks.           -->
+<!-- If a passport or license field is empty (not provided by operator),        -->
+<!-- the corresponding block is omitted from the contract.                      -->
 <div style="font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.4; color: #000; max-width: 700px; margin: 0 auto;">
 
 <p style="text-align: center; font-weight: bold; font-size: 12pt; margin-top: 14pt;">ДОГОВОР № {{contract_number}}</p>
@@ -36,11 +39,9 @@
 
 <p style="text-indent: 1.25cm; text-align: justify;">1.4. Заказчик обязуется возвратить ТС в течение установленного срока, не позднее (окончание тест-драйва или момент требования).</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">1.5. Заказчик подтверждает, что имеет Водительское удостоверение категории: {{license_category}}.</p>
+{{#if license_category}}<p style="text-indent: 1.25cm; text-align: justify;">1.5. Заказчик подтверждает, что имеет Водительское удостоверение категории: {{license_category}}.</p>{{/if}}
 
-<p style="text-indent: 1.25cm; text-align: justify;">1.6. Заказчик подтверждает, что имеет водительский стаж не менее 1 (одного) года с момента получения ВУ.</p>
-
-<p style="text-indent: 1.25cm; text-align: justify;">1.7. Заказчик подтверждает, что ознакомлен с характеристиками и правилами эксплуатации ТС, и не имеет медицинских противопоказаний к управлению ТС.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">1.6. Заказчик подтверждает{{#if license_category}}, что имеет водительский стаж не менее 1 (одного) года с момента получения ВУ{{/if}}, что ознакомлен с характеристиками и правилами эксплуатации ТС, и не имеет медицинских противопоказаний к управлению ТС.</p>
 
 <p style="text-align: center; font-weight: bold;">2. Права и обязанности Сторон</p>
 
@@ -117,11 +118,13 @@ ____________________ /{{issuer_name}}/<br>
 <b>Заказчик:</b><br>
 <br>
 {{customer_full_name}}<br>
-Дата рождения: {{customer_birth_date}}<br>
-Паспорт: № {{customer_passport_number}}<br>
-Выдан: {{customer_passport_issued_by}}<br>
-Дата выдачи: {{customer_passport_issue_date}}<br>
-Прописка: {{customer_registration}}<br>
+{{#if customer_birth_date}}Дата рождения: {{customer_birth_date}}<br>{{/if}}
+{{#if customer_passport_number}}Паспорт: № {{customer_passport_number}}<br>{{/if}}
+{{#if customer_passport_issued_by}}Выдан: {{customer_passport_issued_by}}<br>{{/if}}
+{{#if customer_passport_issue_date}}Дата выдачи: {{customer_passport_issue_date}}<br>{{/if}}
+{{#if customer_registration}}Прописка: {{customer_registration}}<br>{{/if}}
+{{#if license_series}}В/У: серия {{license_series}} № {{license_number}}<br>{{/if}}
+{{#if license_category}}Категория: {{license_category}}<br>{{/if}}
 Телефон: {{customer_phone}}<br>
 <br>
 ____________________ /{{customer_short_name}}/<br>
