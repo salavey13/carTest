@@ -55,6 +55,8 @@ interface TestDriveContext {
   // License fields
   licenseSeries?: string;
   licenseNumber?: string;
+  licenseIssueDate?: string;    // null if user chose "нет прав"
+  licenseExpiryDate?: string;   // auto-calc +10 years from issue
   licenseCategory?: string;
 }
 
@@ -240,21 +242,43 @@ function parsePassport(text: string): { series: string; number: string; issueDat
 }
 
 /**
- * Parse Russian VU (driver's license) series + number.
- * Accepted formats:
- *   "99 76 123456"     → series=9976, number=123456  (2+2 = 4-digit series)
- *   "9976 123456"      → series=9976, number=123456  (4-digit series)
- *   "99 76 123456 15.03" → same, dates ignored (we don't need them for test-drive)
+ * Parse Russian VU (driver's license) series + number + dates.
+ * Ported from doc-manual.ts parseLicense() with testdrive's 4-strategy series parsing.
+ *
+ * Format: серия номер [дата_выдачи [дата_окончания]]
+ *   "9976 123456 15.03"          → series=9976, num=123456, issue=15.03.2026, expiry=15.03.2036
+ *   "99 76 123456 15.03.2020 15.03.2030"  → series=9976, num=123456, issue=15.03.2020, expiry=15.03.2030
+ *   "99 76 123456"               → no dates → still returns series+number with null dates
+ *   "99 76123456 15.03"          → Strategy 4: 2+8 split → series=9976, num=123456, issue=15.03.2026
+ *
+ * If only one date: it's treated as issue date, expiry = issue + 10 years.
+ * Year defaults to CURRENT_YEAR if omitted.
  */
-function parseLicenseSimple(text: string): { series: string; number: string } | null {
+function parseLicense(text: string): { series: string; number: string; issueDate: string | null; expiryDate: string | null } | null {
   const parts = text.trim().split(/\s+/).filter(Boolean);
   if (parts.length < 2) return null;
 
-  // Extract all digit sequences
+  // Separate digit sequences from date-like tokens
   const digits: string[] = [];
+  const dates: string[] = [];
+
   for (const p of parts) {
-    const d = p.replace(/\D/g, '');
-    if (d.length > 0) digits.push(d);
+    if (/^\d{1,2}\.\d{1,2}(\.\d{2,4})?$/.test(p)) {
+      // It's a date-like token
+      let d = p;
+      if (!d.includes('.')) continue;
+      const dparts = d.split('.');
+      if (dparts.length === 2) d += `.${CURRENT_YEAR}`;
+      else if (dparts[2].length === 2) {
+        const y = parseInt(dparts[2]);
+        dparts[2] = y > 50 ? `19${y}` : `20${y}`;
+        d = dparts.join('.');
+      }
+      dates.push(d);
+    } else {
+      const cleaned = p.replace(/\D/g, '');
+      if (cleaned.length > 0) digits.push(cleaned);
+    }
   }
 
   if (digits.length < 2) return null;
@@ -265,12 +289,8 @@ function parseLicenseSimple(text: string): { series: string; number: string } | 
   for (let i = 0; i < digits.length; i++) {
     if (digits[i].length === 4) {
       series = digits[i];
-      // Next non-consumed 6-digit = number
       for (let j = i + 1; j < digits.length; j++) {
-        if (digits[j].length === 6) {
-          number = digits[j];
-          break;
-        }
+        if (digits[j].length === 6) { number = digits[j]; break; }
       }
       if (number) break;
     }
@@ -281,12 +301,8 @@ function parseLicenseSimple(text: string): { series: string; number: string } | 
     for (let i = 0; i < digits.length - 1; i++) {
       if (digits[i].length === 2 && digits[i + 1].length === 2) {
         series = digits[i] + digits[i + 1];
-        // Find a 6-digit after these
         for (let j = i + 2; j < digits.length; j++) {
-          if (digits[j].length === 6) {
-            number = digits[j];
-            break;
-          }
+          if (digits[j].length === 6) { number = digits[j]; break; }
         }
         if (number) break;
       }
@@ -308,14 +324,35 @@ function parseLicenseSimple(text: string): { series: string; number: string } | 
         series = digits[i] + digits[i + 1].slice(0, 2);
         number = digits[i + 1].slice(2);
         if (number.length === 6) break;
-        // reset if not valid
         series = ""; number = "";
       }
     }
   }
 
   if (!series || !number) return null;
-  return { series, number };
+
+  // ── Date handling (ported from doc-manual.ts) ──
+  let issueDate: string | null = null;
+  let expiryDate: string | null = null;
+
+  if (dates.length === 1) {
+    // Single date → issue date, expiry = +10 years
+    issueDate = dates[0];
+    const [dd, mm, yyyy] = issueDate.split('.');
+    expiryDate = `${dd}.${mm}.${parseInt(yyyy) + 10}`;
+  } else if (dates.length >= 2) {
+    // Two dates → issue and expiry
+    issueDate = dates[0];
+    expiryDate = dates[1];
+    // If both same year → auto extend (e.g., "15.03.2026 15.03.2026" → +10y)
+    if (issueDate === expiryDate && issueDate.endsWith(`.${CURRENT_YEAR}`)) {
+      const [dd, mm, yyyy] = issueDate.split('.');
+      expiryDate = `${dd}.${mm}.${parseInt(yyyy) + 10}`;
+    }
+  }
+  // If no dates → issueDate/expiryDate stay null (template {{#if}} hides them)
+
+  return { series, number, issueDate, expiryDate };
 }
 
 function parseDate(text: string, requireYear = true): string | null {
@@ -434,10 +471,11 @@ function buildSummary(context: TestDriveContext): string {
   }
 
   if (context.needLicense && context.licenseSeries) {
-    lines.push(
-      `🚗 В/У: ${context.licenseSeries} № ${context.licenseNumber}` +
-      `${context.licenseCategory ? ` (${context.licenseCategory})` : ""}`
-    );
+    let vu = `🚗 В/У: ${context.licenseSeries} № ${context.licenseNumber}`;
+    if (context.licenseIssueDate) vu += ` от ${context.licenseIssueDate}`;
+    if (context.licenseExpiryDate) vu += ` до ${context.licenseExpiryDate}`;
+    if (context.licenseCategory) vu += ` (${context.licenseCategory})`;
+    lines.push(vu);
   } else if (context.needLicense) {
     lines.push(`🚗 В/У: не указано`);
   }
@@ -503,6 +541,8 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       // License fields (empty if not collected → {{#if}} omits them in template)
       license_series: (context.needLicense && context.licenseSeries) ? context.licenseSeries : "",
       license_number: (context.needLicense && context.licenseNumber) ? context.licenseNumber : "",
+      license_issue_date: (context.needLicense && context.licenseIssueDate) ? context.licenseIssueDate : "",
+      license_expiry_date: (context.needLicense && context.licenseExpiryDate) ? context.licenseExpiryDate : "",
       license_category: context.licenseCategory || "",
       // Bike
       bike_make: bike.make || "уточняется",
@@ -827,7 +867,7 @@ export async function handleTestDriveText(userId: string, chatId: number, text: 
       await setState(userId, "td_license", context);
       await sendComplexMessage(
         chatId,
-        `✅ ${text}\n\n*Водительское удостоверение*\n\nФормат: серия номер\n\nПримеры:\n• 99 76 123456\n• 9976 123456`,
+        `✅ ${text}\n\n*Водительское удостоверение*\n\nФормат: серия номер [дата_выдачи] [дата_окончания]\n\nПримеры:\n• 99 76 123456 15.03 (срок auto +10 лет)\n• 99 76 123456 (без дат)`,
         [],
         { removeKeyboard: true, parseMode: "Markdown" },
       );
@@ -877,7 +917,7 @@ export async function handleTestDriveText(userId: string, chatId: number, text: 
       await setState(userId, "td_license", context);
       await sendComplexMessage(
         chatId,
-        `✅\n\n*Водительское удостоверение*\n\nФормат: серия номер\n\nПримеры:\n• 99 76 123456\n• 9976 123456`,
+        `✅\n\n*Водительское удостоверение*\n\nФормат: серия номер [дата_выдачи] [дата_окончания]\n\nПримеры:\n• 99 76 123456 15.03 (срок auto +10 лет)\n• 99 76 123456 (без дат)`,
         [],
         { removeKeyboard: true, parseMode: "Markdown" },
       );
@@ -889,11 +929,11 @@ export async function handleTestDriveText(userId: string, chatId: number, text: 
 
   // ── License input ──
   if (state === "td_license") {
-    const l = parseLicenseSimple(text);
+    const l = parseLicense(text);
     if (!l) {
       await sendComplexMessage(
         chatId,
-        "❌ Не удалось распознать. Формат: серия номер\n\nПримеры:\n• 99 76 123456\n• 9976 123456",
+        `❌ Не удалось распознать. Формат: серия номер [дата_выдачи] [дата_окончания]\n\nПримеры:\n• 99 76 123456 15.03 (срок auto +10 лет)\n• 9976 123456 15.03.2020 15.03.2030\n• 99 76 123456 (без дат)`,
         [],
         { removeKeyboard: true, parseMode: "Markdown" },
       );
@@ -901,11 +941,16 @@ export async function handleTestDriveText(userId: string, chatId: number, text: 
     }
     context.licenseSeries = l.series;
     context.licenseNumber = l.number;
+    context.licenseIssueDate = l.issueDate;
+    context.licenseExpiryDate = l.expiryDate;
     // After license → ask for categories
     await setState(userId, "td_category", context);
+    const dateStr = l.issueDate
+      ? ` от ${l.issueDate}${l.expiryDate ? ` до ${l.expiryDate}` : ""}`
+      : "";
     await sendComplexMessage(
       chatId,
-      `✅ В/У ${l.series} № ${l.number}\n\n*Категория ВУ*`,
+      `✅ В/У ${l.series} № ${l.number}${dateStr}\n\n*Категория ВУ*`,
       buildCategoryKeyboard(),
       { keyboardType: "inline", parseMode: "Markdown" },
     );
