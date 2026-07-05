@@ -5,6 +5,41 @@ const TEMPLATE_BASE_PATH = 'docs/RENTAL_DEAL_TEMPLATE.html';
 const TEMPLATE_MD_PATH = 'docs/RENTAL_DEAL_TEMPLATE.md';
 
 /**
+ * Count weekend days (Sat=6, Sun=0) in a date range [startDate, endDate].
+ * Dates can be in DD.MM.YYYY or YYYY-MM-DD format.
+ */
+function countWeekendDaysInRange(startDate: string, endDate: string): number {
+  try {
+    // Parse dates — handle both DD.MM.YYYY and YYYY-MM-DD
+    const parseDate = (s: string): Date | null => {
+      if (!s) return null;
+      // DD.MM.YYYY format
+      const dmy = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+      if (dmy) return new Date(`${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}T00:00:00`);
+      // YYYY-MM-DD format
+      const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (ymd) return new Date(`${ymd[1]}-${ymd[2]}-${ymd[3]}T00:00:00`);
+      return null;
+    };
+
+    const start = parseDate(startDate);
+    const end = parseDate(endDate);
+    if (!start || !end) return 0;
+
+    let count = 0;
+    const d = new Date(start);
+    while (d <= end) {
+      const day = d.getDay(); // 0=Sun, 6=Sat
+      if (day === 0 || day === 6) count++;
+      d.setDate(d.getDate() + 1);
+    }
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Determine if bike is electric based on type and specs
  */
 export function isElectricBike(bike: BikeSpecs, type?: string): boolean {
@@ -126,21 +161,43 @@ export async function buildTemplateVars(params: {
   const isHourly = rentalHours > 0 && rentalHours < 24;
 
   // Pricing: use bike specs or fallback
-  const dailyPrice = params.bike.specs.dailyPrice || params.bike.specs.rent_weekday || 10000;
-  const hourlyPrice = params.bike.specs.price_per_hour || Math.round(dailyPrice / 8);
+  const baseDailyPrice = params.bike.specs.dailyPrice || params.bike.specs.rent_weekday || 10000;
+  const rentWeekend = params.bike.specs.rent_weekend;
+  const hourlyPrice = params.bike.specs.price_per_hour || Math.round(baseDailyPrice / 8);
   const deposit = params.bike.specs.deposit_rub || 20000;
   const bikeValue = params.bike.specs.sale_price || params.bike.specs.price_rub || 850000;
+
+  // Weekend-aware pricing: count weekend days in the rental period
+  const weekendDayCount = countWeekendDaysInRange(params.dates.start, params.dates.end);
+  const weekdayCount = Math.max(0, rentalDays - weekendDayCount);
+  const isSingleWeekendDay = rentalDays === 1 && weekendDayCount > 0;
+
+  // Determine the effective daily rate for display in the contract
+  // For single day: use weekend rate if it's a weekend
+  // For multi-day: show the blended rate
+  let dailyPrice: number;
+  if (isSingleWeekendDay && rentWeekend) {
+    dailyPrice = rentWeekend;
+  } else if (rentalDays > 1 && weekendDayCount > 0 && rentWeekend) {
+    // Blended rate across weekday + weekend days
+    const weekdayRate = params.bike.specs.rent_weekday || baseDailyPrice;
+    dailyPrice = Math.round((weekdayCount * weekdayRate + weekendDayCount * rentWeekend) / rentalDays);
+  } else {
+    dailyPrice = baseDailyPrice;
+  }
 
   // Use cart-provided priceBreakdown if available, otherwise calculate
   let subtotal: number;
   if (params.priceBreakdown) {
     subtotal = params.priceBreakdown.totalRub;
+  } else if (isHourly) {
+    subtotal = Number(hourlyPrice) * rentalHours;
+  } else if (rentalDays > 1 && weekendDayCount > 0 && rentWeekend) {
+    // Blended total for multi-day with weekend
+    const weekdayRate = params.bike.specs.rent_weekday || baseDailyPrice;
+    subtotal = weekdayCount * weekdayRate + weekendDayCount * rentWeekend;
   } else {
-    if (isHourly) {
-      subtotal = Number(hourlyPrice) * rentalHours;
-    } else {
-      subtotal = Number(dailyPrice) * rentalDays;
-    }
+    subtotal = Number(dailyPrice) * rentalDays;
   }
   const subtotalRounded = Math.round(subtotal);
 
