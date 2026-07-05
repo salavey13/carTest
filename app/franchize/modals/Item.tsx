@@ -793,8 +793,9 @@ export function ItemModal({
   const [calculatedPrice, setCalculatedPrice] = useState<{ label: string; price: string; period: string } | null>(null);
 
   // ── Browser vs Telegram context detection ──
-  // When NOT in Telegram WebApp, CTAs redirect to the bot with startapp state.
-  const [isInTelegram, setIsInTelegram] = useState(true);
+  // Default to false (browser) — corrected to true on mount if Telegram SDK is present.
+  // This prevents a flash of Telegram-mode buttons on first render in a browser.
+  const [isInTelegram, setIsInTelegram] = useState(false);
   // Callback request form
   const [showCallbackForm, setShowCallbackForm] = useState(false);
   const [callbackName, setCallbackName] = useState("");
@@ -1083,7 +1084,8 @@ export function ItemModal({
   // In Telegram WebApp: normal "Забронировать"/"Купить".
   // In browser (no TG context): CTAs become "Продолжить в Telegram" with a
   // deep-link that carries the current selection as startapp state.
-  const botUsername = "oneBikePlsBot"; // VIP Bike bot
+  // Use crew-configured bot username, fall back to default.
+  const botUsername = (theme as any)?.telegramBotUsername || "oneBikePlsBot";
 
   // Build the deep-link that carries current selections to the web app
   const buildStartappLink = useCallback(
@@ -1123,10 +1125,27 @@ export function ItemModal({
   // Determine footer grid layout — wider when callback option is present
   const footerCols = showRentCta && showBuyCta ? 3 : 2;
 
-  // Callback submit handler — sends lead to owner via Telegram
+  // Callback submit handler — sends lead to owner via Telegram + persists to DB
   const handleCallbackSubmit = useCallback(
     (name: string, phone: string) => {
-      // Use the forward-telegram API to notify the owner
+      // 1. Persist lead to franchize_intents (so it's not lost if Telegram fails)
+      fetch("/api/franchize-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug,
+          bikeId: item?.id,
+          intentType: "callback_request",
+          stage: "lead_captured",
+          sourceRoute: typeof window !== "undefined" ? window.location.pathname : "/franchize",
+          contactChannel: "web_callback",
+          urgencyScore: 60,
+          leadName: name,
+          leadPhone: phone,
+        }),
+      }).catch(() => {});
+
+      // 2. Notify owner via Telegram
       const message = `📞 *Новая заявка на звонок*\n\n` +
         `🏍 ${item?.title || "Байк"}\n` +
         `👤 ${name}\n` +
@@ -1134,21 +1153,17 @@ export function ItemModal({
         `🌐 Источник: веб-сайт (не Telegram)\n` +
         `⏰ ${new Date().toLocaleString("ru-RU")}`;
 
-      // Fire-and-forget — don't block the UI
       fetch("/api/forward-telegram", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          // Owner chat ID for VIP Bike crew
           chatId: "356282674", // Илья (owner)
           text: message,
           parseMode: "Markdown",
         }),
-      }).catch(() => {
-        // Silent fail — user already saw "submitted"
-      });
+      }).catch(() => {});
     },
-    [item?.title],
+    [item?.id, item?.title, slug],
   );
 
   return (

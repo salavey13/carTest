@@ -53,11 +53,9 @@ export interface StartappState {
 /** Prefix used in startapp to flag a state payload. */
 export const STARTAPP_STATE_PREFIX = "cart_";
 
-/** Telegram-imposed max length for the startapp query param (64 chars). */
-const MAX_TELEGRAM_STARTAPP = 64;
-
-/** Soft cap on the encoded payload to stay within Telegram limits. */
-const MAX_ENCODED_LENGTH = 56;
+/** Telegram allows startapp param up to ~4096 chars in the URL.
+ *  We cap at 512 to be safe (enough for any payload we'd send). */
+const MAX_ENCODED_LENGTH = 512;
 
 // ─── base64url helpers (browser + node safe) ─────────────────────────────────
 

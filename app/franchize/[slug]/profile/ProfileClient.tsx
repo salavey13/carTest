@@ -21,6 +21,8 @@ import {
   getFranchizeFormPrefillAction,
   saveFranchizeFormPrefillAction,
   getFranchizeUserRentalSecretsAction,
+  getRentalDocsPrefillAction,
+  saveRentalDocsPrefillAction,
 } from "@/app/franchize/profile-actions";
 import {
   getFranchizeOperatorDashboardAccess,
@@ -28,6 +30,7 @@ import {
 } from "@/app/franchize/actions";
 import { readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
+import { RentalDocsForm } from "../../components/RentalDocsForm";
 import {
   FranchizeOperatorLinkButton,
   FranchizeOperatorPanel,
@@ -198,6 +201,14 @@ export function FranchizeProfileClient({
     comment: "",
   });
   const [canOpenCloserDashboard, setCanOpenCloserDashboard] = useState(false);
+  // Pre-entered rental docs (passport/license) from private.user_rental_secrets
+  const [docsPrefill, setDocsPrefill] = useState<{
+    fullName?: string; phone?: string; birthDate?: string;
+    passportSeries?: string; passportNumber?: string; passportIssuedBy?: string;
+    passportIssueDate?: string; registrationAddress?: string;
+    licenseSeries?: string; licenseNumber?: string; licenseCategories?: string;
+    licenseExpiryDate?: string; verificationStatus?: string; hasVerifiedData?: boolean;
+  } | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -218,15 +229,17 @@ export function FranchizeProfileClient({
       setCatalog(result.catalog || []);
       const capabilities = await getFranchizeCapabilityContractAction();
       setCapabilityContract(capabilities);
-      const [digestRes, prefillRes, operatorAccessRes, rentalSecretsRes] = await Promise.all([
+      const [digestRes, prefillRes, operatorAccessRes, rentalSecretsRes, docsRes] = await Promise.all([
         getFranchizeActivityDigestAction({ slug, userId: dbUser.user_id }),
         getFranchizeFormPrefillAction({ slug, userId: dbUser.user_id }),
         getFranchizeOperatorDashboardAccess({ slug }),
         getFranchizeUserRentalSecretsAction({ slug, userId: dbUser.user_id }),
+        getRentalDocsPrefillAction({ slug, userId: dbUser.user_id }),
       ]);
       if (digestRes.success && digestRes.data) setDigest(digestRes.data);
       if (prefillRes.success && prefillRes.data) setPrefill(prefillRes.data);
       if (rentalSecretsRes.success && rentalSecretsRes.data) setRentalSecrets(rentalSecretsRes.data);
+      if (docsRes.success && docsRes.data) setDocsPrefill(docsRes.data);
       setCanOpenCloserDashboard(
         Boolean(operatorAccessRes.success && operatorAccessRes.canOpen),
       );
@@ -553,66 +566,60 @@ export function FranchizeProfileClient({
         </FranchizeOperatorPanel>
       </motion.div>
 
-      {/* Rental Documents Panel */}
+      {/* Rental Documents Panel — editable via RentalDocsForm */}
       <motion.div variants={itemVariants}>
         <FranchizeOperatorPanel>
           <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--fr-profile-text)]">
             <Lock className="h-4 w-4" /> Документы для аренды
           </h2>
           <p className="mt-1 text-xs text-[var(--fr-profile-muted)]">
-            Верифицированные документы из прошлых аренд для быстрого оформления
+            Заполните заранее — данные подставятся при оформлении. Проверяются оператором при первой аренде.
           </p>
-          <div className="mt-3 rounded-xl border p-4" style={{
-            borderColor: rentalSecrets?.hasPreviousRentals
-              ? "var(--fr-profile-accent)"
-              : "var(--fr-profile-border)",
-            backgroundColor: rentalSecrets?.hasPreviousRentals
-              ? withAlpha(crew.theme.palette.accentMain, 0.09)
-              : "color-mix(in srgb, var(--franchize-shell-card) 70%, transparent)",
-          }}>
-            {rentalSecrets?.hasPreviousRentals ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{
-                    backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.2),
-                    color: crew.theme.palette.accentMain,
-                  }}>
-                    <CheckCircle className="h-4 w-4" />
-                  </div>
-                  <span className="text-sm font-semibold text-[var(--fr-profile-accent)]">
-                    Документы верифицированы
+          <div className="mt-3">
+            {/* Verification status badge */}
+            {docsPrefill?.hasVerifiedData && (
+              <div className="mb-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs"
+                style={{
+                  borderColor: withAlpha(crew.theme.palette.accentMain, 0.3),
+                  backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.1),
+                  color: crew.theme.palette.accentMain,
+                }}>
+                <CheckCircle className="h-4 w-4" />
+                <span>Документы верифицированы (завершённая аренда найдена)</span>
+              </div>
+            )}
+
+            {/* Read-only summary of verified data from past rentals */}
+            {rentalSecrets?.hasPreviousRentals && (
+              <div className="mb-3 grid grid-cols-2 gap-2 text-xs text-[var(--fr-profile-muted)]">
+                <div>
+                  Паспорт: <span className={rentalSecrets.savedData?.passport ? "text-[var(--fr-profile-accent)]" : ""}>
+                    {rentalSecrets.savedData?.passport ? "✓ Сохранён" : "—"}
                   </span>
                 </div>
-                {rentalSecrets.lastRentalDate && (
-                  <p className="text-xs text-[var(--fr-profile-muted)]">
-                    Последняя аренда: {rentalSecrets.lastRentalDate}
-                  </p>
-                )}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[var(--fr-profile-muted)]">Паспорт:</span>
-                    <span className={rentalSecrets.savedData?.passport ? "text-[var(--fr-profile-accent)]" : "text-[var(--fr-profile-muted)]"}>
-                      {rentalSecrets.savedData?.passport ? "✓ Сохранён" : "Не добавлен"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[var(--fr-profile-muted)]">Вод. удостоверение:</span>
-                    <span className={rentalSecrets.savedData?.driverLicense ? "text-[var(--fr-profile-accent)]" : "text-[var(--fr-profile-muted)]"}>
-                      {rentalSecrets.savedData?.driverLicense ? "✓ Сохранено" : "Не добавлено"}
-                    </span>
-                  </div>
+                <div>
+                  ВУ: <span className={rentalSecrets.savedData?.driverLicense ? "text-[var(--fr-profile-accent)]" : ""}>
+                    {rentalSecrets.savedData?.driverLicense ? "✓ Сохранено" : "—"}
+                  </span>
                 </div>
               </div>
+            )}
+
+            {/* Editable form — only inside Telegram WebApp (not browser) */}
+            {dbUser?.user_id ? (
+              <RentalDocsForm
+                slug={slug}
+                userId={dbUser.user_id}
+                accentColor={crew.theme.palette.accentMain}
+                initialData={docsPrefill || undefined}
+                onSave={async (data) => {
+                  return saveRentalDocsPrefillAction({ slug, userId: dbUser.user_id, ...data });
+                }}
+              />
             ) : (
-              <div className="flex flex-col items-center justify-center py-4 text-center">
-                <Lock className="h-8 w-8 text-[var(--fr-profile-muted)] mb-2" />
-                <p className="text-sm font-semibold text-[var(--fr-profile-text)]">
-                  Нет верифицированных документов
-                </p>
-                <p className="mt-1 text-xs text-[var(--fr-profile-muted)]">
-                  После первой аренды ваши документы будут сохранены здесь
-                </p>
-              </div>
+              <p className="py-4 text-center text-xs text-[var(--fr-profile-muted)]">
+                Откройте профиль в Telegram для ввода документов
+              </p>
             )}
           </div>
         </FranchizeOperatorPanel>
