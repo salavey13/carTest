@@ -502,7 +502,7 @@ function PricingTable({
 export const ADDITIONAL_ITEMS = [
   { key: "helmet", label: "Шлем", icon: "🪖", price: 1000, type: "count" as const, max: 2 },
   { key: "gloves", label: "Перчатки", icon: "🧤", price: 500, type: "toggle" as const },
-  { key: "net", label: "Сеть (накидка)", icon: "🌐", price: 0, type: "toggle" as const },
+  { key: "net", label: "Сетка", icon: "🌐", price: 500, type: "toggle" as const },
   { key: "bag", label: "Багажная сумка", icon: "👜", price: 500, type: "toggle" as const },
   { key: "coat", label: "Дождевик", icon: "🧥", price: 500, type: "toggle" as const },
 ];

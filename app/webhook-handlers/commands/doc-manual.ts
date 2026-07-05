@@ -1268,6 +1268,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         bike_power_hp: String(bike.specs?.power_hp || bike.specs?.max_power_hp || "0"),
         bike_power_kw: String(bike.specs?.power_kw || "0"),
         bike_battery: String(bike.specs?.battery || (isElectric ? "уточняется" : "")),
+        buyer_phone: context.clientPhone || "",
       };
     }
 
@@ -2582,7 +2583,7 @@ export async function handleDocCallback(
           [{ text: "⏭ Пропустить", callback_data: "phone_skip" }],
           [{ text: "❌ Отменить", callback_data: "cancel" }],
         ],
-        { keyboardType: "inline", parseMode: "Markdown", removeKeyboard: true },
+        { keyboardType: "inline", parseMode: "Markdown" },
       );
       return true;
     }
