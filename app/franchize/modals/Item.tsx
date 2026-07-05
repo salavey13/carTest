@@ -324,7 +324,7 @@ function DurationShortcuts({
     const effectiveStart = startDate || today;
     onStartDateChange(effectiveStart);
     onEndDateChange(addDays(effectiveStart, days));
-    // End time stays same as start time
+    onEndTimeChange(startTime); // Reset end time to match start time for clean day calculation
   };
 
   return (
