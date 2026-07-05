@@ -37,6 +37,7 @@ const SOURCE_META: Record<string, { label: string; icon: typeof Globe; color: st
   dashboard_intent: { label: "Интерес", icon: LayoutDashboard, color: "#f59e0b" },
   rental_contract: { label: "Аренда", icon: FileText, color: "#10b981" },
   sale_contract: { label: "Покупка", icon: FileText, color: "#a855f7" },
+  test_drive: { label: "Тест-драйв", icon: FileText, color: "#f97316" },
   rental_secret: { label: "Данные", icon: Lock, color: "#6b7280" },
   profile_prefill: { label: "Профиль", icon: MessageCircle, color: "#8b5cf6" },
 };
@@ -45,6 +46,7 @@ const INTENT_LABELS: Record<string, string> = {
   rent: "Аренда",
   sale: "Покупка",
   test_ride: "Тест-драйв",
+  test_drive: "Тест-драйв",
   checkout_start: "Оформление",
   callback_request: "Звонок",
   rental_contract: "Договор аренды",
