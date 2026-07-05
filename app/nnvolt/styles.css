@@ -146,8 +146,11 @@
   pointer-events: none;
 }
 
-/* Smooth scroll */
-html { scroll-behavior: smooth; }
+/* Smooth scroll + offset for fixed header (~80px) */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 6rem;
+}
 
 /* Number input */
 input[type="number"]::-webkit-inner-spin-button,
