@@ -160,6 +160,8 @@ interface CrewSecrets {
   issuerName: string;
   issuerRepresentative: string;
   phone: string;
+  signatoryRole: string;
+  returnAddress: string;
 }
 
 async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<CrewSecrets> {
@@ -191,6 +193,8 @@ async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<CrewSecre
       issuerName: cd.issuerName || "Воробьев Р.В.",
       issuerRepresentative: cd.issuerRepresentative || "Сидоров Илья Олегович",
       phone: cd.phone || "+7 920 078 98 88",
+      signatoryRole: cd.signatoryRole || "",
+      returnAddress: cd.returnAddress || "",
     };
   } catch (error) {
     logger.warn("[/testdrive] Failed to load crew_secrets, using fallbacks:", error);
@@ -208,6 +212,8 @@ async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<CrewSecre
       issuerName: "Воробьев Р.В.",
       issuerRepresentative: "Сидоров Илья Олегович",
       phone: "+7 920 078 98 88",
+      signatoryRole: "",
+      returnAddress: "",
     };
   }
 }
@@ -958,8 +964,8 @@ export async function handleTestDriveText(userId: string, chatId: number, text: 
     }
     context.licenseSeries = l.series;
     context.licenseNumber = l.number;
-    context.licenseIssueDate = l.issueDate;
-    context.licenseExpiryDate = l.expiryDate;
+    context.licenseIssueDate = l.issueDate || undefined;
+    context.licenseExpiryDate = l.expiryDate || undefined;
     // After license → ask for categories
     await setState(userId, "td_category", context);
     const dateStr = l.issueDate

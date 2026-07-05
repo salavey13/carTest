@@ -257,6 +257,7 @@ export interface BikeSpecs {
   max_power_hp?: string;
   dailyPrice?: number;
   rent_weekday?: number;
+  rent_weekend?: number;
   price_per_hour?: number;
   deposit_rub?: number;
   sale_price?: number;
