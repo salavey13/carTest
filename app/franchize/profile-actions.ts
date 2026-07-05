@@ -1,5 +1,6 @@
 "use server";
 
+import { createHash } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { privateSchema } from "@/lib/private-secrets";
 
@@ -505,9 +506,12 @@ export async function saveRentalDocsPrefillAction(params: {
 
     const chatId = user.user_id; // Telegram user_id is the chat_id in this table
 
-    // 2. Build deterministic doc_sha256 for prefill record
-    //    Format: prefill_<chatId>_<crewSlug> — stable across saves
-    const docSha256 = `prefill_${chatId}_${params.slug}`;
+    // 2. Compute real SHA-256 hash as doc_sha256
+    //    For prefill records (no actual DOCX), hash the identifier string.
+    //    This gives a valid 64-char hex hash that won't collide with
+    //    operator-created records (those hash the actual contract file).
+    const hashInput = `profile_prefill_${chatId}_${params.slug}`;
+    const docSha256 = createHash("sha256").update(hashInput).digest("hex");
 
     // 3. Build combined passport string (series + number)
     const passportStr = [params.passportSeries, params.passportNumber]
@@ -538,11 +542,13 @@ export async function saveRentalDocsPrefillAction(params: {
       template_version: 1,
     };
 
-    // Check if a prefill row already exists
+    // Check if a prefill row already exists (by source_doc_key, not by hash)
     const { data: existing } = await privateSchema()
       .from("user_rental_secrets")
       .select("*")
-      .eq("doc_sha256", docSha256)
+      .eq("chat_id", chatId)
+      .eq("crew_slug", params.slug)
+      .eq("source_doc_key", "profile_prefill")
       .maybeSingle();
 
     if (existing) {
@@ -563,7 +569,9 @@ export async function saveRentalDocsPrefillAction(params: {
       const { error: updateError } = await privateSchema()
         .from("user_rental_secrets")
         .update(merged)
-        .eq("doc_sha256", docSha256);
+        .eq("chat_id", chatId)
+        .eq("crew_slug", params.slug)
+        .eq("source_doc_key", "profile_prefill");
 
       if (updateError) {
         return { success: false, error: updateError.message };
@@ -607,7 +615,7 @@ export async function saveRentalDocsPrefillAction(params: {
 export async function tryVerifyUserRentalDocs(chatId: string, crewSlug: string): Promise<boolean> {
   try {
     // 1. Check private.rental_contract_artifacts for contracts created for this user
-    const { data: artifact, error: artifactError } = await privateSchema()
+    const { data: artifact } = await privateSchema()
       .from("rental_contract_artifacts")
       .select("renter_full_name, renter_passport, renter_passport_issued_by, renter_passport_issue_date, renter_registration, renter_driver_license, renter_birth_date, license_categories, created_at")
       .eq("telegram_chat_id", chatId)
@@ -626,26 +634,19 @@ export async function tryVerifyUserRentalDocs(chatId: string, crewSlug: string):
     const hasContract = !!artifact;
     const hasRental = !!rental;
 
-    if (!hasContract && !hasRental) {
-      return false; // nothing to verify against
-    }
+    if (!hasContract && !hasRental) return false;
 
-    // 3. Find the prefill record and upgrade it
-    const docSha256 = `prefill_${chatId}_${crewSlug}`;
+    // 3. Find the prefill record (by source_doc_key, not by fake hash)
     const { data: prefillRow } = await privateSchema()
       .from("user_rental_secrets")
       .select("*")
-      .eq("doc_sha256", docSha256)
+      .eq("chat_id", chatId)
+      .eq("crew_slug", crewSlug)
+      .eq("source_doc_key", "profile_prefill")
       .maybeSingle();
 
-    if (!prefillRow) {
-      return false; // no prefill to verify
-    }
-
-    // Already verified — nothing to do
-    if (prefillRow.verification_status === "verified") {
-      return true;
-    }
+    if (!prefillRow) return false;
+    if (prefillRow.verification_status === "verified") return true;
 
     // 4. Upgrade to verified, enriching with authoritative data from artifact
     const updateData: Record<string, unknown> = {
@@ -667,7 +668,9 @@ export async function tryVerifyUserRentalDocs(chatId: string, crewSlug: string):
     const { error: updateError } = await privateSchema()
       .from("user_rental_secrets")
       .update(updateData)
-      .eq("doc_sha256", docSha256)
+      .eq("chat_id", chatId)
+      .eq("crew_slug", crewSlug)
+      .eq("source_doc_key", "profile_prefill")
       .eq("verification_status", "pending"); // only upgrade pending → verified
 
     if (updateError) {
@@ -726,7 +729,9 @@ export async function getRentalDocsPrefillAction(params: {
     if (!user) return { success: false };
 
     const chatId = user.user_id;
-    const docSha256 = `prefill_${chatId}_${params.slug}`;
+    const docSha256 = createHash("sha256")
+      .update(`profile_prefill_${chatId}_${params.slug}`)
+      .digest("hex");
 
     // 2. Auto-verify: check if user has completed rentals
     //    If yes, upgrade prefill from "pending" to "verified" with authoritative data
