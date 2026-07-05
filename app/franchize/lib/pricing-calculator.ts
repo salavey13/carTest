@@ -199,7 +199,7 @@ function calculatePriceForDays(
 
   if (days === 1) {
     // For single-day: use weekend rate if the rental day is a weekend
-    if (isWeekendDay(startDateStr) && validatePositiveNumber(specs.rent_weekend) !== undefined) {
+    if (startDateStr && isWeekendDay(startDateStr) && validatePositiveNumber(specs.rent_weekend) !== undefined) {
       perDayRate = specs.rent_weekend!;
       periodLabel = '/ день (выходные)';
       return { price: perDayRate, period: periodLabel, rate: perDayRate };
