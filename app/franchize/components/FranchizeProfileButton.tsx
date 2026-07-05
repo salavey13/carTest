@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, User, IdCard, MessageCircle, Send, UserPlus, Users, Moon, Sun, BarChart3 } from "lucide-react";
+import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, User, IdCard, MessageCircle, Send, UserPlus, Users, Moon, Sun, BarChart3, PhoneCall } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
@@ -329,6 +329,16 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
               <span className="truncate">Дашборд франшизы</span>
             </Link>
           </DropdownMenuItem>
+
+          {/* Leads page — visible to crew owner, admin, and members */}
+          {(userIsAdmin || userCrewInfo?.slug) && effectiveSlug && (
+            <DropdownMenuItem asChild>
+              <Link href={`/franchize/${effectiveSlug}/leads`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                <PhoneCall className="mr-2 h-4 w-4 shrink-0" />
+                <span className="truncate">Клиенты и заявки</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuItem asChild>
             <Link href={franchizeProfileHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">

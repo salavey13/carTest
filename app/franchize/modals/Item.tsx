@@ -801,10 +801,16 @@ function CallbackRequestForm({
     setSubmitted(true);
   };
 
+  // Theme-aware input style using CSS variables set by getModalThemeVars
+  const inputStyle = {
+    backgroundColor: "var(--item-border)",
+    borderColor: "var(--item-border)",
+  };
+
   if (submitted) {
     return (
-      <div className="rounded-2xl border px-3 py-3 text-center" style={{ borderColor: `${accentColor}40`, backgroundColor: `${accentColor}10` }}>
-        <p className="text-sm font-semibold" style={{ color: accentColor }}>✅ Заявка отправлена!</p>
+      <div className="rounded-2xl border px-3 py-3 text-center" style={{ borderColor: "var(--item-accent)", backgroundColor: "color-mix(in srgb, var(--item-accent) 10%, transparent)" }}>
+        <p className="text-sm font-semibold text-[var(--item-accent)]">✅ Заявка отправлена!</p>
         <p className="mt-1 text-xs text-[var(--item-muted-text)]">
           Менеджер перезвонит в течение 15 минут.
           Документы можно показать при встрече.
@@ -814,13 +820,13 @@ function CallbackRequestForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-2xl border p-3" style={{ borderColor: `${accentColor}40`, backgroundColor: `${accentColor}08` }}>
+    <form onSubmit={handleSubmit} className="rounded-2xl border p-3" style={{ borderColor: "var(--item-border)", backgroundColor: "color-mix(in srgb, var(--item-border) 15%, transparent)" }}>
       <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
         <Phone className="h-3.5 w-3.5" /> Запросить звонок
       </p>
       <p className="mb-2 text-[11px] text-[var(--item-muted-text)]">
         Оставьте контакты — менеджер перезвонит, ответит на вопросы и поможет с оформлением.
-        Документы (паспорт, права) можно показать при встрече.
+        Документы можно показать при встрече.
       </p>
       <div className="space-y-2">
         <input
@@ -829,7 +835,7 @@ function CallbackRequestForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="w-full rounded-lg border px-3 py-2 text-sm text-[var(--item-text)] transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
-          style={{ backgroundColor: "rgba(0,0,0,0.25)", borderColor: `${accentColor}30` }}
+          style={inputStyle}
           aria-label="Ваше имя"
           required
           minLength={2}
@@ -840,7 +846,7 @@ function CallbackRequestForm({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           className="w-full rounded-lg border px-3 py-2 text-sm text-[var(--item-text)] transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
-          style={{ backgroundColor: "rgba(0,0,0,0.25)", borderColor: `${accentColor}30` }}
+          style={inputStyle}
           aria-label="Номер телефона"
           required
           minLength={6}
@@ -848,7 +854,7 @@ function CallbackRequestForm({
         <button
           type="submit"
           className="w-full rounded-lg px-3 py-2 text-sm font-bold transition hover:brightness-110 active:scale-[0.99]"
-          style={{ backgroundColor: accentColor, color: "#fff" }}
+          style={{ backgroundColor: "var(--item-accent)", color: "var(--item-accent-contrast)" }}
         >
           Перезвоните мне
         </button>

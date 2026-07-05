@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle, Phone, Globe, FileText, Lock, MessageCircle } from "lucide-react";
+import { CheckCircle, Phone, Globe, FileText, Lock, MessageCircle, Flame, LayoutDashboard } from "lucide-react";
 
 interface LeadRow {
   user_id: string;
@@ -11,13 +11,25 @@ interface LeadRow {
   bikeTitle: string | null;
   createdAt: string | null;
   verified: boolean;
+  intentType?: string | null;
+  intentStage?: string | null;
+  urgencyScore?: number | null;
 }
 
 const SOURCE_META: Record<string, { label: string; icon: typeof Globe; color: string }> = {
   web_callback: { label: "Заявка с сайта", icon: Globe, color: "#3b82f6" },
+  dashboard_intent: { label: "Интерес из каталога", icon: LayoutDashboard, color: "#f59e0b" },
   rental_contract: { label: "Договор аренды", icon: FileText, color: "#10b981" },
-  rental_secret: { label: "Данные арендатора", icon: Lock, color: "#f59e0b" },
+  rental_secret: { label: "Данные арендатора", icon: Lock, color: "#a855f7" },
   profile_prefill: { label: "Самостоятельно", icon: MessageCircle, color: "#8b5cf6" },
+};
+
+const INTENT_LABELS: Record<string, string> = {
+  rent: "Аренда",
+  sale: "Покупка",
+  test_ride: "Тест-драйв",
+  checkout_start: "Оформление",
+  callback_request: "Заявка на звонок",
 };
 
 export default function LeadsClient({
@@ -28,62 +40,98 @@ export default function LeadsClient({
   accentColor: string;
 }) {
   const verified = leads.filter((l) => l.verified);
-  const pending = leads.filter((l) => !l.verified);
+  const hot = leads.filter((l) => !l.verified && (l.urgencyScore ?? 0) >= 60);
+  const warm = leads.filter((l) => !l.verified && (l.urgencyScore ?? 0) < 60);
 
   return (
     <div className="mt-6 space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-xl border p-4" style={{ borderColor: `${accentColor}30` }}>
-          <p className="text-2xl font-bold" style={{ color: accentColor }}>{leads.length}</p>
-          <p className="text-xs opacity-60">Всего</p>
-        </div>
-        <div className="rounded-xl border p-4" style={{ borderColor: "#10b98130" }}>
-          <p className="text-2xl font-bold text-emerald-400">{verified.length}</p>
-          <p className="text-xs opacity-60">Верифицированы</p>
-        </div>
-        <div className="rounded-xl border p-4" style={{ borderColor: "#3b82f630" }}>
-          <p className="text-2xl font-bold text-blue-400">{pending.length}</p>
-          <p className="text-xs opacity-60">Ожидают</p>
-        </div>
+      <div className="grid grid-cols-4 gap-2 sm:gap-3">
+        <StatCard count={leads.length} label="Всего" color={accentColor} />
+        <StatCard count={verified.length} label="Верифицированы" color="#10b981" />
+        <StatCard count={hot.length} label="Горячие 🔥" color="#ef4444" />
+        <StatCard count={warm.length} label="Тёплые" color="#3b82f6" />
       </div>
+
+      {/* Hot leads section */}
+      {hot.length > 0 && (
+        <LeadSection
+          title={`Горячие заявки (${hot.length})`}
+          icon={Flame}
+          iconColor="#ef4444"
+          leads={hot}
+          accentColor={accentColor}
+        />
+      )}
 
       {/* Verified section */}
       {verified.length > 0 && (
-        <div>
-          <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-            <CheckCircle className="h-4 w-4 text-emerald-400" />
-            Верифицированные ({verified.length})
-          </h2>
-          <div className="space-y-2">
-            {verified.map((lead) => (
-              <LeadCard key={lead.user_id} lead={lead} accentColor={accentColor} />
-            ))}
-          </div>
-        </div>
+        <LeadSection
+          title={`Верифицированные (${verified.length})`}
+          icon={CheckCircle}
+          iconColor="#10b981"
+          leads={verified}
+          accentColor={accentColor}
+        />
       )}
 
-      {/* Pending section */}
-      {pending.length > 0 && (
-        <div>
-          <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold opacity-70">
-            <Phone className="h-4 w-4" />
-            Заявки с сайта ({pending.length})
-          </h2>
-          <div className="space-y-2">
-            {pending.map((lead) => (
-              <LeadCard key={lead.user_id} lead={lead} accentColor={accentColor} />
-            ))}
-          </div>
-        </div>
+      {/* Warm/pending section */}
+      {warm.length > 0 && (
+        <LeadSection
+          title={`Ожидают (${warm.length})`}
+          icon={Phone}
+          iconColor="#3b82f6"
+          leads={warm}
+          accentColor={accentColor}
+        />
       )}
 
       {leads.length === 0 && (
-        <div className="rounded-xl border p-8 text-center opacity-60">
-          <Phone className="mx-auto mb-3 h-10 w-10" />
-          <p className="text-sm">Пока нет ни одной заявки</p>
+        <div className="rounded-xl border p-8 text-center" style={{ borderColor: `${accentColor}20` }}>
+          <Phone className="mx-auto mb-3 h-10 w-10 opacity-40" />
+          <p className="text-sm opacity-60">Пока нет ни одной заявки</p>
+          <p className="mt-1 text-xs opacity-40">
+            Заявки с сайта, интерес из каталога и арендаторы появятся здесь
+          </p>
         </div>
       )}
+    </div>
+  );
+}
+
+function StatCard({ count, label, color }: { count: number; label: string; color: string }) {
+  return (
+    <div className="rounded-xl border p-3 text-center" style={{ borderColor: `${color}30` }}>
+      <p className="text-xl font-bold sm:text-2xl" style={{ color }}>{count}</p>
+      <p className="text-[10px] opacity-60 sm:text-xs">{label}</p>
+    </div>
+  );
+}
+
+function LeadSection({
+  title,
+  icon: Icon,
+  iconColor,
+  leads,
+  accentColor,
+}: {
+  title: string;
+  icon: typeof Flame;
+  iconColor: string;
+  leads: LeadRow[];
+  accentColor: string;
+}) {
+  return (
+    <div>
+      <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold" style={{ color: iconColor }}>
+        <Icon className="h-4 w-4" />
+        {title}
+      </h2>
+      <div className="space-y-2">
+        {leads.map((lead) => (
+          <LeadCard key={lead.user_id + lead.source} lead={lead} accentColor={accentColor} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -94,10 +142,11 @@ function LeadCard({ lead, accentColor }: { lead: LeadRow; accentColor: string })
   const date = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString("ru-RU", {
     day: "numeric", month: "short", year: "numeric",
   }) : "";
+  const intentLabel = lead.intentType ? INTENT_LABELS[lead.intentType] || lead.intentType : null;
 
   return (
     <div
-      className="flex items-center gap-3 rounded-xl border p-3"
+      className="flex items-center gap-3 rounded-xl border p-3 transition hover:border-opacity-50"
       style={{ borderColor: `${accentColor}20`, backgroundColor: `${accentColor}05` }}
     >
       {/* Source icon */}
@@ -120,13 +169,14 @@ function LeadCard({ lead, accentColor }: { lead: LeadRow; accentColor: string })
             </a>
           )}
           {lead.username && <span>@{lead.username}</span>}
-          {lead.bikeTitle && <span className="truncate">🏍 {lead.bikeTitle}</span>}
+          {lead.bikeTitle && <span className="max-w-32 truncate">🏍 {lead.bikeTitle}</span>}
+          {intentLabel && <span className="rounded-full px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: `${meta.color}15` }}>{intentLabel}</span>}
           {date && <span>{date}</span>}
         </div>
       </div>
 
       {/* Status badge */}
-      <div className="shrink-0">
+      <div className="flex shrink-0 items-center gap-1">
         <span
           className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
           style={{ backgroundColor: `${meta.color}15`, color: meta.color }}
@@ -134,27 +184,23 @@ function LeadCard({ lead, accentColor }: { lead: LeadRow; accentColor: string })
           {meta.label}
         </span>
         {lead.verified && (
-          <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
-            <CheckCircle className="h-3 w-3" /> ✓
-          </span>
+          <CheckCircle className="h-4 w-4 text-emerald-400" />
         )}
       </div>
 
       {/* Actions */}
-      <div className="shrink-0">
-        {lead.phone && (
-          <a
-            href={`https://wa.me/${lead.phone.replace(/\D/g, "")}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition hover:opacity-80"
-            style={{ borderColor: `${accentColor}40`, color: accentColor }}
-            title="Написать в WhatsApp"
-          >
-            <MessageCircle className="h-4 w-4" />
-          </a>
-        )}
-      </div>
+      {lead.phone && (
+        <a
+          href={`https://wa.me/${lead.phone.replace(/\D/g, "")}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition hover:opacity-80"
+          style={{ borderColor: `${accentColor}40`, color: accentColor }}
+          title="Написать в WhatsApp"
+        >
+          <MessageCircle className="h-4 w-4" />
+        </a>
+      )}
     </div>
   );
 }
