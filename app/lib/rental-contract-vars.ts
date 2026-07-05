@@ -588,6 +588,7 @@ export function buildRentalContractVariables(
     issuer_name: crewSecrets.issuerName,
     issuer_signatory: crewSecrets.signatoryRole || "Менеджер Мотосалона",
     issuer_representative: crewSecrets.issuerRepresentative || crewSecrets.organizationRepresentative || crewSecrets.issuerName,
+    organization_representative: crewSecrets.organizationRepresentative || crewSecrets.issuerName || crewSecrets.organizationShort || "ИП Воробьев Р.В.",
     organization_name: crewSecrets.organizationName,
     organization_short: crewSecrets.organizationShort,
     ogrnip: crewSecrets.ogrnip,

@@ -553,13 +553,16 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       price_digits: String(price),
       price_words: numberToWords(price),
       deposit_rub: String(deposit),
+      deposit_words: numberToWords(deposit),
       // Crew
       organization_name: crewSecrets.organizationName,
       organization_short: crewSecrets.organizationShort,
       issuer_name: crewSecrets.issuerName,
+      issuer_signatory: crewSecrets.signatoryRole || crewSecrets.issuerName || "Менеджер",
       ogrnip: crewSecrets.ogrnip,
       inn: crewSecrets.inn,
       legal_address: crewSecrets.legalAddress,
+      return_address: crewSecrets.returnAddress || crewSecrets.legalAddress || "г. Нижний Новгород, пл. Комсомольская 2",
       phone: crewSecrets.phone,
       email: crewSecrets.email,
       // Meta
@@ -735,9 +738,23 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       logger.warn("[/testdrive] rental_contract_artifacts save failed (non-fatal):", dbErr);
     }
 
-    // 3. Also upsert to franchize_intents for the dashboard pipeline
+    // 3. Lead pipeline: upsert to users + franchize_intents for the dashboard
     try {
-      const leadUserId = context.customerPhone || String(userId);
+      const leadPhone = context.customerPhone || "";
+      const leadUserId = leadPhone || String(userId);
+      // Upsert users record by phone as fallback identifier
+      if (leadPhone) {
+        await supabaseAdmin.from("users").upsert({
+          user_id: leadUserId,
+          phone: leadPhone,
+          full_name: context.customerFullName || "",
+          metadata: {
+            source: "telegram-testdrive",
+            created_via: "contract_generation",
+            is_lead: true,
+          },
+        }, { onConflict: "user_id" });
+      }
       await supabaseAdmin.from("franchize_intents").upsert({
         slug: "vip-bike",
         bike_id: bike.id,

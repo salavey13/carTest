@@ -5,7 +5,12 @@
 <!--   СТС-pledge clauses; otherwise the original cash-deposit clauses render unchanged. -->
 <!--   Engine: renderTemplateWithVars() in scripts/make-deal-contract-skill.mjs -->
 <!--   supports {{#if var}}…{{else}}…{{/if}} blocks (innermost-first, max 50 depth). -->
-<div style="font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000; max-width: 700px; margin: 0 auto;">
+<style>
+  @page { size: A4; margin: 20mm 20mm 25mm 25mm; }
+  .doc-container { max-width: 17cm; margin: 0 auto; }
+  .doc-container p { max-width: 100%; overflow-wrap: break-word; }
+</style>
+<div class="doc-container" style="font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000;">
 
 <p style="text-align: center; font-weight: bold; font-size: 14pt; text-transform: uppercase;">ДОГОВОР № {{contract_number}}</p>
 <p style="text-align: center; font-weight: bold; font-size: 14pt; text-transform: uppercase;">ПРОКАТА (АРЕНДЫ) {{bike_vehicle_type_label}}</p>
@@ -20,7 +25,7 @@
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt; width: 40%;">Арендатор:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{renter_full_name}}</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">ТС:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{bike_make}} {{bike_model}}</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Период:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{rent_start_date}} {{rent_start_time}} — {{rent_end_date}} {{rent_end_time}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Тариф:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{daily_price}} ₽/сут</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Тариф:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{daily_price_rub}} ₽/сут</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Залог:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{deposit_rub}} ₽</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Телефон:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{renter_phone}}</td></tr>
 </table>
@@ -230,7 +235,9 @@
 ФИО: {{renter_full_name}}<br>
 Паспорт: {{renter_passport}}<br>
 Дата выдачи: {{renter_passport_issue_date}}<br>
-Прописка: {{renter_registration}}</td>
+{{#if renter_driver_license}}ВУ: {{renter_driver_license}}<br>{{/if}}
+Прописка: {{renter_registration}}<br>
+Телефон: {{renter_phone}}</td>
 </tr>
 </table>
 
