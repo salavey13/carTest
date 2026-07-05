@@ -20,6 +20,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
   // 1. Callback leads (users with metadata.source = "web_callback")
   // 2. Users from rental_contract_artifacts
   // 3. Users from user_rental_secrets
+  // 4. Users from franchize_intents (dashboard leads)
 
   type LeadRow = {
     user_id: string;
@@ -30,9 +31,31 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
     bikeTitle: string | null;
     createdAt: string | null;
     verified: boolean;
+    intentType?: string | null;
+    intentStage?: string | null;
+    urgencyScore?: number | null;
   };
 
   const leads: LeadRow[] = [];
+  const seenIds = new Set<string>();
+
+  // Helper to add or merge a lead
+  const addLead = (row: LeadRow) => {
+    const existing = leads.find((l) => l.user_id === row.user_id);
+    if (existing) {
+      // Merge: prefer verified, keep most recent date
+      if (row.verified) existing.verified = true;
+      if (row.intentType && !existing.intentType) existing.intentType = row.intentType;
+      if (row.intentStage && !existing.intentStage) existing.intentStage = row.intentStage;
+      if (row.urgencyScore && !existing.urgencyScore) existing.urgencyScore = row.urgencyScore;
+      if (row.createdAt && (!existing.createdAt || row.createdAt > existing.createdAt)) {
+        existing.createdAt = row.createdAt;
+      }
+      return;
+    }
+    leads.push(row);
+    seenIds.add(row.user_id);
+  };
 
   // 1. Callback leads from public.users
   const { data: callbackUsers } = await supabaseAdmin
@@ -44,7 +67,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
 
   if (callbackUsers) {
     for (const u of callbackUsers) {
-      leads.push({
+      addLead({
         user_id: u.user_id,
         full_name: u.full_name,
         username: u.username,
@@ -57,7 +80,35 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
     }
   }
 
-  // 2. Users from rental_contract_artifacts (operator-created contracts)
+  // 2. Users from franchize_intents (dashboard leads)
+  const { data: intentLeads } = await supabaseAdmin
+    .from("franchize_intents")
+    .select("telegram_user_id, intent_type, stage, urgency_score, created_at, metadata")
+    .eq("slug", slug)
+    .not("telegram_user_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (intentLeads) {
+    for (const i of intentLeads) {
+      if (!i.telegram_user_id) continue;
+      addLead({
+        user_id: i.telegram_user_id,
+        full_name: i.metadata?.name || null,
+        username: null,
+        phone: i.metadata?.phone || null,
+        source: "dashboard_intent",
+        bikeTitle: null,
+        createdAt: i.created_at,
+        verified: false,
+        intentType: i.intent_type,
+        intentStage: i.stage,
+        urgencyScore: i.urgency_score,
+      });
+    }
+  }
+
+  // 3. Users from rental_contract_artifacts (operator-created contracts)
   const { data: artifactUsers } = await privateSchema()
     .from("rental_contract_artifacts")
     .select("telegram_chat_id, renter_full_name, created_at")
@@ -68,26 +119,20 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
     for (const a of artifactUsers) {
       const chatId = a.telegram_chat_id;
       if (!chatId) continue;
-      // Check if already in leads (callback lead with same phone)
-      const existing = leads.find((l) => l.user_id === chatId);
-      if (existing) {
-        existing.verified = true;
-      } else {
-        leads.push({
-          user_id: chatId,
-          full_name: a.renter_full_name,
-          username: null,
-          phone: chatId.startsWith("+") || /^\d{10,}$/.test(chatId) ? chatId : null,
-          source: "rental_contract",
-          bikeTitle: null,
-          createdAt: a.created_at,
-          verified: true,
-        });
-      }
+      addLead({
+        user_id: chatId,
+        full_name: a.renter_full_name,
+        username: null,
+        phone: chatId.startsWith("+") || /^\d{10,}$/.test(chatId) ? chatId : null,
+        source: "rental_contract",
+        bikeTitle: null,
+        createdAt: a.created_at,
+        verified: true,
+      });
     }
   }
 
-  // 3. Users from user_rental_secrets
+  // 4. Users from user_rental_secrets
   const { data: secretUsers } = await privateSchema()
     .from("user_rental_secrets")
     .select("chat_id, renter_full_name, renter_phone, verification_status, source_doc_key, created_at")
@@ -98,21 +143,16 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
     for (const s of secretUsers) {
       const chatId = s.chat_id;
       if (!chatId) continue;
-      const existing = leads.find((l) => l.user_id === chatId);
-      if (existing) {
-        if (s.verification_status === "verified") existing.verified = true;
-      } else {
-        leads.push({
-          user_id: chatId,
-          full_name: s.renter_full_name,
-          username: null,
-          phone: s.renter_phone || null,
-          source: s.source_doc_key === "profile_prefill" ? "profile_prefill" : "rental_secret",
-          bikeTitle: null,
-          createdAt: s.created_at,
-          verified: s.verification_status === "verified",
-        });
-      }
+      addLead({
+        user_id: chatId,
+        full_name: s.renter_full_name,
+        username: null,
+        phone: s.renter_phone || null,
+        source: s.source_doc_key === "profile_prefill" ? "profile_prefill" : "rental_secret",
+        bikeTitle: null,
+        createdAt: s.created_at,
+        verified: s.verification_status === "verified",
+      });
     }
   }
 
