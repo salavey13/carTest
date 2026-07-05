@@ -3,11 +3,11 @@
  * /testdrive command handler — MANUAL INPUT VERSION
  * =============================================================================
  *
- * Enhanced flow (2026-07-05): operator chooses which document to collect.
+ * Enhanced flow (2026-07-05): inline bike selection + doc choice + private table saving.
  * After phone → doc choice (passport / license / both) → conditional steps.
  *
  * Flow:
- *   1. Bike selection
+ *   1. Bike selection (inline keyboard with callback_data)
  *   2. Phone → "+7 987 654 32 10"
  *   3. Document choice → inline keyboard (🪪 Passport / 🚗 License / 📋 Both)
  *      ├─ Passport only: name → passport → birth → address → confirm
@@ -27,7 +27,6 @@ import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessag
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
 import { privateSchema } from "@/lib/private-secrets";
-import { createHash } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -783,22 +782,6 @@ export async function handleTestDriveText(userId: string, chatId: number, text: 
 
   const { state, context } = tdState;
 
-  // ── Bike selection ──
-  if (state === "td_bike") {
-    const bike = await resolveBikeById(text.trim());
-    if (!bike) {
-      await sendComplexMessage(chatId, "🚲 Не найден. Попробуйте:", [], { keyboardType: "reply" });
-      return true;
-    }
-    context.bikeId = bike.id;
-    context.bikeMake = bike.make;
-    context.bikeModel = bike.model;
-    await setState(userId, "td_phone", context);
-    await sendComplexMessage(chatId, `🏍 ${bike.make} ${bike.model}`, [], { removeKeyboard: true });
-    await sendComplexMessage(chatId, "*Тест-драйв — телефон клиента*", [], { parseMode: "Markdown", removeKeyboard: true });
-    return true;
-  }
-
   // ── Phone ──
   if (state === "td_phone") {
     const cleaned = text.replace(/[^\d+]/g, "");
@@ -974,6 +957,25 @@ export async function handleTestDriveCallback(
     return true;
   }
 
+  // ── Bike selection (state: td_bike) ──
+
+  if (state === "td_bike" && callbackData.startsWith("td_bike_")) {
+    const bikeId = callbackData.replace("td_bike_", "");
+    const bike = await resolveBikeById(bikeId);
+    if (!bike) {
+      await sendComplexMessage(chatId, "🚲 Байк не найден. Попробуйте снова /testdrive", [], { removeKeyboard: true });
+      await clearState(userId);
+      return true;
+    }
+    context.bikeId = bike.id;
+    context.bikeMake = bike.make;
+    context.bikeModel = bike.model;
+    await setState(userId, "td_phone", context);
+    await sendComplexMessage(chatId, `🏍 ${bike.make} ${bike.model}`, [], { removeKeyboard: true });
+    await sendComplexMessage(chatId, "*Тест-драйв — телефон клиента*", [], { parseMode: "Markdown", removeKeyboard: true });
+    return true;
+  }
+
   // ── Document choice (state: td_doc_choice) ──
 
   if (state === "td_doc_choice" && callbackData === "td_doc_passport") {
@@ -1045,27 +1047,7 @@ export async function testDriveCommand(
   const userIdStr = String(userId);
   logger.info(`[/testdrive] ${userIdStr}: ${text}`);
 
-  const parts = text.trim().split(/\s+/);
-  const bikeArg = parts.slice(1).join(" ").trim();
-
-  if (bikeArg) {
-    const bike = await resolveBikeById(bikeArg);
-    if (!bike) {
-      await sendComplexMessage(chatId, `🚲 "${bikeArg}" не найден.`, [], { removeKeyboard: true });
-      return;
-    }
-    const context: TestDriveContext = {
-      bikeId: bike.id,
-      bikeMake: bike.make,
-      bikeModel: bike.model,
-    };
-    await setState(userIdStr, "td_phone", context);
-    await sendComplexMessage(chatId, `🏍 ${bike.make} ${bike.model}`, [], { removeKeyboard: true });
-    await sendComplexMessage(chatId, "*Тест-драйв — телефон клиента*", [], { parseMode: "Markdown", removeKeyboard: true });
-    return;
-  }
-
-  // No bike arg — show inline bike selection
+  // Show inline bike selection
   const bikes = await getAvailableBikes();
   if (!bikes.length) {
     await sendComplexMessage(chatId, "🚲 Нет байков.", [], { removeKeyboard: true });
@@ -1075,14 +1057,15 @@ export async function testDriveCommand(
   const buttons: KeyboardButton[][] = bikes.map(b => {
     const tier = b.specs?.access_tier;
     const emoji = tier === "pro" ? "🔴" : tier === "mid" ? "🟡" : tier === "entry" ? "🟢" : "⚪";
-    return [{ text: `${emoji} ${b.make} ${b.model}` }];
+    return [{ text: `${emoji} ${b.make} ${b.model}`, callback_data: `td_bike_${b.id}` }];
   });
+  buttons.push([{ text: "❌ Отменить", callback_data: "td_cancel" }]);
 
   await setState(userIdStr, "td_bike", { bikeId: "" });
   await sendComplexMessage(
     chatId,
-    "🛵 *Тест-драйв — выберите байк*\n\nВведите название или ID, или нажмите на кнопку:",
+    "🛵 *Тест-драйв — выберите байк*",
     buttons,
-    { keyboardType: "reply", parseMode: "Markdown" },
+    { keyboardType: "inline", parseMode: "Markdown" },
   );
 }
