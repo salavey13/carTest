@@ -939,9 +939,6 @@ export function ItemModal({
   const [isInTelegram, setIsInTelegram] = useState(false);
   // Callback request form
   const [showCallbackForm, setShowCallbackForm] = useState(false);
-  const [callbackName, setCallbackName] = useState("");
-  const [callbackPhone, setCallbackPhone] = useState("");
-  const [callbackSent, setCallbackSent] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
