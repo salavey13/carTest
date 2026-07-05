@@ -4,7 +4,7 @@ import {
   decodeStartappState,
   isStartappStateFresh,
   type StartappState,
-} from './startapp-state';
+} from "@/lib/startapp-state";
 
 /**
  * Result of handling a startapp param — tells the caller what to do next.
