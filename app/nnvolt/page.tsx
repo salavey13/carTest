@@ -124,16 +124,26 @@ function Header() {
     { label: "Контакты", href: "#contacts" },
   ];
 
+  // Reliable scroll: JS scrollIntoView instead of relying on hash anchor,
+  // which can glitch inside framer-motion animated containers.
+  const scrollTo = (href: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    const id = href.replace("#", "");
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const headerBlur =
+    scrolled || mobileOpen
+      ? "bg-[#0a0a0a]/95 backdrop-blur-md border-b border-white/5 shadow-lg shadow-black/30"
+      : "bg-transparent";
+
   return (
     <motion.header
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.5 }}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? "bg-[#0a0a0a]/95 backdrop-blur-md border-b border-white/5 shadow-lg shadow-black/30"
-          : "bg-transparent"
-      }`}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${headerBlur}`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20">
@@ -157,12 +167,13 @@ function Header() {
               <a
                 key={l.href}
                 href={l.href}
+                onClick={scrollTo(l.href)}
                 className="px-3.5 py-2 text-[13px] font-medium text-white/60 hover:text-volt transition-colors tracking-wide uppercase"
               >
                 {l.label}
               </a>
             ))}
-            <a href="#contacts">
+            <a href="#contacts" onClick={scrollTo("#contacts")}>
               <Button className="ml-3 bg-volt text-charcoal font-bold hover:bg-volt-hover hover:text-charcoal tracking-wide uppercase text-xs px-5">
                 Вызвать электрика
               </Button>
@@ -191,13 +202,22 @@ function Header() {
                 <a
                   key={l.href}
                   href={l.href}
-                  onClick={() => setMobileOpen(false)}
+                  onClick={(e) => {
+                    setMobileOpen(false);
+                    scrollTo(l.href)(e);
+                  }}
                   className="block px-4 py-3 text-sm font-medium text-white/60 hover:text-volt hover:bg-white/5 rounded transition-colors tracking-wide uppercase"
                 >
                   {l.label}
                 </a>
               ))}
-              <a href="#contacts" onClick={() => setMobileOpen(false)}>
+              <a
+                href="#contacts"
+                onClick={(e) => {
+                  setMobileOpen(false);
+                  scrollTo("#contacts")(e);
+                }}
+              >
                 <Button className="w-full mt-2 bg-volt text-charcoal font-bold hover:bg-volt-hover hover:text-charcoal tracking-wide uppercase text-xs">
                   Вызвать электрика
                 </Button>
