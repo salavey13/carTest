@@ -53,7 +53,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
   const { data: usersLeads } = await supabaseAdmin
     .from("users")
     .select("user_id, full_name, username, metadata, created_at")
-    .in("metadata->>source", ["web_callback", "rental_contract", "sale_contract"])
+    .in("metadata->>source", ["web_callback", "rental_contract", "sale_contract", "test_drive"])
     .order("created_at", { ascending: false })
     .limit(200);
 
@@ -67,7 +67,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
         source: u.metadata?.source || "unknown",
         bikeTitle: u.metadata?.bikeTitle || null,
         createdAt: u.created_at,
-        verified: u.metadata?.source === "rental_contract" || u.metadata?.source === "sale_contract",
+        verified: u.metadata?.source === "rental_contract" || u.metadata?.source === "sale_contract" || u.metadata?.source === "test_drive",
       });
     }
   }
@@ -92,7 +92,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
         source: "dashboard_intent",
         bikeTitle: null,
         createdAt: i.created_at,
-        verified: i.intent_type === "rental_contract" || i.intent_type === "sale_contract",
+        verified: i.intent_type === "rental_contract" || i.intent_type === "sale_contract" || i.intent_type === "test_drive",
         intentType: i.intent_type,
         intentStage: i.stage,
         urgencyScore: i.urgency_score,

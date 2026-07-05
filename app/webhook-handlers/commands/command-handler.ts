@@ -26,6 +26,7 @@ import { codexCommand } from "./codex";
 import { docCommand, handleDocText, handleDocCallback } from "./doc-manual";
 import { handleSubrentManualCommand } from "./subrent-manual";
 import { analyticsPassCommand } from "./analytics-pass";
+import { testDriveCommand, handleTestDriveText, handleTestDriveCallback } from "./testdrive-manual";
 
 import { escapeTelegramMarkdown } from "@/lib/utils"; // Helper для Markdown escape
 
@@ -78,6 +79,12 @@ export async function handleCommand(update: any) {
             text === "sts_skip"          // <<< FIX: skip optional СТС field (vehicle model / VIN)
         )) {
             const handled = await handleDocCallback(userIdStr, chatId, text, update.callback_query.id);
+            if (handled) return;
+        }
+
+        // Handle callback queries for /testdrive flow
+        if (update.callback_query && text.startsWith("td_")) {
+            const handled = await handleTestDriveCallback(userIdStr, chatId, text, update.callback_query.id);
             if (handled) return;
         }
 
@@ -139,6 +146,7 @@ export async function handleCommand(update: any) {
             "/ctx": () => ctxCommand(chatId, userId),
             "/profile": () => profileCommand(chatId, userId, username),
             "/analytics-pass": () => analyticsPassCommand(chatId, userId, username),
+            "/testdrive": () => testDriveCommand(chatId, userId, username, text),
             "/doc": () => {
                 const bestPhotoVariant = update.message?.photo?.length
                     ? [update.message.photo[update.message.photo.length - 1]]
@@ -165,7 +173,8 @@ export async function handleCommand(update: any) {
         const commandFunction = commandMap[command]
             || (command.startsWith("/codex@") ? commandMap["/codex"] : undefined)
             || (command.startsWith("/doc@") ? commandMap["/doc"] : undefined)
-            || (command.startsWith("/subrent@") ? commandMap["/subrent"] : undefined);
+            || (command.startsWith("/subrent@") ? commandMap["/subrent"] : undefined)
+            || (command.startsWith("/testdrive@") ? commandMap["/testdrive"] : undefined);
 
         if (commandFunction) {
             logger.info(`[Command Handler] Executing command: ${command}`);
@@ -178,6 +187,17 @@ export async function handleCommand(update: any) {
             // Check if user is in /doc flow (awaiting bike selection or schedule)
             const docHandled = await handleDocText(userIdStr, chatId, text);
             if (docHandled) return;
+
+            // Check if user is in /testdrive flow
+            const { data: tdState } = await supabaseAnon.from("user_states")
+                .select("state")
+                .eq("user_id", userIdStr)
+                .like("state", "td_%")
+                .maybeSingle();
+            if (tdState) {
+                const tdHandled = await handleTestDriveText(userIdStr, chatId, text);
+                if (tdHandled) return;
+            }
 
             // Check if user is in /subrent flow
             const { data: subrentState } = await supabaseAnon.from("user_states")
