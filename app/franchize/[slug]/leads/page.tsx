@@ -11,16 +11,13 @@ interface LeadsPageProps {
   params: Promise<{ slug: string }>;
 }
 
+export const metadata = { title: "Клиенты и заявки" };
+
 export default async function LeadsPage({ params }: LeadsPageProps) {
   const { slug } = await params;
   const { crew } = await getFranchizeBySlug(slug);
   const surface = crewPaletteWithCssVars(crew.theme);
-
-  // Fetch all leads:
-  // 1. Callback leads (users with metadata.source = "web_callback")
-  // 2. Users from rental_contract_artifacts
-  // 3. Users from user_rental_secrets
-  // 4. Users from franchize_intents (dashboard leads)
+  const crewId = crew.id;
 
   type LeadRow = {
     user_id: string;
@@ -37,13 +34,9 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
   };
 
   const leads: LeadRow[] = [];
-  const seenIds = new Set<string>();
-
-  // Helper to add or merge a lead
   const addLead = (row: LeadRow) => {
     const existing = leads.find((l) => l.user_id === row.user_id);
     if (existing) {
-      // Merge: prefer verified, keep most recent date
       if (row.verified) existing.verified = true;
       if (row.intentType && !existing.intentType) existing.intentType = row.intentType;
       if (row.intentStage && !existing.intentStage) existing.intentStage = row.intentStage;
@@ -54,40 +47,39 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
       return;
     }
     leads.push(row);
-    seenIds.add(row.user_id);
   };
 
-  // 1. Callback leads from public.users
-  const { data: callbackUsers } = await supabaseAdmin
+  // 1. Callback leads + contract leads from public.users
+  const { data: usersLeads } = await supabaseAdmin
     .from("users")
     .select("user_id, full_name, username, metadata, created_at")
-    .filter("metadata->>source", "eq", "web_callback")
+    .in("metadata->>source", ["web_callback", "rental_contract", "sale_contract"])
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(200);
 
-  if (callbackUsers) {
-    for (const u of callbackUsers) {
+  if (usersLeads) {
+    for (const u of usersLeads) {
       addLead({
         user_id: u.user_id,
         full_name: u.full_name,
         username: u.username,
         phone: u.metadata?.phone || u.user_id,
-        source: "web_callback",
+        source: u.metadata?.source || "unknown",
         bikeTitle: u.metadata?.bikeTitle || null,
         createdAt: u.created_at,
-        verified: false,
+        verified: u.metadata?.source === "rental_contract" || u.metadata?.source === "sale_contract",
       });
     }
   }
 
-  // 2. Users from franchize_intents (dashboard leads)
+  // 2. Dashboard intents
   const { data: intentLeads } = await supabaseAdmin
     .from("franchize_intents")
     .select("telegram_user_id, intent_type, stage, urgency_score, created_at, metadata")
     .eq("slug", slug)
     .not("telegram_user_id", "is", null)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(300);
 
   if (intentLeads) {
     for (const i of intentLeads) {
@@ -100,7 +92,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
         source: "dashboard_intent",
         bikeTitle: null,
         createdAt: i.created_at,
-        verified: false,
+        verified: i.intent_type === "rental_contract" || i.intent_type === "sale_contract",
         intentType: i.intent_type,
         intentStage: i.stage,
         urgencyScore: i.urgency_score,
@@ -108,7 +100,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
     }
   }
 
-  // 3. Users from rental_contract_artifacts (operator-created contracts)
+  // 3. Contract artifacts (verified renters)
   const { data: artifactUsers } = await privateSchema()
     .from("rental_contract_artifacts")
     .select("telegram_chat_id, renter_full_name, created_at")
@@ -117,13 +109,12 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
 
   if (artifactUsers) {
     for (const a of artifactUsers) {
-      const chatId = a.telegram_chat_id;
-      if (!chatId) continue;
+      if (!a.telegram_chat_id) continue;
       addLead({
-        user_id: chatId,
+        user_id: a.telegram_chat_id,
         full_name: a.renter_full_name,
         username: null,
-        phone: chatId.startsWith("+") || /^\d{10,}$/.test(chatId) ? chatId : null,
+        phone: /^\+?\d{10,}$/.test(a.telegram_chat_id) ? a.telegram_chat_id : null,
         source: "rental_contract",
         bikeTitle: null,
         createdAt: a.created_at,
@@ -132,7 +123,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
     }
   }
 
-  // 4. Users from user_rental_secrets
+  // 4. Rental secrets
   const { data: secretUsers } = await privateSchema()
     .from("user_rental_secrets")
     .select("chat_id, renter_full_name, renter_phone, verification_status, source_doc_key, created_at")
@@ -141,10 +132,9 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
 
   if (secretUsers) {
     for (const s of secretUsers) {
-      const chatId = s.chat_id;
-      if (!chatId) continue;
+      if (!s.chat_id) continue;
       addLead({
-        user_id: chatId,
+        user_id: s.chat_id,
         full_name: s.renter_full_name,
         username: null,
         phone: s.renter_phone || null,
@@ -156,11 +146,13 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
     }
   }
 
-  // Sort: verified first, then by date
-  leads.sort((a, b) => {
-    if (a.verified !== b.verified) return a.verified ? -1 : 1;
-    return (b.createdAt || "").localeCompare(a.createdAt || "");
-  });
+  // 5. Fetch all lead-linked todos for this crew
+  const { data: todos } = await supabaseAdmin
+    .from("crew_todos")
+    .select("id, title, description, status, priority, category, created_at, completed_at, assigned_to")
+    .eq("crew_id", crewId)
+    .eq("category", "lead_followup")
+    .order("created_at", { ascending: false });
 
   return (
     <main className="min-h-screen" style={surface.page}>
@@ -170,9 +162,15 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
           Клиенты и заявки
         </h1>
         <p className="mt-1 text-sm" style={{ color: "var(--franchize-text-secondary, inherit)" }}>
-          Все, кто оставил заявку на сайте или оформлял аренду
+          Все, кто оставил заявку, интересовался техникой или оформлял аренду
         </p>
-        <LeadsClient leads={leads} accentColor={crew.theme.palette.accentMain} />
+        <LeadsClient
+          leads={leads}
+          todos={todos || []}
+          accentColor={crew.theme.palette.accentMain}
+          crewId={crewId}
+          slug={slug}
+        />
       </div>
       <CrewFooter crew={crew} />
     </main>
