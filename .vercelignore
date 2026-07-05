@@ -28,9 +28,9 @@ seed.sql
 *.pdf
 
 # ===================================================================
-# Exclude only the LARGEST standalone non-rental app dirs
+# Exclude large standalone non-rental app dirs
 # (verified: no shared imports from components/contexts/hooks/franchize)
-# These are the biggest page-count reducers with zero import risk
+# UN-IGNORED: nnvolt, admin, repo-xml, about, zai-docx-instructions
 # ===================================================================
 app/greenbox/
 app/homework/
@@ -52,7 +52,6 @@ app/game-plan/
 app/hub/
 app/jumpstart/
 app/nexus/
-app/nnvolt/
 app/nutrition/
 app/onesitepls/
 app/onesiteplsinstructions/
@@ -79,8 +78,6 @@ app/veritasium/
 app/wheel-of-fortune/
 app/youtubeAdmin/
 app/yt/
-app/zai-docx-instructions/
-app/about/
 app/about_en/
 app/advice/
 app/advice-upload/
@@ -97,4 +94,3 @@ app/paddock/
 app/rules/
 app/rental-doc-workflow/
 app/rent-car/
-app/admin/
