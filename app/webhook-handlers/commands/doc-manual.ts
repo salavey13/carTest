@@ -1167,7 +1167,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         renter: {
           fullName: context.mpFullName || "",
           birthDate: context.mpBirthDate || "",
-          phone: "",
+          phone: context.clientPhone || "",
           email: "",
           passportSeries: context.mpSeries,
           passportNumber: context.mpNumber,
@@ -1440,7 +1440,7 @@ ${qrDeepLink}`);
         original_sha256: docSha256,
         requested_bike_id: context.bikeId,
         resolved_bike_id: bike.id,
-        telegram_chat_id: String(userId),
+        telegram_chat_id: context.clientPhone || String(userId),
         telegram_message_id: null,
         renter_full_name: context.mpFullName || null,
         renter_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
@@ -1531,7 +1531,7 @@ ${qrDeepLink}`);
           original_sha256: docSha256,
           requested_bike_id: context.bikeId,
           resolved_bike_id: bike.id,
-        telegram_chat_id: context.clientPhone || String(userId),
+          telegram_chat_id: context.clientPhone || String(userId),
           telegram_message_id: null,
           buyer_full_name: context.mpFullName || null,
           buyer_passport_number: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
@@ -1544,10 +1544,50 @@ ${qrDeepLink}`);
         });
         if (saleError) {
           logger.error("[/doc] Failed to save sale_contract_artifacts:", saleError);
-        }
       }
     }
 
+    // ── Lead pipeline: upsert to franchize_intents + users for dashboard
+    try {
+      const leadPhone = context.clientPhone || "";
+      const leadUserId = leadPhone || String(userId);
+      // Upsert users record by phone as fallback identifier
+      if (leadPhone) {
+        await supabaseAdmin.from("users").upsert({
+          user_id: leadUserId,
+          phone: leadPhone,
+          full_name: context.mpFullName || "",
+          metadata: {
+            source: "telegram-doc",
+            created_via: "contract_generation",
+            is_lead: true,
+          },
+        }, { onConflict: "user_id" });
+      }
+      await supabaseAdmin.from("franchize_intents").upsert({
+        slug: "vip-bike",
+        bike_id: context.bikeId,
+        intent_type: isRent ? "rent" : "sale",
+        stage: "contract_generated",
+        source_route: "/doc-manual",
+        contact_channel: "telegram_bot",
+        urgency_score: isRent ? 90 : 85,
+        telegram_user_id: leadUserId,
+        metadata: {
+          name: context.mpFullName,
+          phone: leadPhone || null,
+          bikeTitle: `${bike.make} ${bike.model}`,
+          dealType: isRent ? "rent" : "sale",
+          operatorId: String(userId),
+          hasPassport: !!(context.mpSeries && context.mpNumber),
+          hasLicense: !!(context.mlSeries && context.mlNumber),
+        },
+      }, { onConflict: "slug,bike_id,telegram_user_id,intent_type" });
+    } catch (leadErr) {
+      logger.warn("[/doc] Failed to create lead:", leadErr);
+    }
+
+    // ── Send confirmation to the operator
     await sendComplexMessage(
       chatId,
       `✅ *${isRent ? 'Договор аренды' : 'Договор купли-продажи'} готов!*${isRent ? `\n\n🛡 Категории: ${(context.mlCategories || []).join(", ")}` : ""}`,

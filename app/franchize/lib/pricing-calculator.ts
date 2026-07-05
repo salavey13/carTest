@@ -35,11 +35,31 @@ function isValidDateString(dateStr: string): boolean {
 }
 
 /**
+ * Parse a date string that could be DD.MM.YYYY or YYYY-MM-DD into a Date object,
+ * or return null if neither format matches.
+ */
+function parseDateSafe(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  // Try YYYY-MM-DD first (ISO format)
+  const iso = new Date(dateStr);
+  if (!isNaN(iso.getTime())) return iso;
+  // Try DD.MM.YYYY (Russian format)
+  const dmy = dateStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (dmy) {
+    const d = new Date(`${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}T00:00:00`);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
+/**
  * Check if a date is a weekend day (Saturday=6, Sunday=0)
+ * Supports both YYYY-MM-DD and DD.MM.YYYY formats.
  */
 function isWeekendDay(dateStr: string): boolean {
-  if (!isValidDateString(dateStr)) return false;
-  const day = new Date(dateStr).getDay();
+  const d = parseDateSafe(dateStr);
+  if (!d) return false;
+  const day = d.getDay();
   return day === 0 || day === 6;
 }
 
@@ -69,7 +89,8 @@ function countWeekendDays(startDate: string, endDate: string): number {
  */
 export function calculatePriceForDuration(
   specs: BikePricingSpecs,
-  hours: number
+  hours: number,
+  startDateStr?: string
 ): { price: number; period: string; rate: number } {
   // Handle invalid input
   if (hours <= 0) {
@@ -125,8 +146,7 @@ export function calculatePriceForDuration(
   // Daily pricing (more than 12 hours)
   const days = Math.ceil(hours / 24);
   // Compute weekend days if startDate is available
-  // (calculatePriceForDays doesn't receive dates, so it uses 0 weekend days as fallback)
-  return calculatePriceForDays(specs, days);
+  return calculatePriceForDays(specs, days, startDateStr);
 }
 
 /**
@@ -140,7 +160,8 @@ export function calculatePriceForDuration(
  */
 function calculatePriceForDays(
   specs: BikePricingSpecs,
-  days: number
+  days: number,
+  startDateStr?: string
 ): { price: number; period: string; rate: number } {
   if (days <= 0) {
     return { price: 0, period: 'Invalid duration', rate: 0 };
@@ -231,7 +252,7 @@ export function getDisplayPriceTier(
     };
   }
 
-  const { price, period } = calculatePriceForDuration(specs, hours);
+  const { price, period } = calculatePriceForDuration(specs, hours, startDate);
 
   // Format price
   const formattedPrice2 = price > 0 ? `${price.toLocaleString('ru-RU')} ₽` : 'Цена по запросу';
