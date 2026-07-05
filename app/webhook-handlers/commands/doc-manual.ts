@@ -473,6 +473,13 @@ interface DocFlowContext {
   saleColor?: string;        // operator-confirmed or custom color
   saleVin?: string;          // operator-confirmed or custom VIN/frame
   saleVinSkipped?: boolean;  // operator chose to skip VIN entry (no override)
+
+  // ── Client phone linking (added 2026-07-05) ──────────────────────────────
+  // When a client arrives via web callback (phone = user_id in users table),
+  // the operator can enter their phone to link the contract to the lead.
+  // Used as telegram_chat_id in rental_contract_artifacts.
+  clientPhone?: string;           // phone number (normalized: digits + leading +)
+  clientPhoneResolved?: boolean;  // true if operator entered phone OR skipped
 }
 
 // ── Bike resolution ─────────────────────────────────────────────────────
@@ -1495,7 +1502,7 @@ ${qrDeepLink}`);
           original_sha256: docSha256,
           requested_bike_id: context.bikeId,
           resolved_bike_id: bike.id,
-          telegram_chat_id: String(userId),
+        telegram_chat_id: context.clientPhone || String(userId),
           telegram_message_id: null,
           buyer_full_name: context.mpFullName || null,
           buyer_passport_number: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
@@ -1824,6 +1831,24 @@ export async function handleDocText(userId: string, chatId: number, text: string
     await setState(userId, "deal", context);
     await sendComplexMessage(chatId, `🏍 ${bike.make} ${bike.model}`, [], { removeKeyboard: true });
     await sendComplexMessage(chatId, "Тип договора:", buildDealKeyboard(), { keyboardType: 'inline' });
+    return true;
+  }
+
+  // Optional client phone step — links contract to web callback lead
+  if (state === "client_phone") {
+    const cleaned = text.replace(/[^\d+]/g, "");
+    if (cleaned.length < 10) {
+      await sendComplexMessage(chatId, "❌ Неверный формат. Введите номер или нажмите «Пропустить».", [], { removeKeyboard: true });
+      return true;
+    }
+    context.clientPhone = cleaned;
+    context.clientPhoneResolved = true;
+    await setState(userId, "confirm", context);
+    await sendComplexMessage(chatId, `✅ Телефон клиента: ${cleaned}\n\n⏳ Генерирую...`, [], { removeKeyboard: true });
+    const success = await generateContract(chatId, userId, context);
+    if (success) {
+      await clearState(userId);
+    }
     return true;
   }
 
@@ -2546,9 +2571,34 @@ export async function handleDocCallback(
   }
 
   if (callbackData === "ok") {
+    // Before generating: ask for optional client phone (for callback leads)
+    // This links the contract to the web lead (phone = user_id in users table)
+    if (!context.clientPhoneResolved) {
+      await setState(userId, "client_phone", context);
+      await sendComplexMessage(
+        chatId,
+        "📞 *Телефон клиента*\n\nЕсли клиент пришёл с сайта (заявка на звонок), введите его номер — договор привяжется к заявке.\n\nИли нажмите «Пропустить».",
+        [
+          [{ text: "⏭ Пропустить", callback_data: "phone_skip" }],
+          [{ text: "❌ Отменить", callback_data: "cancel" }],
+        ],
+        { keyboardType: "inline", parseMode: "Markdown", removeKeyboard: true },
+      );
+      return true;
+    }
     await sendComplexMessage(chatId, "⏳ Генерирую...", [], { removeKeyboard: true });
     const success = await generateContract(chatId, userId, context);
-    // Only clear state after successful generation to preserve context on failure
+    if (success) {
+      await clearState(userId);
+    }
+    return true;
+  }
+
+  if (callbackData === "phone_skip") {
+    context.clientPhoneResolved = true;
+    await setState(userId, "confirm", context);
+    await sendComplexMessage(chatId, "⏳ Генерирую...", [], { removeKeyboard: true });
+    const success = await generateContract(chatId, userId, context);
     if (success) {
       await clearState(userId);
     }

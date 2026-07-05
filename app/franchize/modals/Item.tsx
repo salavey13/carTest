@@ -1125,41 +1125,22 @@ export function ItemModal({
   // Determine footer grid layout — wider when callback option is present
   const footerCols = showRentCta && showBuyCta ? 3 : 2;
 
-  // Callback submit handler — sends lead to owner via Telegram + persists to DB
+  // Callback submit handler — creates user record + notifies owner
   const handleCallbackSubmit = useCallback(
     (name: string, phone: string) => {
-      // 1. Persist lead to franchize_intents (so it's not lost if Telegram fails)
-      fetch("/api/franchize-intent", {
+      // Single API call that:
+      // 1. Upserts user with phone as user_id (public.users)
+      // 2. Records franchize intent
+      // 3. Notifies owner via forward-telegram
+      fetch("/api/franchize/callback-lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           slug,
           bikeId: item?.id,
-          intentType: "callback_request",
-          stage: "lead_captured",
-          sourceRoute: typeof window !== "undefined" ? window.location.pathname : "/franchize",
-          contactChannel: "web_callback",
-          urgencyScore: 60,
-          leadName: name,
-          leadPhone: phone,
-        }),
-      }).catch(() => {});
-
-      // 2. Notify owner via Telegram
-      const message = `📞 *Новая заявка на звонок*\n\n` +
-        `🏍 ${item?.title || "Байк"}\n` +
-        `👤 ${name}\n` +
-        `📱 ${phone}\n` +
-        `🌐 Источник: веб-сайт (не Telegram)\n` +
-        `⏰ ${new Date().toLocaleString("ru-RU")}`;
-
-      fetch("/api/forward-telegram", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chatId: "356282674", // Илья (owner)
-          text: message,
-          parseMode: "Markdown",
+          bikeTitle: item?.title,
+          name,
+          phone,
         }),
       }).catch(() => {});
     },
