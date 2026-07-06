@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   Flame, Phone, CheckCircle, ChevronDown, ChevronRight, Plus,
   Trash2, MessageCircle, Send, Clock, TrendingUp, Search,
-  Filter, ArrowUpDown, X, Bike, FileText, Mail, CircleDot,
+  X, Bike, FileText, Mail, CircleDot, Users, Target, Zap,
+  Calendar, ShoppingCart, Wrench,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -42,17 +43,27 @@ interface LeadsClientProps {
   isLightTheme?: boolean;
 }
 
-// ── Source metadata ──────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-const SOURCE_META: Record<string, { label: string; icon: typeof Flame; color: string }> = {
-  web_callback: { label: "Звонок", icon: Phone, color: "#3b82f6" },
-  rental_contract: { label: "Аренда", icon: CheckCircle, color: "#10b981" },
-  sale_contract: { label: "Покупка", icon: TrendingUp, color: "#f59e0b" },
-  test_drive: { label: "Тест-драйв", icon: Bike, color: "#8b5cf6" },
-  dashboard_intent: { label: "Заявка", icon: Flame, color: "#ef4444" },
-  rental_secret: { label: "Документы", icon: FileText, color: "#06b6d4" },
-  profile_prefill: { label: "Профиль", icon: FileText, color: "#6366f1" },
-  unknown: { label: "Клиент", icon: Phone, color: "#64748b" },
+const SOURCE_META: Record<string, { label: string; icon: typeof Flame; color: string; bg: string }> = {
+  web_callback:    { label: "Звонок",     icon: Phone,        color: "#3b82f6", bg: "#3b82f620" },
+  rental_contract: { label: "Аренда",     icon: CheckCircle,  color: "#10b981", bg: "#10b98120" },
+  sale_contract:   { label: "Покупка",    icon: TrendingUp,   color: "#f59e0b", bg: "#f59e0b20" },
+  test_drive:      { label: "Тест-драйв", icon: Bike,         color: "#8b5cf6", bg: "#8b5cf620" },
+  dashboard_intent:{ label: "Заявка",     icon: Flame,        color: "#ef4444", bg: "#ef444420" },
+  rental_secret:   { label: "Документы",  icon: FileText,     color: "#06b6d4", bg: "#06b6d420" },
+  profile_prefill:{ label: "Профиль",    icon: FileText,     color: "#6366f1", bg: "#6366f120" },
+  unknown:         { label: "Клиент",     icon: Users,        color: "#64748b", bg: "#64748b20" },
+};
+
+const STAGE_LABELS: Record<string, string> = {
+  contract_generated: "Договор готов",
+  checkout_started: "Оформление",
+  checkout_completed: "Оплачен",
+  dismissed: "Отклонён",
+  interest_paid: "Интерес",
+  new: "Новый",
+  contacted: "Контакт установлен",
 };
 
 const INTENT_LABELS: Record<string, string> = {
@@ -65,6 +76,61 @@ const INTENT_LABELS: Record<string, string> = {
 
 type SortMode = "recent" | "urgent" | "name" | "verified";
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function getInitials(name: string | null): string {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+function relativeTime(dateStr: string | null): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffH = Math.floor(diffMin / 60);
+  const diffD = Math.floor(diffH / 24);
+
+  if (diffMin < 1) return "только что";
+  if (diffMin < 60) return `${diffMin} мин назад`;
+  if (diffH < 24) return `${diffH} ч назад`;
+  if (diffD === 1) return "вчера";
+  if (diffD < 7) return `${diffD} дн назад`;
+  return date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+}
+
+function temperatureColor(urgency: number | null | undefined, pendingTodos: number): string {
+  const score = (urgency || 0) + pendingTodos * 15;
+  if (score >= 90) return "#ef4444"; // red-hot
+  if (score >= 60) return "#f59e0b"; // warm
+  if (score >= 30) return "#3b82f6"; // cool
+  return "#64748b"; // cold
+}
+
+// ── Avatar ────────────────────────────────────────────────────────────────────
+
+function Avatar({ name, source, size = 40 }: { name: string | null; source: string; size?: number }) {
+  const meta = SOURCE_META[source] || SOURCE_META.unknown;
+  const initials = getInitials(name);
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center rounded-full font-bold"
+      style={{
+        width: size,
+        height: size,
+        backgroundColor: meta.bg,
+        color: meta.color,
+        fontSize: size > 36 ? "13px" : "11px",
+      }}
+    >
+      {initials}
+    </div>
+  );
+}
+
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function LeadsClient({
@@ -76,12 +142,28 @@ export function LeadsClient({
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [filterSource, setFilterSource] = useState<string>("all");
 
-  // Parse lead_id from todo description
+  // ── Theme tokens ──────────────────────────────────────────────────────────
+
+  const T = useMemo(() => ({
+    text: isLightTheme ? "#1e293b" : textColor,
+    textMuted: isLightTheme ? "#64748b" : `${textColor}99`,
+    textFaint: isLightTheme ? "#94a3b8" : `${textColor}60`,
+    bg: isLightTheme ? "#f8fafc" : bgColor,
+    bgCard: isLightTheme ? "#ffffff" : `${accentColor}06`,
+    bgCardHover: isLightTheme ? "#f1f5f9" : `${accentColor}0c`,
+    border: isLightTheme ? "#e2e8f0" : `${accentColor}1a`,
+    borderActive: isLightTheme ? accentColor : accentColor,
+    inputBg: isLightTheme ? "#ffffff" : `${accentColor}0a`,
+    inputBorder: isLightTheme ? "#cbd5e1" : `${accentColor}25`,
+    shadow: isLightTheme ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
+  }), [isLightTheme, textColor, bgColor, accentColor]);
+
+  // ── Todo helpers ──────────────────────────────────────────────────────────
+
   const getTodoLeadId = useCallback((todo: TodoRow): string | null => {
     if (!todo.description) return null;
     try {
-      const parsed = JSON.parse(todo.description);
-      return parsed.lead_id || null;
+      return JSON.parse(todo.description).lead_id || null;
     } catch {
       return null;
     }
@@ -91,12 +173,42 @@ export function LeadsClient({
     return todos.filter((t) => getTodoLeadId(t) === leadId);
   }, [todos, getTodoLeadId]);
 
-  // ── Smart filtering ──────────────────────────────────────────────────────
+  // ── Dedup leads by user_id (keep highest-priority source) ──────────────────
+
+  const dedupedLeads = useMemo(() => {
+    const map = new Map<string, LeadRow>();
+    const sourcePriority: Record<string, number> = {
+      rental_contract: 5, sale_contract: 4, test_drive: 3,
+      dashboard_intent: 2, web_callback: 1, rental_secret: 0,
+      profile_prefill: 0, unknown: -1,
+    };
+    for (const lead of leads) {
+      const existing = map.get(lead.user_id);
+      if (!existing) {
+        map.set(lead.user_id, lead);
+      } else {
+        const leadScore = sourcePriority[lead.source] ?? 0;
+        const existScore = sourcePriority[existing.source] ?? 0;
+        if (leadScore > existScore) {
+          map.set(lead.user_id, {
+            ...lead,
+            // Keep richest data
+            phone: lead.phone || existing.phone,
+            full_name: lead.full_name || existing.full_name,
+            username: lead.username || existing.username,
+            bikeTitle: lead.bikeTitle || existing.bikeTitle,
+            verified: lead.verified || existing.verified,
+          });
+        }
+      }
+    }
+    return Array.from(map.values());
+  }, [leads]);
+
+  // ── Filter + sort ─────────────────────────────────────────────────────────
 
   const filteredLeads = useMemo(() => {
-    let result = leads;
-
-    // Search filter
+    let result = dedupedLeads;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter((l) =>
@@ -106,62 +218,52 @@ export function LeadsClient({
         (l.bikeTitle || "").toLowerCase().includes(q)
       );
     }
-
-    // Source filter
     if (filterSource !== "all") {
       result = result.filter((l) => l.source === filterSource);
     }
-
     return result;
-  }, [leads, searchQuery, filterSource]);
-
-  // ── Smart sorting ────────────────────────────────────────────────────────
+  }, [dedupedLeads, searchQuery, filterSource]);
 
   const sortedLeads = useMemo(() => {
     const arr = [...filteredLeads];
-
     switch (sortMode) {
       case "urgent":
-        // Sort by urgency score (desc), then by pending todos (desc), then by recency
         return arr.sort((a, b) => {
-          const aUrgency = a.urgencyScore || 0;
-          const bUrgency = b.urgencyScore || 0;
-          if (aUrgency !== bUrgency) return bUrgency - aUrgency;
-          const aTodos = getTodosForLead(a.user_id).filter((t) => t.status !== "done").length;
-          const bTodos = getTodosForLead(b.user_id).filter((t) => t.status !== "done").length;
-          if (aTodos !== bTodos) return bTodos - aTodos;
+          const aT = getTodosForLead(a.user_id).filter((t) => t.status !== "done").length;
+          const bT = getTodosForLead(b.user_id).filter((t) => t.status !== "done").length;
+          const aScore = (a.urgencyScore || 0) + aT * 20;
+          const bScore = (b.urgencyScore || 0) + bT * 20;
+          if (aScore !== bScore) return bScore - aScore;
           return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
         });
-
       case "name":
-        return arr.sort((a, b) => (a.full_name || "ЯЯЯЯ").localeCompare(b.full_name || "ЯЯЯЯ", "ru"));
-
+        return arr.sort((a, b) => (a.full_name || "яя").localeCompare(b.full_name || "яя", "ru"));
       case "verified":
-        // Verified leads first, then by recency
         return arr.sort((a, b) => {
           if (a.verified !== b.verified) return a.verified ? -1 : 1;
           return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
         });
-
-      case "recent":
       default:
         return arr.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     }
   }, [filteredLeads, sortMode, getTodosForLead]);
 
-  // ── Buckets ───────────────────────────────────────────────────────────────
+  // ── Buckets ────────────────────────────────────────────────────────────────
 
-  const verified = sortedLeads.filter((l) => l.verified);
-  const hot = sortedLeads.filter((l) => {
-    const pendingTodos = getTodosForLead(l.user_id).filter((t) => t.status !== "done").length;
-    return !l.verified && ((l.urgencyScore ?? 0) >= 60 || pendingTodos > 0);
-  });
-  const warm = sortedLeads.filter((l) => {
-    const pendingTodos = getTodosForLead(l.user_id).filter((t) => t.status !== "done").length;
-    return !l.verified && (l.urgencyScore ?? 0) < 60 && pendingTodos === 0;
-  });
+  const { hot, verified, warm } = useMemo(() => {
+    const hot: LeadRow[] = [];
+    const verified: LeadRow[] = [];
+    const warm: LeadRow[] = [];
+    for (const l of sortedLeads) {
+      const pt = getTodosForLead(l.user_id).filter((t) => t.status !== "done").length;
+      if (l.verified) { verified.push(l); continue; }
+      if ((l.urgencyScore ?? 0) >= 60 || pt > 0) { hot.push(l); continue; }
+      warm.push(l);
+    }
+    return { hot, verified, warm };
+  }, [sortedLeads, getTodosForLead]);
 
-  // ── Dismiss lead ─────────────────────────────────────────────────────────
+  // ── Dismiss ────────────────────────────────────────────────────────────────
 
   const handleDismissLead = async (leadId: string) => {
     try {
@@ -171,19 +273,16 @@ export function LeadsClient({
         body: JSON.stringify({ leadId, dismissLead: true }),
       });
       if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        console.error("Dismiss failed:", data);
         alert("Не удалось убрать лид. Попробуйте позже.");
         return;
       }
       window.location.reload();
-    } catch (e) {
-      console.error("Dismiss error:", e);
-      alert("Ошибка сети при удалении лида.");
+    } catch {
+      alert("Ошибка сети.");
     }
   };
 
-  // ── Available source filters ──────────────────────────────────────────────
+  // ── Derived ────────────────────────────────────────────────────────────────
 
   const availableSources = useMemo(() => {
     const set = new Set(leads.map((l) => l.source));
@@ -191,135 +290,135 @@ export function LeadsClient({
   }, [leads]);
 
   const pendingTodoCount = todos.filter((t) => t.status !== "done").length;
-
-  // ── Theme-aware styles ────────────────────────────────────────────────────
-
-  const surfaceStyle = isLightTheme
-    ? { backgroundColor: "#f8fafc", color: "#1e293b", borderColor: "#e2e8f0" }
-    : { backgroundColor: bgColor, color: textColor, borderColor: `${accentColor}20` };
-
-  const cardStyle = isLightTheme
-    ? { backgroundColor: "#ffffff", borderColor: "#e2e8f0" }
-    : { backgroundColor: `${accentColor}05`, borderColor: `${accentColor}20` };
-
-  const mutedColor = isLightTheme ? "#64748b" : `${textColor}99`;
-  const inputBg = isLightTheme ? "#ffffff" : `${accentColor}08`;
-  const inputBorder = isLightTheme ? "#cbd5e1" : `${accentColor}20`;
+  const hasFilters = searchQuery || filterSource !== "all";
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mt-4 space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {/* Search */}
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-40" />
-          <input
-            type="text"
-            placeholder="Поиск по имени, телефону, байку..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border py-2 pl-9 pr-3 text-sm outline-none transition"
-            style={{
-              backgroundColor: inputBg,
-              borderColor: inputBorder,
-              color: surfaceStyle.color,
-            }}
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 opacity-40 hover:opacity-80"
-            >
-              <X className="h-4 w-4" />
-            </button>
+    <div className="space-y-4">
+      {/* ── Sticky toolbar ────────────────────────────────────────────────── */}
+      <div
+        className="sticky top-0 z-10 -mx-4 border-b px-4 py-3 backdrop-blur-md sm:rounded-xl sm:border"
+        style={{
+          backgroundColor: isLightTheme ? "rgba(248,250,252,0.85)" : `${bgColor}d9`,
+          borderColor: T.border,
+        }}
+      >
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          {/* Search */}
+          <div className="relative flex-1 sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: T.textFaint }} />
+            <input
+              type="text"
+              placeholder="Имя, телефон, байк…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-lg border py-2 pl-9 pr-8 text-sm outline-none transition focus:ring-2"
+              style={{
+                backgroundColor: T.inputBg,
+                borderColor: T.inputBorder,
+                color: T.text,
+                // @ts-ignore — CSS custom prop for ring color
+                "--tw-ring-color": `${accentColor}40`,
+              }}
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 transition hover:opacity-80"
+                style={{ color: T.textFaint }}>
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Sort + filter */}
+          <div className="flex gap-2">
+            <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)}
+              className="rounded-lg border px-2.5 py-2 text-xs outline-none"
+              style={{ backgroundColor: T.inputBg, borderColor: T.inputBorder, color: T.text }}>
+              <option value="all">Все источники</option>
+              {availableSources.map((s) => (
+                <option key={s} value={s}>{SOURCE_META[s]?.label || s}</option>
+              ))}
+            </select>
+            <select value={sortMode} onChange={(e) => setSortMode(e.target.value as SortMode)}
+              className="rounded-lg border px-2.5 py-2 text-xs outline-none"
+              style={{ backgroundColor: T.inputBg, borderColor: T.inputBorder, color: T.text }}>
+              <option value="recent">Свежие</option>
+              <option value="urgent">🔥 Срочные</option>
+              <option value="verified">✅ Клиенты</option>
+              <option value="name">А→Я</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Stats row — compact */}
+        <div className="mt-2 flex gap-3 text-xs" style={{ color: T.textMuted }}>
+          <span className="flex items-center gap-1">
+            <Users className="h-3.5 w-3.5" />
+            <strong style={{ color: T.text }}>{dedupedLeads.length}</strong> всего
+          </span>
+          <span className="flex items-center gap-1">
+            <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+            <strong style={{ color: T.text }}>{verified.length}</strong> клиентов
+          </span>
+          {hot.length > 0 && (
+            <span className="flex items-center gap-1">
+              <Flame className="h-3.5 w-3.5 text-red-400" />
+              <strong style={{ color: T.text }}>{hot.length}</strong> горячих
+            </span>
+          )}
+          {pendingTodoCount > 0 && (
+            <span className="flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5 text-amber-400" />
+              <strong style={{ color: T.text }}>{pendingTodoCount}</strong> задач
+            </span>
           )}
         </div>
-
-        {/* Sort + Filter */}
-        <div className="flex gap-2">
-          <select
-            value={filterSource}
-            onChange={(e) => setFilterSource(e.target.value)}
-            className="rounded-xl border px-3 py-2 text-sm outline-none"
-            style={{ backgroundColor: inputBg, borderColor: inputBorder, color: surfaceStyle.color }}
-          >
-            <option value="all">Все источники</option>
-            {availableSources.map((s) => (
-              <option key={s} value={s}>{SOURCE_META[s]?.label || s}</option>
-            ))}
-          </select>
-
-          <select
-            value={sortMode}
-            onChange={(e) => setSortMode(e.target.value as SortMode)}
-            className="rounded-xl border px-3 py-2 text-sm outline-none"
-            style={{ backgroundColor: inputBg, borderColor: inputBorder, color: surfaceStyle.color }}
-          >
-            <option value="recent">↓ Свежие</option>
-            <option value="urgent">🔥 Срочные</option>
-            <option value="verified">✅ Верифицированные</option>
-            <option value="name">А-Я</option>
-          </select>
-        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatCard count={sortedLeads.length} label="Всего" icon={Phone} color={accentColor} mutedColor={mutedColor} cardStyle={cardStyle} />
-        <StatCard count={verified.length} label="Клиенты" icon={CheckCircle} color="#10b981" mutedColor={mutedColor} cardStyle={cardStyle} />
-        <StatCard count={hot.length} label="Горячие 🔥" icon={Flame} color="#ef4444" mutedColor={mutedColor} cardStyle={cardStyle} />
-        <StatCard count={pendingTodoCount} label="Задачи" icon={Clock} color="#f59e0b" mutedColor={mutedColor} cardStyle={cardStyle} />
-      </div>
-
-      {/* Lead sections */}
-      <div className="space-y-4">
+      {/* ── Lead sections ────────────────────────────────────────────────── */}
+      <div className="space-y-5">
         {hot.length > 0 && (
-          <LeadSection
-            title={`Горячие лиды (${hot.length})`}
-            icon={Flame} iconColor="#ef4444"
-            leads={hot} accentColor={accentColor} mutedColor={mutedColor}
-            cardStyle={cardStyle} inputBg={inputBg} inputBorder={inputBorder}
+          <Section title="Горячие" count={hot.length} icon={Flame} color="#ef4444"
+            leads={hot} T={T} accentColor={accentColor}
             expandedLead={expandedLead} setExpandedLead={setExpandedLead}
             getTodosForLead={getTodosForLead} crewId={crewId} slug={slug}
-            surfaceColor={surfaceStyle.color}
             onDismiss={handleDismissLead}
           />
         )}
-
         {verified.length > 0 && (
-          <LeadSection
-            title={`Клиенты (${verified.length})`}
-            icon={CheckCircle} iconColor="#10b981"
-            leads={verified} accentColor={accentColor} mutedColor={mutedColor}
-            cardStyle={cardStyle} inputBg={inputBg} inputBorder={inputBorder}
+          <Section title="Клиенты" count={verified.length} icon={CheckCircle} color="#10b981"
+            leads={verified} T={T} accentColor={accentColor}
             expandedLead={expandedLead} setExpandedLead={setExpandedLead}
             getTodosForLead={getTodosForLead} crewId={crewId} slug={slug}
-            surfaceColor={surfaceStyle.color}
             onDismiss={handleDismissLead}
           />
         )}
-
         {warm.length > 0 && (
-          <LeadSection
-            title={`Заявки (${warm.length})`}
-            icon={Phone} iconColor="#3b82f6"
-            leads={warm} accentColor={accentColor} mutedColor={mutedColor}
-            cardStyle={cardStyle} inputBg={inputBg} inputBorder={inputBorder}
+          <Section title="Заявки" count={warm.length} icon={Phone} color="#3b82f6"
+            leads={warm} T={T} accentColor={accentColor}
             expandedLead={expandedLead} setExpandedLead={setExpandedLead}
             getTodosForLead={getTodosForLead} crewId={crewId} slug={slug}
-            surfaceColor={surfaceStyle.color}
             onDismiss={handleDismissLead}
           />
         )}
       </div>
 
+      {/* Empty state */}
       {sortedLeads.length === 0 && (
-        <div className="rounded-xl border p-8 text-center" style={cardStyle}>
-          <Phone className="mx-auto mb-3 h-10 w-4 opacity-30" />
-          <p className="text-sm" style={{ color: mutedColor }}>
-            {searchQuery || filterSource !== "all" ? "Ничего не найдено" : "Пока нет ни одной заявки"}
+        <div className="flex flex-col items-center rounded-xl border p-12 text-center" style={{ borderColor: T.border }}>
+          <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full"
+            style={{ backgroundColor: `${accentColor}10` }}>
+            {hasFilters
+              ? <Search className="h-7 w-7" style={{ color: T.textFaint }} />
+              : <Users className="h-7 w-7" style={{ color: T.textFaint }} />}
+          </div>
+          <p className="text-sm font-medium" style={{ color: T.text }}>
+            {hasFilters ? "Ничего не найдено" : "Пока нет заявок"}
+          </p>
+          <p className="mt-1 text-xs" style={{ color: T.textFaint }}>
+            {hasFilters ? "Попробуйте изменить фильтры" : "Заявки появятся автоматически"}
           </p>
         </div>
       )}
@@ -327,67 +426,47 @@ export function LeadsClient({
   );
 }
 
-// ── Stat Card ────────────────────────────────────────────────────────────────
+// ── Section ───────────────────────────────────────────────────────────────────
 
-function StatCard({ count, label, icon: Icon, color, mutedColor, cardStyle }: {
-  count: number; label: string; icon: typeof Flame; color: string; mutedColor: string;
-  cardStyle: Record<string, string>;
-}) {
-  return (
-    <div className="rounded-xl border p-3 text-center" style={cardStyle}>
-      <Icon className="mx-auto mb-1 h-4 w-4 opacity-50" style={{ color }} />
-      <p className="text-xl font-bold sm:text-2xl" style={{ color }}>{count}</p>
-      <p className="text-[10px] sm:text-xs" style={{ color: mutedColor }}>{label}</p>
-    </div>
-  );
-}
+type Theme = {
+  text: string; textMuted: string; textFaint: string;
+  bg: string; bgCard: string; bgCardHover: string;
+  border: string; borderActive: string;
+  inputBg: string; inputBorder: string; shadow: string;
+};
 
-// ── Lead Section ─────────────────────────────────────────────────────────────
-
-function LeadSection({
-  title, icon: Icon, iconColor, leads, accentColor, mutedColor,
-  cardStyle, inputBg, inputBorder, expandedLead, setExpandedLead,
-  getTodosForLead, crewId, slug, surfaceColor, onDismiss,
+function Section({
+  title, count, icon: Icon, color, leads, T, accentColor,
+  expandedLead, setExpandedLead, getTodosForLead, crewId, slug, onDismiss,
 }: {
-  title: string;
-  icon: typeof Flame;
-  iconColor: string;
-  leads: LeadRow[];
-  accentColor: string;
-  mutedColor: string;
-  cardStyle: Record<string, string>;
-  inputBg: string;
-  inputBorder: string;
-  expandedLead: string | null;
-  setExpandedLead: (id: string | null) => void;
+  title: string; count: number; icon: typeof Flame; color: string;
+  leads: LeadRow[]; T: Theme; accentColor: string;
+  expandedLead: string | null; setExpandedLead: (id: string | null) => void;
   getTodosForLead: (id: string) => TodoRow[];
-  crewId: string;
-  slug: string;
-  surfaceColor: string;
-  onDismiss: (leadId: string) => void;
+  crewId: string; slug: string; onDismiss: (leadId: string) => void;
 }) {
   return (
     <div>
-      <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold" style={{ color: iconColor }}>
-        <Icon className="h-4 w-4" />
-        {title}
-      </h2>
+      <div className="mb-2 flex items-center gap-2">
+        <Icon className="h-4 w-4" style={{ color }} />
+        <h2 className="text-sm font-bold" style={{ color }}>{title}</h2>
+        <span className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+          style={{ backgroundColor: `${color}20`, color }}>
+          {count}
+        </span>
+      </div>
       <div className="space-y-2">
         {leads.map((lead) => (
           <LeadCard
-            key={lead.user_id + lead.source}
+            key={lead.user_id}
             lead={lead}
+            T={T}
             accentColor={accentColor}
-            mutedColor={mutedColor}
-            cardStyle={cardStyle}
-            inputBg={inputBg}
-            inputBorder={inputBorder}
             isExpanded={expandedLead === lead.user_id}
             onToggle={() => setExpandedLead(expandedLead === lead.user_id ? null : lead.user_id)}
             todos={getTodosForLead(lead.user_id)}
             crewId={crewId}
             slug={slug}
-            surfaceColor={surfaceColor}
             onDismiss={onDismiss}
           />
         ))}
@@ -396,141 +475,111 @@ function LeadSection({
   );
 }
 
-// ── Lead Card ────────────────────────────────────────────────────────────────
+// ── Lead Card ─────────────────────────────────────────────────────────────────
 
 function LeadCard({
-  lead, accentColor, mutedColor, cardStyle, inputBg, inputBorder,
-  isExpanded, onToggle, todos, crewId, slug, surfaceColor, onDismiss,
+  lead, T, accentColor, isExpanded, onToggle, todos, crewId, slug, onDismiss,
 }: {
-  lead: LeadRow;
-  accentColor: string;
-  mutedColor: string;
-  cardStyle: Record<string, string>;
-  inputBg: string;
-  inputBorder: string;
-  isExpanded: boolean;
-  onToggle: () => void;
-  todos: TodoRow[];
-  crewId: string;
-  slug: string;
-  surfaceColor: string;
+  lead: LeadRow; T: Theme; accentColor: string;
+  isExpanded: boolean; onToggle: () => void;
+  todos: TodoRow[]; crewId: string; slug: string;
   onDismiss: (leadId: string) => void;
 }) {
   const meta = SOURCE_META[lead.source] || SOURCE_META.unknown;
-  const Icon = meta.icon;
-  const date = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString("ru-RU", {
-    day: "numeric", month: "short",
-  }) : "";
+  const relTime = relativeTime(lead.createdAt);
+  const stageLabel = lead.intentStage ? STAGE_LABELS[lead.intentStage] || lead.intentStage : null;
   const intentLabel = lead.intentType ? INTENT_LABELS[lead.intentType] || lead.intentType : null;
   const pendingTodos = todos.filter((t) => t.status !== "done").length;
   const phoneDigits = (lead.phone || "").replace(/\D/g, "");
+  const tempColor = temperatureColor(lead.urgencyScore, pendingTodos);
 
   return (
     <div
-      className="rounded-xl border transition"
+      className="overflow-hidden rounded-xl border transition-all duration-200"
       style={{
-        ...cardStyle,
-        borderColor: isExpanded ? accentColor : cardStyle.borderColor,
+        backgroundColor: T.bgCard,
+        borderColor: isExpanded ? T.borderActive : T.border,
+        boxShadow: T.shadow,
+        borderLeft: `3px solid ${tempColor}`,
       }}
     >
       {/* Header */}
-      <div className="flex cursor-pointer items-center gap-3 p-3" onClick={onToggle}>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-          style={{ backgroundColor: `${meta.color}20`, color: meta.color }}>
-          <Icon className="h-5 w-5" />
-        </div>
+      <div
+        className="flex cursor-pointer items-center gap-3 p-3 transition-colors duration-150"
+        onClick={onToggle}
+        style={{ backgroundColor: isExpanded ? T.bgCardHover : undefined }}
+      >
+        <Avatar name={lead.full_name} source={lead.source} />
+
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold" style={{ color: surfaceColor }}>
-            {lead.full_name || "Без имени"}
-          </p>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs" style={{ color: mutedColor }}>
-            {lead.phone && (
-              <a href={`tel:${lead.phone}`} onClick={(e) => e.stopPropagation()} className="hover:opacity-100">
-                📱 {lead.phone}
-              </a>
+          <div className="flex items-center gap-2">
+            <p className="truncate text-sm font-semibold" style={{ color: T.text }}>
+              {lead.full_name || "Без имени"}
+            </p>
+            {lead.verified && (
+              <CheckCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
             )}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]" style={{ color: T.textMuted }}>
+            {lead.phone && <span className="truncate">{lead.phone}</span>}
             {lead.username && <span>@{lead.username}</span>}
-            {lead.bikeTitle && <span className="max-w-32 truncate">🏍 {lead.bikeTitle}</span>}
-            {intentLabel && (
-              <span className="rounded-full px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: `${meta.color}15` }}>
-                {intentLabel}
-              </span>
-            )}
-            {date && <span>{date}</span>}
+            {relTime && <span className="opacity-70">{relTime}</span>}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+
+        {/* Badges */}
+        <div className="flex shrink-0 items-center gap-1.5">
           {pendingTodos > 0 && (
-            <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-400">
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500/20 px-1.5 text-[10px] font-bold text-amber-400">
               {pendingTodos}
             </span>
           )}
-          <span className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-            style={{ backgroundColor: `${meta.color}15`, color: meta.color }}>
-            {meta.label}
-          </span>
-          {lead.verified && <CheckCircle className="h-4 w-4 text-emerald-400" />}
+          {intentLabel && (
+            <span className="hidden rounded-full px-2 py-0.5 text-[9px] font-medium sm:inline"
+              style={{ backgroundColor: meta.bg, color: meta.color }}>
+              {intentLabel}
+            </span>
+          )}
           {isExpanded
-            ? <ChevronDown className="h-4 w-4 opacity-50" />
-            : <ChevronRight className="h-4 w-4 opacity-50" />}
+            ? <ChevronDown className="h-4 w-4" style={{ color: T.textFaint }} />
+            : <ChevronRight className="h-4 w-4" style={{ color: T.textFaint }} />}
         </div>
       </div>
 
-      {/* Expanded */}
+      {/* Expanded content */}
       {isExpanded && (
-        <div className="border-t px-3 py-3" style={{ borderColor: `${accentColor}15` }}>
-          {/* Contact actions */}
-          <div className="mb-3 flex flex-wrap gap-2">
-            {lead.phone && (
-              <>
-                <a href={`tel:${lead.phone}`}
-                  className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs transition hover:opacity-80"
-                  style={{ borderColor: `${accentColor}40`, color: accentColor }}>
-                  <Phone className="h-3 w-3" /> Позвонить
-                </a>
-                <a href={`https://wa.me/${phoneDigits}`} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs transition hover:opacity-80"
-                  style={{ borderColor: `${accentColor}40`, color: accentColor }}>
-                  <MessageCircle className="h-3 w-3" /> WhatsApp
-                </a>
-              </>
-            )}
-            {lead.username && (
-              <a href={`https://t.me/${lead.username}`}
-                target="_blank" rel="noreferrer"
-                className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs transition hover:opacity-80"
-                style={{ borderColor: `${accentColor}40`, color: accentColor }}>
-                <Send className="h-3 w-3" /> Telegram
-              </a>
-            )}
-            {lead.phone && (
-              <a href={`sms:${lead.phone}`}
-                className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs transition hover:opacity-80"
-                style={{ borderColor: `${accentColor}40`, color: accentColor }}>
-                <Mail className="h-3 w-3" /> SMS
-              </a>
-            )}
-          </div>
-
-          {/* Lead details */}
-          {(lead.intentStage || lead.urgencyScore != null) && (
-            <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
-              {lead.intentStage && (
-                <div className="rounded-lg border p-2" style={{ borderColor: inputBorder }}>
-                  <span style={{ color: mutedColor }}>Стадия</span>
-                  <p className="font-medium" style={{ color: surfaceColor }}>{lead.intentStage}</p>
-                </div>
+        <div className="border-t px-3 py-3" style={{ borderColor: T.border }}>
+          {/* Stage + urgency */}
+          {(stageLabel || lead.urgencyScore != null || lead.bikeTitle) && (
+            <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {stageLabel && (
+                <InfoTile label="Стадия" value={stageLabel} T={T} />
               )}
               {lead.urgencyScore != null && (
-                <div className="rounded-lg border p-2" style={{ borderColor: inputBorder }}>
-                  <span style={{ color: mutedColor }}>Приоритет</span>
-                  <p className="font-medium" style={{ color: surfaceColor }}>
-                    {lead.urgencyScore >= 80 ? "🔥 Высокий" : lead.urgencyScore >= 50 ? "⚡ Средний" : "💤 Низкий"} ({lead.urgencyScore})
-                  </p>
-                </div>
+                <InfoTile label="Приоритет" value={
+                  lead.urgencyScore >= 80 ? "🔥 Высокий" :
+                  lead.urgencyScore >= 50 ? "⚡ Средний" : "💤 Низкий"
+                } T={T} />
+              )}
+              {lead.bikeTitle && (
+                <InfoTile label="Байк" value={lead.bikeTitle} T={T} />
               )}
             </div>
           )}
+
+          {/* Contact actions */}
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {lead.phone && (
+              <>
+                <ActionBtn href={`tel:${lead.phone}`} icon={Phone} label="Звонок" T={T} accent={accentColor} />
+                <ActionBtn href={`https://wa.me/${phoneDigits}`} icon={MessageCircle} label="WhatsApp" T={T} accent={accentColor} external />
+                <ActionBtn href={`sms:${lead.phone}`} icon={Mail} label="SMS" T={T} accent={accentColor} />
+              </>
+            )}
+            {lead.username && (
+              <ActionBtn href={`https://t.me/${lead.username}`} icon={Send} label="Telegram" T={T} accent={accentColor} external />
+            )}
+          </div>
 
           {/* Todos */}
           <TodoList
@@ -539,24 +588,20 @@ function LeadCard({
             todos={todos}
             crewId={crewId}
             slug={slug}
+            T={T}
             accentColor={accentColor}
-            mutedColor={mutedColor}
-            inputBg={inputBg}
-            inputBorder={inputBorder}
-            surfaceColor={surfaceColor}
           />
 
           {/* Dismiss */}
-          <div className="mt-3 border-t pt-2" style={{ borderColor: `${accentColor}10` }}>
+          <div className="mt-3 border-t pt-2" style={{ borderColor: T.border }}>
             <button
               onClick={() => {
-                if (confirm(`Убрать "${lead.full_name || 'этот лид'}" из списка?`)) {
-                  onDismiss(lead.user_id);
-                }
+                if (confirm(`Убрать «${lead.full_name || 'лид'}» из списка?`)) onDismiss(lead.user_id);
               }}
-              className="flex items-center gap-1 text-xs opacity-40 transition hover:opacity-80 hover:text-red-400"
+              className="flex items-center gap-1 text-[11px] transition hover:text-red-400"
+              style={{ color: T.textFaint }}
             >
-              <Trash2 className="h-3 w-3" /> Убрать из списка
+              <Trash2 className="h-3 w-3" /> Скрыть
             </button>
           </div>
         </div>
@@ -565,142 +610,151 @@ function LeadCard({
   );
 }
 
+// ── Small UI atoms ────────────────────────────────────────────────────────────
+
+function InfoTile({ label, value, T }: { label: string; value: string; T: Theme }) {
+  return (
+    <div className="rounded-lg border p-2" style={{ borderColor: T.border }}>
+      <p className="text-[9px] uppercase tracking-wide" style={{ color: T.textFaint }}>{label}</p>
+      <p className="text-xs font-medium" style={{ color: T.text }}>{value}</p>
+    </div>
+  );
+}
+
+function ActionBtn({ href, icon: Icon, label, T, accent, external }: {
+  href: string; icon: typeof Phone; label: string; T: Theme; accent: string; external?: boolean;
+}) {
+  return (
+    <a href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}
+      className="flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px] transition hover:opacity-70"
+      style={{ borderColor: `${accent}40`, color: accent }}>
+      <Icon className="h-3 w-3" /> {label}
+    </a>
+  );
+}
+
 // ── Todo List ────────────────────────────────────────────────────────────────
 
 function TodoList({
-  leadId, leadName, todos, crewId, slug,
-  accentColor, mutedColor, inputBg, inputBorder, surfaceColor,
+  leadId, leadName, todos, crewId, slug, T, accentColor,
 }: {
-  leadId: string;
-  leadName: string;
-  todos: TodoRow[];
-  crewId: string;
-  slug: string;
-  accentColor: string;
-  mutedColor: string;
-  inputBg: string;
-  inputBorder: string;
-  surfaceColor: string;
+  leadId: string; leadName: string; todos: TodoRow[];
+  crewId: string; slug: string; T: Theme; accentColor: string;
 }) {
   const [localTodos, setLocalTodos] = useState<TodoRow[]>(todos);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newTodoTitle, setNewTodoTitle] = useState("");
-  const [newTodoPriority, setNewTodoPriority] = useState("medium");
+  const [newTitle, setNewTitle] = useState("");
+  const [newPriority, setNewPriority] = useState("medium");
   const [saving, setSaving] = useState(false);
 
-  const handleAddTodo = async () => {
-    if (!newTodoTitle.trim()) return;
+  // Sync when server data changes
+  useEffect(() => { setLocalTodos(todos); }, [todos]);
+
+  const handleAdd = async () => {
+    if (!newTitle.trim()) return;
     setSaving(true);
     try {
       const resp = await fetch("/api/franchize/lead-todo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          crewId, slug, leadId, leadName,
-          title: newTodoTitle.trim(),
-          priority: newTodoPriority,
-        }),
+        body: JSON.stringify({ crewId, slug, leadId, leadName, title: newTitle.trim(), priority: newPriority }),
       });
       const data = await resp.json();
       if (data.success && data.todo) {
         setLocalTodos([data.todo, ...localTodos]);
-        setNewTodoTitle("");
+        setNewTitle("");
         setShowAddForm(false);
       }
     } catch { /* ignore */ }
     setSaving(false);
   };
 
-  const handleToggleTodo = async (todoId: string, currentStatus: string) => {
+  const handleToggle = async (todoId: string, currentStatus: string) => {
     const newStatus = currentStatus === "done" ? "pending" : "done";
-    const prevTodos = localTodos;
-    setLocalTodos(localTodos.map((t) => t.id === todoId ? { ...t, status: newStatus } : t));
+    const prev = localTodos;
+    setLocalTodos(localTodos.map((t) => (t.id === todoId ? { ...t, status: newStatus } : t)));
     try {
-      const resp = await fetch("/api/franchize/lead-todo", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+      const r = await fetch("/api/franchize/lead-todo", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ todoId, status: newStatus }),
       });
-      if (!resp.ok) throw new Error("PATCH failed");
-    } catch {
-      setLocalTodos(prevTodos);
-    }
+      if (!r.ok) throw new Error();
+    } catch { setLocalTodos(prev); }
   };
 
-  const handleDeleteTodo = async (todoId: string) => {
-    const prevTodos = localTodos;
+  const handleDelete = async (todoId: string) => {
+    const prev = localTodos;
     setLocalTodos(localTodos.filter((t) => t.id !== todoId));
     try {
-      const resp = await fetch("/api/franchize/lead-todo", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+      const r = await fetch("/api/franchize/lead-todo", {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ todoId }),
       });
-      if (!resp.ok) throw new Error("DELETE failed");
-    } catch {
-      setLocalTodos(prevTodos);
-    }
+      if (!r.ok) throw new Error();
+    } catch { setLocalTodos(prev); }
   };
 
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-medium" style={{ color: mutedColor }}>📋 Задачи по клиенту</p>
+        <p className="text-[11px] font-medium" style={{ color: T.textMuted }}>Задачи</p>
         <button onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center gap-1 rounded-lg border px-2 py-1 text-xs transition hover:opacity-80"
-          style={{ borderColor: `${accentColor}40`, color: accentColor }}>
-          <Plus className="h-3 w-3" /> Добавить
+          className="flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] transition hover:opacity-70"
+          style={{ borderColor: `${accentColor}30`, color: accentColor }}>
+          <Plus className="h-2.5 w-2.5" /> Добавить
         </button>
       </div>
 
       {showAddForm && (
-        <div className="mb-2 space-y-2 rounded-lg border p-2" style={{ borderColor: inputBorder }}>
+        <div className="mb-2 space-y-1.5 rounded-lg border p-2" style={{ borderColor: T.inputBorder }}>
           <input
-            type="text"
-            placeholder="Что нужно сделать?"
-            value={newTodoTitle}
-            onChange={(e) => setNewTodoTitle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAddTodo()}
-            className="w-full rounded border px-2 py-1.5 text-xs outline-none"
-            style={{ borderColor: inputBorder, backgroundColor: inputBg, color: surfaceColor }}
+            type="text" placeholder="Что нужно сделать?"
+            value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+            className="w-full rounded border px-2 py-1 text-xs outline-none"
+            style={{ borderColor: T.inputBorder, backgroundColor: T.inputBg, color: T.text }}
             autoFocus
           />
-          <div className="flex gap-2">
-            <select value={newTodoPriority} onChange={(e) => setNewTodoPriority(e.target.value)}
-              className="rounded border px-2 py-1 text-xs outline-none"
-              style={{ borderColor: inputBorder, backgroundColor: inputBg, color: surfaceColor }}>
+          <div className="flex gap-1.5">
+            <select value={newPriority} onChange={(e) => setNewPriority(e.target.value)}
+              className="rounded border px-1.5 py-1 text-[10px] outline-none"
+              style={{ borderColor: T.inputBorder, backgroundColor: T.inputBg, color: T.text }}>
               <option value="low">Низкий</option>
               <option value="medium">Средний</option>
               <option value="high">Высокий</option>
             </select>
-            <button onClick={handleAddTodo} disabled={saving || !newTodoTitle.trim()}
-              className="rounded px-3 py-1 text-xs font-bold text-white disabled:opacity-50"
+            <button onClick={handleAdd} disabled={saving || !newTitle.trim()}
+              className="rounded px-2 py-1 text-[10px] font-bold text-white disabled:opacity-40"
               style={{ backgroundColor: accentColor }}>
-              {saving ? "..." : "OK"}
+              {saving ? "…" : "OK"}
             </button>
           </div>
         </div>
       )}
 
       {localTodos.length === 0 ? (
-        <p className="py-2 text-center text-xs opacity-40">Нет задач</p>
+        <p className="py-1.5 text-center text-[10px]" style={{ color: T.textFaint }}>Нет задач</p>
       ) : (
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {localTodos.map((todo) => (
-            <div key={todo.id} className="flex items-center gap-2 rounded-lg border px-2 py-1.5"
-              style={{ borderColor: `${accentColor}15`, opacity: todo.status === "done" ? 0.5 : 1 }}>
-              <button onClick={() => handleToggleTodo(todo.id, todo.status)} className="shrink-0">
+            <div key={todo.id}
+              className="flex items-center gap-1.5 rounded-md px-1.5 py-1 transition hover:bg-black/5"
+              style={{ opacity: todo.status === "done" ? 0.4 : 1 }}>
+              <button onClick={() => handleToggle(todo.id, todo.status)} className="shrink-0">
                 {todo.status === "done"
-                  ? <CheckCircle className="h-4 w-4 text-emerald-400" />
-                  : <CircleDot className="h-4 w-4 opacity-40" />}
+                  ? <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+                  : <CircleDot className="h-3.5 w-3.5" style={{ color: T.textFaint }} />}
               </button>
-              <span className={`flex-1 text-xs ${todo.status === "done" ? "line-through" : ""}`} style={{ color: surfaceColor }}>
+              <span className={`flex-1 text-[11px] ${todo.status === "done" ? "line-through" : ""}`}
+                style={{ color: T.text }}>
                 {todo.title}
               </span>
-              {todo.priority === "high" && <span className="rounded bg-red-500/20 px-1 text-[9px] text-red-400">!</span>}
-              <button onClick={() => handleDeleteTodo(todo.id)}
-                className="shrink-0 opacity-50 transition hover:opacity-100">
-                <Trash2 className="h-3.5 w-3.5" />
+              {todo.priority === "high" && todo.status !== "done" && (
+                <span className="rounded bg-red-500/20 px-1 text-[8px] text-red-400">!</span>
+              )}
+              <button onClick={() => handleDelete(todo.id)}
+                className="shrink-0 opacity-40 transition hover:opacity-80">
+                <Trash2 className="h-3 w-3" />
               </button>
             </div>
           ))}
