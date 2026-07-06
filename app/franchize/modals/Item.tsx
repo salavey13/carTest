@@ -1677,6 +1677,15 @@ export function ItemModal({
               <p className="mb-1 text-[10px] text-[var(--item-muted-text)]">
                 ⚡ Бронирование и оплата — в Telegram-боте
               </p>
+              <a
+                href={`https://t.me/${botUsername}?start=sample`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] underline transition hover:opacity-70"
+                style={{ color: theme.palette.accentMain }}
+              >
+                📄 Посмотреть образец договора
+              </a>
             </div>
           )}
           <div

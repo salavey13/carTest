@@ -27,6 +27,7 @@ import { docCommand, handleDocText, handleDocCallback } from "./doc-manual";
 import { handleSubrentManualCommand } from "./subrent-manual";
 import { analyticsPassCommand } from "./analytics-pass";
 import { testDriveCommand, handleTestDriveText, handleTestDriveCallback } from "./testdrive-manual";
+import { sampleCommand } from "./sample";
 
 import { escapeTelegramMarkdown } from "@/lib/utils"; // Helper для Markdown escape
 
@@ -146,6 +147,7 @@ export async function handleCommand(update: any) {
             "/ctx": () => ctxCommand(chatId, userId),
             "/profile": () => profileCommand(chatId, userId, username),
             "/analytics-pass": () => analyticsPassCommand(chatId, userId, username),
+            "/sample": () => sampleCommand(chatId, userId, username),
             "/testdrive": () => testDriveCommand(chatId, userId, username, text),
             "/doc": () => {
                 const bestPhotoVariant = update.message?.photo?.length

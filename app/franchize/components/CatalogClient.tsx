@@ -109,25 +109,32 @@ function getItemFlowType(item: CatalogItemVM): FlowType {
   const rs = item.rawSpecs;
   const hasExplicitRent = rs != null && "rent" in rs;
   const hasExplicitSale = rs != null && "sale" in rs;
+  const rentEnabled = hasExplicitRent ? isSpecEnabled(rs!.rent) : true;
+  const saleEnabled = hasExplicitSale ? isSpecEnabled(rs!.sale) : false;
 
-  // rent explicitly disabled → order flow (even if pricePerDay > 0)
-  if (hasExplicitRent && !isSpecEnabled(rs!.rent)) return "order";
-  // sale present but no rent → order flow (svarprofi, custom orders)
-  if (hasExplicitSale && !hasExplicitRent && item.pricePerDay === 0) return "order";
-  // Items with rental pricing → rental flow
+  // rent explicitly disabled → order flow (even if pricePerDay > 0 from legacy data)
+  if (!rentEnabled) return "order";
+  // sale-only (sale enabled, no rent pricing) → order flow
+  if (saleEnabled && item.pricePerDay === 0) return "order";
+  // Items with rental pricing and rent enabled → rental flow
   return item.pricePerDay > 0 ? "rental" : "order";
 }
 
-// Derive CTA label per-item from flow type + saleAvailable
+// Derive CTA label per-item from flow type + rent/sale availability
 // NOTE: In the ItemModal, dual CTAs are shown when both rent+sale are available.
 // This label is used on the catalog card CTA — keeps a single button per card.
 function getItemCtaLabel(item: CatalogItemVM): string {
+  const rs = item.rawSpecs;
+  const hasExplicitRent = rs != null && "rent" in rs;
+  const rentEnabled = hasExplicitRent ? isSpecEnabled(rs!.rent) : true;
   const flow = getItemFlowType(item);
-  // Rental flow (pricePerDay > 0) → "Забронировать" regardless of saleAvailable
-  // (the modal will show a separate "Купить" button if saleAvailable is true)
-  if (flow === "rental") return "Забронировать";
-  // Sale-only or order-only (svarprofi etc.) → "Выбрать"
-  return "Выбрать";
+
+  // Rent disabled (sale-only) → show "Купить" if sale price exists, else "Выбрать"
+  if (!rentEnabled || flow === "order") {
+    return hasSalePrice(item) ? "Купить" : "Выбрать";
+  }
+  // Rental flow → "Забронировать"
+  return "Забронировать";
 }
 
 // ── RESTORED: Helper function deleted by agent but still referenced in grid path ──

@@ -10,14 +10,18 @@ const isSpecExplicitlyEnabled = (rawSpecs: Record<string, unknown> | undefined, 
   return value === 1 || value === true || String(value).toLowerCase() === "1" || String(value).toLowerCase() === "true";
 };
 
-/** True when item has rental pricing AND rent=1 spec is explicitly set */
+/** True when item is available for rent (rent=1 or legacy pricePerDay>0 with no rent=0) */
 export const hasRentPrice = (item: CatalogItemVM): boolean => {
   const rs = item.rawSpecs as Record<string, unknown> | undefined;
   // If rent spec exists, it must be explicitly enabled
   if (rs && "rent" in rs) {
     return isSpecExplicitlyEnabled(rs, "rent") && item.pricePerDay > 0;
   }
-  // Fallback: if no rent spec, use pricePerDay (backward compatibility)
+  // If sale is explicitly enabled but rent is absent — treat as sale-only
+  if (rs && "sale" in rs && isSpecExplicitlyEnabled(rs, "sale")) {
+    return false;
+  }
+  // Fallback: if no rent/sale specs, use pricePerDay (backward compatibility)
   return item.pricePerDay > 0;
 };
 
