@@ -5,7 +5,7 @@ import { getFranchizeBySlug } from "../../actions";
 import { crewPaletteWithCssVars } from "../../lib/theme";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { privateSchema } from "@/lib/private-secrets";
-import LeadsClient from "./LeadsClient";
+import { LeadsClient } from "./LeadsClient";
 
 interface LeadsPageProps {
   params: Promise<{ slug: string }>;
@@ -49,11 +49,12 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
     leads.push(row);
   };
 
-  // 1. Callback leads + contract leads from public.users
+  // 1. Callback leads + contract leads from public.users (exclude dismissed)
   const { data: usersLeads } = await supabaseAdmin
     .from("users")
     .select("user_id, full_name, username, metadata, created_at")
     .in("metadata->>source", ["web_callback", "rental_contract", "sale_contract", "test_drive"])
+    .neq("metadata->>is_dismissed_lead", "true")
     .order("created_at", { ascending: false })
     .limit(200);
 
@@ -169,6 +170,9 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
           leads={leads}
           todos={todos || []}
           accentColor={crew.theme.palette.accentMain}
+          textColor={crew.theme.palette.textPrimary}
+          bgColor={crew.theme.palette.bgBase}
+          isLightTheme={crew.theme.mode === "light"}
           crewId={crewId}
           slug={slug}
         />
