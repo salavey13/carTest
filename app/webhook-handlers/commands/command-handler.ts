@@ -65,19 +65,22 @@ export async function handleCommand(update: any) {
             text.startsWith("cat_") ||
             text.startsWith("d_") ||
             text.startsWith("c_") ||
-            text.startsWith("hl_") ||   // <<< FIX: "has license?" Yes/No callbacks (hl_yes, hl_no)
-            text.startsWith("e_") ||     // <<< FIX: end date callbacks (e_tomorrow_10, e_2days_10, e_custom)
+            text.startsWith("hl_") ||   // "has license?" Yes/No callbacks
+            text.startsWith("e_") ||     // end date callbacks
             text.startsWith("p_") ||
             text.startsWith("s_") ||
-            text.startsWith("dep_") ||   // <<< FIX: deposit choice callbacks (dep_confirm, dep_custom, dep_sts)
-            text.startsWith("sr_") ||    // <<< FIX: СТС owner-relation callbacks (sr_self, sr_wife, sr_father, sr_mother, sr_power_of_attorney, sr_custom)
-            text.startsWith("salecol_") || // <<< FIX: sale flow color callbacks (salecol_confirm, salecol_custom)
-            text.startsWith("salevin_") || // <<< FIX: sale flow VIN callbacks (salevin_confirm, salevin_custom, salevin_skip)
+            text.startsWith("eq_") ||    // <<< FIX: equipment callbacks (eq_helmets, eq_done, etc)
+            text.startsWith("pay_") ||   // <<< FIX: payment split callbacks (pay_cash, pay_all_cash, etc)
+            text.startsWith("dep_") ||   // deposit choice callbacks
+            text.startsWith("sr_") ||    // СТС owner-relation callbacks
+            text.startsWith("salecol_") || // sale flow color callbacks
+            text.startsWith("salevin_") || // sale flow VIN callbacks
             text === "cdone" ||
             text === "cancel" ||
             text === "ok" ||
             text === "restart" ||
-            text === "sts_skip"          // <<< FIX: skip optional СТС field (vehicle model / VIN)
+            text === "sts_skip" ||
+            text === "ph_skip"           // <<< FIX: phone skip callback
         )) {
             const handled = await handleDocCallback(userIdStr, chatId, text, update.callback_query.id);
             if (handled) return;
