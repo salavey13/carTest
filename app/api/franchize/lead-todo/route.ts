@@ -91,7 +91,22 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
-    const { todoId } = body;
+    const { todoId, dismissLead, leadId, crewId } = body;
+
+    // Dismiss a lead entirely (mark franchize_intents as dismissed)
+    if (dismissLead && leadId) {
+      const query = supabaseAdmin.from("franchize_intents").update({
+        stage: "dismissed",
+        updated_at: new Date().toISOString(),
+      }).eq("telegram_user_id", leadId);
+      if (crewId) query.eq("crew_slug", "vip-bike"); // best-effort scoping
+      const { error } = await query;
+      if (error) {
+        logger.error("[lead-todo] dismiss lead failed", error);
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      }
+      return NextResponse.json({ success: true });
+    }
 
     if (!todoId) {
       return NextResponse.json({ success: false, error: "Missing todoId" }, { status: 400 });

@@ -537,6 +537,7 @@ export async function saveRentalDocsPrefillAction(params: {
       renter_driver_license: licenseStr || null,
       renter_birth_date: params.birthDate ?? null,
       renter_phone: params.phone ?? null,
+      license_categories: params.licenseCategories ?? null,
       source_doc_key: "profile_prefill",
       verification_status: "pending" as const,
       template_version: 1,

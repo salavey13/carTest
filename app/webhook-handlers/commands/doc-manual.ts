@@ -1484,7 +1484,7 @@ ${qrDeepLink}`);
       renter_registration: context.mpRegistration || null,
       renter_driver_license: isRent ? `${context.mlSeries || ""} ${context.mlNumber || ""}`.trim() || null : null,
       renter_birth_date: context.mpBirthDate || null,
-      renter_phone: null,
+      renter_phone: context.clientPhone || null,
       renter_email: null,
       renter_address: context.mpRegistration || null,
       source_doc_key: vars.document_key,
@@ -1696,6 +1696,7 @@ ${qrDeepLink}`);
       if (context.charger) todos.push({ title: `🔌 Принять зарядное устройство`, priority: "medium" });
 
       const crewId = bike.crew_id || "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
+      const leadId = context.clientPhone || String(userId);
       for (const todo of todos) {
         try {
           await supabaseAdmin.from("crew_todos").insert({
@@ -1704,6 +1705,14 @@ ${qrDeepLink}`);
             status: "pending",
             priority: todo.priority,
             assigned_to: String(userId),
+            category: "lead_followup",
+            description: JSON.stringify({
+              lead_id: leadId,
+              lead_name: context.mpFullName || "",
+              bike_id: bike.id,
+              rental_id: rentalId || null,
+              rent_end_date: context.rentEndDate || null,
+            }),
             metadata: {
               source: "doc-manual-rent",
               bike_id: bike.id,

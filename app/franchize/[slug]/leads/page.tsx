@@ -72,11 +72,12 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
     }
   }
 
-  // 2. Dashboard intents
+  // 2. Dashboard intents (exclude dismissed)
   const { data: intentLeads } = await supabaseAdmin
     .from("franchize_intents")
     .select("telegram_user_id, intent_type, stage, urgency_score, created_at, metadata")
     .eq("slug", slug)
+    .neq("stage", "dismissed")
     .not("telegram_user_id", "is", null)
     .order("created_at", { ascending: false })
     .limit(300);
