@@ -1,13 +1,28 @@
 <!-- /docs/SUBRENTAL_DEAL_TEMPLATE.html -->
 <!-- Subrental agreement template: Park rents bike from owner for commercial subrenting -->
 <!-- Engine: renderTemplateWithVars() in scripts/make-deal-contract-skill.mjs -->
-<div style="font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000; max-width: 700px; margin: 0 auto;">
+<style>
+  @page { size: A4; margin: 20mm 20mm 25mm 25mm; }
+  .doc-container { max-width: 17cm; margin: 0 auto; }
+  .doc-container p { max-width: 100%; overflow-wrap: break-word; }
+</style>
+<div class="doc-container" style="font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000;">
 
 <p style="text-align: center; font-weight: bold; font-size: 14pt;">ДОГОВОР № {{contract_number}}</p>
 <p style="text-align: center; font-weight: bold; font-size: 12pt;">аренды транспортного средства без экипажа с правом коммерческого использования и передачи в субаренду</p>
 
 <table style="width: 100%; border: none; margin-top: 12pt;">
 <tr><td style="border: none; width: 50%;">г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">«{{day}}» {{month_num}} {{year}} года</td></tr>
+</table>
+
+<!-- Quick-info box for fast verification -->
+<table style="width: 100%; border: 2px solid #333; margin-top: 12pt; margin-bottom: 12pt; font-size: 11pt;">
+<tr><td style="border: 1px solid #999; padding: 4pt 8pt; font-weight: bold; background: #f0f0f0;" colspan="2">КРАТКАЯ ИНФОРМАЦИЯ</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; width: 40%;">Собственник:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{owner_full_name}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">ТС:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{bike_make}} {{bike_model}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Процент собственника:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{owner_percentage}}%</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Срок:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{rent_start_date}} — {{rent_end_date}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Телефон:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{owner_phone}}</td></tr>
 </table>
 
 <p style="text-align: justify;">{{organization_name}} {{organization_short}} {{organization_representative}} Адрес: {{legal_address}} ОГРНИП: {{ogrnip}} ИНН: {{inn}} р/сч {{bank_account}} {{bank_name}} {{bank_city}} к/сч {{bank_corr_account}} именуемый в дальнейшем «Арендатор», с одной стороны, и гражданин {{owner_full_name}} {{owner_birth_date}} года рождения, паспорт, серия: {{owner_passport_series}} {{owner_passport_number}} выдан: {{owner_passport_issued_by}}, {{owner_passport_issue_date}}, именуемый в дальнейшем «Арендодатель», с другой стороны, совместно именуемые «Стороны», заключили настоящий договор о нижеследующем.</p>

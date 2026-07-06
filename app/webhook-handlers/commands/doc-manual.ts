@@ -1738,6 +1738,40 @@ ${qrDeepLink}`);
       }
       logger.info(`[/doc] Created ${todos.length} crew_todos for equipment return + checks`);
     }
+
+    // ── Create crew_todos for SALE deals ────────────────────────────────────
+    if (!isRent) {
+      const saleTodos: Array<{ title: string; priority: string }> = [
+        { title: `📦 Подготовить ТС к передаче: ${bike.make} ${bike.model}`, priority: "high" },
+        { title: `🔑 Передать ключи и документы: ${bike.make} ${bike.model}`, priority: "high" },
+        { title: `📋 Подписать Акт приёма-передачи с ${context.mpFullName || "покупателем"}`, priority: "high" },
+        { title: `💳 Проконтролировать оплату (${context.salePrice || "?"} ₽)`, priority: "medium" },
+      ];
+
+      const crewId = bike.crew_id || "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
+      const leadId = context.clientPhone || String(userId);
+      for (const todo of saleTodos) {
+        try {
+          await supabaseAdmin.from("crew_todos").insert({
+            crew_id: crewId,
+            title: todo.title,
+            status: "pending",
+            priority: todo.priority,
+            assigned_to: String(userId),
+            category: "lead_followup",
+            description: JSON.stringify({
+              lead_id: leadId,
+              lead_name: context.mpFullName || "",
+              bike_id: bike.id,
+              deal_type: "sale",
+            }),
+          });
+        } catch (todoErr) {
+          logger.warn("[/doc] Failed to create sale crew_todo:", todo.title, todoErr);
+        }
+      }
+      logger.info(`[/doc] Created ${saleTodos.length} crew_todos for sale deal`);
+    }
   } catch (leadErr) {
     logger.warn("[/doc] Failed to create lead:", leadErr);
   }

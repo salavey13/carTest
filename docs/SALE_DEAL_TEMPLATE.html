@@ -1,4 +1,9 @@
-<div style="font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000; max-width: 700px; margin: 0 auto;">
+<style>
+  @page { size: A4; margin: 20mm 20mm 25mm 25mm; }
+  .doc-container { max-width: 17cm; margin: 0 auto; }
+  .doc-container p { max-width: 100%; overflow-wrap: break-word; }
+</style>
+<div class="doc-container" style="font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000;">
 
 <p style="text-align: center; font-weight: bold; text-transform: uppercase;">ДОГОВОР</p>
 <p style="text-align: center; font-weight: bold; text-transform: uppercase;">купли-продажи электротранспортного средства № {{contract_number}}</p>
@@ -15,6 +20,7 @@
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Цвет:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{product_color}}</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">VIN / № рамы:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{product_vin}}</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Цена:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold; font-size: 12pt;">{{price_digits_table}} ₽</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Оплата:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">Наличные: {{payment_cash_rub}} ₽, Безнал: {{payment_bank_rub}} ₽</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Телефон:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{buyer_phone}}</td></tr>
 </table>
 
