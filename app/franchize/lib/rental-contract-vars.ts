@@ -1,5 +1,6 @@
 // /app/franchize/lib/rental-contract-vars.ts
 import type { RentalContractTemplateVars, BikeSpecs, CrewContractSecrets } from './rental-contract-types';
+import { calculatePriceForDuration } from './pricing-calculator';
 
 const TEMPLATE_BASE_PATH = 'docs/RENTAL_DEAL_TEMPLATE.html';
 const TEMPLATE_MD_PATH = 'docs/RENTAL_DEAL_TEMPLATE.md';
@@ -186,20 +187,48 @@ export async function buildTemplateVars(params: {
     dailyPrice = baseDailyPrice;
   }
 
-  // Use cart-provided priceBreakdown if available, otherwise calculate
+  // ── Tier-aware pricing using calculatePriceForDuration ──
+  // This properly uses price_per_3h, price_per_6h, price_per_12h for hourly rentals
+  // and rent_weekday/rent_weekend for daily rentals, plus multi-day tier rates.
+  const specsForPricing = {
+    price_per_hour: params.bike.specs.price_per_hour,
+    price_per_3h: params.bike.specs.price_per_3h,
+    price_per_6h: params.bike.specs.price_per_6h,
+    price_per_12h: params.bike.specs.price_per_12h,
+    dailyPrice: params.bike.specs.dailyPrice,
+    rent_weekday: params.bike.specs.rent_weekday,
+    rent_weekend: params.bike.specs.rent_weekend,
+    rent_2_4d: params.bike.specs.rent_2_4d,
+    rent_5_10d: params.bike.specs.rent_5_10d,
+    rent_11_30d: params.bike.specs.rent_11_30d,
+  };
+
+  // Convert DD.MM.YYYY start date to YYYY-MM-DD for the calculator
+  const startDateForCalc = (() => {
+    const s = params.dates.start;
+    if (!s) return undefined;
+    const dmy = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (dmy) return `${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}`;
+    return s; // already YYYY-MM-DD
+  })();
+
+  const tierResult = calculatePriceForDuration(specsForPricing, rentalHours, startDateForCalc);
+
+  // Use cart-provided priceBreakdown if available, otherwise use tier-aware pricing
   let subtotal: number;
   if (params.priceBreakdown) {
     subtotal = params.priceBreakdown.totalRub;
-  } else if (isHourly) {
-    subtotal = Number(hourlyPrice) * rentalHours;
-  } else if (rentalDays > 1 && weekendDayCount > 0 && rentWeekend) {
-    // Blended total for multi-day with weekend
-    const weekdayRate = params.bike.specs.rent_weekday || baseDailyPrice;
-    subtotal = weekdayCount * weekdayRate + weekendDayCount * rentWeekend;
   } else {
-    subtotal = Number(dailyPrice) * rentalDays;
+    // Use the tier-aware price from calculatePriceForDuration
+    subtotal = tierResult.price > 0 ? tierResult.price : Number(dailyPrice) * rentalDays;
   }
   const subtotalRounded = Math.round(subtotal);
+
+  // Build tier label and unit from the period string (e.g., "/ 3 часа" → "3 часа", "за 3 часа")
+  const tierPeriod = tierResult.period || '';
+  const tierLabel = tierPeriod.replace(/^\//, '').trim() || 'сутки';
+  const tierUnit = tierPeriod ? `за ${tierLabel}` : 'за сутки';
+  const tierPrice = tierResult.price > 0 ? tierResult.price : subtotal;
 
   // Build equipment string
   const equipmentParts = [
@@ -267,6 +296,10 @@ export async function buildTemplateVars(params: {
     daily_price_rub: String(dailyPrice),
     subtotal_rub: String(subtotalRounded),
     deposit_rub: String(deposit),
+    // Tier-aware pricing (for quick-info and section 4.1)
+    pricing_tier_label: tierLabel,
+    pricing_tier_price_rub: String(Math.round(tierPrice)),
+    pricing_tier_unit: tierUnit,
     included_km_per_day: String(params.contractDefaults.includedMileage || 200),
     extra_km_fee_rub: String(params.contractDefaults.overageRate || 35),
     late_return_penalty_rub: String(params.contractDefaults.lateReturnPenaltyRub || 10000),

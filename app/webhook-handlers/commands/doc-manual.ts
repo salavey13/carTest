@@ -56,6 +56,7 @@ import { convertTextDateToTimestamp, resolveCrewOwnerChatId } from "@/lib/rental
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets } from "@/app/lib/rental-contract-vars";
 import { privateSchema } from "@/lib/private-secrets";
 import nodemailer from "nodemailer";
+import { calculatePriceForDuration } from "@/app/franchize/lib/pricing-calculator";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026; // 👍 Fixed current year
@@ -1037,48 +1038,37 @@ async function createRentalFromDocContract(
       return null;
     }
 
-    // Calculate total cost with weekend-aware pricing
+    // Calculate total cost with tier-aware pricing
     const baseDailyPrice = Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || '10000');
-    const rentWeekend = Number(bike.specs?.rent_weekend) || 0;
     const start = new Date(startDateIso);
     const end = new Date(endDateIso);
     const hours = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10;
     const days = Math.max(1, Math.ceil(hours / 24));
 
-    // Count weekend days for blended pricing
-    let weekendCount = 0;
-    {
-      const d = new Date(start);
-      while (d <= end) {
-        const dow = d.getDay();
-        if (dow === 0 || dow === 6) weekendCount++;
-        d.setDate(d.getDate() + 1);
-      }
-    }
-    const weekdayCount = Math.max(0, days - weekendCount);
-
-    let dailyPrice: number;
-    let totalCost: number;
-    if (days === 1 && weekendCount > 0 && rentWeekend > 0) {
-      // Single weekend day
-      dailyPrice = rentWeekend;
-      totalCost = rentWeekend;
-    } else if (days > 1 && weekendCount > 0 && rentWeekend > 0) {
-      // Multi-day with weekends: blend rates
-      const weekdayRate = Number(bike.specs?.rent_weekday) || baseDailyPrice;
-      dailyPrice = Math.round((weekdayCount * weekdayRate + weekendCount * rentWeekend) / days);
-      totalCost = weekdayCount * weekdayRate + weekendCount * rentWeekend;
-    } else {
-      // All weekdays
-      dailyPrice = baseDailyPrice;
-      totalCost = baseDailyPrice * days;
-    }
+    // Use tier-aware pricing calculator (handles 3h/6h/12h tiers, weekday/weekend, multi-day)
+    const specsForPricing = {
+      price_per_hour: bike.specs?.price_per_hour,
+      price_per_3h: bike.specs?.price_per_3h,
+      price_per_6h: bike.specs?.price_per_6h,
+      price_per_12h: bike.specs?.price_per_12h,
+      dailyPrice: bike.specs?.dailyPrice,
+      rent_weekday: bike.specs?.rent_weekday,
+      rent_weekend: bike.specs?.rent_weekend,
+      rent_2_4d: bike.specs?.rent_2_4d,
+      rent_5_10d: bike.specs?.rent_5_10d,
+      rent_11_30d: bike.specs?.rent_11_30d,
+    };
+    const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateIso);
+    const dailyPrice = tierResult.rate > 0 ? tierResult.rate : baseDailyPrice;
+    const totalCost = tierResult.price > 0 ? tierResult.price : baseDailyPrice * days;
 
     logger.info('[/doc] createRentalFromDocContract: pricing', {
       dailyPrice,
       hours,
       days,
       totalCost,
+      tier: tierResult.period,
+      tierPrice: tierResult.price,
     });
 
     // Resolve crew owner for placeholder user_id
@@ -1452,9 +1442,9 @@ ${qrDeepLink}`);
         license_categories: (context.mlCategories || []).join(", ") || null,
         rent_start_date: context.rentStartDate || null,
         rent_end_date: context.rentEndDate || null,
-        daily_price: bike.specs?.dailyPrice || bike.specs?.rent_weekday || null,
+        daily_price: Number(vars.daily_price_rub) || bike.specs?.dailyPrice || bike.specs?.rent_weekday || null,
         deposit_rub: depositForRecord,
-        total_sum: Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
+        total_sum: Number(vars.subtotal_rub) || Number(vars.pricing_tier_price_rub) || Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
         template_version: 1,
         rental_id: rentalId || null,  // FK to rentals table if rental was created
         // СТС pledge columns (added 2026-06-17):
