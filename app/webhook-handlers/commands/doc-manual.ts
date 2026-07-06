@@ -2772,9 +2772,12 @@ export async function handleDocCallback(
   }
 
   // ── Equipment callbacks (eq_*) — NEW step after schedule_end ─────────────
+  // IMPORTANT: Must call setState after each modification, otherwise context
+  // changes are lost on next callback (state reloads from storage).
   if (callbackData === "eq_helmets") {
     const current = context.helmets || 0;
     context.helmets = current >= 2 ? 0 : current + 1;
+    await setState(userId, "equipment", context);
     logger.info(`[/doc] eq_helmets: ${userId} → helmets=${context.helmets}`);
     await sendComplexMessage(chatId, `🪖 Шлемы: ${context.helmets}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
@@ -2783,6 +2786,7 @@ export async function handleDocCallback(
   if (callbackData === "eq_gloves") {
     const current = context.gloves || 0;
     context.gloves = current >= 2 ? 0 : current + 1;
+    await setState(userId, "equipment", context);
     logger.info(`[/doc] eq_gloves: ${userId} → gloves=${context.gloves}`);
     await sendComplexMessage(chatId, `🧤 Перчатки: ${context.gloves}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
@@ -2790,6 +2794,7 @@ export async function handleDocCallback(
 
   if (callbackData === "eq_net") {
     context.net = !context.net;
+    await setState(userId, "equipment", context);
     logger.info(`[/doc] eq_net: ${userId} → net=${context.net}`);
     await sendComplexMessage(chatId, `Сетка: ${context.net ? "✅" : "⬜"}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
@@ -2797,6 +2802,7 @@ export async function handleDocCallback(
 
   if (callbackData === "eq_backpack") {
     context.backpack = !context.backpack;
+    await setState(userId, "equipment", context);
     logger.info(`[/doc] eq_backpack: ${userId} → backpack=${context.backpack}`);
     await sendComplexMessage(chatId, `Рюкзак: ${context.backpack ? "✅" : "⬜"}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
@@ -2804,6 +2810,7 @@ export async function handleDocCallback(
 
   if (callbackData === "eq_bag") {
     context.bag = !context.bag;
+    await setState(userId, "equipment", context);
     logger.info(`[/doc] eq_bag: ${userId} → bag=${context.bag}`);
     await sendComplexMessage(chatId, `Сумка: ${context.bag ? "✅" : "⬜"}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
@@ -2811,13 +2818,14 @@ export async function handleDocCallback(
 
   if (callbackData === "eq_charger") {
     context.charger = !context.charger;
+    await setState(userId, "equipment", context);
     logger.info(`[/doc] eq_charger: ${userId} → charger=${context.charger}`);
     await sendComplexMessage(chatId, `Зарядка: ${context.charger ? "✅" : "⬜"}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
   }
 
   if (callbackData === "eq_done") {
-    logger.info(`[/doc] eq_done: ${userId} → equipment selected, moving to odometer`);
+    logger.info(`[/doc] eq_done: ${userId} → equipment done (helmets=${context.helmets || 0}, gloves=${context.gloves || 0}, net=${!!context.net}, backpack=${!!context.backpack}, bag=${!!context.bag}, charger=${!!context.charger}), moving to odometer`);
     await gotoOdometer(chatId, userId, context);
     return true;
   }
