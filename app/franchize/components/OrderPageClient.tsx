@@ -13,7 +13,7 @@ import { checkFranchizeCarsAvailability, createFranchizeOrderCheckout, recordFra
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
 import { getTelegramHandleHref, getTelegramWebAppFallbackHref } from "../lib/telegram-links";
-import { getFranchizeFormPrefillAction, getFranchizeUserRentalSecretsAction } from "../profile-actions";
+import { getFranchizeFormPrefillAction, getFranchizeUserRentalSecretsAction, getRentalDocsPrefillAction } from "../profile-actions";
 
 interface OrderPageClientProps {
   crew: FranchizeCrewVM;
@@ -393,22 +393,39 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     void loadPrefill();
   }, [dbUser?.user_id, setValue, slug]);
 
-  // Load rental secrets for returning users (WOW effect)
+  // Load rental secrets for returning users (WOW effect + signature prefill)
   useEffect(() => {
     const loadRentalSecrets = async () => {
       if (!dbUser?.user_id) return;
-      const res = await getFranchizeUserRentalSecretsAction({ userId: dbUser.user_id, slug });
-      if (!res.success || !res.data) return;
 
-      // If user has previous rentals, show returning user indicators
-      if (res.data.hasPreviousRentals) {
+      // 1. Check for previous rentals (WOW effect)
+      const res = await getFranchizeUserRentalSecretsAction({ userId: dbUser.user_id, slug });
+      if (res.success && res.data?.hasPreviousRentals) {
         setIsReturningUser(true);
         setReturningUserLastRental(res.data.lastRentalDate ?? null);
 
-        // Pre-fill form fields with saved rental secrets (without dirtying form)
-        const { fullName, phone } = res.data.savedData;
-        if (fullName) setValue("recipient", fullName, { shouldDirty: false, shouldValidate: false });
+        // Pre-fill form fields with saved rental secrets
+        const { fullName, phone } = res.data.savedData || {};
+        if (fullName) {
+          setValue("recipient", fullName, { shouldDirty: false, shouldValidate: false });
+          setValue("signatureName", fullName, { shouldDirty: false, shouldValidate: false });
+        }
         if (phone) setValue("phone", phone, { shouldDirty: false, shouldValidate: false });
+      }
+
+      // 2. Load full rental docs prefill (passport, license, etc.)
+      const docsRes = await getRentalDocsPrefillAction({ userId: dbUser.user_id, slug });
+      if (docsRes.success && docsRes.data) {
+        // Prefill signature name from docs if not already set
+        if (docsRes.data.fullName) {
+          setValue("signatureName", docsRes.data.fullName, { shouldDirty: false, shouldValidate: false });
+          if (!recipient) {
+            setValue("recipient", docsRes.data.fullName, { shouldDirty: false, shouldValidate: false });
+          }
+        }
+        if (docsRes.data.phone) {
+          setValue("phone", docsRes.data.phone, { shouldDirty: false, shouldValidate: false });
+        }
       }
     };
     void loadRentalSecrets();
