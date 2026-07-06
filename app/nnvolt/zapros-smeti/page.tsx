@@ -3,11 +3,9 @@
 import { useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft,
   Download,
   Send,
   CheckCircle2,
-  Zap,
   Paperclip,
   X,
 } from "lucide-react";
@@ -19,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
+import { Header } from "../components/Header";
 import {
   generateFileName,
   generateRequestText,
@@ -267,30 +266,7 @@ export default function ZaprosSmetiPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pb-32">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-40 bg-[#0a0a0a]/95 backdrop-blur-md border-b border-white/5">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <a
-            href="/nnvolt"
-            className="inline-flex items-center gap-2 text-white/50 hover:text-volt transition-colors text-sm"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Назад на сайт</span>
-          </a>
-
-          <a href="/nnvolt" className="flex items-center gap-2 group">
-            <Zap className="w-6 h-6 text-volt group-hover:text-electric-blue transition-colors" />
-            <div className="flex flex-col">
-              <span className="text-base font-black tracking-[0.15em] text-white leading-none">
-                NN VOLT
-              </span>
-              <span className="text-[9px] tracking-[0.25em] text-volt font-semibold leading-none mt-0.5">
-                ЭЛЕКТРОМОНТАЖ
-              </span>
-            </div>
-          </a>
-        </div>
-      </header>
+      <Header variant="compact" />
 
       <main className="pt-28 sm:pt-32">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
