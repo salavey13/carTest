@@ -87,6 +87,18 @@ export default function LeadsClient({
   const hot = leads.filter((l) => !l.verified && (l.urgencyScore ?? 0) >= 60);
   const warm = leads.filter((l) => !l.verified && (l.urgencyScore ?? 0) < 60);
 
+  const handleDismissLead = async (leadId: string) => {
+    try {
+      await fetch("/api/franchize/lead-todo", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId, crewId, dismissLead: true }),
+      });
+    } catch { /* ignore */ }
+    // Reload page to reflect removal
+    window.location.reload();
+  };
+
   return (
     <div className="mt-6 space-y-6">
       {/* Stats */}
@@ -100,19 +112,19 @@ export default function LeadsClient({
       {hot.length > 0 && (
         <LeadSection title={`Горячие заявки (${hot.length})`} icon={Flame} iconColor="#ef4444"
           leads={hot} accentColor={accentColor} expandedLead={expandedLead} setExpandedLead={setExpandedLead}
-          getTodosForLead={getTodosForLead} crewId={crewId} slug={slug} allTodos={todos} />
+          getTodosForLead={getTodosForLead} crewId={crewId} slug={slug} allTodos={todos} onDismiss={handleDismissLead} />
       )}
 
       {verified.length > 0 && (
         <LeadSection title={`Клиенты (${verified.length})`} icon={CheckCircle} iconColor="#10b981"
           leads={verified} accentColor={accentColor} expandedLead={expandedLead} setExpandedLead={setExpandedLead}
-          getTodosForLead={getTodosForLead} crewId={crewId} slug={slug} allTodos={todos} />
+          getTodosForLead={getTodosForLead} crewId={crewId} slug={slug} allTodos={todos} onDismiss={handleDismissLead} />
       )}
 
       {warm.length > 0 && (
         <LeadSection title={`Заявки (${warm.length})`} icon={Phone} iconColor="#3b82f6"
           leads={warm} accentColor={accentColor} expandedLead={expandedLead} setExpandedLead={setExpandedLead}
-          getTodosForLead={getTodosForLead} crewId={crewId} slug={slug} allTodos={todos} />
+          getTodosForLead={getTodosForLead} crewId={crewId} slug={slug} allTodos={todos} onDismiss={handleDismissLead} />
       )}
 
       {leads.length === 0 && (
@@ -136,7 +148,7 @@ function StatCard({ count, label, color }: { count: number; label: string; color
 
 function LeadSection({
   title, icon: Icon, iconColor, leads, accentColor, expandedLead, setExpandedLead,
-  getTodosForLead, crewId, slug, allTodos,
+  getTodosForLead, crewId, slug, allTodos, onDismiss,
 }: {
   title: string;
   icon: typeof Flame;
@@ -149,6 +161,7 @@ function LeadSection({
   crewId: string;
   slug: string;
   allTodos: TodoRow[];
+  onDismiss: (leadId: string) => void;
 }) {
   return (
     <div>
@@ -167,6 +180,7 @@ function LeadSection({
             todos={getTodosForLead(lead.user_id)}
             crewId={crewId}
             slug={slug}
+            onDismiss={onDismiss}
           />
         ))}
       </div>
@@ -175,7 +189,7 @@ function LeadSection({
 }
 
 function LeadCard({
-  lead, accentColor, isExpanded, onToggle, todos, crewId, slug,
+  lead, accentColor, isExpanded, onToggle, todos, crewId, slug, onDismiss,
 }: {
   lead: LeadRow;
   accentColor: string;
@@ -184,6 +198,7 @@ function LeadCard({
   todos: TodoRow[];
   crewId: string;
   slug: string;
+  onDismiss: (leadId: string) => void;
 }) {
   const meta = SOURCE_META[lead.source] || SOURCE_META.dashboard_intent;
   const Icon = meta.icon;
@@ -250,6 +265,16 @@ function LeadCard({
 
           {/* Todos */}
           <TodoList leadId={lead.user_id} leadName={lead.full_name || "Без имени"} todos={todos} crewId={crewId} slug={slug} accentColor={accentColor} />
+
+          {/* Dismiss lead */}
+          <div className="mt-3 border-t pt-2" style={{ borderColor: `${accentColor}10` }}>
+            <button
+              onClick={() => onDismiss(lead.user_id)}
+              className="flex items-center gap-1 text-xs opacity-40 transition hover:opacity-80 hover:text-red-400"
+            >
+              <Trash2 className="h-3 w-3" /> Убрать из списка
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -297,26 +322,36 @@ function TodoList({
 
   const handleToggleTodo = async (todoId: string, currentStatus: string) => {
     const newStatus = currentStatus === "done" ? "pending" : "done";
+    const prevTodos = localTodos;
     // Optimistic update
     setLocalTodos(localTodos.map((t) => t.id === todoId ? { ...t, status: newStatus } : t));
     try {
-      await fetch("/api/franchize/lead-todo", {
+      const resp = await fetch("/api/franchize/lead-todo", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ todoId, status: newStatus }),
       });
-    } catch { /* revert on error */ }
+      if (!resp.ok) throw new Error("PATCH failed");
+    } catch {
+      // Revert optimistic update on error
+      setLocalTodos(prevTodos);
+    }
   };
 
   const handleDeleteTodo = async (todoId: string) => {
+    const prevTodos = localTodos;
     setLocalTodos(localTodos.filter((t) => t.id !== todoId));
     try {
-      await fetch("/api/franchize/lead-todo", {
+      const resp = await fetch("/api/franchize/lead-todo", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ todoId }),
       });
-    } catch { /* ignore */ }
+      if (!resp.ok) throw new Error("DELETE failed");
+    } catch {
+      // Revert on error
+      setLocalTodos(prevTodos);
+    }
   };
 
   return (
@@ -379,7 +414,7 @@ function TodoList({
               </span>
               {todo.priority === "high" && <span className="rounded bg-red-500/20 px-1 text-[9px] text-red-400">!</span>}
               <button onClick={() => handleDeleteTodo(todo.id)}
-                className="shrink-0 opacity-30 transition hover:opacity-100">
+                className="shrink-0 opacity-50 transition hover:opacity-100">
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
