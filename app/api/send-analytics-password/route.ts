@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
                     process.env.NEXT_PUBLIC_VERCEL_URL ||
                     `https://${process.env.VERCEL_URL || "your-app.vercel.app"}`;
     const analyticsUrl = `${siteUrl}/franchize/${crew.slug}/rentals-analytics`;
+    const leadsUrl = `${siteUrl}/franchize/${crew.slug}/leads`;
 
     // Configure SMTP (Yandex first, fallback to Gmail)
     const SMTP_HOST = process.env.SMTP_YANDEX_HOST || process.env.SMTP_GMAIL_HOST || "smtp.yandex.ru";
@@ -138,11 +139,12 @@ export async function POST(request: NextRequest) {
       subject: `Пароль для аналитики — ${crew.name}`,
       text: `Здравствуйте!
 
-Ваш одноразовый пароль для доступа к аналитике аренд:
+Ваш одноразовый пароль для доступа к аналитике и клиентам:
 
 ${passwordData.password}
 
-Ссылка для входа: ${analyticsUrl}
+Аналитика аренд: ${analyticsUrl}
+Клиенты и заявки: ${leadsUrl}
 
 ⏰ Пароль действителен ${hoursLeft} час(ов).
 
@@ -173,12 +175,13 @@ ${crew.name}`,
     </div>
     <div class="content">
       <p>Здравствуйте!</p>
-      <p>Ваш одноразовый пароль для доступа к аналитике аренд:</p>
+      <p>Ваш одноразовый пароль для доступа:</p>
 
       <div class="password">${passwordData.password}</div>
 
-      <p style="text-align: center;">
-        <a href="${analyticsUrl}" class="button">Открыть аналитику</a>
+      <p style="text-align: center; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+        <a href="${analyticsUrl}" class="button">📊 Аналитика</a>
+        <a href="${leadsUrl}" class="button" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">👥 Клиенты</a>
       </p>
 
       <div class="expires">
