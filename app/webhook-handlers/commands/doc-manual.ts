@@ -316,7 +316,7 @@ function buildDepositChoiceKeyboard(depositAmount: string, bike?: any): Keyboard
  * Parse a date+time pair into a valid Date object.
  * Handles both DD.MM.YYYY (Russian) and YYYY-MM-DD (ISO) date formats.
  */
-function parseRuDateTime(dateStr: string, timeStr: string): Date {
+function parseRuDateTime(dateStr: string | undefined, timeStr: string | undefined): Date {
   if (!dateStr) return new Date(NaN);
   // DD.MM.YYYY → YYYY-MM-DD
   const dmy = dateStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
@@ -1673,7 +1673,7 @@ ${qrDeepLink}`);
     }, { onConflict: "user_id" });
 
     // Record intent with deal-specific state
-    await supabaseAdmin.from("franchize_intents").upsert({
+    const { error: intentError } = await supabaseAdmin.from("franchize_intents").upsert({
       slug: "vip-bike",
       bike_id: bike.id,
       intent_type: isRent ? "rent" : "sale",
@@ -1692,6 +1692,10 @@ ${qrDeepLink}`);
         hasLicense: !!(context.mlSeries && context.mlNumber),
       },
     }, { onConflict: "slug,bike_id,telegram_user_id,intent_type" });
+
+    if (intentError) {
+      logger.error("[/doc] Failed to create franchize_intent:", intentError);
+    }
 
     // ── Create crew_todos for equipment return and default checks ──────────
     if (isRent) {
@@ -1727,13 +1731,6 @@ ${qrDeepLink}`);
               rental_id: rentalId || null,
               rent_end_date: context.rentEndDate || null,
             }),
-            metadata: {
-              source: "doc-manual-rent",
-              bike_id: bike.id,
-              rental_id: rentalId || null,
-              renter_name: context.mpFullName || null,
-              rent_end_date: context.rentEndDate || null,
-            },
           });
         } catch (todoErr) {
           logger.warn("[/doc] Failed to create crew_todo:", todo.title, todoErr);

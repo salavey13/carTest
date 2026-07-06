@@ -95,12 +95,16 @@ export async function DELETE(request: NextRequest) {
 
     // Dismiss a lead entirely (mark franchize_intents as dismissed)
     if (dismissLead && leadId) {
-      const query = supabaseAdmin.from("franchize_intents").update({
+      // Also dismiss the user (mark as not a lead) so they disappear from all lead sources
+      await supabaseAdmin.from("users").update({
+        metadata: { is_dismissed_lead: true, dismissed_at: new Date().toISOString() },
+      }).eq("user_id", leadId);
+
+      const { error } = await supabaseAdmin.from("franchize_intents").update({
         stage: "dismissed",
         updated_at: new Date().toISOString(),
-      }).eq("telegram_user_id", leadId);
-      if (crewId) query.eq("crew_slug", "vip-bike"); // best-effort scoping
-      const { error } = await query;
+      }).eq("telegram_user_id", leadId).eq("slug", "vip-bike");
+
       if (error) {
         logger.error("[lead-todo] dismiss lead failed", error);
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
