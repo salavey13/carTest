@@ -16,8 +16,6 @@ import {
   Award,
   CheckCircle2,
   ArrowRight,
-  Menu,
-  X,
   Cable,
   Wrench,
   FileCheck,
@@ -41,6 +39,7 @@ import {
   Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Header } from "./components/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -103,131 +102,6 @@ function Counter({ target, suffix = "" }: { target: number; suffix?: string }) {
     return () => clearInterval(t);
   }, [inView, target]);
   return <span ref={ref}>{count}{suffix}</span>;
-}
-
-/* ─── Header ─── */
-function Header() {
-  const [scrolled, setScrolled] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  useEffect(() => {
-    const h = () => setScrolled(window.scrollY > 50);
-    window.addEventListener("scroll", h);
-    return () => window.removeEventListener("scroll", h);
-  }, []);
-
-  const links = [
-    { label: "Услуги", href: "https://nnvolt.ru#services" },
-    { label: "Портфолио", href: "https://nnvolt.ru#portfolio" },
-    { label: "Бригада", href: "https://nnvolt.ru#team" },
-    { label: "Калькулятор", href: "#calculator" },
-    { label: "FAQ", href: "#faq" },
-    { label: "Контакты", href: "#contacts" },
-  ];
-
-  // Reliable scroll: JS scrollIntoView instead of relying on hash anchor,
-  // which can glitch inside framer-motion animated containers.
-  const scrollTo = (href: string) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    const id = href.replace("#", "");
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const headerBlur =
-    scrolled || mobileOpen
-      ? "bg-[#0a0a0a]/95 backdrop-blur-md border-b border-white/5 shadow-lg shadow-black/30"
-      : "bg-transparent";
-
-  return (
-    <motion.header
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.5 }}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${headerBlur}`}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20">
-          <a href="#" className="flex items-center gap-2.5 group">
-            <div className="relative">
-              <Zap className="w-8 h-8 text-volt group-hover:text-electric-blue transition-colors duration-300" />
-              <div className="absolute inset-0 bg-volt/20 rounded-full blur-lg group-hover:bg-electric-blue/20 transition-colors duration-300" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-lg sm:text-xl font-black tracking-[0.15em] text-white leading-none">
-                NN VOLT
-              </span>
-              <span className="text-[9px] tracking-[0.25em] text-volt font-semibold leading-none mt-0.5">
-                ЭЛЕКТРОМОНТАЖ
-              </span>
-            </div>
-          </a>
-
-          <nav className="hidden md:flex items-center gap-0.5">
-            {links.map((l) => (
-              <a
-                key={l.href}
-                href={l.href}
-                onClick={scrollTo(l.href)}
-                className="px-3.5 py-2 text-[13px] font-medium text-white/60 hover:text-volt transition-colors tracking-wide uppercase"
-              >
-                {l.label}
-              </a>
-            ))}
-            <a href="#contacts" onClick={scrollTo("#contacts")}>
-              <Button className="ml-3 bg-volt text-charcoal font-bold hover:bg-volt-hover hover:text-charcoal tracking-wide uppercase text-xs px-5">
-                Вызвать электрика
-              </Button>
-            </a>
-          </nav>
-
-          <button
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="md:hidden p-2 text-white/60 hover:text-volt transition-colors"
-          >
-            {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {mobileOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-[#0a0a0a]/98 backdrop-blur-md border-t border-white/5"
-          >
-            <div className="px-4 py-4 space-y-1">
-              {links.map((l) => (
-                <a
-                  key={l.href}
-                  href={l.href}
-                  onClick={(e) => {
-                    setMobileOpen(false);
-                    scrollTo(l.href)(e);
-                  }}
-                  className="block px-4 py-3 text-sm font-medium text-white/60 hover:text-volt hover:bg-white/5 rounded transition-colors tracking-wide uppercase"
-                >
-                  {l.label}
-                </a>
-              ))}
-              <a
-                href="#contacts"
-                onClick={(e) => {
-                  setMobileOpen(false);
-                  scrollTo("#contacts")(e);
-                }}
-              >
-                <Button className="w-full mt-2 bg-volt text-charcoal font-bold hover:bg-volt-hover hover:text-charcoal tracking-wide uppercase text-xs">
-                  Вызвать электрика
-                </Button>
-              </a>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.header>
-  );
 }
 
 /* ─── Hero ─── */
