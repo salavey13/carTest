@@ -187,6 +187,19 @@ export interface RentalContractTemplateVars {
   pricing_tier_label: string;   // e.g., "3 часа", "6 часов", "1 день (будни)", "3 дня"
   pricing_tier_price_rub: string; // price for the selected tier
   pricing_tier_unit: string;     // e.g., "за 3 часа", "за сутки (будни)", "за 3 дня"
+  // Equipment
+  equipment_helmets: string;     // number of helmets (0-2)
+  equipment_gloves: string;      // number of gloves pairs (0-2)
+  equipment_net: string;         // "да" or "нет"
+  equipment_backpack: string;    // "да" or "нет"
+  equipment_bag: string;         // "да" or "нет"
+  equipment_charger: string;     // "да" or "нет"
+  equipment_total_cost: string;  // total equipment cost
+  // Payment split
+  payment_cash_rub: string;      // amount paid in cash
+  payment_bank_rub: string;      // amount paid by bank transfer
+  // Odometer
+  odometer_before: string;       // odometer reading before rental
   included_km_per_day: string;
   extra_km_fee_rub: string;
   late_return_penalty_rub: string;
