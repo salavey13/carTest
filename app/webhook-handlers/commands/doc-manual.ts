@@ -313,6 +313,20 @@ function buildDepositChoiceKeyboard(depositAmount: string, bike?: any): Keyboard
 }
 
 /**
+ * Parse a date+time pair into a valid Date object.
+ * Handles both DD.MM.YYYY (Russian) and YYYY-MM-DD (ISO) date formats.
+ */
+function parseRuDateTime(dateStr: string, timeStr: string): Date {
+  if (!dateStr) return new Date(NaN);
+  // DD.MM.YYYY → YYYY-MM-DD
+  const dmy = dateStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  const iso = dmy
+    ? `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
+    : dateStr;
+  return new Date(`${iso}T${timeStr || '10:00'}`);
+}
+
+/**
  * Build equipment selection keyboard.
  * Shows current selections and allows toggling each item.
  */
@@ -1922,8 +1936,8 @@ async function gotoPaymentSplit(chatId: number, userId: string, context: DocFlow
   const endTime = context.rentEndTime || "10:00";
 
   // Calculate rental hours
-  const start = new Date(`${startDate}T${startTime}`);
-  const end = new Date(`${endDate}T${endTime}`);
+  const start = parseRuDateTime(startDate, startTime);
+  const end = parseRuDateTime(endDate, endTime);
   const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
 
   // Use tier-aware pricing
@@ -1965,10 +1979,14 @@ async function gotoPaymentSplit(chatId: number, userId: string, context: DocFlow
   context.bankAmount = 0;
 
   await setState(userId, "payment_split", context);
+
+  // Build a human-readable period label from tierResult.period (e.g., "/ 6 часов" → "6 часов")
+  const periodLabel = (tierResult.period || '').replace(/^\//, '').trim() || `${Math.ceil(hours / 24)} дн.`;
+
   await sendComplexMessage(
     chatId,
     `*Расчёт стоимости*\n\n` +
-    `Аренда (${tierResult.period}): *${rentalCost.toLocaleString("ru-RU")} ₽*\n` +
+    `Аренда (${periodLabel}): *${rentalCost.toLocaleString("ru-RU")} ₽*\n` +
     (equipmentCost > 0 ? `Оборудование: *${equipmentCost.toLocaleString("ru-RU")} ₽*\n` : "") +
     `\n💰 *Итого: ${totalAmount.toLocaleString("ru-RU")} ₽*\n\n` +
     `Как будет оплачено?`,
@@ -2482,8 +2500,8 @@ export async function handleDocText(userId: string, chatId: number, text: string
     const startTime = context.rentStartTime || "10:00";
     const endDate = context.rentEndDate;
     const endTime = context.rentEndTime || "10:00";
-    const start = new Date(`${startDate}T${startTime}`);
-    const end = new Date(`${endDate}T${endTime}`);
+    const start = parseRuDateTime(startDate, startTime);
+    const end = parseRuDateTime(endDate, endTime);
     const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
     const specsForPricing = {
       price_per_hour: specs.price_per_hour,
@@ -2854,8 +2872,8 @@ export async function handleDocCallback(
     const startTime = context.rentStartTime || "10:00";
     const endDate = context.rentEndDate;
     const endTime = context.rentEndTime || "10:00";
-    const start = new Date(`${startDate}T${startTime}`);
-    const end = new Date(`${endDate}T${endTime}`);
+    const start = parseRuDateTime(startDate, startTime);
+    const end = parseRuDateTime(endDate, endTime);
     const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
     const specsForPricing = {
       price_per_hour: specs.price_per_hour,
@@ -2898,8 +2916,8 @@ export async function handleDocCallback(
     const startTime = context.rentStartTime || "10:00";
     const endDate = context.rentEndDate;
     const endTime = context.rentEndTime || "10:00";
-    const start = new Date(`${startDate}T${startTime}`);
-    const end = new Date(`${endDate}T${endTime}`);
+    const start = parseRuDateTime(startDate, startTime);
+    const end = parseRuDateTime(endDate, endTime);
     const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
     const specsForPricing = {
       price_per_hour: specs.price_per_hour,
