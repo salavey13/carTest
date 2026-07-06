@@ -27,6 +27,6 @@ export const IS_VPS_DEPLOYMENT: boolean =
 
 /**
  * Whether to show cart-related UI (cart icon, floating cart, cart menu link).
- * Only shown when Telegram auth is available (Vercel deployment).
+ * Enabled for all deployments — cart works in both Telegram and web app contexts.
  */
-export const SHOW_CART: boolean = IS_TELEGRAM_AUTH_AVAILABLE;
+export const SHOW_CART: boolean = true;

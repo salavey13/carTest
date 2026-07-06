@@ -66,8 +66,8 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
         {/* RIGHT: Info */}
         <div className="flex-1 min-w-0">
           {/* Title row with delete button */}
-          <div className="flex items-start justify-between gap-2">
-            <h2 className="text-base font-semibold truncate">
+          <div className="flex items-start justify-between gap-2 min-w-0 overflow-hidden">
+            <h2 className="text-base font-semibold truncate min-w-0 flex-1">
               {line.item?.title ?? "Позиция недоступна"}
             </h2>
 
@@ -122,7 +122,7 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
               <button
                 onClick={() => setConfirmDelete(true)}
                 aria-label="Удалить товар"
-                className="shrink-0 flex items-center gap-1 text-xs transition-colors"
+                className="shrink-0 flex items-center gap-1 text-xs transition-colors sm:flex-row flex-row"
                 style={{ color: crew.theme.palette.textSecondary }}
                 onFocus={(e) => {
                   e.currentTarget.style.boxShadow = interactionRingStyle(crew.theme).boxShadow;
@@ -131,7 +131,7 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
                   e.currentTarget.style.boxShadow = "";
                 }}
               >
-                Удалить
+                <span className="hidden sm:inline">Удалить</span>
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             )}

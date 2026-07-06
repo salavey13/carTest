@@ -1110,7 +1110,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                                 Хит
                               </span>
                             )}
-                            {item.saleAvailable && <span className="inline-flex rounded-full border-2 border-[var(--catalog-accent)] bg-[var(--catalog-bg)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent)] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
+                            {hasSalePrice(item) && <span className="inline-flex rounded-full border-2 border-[var(--catalog-accent)] bg-[var(--catalog-bg)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent)] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
                             {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="text-[7px]">{tv.emoji}</span>{tv.label}</span> : null; })()}
                           </div>
 
@@ -1240,7 +1240,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                                 Хит
                               </span>
                             )}
-                            {item.saleAvailable && <span className="inline-flex rounded-full border-2 border-[var(--catalog-accent)] bg-[var(--catalog-bg)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent)] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
+                            {hasSalePrice(item) && <span className="inline-flex rounded-full border-2 border-[var(--catalog-accent)] bg-[var(--catalog-bg)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent)] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
                             {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="text-[7px]">{tv.emoji}</span>{tv.label}</span> : null; })()}
                           </div>
 
