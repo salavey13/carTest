@@ -8,6 +8,7 @@ import { FranchizeRentalLifecycleActions } from "../../../components/FranchizeRe
 import { FranchizeHero } from "../../../components/FranchizeHero";
 import { FranchizePageShell } from "../../../components/FranchizePageShell";
 import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRentalDocumentsPanel";
+import { RentalChecklistPanel } from "../../../components/RentalChecklistPanel";
 import { getTelegramHandleHref } from "../../../lib/telegram-links";
 import { crewPaletteForSurface } from "../../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../../metadata";
@@ -326,6 +327,18 @@ export default async function FranchizeRentalPage({
                 {rental.contractOriginalSha256}
               </p>
             ) : null}
+          </div>
+
+          {/* Interactive rental checklist — equipment, photos, checks */}
+          <div className="mt-4">
+            <RentalChecklistPanel
+              rentalId={rental.rentalId}
+              crewId={crew.id}
+              slug={resolvedSlug}
+              accentColor={crew.theme.palette.accentMain}
+              metadata={(rental.metadata as Record<string, any>) || undefined}
+              status={rental.status}
+            />
           </div>
 
           <div className="mt-5 grid gap-2 sm:grid-cols-2">
