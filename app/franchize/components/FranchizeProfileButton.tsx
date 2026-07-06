@@ -186,8 +186,22 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   }, [tempCartId, telegramWebAppUrl]);
 
   if (!hasUser) {
-    // FIX: When no user and no telegramWebAppUrl, show a simpler "Войти" button
-    // instead of hard-linking to oneBikePlsBot.
+    // Inside Telegram WebApp but auth not resolved yet — show loading state, not a link to ourselves
+    if (isInTelegramContext) {
+      return (
+        <button
+          type="button"
+          disabled
+          aria-label="Загрузка профиля"
+          className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold opacity-60"
+          style={{ backgroundColor: bgColor, color: textColor, borderColor }}
+        >
+          <Send className="h-4 w-4 animate-pulse" />
+          <span className="hidden sm:inline">...</span>
+        </button>
+      );
+    }
+    // Outside Telegram (browser) — show WebApp link
     if (!telegramWebAppUrl) {
       return (
         <button

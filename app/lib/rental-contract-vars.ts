@@ -630,6 +630,18 @@ export function buildRentalContractVariables(
       (options.equipment?.backpack ? 500 : 0) +
       (options.equipment?.bag ? 500 : 0)
     ),
+    equipment_summary: (() => {
+      const parts: string[] = [];
+      const h = options.equipment?.helmets || 0;
+      const g = options.equipment?.gloves || 0;
+      if (h > 0) parts.push(`Шлем ×${h}`);
+      if (g > 0) parts.push(`Перчатки ×${g}`);
+      if (options.equipment?.net) parts.push('Сетка');
+      if (options.equipment?.backpack) parts.push('Рюкзак');
+      if (options.equipment?.bag) parts.push('Сумка');
+      if (options.equipment?.charger) parts.push('Зарядка');
+      return parts.length > 0 ? parts.join(', ') : '—';
+    })(),
     // Payment split
     payment_cash_rub: String(options.paymentSplit?.cashAmount || 0),
     payment_bank_rub: String(options.paymentSplit?.bankAmount || 0),
