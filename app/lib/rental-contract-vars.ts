@@ -13,6 +13,7 @@
  */
 
 import { readPath } from "@/lib/readPath";
+import { calculatePriceForDuration } from "@/app/franchize/lib/pricing-calculator";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Types
@@ -68,7 +69,14 @@ export type BikeSpecs = {
     mileage?: number;
     dailyPrice?: number;
     rent_weekday?: number;
+    rent_weekend?: number;
     price_per_hour?: number;
+    price_per_3h?: number;
+    price_per_6h?: number;
+    price_per_12h?: number;
+    rent_2_4d?: number;
+    rent_5_10d?: number;
+    rent_11_30d?: number;
     deposit_rub?: number;
     sale_price?: number;
     price_rub?: number;
@@ -458,16 +466,41 @@ export function buildRentalContractVariables(
   const rentalDays = Math.max(1, Math.ceil(rentalHours / 24));
   const isHourlyRental = rentalHours > 0 && rentalHours < 24;
 
-  // Use cart-provided priceBreakdown if available, otherwise calculate
+  // Use cart-provided priceBreakdown if available, otherwise use tier-aware pricing
   let subtotal: number;
+  let tierLabel = '';
+  let tierUnit = '';
+  let tierPrice = 0;
   if (options.priceBreakdown) {
     subtotal = options.priceBreakdown.totalRub;
   } else {
-    if (isHourlyRental) {
-      subtotal = Number(hourlyPrice) * rentalHours;
-    } else {
-      subtotal = Number(dailyPrice) * rentalDays;
-    }
+    // Tier-aware pricing: uses price_per_3h, price_per_6h, price_per_12h, weekday/weekend, multi-day tiers
+    const specsForPricing = {
+      price_per_hour: bikeSpecs.price_per_hour,
+      price_per_3h: bikeSpecs.price_per_3h,
+      price_per_6h: bikeSpecs.price_per_6h,
+      price_per_12h: bikeSpecs.price_per_12h,
+      dailyPrice: bikeSpecs.dailyPrice,
+      rent_weekday: bikeSpecs.rent_weekday,
+      rent_weekend: bikeSpecs.rent_weekend,
+      rent_2_4d: bikeSpecs.rent_2_4d,
+      rent_5_10d: bikeSpecs.rent_5_10d,
+      rent_11_30d: bikeSpecs.rent_11_30d,
+    };
+    // Convert DD.MM.YYYY to YYYY-MM-DD for the calculator
+    const startDateForCalc = (() => {
+      const s = period.startDate;
+      if (!s) return undefined;
+      const dmy = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if (dmy) return `${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}`;
+      return s;
+    })();
+    const tierResult = calculatePriceForDuration(specsForPricing, rentalHours, startDateForCalc);
+    const tierPeriod = tierResult.period || '';
+    tierLabel = tierPeriod.replace(/^\//, '').trim() || 'сутки';
+    tierUnit = tierPeriod ? `за ${tierLabel}` : 'за сутки';
+    tierPrice = tierResult.price > 0 ? tierResult.price : Number(dailyPrice) * rentalDays;
+    subtotal = tierPrice;
   }
   const subtotalRounded = Math.round(subtotal);
 
@@ -563,6 +596,10 @@ export function buildRentalContractVariables(
     hourly_price_rub: hourlyPrice,
     deposit_rub: deposit,
     subtotal_rub: String(subtotalRounded), // Calculated from rental duration
+    // Tier-aware pricing (for quick-info and section 4.1)
+    pricing_tier_label: tierLabel || 'сутки',
+    pricing_tier_price_rub: String(Math.round(tierPrice || subtotalRounded)),
+    pricing_tier_unit: tierUnit || 'за сутки',
     bike_value_rub: bikeValue,
     bike_value_words: "", // Not used in rental contracts (sale-only field)
 

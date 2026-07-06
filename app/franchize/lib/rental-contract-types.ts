@@ -183,6 +183,10 @@ export interface RentalContractTemplateVars {
   daily_price_rub: string;
   subtotal_rub: string;
   deposit_rub: string;
+  // Tier-aware pricing (for quick-info and section 4.1)
+  pricing_tier_label: string;   // e.g., "3 часа", "6 часов", "1 день (будни)", "3 дня"
+  pricing_tier_price_rub: string; // price for the selected tier
+  pricing_tier_unit: string;     // e.g., "за 3 часа", "за сутки (будни)", "за 3 дня"
   included_km_per_day: string;
   extra_km_fee_rub: string;
   late_return_penalty_rub: string;
@@ -259,6 +263,12 @@ export interface BikeSpecs {
   rent_weekday?: number;
   rent_weekend?: number;
   price_per_hour?: number;
+  price_per_3h?: number;
+  price_per_6h?: number;
+  price_per_12h?: number;
+  rent_2_4d?: number;
+  rent_5_10d?: number;
+  rent_11_30d?: number;
   deposit_rub?: number;
   sale_price?: number;
   price_rub?: number;
