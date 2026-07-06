@@ -15,7 +15,6 @@ import { getFranchizeUserRentalSecretsAction } from "../profile-actions";
 import {
   CartItemCard,
   OrderSummary,
-  ProtectionPlan,
   TrustBadges,
   CheckoutButton,
   EmptyCartState,
@@ -247,7 +246,6 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
                   subtotal={subtotal}
                   crew={crew}
                 />
-                <ProtectionPlan crew={crew} />
                 <CheckoutButton
                   onClick={handleProceed}
                   isLoading={isSaving}

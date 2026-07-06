@@ -955,8 +955,9 @@ export function ItemModal({
   }, [item?.id]);
 
   // Determine which CTAs to show (safe optional chaining — item may be null during close transition)
+  // Only show CTAs for flows that are explicitly enabled via rent=1/sale=1 specs
   const showRentCta = isRental && (item ? hasRentPrice(item) : false);
-  const showBuyCta = item?.saleAvailable === true;
+  const showBuyCta = item ? hasSalePrice(item) : false;
 
   const gallery = useMemo(() => {
     if (!item) return [];
@@ -1234,27 +1235,35 @@ export function ItemModal({
 
   // Generalized fallback specs — rental vs order
   // Use dynamic pricing when dates are selected, otherwise fallback to rentPriceLabel
+  // Only show prices that are explicitly enabled via rent=1/sale=1 specs
   const rentalPriceDisplay = calculatedPrice
     ? `${calculatedPrice.price} ${calculatedPrice.period}`
     : item.rentPriceLabel;
 
+  const showRentInSpecs = hasRentPrice(item);
+  const showSaleInSpecs = hasSalePrice(item);
+
   const fallbackSpecs = isRental
     ? [
         { label: "Категория", value: item.category },
-        { label: "Тариф аренды", value: rentalPriceDisplay },
-        // Show pricing tier indicator when dynamic pricing is active
-        ...(calculatedPrice && calculatedPrice.label !== "Цена"
-          ? [{ label: "Тариф", value: calculatedPrice.label }]
+        ...(showRentInSpecs
+          ? [
+              { label: "Тариф аренды", value: rentalPriceDisplay },
+              // Show pricing tier indicator when dynamic pricing is active
+              ...(calculatedPrice && calculatedPrice.label !== "Цена"
+                ? [{ label: "Тариф", value: calculatedPrice.label }]
+                : []),
+              // Show deposit amount from specs if available
+              ...((item.rawSpecs as BikePricingSpecs)?.deposit_rub
+                ? [{ label: "Залог", value: `${(item.rawSpecs as BikePricingSpecs).deposit_rub!.toLocaleString("ru-RU")} ₽` }]
+                : []),
+            ]
           : []),
-        // Show deposit amount from specs if available
-        ...((item.rawSpecs as BikePricingSpecs)?.deposit_rub
-          ? [{ label: "Залог", value: `${(item.rawSpecs as BikePricingSpecs).deposit_rub!.toLocaleString("ru-RU")} ₽` }]
-          : []),
-        ...(item.saleAvailable && item.salePrice
+        ...(showSaleInSpecs
           ? [
               {
                 label: "Цена покупки",
-                value: `${item.salePrice.toLocaleString("ru-RU")} ₽`,
+                value: `${item.salePrice!.toLocaleString("ru-RU")} ₽`,
               },
             ]
           : []),
@@ -1262,11 +1271,11 @@ export function ItemModal({
       ]
     : [
         { label: "Категория", value: item.category },
-        ...(item.salePrice
+        ...(showSaleInSpecs
           ? [
               {
                 label: "Цена",
-                value: `${item.salePrice.toLocaleString("ru-RU")} ₽`,
+                value: `${item.salePrice!.toLocaleString("ru-RU")} ₽`,
               },
             ]
           : []),
@@ -1390,7 +1399,7 @@ export function ItemModal({
                       ? "Доступно для заказа"
                       : "Уточните наличие"}
                 </span>
-                {item.saleAvailable && (
+                {showBuyCta && (
                   <span className="inline-flex rounded-full border border-[var(--item-accent)]/40 bg-[var(--item-accent)]/15 px-2.5 py-1 font-semibold text-[var(--item-accent)]">
                     {isRental ? "Аренда + покупка" : "Доступно к покупке"}
                   </span>
@@ -1494,7 +1503,7 @@ export function ItemModal({
               </section>
             )}
 
-            {item.saleAvailable && (
+            {showBuyCta && (
               <Link
                 href={`/franchize/${slug}/market/${item.id}/buy`}
                 className="inline-flex w-full items-center justify-center rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
@@ -1517,7 +1526,14 @@ export function ItemModal({
                   borderColor={theme.palette.borderSoft}
                 />
 
-                {/* New dynamic pricing components */}
+                {/* Full pricing table — shows ALL available rates (before quick selection) */}
+                <PricingTable
+                  specs={item.rawSpecs ?? {}}
+                  borderColor={theme.palette.borderSoft}
+                  accentColor={theme.palette.accentMain}
+                />
+
+                {/* Quick duration selection with prices */}
                 <DurationShortcuts
                   startDate={options.rentStartDate ?? ""}
                   endDate={options.rentEndDate ?? ""}
@@ -1527,13 +1543,6 @@ export function ItemModal({
                   onEndTimeChange={setRentEndTime}
                   borderColor={theme.palette.borderSoft}
                   specs={item.rawSpecs ?? {}}
-                />
-
-                {/* Full pricing table — shows ALL available rates */}
-                <PricingTable
-                  specs={item.rawSpecs ?? {}}
-                  borderColor={theme.palette.borderSoft}
-                  accentColor={theme.palette.accentMain}
                 />
 
                 <AdditionalItems

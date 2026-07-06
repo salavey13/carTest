@@ -2430,6 +2430,20 @@ export async function handleDocText(userId: string, chatId: number, text: string
     return true;
   }
 
+  if (state === "equipment") {
+    // User typed instead of clicking equipment buttons — re-prompt
+    logger.info(`[/doc] equipment: ${userId} → typed instead of clicking, re-prompting`);
+    await gotoEquipment(chatId, userId, context);
+    return true;
+  }
+
+  if (state === "payment_split") {
+    // User typed instead of clicking payment buttons — re-prompt
+    logger.info(`[/doc] payment_split: ${userId} → typed instead of clicking, re-prompting`);
+    await gotoPaymentSplit(chatId, userId, context);
+    return true;
+  }
+
   if (state === "odometer") {
     // User entered odometer reading
     const value = text.replace(/\D/g, '');
@@ -2743,8 +2757,8 @@ export async function handleDocCallback(
       return true;
     }
 
-    // End date resolved → route to deposit_choice (NEW step 10) instead of confirm
-    await gotoDepositChoice(chatId, userId, context);
+    // End date resolved → route to equipment selection (NEW step)
+    await gotoEquipment(chatId, userId, context);
     return true;
   }
 
@@ -3100,7 +3114,7 @@ export async function handleDocCallback(
         chatId,
         "📞 *Телефон клиента*\n\nЕсли клиент пришёл с сайта (заявка на звонок), введите его номер — договор привяжется к заявке.\n\nИли нажмите «Пропустить».",
         [
-          [{ text: "⏭ Пропустить", callback_data: "phone_skip" }],
+          [{ text: "⏭ Пропустить", callback_data: "ph_skip" }],
           [{ text: "❌ Отменить", callback_data: "cancel" }],
         ],
         { keyboardType: "inline", parseMode: "Markdown" },
@@ -3115,7 +3129,7 @@ export async function handleDocCallback(
     return true;
   }
 
-  if (callbackData === "phone_skip") {
+  if (callbackData === "ph_skip") {
     context.clientPhoneResolved = true;
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, "⏳ Генерирую...", [], { removeKeyboard: true });
