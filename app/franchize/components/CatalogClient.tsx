@@ -112,10 +112,12 @@ function getItemFlowType(item: CatalogItemVM): FlowType {
   const rentEnabled = hasExplicitRent ? isSpecEnabled(rs!.rent) : true;
   const saleEnabled = hasExplicitSale ? isSpecEnabled(rs!.sale) : false;
 
-  // rent explicitly disabled → order flow (even if pricePerDay > 0 from legacy data)
+  // rent explicitly disabled → order flow (even if daily_price column has legacy value)
   if (!rentEnabled) return "order";
-  // sale-only (sale enabled, no rent pricing) → order flow
-  if (saleEnabled && item.pricePerDay === 0) return "order";
+  // sale explicitly enabled but rent NOT explicitly set → sale-only
+  // (prevents "Забронировать" on bikes where daily_price exists from import
+  // but the bike is actually only for sale per operator flag)
+  if (saleEnabled && !hasExplicitRent) return "order";
   // Items with rental pricing and rent enabled → rental flow
   return item.pricePerDay > 0 ? "rental" : "order";
 }
