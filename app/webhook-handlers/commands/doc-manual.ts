@@ -313,6 +313,51 @@ function buildDepositChoiceKeyboard(depositAmount: string, bike?: any): Keyboard
 }
 
 /**
+ * Build equipment selection keyboard.
+ * Shows current selections and allows toggling each item.
+ */
+function buildEquipmentKeyboard(context: DocFlowContext): KeyboardButton[][] {
+  const helmets = context.helmets || 0;
+  const gloves = context.gloves || 0;
+  const net = context.net || false;
+  const backpack = context.backpack || false;
+  const bag = context.bag || false;
+  const charger = context.charger || false;
+
+  return [
+    [
+      { text: `🪖 Шлемы: ${helmets}`, callback_data: "eq_helmets" },
+      { text: `🧤 Перчатки: ${gloves}`, callback_data: "eq_gloves" },
+    ],
+    [
+      { text: `${net ? "✅" : "⬜"} Сетка`, callback_data: "eq_net" },
+      { text: `${backpack ? "✅" : "⬜"} Рюкзак`, callback_data: "eq_backpack" },
+    ],
+    [
+      { text: `${bag ? "✅" : "⬜"} Сумка`, callback_data: "eq_bag" },
+      { text: `${charger ? "✅" : "⬜"} Зарядка`, callback_data: "eq_charger" },
+    ],
+    [{ text: "✅ Готово", callback_data: "eq_done" }],
+    [{ text: "❌ Отменить", callback_data: "cancel" }],
+  ];
+}
+
+/**
+ * Build payment split keyboard.
+ * Shows calculated total and allows entering cash/bank split.
+ */
+function buildPaymentSplitKeyboard(totalAmount: number): KeyboardButton[][] {
+  const formatted = totalAmount.toLocaleString("ru-RU");
+  return [
+    [{ text: `💰 Итого: ${formatted} ₽`, callback_data: "pay_info" }],
+    [{ text: "💵 Ввести сумму наличными", callback_data: "pay_cash" }],
+    [{ text: "✅ Всё наличными", callback_data: "pay_all_cash" }],
+    [{ text: "💳 Всё безнал", callback_data: "pay_all_bank" }],
+    [{ text: "❌ Отменить", callback_data: "cancel" }],
+  ];
+}
+
+/**
  * Build sale-color keyboard.
  *
  * Two modes depending on whether the bike card has a color:
@@ -481,6 +526,25 @@ interface DocFlowContext {
   // Used as telegram_chat_id in rental_contract_artifacts.
   clientPhone?: string;           // phone number (normalized: digits + leading +)
   clientPhoneResolved?: boolean;  // true if operator entered phone OR skipped
+
+  // ── Equipment selection (added 2026-07-06) ────────────────────────────────
+  // Additional equipment rented with the bike. Prices: helmet=1000, gloves=500,
+  // net=500, backpack=500, bag=500, charger=0 (free but tracked for return).
+  helmets?: number;        // 0-2 helmets
+  gloves?: number;         // 0-2 pairs of gloves
+  net?: boolean;           // safety net
+  backpack?: boolean;      // backpack
+  bag?: boolean;           // small bag
+  charger?: boolean;       // charger (free, but tracked for return)
+
+  // ── Odometer reading (added 2026-07-06) ───────────────────────────────────
+  // Odometer value before rental (in km). Used for damage/overage tracking.
+  odometerBefore?: number;
+
+  // ── Payment split (added 2026-07-06) ──────────────────────────────────────
+  // How the total is split between cash and bank transfer.
+  cashAmount?: number;     // amount paid in cash
+  bankAmount?: number;     // amount paid by bank transfer
 }
 
 // ── Bike resolution ─────────────────────────────────────────────────────
@@ -1204,6 +1268,22 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
           documentKey: `rental-${bike.id}-${Date.now()}`,
           appendixDate: `${String(now.getDate()).padStart(2,'0')}.${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()}`,
         },
+        // Equipment selection
+        equipment: {
+          helmets: context.helmets || 0,
+          gloves: context.gloves || 0,
+          net: context.net || false,
+          backpack: context.backpack || false,
+          bag: context.bag || false,
+          charger: context.charger || false,
+        },
+        // Odometer reading
+        odometerBefore: context.odometerBefore || 0,
+        // Payment split
+        paymentSplit: {
+          cashAmount: context.cashAmount || 0,
+          bankAmount: context.bankAmount || 0,
+        },
       });
     } else {
       // Sale contract still uses manual construction (TODO: could be extracted too)
@@ -1598,6 +1678,46 @@ ${qrDeepLink}`);
         hasLicense: !!(context.mlSeries && context.mlNumber),
       },
     }, { onConflict: "slug,bike_id,telegram_user_id,intent_type" });
+
+    // ── Create crew_todos for equipment return and default checks ──────────
+    if (isRent) {
+      const todos: Array<{ title: string; priority: string }> = [
+        { title: `🔧 Проверить ТС при возврате: ${bike.make} ${bike.model} (${context.rentEndDate} ${context.rentEndTime})`, priority: "high" },
+        { title: `🔑 Принять ключи от ${bike.make} ${bike.model}`, priority: "high" },
+        { title: `📄 Проверить документы при возврате ${bike.make} ${bike.model}`, priority: "medium" },
+        { title: `📊 Сравить одометр: было ${context.odometerBefore || 0} км`, priority: "medium" },
+        { title: `🔍 Осмотр на повреждения: ${bike.make} ${bike.model}`, priority: "high" },
+      ];
+      if ((context.helmets || 0) > 0) todos.push({ title: `🪖 Принять ${context.helmets} шлем(а/ов)`, priority: "medium" });
+      if ((context.gloves || 0) > 0) todos.push({ title: `🧤 Принять ${context.gloves} перчатки`, priority: "low" });
+      if (context.net) todos.push({ title: `🌐 Принять сетку`, priority: "low" });
+      if (context.backpack) todos.push({ title: `👜 Принять рюкзак`, priority: "low" });
+      if (context.bag) todos.push({ title: `👜 Принять сумку`, priority: "low" });
+      if (context.charger) todos.push({ title: `🔌 Принять зарядное устройство`, priority: "medium" });
+
+      const crewId = bike.crew_id || "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
+      for (const todo of todos) {
+        try {
+          await supabaseAdmin.from("crew_todos").insert({
+            crew_id: crewId,
+            title: todo.title,
+            status: "pending",
+            priority: todo.priority,
+            assigned_to: String(userId),
+            metadata: {
+              source: "doc-manual-rent",
+              bike_id: bike.id,
+              rental_id: rentalId || null,
+              renter_name: context.mpFullName || null,
+              rent_end_date: context.rentEndDate || null,
+            },
+          });
+        } catch (todoErr) {
+          logger.warn("[/doc] Failed to create crew_todo:", todo.title, todoErr);
+        }
+      }
+      logger.info(`[/doc] Created ${todos.length} crew_todos for equipment return + checks`);
+    }
   } catch (leadErr) {
     logger.warn("[/doc] Failed to create lead:", leadErr);
   }
@@ -1732,6 +1852,118 @@ async function gotoDepositChoice(chatId: number, userId: string, context: DocFlo
     `Депозит из карточки ТС: *${formatted} ₽*\n\n` +
     `Выберите вариант:`,
     buildDepositChoiceKeyboard(depositAmount, bike),
+    { keyboardType: 'inline', parseMode: 'Markdown' },
+  );
+}
+
+/**
+ * Equipment selection step.
+ * Allows operator to select additional equipment (helmets, gloves, net, etc.)
+ */
+async function gotoEquipment(chatId: number, userId: string, context: DocFlowContext): Promise<void> {
+  await setState(userId, "equipment", context);
+  await sendComplexMessage(
+    chatId,
+    `*Дополнительное оборудование*\n\n` +
+    `Выберите оборудование для аренды:\n` +
+    `• Шлем: 1 000 ₽\n` +
+    `• Перчатки: 500 ₽\n` +
+    `• Сетка: 500 ₽\n` +
+    `• Рюкзак: 500 ₽\n` +
+    `• Сумка: 500 ₽\n` +
+    `• Зарядка: бесплатно (возврат)`,
+    buildEquipmentKeyboard(context),
+    { keyboardType: 'inline', parseMode: 'Markdown' },
+  );
+}
+
+/**
+ * Odometer reading step.
+ * Asks operator to enter odometer value before rental.
+ */
+async function gotoOdometer(chatId: number, userId: string, context: DocFlowContext): Promise<void> {
+  await setState(userId, "odometer", context);
+  await sendComplexMessage(
+    chatId,
+    `*Показания одометра*\n\n` +
+    `Введите текущий пробег байка (в км):\n\n` +
+    `Пример: \`1234\``,
+    [],
+    { removeKeyboard: true, parseMode: 'Markdown' },
+  );
+}
+
+/**
+ * Payment split step.
+ * Calculates total and asks how to split between cash and bank transfer.
+ */
+async function gotoPaymentSplit(chatId: number, userId: string, context: DocFlowContext): Promise<void> {
+  const bike = await resolveBikeById(context.bikeId);
+  if (!bike) {
+    logger.error(`[/doc] gotoPaymentSplit: bike not found for ${context.bikeId}`);
+    await sendComplexMessage(chatId, "❌ Байк не найден", [], { removeKeyboard: true });
+    return;
+  }
+
+  // Calculate total using tier-aware pricing
+  const specs = bike.specs || {};
+  const startDate = context.rentStartDate;
+  const startTime = context.rentStartTime || "10:00";
+  const endDate = context.rentEndDate;
+  const endTime = context.rentEndTime || "10:00";
+
+  // Calculate rental hours
+  const start = new Date(`${startDate}T${startTime}`);
+  const end = new Date(`${endDate}T${endTime}`);
+  const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
+
+  // Use tier-aware pricing
+  const specsForPricing = {
+    price_per_hour: specs.price_per_hour,
+    price_per_3h: specs.price_per_3h,
+    price_per_6h: specs.price_per_6h,
+    price_per_12h: specs.price_per_12h,
+    dailyPrice: specs.dailyPrice,
+    rent_weekday: specs.rent_weekday,
+    rent_weekend: specs.rent_weekend,
+    rent_2_4d: specs.rent_2_4d,
+    rent_5_10d: specs.rent_5_10d,
+    rent_11_30d: specs.rent_11_30d,
+  };
+
+  const startDateForCalc = (() => {
+    if (!startDate) return undefined;
+    const dmy = startDate.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+    return startDate;
+  })();
+
+  const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateForCalc);
+  const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
+
+  // Add equipment costs
+  const helmets = context.helmets || 0;
+  const gloves = context.gloves || 0;
+  const net = context.net ? 1 : 0;
+  const backpack = context.backpack ? 1 : 0;
+  const bag = context.bag ? 1 : 0;
+
+  const equipmentCost = helmets * 1000 + gloves * 500 + net * 500 + backpack * 500 + bag * 500;
+  const totalAmount = rentalCost + equipmentCost;
+
+  // Store total in context for later use
+  context.cashAmount = totalAmount; // Default to all cash
+  context.bankAmount = 0;
+
+  await setState(userId, "payment_split", context);
+  await sendComplexMessage(
+    chatId,
+    `*Расчёт стоимости*\n\n` +
+    `Аренда (${tierResult.period}): *${rentalCost.toLocaleString("ru-RU")} ₽*\n` +
+    (equipmentCost > 0 ? `Оборудование: *${equipmentCost.toLocaleString("ru-RU")} ₽*\n` : "") +
+    `\n💰 *Итого: ${totalAmount.toLocaleString("ru-RU")} ₽*\n\n` +
+    `Как будет оплачено?`,
+    buildPaymentSplitKeyboard(totalAmount),
     { keyboardType: 'inline', parseMode: 'Markdown' },
   );
 }
@@ -2036,8 +2268,8 @@ export async function handleDocText(userId: string, chatId: number, text: string
     }
     context.rentEndDate = e.date;
     context.rentEndTime = e.time;
-    // Route to deposit_choice (NEW step 10) instead of jumping straight to confirm
-    await gotoDepositChoice(chatId, userId, context);
+    // Route to equipment selection (NEW step) instead of deposit_choice
+    await gotoEquipment(chatId, userId, context);
     return true;
   }
 
@@ -2195,6 +2427,72 @@ export async function handleDocText(userId: string, chatId: number, text: string
     logger.info(`[/doc] sts_vin: ${userId} → vin=${vin}`);
     // СТС sub-flow complete → go to confirm
     await gotoConfirmFromSts(chatId, userId, context);
+    return true;
+  }
+
+  if (state === "odometer") {
+    // User entered odometer reading
+    const value = text.replace(/\D/g, '');
+    if (!value || parseInt(value) < 0 || parseInt(value) > 999999) {
+      logger.info(`[/doc] odometer: ${userId} → invalid input "${text.slice(0,40)}"`);
+      await sendComplexMessage(chatId, "❌ Введите пробег в км (0-999999)", [], { removeKeyboard: true });
+      return true;
+    }
+    context.odometerBefore = parseInt(value);
+    logger.info(`[/doc] odometer: ${userId} → odometerBefore=${context.odometerBefore}`);
+    await gotoPaymentSplit(chatId, userId, context);
+    return true;
+  }
+
+  if (state === "payment_cash") {
+    // User entered cash amount
+    const value = text.replace(/\D/g, '');
+    if (!value || parseInt(value) < 0) {
+      logger.info(`[/doc] payment_cash: ${userId} → invalid input "${text.slice(0,40)}"`);
+      await sendComplexMessage(chatId, "❌ Введите сумму наличными (руб)", [], { removeKeyboard: true });
+      return true;
+    }
+    const cashAmount = parseInt(value);
+    const bike = await resolveBikeById(context.bikeId);
+    const specs = bike?.specs || {};
+    const startDate = context.rentStartDate;
+    const startTime = context.rentStartTime || "10:00";
+    const endDate = context.rentEndDate;
+    const endTime = context.rentEndTime || "10:00";
+    const start = new Date(`${startDate}T${startTime}`);
+    const end = new Date(`${endDate}T${endTime}`);
+    const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
+    const specsForPricing = {
+      price_per_hour: specs.price_per_hour,
+      price_per_3h: specs.price_per_3h,
+      price_per_6h: specs.price_per_6h,
+      price_per_12h: specs.price_per_12h,
+      dailyPrice: specs.dailyPrice,
+      rent_weekday: specs.rent_weekday,
+      rent_weekend: specs.rent_weekend,
+      rent_2_4d: specs.rent_2_4d,
+      rent_5_10d: specs.rent_5_10d,
+      rent_11_30d: specs.rent_11_30d,
+    };
+    const startDateForCalc = (() => {
+      if (!startDate) return undefined;
+      const dmy = startDate.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+      return startDate;
+    })();
+    const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateForCalc);
+    const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
+    const helmets = context.helmets || 0;
+    const gloves = context.gloves || 0;
+    const net = context.net ? 1 : 0;
+    const backpack = context.backpack ? 1 : 0;
+    const bag = context.bag ? 1 : 0;
+    const equipmentCost = helmets * 1000 + gloves * 500 + net * 500 + backpack * 500 + bag * 500;
+    const totalAmount = rentalCost + equipmentCost;
+    context.cashAmount = Math.min(cashAmount, totalAmount);
+    context.bankAmount = Math.max(0, totalAmount - cashAmount);
+    logger.info(`[/doc] payment_cash: ${userId} → cash=${context.cashAmount}, bank=${context.bankAmount}`);
+    await gotoDepositChoice(chatId, userId, context);
     return true;
   }
 
@@ -2446,6 +2744,162 @@ export async function handleDocCallback(
     }
 
     // End date resolved → route to deposit_choice (NEW step 10) instead of confirm
+    await gotoDepositChoice(chatId, userId, context);
+    return true;
+  }
+
+  // ── Equipment callbacks (eq_*) — NEW step after schedule_end ─────────────
+  if (callbackData === "eq_helmets") {
+    const current = context.helmets || 0;
+    context.helmets = current >= 2 ? 0 : current + 1;
+    logger.info(`[/doc] eq_helmets: ${userId} → helmets=${context.helmets}`);
+    await sendComplexMessage(chatId, `🪖 Шлемы: ${context.helmets}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData === "eq_gloves") {
+    const current = context.gloves || 0;
+    context.gloves = current >= 2 ? 0 : current + 1;
+    logger.info(`[/doc] eq_gloves: ${userId} → gloves=${context.gloves}`);
+    await sendComplexMessage(chatId, `🧤 Перчатки: ${context.gloves}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData === "eq_net") {
+    context.net = !context.net;
+    logger.info(`[/doc] eq_net: ${userId} → net=${context.net}`);
+    await sendComplexMessage(chatId, `Сетка: ${context.net ? "✅" : "⬜"}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData === "eq_backpack") {
+    context.backpack = !context.backpack;
+    logger.info(`[/doc] eq_backpack: ${userId} → backpack=${context.backpack}`);
+    await sendComplexMessage(chatId, `Рюкзак: ${context.backpack ? "✅" : "⬜"}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData === "eq_bag") {
+    context.bag = !context.bag;
+    logger.info(`[/doc] eq_bag: ${userId} → bag=${context.bag}`);
+    await sendComplexMessage(chatId, `Сумка: ${context.bag ? "✅" : "⬜"}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData === "eq_charger") {
+    context.charger = !context.charger;
+    logger.info(`[/doc] eq_charger: ${userId} → charger=${context.charger}`);
+    await sendComplexMessage(chatId, `Зарядка: ${context.charger ? "✅" : "⬜"}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData === "eq_done") {
+    logger.info(`[/doc] eq_done: ${userId} → equipment selected, moving to odometer`);
+    await gotoOdometer(chatId, userId, context);
+    return true;
+  }
+
+  // ── Payment split callbacks (pay_*) — NEW step after odometer ───────────
+  if (callbackData === "pay_info") {
+    // Just informational button, do nothing
+    return true;
+  }
+
+  if (callbackData === "pay_cash") {
+    logger.info(`[/doc] pay_cash: ${userId} → asking for cash amount`);
+    await setState(userId, "payment_cash", context);
+    await sendComplexMessage(
+      chatId,
+      "*Введите сумму наличными (руб)*\n\nПример: `5000`",
+      [], { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  if (callbackData === "pay_all_cash") {
+    const bike = await resolveBikeById(context.bikeId);
+    const specs = bike?.specs || {};
+    const startDate = context.rentStartDate;
+    const startTime = context.rentStartTime || "10:00";
+    const endDate = context.rentEndDate;
+    const endTime = context.rentEndTime || "10:00";
+    const start = new Date(`${startDate}T${startTime}`);
+    const end = new Date(`${endDate}T${endTime}`);
+    const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
+    const specsForPricing = {
+      price_per_hour: specs.price_per_hour,
+      price_per_3h: specs.price_per_3h,
+      price_per_6h: specs.price_per_6h,
+      price_per_12h: specs.price_per_12h,
+      dailyPrice: specs.dailyPrice,
+      rent_weekday: specs.rent_weekday,
+      rent_weekend: specs.rent_weekend,
+      rent_2_4d: specs.rent_2_4d,
+      rent_5_10d: specs.rent_5_10d,
+      rent_11_30d: specs.rent_11_30d,
+    };
+    const startDateForCalc = (() => {
+      if (!startDate) return undefined;
+      const dmy = startDate.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+      return startDate;
+    })();
+    const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateForCalc);
+    const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
+    const helmets = context.helmets || 0;
+    const gloves = context.gloves || 0;
+    const net = context.net ? 1 : 0;
+    const backpack = context.backpack ? 1 : 0;
+    const bag = context.bag ? 1 : 0;
+    const equipmentCost = helmets * 1000 + gloves * 500 + net * 500 + backpack * 500 + bag * 500;
+    const totalAmount = rentalCost + equipmentCost;
+    context.cashAmount = totalAmount;
+    context.bankAmount = 0;
+    logger.info(`[/doc] pay_all_cash: ${userId} → cash=${totalAmount}, bank=0`);
+    await gotoDepositChoice(chatId, userId, context);
+    return true;
+  }
+
+  if (callbackData === "pay_all_bank") {
+    const bike = await resolveBikeById(context.bikeId);
+    const specs = bike?.specs || {};
+    const startDate = context.rentStartDate;
+    const startTime = context.rentStartTime || "10:00";
+    const endDate = context.rentEndDate;
+    const endTime = context.rentEndTime || "10:00";
+    const start = new Date(`${startDate}T${startTime}`);
+    const end = new Date(`${endDate}T${endTime}`);
+    const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
+    const specsForPricing = {
+      price_per_hour: specs.price_per_hour,
+      price_per_3h: specs.price_per_3h,
+      price_per_6h: specs.price_per_6h,
+      price_per_12h: specs.price_per_12h,
+      dailyPrice: specs.dailyPrice,
+      rent_weekday: specs.rent_weekday,
+      rent_weekend: specs.rent_weekend,
+      rent_2_4d: specs.rent_2_4d,
+      rent_5_10d: specs.rent_5_10d,
+      rent_11_30d: specs.rent_11_30d,
+    };
+    const startDateForCalc = (() => {
+      if (!startDate) return undefined;
+      const dmy = startDate.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+      return startDate;
+    })();
+    const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateForCalc);
+    const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
+    const helmets = context.helmets || 0;
+    const gloves = context.gloves || 0;
+    const net = context.net ? 1 : 0;
+    const backpack = context.backpack ? 1 : 0;
+    const bag = context.bag ? 1 : 0;
+    const equipmentCost = helmets * 1000 + gloves * 500 + net * 500 + backpack * 500 + bag * 500;
+    const totalAmount = rentalCost + equipmentCost;
+    context.cashAmount = 0;
+    context.bankAmount = totalAmount;
+    logger.info(`[/doc] pay_all_bank: ${userId} → cash=0, bank=${totalAmount}`);
     await gotoDepositChoice(chatId, userId, context);
     return true;
   }

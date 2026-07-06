@@ -121,6 +121,10 @@ export async function buildTemplateVars(params: {
   equipmentData: {
     keys_count: number;
     helmets_count: number;
+    gloves_count?: number;
+    net?: boolean;
+    backpack?: boolean;
+    bag?: boolean;
     charger: boolean;
     lock: boolean;
     other_equipment?: string;
@@ -134,6 +138,11 @@ export async function buildTemplateVars(params: {
   returnData?: {
     damage_notes_at_return?: string;
     battery_level_end?: string;
+  };
+  // Payment split (cash vs bank transfer)
+  paymentSplit?: {
+    cashAmount: number;
+    bankAmount: number;
   };
   // Cart-provided price breakdown (optional, skips recalculation)
   priceBreakdown?: {
@@ -300,6 +309,25 @@ export async function buildTemplateVars(params: {
     pricing_tier_label: tierLabel,
     pricing_tier_price_rub: String(Math.round(tierPrice)),
     pricing_tier_unit: tierUnit,
+    // Equipment
+    equipment_helmets: String(params.equipmentData.helmets_count || 0),
+    equipment_gloves: String(params.equipmentData.gloves_count || 0),
+    equipment_net: params.equipmentData.net ? 'да' : 'нет',
+    equipment_backpack: params.equipmentData.backpack ? 'да' : 'нет',
+    equipment_bag: params.equipmentData.bag ? 'да' : 'нет',
+    equipment_charger: params.equipmentData.charger ? 'да' : 'нет',
+    equipment_total_cost: String(
+      (params.equipmentData.helmets_count || 0) * 1000 +
+      (params.equipmentData.gloves_count || 0) * 500 +
+      (params.equipmentData.net ? 500 : 0) +
+      (params.equipmentData.backpack ? 500 : 0) +
+      (params.equipmentData.bag ? 500 : 0)
+    ),
+    // Payment split
+    payment_cash_rub: String(params.paymentSplit?.cashAmount || 0),
+    payment_bank_rub: String(params.paymentSplit?.bankAmount || 0),
+    // Odometer
+    odometer_before: String(params.pickupData.odometer_km || 0),
     included_km_per_day: String(params.contractDefaults.includedMileage || 200),
     extra_km_fee_rub: String(params.contractDefaults.overageRate || 35),
     late_return_penalty_rub: String(params.contractDefaults.lateReturnPenaltyRub || 10000),

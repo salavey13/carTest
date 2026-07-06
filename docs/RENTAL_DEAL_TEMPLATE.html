@@ -26,7 +26,12 @@
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">ТС:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{bike_make}} {{bike_model}}</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Период:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{rent_start_date}} {{rent_start_time}} — {{rent_end_date}} {{rent_end_time}}</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Тариф:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{pricing_tier_price_rub}} ₽ {{pricing_tier_unit}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Оборудование:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">Шлемы: {{equipment_helmets}}, Перчатки: {{equipment_gloves}}, Сетка: {{equipment_net}}, Рюкзак: {{equipment_backpack}}, Сумка: {{equipment_bag}}, Зарядка: {{equipment_charger}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Стоимость оборудования:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{equipment_total_cost}} ₽</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Итого к оплате:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{subtotal_rub}} ₽</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Оплата:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">Наличные: {{payment_cash_rub}} ₽, Безнал: {{payment_bank_rub}} ₽</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Залог:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{deposit_rub}} ₽</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Одометр (до):</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{odometer_before}} км</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Телефон:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{renter_phone}}</td></tr>
 </table>
 
@@ -78,9 +83,9 @@
 
 <p style="text-align: center; font-weight: bold;">4. Арендная плата и обеспечительный платеж</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">4.1. Размер арендной платы: {{pricing_tier_price_rub}} руб. {{pricing_tier_unit}}. Итого к оплате: {{subtotal_rub}} руб. Базовые тарифы (почасовой: {{hourly_price_rub}} руб./час, посуточный: {{daily_price_rub}} руб./сутки) и правила перерасчета времени указываются в Приложении № 3.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">4.1. Размер арендной платы: {{pricing_tier_price_rub}} руб. {{pricing_tier_unit}}. Дополнительное оборудование: {{equipment_total_cost}} руб. Итого к оплате: {{subtotal_rub}} руб., из них наличными {{payment_cash_rub}} руб., безналичным расчётом {{payment_bank_rub}} руб. Посуточный тариф (для расчёта простоя): {{daily_price_rub}} руб./сутки. Правила перерасчета времени указываются в Приложении № 3.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">4.2. Арендная плата оплачивается авансом до передачи ТС, если Стороны не согласовали иное. При бронировании на следующий день и позже Арендатор вносит предоплату 2 000 руб. для фиксации бронирования; сумма предоплаты зачитывается в счёт арендной платы.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">4.2. Арендная плата оплачивается авансом до передачи ТС, если Стороны не согласовали иное.</p>
 
 <p style="text-indent: 1.25cm; text-align: justify;">4.3. {{#if sts_collateral}}В качестве обеспечительного платежа Арендатор передаёт Арендодателю в залог оригинал Свидетельства о регистрации транспортного средства (СТС) серии {{sts_series}} № {{sts_number}}{{#if sts_issue_date}}, выдано {{sts_issue_date}}{{/if}}, на транспортное средство марки/модели {{sts_vehicle_model}}{{#if sts_vehicle_year}} {{sts_vehicle_year}} г.в.{{/if}}, государственный регистрационный знак {{sts_vehicle_plate}}{{#if sts_vehicle_vin}}, VIN {{sts_vehicle_vin}}{{/if}}. Собственник указанного ТС: {{sts_owner_full_name}}{{#if sts_owner_registration}}, зарегистрированный по адресу: {{sts_owner_registration}}{{/if}}; отношение собственника к Арендатору: {{sts_owner_relation}}. СТС передаётся Арендодателю на период аренды и возвращается Арендатору в течение {{sts_pledge_return_days}} (трех) рабочих дней после возврата арендованного ТС и исполнения всех обязательств по Договору. Денежный обеспечительный платёж (депозит) в размере {{sts_deposit_amount_skipped}} руб. настоящим сторонами не вносится и не удерживается. Обеспечением исполнения денежных обязательств Арендатора по Договору является заложенное СТС в смысле п. 1 ст. 334 ГК РФ и ст. 381.1 ГК РФ.{{else}}Обеспечительный платеж (депозит): {{deposit_rub}} руб., вносится до передачи ТС. Обеспечительный платеж является обеспечением денежного обязательства, включая обязанность возместить убытки и/или уплатить неустойку, и используется по правилам ст. 381.1 ГК РФ.{{/if}}</p>
 
@@ -352,7 +357,7 @@
 <p style="text-align: center; font-weight: bold;">Стоимость ТС, тарифы и прайс типовых повреждений/утрат</p>
 
 <p style="text-indent: 1.25cm; text-align: justify;">1. Стоимость ТС для целей возмещения при утрате/тотальной гибели: {{bike_value_rub}} руб.</p>
-<p style="text-indent: 1.25cm; text-align: justify;">2. Тарифы аренды и перерасчет времени: {{hourly_price_rub}} руб./час, {{daily_price_rub}} руб./сутки</p>
+<p style="text-indent: 1.25cm; text-align: justify;">2. Тарифы аренды и перерасчет времени: посуточный {{daily_price_rub}} руб./сутки</p>
 <p style="text-indent: 1.25cm; text-align: justify;">3. Тариф простоя/упущенной выгоды (если применяется): {{late_return_penalty_rub}} руб./сутки, максимум {{late_return_penalty_max_days}} суток.</p>
 <p style="text-indent: 1.25cm; text-align: justify;">4. Включённый пробег: для ТС с ДВС — 200 км в сутки, для электромотоциклов — 150 км в сутки. Перепробег {{#if sts_collateral}}оплачивается Арендатором дополнительно по тарифу 25–40 руб. за 1 км; при неоплате СТС удерживается до полного погашения задолженности{{else}}оплачивается из обеспечительного платежа или доплатой по тарифу 25–40 руб. за 1 км (в зависимости от модели ТС){{/if}}.</p>
 <p style="text-indent: 1.25cm; text-align: justify;">5. Мойка при сильном загрязнении ТС: 500 руб. {{#if sts_collateral}}(оплачивается Арендатором при возврате; СТС возвращается только после оплаты){{else}}(удерживается из обеспечительного платежа){{/if}}.</p>

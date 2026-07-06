@@ -424,6 +424,22 @@ export interface BuildRentalContractVariablesOptions {
     savingsPercent: number;
     tier: string;
   };
+  // Equipment selection (from /doc flow)
+  equipment?: {
+    helmets?: number;
+    gloves?: number;
+    net?: boolean;
+    backpack?: boolean;
+    bag?: boolean;
+    charger?: boolean;
+  };
+  // Odometer reading before rental
+  odometerBefore?: number;
+  // Payment split (cash vs bank transfer)
+  paymentSplit?: {
+    cashAmount: number;
+    bankAmount: number;
+  };
 }
 
 /**
@@ -600,6 +616,25 @@ export function buildRentalContractVariables(
     pricing_tier_label: tierLabel || 'сутки',
     pricing_tier_price_rub: String(Math.round(tierPrice || subtotalRounded)),
     pricing_tier_unit: tierUnit || 'за сутки',
+    // Equipment
+    equipment_helmets: String(options.equipment?.helmets || 0),
+    equipment_gloves: String(options.equipment?.gloves || 0),
+    equipment_net: options.equipment?.net ? 'да' : 'нет',
+    equipment_backpack: options.equipment?.backpack ? 'да' : 'нет',
+    equipment_bag: options.equipment?.bag ? 'да' : 'нет',
+    equipment_charger: options.equipment?.charger ? 'да' : 'нет',
+    equipment_total_cost: String(
+      (options.equipment?.helmets || 0) * 1000 +
+      (options.equipment?.gloves || 0) * 500 +
+      (options.equipment?.net ? 500 : 0) +
+      (options.equipment?.backpack ? 500 : 0) +
+      (options.equipment?.bag ? 500 : 0)
+    ),
+    // Payment split
+    payment_cash_rub: String(options.paymentSplit?.cashAmount || 0),
+    payment_bank_rub: String(options.paymentSplit?.bankAmount || 0),
+    // Odometer
+    odometer_before: String(options.odometerBefore || 0),
     bike_value_rub: bikeValue,
     bike_value_words: "", // Not used in rental contracts (sale-only field)
 
