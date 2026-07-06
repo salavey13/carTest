@@ -1488,12 +1488,11 @@ ${form.message ? `💬 <b>Сообщение:</b>\n${form.message}` : ""}
                   Отправьте описание объекта — подготовим предварительный расчёт стоимости.
                 </p>
                 <a
-                  href="/zapros-smeti-nn-volt.txt"
-                  download
+                  href="/nnvolt/zapros-smeti"
                   className="inline-flex items-center gap-2 text-xs font-medium text-electric-blue hover:text-white transition-colors"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  Скачать бланк заявки
+                  <Send className="w-3.5 h-3.5" />
+                  Заполнить бланк заявки
                 </a>
               </div>
 
@@ -1999,13 +1998,13 @@ function PriceListDrawer() {
                     Скачать прайс-лист (Excel)
                   </Button>
                 </a>
-                <a href="/zapros-smeti-nn-volt.txt" download>
+                <a href="/nnvolt/zapros-smeti">
                   <Button
                     variant="outline"
                     className="w-full mt-2 border-white/10 text-electric-blue/60 hover:text-electric-blue hover:border-electric-blue/30 tracking-wider uppercase text-sm"
                   >
-                    <Download className="mr-2 w-4 h-4" />
-                    Скачать бланк заявки
+                    <Send className="mr-2 w-4 h-4" />
+                    Заполнить бланк заявки
                   </Button>
                 </a>
                 <a href="#calculator" onClick={() => setOpen(false)}>
