@@ -11,7 +11,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { checkFranchizeCarsAvailability, createFranchizeOrderCheckout, recordFranchizeCheckoutRecoverySnapshot, validateFranchizePromoCode } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
-import { crewPaletteForSurface, focusRingOutlineStyle } from "../lib/theme";
+import { crewPaletteForSurface, focusRingOutlineStyle, readablePaletteTextOnColor } from "../lib/theme";
 import { getTelegramHandleHref, getTelegramWebAppFallbackHref } from "../lib/telegram-links";
 import { getFranchizeFormPrefillAction, getFranchizeUserRentalSecretsAction, getRentalDocsPrefillAction } from "../profile-actions";
 
@@ -40,17 +40,17 @@ const orderExtras = [
 const beginnerSafetyQuiz = [
   {
     id: "gear",
-    question: "Перед выездом новичок едет только в шлеме, перчатках и закрытой обуви?",
+    question: "Шлем, перчатки и закрытая обувь — обязательны перед выездом?",
     correct: true,
   },
   {
     id: "speed",
-    question: "В колонне можно обгонять ведущего райдера, если кажется, что темп слишком медленный?",
+    question: "Можно обгонять ведущего райдера в колонне?",
     correct: false,
   },
   {
     id: "meetup",
-    question: "Если отстал или остановился, лучше поставить meetup-точку/написать экипажу, а не догонять на максимальной скорости?",
+    question: "Если отстал — поставить meetup-точку, а не догонять на максимуме?",
     correct: true,
   },
 ] as const;
@@ -101,7 +101,6 @@ const orderFormSchema = z.object({
   time: z.string().trim().min(1, "Выберите удобное время"),
   comment: z.string().default(""),
   rentalStartDate: z.string().trim().min(1, "Выберите дату начала аренды"),
-  signatureName: z.string().trim().min(3, "Введите ФИО для подписи"),
   payment: z.enum(["telegram_xtr", "card", "cash", "sbp"]),
   deliveryMode: z.enum(["pickup", "delivery"]),
   selectedExtras: z.array(z.string()).default([]),
@@ -125,7 +124,7 @@ function normalizePromoCode(value: string): string {
 }
 
 export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientProps) {
-  const { user, dbUser } = useAppContext();
+  const { user, dbUser, isInTelegramContext } = useAppContext();
   const { cartLines, subtotal } = useFranchizeCartLines(slug, items);
   const [isSubmitting, startSubmitTransition] = useTransition();
   const [paymentRetryHint, setPaymentRetryHint] = useState<string | null>(null);
@@ -150,10 +149,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       time: "",
       comment: "",
       rentalStartDate: "",
-      signatureName: "",
       promo: "",
       selectedExtras: [],
-      payment: payments[0].id,
+      payment: isInTelegramContext ? payments[0].id : "card",
       deliveryMode: "pickup",
       consent: false,
     },
@@ -171,17 +169,26 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const time = watch("time") ?? "";
   const comment = watch("comment") ?? "";
   const rentalStartDate = watch("rentalStartDate") ?? "";
-  const signatureName = watch("signatureName") ?? "";
   const promo = watch("promo") ?? "";
   const payment = watch("payment") as PaymentMethod;
   const deliveryMode = watch("deliveryMode");
   const selectedExtras = watch("selectedExtras") ?? EMPTY_SELECTED_EXTRAS;
   const consent = Boolean(watch("consent"));
   const surface = crewPaletteForSurface(crew.theme);
+  const isAuto = crew.theme.isAuto;
+  const accentMain = isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain;
+  const accentHover = isAuto ? "var(--franchize-accent-hover)" : crew.theme.palette.accentMainHover;
+  const borderSoft = isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft;
+  const textSecondary = isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary;
+  const textPrimary = isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary;
+  const textMuted = isAuto ? "var(--franchize-text-secondary)" : (crew.theme.palette as Record<string, string>).textMuted || textSecondary;
+  const accentTextOn = isAuto
+    ? readablePaletteTextOnColor(crew.theme.palettes?.dark?.accentMain || crew.theme.palette.accentMain, crew.theme.palettes?.dark || crew.theme.palette)
+    : (crew.theme.palette as Record<string, string>).accentTextOn;
   const fieldStyle = {
     borderColor: "var(--order-border)",
-    backgroundColor: `${crew.theme.palette.bgBase}a8`,
-    color: crew.theme.palette.textPrimary,
+    backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-bg-base) 66%, transparent)" : `${crew.theme.palette.bgBase}a8`,
+    color: isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
   };
 
   const isCartEmpty = cartLines.length === 0;
@@ -213,6 +220,14 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   }, [maxRentalDays, rentalStartDate]);
   const requiresTelegram = payment === "telegram_xtr";
   const hasTelegramUser = Boolean(user?.id);
+  const visiblePayments = isInTelegramContext ? payments : payments.filter((p) => p.id !== "telegram_xtr");
+
+  // Auto-switch from XTR to card when not in Telegram context
+  useEffect(() => {
+    if (!isInTelegramContext && payment === "telegram_xtr") {
+      setValue("payment", "card", { shouldDirty: false, shouldValidate: true });
+    }
+  }, [isInTelegramContext, payment, setValue]);
   const normalizedPromoInput = normalizePromoCode(promo);
   const hasUnvalidatedPromo = normalizedPromoInput.length > 0 && appliedPromo?.code !== normalizedPromoInput;
   const safetyQuizPassed = safetyPersisted || beginnerSafetyQuiz.every((item) => safetyAnswers[item.id] === item.correct);
@@ -223,11 +238,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       { id: "cart", label: "Байк выбран", done: !isCartEmpty },
       { id: "contact", label: "Контакт заполнен", done: recipient.trim().length > 1 && phone.trim().length > 5 && time.trim().length > 0 },
       { id: "dates", label: `Период ${flowLabel} выбран`, done: Boolean(rentalStartDate) },
-      { id: "signature", label: "Электронная подпись задана", done: signatureName.trim().length > 2 },
+      { id: "signature", label: "Электронная подпись (ФИО)", done: recipient.trim().length > 2 },
       { id: "safety", label: "Safety quiz пройден", done: safetyQuizPassed },
       { id: "consent", label: `Условия ${flowLabel} подтверждены`, done: consent },
     ],
-    [consent, flowLabel, isCartEmpty, phone, recipient, rentalStartDate, safetyQuizPassed, signatureName, time],
+    [consent, flowLabel, isCartEmpty, phone, recipient, rentalStartDate, safetyQuizPassed, time],
   );
   const completedMilestones = checkoutMilestones.filter((step) => step.done).length;
   const readinessPercent = Math.round((completedMilestones / checkoutMilestones.length) * 100);
@@ -238,13 +253,13 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       { id: "phone", label: "Добавьте контактный номер", active: phone.trim().length <= 5 },
       { id: "time", label: "Выберите удобное время", active: time.trim().length === 0 },
       { id: "dates", label: `Выберите дату начала ${flowLabel}`, active: !rentalStartDate },
-      { id: "signature", label: "Введите ФИО для электронной подписи", active: signatureName.trim().length <= 2 },
+      { id: "signature", label: "Укажите ФИО получателя для электронной подписи", active: recipient.trim().length <= 2 },
       { id: "safety", label: "Пройдите safety quiz новичка", active: !safetyQuizPassed },
       { id: "consent", label: `Подтвердите условия ${flowLabel}`, active: !consent },
       { id: "promo", label: "Примените введённый промокод или очистите поле", active: hasUnvalidatedPromo },
       { id: "telegram", label: "Для Stars откройте страницу через Telegram WebApp", active: requiresTelegram && !hasTelegramUser },
     ].filter((item) => item.active),
-    [consent, flowLabel, hasTelegramUser, hasUnvalidatedPromo, isCartEmpty, phone, recipient, rentalStartDate, requiresTelegram, safetyQuizPassed, signatureName, time],
+    [consent, flowLabel, hasTelegramUser, hasUnvalidatedPromo, isCartEmpty, phone, recipient, rentalStartDate, requiresTelegram, safetyQuizPassed, time],
   );
   const nextAction = checkoutBlockers[0];
   const holdAmountRub = crew.reservationHold.amountRub;
@@ -273,7 +288,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         : comment.trim(),
       rentalStartDate: rentalStartDate || undefined,
       rentalEndDate: rentalEndDate || undefined,
-      signatureName: signatureName.trim() || undefined,
+      signatureName: recipient.trim() || undefined,
       signatureAccepted: consent,
       signatureFingerprint: user?.id ? `tg:${user.id}` : "manual-sign",
       payment,
@@ -299,7 +314,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       requiredDocs,
       flowType,
     }),
-    [appliedPromo, cartLines, checkoutBlockers, comment, consent, deliveryMode, extrasTotal, flowType, holdDepositAmount, orderId, payment, phone, pickupAddress, promoDiscount, recipient, rentalEndDate, rentalStartDate, requiredDocs, safetyQuizPassed, selectedExtraItems, signatureName, time, totalAmount, user?.id],
+    [appliedPromo, cartLines, checkoutBlockers, comment, consent, deliveryMode, extrasTotal, flowType, holdDepositAmount, orderId, payment, phone, pickupAddress, promoDiscount, recipient, rentalEndDate, rentalStartDate, requiredDocs, safetyQuizPassed, selectedExtraItems, time, totalAmount, user?.id],
   );
 
   const recoveryDepositAmount = flowType === "sale" ? Math.round(totalAmount * 0.1) : holdDepositAmount;
@@ -408,7 +423,6 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         const { fullName, phone } = res.data.savedData || {};
         if (fullName) {
           setValue("recipient", fullName, { shouldDirty: false, shouldValidate: false });
-          setValue("signatureName", fullName, { shouldDirty: false, shouldValidate: false });
         }
         if (phone) setValue("phone", phone, { shouldDirty: false, shouldValidate: false });
       }
@@ -416,9 +430,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       // 2. Load full rental docs prefill (passport, license, etc.)
       const docsRes = await getRentalDocsPrefillAction({ userId: dbUser.user_id, slug });
       if (docsRes.success && docsRes.data) {
-        // Prefill signature name from docs if not already set
+        // Prefill recipient from docs if not already set
         if (docsRes.data.fullName) {
-          setValue("signatureName", docsRes.data.fullName, { shouldDirty: false, shouldValidate: false });
           if (!recipient) {
             setValue("recipient", docsRes.data.fullName, { shouldDirty: false, shouldValidate: false });
           }
@@ -513,7 +526,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       time: values.time.trim(),
       rentalStartDate: submitPayload.rentalStartDate,
       rentalEndDate: submitPayload.rentalEndDate,
-      signatureName: values.signatureName.trim(),
+      signatureName: values.recipient.trim(),
       signatureAccepted: values.consent,
       totalAmount: submitPayload.totalAmount,
       extras: submitPayload.extras,
@@ -553,7 +566,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         comment: submitPayload.comment,
         rentalStartDate: submitPayload.rentalStartDate,
         rentalEndDate: submitPayload.rentalEndDate,
-        signatureName: values.signatureName.trim(),
+        signatureName: values.recipient.trim(),
         signatureAccepted: values.consent,
         signatureFingerprint: user?.id ? `tg:${user.id}` : "manual-sign",
         payment: values.payment,
@@ -607,6 +620,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     }
     if (blockerId === "time") {
       setFocus("time");
+      return;
+    }
+    if (blockerId === "signature") {
+      setFocus("recipient");
       return;
     }
     if (blockerId === "consent") {
@@ -675,16 +692,16 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     <section
       className="mx-auto w-full max-w-4xl px-4 py-6"
       style={{
-        ["--order-accent" as string]: crew.theme.palette.accentMain,
-        ["--order-border" as string]: crew.theme.palette.borderSoft,
-        ["--order-muted" as string]: crew.theme.palette.textSecondary,
+        ["--order-accent" as string]: accentMain,
+        ["--order-border" as string]: borderSoft,
+        ["--order-muted" as string]: textSecondary,
         ["--order-accent-contrast" as string]: "#16130A",
-        ["--order-accent-on" as string]: crew.theme.palette.accentTextOn,
-        ["--order-text-primary" as string]: crew.theme.palette.textPrimary,
-        ["--order-text-muted" as string]: crew.theme.palette.textMuted,
-        ["--order-accent-soft" as string]: `${crew.theme.palette.accentMain}1f`,
-        ["--order-progress-track" as string]: `${crew.theme.palette.borderSoft}80`,
-        ["--order-progress-gradient-end" as string]: crew.theme.palette.accentMainHover,
+        ["--order-accent-on" as string]: accentTextOn,
+        ["--order-text-primary" as string]: textPrimary,
+        ["--order-text-muted" as string]: textMuted,
+        ["--order-accent-soft" as string]: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 12%, transparent)" : `${crew.theme.palette.accentMain}1f`,
+        ["--order-progress-track" as string]: isAuto ? "color-mix(in srgb, var(--franchize-border-soft) 50%, transparent)" : `${crew.theme.palette.borderSoft}80`,
+        ["--order-progress-gradient-end" as string]: accentHover,
       }}
     >
       <p className="text-xs uppercase tracking-[0.2em] text-[var(--order-accent)]">
@@ -749,7 +766,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             className="flex w-full justify-center rounded-xl border border-[var(--order-border)] px-3 py-2 text-center text-xs transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             style={focusRingOutlineStyle(crew.theme)}
           >
-            Открыть WebApp fallback
+            Открыть в TG
           </a>
           <Link href={contactsHref} className="flex w-full justify-center rounded-xl border border-[var(--order-border)] px-3 py-2 text-center text-xs transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={focusRingOutlineStyle(crew.theme)}>
             Поддержка / контакты
@@ -828,16 +845,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                   />
                 </label>
               </div>
-              <input
-                className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                placeholder="ФИО для электронной подписи"
-                {...register("signatureName")}
-              />
-              <textarea className="min-h-20 w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Комментарий к заказу" {...register("comment")} />
-              {errors.recipient || errors.phone || errors.time || errors.rentalStartDate || errors.signatureName ? (
+              <textarea className="min-h-20 w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Комментарий к заказ" {...register("comment")} />
+              {errors.recipient || errors.phone || errors.time || errors.rentalStartDate ? (
                 <p className="text-xs text-rose-300">
-                  {errors.recipient?.message || errors.phone?.message || errors.time?.message || errors.rentalStartDate?.message || errors.signatureName?.message}
+                  {errors.recipient?.message || errors.phone?.message || errors.time?.message || errors.rentalStartDate?.message}
                 </p>
               ) : null}
             </div>
@@ -845,8 +856,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
           <div className="rounded-2xl border p-4" style={surface.card}>
             <p className="text-sm font-medium">Оплата и промокод</p>
-            <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-              {payments.map((item) => (
+            <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-3">
+              {visiblePayments.map((item) => (
                 <button
                   key={item.id}
                   type="button"
@@ -938,24 +949,19 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           </div>
 
           <div id="beginner-safety-quiz" className="rounded-2xl border p-4" style={surface.card}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium">Safety quiz новичка</p>
-                <p className="mt-1 text-xs" style={surface.mutedText}>
-                  Ответь на 3 быстрых вопроса перед первым выездом. После прохождения отметка сохранится в этом браузере для preview/Telegram WebApp тестов.
-                </p>
-              </div>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium">Safety quiz</p>
               <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${safetyQuizPassed ? "bg-emerald-400/15 text-emerald-200" : "bg-amber-300/15 text-amber-200"}`}>
-                {safetyQuizPassed ? "пройден" : "нужно пройти"}
+                {safetyQuizPassed ? "пройден" : "3 вопроса"}
               </span>
             </div>
             <div className="mt-3 space-y-2">
               {beginnerSafetyQuiz.map((item) => {
                 const answer = safetyAnswers[item.id];
                 return (
-                  <div key={item.id} className="rounded-xl border border-[var(--order-border)] p-3" style={surface.subtleCard}>
+                  <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--order-border)] p-3" style={surface.subtleCard}>
                     <p className="text-sm">{item.question}</p>
-                    <div className="mt-2 flex gap-2">
+                    <div className="flex shrink-0 gap-2">
                       {[
                         { label: "Да", value: true },
                         { label: "Нет", value: false },
@@ -980,7 +986,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 );
               })}
             </div>
-            {!safetyQuizPassed ? <p className="mt-2 text-xs text-amber-200">Нужны все правильные ответы: экипировка — да, обгон ведущего — нет, meetup вместо погони — да.</p> : null}
+            {!safetyQuizPassed ? <p className="mt-2 text-xs text-amber-200">Нужны все правильные ответы для подтверждения заказа.</p> : null}
           </div>
 
           <label className="flex items-start gap-2 rounded-xl border p-3 text-sm" style={surface.card}>
@@ -1059,7 +1065,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 ))}
               </ul>
             )}
-            {nextAction && ["recipient", "phone", "time", "consent", "promo", "safety"].includes(nextAction.id) ? (
+            {nextAction && ["recipient", "phone", "time", "consent", "promo", "safety", "signature"].includes(nextAction.id) ? (
               <button
                 type="button"
                 onClick={() => focusBlockerControl(nextAction.id)}

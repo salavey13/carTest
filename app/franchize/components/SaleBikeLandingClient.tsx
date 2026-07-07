@@ -1044,7 +1044,7 @@ export function SaleBikeLandingClient({
                       style={surface.subtleCard}
                     >
                       <Sparkles className="h-4 w-4" />
-                      Открыть в Telegram
+                      Открыть в TG
                     </a>
                   ) : (
                     <button

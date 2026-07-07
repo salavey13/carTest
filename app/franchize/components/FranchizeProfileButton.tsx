@@ -99,10 +99,16 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
 
   // Construct the Telegram WebApp URL dynamically from crew metadata
   const telegramWebAppUrl = useMemo(() => {
-    const botUsername = telegramBotUsername || userCrewInfo?.slug || "";
+    const botUsername = telegramBotUsername || "";
     if (!botUsername) return "";
     return TELEGRAM_BOT_APP_URL_TEMPLATE.replace("{botUsername}", botUsername);
-  }, [telegramBotUsername, userCrewInfo?.slug]);
+  }, [telegramBotUsername]);
+
+  // Generate a deep-link that routes to the franchize profile page via StartParamRouter
+  const telegramProfileDeepLink = useMemo(() => {
+    if (!telegramWebAppUrl || !effectiveSlug) return telegramWebAppUrl || "";
+    return `${telegramWebAppUrl}?startapp=franchize/${effectiveSlug}/profile`;
+  }, [telegramWebAppUrl, effectiveSlug]);
 
   // ── Avatar loading state machine ──
   const [brokenAvatarUrls, setBrokenAvatarUrls] = useState<Record<string, true>>({});
@@ -217,15 +223,15 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
     }
     return (
       <a
-        href={telegramWebAppUrl}
+        href={telegramProfileDeepLink}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Открыть Telegram WebApp"
+        aria-label="Открыть в Telegram"
         className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
         style={{ backgroundColor: bgColor, color: textColor, borderColor }}
       >
         <Send className="h-4 w-4" />
-        <span className="hidden sm:inline">WebApp</span>
+        <span className="hidden sm:inline">Открыть в TG</span>
       </a>
     );
   }

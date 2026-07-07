@@ -382,6 +382,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                 textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
                 borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}
                 currentSlug={crew.slug}
+                telegramBotUsername={crew.contacts.telegramBotUsername}
               />
             </CrewButtonErrorBoundary>
             {SHOW_CART && (

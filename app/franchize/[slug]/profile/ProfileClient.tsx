@@ -71,6 +71,7 @@ const fallbackCrew: FranchizeCrewVM = {
     email: "",
     address: "",
     telegram: "",
+    telegramBotUsername: "",
     workingHours: "",
     map: {
       gps: "",
@@ -732,7 +733,7 @@ export function FranchizeProfileClient({
       {/* Quick Actions */}
       <motion.div
         variants={itemVariants}
-        className="grid grid-cols-1 gap-3 md:grid-cols-3"
+        className="grid grid-cols-1 gap-3 md:grid-cols-2"
       >
         {canOpenCloserDashboard && (
           <FranchizeOperatorLinkButton href={`/franchize/${slug}/dashboard`}>
@@ -743,10 +744,6 @@ export function FranchizeProfileClient({
         <FranchizeOperatorLinkButton href={`/franchize/${slug}/map-riders`}>
           <VibeContentRenderer content="::FaMap::" className="mr-2" />
           Map Riders
-        </FranchizeOperatorLinkButton>
-        <FranchizeOperatorLinkButton href="/profile" variant="secondary">
-          <VibeContentRenderer content="::FaUser::" className="mr-2" />
-          Главный профиль
         </FranchizeOperatorLinkButton>
       </motion.div>
     </motion.div>
