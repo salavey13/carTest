@@ -21,6 +21,12 @@ export interface ContractDraftData {
   equipmentData: {
     keys_count: number;
     helmets_count: number;
+    gloves_count?: number;
+    jacket?: boolean;
+    boots?: boolean;
+    net?: boolean;
+    backpack?: boolean;
+    bag?: boolean;
     charger: boolean;
     lock: boolean;
     other_equipment?: string;

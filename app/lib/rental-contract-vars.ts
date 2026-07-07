@@ -587,7 +587,15 @@ export function buildRentalContractVariables(
     // Engine specs
     bike_engine_cc: String(bikeSpecs.engine_cc || bikeSpecs.displacement_cc || "0"),
     bike_power_hp: String(bikeSpecs.power_hp || bikeSpecs.max_power_hp || "0"),
-    bike_power_kw: String(bikeSpecs.power_kw || "0"),
+    // Ducati electric bikes capped at 3kW in contracts (regulatory class limit)
+    bike_power_kw: (() => {
+      const raw = String(bikeSpecs.power_kw || "0");
+      if (isElectric && /ducati/i.test(bike.id || "")) {
+        const num = Number(raw);
+        return num > 3 ? "3" : raw;
+      }
+      return raw;
+    })(),
     bike_max_speed: String(bikeSpecs.max_speed || bikeSpecs.top_speed_kmh || "уточняется"),
     bike_battery: String(bikeSpecs.battery || (isElectric ? "уточняется" : "")),
 
