@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Info, Swords, X, Phone } from "lucide-react";
+import { Calendar, FileText, Info, Swords, X, Phone } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
@@ -1282,7 +1282,13 @@ export function ItemModal({
         { label: "Статус", value: "Доступно для заказа" },
       ];
 
-  const normalizedSpecs = item.specs.length > 0 ? item.specs : fallbackSpecs;
+  const normalizedSpecs = (item.specs.length > 0 ? item.specs : fallbackSpecs)
+    // Filter out internal fields like "id" and "rent" that shouldn't be shown to customers
+    .filter((s) => {
+      const excludeKeys = new Set(["id", "rent"]);
+      const key = s.label?.toLowerCase().trim();
+      return !excludeKeys.has(key);
+    });
 
   // ── CTA labels (browser vs Telegram) ──
   const rentCtaLabel = isInTelegram
@@ -1321,9 +1327,9 @@ export function ItemModal({
             onNavigate={changeMedia}
             onSelect={setActiveMediaIndex}
             altText={item.title}
-            borderColor={theme.palette.borderSoft}
-            accentColor={theme.palette.accentMain}
-            bgColor={theme.palette.bgBase}
+            borderColor="var(--item-border)"
+            accentColor="var(--item-accent)"
+            bgColor="color-mix(in srgb, var(--item-border) 15%, transparent)"
             mainAspectRatio="16/11"
             prefer4x3
             disableKeyboardNav={false}
@@ -1345,11 +1351,11 @@ export function ItemModal({
             {startappBanner && (
               <div
                 className="flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs"
-                style={{
-                  borderColor: `${theme.palette.accentMain}40`,
-                  backgroundColor: `${theme.palette.accentMain}15`,
-                  color: theme.palette.accentMain,
-                }}
+                  style={{
+                    borderColor: "color-mix(in srgb, var(--item-accent) 25%, transparent)",
+                    backgroundColor: "color-mix(in srgb, var(--item-accent) 8%, transparent)",
+                    color: "var(--item-accent)",
+                  }}
                 role="status"
               >
                 <span aria-hidden>⚡</span>
@@ -1506,7 +1512,7 @@ export function ItemModal({
             {showBuyCta && (
               <Link
                 href={`/franchize/${slug}/market/${item.id}/buy`}
-                className="inline-flex w-full items-center justify-center rounded-xl border px-3 py-2 text-sm font-medium transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                className="inline-flex w-full items-center justify-center rounded-xl border px-2.5 py-1.5 text-xs font-medium transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
                 aria-label={`Открыть страницу покупки ${item.title}`}
                 style={surface.subtleCard}
               >
@@ -1529,8 +1535,8 @@ export function ItemModal({
                 {/* Full pricing table — shows ALL available rates (before quick selection) */}
                 <PricingTable
                   specs={item.rawSpecs ?? {}}
-                  borderColor={theme.palette.borderSoft}
-                  accentColor={theme.palette.accentMain}
+                  borderColor="var(--item-border)"
+                  accentColor="var(--item-accent)"
                 />
 
                 {/* Quick duration selection with prices */}
@@ -1541,7 +1547,7 @@ export function ItemModal({
                   onStartDateChange={(v) => onChangeOption("rentStartDate", v)}
                   onEndDateChange={(v) => onChangeOption("rentEndDate", v)}
                   onEndTimeChange={setRentEndTime}
-                  borderColor={theme.palette.borderSoft}
+                  borderColor="var(--item-border)"
                   specs={item.rawSpecs ?? {}}
                 />
 
@@ -1566,7 +1572,7 @@ export function ItemModal({
                       extrasSelection={extrasSelection}
                       isExpanded={priceCardExpanded}
                       onToggleExpand={() => setPriceCardExpanded((v) => !v)}
-                      borderColor={theme.palette.borderSoft}
+                  borderColor="var(--item-border)"
                     />
 
                     {pricingResult.rounded && (
@@ -1661,11 +1667,11 @@ export function ItemModal({
               <button
                 type="button"
                 onClick={() => setShowCallbackForm(true)}
-                className="flex w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition hover:opacity-80 active:scale-[0.99]"
-                style={{ borderColor: `${theme.palette.accentMain}40`, color: theme.palette.accentMain }}
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-medium transition hover:opacity-80 active:scale-[0.99]"
+                style={{ borderColor: "color-mix(in srgb, var(--item-accent) 25%, transparent)", color: "var(--item-accent)" }}
               >
-                <Phone className="h-3.5 w-3.5" />
-                Не готовы бронировать? Запросить звонок менеджера
+                <Phone className="h-3 w-3" />
+                Запросить звонок
               </button>
             )}
           </div>
@@ -1673,7 +1679,7 @@ export function ItemModal({
           {/* Footer Buttons — dual CTA when both rent + sale available */}
           {/* In browser mode (no TG), CTAs become deep-links to the Telegram bot */}
           {!isInTelegram && (
-            <div className="shrink-0 border-t p-2 text-center" style={{ ...surface.card, borderColor: theme.palette.borderSoft }}>
+            <div className="shrink-0 border-t p-2 text-center" style={{ ...surface.card, borderColor: "var(--item-border)" }}>
               <p className="mb-1 text-[10px] text-[var(--item-muted-text)]">
                 ⚡ Бронирование и оплата — в Telegram-боте
               </p>
@@ -1681,22 +1687,23 @@ export function ItemModal({
                 href={`https://t.me/${botUsername}?start=sample`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[10px] underline transition hover:opacity-70"
-                style={{ color: theme.palette.accentMain }}
+                className="inline-flex items-center gap-1 transition hover:opacity-70 text-[10px]"
+                style={{ color: "var(--item-accent)" }}
               >
-                📄 Посмотреть образец договора
+                <FileText className="h-3 w-3" />
+                Образец договора
               </a>
             </div>
           )}
           <div
             className={`grid shrink-0 gap-2 border-t p-3 grid-cols-2 ${footerCols === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
-            style={{ ...surface.card, borderColor: theme.palette.borderSoft }}
+            style={{ ...surface.card, borderColor: "var(--item-border)" }}
           >
             <button
               type="button"
               onClick={onClose}
               aria-label="Закрыть карточку товара"
-              className="rounded-xl border-2 border-white/20 px-3 py-2 text-sm font-medium transition hover:border-white/40 hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+              className="rounded-xl border-2 border-white/20 px-2.5 py-1.5 text-xs font-medium transition hover:border-white/40 hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
               style={surface.subtleCard}
             >
               Закрыть
@@ -1711,7 +1718,7 @@ export function ItemModal({
                   disabled={isAdding}
                   aria-busy={isAdding}
                   aria-label="Забронировать аренду"
-                  className="rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                  className="rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
                 >
                   {rentCtaLabel}
                 </button>
@@ -1721,7 +1728,7 @@ export function ItemModal({
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Продолжить бронирование в Telegram"
-                  className="flex items-center justify-center gap-1 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                  className="flex items-center justify-center gap-1 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
                 >
                   {rentCtaLabel}
                 </a>
@@ -1737,7 +1744,7 @@ export function ItemModal({
                   disabled={isBuying}
                   aria-busy={isBuying}
                   aria-label="Купить"
-                  className={`rounded-xl border-2 px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] ${
+                  className={`rounded-xl border-2 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] ${
                     showRentCta
                       ? "border-[var(--item-accent)] text-[var(--item-accent)] hover:bg-[var(--item-accent)] hover:text-[var(--item-accent-contrast)]"
                       : "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
@@ -1751,7 +1758,7 @@ export function ItemModal({
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Продолжить покупку в Telegram"
-                  className={`flex items-center justify-center gap-1 rounded-xl border-2 px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] transition hover:brightness-110 active:scale-[0.99] ${
+                  className={`flex items-center justify-center gap-1 rounded-xl border-2 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] transition hover:brightness-110 active:scale-[0.99] ${
                     showRentCta
                       ? "border-[var(--item-accent)] text-[var(--item-accent)] hover:bg-[var(--item-accent)] hover:text-[var(--item-accent-contrast)]"
                       : "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
@@ -1770,7 +1777,7 @@ export function ItemModal({
                   onClick={handleAddToCart}
                   disabled={isAdding}
                   aria-busy={isAdding}
-                  className="rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                  className="rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
                 >
                   {singleCtaLabel}
                 </button>
@@ -1779,7 +1786,7 @@ export function ItemModal({
                   href={`https://t.me/${botUsername}/app`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-3 py-2 text-sm font-bold uppercase tracking-[0.04em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99]"
+                  className="flex items-center justify-center gap-1 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99]"
                 >
                   {singleCtaLabel}
                 </a>
@@ -1791,7 +1798,7 @@ export function ItemModal({
           {showCallbackForm && (
             <CallbackRequestForm
               bikeTitle={item.title}
-              accentColor={theme.palette.accentMain}
+              accentColor="var(--item-accent)"
               onSubmit={handleCallbackSubmit}
             />
           )}

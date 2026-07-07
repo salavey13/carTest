@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import { submitRentalReview, type FranchizeTheme, type RentalReviewVM } from "../../../actions";
-import { crewPaletteForSurface } from "../../../lib/theme";
+import { crewPaletteForSurface, readablePaletteTextOnColor } from "../../../lib/theme";
 
 interface ReviewFormProps {
   slug: string;
@@ -24,6 +24,14 @@ export function ReviewForm({ slug, rentalId, bikeTitle, status, renterUserId, th
   const [saved, setSaved] = useState(false);
   const [isPending, startTransition] = useTransition();
   const surface = crewPaletteForSurface(theme);
+  const isAuto = theme.isAuto;
+  const cssAccent = isAuto ? "var(--franchize-accent-main)" : theme.palette.accentMain;
+  const cssBorder = isAuto ? "var(--franchize-border-soft)" : theme.palette.borderSoft;
+  const cssTextPrimary = isAuto ? "var(--franchize-text-primary)" : theme.palette.textPrimary;
+  const cssBgBase = isAuto ? "var(--franchize-bg-base)" : theme.palette.bgBase;
+  const accentContrastText = isAuto
+    ? readablePaletteTextOnColor(theme.palettes?.dark?.accentMain || theme.palette.accentMain, theme.palettes?.dark || theme.palette)
+    : readablePaletteTextOnColor(theme.palette.accentMain, theme.palette);
   const isCompleted = status === "completed";
   const isRenter = Boolean(dbUser?.user_id) && dbUser?.user_id === renterUserId;
   const canSubmit = isCompleted && isRenter;
@@ -50,7 +58,7 @@ export function ReviewForm({ slug, rentalId, bikeTitle, status, renterUserId, th
 
   return (
     <div className="mx-auto w-full max-w-xl rounded-3xl border p-4 shadow-2xl sm:p-6" style={surface.card}>
-      <p className="text-xs uppercase tracking-[0.18em]" style={{ color: theme.palette.accentMain }}>friend review</p>
+      <p className="text-xs uppercase tracking-[0.18em]" style={{ color: cssAccent }}>friend review</p>
       <h1 className="mt-2 text-2xl font-semibold">Как прошла аренда?</h1>
       <p className="mt-2 text-sm" style={surface.mutedText}>{bikeTitle}</p>
 
@@ -74,9 +82,9 @@ export function ReviewForm({ slug, rentalId, bikeTitle, status, renterUserId, th
             onClick={() => setRating(value)}
             className="h-11 flex-1 rounded-2xl border text-lg font-bold transition active:scale-95 disabled:opacity-60"
             style={{
-              borderColor: value <= rating ? theme.palette.accentMain : theme.palette.borderSoft,
-              backgroundColor: value <= rating ? theme.palette.accentMain : "transparent",
-              color: value <= rating ? "#16130A" : theme.palette.textPrimary,
+              borderColor: value <= rating ? cssAccent : cssBorder,
+              backgroundColor: value <= rating ? cssAccent : "transparent",
+              color: value <= rating ? accentContrastText : cssTextPrimary,
             }}
             disabled={!canSubmit || isPending}
           >
@@ -92,7 +100,7 @@ export function ReviewForm({ slug, rentalId, bikeTitle, status, renterUserId, th
           onChange={(event) => setText(event.target.value)}
           rows={5}
           className="mt-2 w-full rounded-2xl border px-3 py-2 text-sm outline-none"
-          style={{ borderColor: theme.palette.borderSoft, backgroundColor: theme.palette.bgBase, color: theme.palette.textPrimary }}
+          style={{ borderColor: cssBorder, backgroundColor: cssBgBase, color: cssTextPrimary }}
           placeholder="Что понравилось, кому подойдёт байк, как прошла выдача..."
           disabled={!canSubmit || isPending}
           maxLength={1200}
@@ -104,12 +112,12 @@ export function ReviewForm({ slug, rentalId, bikeTitle, status, renterUserId, th
         onClick={onSubmit}
         disabled={!canSubmit || isPending || isLoading}
         className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold transition active:scale-[0.99] disabled:opacity-60"
-        style={{ backgroundColor: theme.palette.accentMain, color: "#16130A" }}
+        style={{ backgroundColor: cssAccent, color: accentContrastText }}
       >
         {isPending ? "Сохраняем..." : saved || existingReview ? "Обновить отзыв" : "Сохранить отзыв"}
       </button>
 
-      <Link href={`/franchize/${slug}`} className="mt-4 inline-flex text-sm underline underline-offset-4" style={{ color: theme.palette.accentMain }}>
+      <Link href={`/franchize/${slug}`} className="mt-4 inline-flex text-sm underline underline-offset-4" style={{ color: cssAccent }}>
         Вернуться в каталог
       </Link>
     </div>

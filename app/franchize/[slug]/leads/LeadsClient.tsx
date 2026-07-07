@@ -41,6 +41,7 @@ interface LeadsClientProps {
   textColor?: string;
   bgColor?: string;
   isLightTheme?: boolean;
+  isAuto?: boolean;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -135,7 +136,7 @@ function Avatar({ name, source, size = 40 }: { name: string | null; source: stri
 
 export function LeadsClient({
   leads, todos, crewId, slug, accentColor,
-  textColor = "#e5e7eb", bgColor = "#0a0a0a", isLightTheme = false,
+  textColor = "#e5e7eb", bgColor = "#0a0a0a", isLightTheme = false, isAuto = false,
 }: LeadsClientProps) {
   const [expandedLead, setExpandedLead] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -189,19 +190,36 @@ export function LeadsClient({
 
   // ── Theme tokens ──────────────────────────────────────────────────────────
 
-  const T = useMemo(() => ({
-    text: isLightTheme ? "#1e293b" : textColor,
-    textMuted: isLightTheme ? "#64748b" : `${textColor}99`,
-    textFaint: isLightTheme ? "#94a3b8" : `${textColor}60`,
-    bg: isLightTheme ? "#f8fafc" : bgColor,
-    bgCard: isLightTheme ? "#ffffff" : `${accentColor}06`,
-    bgCardHover: isLightTheme ? "#f1f5f9" : `${accentColor}0c`,
-    border: isLightTheme ? "#e2e8f0" : `${accentColor}1a`,
-    borderActive: isLightTheme ? accentColor : accentColor,
-    inputBg: isLightTheme ? "#ffffff" : `${accentColor}0a`,
-    inputBorder: isLightTheme ? "#cbd5e1" : `${accentColor}25`,
-    shadow: isLightTheme ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
-  }), [isLightTheme, textColor, bgColor, accentColor]);
+  const T = useMemo(() => {
+    if (isAuto) {
+      return {
+        text: "var(--franchize-text-primary)",
+        textMuted: "var(--franchize-text-secondary)",
+        textFaint: "color-mix(in srgb, var(--franchize-text-secondary) 60%, transparent)",
+        bg: "var(--franchize-bg-base)",
+        bgCard: "color-mix(in srgb, var(--franchize-bg-card) 96%, transparent)",
+        bgCardHover: "color-mix(in srgb, var(--franchize-accent-main) 5%, transparent)",
+        border: "color-mix(in srgb, var(--franchize-border-soft) 50%, transparent)",
+        borderActive: "var(--franchize-accent-main)",
+        inputBg: "var(--franchize-bg-base)",
+        inputBorder: "color-mix(in srgb, var(--franchize-border-soft) 60%, transparent)",
+        shadow: "none",
+      };
+    }
+    return {
+      text: isLightTheme ? "#1e293b" : textColor,
+      textMuted: isLightTheme ? "#64748b" : `${textColor}99`,
+      textFaint: isLightTheme ? "#94a3b8" : `${textColor}60`,
+      bg: isLightTheme ? "#f8fafc" : bgColor,
+      bgCard: isLightTheme ? "#ffffff" : `${accentColor}06`,
+      bgCardHover: isLightTheme ? "#f1f5f9" : `${accentColor}0c`,
+      border: isLightTheme ? "#e2e8f0" : `${accentColor}1a`,
+      borderActive: isLightTheme ? accentColor : accentColor,
+      inputBg: isLightTheme ? "#ffffff" : `${accentColor}0a`,
+      inputBorder: isLightTheme ? "#cbd5e1" : `${accentColor}25`,
+      shadow: isLightTheme ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
+    };
+  }, [isLightTheme, textColor, bgColor, accentColor, isAuto]);
 
   // ── Todo helpers ──────────────────────────────────────────────────────────
 
@@ -324,22 +342,22 @@ export function LeadsClient({
         <div
           className="w-full max-w-sm space-y-4 rounded-2xl border p-6"
           style={{
-            borderColor: isLightTheme ? "#e2e8f0" : `${accentColor}20`,
-            backgroundColor: isLightTheme ? "#ffffff" : `${accentColor}08`,
-            boxShadow: isLightTheme ? "0 2px 8px rgba(0,0,0,0.06)" : "none",
+            borderColor: T.border,
+            backgroundColor: T.bgCard,
+            boxShadow: T.shadow,
           }}
         >
           <div className="text-center">
             <div
               className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full"
-              style={{ backgroundColor: `${accentColor}15` }}
+              style={{ backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 8%, transparent)" : `${accentColor}15` }}
             >
               <Lock className="h-6 w-6" style={{ color: accentColor }} />
             </div>
-            <h2 className="text-lg font-bold" style={{ color: isLightTheme ? "#1e293b" : textColor }}>
+            <h2 className="text-lg font-bold" style={{ color: T.text }}>
               Клиенты и заявки
             </h2>
-            <p className="mt-1 text-sm" style={{ color: isLightTheme ? "#64748b" : `${textColor}99` }}>
+            <p className="mt-1 text-sm" style={{ color: T.textMuted }}>
               Введите пароль для доступа
             </p>
           </div>
@@ -353,9 +371,9 @@ export function LeadsClient({
             disabled={isPasswordValidating}
             className="w-full rounded-xl border px-4 py-3 text-center tracking-widest outline-none transition focus:ring-2"
             style={{
-              borderColor: isLightTheme ? "#cbd5e1" : `${accentColor}25`,
-              backgroundColor: isLightTheme ? "#ffffff" : `${accentColor}08`,
-              color: isLightTheme ? "#1e293b" : textColor,
+              borderColor: T.inputBorder,
+              backgroundColor: T.inputBg,
+              color: T.text,
             }}
             autoFocus
           />
@@ -371,12 +389,12 @@ export function LeadsClient({
             onClick={handlePasswordSubmit}
             disabled={isPasswordValidating || !passwordInput.trim()}
             className="w-full rounded-xl py-3 font-bold transition hover:opacity-90 disabled:opacity-50"
-            style={{ backgroundColor: accentColor, color: "#fff" }}
+            style={{ backgroundColor: accentColor, color: isAuto ? "var(--franchize-accent-contrast)" : "#fff" }}
           >
             {isPasswordValidating ? "Проверка..." : "Войти"}
           </button>
 
-          <p className="text-center text-xs" style={{ color: isLightTheme ? "#94a3b8" : `${textColor}60` }}>
+          <p className="text-center text-xs" style={{ color: T.textFaint }}>
             Пароль можно получить через бота: /analytics-pass
           </p>
         </div>
@@ -411,7 +429,7 @@ export function LeadsClient({
       <div
         className="sticky top-0 z-10 -mx-4 border-b px-4 py-3 backdrop-blur-md sm:rounded-xl sm:border"
         style={{
-          backgroundColor: isLightTheme ? "rgba(248,250,252,0.85)" : `${bgColor}d9`,
+          backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-bg-base) 85%, transparent)" : (isLightTheme ? "rgba(248,250,252,0.85)" : `${bgColor}d9`),
           borderColor: T.border,
         }}
       >
@@ -430,7 +448,7 @@ export function LeadsClient({
                 borderColor: T.inputBorder,
                 color: T.text,
                 // @ts-ignore — CSS custom prop for ring color
-                "--tw-ring-color": `${accentColor}40`,
+                "--tw-ring-color": isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 25%, transparent)" : `${accentColor}40`,
               }}
             />
             {searchQuery && (
@@ -520,7 +538,7 @@ export function LeadsClient({
       {sortedLeads.length === 0 && (
         <div className="flex flex-col items-center rounded-xl border p-12 text-center" style={{ borderColor: T.border }}>
           <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full"
-            style={{ backgroundColor: `${accentColor}10` }}>
+            style={{ backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 6%, transparent)" : `${accentColor}10` }}>
             {hasFilters
               ? <Search className="h-7 w-7" style={{ color: T.textFaint }} />
               : <Users className="h-7 w-7" style={{ color: T.textFaint }} />}
@@ -738,7 +756,7 @@ function ActionBtn({ href, icon: Icon, label, T, accent, external }: {
   return (
     <a href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}
       className="flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px] transition hover:opacity-70"
-      style={{ borderColor: `${accent}40`, color: accent }}>
+      style={{ borderColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 25%, transparent)" : `${accent}40`, color: accent }}>
       <Icon className="h-3 w-3" /> {label}
     </a>
   );
@@ -811,7 +829,7 @@ function TodoList({
         <p className="text-[11px] font-medium" style={{ color: T.textMuted }}>Задачи</p>
         <button onClick={() => setShowAddForm(!showAddForm)}
           className="flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] transition hover:opacity-70"
-          style={{ borderColor: `${accentColor}30`, color: accentColor }}>
+          style={{ borderColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 19%, transparent)" : `${accentColor}30`, color: accentColor }}>
           <Plus className="h-2.5 w-2.5" /> Добавить
         </button>
       </div>

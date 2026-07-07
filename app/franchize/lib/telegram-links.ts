@@ -32,3 +32,21 @@ export function getTelegramWebAppFallbackHref(
 
   return `https://t.me/${normalizedBot}/app?startapp=${safePrefix}${separator}${safeValue}`;
 }
+
+/**
+ * Build a Telegram WebApp deep-link that routes to a specific franchize page
+ * via StartParamRouter. Returns empty string if no bot username is available.
+ *
+ * Used for "open in TG" buttons that should navigate to e.g. profile, order, etc.
+ * inside the Telegram WebApp context.
+ */
+export function getTelegramWebAppPageHref(
+  pagePath: string,
+  botUsername?: string | null,
+): string {
+  const normalizedBot = sanitizeTelegramUsername(botUsername) || DEFAULT_TELEGRAM_BOT_USERNAME;
+  if (!normalizedBot) return "";
+  // Strip leading slash and encode for startapp param
+  const cleanPath = pagePath.replace(/^\/+/, "");
+  return `https://t.me/${normalizedBot}/app?startapp=${encodeURIComponent(cleanPath)}`;
+}

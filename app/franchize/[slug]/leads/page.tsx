@@ -169,10 +169,11 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
         <LeadsClient
           leads={leads}
           todos={todos || []}
-          accentColor={crew.theme.palette.accentMain}
-          textColor={crew.theme.palette.textPrimary}
-          bgColor={crew.theme.palette.bgBase}
-          isLightTheme={crew.theme.mode === "light"}
+          accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain}
+          textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
+          bgColor={crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase}
+          isLightTheme={crew.theme.mode === "light" && !crew.theme.isAuto}
+          isAuto={crew.theme.isAuto || false}
           crewId={crewId}
           slug={slug}
         />

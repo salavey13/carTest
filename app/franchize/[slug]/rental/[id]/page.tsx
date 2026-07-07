@@ -9,7 +9,7 @@ import { FranchizeHero } from "../../../components/FranchizeHero";
 import { FranchizePageShell } from "../../../components/FranchizePageShell";
 import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRentalDocumentsPanel";
 import { RentalChecklistPanel } from "../../../components/RentalChecklistPanel";
-import { getTelegramHandleHref } from "../../../lib/telegram-links";
+import { getTelegramHandleHref, getTelegramWebAppPageHref } from "../../../lib/telegram-links";
 import { crewPaletteForSurface } from "../../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../../metadata";
 
@@ -49,7 +49,7 @@ export default async function FranchizeRentalPage({
   const surface = crewPaletteForSurface(crew.theme);
   const dealStarted = rental.found || rental.paymentStatus === "interest_paid";
   const catalogHref = `/franchize/${resolvedSlug}`;
-  const profileHref = `/franchize/${resolvedSlug}/profile`;
+  const profileHref = getTelegramWebAppPageHref(`franchize/${resolvedSlug}/profile`, crew.contacts.telegramBotUsername) || `/franchize/${resolvedSlug}/profile`;
   const contactsHref = `/franchize/${resolvedSlug}/contacts`;
   const telegramSupportHref = getTelegramHandleHref(crew.contacts.telegram);
   const verificationText =

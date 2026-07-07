@@ -36,7 +36,7 @@ import {
   upsertFranchizeIntent,
 } from "@/app/franchize/actions";
 import type { PageSize } from "@/app/franchize/server-actions/buy-print";
-import { crewPaletteForSurface, crewPaletteWithCssVars } from "@/app/franchize/lib/theme";
+import { crewPaletteForSurface, crewPaletteWithCssVars, readablePaletteTextOnColor } from "@/app/franchize/lib/theme";
 import {
   DEFAULT_COLOR_OPTIONS,
   DEFAULT_CONFIG_OPTIONS,
@@ -122,6 +122,23 @@ export function SaleBikeLandingClient({
   // Use CSS variables when theme is in 'auto' mode
   const surface = crew.theme.isAuto ? crewPaletteWithCssVars(crew.theme) : crewPaletteForSurface(crew.theme);
   useFranchizeTheme(crew.theme);
+
+  // Theme-aware inline style helpers — resolve to CSS vars in auto mode, direct hex otherwise
+  const isAuto = crew.theme.isAuto;
+  const cssAccent = isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain;
+  const cssBorder = isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft;
+  const cssBgBase = isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase;
+  const cssTextPrimary = isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary;
+  const cssTextSecondary = isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary;
+  const accentContrastText = isAuto
+    ? readablePaletteTextOnColor(crew.theme.palettes?.dark?.accentMain || crew.theme.palette.accentMain, crew.theme.palettes?.dark || crew.theme.palette)
+    : readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
+  const inputFieldClass = "rounded-xl border px-3 py-2 text-sm outline-none transition focus:ring-2";
+  const inputFieldStyle = {
+    borderColor: isAuto ? "color-mix(in srgb, var(--franchize-border-soft) 60%, transparent)" : `${crew.theme.palette.borderSoft}60`,
+    backgroundColor: isAuto ? "var(--franchize-bg-base)" : `${crew.theme.palette.bgBase}cc`,
+    color: cssTextPrimary,
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -874,7 +891,7 @@ export function SaleBikeLandingClient({
                 type="button"
                 onClick={() => setSelectedImage(0)}
                 className="overflow-hidden rounded-xl border transition hover:brightness-110 relative"
-                style={selectedImage === 0 ? { borderColor: crew.theme.palette.accentMain, boxShadow: `0 0 0 1px ${crew.theme.palette.accentMain}` } : {}}
+                style={selectedImage === 0 ? { borderColor: cssAccent, boxShadow: `0 0 0 1px ${cssAccent}` } : {}}
               >
                 <span className="relative block aspect-[4/3] w-full">
                   <Image src={localImageSrc(heroImage)} alt="video" fill sizes="120px" className="object-cover" loading="lazy" />
@@ -897,8 +914,8 @@ export function SaleBikeLandingClient({
                   style={{
                     ...(i === selectedImage
                       ? {
-                          borderColor: crew.theme.palette.accentMain,
-                          boxShadow: `0 0 0 1px ${crew.theme.palette.accentMain}`,
+                          borderColor: cssAccent,
+                          boxShadow: `0 0 0 1px ${cssAccent}`,
                         }
                       : {}),
                   }}
@@ -937,18 +954,26 @@ export function SaleBikeLandingClient({
           </div>
           <div className="rounded-2xl border p-4" style={surface.subtleCard}>
             <p className="text-xs uppercase tracking-[0.16em] opacity-70">
-              Группа магазина
+              Связь с экипажем
             </p>
             <p className="mt-2 text-sm">
               Актуальные поставки и консультации:{" "}
-              <a
-                className="underline"
-                href="https://vk.ru/vip_bike_electro"
-                target="_blank"
-                rel="noreferrer"
-              >
-                vk.ru/vip_bike_electro
-              </a>
+              {crew.contacts.telegram ? (
+                <a
+                  className="underline"
+                  href={`https://t.me/${crew.contacts.telegram.replace("@", "")}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {crew.contacts.telegram}
+                </a>
+              ) : crew.contacts.phone ? (
+                <a className="underline" href={`tel:${crew.contacts.phone}`}>
+                  {crew.contacts.phone}
+                </a>
+              ) : (
+                <span className="opacity-60">контакты скоро добавим</span>
+              )}
             </p>
           </div>
           <div className="rounded-2xl border p-4" style={surface.subtleCard}>
@@ -1071,7 +1096,7 @@ export function SaleBikeLandingClient({
                           }`}
                           style={
                             printPageSize === "A4"
-                              ? { background: crew.theme.palette.accentMain, color: "#101010" }
+                              ? { background: cssAccent, color: accentContrastText }
                               : {}
                           }
                         >
@@ -1087,7 +1112,7 @@ export function SaleBikeLandingClient({
                           }`}
                           style={
                             printPageSize === "A5"
-                              ? { background: crew.theme.palette.accentMain, color: "#101010" }
+                              ? { background: cssAccent, color: accentContrastText }
                               : {}
                           }
                         >
@@ -1101,7 +1126,7 @@ export function SaleBikeLandingClient({
                         className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
                         style={{
                           ...surface.subtleCard,
-                          borderColor: crew.theme.palette.accentMain,
+                          borderColor: cssAccent,
                         }}
                       >
                         <Printer className="h-4 w-4" />
@@ -1120,7 +1145,7 @@ export function SaleBikeLandingClient({
                         className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
                         style={{
                           ...surface.subtleCard,
-                          borderColor: crew.theme.palette.accentMain,
+                          borderColor: cssAccent,
                         }}
                       >
                         <Printer className="h-4 w-4" />
@@ -1306,7 +1331,7 @@ export function SaleBikeLandingClient({
                             option.id === "buy_now"
                               ? {
                                   ...surface.subtleCard,
-                                  borderColor: crew.theme.palette.accentMain,
+                                  borderColor: cssAccent,
                                 }
                               : surface.subtleCard
                           }
@@ -1339,8 +1364,8 @@ export function SaleBikeLandingClient({
                   aria-live="polite"
                   style={{
                     ...surface.subtleCard,
-                    background: crew.theme.palette.accentMain,
-                    color: "#101010",
+                    background: cssAccent,
+                    color: accentContrastText,
                   }}
                 >
                   {!isHydrated
@@ -1413,7 +1438,7 @@ export function SaleBikeLandingClient({
                 </div>
                 <Swords
                   className="h-7 w-7"
-                  style={{ color: crew.theme.palette.accentMain }}
+                  style={{ color: cssAccent }}
                 />
                 <div className="flex items-center justify-end gap-2 text-sm font-semibold">
                   <span className="min-w-0 truncate">{vsItem.title}</span>
@@ -1457,10 +1482,10 @@ export function SaleBikeLandingClient({
                   className="flex w-full items-center justify-between rounded-2xl border p-3 text-left transition hover:brightness-110"
                   style={
                     selectedOptionId === option.id
-                      ? {
-                          ...surface.subtleCard,
-                          borderColor: crew.theme.palette.accentMain,
-                        }
+                        ? {
+                            ...surface.subtleCard,
+                            borderColor: cssAccent,
+                          }
                       : surface.subtleCard
                   }
                 >
@@ -1488,7 +1513,7 @@ export function SaleBikeLandingClient({
                     background: color.hex,
                     borderColor:
                       selectedColorId === color.id
-                        ? crew.theme.palette.accentMain
+                        ? cssAccent
                         : "rgba(255,255,255,0.3)",
                   }}
                 />
@@ -1562,7 +1587,7 @@ export function SaleBikeLandingClient({
             <p className="truncate text-sm font-semibold">{item.title}</p>
             <p
               className="text-base font-bold"
-              style={{ color: crew.theme.palette.accentMain }}
+              style={{ color: cssAccent }}
             >
               {formatPrice(finalPrice)}
             </p>
@@ -1572,7 +1597,7 @@ export function SaleBikeLandingClient({
             onClick={handleReserveTestDrive}
             disabled={!isHydrated || reservationState === "loading" || reservationState === "success"}
             className="rounded-xl px-4 py-3 text-sm font-semibold"
-            style={{ background: crew.theme.palette.accentMain, color: "#111" }}
+            style={{ background: cssAccent, color: accentContrastText }}
           >
             {reservationState === "success" ? (
               <Check className="h-4 w-4" />

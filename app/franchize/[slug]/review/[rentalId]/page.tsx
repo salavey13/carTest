@@ -5,9 +5,10 @@ import { CrewHeader } from "../../../components/CrewHeader";
 import { CrewFooter } from "../../../components/CrewFooter";
 import {
   getTelegramHandleHref,
+  getTelegramWebAppPageHref,
   getTelegramWebAppFallbackHref,
 } from "../../../lib/telegram-links";
-import { crewPaletteForSurface } from "../../../lib/theme";
+import { crewPaletteForSurface, readablePaletteTextOnColor } from "../../../lib/theme";
 import { ReviewForm } from "./ReviewForm";
 import { buildFranchizeSectionMetadata } from "../../metadata";
 
@@ -36,10 +37,18 @@ export default async function RentalReviewPage({
     getRentalReviewContext({ slug, rentalId }),
   ]);
   const surface = crewPaletteForSurface(crew.theme);
+  const isAuto = crew.theme.isAuto;
+  const themePalette = crew.theme.palette;
+  const cssAccent = isAuto ? "var(--franchize-accent-main)" : themePalette.accentMain;
+  const cssBorder = isAuto ? "var(--franchize-border-soft)" : themePalette.borderSoft;
+  const cssTextPrimary = isAuto ? "var(--franchize-text-primary)" : themePalette.textPrimary;
+  const accentContrastText = isAuto
+    ? readablePaletteTextOnColor(crew.theme.palettes?.dark?.accentMain || themePalette.accentMain, crew.theme.palettes?.dark || themePalette)
+    : readablePaletteTextOnColor(themePalette.accentMain, themePalette);
   const rental = context.rental;
   const resolvedSlug = crew.slug || slug;
   const catalogHref = `/franchize/${resolvedSlug}`;
-  const profileHref = `/franchize/${resolvedSlug}/profile`;
+  const profileHref = getTelegramWebAppPageHref(`franchize/${resolvedSlug}/profile`, crew.contacts.telegramBotUsername) || `/franchize/${resolvedSlug}/profile`;
   const contactsHref = `/franchize/${resolvedSlug}/contacts`;
   const telegramSupportHref = getTelegramHandleHref(crew.contacts.telegram);
   const telegramFallbackHref = getTelegramWebAppFallbackHref(
@@ -78,21 +87,21 @@ export default async function RentalReviewPage({
                 <Link
                   href={catalogHref}
                   className="rounded-xl border px-3 py-2"
-                  style={{ borderColor: crew.theme.palette.borderSoft }}
+                  style={{ borderColor: cssBorder }}
                 >
                   Вернуться в каталог
                 </Link>
                 <Link
                   href={profileHref}
                   className="rounded-xl border px-3 py-2"
-                  style={{ borderColor: crew.theme.palette.borderSoft }}
+                  style={{ borderColor: cssBorder }}
                 >
                   Вернуться в профиль
                 </Link>
                 <Link
                   href={contactsHref}
                   className="rounded-xl border px-3 py-2"
-                  style={{ borderColor: crew.theme.palette.borderSoft }}
+                  style={{ borderColor: cssBorder }}
                 >
                   Поддержка
                 </Link>
@@ -106,7 +115,7 @@ export default async function RentalReviewPage({
           >
             <p
               className="text-xs font-semibold uppercase tracking-[0.16em]"
-              style={{ color: crew.theme.palette.accentMain }}
+              style={{ color: cssAccent }}
             >
               Что будет дальше
             </p>
@@ -127,8 +136,8 @@ export default async function RentalReviewPage({
                   <span
                     className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
                     style={{
-                      backgroundColor: `${crew.theme.palette.accentMain}24`,
-                      color: crew.theme.palette.accentMain,
+                      backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 14%, transparent)" : `${themePalette.accentMain}24`,
+                      color: cssAccent,
                     }}
                   >
                     {index + 1}
@@ -141,7 +150,7 @@ export default async function RentalReviewPage({
               className="mt-3 rounded-2xl border p-3 text-xs"
               style={{
                 ...surface.card,
-                borderColor: crew.theme.palette.borderSoft,
+                borderColor: cssBorder,
               }}
             >
               Безопасность: отзыв не запускает списания; договор и оплата уже
@@ -155,8 +164,8 @@ export default async function RentalReviewPage({
                 rel="noreferrer"
                 className="flex justify-center rounded-xl px-4 py-3 font-semibold"
                 style={{
-                  backgroundColor: crew.theme.palette.accentMain,
-                  color: crew.theme.palette.accentTextOn,
+                  backgroundColor: cssAccent,
+                  color: accentContrastText,
                 }}
               >
                 Открыть в TG
@@ -167,8 +176,8 @@ export default async function RentalReviewPage({
                 rel="noreferrer"
                 className="flex justify-center rounded-xl border px-4 py-3"
                 style={{
-                  borderColor: crew.theme.palette.borderSoft,
-                  color: crew.theme.palette.textPrimary,
+                  borderColor: cssBorder,
+                  color: cssTextPrimary,
                 }}
               >
                 Написать оператору
@@ -177,8 +186,8 @@ export default async function RentalReviewPage({
                 href={contactsHref}
                 className="flex justify-center rounded-xl border px-4 py-3"
                 style={{
-                  borderColor: crew.theme.palette.borderSoft,
-                  color: crew.theme.palette.textPrimary,
+                  borderColor: cssBorder,
+                  color: cssTextPrimary,
                 }}
               >
                 Поддержка / контакты
@@ -187,14 +196,14 @@ export default async function RentalReviewPage({
                 <Link
                   href={catalogHref}
                   className="rounded-xl border px-3 py-2 text-center text-xs"
-                  style={{ borderColor: crew.theme.palette.borderSoft }}
+                  style={{ borderColor: cssBorder }}
                 >
                   Каталог
                 </Link>
                 <Link
                   href={profileHref}
                   className="rounded-xl border px-3 py-2 text-center text-xs"
-                  style={{ borderColor: crew.theme.palette.borderSoft }}
+                  style={{ borderColor: cssBorder }}
                 >
                   Профиль
                 </Link>

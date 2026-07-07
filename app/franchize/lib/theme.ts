@@ -170,7 +170,30 @@ export function crewPaletteWithCssVars(theme: FranchizeTheme) {
 }
 
 export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: number) {
+  const isAuto = theme.isAuto;
   const palette = theme.palette;
+
+  // In auto mode, use CSS variables so the card variants respond to light/dark toggle
+  if (isAuto) {
+    const variants = [
+      {
+        borderColor: "color-mix(in srgb, var(--franchize-border-soft) 30%, transparent)",
+        backgroundColor: "var(--franchize-bg-card)",
+      },
+      {
+        borderColor: "transparent",
+        backgroundImage: `linear-gradient(to bottom, color-mix(in srgb, var(--franchize-bg-card) 96%, transparent), var(--franchize-bg-base))`,
+        boxShadow: `0 8px 24px color-mix(in srgb, var(--franchize-accent-main) 5%, transparent)`,
+      },
+      {
+        borderColor: "transparent",
+        backgroundColor: "var(--franchize-bg-card)",
+        boxShadow: `0 0 0 1px color-mix(in srgb, var(--franchize-accent-main) 8%, transparent), 0 12px 20px color-mix(in srgb, var(--franchize-bg-base) 40%, transparent)`,
+      },
+    ] as const;
+    return variants[Math.abs(variantIndex) % variants.length];
+  }
+
   const variants = [
     {
       borderColor: withAlpha(palette.borderSoft, 0.3),
@@ -178,7 +201,7 @@ export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: nu
     },
     {
       borderColor: "transparent",
-      backgroundImage: `linear-gradient(to bottom, ${withAlpha(palette.bgCard, 0.96)}, ${theme.palette.bgBase})`,
+      backgroundImage: `linear-gradient(to bottom, ${withAlpha(palette.bgCard, 0.96)}, ${palette.bgBase})`,
       boxShadow: `0 8px 24px ${withAlpha(palette.accentMain, 0.05)}`,
     },
     {
@@ -202,6 +225,11 @@ export function floatingCartOverlayBackground(theme: FranchizeTheme) {
 }
 
 export function interactionRingStyle(theme: FranchizeTheme) {
+  if (theme.isAuto) {
+    return {
+      boxShadow: "0 0 0 2px color-mix(in srgb, var(--franchize-accent-main) 72%, transparent)",
+    };
+  }
   return {
     boxShadow: `0 0 0 2px ${withAlpha(theme.palette.accentMain, 0.72)}`,
   };
@@ -209,6 +237,11 @@ export function interactionRingStyle(theme: FranchizeTheme) {
 
 
 export function focusRingOutlineStyle(theme: FranchizeTheme) {
+  if (theme.isAuto) {
+    return {
+      outlineColor: "color-mix(in srgb, var(--franchize-accent-main) 78%, transparent)",
+    };
+  }
   return {
     outlineColor: withAlpha(theme.palette.accentMain, 0.78),
   };
