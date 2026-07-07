@@ -95,6 +95,7 @@ const getModalThemeVars = (theme: FranchizeTheme) => {
     return {
       "--item-accent": "var(--franchize-accent-main)",
       "--item-border": "var(--franchize-border-soft)",
+      "--item-input-bg": "var(--franchize-bg-base)",
       "--item-muted-text": "var(--franchize-text-secondary)",
       "--item-text": "var(--franchize-text-primary)",
       "--item-accent-contrast": "var(--franchize-accent-contrast)",
@@ -109,6 +110,7 @@ const getModalThemeVars = (theme: FranchizeTheme) => {
   return {
     "--item-accent": palette.accentMain,
     "--item-border": palette.borderSoft,
+    "--item-input-bg": palette.bgBase,
     "--item-muted-text": palette.textSecondary,
     "--item-text": palette.textPrimary,
     "--item-accent-contrast": readableTextOnColor(palette.accentMain),
@@ -803,7 +805,7 @@ function CallbackRequestForm({
 
   // Theme-aware input style using CSS variables set by getModalThemeVars
   const inputStyle = {
-    backgroundColor: "var(--item-border)",
+    backgroundColor: "var(--item-input-bg, var(--item-border))",
     borderColor: "var(--item-border)",
   };
 

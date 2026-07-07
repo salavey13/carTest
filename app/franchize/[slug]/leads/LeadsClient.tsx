@@ -409,7 +409,7 @@ export function LeadsClient({
       const resp = await fetch("/api/franchize/lead-todo", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadId, dismissLead: true }),
+        body: JSON.stringify({ leadId, dismissLead: true, slug }),
       });
       if (!resp.ok) {
         alert("Не удалось убрать лид. Попробуйте позже.");
@@ -514,6 +514,7 @@ export function LeadsClient({
             expandedLead={expandedLead} setExpandedLead={setExpandedLead}
             getTodosForLead={getTodosForLead} crewId={crewId} slug={slug}
             onDismiss={handleDismissLead}
+            isAuto={isAuto}
           />
         )}
         {verified.length > 0 && (
@@ -522,6 +523,7 @@ export function LeadsClient({
             expandedLead={expandedLead} setExpandedLead={setExpandedLead}
             getTodosForLead={getTodosForLead} crewId={crewId} slug={slug}
             onDismiss={handleDismissLead}
+            isAuto={isAuto}
           />
         )}
         {warm.length > 0 && (
@@ -530,6 +532,7 @@ export function LeadsClient({
             expandedLead={expandedLead} setExpandedLead={setExpandedLead}
             getTodosForLead={getTodosForLead} crewId={crewId} slug={slug}
             onDismiss={handleDismissLead}
+            isAuto={isAuto}
           />
         )}
       </div>
@@ -566,13 +569,14 @@ type Theme = {
 
 function Section({
   title, count, icon: Icon, color, leads, T, accentColor,
-  expandedLead, setExpandedLead, getTodosForLead, crewId, slug, onDismiss,
+  expandedLead, setExpandedLead, getTodosForLead, crewId, slug, onDismiss, isAuto,
 }: {
   title: string; count: number; icon: typeof Flame; color: string;
   leads: LeadRow[]; T: Theme; accentColor: string;
   expandedLead: string | null; setExpandedLead: (id: string | null) => void;
   getTodosForLead: (id: string) => TodoRow[];
   crewId: string; slug: string; onDismiss: (leadId: string) => void;
+  isAuto: boolean;
 }) {
   return (
     <div>
@@ -597,6 +601,7 @@ function Section({
             crewId={crewId}
             slug={slug}
             onDismiss={onDismiss}
+            isAuto={isAuto}
           />
         ))}
       </div>
@@ -607,12 +612,13 @@ function Section({
 // ── Lead Card ─────────────────────────────────────────────────────────────────
 
 function LeadCard({
-  lead, T, accentColor, isExpanded, onToggle, todos, crewId, slug, onDismiss,
+  lead, T, accentColor, isExpanded, onToggle, todos, crewId, slug, onDismiss, isAuto,
 }: {
   lead: LeadRow; T: Theme; accentColor: string;
   isExpanded: boolean; onToggle: () => void;
   todos: TodoRow[]; crewId: string; slug: string;
   onDismiss: (leadId: string) => void;
+  isAuto: boolean;
 }) {
   const meta = SOURCE_META[lead.source] || SOURCE_META.unknown;
   const relTime = relativeTime(lead.createdAt);
@@ -642,8 +648,8 @@ function LeadCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-semibold" style={{ color: T.text }}>
-              {lead.full_name || "Без имени"}
+              <p className="truncate text-sm font-semibold" style={{ color: T.text }}>
+                {lead.full_name || (lead.source === "test_drive" ? "Новый тест-драйв" : "Без имени")}
             </p>
             {lead.verified && (
               <CheckCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
@@ -700,32 +706,33 @@ function LeadCard({
           <div className="mb-3 flex flex-wrap gap-1.5">
             {lead.phone && (
               <>
-                <ActionBtn href={`tel:${lead.phone}`} icon={Phone} label="Звонок" T={T} accent={accentColor} />
-                <ActionBtn href={`https://wa.me/${phoneDigits}`} icon={MessageCircle} label="WhatsApp" T={T} accent={accentColor} external />
-                <ActionBtn href={`sms:${lead.phone}`} icon={Mail} label="SMS" T={T} accent={accentColor} />
+                <ActionBtn href={`tel:${lead.phone}`} icon={Phone} label="Звонок" T={T} accent={accentColor} isAuto={isAuto} />
+                <ActionBtn href={`https://wa.me/${phoneDigits}`} icon={MessageCircle} label="WhatsApp" T={T} accent={accentColor} external isAuto={isAuto} />
+                <ActionBtn href={`sms:${lead.phone}`} icon={Mail} label="SMS" T={T} accent={accentColor} isAuto={isAuto} />
               </>
             )}
             {lead.username && (
-              <ActionBtn href={`https://t.me/${lead.username}`} icon={Send} label="Telegram" T={T} accent={accentColor} external />
+              <ActionBtn href={`https://t.me/${lead.username}`} icon={Send} label="Telegram" T={T} accent={accentColor} external isAuto={isAuto} />
             )}
           </div>
 
           {/* Todos */}
           <TodoList
             leadId={lead.user_id}
-            leadName={lead.full_name || "Без имени"}
+            leadName={lead.full_name || (lead.source === "test_drive" ? "Новый тест-драйв" : "Без имени")}
             todos={todos}
             crewId={crewId}
             slug={slug}
             T={T}
             accentColor={accentColor}
+            isAuto={isAuto}
           />
 
           {/* Dismiss */}
           <div className="mt-3 border-t pt-2" style={{ borderColor: T.border }}>
             <button
               onClick={() => {
-                if (confirm(`Убрать «${lead.full_name || 'лид'}» из списка?`)) onDismiss(lead.user_id);
+                if (confirm(`Убрать «${lead.full_name || (lead.source === "test_drive" ? "тест-драйв" : "лид")}» из списка?`)) onDismiss(lead.user_id);
               }}
               className="flex items-center gap-1 text-[11px] transition hover:text-red-400"
               style={{ color: T.textFaint }}
@@ -750,8 +757,8 @@ function InfoTile({ label, value, T }: { label: string; value: string; T: Theme 
   );
 }
 
-function ActionBtn({ href, icon: Icon, label, T, accent, external }: {
-  href: string; icon: typeof Phone; label: string; T: Theme; accent: string; external?: boolean;
+function ActionBtn({ href, icon: Icon, label, T, accent, external, isAuto }: {
+  href: string; icon: typeof Phone; label: string; T: Theme; accent: string; external?: boolean; isAuto?: boolean;
 }) {
   return (
     <a href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}
@@ -765,10 +772,11 @@ function ActionBtn({ href, icon: Icon, label, T, accent, external }: {
 // ── Todo List ────────────────────────────────────────────────────────────────
 
 function TodoList({
-  leadId, leadName, todos, crewId, slug, T, accentColor,
+  leadId, leadName, todos, crewId, slug, T, accentColor, isAuto,
 }: {
   leadId: string; leadName: string; todos: TodoRow[];
   crewId: string; slug: string; T: Theme; accentColor: string;
+  isAuto?: boolean;
 }) {
   const [localTodos, setLocalTodos] = useState<TodoRow[]>(todos);
   const [showAddForm, setShowAddForm] = useState(false);
