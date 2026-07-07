@@ -2019,7 +2019,7 @@ async function gotoPaymentSplit(chatId: number, userId: string, context: DocFlow
   const backpack = context.backpack ? 1 : 0;
   const bag = context.bag ? 1 : 0;
 
-  const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 1500 + boots * 1500 + net * 500 + backpack * 500 + bag * 500;
+  const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
   const totalAmount = rentalCost + equipmentCost;
 
   // Store total in context for later use
@@ -2578,7 +2578,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     const net = context.net ? 1 : 0;
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
-    const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 1500 + boots * 1500 + net * 500 + backpack * 500 + bag * 500;
+    const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
     const totalAmount = rentalCost + equipmentCost;
     context.cashAmount = Math.min(cashAmount, totalAmount);
     context.bankAmount = Math.max(0, totalAmount - cashAmount);
@@ -2968,7 +2968,7 @@ export async function handleDocCallback(
     const net = context.net ? 1 : 0;
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
-    const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 1500 + boots * 1500 + net * 500 + backpack * 500 + bag * 500;
+    const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
     const totalAmount = rentalCost + equipmentCost;
     context.cashAmount = totalAmount;
     context.bankAmount = 0;
@@ -3014,7 +3014,7 @@ export async function handleDocCallback(
     const net = context.net ? 1 : 0;
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
-    const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 1500 + boots * 1500 + net * 500 + backpack * 500 + bag * 500;
+    const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
     const totalAmount = rentalCost + equipmentCost;
     context.cashAmount = 0;
     context.bankAmount = totalAmount;

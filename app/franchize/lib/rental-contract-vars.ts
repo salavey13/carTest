@@ -353,8 +353,8 @@ export async function buildTemplateVars(params: {
     equipment_total_cost: String(
       (params.equipmentData.helmets_count || 0) * 1000 +
       (params.equipmentData.gloves_count || 0) * 500 +
-      (params.equipmentData.jacket ? 1500 : 0) +
-      (params.equipmentData.boots ? 1500 : 0) +
+      (params.equipmentData.jacket ? 500 : 0) +
+      (params.equipmentData.boots ? 500 : 0) +
       (params.equipmentData.net ? 500 : 0) +
       (params.equipmentData.backpack ? 500 : 0) +
       (params.equipmentData.bag ? 500 : 0)

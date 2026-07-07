@@ -85,6 +85,8 @@ export async function POST(request: NextRequest) {
     const passwordData = passwordResult[0];
     const expiresAt = new Date(passwordData.expires_at);
     const hoursLeft = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)));
+    const daysLeft = Math.max(0, Math.ceil(hoursLeft / 24));
+    const expiresInText = daysLeft >= 2 ? `${daysLeft} дн.` : `${hoursLeft} час(ов)`;
 
     // Get site URL for link
     // Get site URL for link - check multiple env vars in order
@@ -146,7 +148,7 @@ ${passwordData.password}
 Аналитика аренд: ${analyticsUrl}
 Клиенты и заявки: ${leadsUrl}
 
-⏰ Пароль действителен ${hoursLeft} час(ов).
+⏰ Пароль действителен ${expiresInText}.
 
 Если вы не запрашивали этот пароль, проигнорируйте это письмо.
 
@@ -185,7 +187,7 @@ ${crew.name}`,
       </p>
 
       <div class="expires">
-        ⏰ Пароль действителен <strong>${hoursLeft} час(ов)</strong>
+        ⏰ Пароль действителен <strong>${expiresInText}</strong>
       </div>
 
       <p style="margin-top: 20px; font-size: 14px; color: #666;">
@@ -210,6 +212,7 @@ ${crew.name}`,
       to: recipientEmail,
       expiresAt: passwordData.expires_at,
       hoursLeft,
+      daysLeft,
     });
 
   } catch (error) {
