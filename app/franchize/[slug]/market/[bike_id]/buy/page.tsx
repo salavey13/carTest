@@ -7,7 +7,7 @@ import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { FranchizeFloatingCart } from "@/app/franchize/components/FranchizeFloatingCart";
 import { FranchizeHero } from "@/app/franchize/components/FranchizeHero";
 import { FranchizePageShell } from "@/app/franchize/components/FranchizePageShell";
-import { getTelegramHandleHref } from "@/app/franchize/lib/telegram-links";
+import { getTelegramHandleHref, getTelegramWebAppPageHref } from "@/app/franchize/lib/telegram-links";
 import { getFranchizeRouteCtaPolicy, shouldShowFloatingCart } from "@/app/franchize/lib/route-cta-policy";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { SaleBikeLanding } from "@/app/franchize/components/SaleBikeLanding";
@@ -77,7 +77,7 @@ export default async function BuyBikePage({
   const item = items.find((candidate) => candidate.id === bike_id);
   const contactHref = `/franchize/${resolvedSlug}/contacts`;
   const catalogHref = `/franchize/${resolvedSlug}`;
-  const profileHref = `/franchize/${resolvedSlug}/profile`;
+  const profileHref = getTelegramWebAppPageHref(`franchize/${resolvedSlug}/profile`, crew.contacts.telegramBotUsername) || `/franchize/${resolvedSlug}/profile`;
   const telegramHref = getTelegramHandleHref(crew.contacts.telegram);
 
   if (!item) notFound();

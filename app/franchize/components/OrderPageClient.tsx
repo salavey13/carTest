@@ -12,7 +12,7 @@ import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { checkFranchizeCarsAvailability, createFranchizeOrderCheckout, recordFranchizeCheckoutRecoverySnapshot, validateFranchizePromoCode } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface, focusRingOutlineStyle, readablePaletteTextOnColor } from "../lib/theme";
-import { getTelegramHandleHref, getTelegramWebAppFallbackHref } from "../lib/telegram-links";
+import { getTelegramHandleHref, getTelegramWebAppFallbackHref, getTelegramWebAppPageHref } from "../lib/telegram-links";
 import { getFranchizeFormPrefillAction, getFranchizeUserRentalSecretsAction, getRentalDocsPrefillAction } from "../profile-actions";
 
 interface OrderPageClientProps {
@@ -196,7 +196,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const flowType: "rental" | "sale" | "mixed" = saleLinesCount === 0 ? "rental" : saleLinesCount === cartLines.length ? "sale" : "mixed";
   const flowLabel = flowType === "sale" ? "покупки" : flowType === "mixed" ? "аренды/покупки" : "аренды";
   const catalogHref = `/franchize/${slug}`;
-  const profileHref = `/franchize/${slug}/profile`;
+  const profileHref = isInTelegramContext
+    ? `/franchize/${slug}/profile`
+    : (getTelegramWebAppPageHref(`franchize/${slug}/profile`, crew.contacts.telegramBotUsername) || `/franchize/${slug}/profile`);
   const contactsHref = `/franchize/${slug}/contacts`;
   const telegramSupportHref = getTelegramHandleHref(crew.contacts.telegram);
   const telegramWebAppFallbackHref = getTelegramWebAppFallbackHref("franchize", slug, crew.contacts.telegramBotUsername);
