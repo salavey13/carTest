@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   Flame, Phone, CheckCircle, ChevronDown, ChevronRight, Plus,
-  Trash2, MessageCircle, Send, Clock, TrendingUp, Search,
+  Trash2, Send, Clock, TrendingUp, Search,
   X, Bike, FileText, Mail, CircleDot, Users, Lock, AlertCircle,
   LayoutList, Columns3, MoreHorizontal, Calendar, UserPlus,
   Download, Star, Filter, ArrowUpRight, StickyNote, History,
@@ -122,14 +122,6 @@ function relativeTime(dateStr: string | null): string {
   if (diffD === 1) return "вчера";
   if (diffD < 7) return `${diffD} дн назад`;
   return date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
-}
-
-function formatPhoneDigits(phone: string | null): string {
-  if (!phone) return "";
-  let digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("8") && digits.length === 11) digits = "7" + digits.slice(1);
-  if (digits.startsWith("9") && digits.length === 10) digits = "7" + digits;
-  return digits;
 }
 
 function temperatureColor(urgency: number | null | undefined, pendingTodos: number): string {
@@ -639,14 +631,12 @@ function HistoryPanel({ lead, T }: { lead: LeadRow; T: ThemeTokens }) {
 // ── Contact Panel ─────────────────────────────────────────────────────────────
 
 function ContactPanel({ lead, T }: { lead: LeadRow; T: ThemeTokens }) {
-  const phoneDigits = formatPhoneDigits(lead.phone);
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {lead.phone && (
           <>
             <ActionBtn href={`tel:${lead.phone}`} icon={Phone} label="Позвонить" T={T} />
-            <ActionBtn href={`https://wa.me/${phoneDigits}`} icon={MessageCircle} label="WhatsApp" T={T} external />
             <ActionBtn href={`sms:${lead.phone}`} icon={Mail} label="SMS" T={T} />
           </>
         )}
