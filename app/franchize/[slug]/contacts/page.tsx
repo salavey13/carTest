@@ -136,7 +136,7 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
                     className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--crew-accent)] px-4 py-2 text-sm font-bold text-[var(--crew-accent-contrast)] transition hover:bg-[var(--crew-accent-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--crew-accent)]"
                   >
                     <MessageCircle className="h-4 w-4" />
-                    Поддержка OneBikePls
+                    Поддержка
                   </FranchizeIntentLink>
                 )}
 
@@ -205,7 +205,7 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
             </div>
             <div className="rounded-xl border border-[var(--crew-border)] bg-[var(--crew-card)] p-3">
               <dt className="flex items-center gap-2 font-semibold text-[var(--crew-text)]"><MessageCircle className="h-4 w-4" /> Telegram</dt>
-              <dd className="mt-1 text-[var(--crew-muted)]">{crew.contacts.telegram || "Используйте поддержку OneBikePls"}</dd>
+              <dd className="mt-1 text-[var(--crew-muted)]">{crew.contacts.telegram || "Напишите нам в Telegram"}</dd>
             </div>
           </dl>
 

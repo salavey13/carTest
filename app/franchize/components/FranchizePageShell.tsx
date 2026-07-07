@@ -63,27 +63,35 @@ export function FranchizePageShell({
       ? readablePaletteTextOnColor(theme.palettes?.dark?.accentMain || theme.palettes?.light?.accentMain || palette.accentMain, theme.palettes?.dark || theme.palettes?.light || palette)
       : readablePaletteTextOnColor(palette.accentMain, palette),
     "--franchize-shell-ring": isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
-    // Set up shadcn/ui CSS variables for proper Button component styling
+    // Set up shadcn/ui CSS variables for proper Button component styling.
+    // In auto mode, --primary/--accent/--ring/--destructive must follow the
+    // franchize palette (via --franchize-accent-main) rather than the global
+    // shadcn defaults (which are gold/red-orange in light mode and would
+    // produce low-contrast text on light backgrounds).
     "--background": isAuto ? "hsl(var(--background))" : palette.bgCard,
     "--foreground": isAuto ? "hsl(var(--foreground))" : palette.textPrimary,
     "--card": isAuto ? "hsl(var(--card))" : palette.bgCard,
     "--card-foreground": isAuto ? "hsl(var(--card-foreground))" : palette.textPrimary,
     "--popover": isAuto ? "hsl(var(--popover))" : palette.bgCard,
     "--popover-foreground": isAuto ? "hsl(var(--popover-foreground))" : palette.textPrimary,
-    "--primary": isAuto ? "hsl(var(--primary))" : palette.accentMain,
-    "--primary-foreground": isAuto ? "hsl(var(--primary-foreground))" : readablePaletteTextOnColor(palette.accentMain, palette),
+    "--primary": isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
+    "--primary-foreground": isAuto
+      ? readablePaletteTextOnColor(theme.palettes?.dark?.accentMain || theme.palettes?.light?.accentMain || palette.accentMain, theme.palettes?.dark || theme.palettes?.light || palette)
+      : readablePaletteTextOnColor(palette.accentMain, palette),
     "--secondary": isAuto ? "hsl(var(--secondary))" : palette.bgBase,
     "--secondary-foreground": isAuto ? "hsl(var(--secondary-foreground))" : palette.textPrimary,
     "--muted": isAuto ? "hsl(var(--muted))" : palette.bgBase,
     "--muted-foreground": isAuto ? "hsl(var(--muted-foreground))" : palette.textSecondary,
-    "--accent": isAuto ? "hsl(var(--accent))" : palette.accentMain,
-    "--accent-foreground": isAuto ? "hsl(var(--accent-foreground))" : readablePaletteTextOnColor(palette.accentMain, palette),
+    "--accent": isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
+    "--accent-foreground": isAuto
+      ? readablePaletteTextOnColor(theme.palettes?.dark?.accentMain || theme.palettes?.light?.accentMain || palette.accentMain, theme.palettes?.dark || theme.palettes?.light || palette)
+      : readablePaletteTextOnColor(palette.accentMain, palette),
     "--destructive": isAuto ? "hsl(var(--destructive))" : palette.accentMain,
     "--destructive-foreground": isAuto ? "hsl(var(--destructive-foreground))" : readablePaletteTextOnColor(palette.accentMain, palette),
     "--border": isAuto ? "hsl(var(--border))" : palette.borderSoft,
     "--input": isAuto ? "hsl(var(--input))" : palette.bgBase,
-    "--ring": isAuto ? "hsl(var(--ring))" : palette.accentMain,
-  } as CSSProperties;
+    "--ring": isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
+  } as FranchizeShellVars;
   // Full-width: no max-width constraint and minimal padding
   // Wide: max-w-6xl with standard padding
   // Content: max-w-5xl with standard padding

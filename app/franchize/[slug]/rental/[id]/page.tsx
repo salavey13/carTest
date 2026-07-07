@@ -151,7 +151,7 @@ export default async function FranchizeRentalPage({
                   color: crew.theme.palette.accentTextOn,
                 }}
               >
-                Открыть сделку в Telegram
+                Открыть в TG
               </a>
               <a
                 href={telegramSupportHref}
@@ -400,7 +400,7 @@ export default async function FranchizeRentalPage({
               className="inline-flex items-center gap-1 underline-offset-2 hover:underline"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              Открыть в Telegram (fallback)
+              Открыть в TG
             </a>
           </div>
         </section>

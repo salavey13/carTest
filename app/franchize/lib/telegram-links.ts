@@ -21,14 +21,14 @@ export function getTelegramWebAppFallbackHref(
   prefix: string,
   value: string,
   botUsername?: string | null,
-  separator: "-" | "_" = "-",
+  separator: "-" | "_" | "/" = "/",
 ): string {
   const normalizedBot =
     sanitizeTelegramUsername(botUsername) || DEFAULT_TELEGRAM_BOT_USERNAME;
   const safePrefix =
-    prefix.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 24) || "franchize";
+    prefix.replace(/[^a-zA-Z0-9_/-]/g, "-").slice(0, 24) || "franchize";
   const safeValue =
-    value.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 40) || "open";
+    value.replace(/[^a-zA-Z0-9_/-]/g, "-").slice(0, 40) || "open";
 
   return `https://t.me/${normalizedBot}/app?startapp=${safePrefix}${separator}${safeValue}`;
 }

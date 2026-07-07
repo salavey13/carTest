@@ -159,7 +159,7 @@ export default async function RentalReviewPage({
                   color: crew.theme.palette.accentTextOn,
                 }}
               >
-                Открыть отзыв в Telegram
+                Открыть в TG
               </a>
               <a
                 href={telegramSupportHref}
