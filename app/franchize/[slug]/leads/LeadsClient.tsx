@@ -173,17 +173,17 @@ function useTheme({ isAuto, isLightTheme, textColor, bgColor, accentColor }: {
       return {
         text: "var(--franchize-text-primary)",
         textMuted: "var(--franchize-text-secondary)",
-        textFaint: "color-mix(in srgb, var(--franchize-text-secondary) 65%, transparent)",
+        textFaint: `color-mix(in srgb, var(--franchize-text-secondary) 65%, transparent)`,
         bg: "var(--franchize-bg-base)",
-        bgCard: "color-mix(in srgb, var(--franchize-bg-card) 96%, transparent)",
-        bgCardHover: "color-mix(in srgb, var(--franchize-accent-main) 6%, transparent)",
+        bgCard: `color-mix(in srgb, var(--franchize-bg-card) 96%, transparent)`,
+        bgCardHover: `color-mix(in srgb, var(--franchize-accent-main) 6%, transparent)`,
         bgElevated: "var(--franchize-bg-card)",
-        border: "color-mix(in srgb, var(--franchize-border-soft) 45%, transparent)",
-        borderSoft: "color-mix(in srgb, var(--franchize-border-soft) 25%, transparent)",
+        border: `color-mix(in srgb, var(--franchize-border-soft) 45%, transparent)`,
+        borderSoft: `color-mix(in srgb, var(--franchize-border-soft) 25%, transparent)`,
         borderActive: "var(--franchize-accent-main)",
         inputBg: "var(--franchize-bg-base)",
-        inputBorder: "color-mix(in srgb, var(--franchize-border-soft) 55%, transparent)",
-        shadow: "0 4px 24px color-mix(in srgb, var(--franchize-accent-main) 6%, transparent)",
+        inputBorder: `color-mix(in srgb, var(--franchize-border-soft) 55%, transparent)`,
+        shadow: `0 4px 24px color-mix(in srgb, var(--franchize-accent-main) 6%, transparent)`,
         accent: "var(--franchize-accent-main)",
         accentContrast: "var(--franchize-accent-contrast)",
       };
@@ -325,7 +325,7 @@ function Toolbar({
     <div
       className="sticky top-0 z-10 -mx-4 space-y-3 border-b px-4 py-3 backdrop-blur-md sm:rounded-2xl sm:border"
       style={{
-        backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-bg-base) 88%, transparent)" : T.bgCard,
+        backgroundColor: isAuto ? `color-mix(in srgb, var(--franchize-bg-base) 88%, transparent)` : T.bgCard,
         borderColor: T.border,
       }}>
       {/* Row 1: search + controls */}
