@@ -945,20 +945,25 @@ function parseStsSeriesNumber(text: string): { series: string; number: string } 
 }
 
 /**
- * Parse Russian vehicle plate, e.g. "А123БВ77" or "А123ВВ 77".
+ * Parse Russian vehicle plate, e.g. "А123БВ77" or "А123ВС77".
  * Validates the standard format: Letter(1-2) Digits(3) Letters(2) Region(2-3)
+ * Uses the standard 12 GOST letters + Б (common in older/special series).
  */
 function parseStsPlate(text: string): string | null {
   const t = text.trim().toUpperCase().replace(/\s+/g, "");
+  // Russian GOST plate letters + common extras like Б
+  const LETTERS = "АБВЕКМНОРСТУХABEKMHOPCTYX";
+  const LETTERS_CLASS = `[${LETTERS}]`;
   // Standard Russian plate format: A123BC77 (1 letter + 3 digits + 2 letters + 2-3 digit region)
-  const m = t.match(/^([АВЕКМНОРСТУХABEKMHOPCTYX])\d{3}([АВЕКМНОРСТУХABEKMHOPCTYX]{2})(\d{2,3})$/);
-  if (m) return t;
-  // Allow trailing RUS suffix or trailing 77 RUS
-  const m2 = t.match(/^([АВЕКМНОРСТУХABEKMHOPCTYX])\d{3}([АВЕКМНОРСТУХABEKMHOPCTYX]{2})(\d{2,3})RUS?$/);
+  const stdRe = new RegExp(`^${LETTERS_CLASS}\\d{3}${LETTERS_CLASS}{2}(\\d{2,3})$`);
+  if (stdRe.test(t)) return t;
+  // Allow trailing RUS suffix
+  const rusRe = new RegExp(`^${LETTERS_CLASS}\\d{3}${LETTERS_CLASS}{2}(\\d{2,3})RUS?$`, "i");
+  const m2 = t.match(rusRe);
   if (m2) return t.replace(/RUS?$/i, "");
   // Trailer / moto format: 2 letters + 4 digits + region (e.g. АБ1234 77)
-  const m3 = t.match(/^([АВЕКМНОРСТУХABEKMHOPCTYX]{2})\d{4}(\d{2,3})$/);
-  if (m3) return t;
+  const motoRe = new RegExp(`^${LETTERS_CLASS}{2}\\d{4}(\\d{2,3})$`);
+  if (motoRe.test(t)) return t;
   return null;
 }
 
