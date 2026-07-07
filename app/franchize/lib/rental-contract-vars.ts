@@ -93,6 +93,22 @@ export function getEngineSpecLines(isElectric: boolean, bike: BikeSpecs) {
 }
 
 /**
+ * Per-bike overage rate (rub per km above included mileage).
+ * Small bikes / scooters: 25, mid-range: 30, premium sport: 40, BMW F800R: 35.
+ */
+function getOverageRateByBike(bikeId: string, fallback?: number): number {
+  const id = (bikeId || '').toLowerCase();
+  // Small / budget bikes — 25 rub/km
+  if (id.includes('nibbler') || id.includes('regumoto') || id.includes('motoland-breakout') || id.includes('jilang')) return 25;
+  // Premium sport ICE — 40 rub/km
+  if (id.includes('aprilia') || id.includes('suzuki-gsx')) return 40;
+  // BMW F800R — 35 rub/km
+  if (id.includes('bmw-f800')) return 35;
+  // Everything else (Kawasaki, Ducati, etc.) — 30 rub/km
+  return fallback ?? 30;
+}
+
+/**
  * Build complete template vars object from all data sources
  */
 export async function buildTemplateVars(params: {
@@ -122,6 +138,8 @@ export async function buildTemplateVars(params: {
     keys_count: number;
     helmets_count: number;
     gloves_count?: number;
+    jacket?: boolean;
+    boots?: boolean;
     net?: boolean;
     backpack?: boolean;
     bag?: boolean;
@@ -244,6 +262,12 @@ export async function buildTemplateVars(params: {
     `ключ(и) ${params.equipmentData.keys_count} шт.`,
     `шлем ${params.equipmentData.helmets_count}`,
   ];
+  if (params.equipmentData.gloves_count) equipmentParts.push(`перчатки ${params.equipmentData.gloves_count}`);
+  if (params.equipmentData.jacket) equipmentParts.push('куртка');
+  if (params.equipmentData.boots) equipmentParts.push('боты');
+  if (params.equipmentData.net) equipmentParts.push('сетка');
+  if (params.equipmentData.backpack) equipmentParts.push('рюкзак');
+  if (params.equipmentData.bag) equipmentParts.push('сумка');
   if (params.equipmentData.charger) equipmentParts.push('зарядка');
   if (params.equipmentData.lock) equipmentParts.push('замок');
   if (params.equipmentData.other_equipment) equipmentParts.push(params.equipmentData.other_equipment);
@@ -280,7 +304,15 @@ export async function buildTemplateVars(params: {
     bike_year: params.bike.specs.year || specs.production_year || 'уточняется',
     bike_engine_cc: params.bike.specs.engine_cc || '0',
     bike_power_hp: params.bike.specs.motor_hp || specs.max_power_hp || '0',
-    bike_power_kw: params.bike.specs.power_kw || specs.motor_nominal_kw || '0',
+    // Ducati electric bikes capped at 3kW in contracts (regulatory class limit)
+    bike_power_kw: (() => {
+      const raw = params.bike.specs.power_kw || specs.motor_nominal_kw || '0';
+      if (isElectric && /ducati/i.test(params.bike.id || '')) {
+        const num = Number(raw);
+        return num > 3 ? '3' : raw;
+      }
+      return raw;
+    })(),
     bike_max_speed: params.bike.specs.top_speed_kmh || specs.top_speed_kmh || 'уточняется',
     bike_battery: isElectric ? (params.bike.specs.battery || 'уточняется') : '',
 
@@ -312,6 +344,8 @@ export async function buildTemplateVars(params: {
     // Equipment
     equipment_helmets: String(params.equipmentData.helmets_count || 0),
     equipment_gloves: String(params.equipmentData.gloves_count || 0),
+    equipment_jacket: params.equipmentData.jacket ? 'да' : 'нет',
+    equipment_boots: params.equipmentData.boots ? 'да' : 'нет',
     equipment_net: params.equipmentData.net ? 'да' : 'нет',
     equipment_backpack: params.equipmentData.backpack ? 'да' : 'нет',
     equipment_bag: params.equipmentData.bag ? 'да' : 'нет',
@@ -319,6 +353,8 @@ export async function buildTemplateVars(params: {
     equipment_total_cost: String(
       (params.equipmentData.helmets_count || 0) * 1000 +
       (params.equipmentData.gloves_count || 0) * 500 +
+      (params.equipmentData.jacket ? 1500 : 0) +
+      (params.equipmentData.boots ? 1500 : 0) +
       (params.equipmentData.net ? 500 : 0) +
       (params.equipmentData.backpack ? 500 : 0) +
       (params.equipmentData.bag ? 500 : 0)
@@ -329,7 +365,7 @@ export async function buildTemplateVars(params: {
     // Odometer
     odometer_before: String(params.pickupData.odometer_km || 0),
     included_km_per_day: String(params.contractDefaults.includedMileage || 200),
-    extra_km_fee_rub: String(params.contractDefaults.overageRate || 35),
+    extra_km_fee_rub: String(getOverageRateByBike(params.bike.id, params.contractDefaults.overageRate)),
     late_return_penalty_rub: String(params.contractDefaults.lateReturnPenaltyRub || 10000),
     late_return_penalty_max_days: '90',
     bike_value_rub: String(bikeValue),

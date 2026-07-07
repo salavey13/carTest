@@ -333,6 +333,8 @@ function parseRuDateTime(dateStr: string | undefined, timeStr: string | undefine
 function buildEquipmentKeyboard(context: DocFlowContext): KeyboardButton[][] {
   const helmets = context.helmets || 0;
   const gloves = context.gloves || 0;
+  const jacket = context.jacket || false;
+  const boots = context.boots || false;
   const net = context.net || false;
   const backpack = context.backpack || false;
   const bag = context.bag || false;
@@ -342,6 +344,10 @@ function buildEquipmentKeyboard(context: DocFlowContext): KeyboardButton[][] {
     [
       { text: `🪖 Шлемы: ${helmets}`, callback_data: "eq_helmets" },
       { text: `🧤 Перчатки: ${gloves}`, callback_data: "eq_gloves" },
+    ],
+    [
+      { text: `${jacket ? "✅" : "⬜"} Куртка`, callback_data: "eq_jacket" },
+      { text: `${boots ? "✅" : "⬜"} Боты`, callback_data: "eq_boots" },
     ],
     [
       { text: `${net ? "✅" : "⬜"} Сетка`, callback_data: "eq_net" },
@@ -546,6 +552,8 @@ interface DocFlowContext {
   // net=500, backpack=500, bag=500, charger=0 (free but tracked for return).
   helmets?: number;        // 0-2 helmets
   gloves?: number;         // 0-2 pairs of gloves
+  jacket?: boolean;        // motorcycle jacket
+  boots?: boolean;         // motorcycle boots
   net?: boolean;           // safety net
   backpack?: boolean;      // backpack
   bag?: boolean;           // small bag
@@ -1291,6 +1299,8 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         equipment: {
           helmets: context.helmets || 0,
           gloves: context.gloves || 0,
+          jacket: context.jacket || false,
+          boots: context.boots || false,
           net: context.net || false,
           backpack: context.backpack || false,
           bag: context.bag || false,
@@ -2003,11 +2013,13 @@ async function gotoPaymentSplit(chatId: number, userId: string, context: DocFlow
   // Add equipment costs
   const helmets = context.helmets || 0;
   const gloves = context.gloves || 0;
+  const jacket = context.jacket ? 1 : 0;
+  const boots = context.boots ? 1 : 0;
   const net = context.net ? 1 : 0;
   const backpack = context.backpack ? 1 : 0;
   const bag = context.bag ? 1 : 0;
 
-  const equipmentCost = helmets * 1000 + gloves * 500 + net * 500 + backpack * 500 + bag * 500;
+  const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 1500 + boots * 1500 + net * 500 + backpack * 500 + bag * 500;
   const totalAmount = rentalCost + equipmentCost;
 
   // Store total in context for later use
@@ -2561,10 +2573,12 @@ export async function handleDocText(userId: string, chatId: number, text: string
     const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
     const helmets = context.helmets || 0;
     const gloves = context.gloves || 0;
+    const jacket = context.jacket ? 1 : 0;
+    const boots = context.boots ? 1 : 0;
     const net = context.net ? 1 : 0;
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
-    const equipmentCost = helmets * 1000 + gloves * 500 + net * 500 + backpack * 500 + bag * 500;
+    const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 1500 + boots * 1500 + net * 500 + backpack * 500 + bag * 500;
     const totalAmount = rentalCost + equipmentCost;
     context.cashAmount = Math.min(cashAmount, totalAmount);
     context.bankAmount = Math.max(0, totalAmount - cashAmount);
@@ -2878,8 +2892,24 @@ export async function handleDocCallback(
     return true;
   }
 
+  if (callbackData === "eq_jacket") {
+    context.jacket = !context.jacket;
+    await setState(userId, "equipment", context);
+    logger.info(`[/doc] eq_jacket: ${userId} → jacket=${context.jacket}`);
+    await sendComplexMessage(chatId, `🧥 Куртка: ${context.jacket ? "✅" : "⬜"}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData === "eq_boots") {
+    context.boots = !context.boots;
+    await setState(userId, "equipment", context);
+    logger.info(`[/doc] eq_boots: ${userId} → boots=${context.boots}`);
+    await sendComplexMessage(chatId, `👢 Боты: ${context.boots ? "✅" : "⬜"}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
   if (callbackData === "eq_done") {
-    logger.info(`[/doc] eq_done: ${userId} → equipment done (helmets=${context.helmets || 0}, gloves=${context.gloves || 0}, net=${!!context.net}, backpack=${!!context.backpack}, bag=${!!context.bag}, charger=${!!context.charger}), moving to odometer`);
+    logger.info(`[/doc] eq_done: ${userId} → equipment done (helmets=${context.helmets || 0}, gloves=${context.gloves || 0}, jacket=${!!context.jacket}, boots=${!!context.boots}, net=${!!context.net}, backpack=${!!context.backpack}, bag=${!!context.bag}, charger=${!!context.charger}), moving to odometer`);
     await gotoOdometer(chatId, userId, context);
     return true;
   }
@@ -2933,10 +2963,12 @@ export async function handleDocCallback(
     const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
     const helmets = context.helmets || 0;
     const gloves = context.gloves || 0;
+    const jacket = context.jacket ? 1 : 0;
+    const boots = context.boots ? 1 : 0;
     const net = context.net ? 1 : 0;
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
-    const equipmentCost = helmets * 1000 + gloves * 500 + net * 500 + backpack * 500 + bag * 500;
+    const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 1500 + boots * 1500 + net * 500 + backpack * 500 + bag * 500;
     const totalAmount = rentalCost + equipmentCost;
     context.cashAmount = totalAmount;
     context.bankAmount = 0;
@@ -2977,10 +3009,12 @@ export async function handleDocCallback(
     const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
     const helmets = context.helmets || 0;
     const gloves = context.gloves || 0;
+    const jacket = context.jacket ? 1 : 0;
+    const boots = context.boots ? 1 : 0;
     const net = context.net ? 1 : 0;
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
-    const equipmentCost = helmets * 1000 + gloves * 500 + net * 500 + backpack * 500 + bag * 500;
+    const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 1500 + boots * 1500 + net * 500 + backpack * 500 + bag * 500;
     const totalAmount = rentalCost + equipmentCost;
     context.cashAmount = 0;
     context.bankAmount = totalAmount;
