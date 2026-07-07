@@ -187,73 +187,6 @@ export function LeadsClient({
     }
   };
 
-  // ── Password gate render ──────────────────────────────────────────────────
-  if (showPasswordEntry && !passwordAuthed) {
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center px-4">
-        <div
-          className="w-full max-w-sm space-y-4 rounded-2xl border p-6"
-          style={{
-            borderColor: isLightTheme ? "#e2e8f0" : `${accentColor}20`,
-            backgroundColor: isLightTheme ? "#ffffff" : `${accentColor}08`,
-            boxShadow: isLightTheme ? "0 2px 8px rgba(0,0,0,0.06)" : "none",
-          }}
-        >
-          <div className="text-center">
-            <div
-              className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full"
-              style={{ backgroundColor: `${accentColor}15` }}
-            >
-              <Lock className="h-6 w-6" style={{ color: accentColor }} />
-            </div>
-            <h2 className="text-lg font-bold" style={{ color: isLightTheme ? "#1e293b" : textColor }}>
-              Клиенты и заявки
-            </h2>
-            <p className="mt-1 text-sm" style={{ color: isLightTheme ? "#64748b" : `${textColor}99` }}>
-              Введите пароль для доступа
-            </p>
-          </div>
-
-          <input
-            type="password"
-            value={passwordInput}
-            onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(null); }}
-            onKeyDown={(e) => e.key === "Enter" && handlePasswordSubmit()}
-            placeholder="••••••••"
-            disabled={isPasswordValidating}
-            className="w-full rounded-xl border px-4 py-3 text-center tracking-widest outline-none transition focus:ring-2"
-            style={{
-              borderColor: isLightTheme ? "#cbd5e1" : `${accentColor}25`,
-              backgroundColor: isLightTheme ? "#ffffff" : `${accentColor}08`,
-              color: isLightTheme ? "#1e293b" : textColor,
-            }}
-            autoFocus
-          />
-
-          {passwordError && (
-            <p className="flex items-center justify-center gap-1.5 text-center text-sm text-red-400">
-              <AlertCircle className="h-4 w-4" />
-              {passwordError}
-            </p>
-          )}
-
-          <button
-            onClick={handlePasswordSubmit}
-            disabled={isPasswordValidating || !passwordInput.trim()}
-            className="w-full rounded-xl py-3 font-bold transition hover:opacity-90 disabled:opacity-50"
-            style={{ backgroundColor: accentColor, color: "#fff" }}
-          >
-            {isPasswordValidating ? "Проверка..." : "Войти"}
-          </button>
-
-          <p className="text-center text-xs" style={{ color: isLightTheme ? "#94a3b8" : `${textColor}60` }}>
-            Пароль можно получить через бота: /analytics-pass
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   // ── Theme tokens ──────────────────────────────────────────────────────────
 
   const T = useMemo(() => ({
@@ -304,7 +237,6 @@ export function LeadsClient({
         if (leadScore > existScore) {
           map.set(lead.user_id, {
             ...lead,
-            // Keep richest data
             phone: lead.phone || existing.phone,
             full_name: lead.full_name || existing.full_name,
             username: lead.username || existing.username,
@@ -375,6 +307,83 @@ export function LeadsClient({
     return { hot, verified, warm };
   }, [sortedLeads, getTodosForLead]);
 
+  // ── Derived ────────────────────────────────────────────────────────────────
+
+  const availableSources = useMemo(() => {
+    const set = new Set(leads.map((l) => l.source));
+    return Array.from(set);
+  }, [leads]);
+
+  const pendingTodoCount = todos.filter((t) => t.status !== "done").length;
+  const hasFilters = searchQuery || filterSource !== "all";
+
+  // ── Password gate render ──────────────────────────────────────────────────
+  if (showPasswordEntry && !passwordAuthed) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-4">
+        <div
+          className="w-full max-w-sm space-y-4 rounded-2xl border p-6"
+          style={{
+            borderColor: isLightTheme ? "#e2e8f0" : `${accentColor}20`,
+            backgroundColor: isLightTheme ? "#ffffff" : `${accentColor}08`,
+            boxShadow: isLightTheme ? "0 2px 8px rgba(0,0,0,0.06)" : "none",
+          }}
+        >
+          <div className="text-center">
+            <div
+              className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full"
+              style={{ backgroundColor: `${accentColor}15` }}
+            >
+              <Lock className="h-6 w-6" style={{ color: accentColor }} />
+            </div>
+            <h2 className="text-lg font-bold" style={{ color: isLightTheme ? "#1e293b" : textColor }}>
+              Клиенты и заявки
+            </h2>
+            <p className="mt-1 text-sm" style={{ color: isLightTheme ? "#64748b" : `${textColor}99` }}>
+              Введите пароль для доступа
+            </p>
+          </div>
+
+          <input
+            type="password"
+            value={passwordInput}
+            onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(null); }}
+            onKeyDown={(e) => e.key === "Enter" && handlePasswordSubmit()}
+            placeholder="••••••••"
+            disabled={isPasswordValidating}
+            className="w-full rounded-xl border px-4 py-3 text-center tracking-widest outline-none transition focus:ring-2"
+            style={{
+              borderColor: isLightTheme ? "#cbd5e1" : `${accentColor}25`,
+              backgroundColor: isLightTheme ? "#ffffff" : `${accentColor}08`,
+              color: isLightTheme ? "#1e293b" : textColor,
+            }}
+            autoFocus
+          />
+
+          {passwordError && (
+            <p className="flex items-center justify-center gap-1.5 text-center text-sm text-red-400">
+              <AlertCircle className="h-4 w-4" />
+              {passwordError}
+            </p>
+          )}
+
+          <button
+            onClick={handlePasswordSubmit}
+            disabled={isPasswordValidating || !passwordInput.trim()}
+            className="w-full rounded-xl py-3 font-bold transition hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: accentColor, color: "#fff" }}
+          >
+            {isPasswordValidating ? "Проверка..." : "Войти"}
+          </button>
+
+          <p className="text-center text-xs" style={{ color: isLightTheme ? "#94a3b8" : `${textColor}60` }}>
+            Пароль можно получить через бота: /analytics-pass
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // ── Dismiss ────────────────────────────────────────────────────────────────
 
   const handleDismissLead = async (leadId: string) => {
@@ -393,16 +402,6 @@ export function LeadsClient({
       alert("Ошибка сети.");
     }
   };
-
-  // ── Derived ────────────────────────────────────────────────────────────────
-
-  const availableSources = useMemo(() => {
-    const set = new Set(leads.map((l) => l.source));
-    return Array.from(set);
-  }, [leads]);
-
-  const pendingTodoCount = todos.filter((t) => t.status !== "done").length;
-  const hasFilters = searchQuery || filterSource !== "all";
 
   // ── Render ────────────────────────────────────────────────────────────────
 
