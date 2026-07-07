@@ -87,16 +87,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
             >
               Записаться на тест-драйв
             </a>
-            <a
-              href={`/franchize/${crew.slug || slug}#catalog-sections`}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 px-6 py-3 text-sm font-bold uppercase tracking-wide transition hover:opacity-80 active:scale-95"
-              style={{
-                borderColor: "var(--franchize-accent-main, #f59e0b)",
-                color: "var(--franchize-accent-main, #f59e0b)",
-              }}
-            >
-              Выбрать байк
-            </a>
+
           </div>
         </div>
       </section>

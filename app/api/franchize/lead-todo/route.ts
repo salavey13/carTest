@@ -103,7 +103,7 @@ export async function DELETE(request: NextRequest) {
       const { error } = await supabaseAdmin.from("franchize_intents").update({
         stage: "dismissed",
         updated_at: new Date().toISOString(),
-      }).eq("telegram_user_id", leadId).eq("slug", "vip-bike");
+      }).eq("telegram_user_id", leadId).eq("slug", body.slug || "vip-bike");
 
       if (error) {
         logger.error("[lead-todo] dismiss lead failed", error);
