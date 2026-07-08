@@ -849,7 +849,7 @@ function CallbackRequestForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="w-full rounded-lg border px-3 py-2 text-sm text-[var(--item-text)] transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
-          style={{ ...inputStyle, touchAction: "manipulation" }}
+          style={inputStyle}
           aria-label="Ваше имя"
           required
           minLength={2}
@@ -860,7 +860,7 @@ function CallbackRequestForm({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           className="w-full rounded-lg border px-3 py-2 text-sm text-[var(--item-text)] transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
-          style={{ ...inputStyle, touchAction: "manipulation" }}
+          style={inputStyle}
           aria-label="Номер телефона"
           required
           minLength={6}
@@ -1336,7 +1336,7 @@ export function ItemModal({
         className="flex w-full max-w-4xl flex-col overflow-hidden rounded-[1.75rem] border shadow-[0_30px_80px_rgba(0,0,0,0.35)] sm:my-auto sm:rounded-3xl max-h-[calc(100dvh-1.5rem)]"
         style={surface.card}
       >
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] [touch-action:manipulation]">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
           {/* Gallery Component — rentalbikes-style portrait hero */}
           <ItemGallery
             images={gallery}
