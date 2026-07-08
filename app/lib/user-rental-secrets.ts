@@ -71,6 +71,72 @@ export type ClaimResult =
   | { ok: true; secret: UserRentalSecret; claimedNow: boolean }
   | { ok: false; reason: "already_claimed_by_other" | "revoked" | "not_found" | "error"; error?: string };
 
+// ─── Helper: safe update with optional qr_claimed_at ────────────────────────
+
+/**
+ * Attempt an update on user_rental_secrets, including qr_claimed_at column.
+ * If the column does not exist in the schema cache (PGRST204), retry without it.
+ * This handles the case where the migration 20260625000000_add_qr_status_tracking.sql
+ * has not been applied on the production Supabase project.
+ *
+ * @param updateFields - Fields to update (will have updated_at + optionally qr_claimed_at added)
+ * @param eqConditions - Array of { column, value } for .eq() filters
+ * @param isNullCondition - Optional { column } for .is(column, null) filter
+ */
+async function updateRentalSecretWithQrTracking(
+  updateFields: Record<string, unknown>,
+  eqConditions: { column: string; value: string | number | boolean | null }[],
+  isNullCondition?: { column: string },
+): Promise<{ data: unknown; error: unknown }> {
+  // Build update payload with qr_claimed_at
+  const payloadWithQr = {
+    ...updateFields,
+    qr_claimed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  let query = privateSchema()
+    .from("user_rental_secrets")
+    .update(payloadWithQr);
+
+  for (const eq of eqConditions) {
+    query = query.eq(eq.column, eq.value);
+  }
+
+  if (isNullCondition) {
+    query = query.is(isNullCondition.column, null);
+  }
+
+  let result = await query.select("*").maybeSingle();
+  const supabaseError = result.error as { code?: string } | null;
+
+  // If column doesn't exist (PGRST204), retry without qr_claimed_at
+  if (supabaseError?.code === "PGRST204") {
+    console.log("[user-rental-secrets] qr_claimed_at column not found, retrying without it. Run migration 20260625000000_add_qr_status_tracking.sql");
+
+    const fallbackPayload = {
+      ...updateFields,
+      updated_at: new Date().toISOString(),
+    };
+
+    let fallbackQuery = privateSchema()
+      .from("user_rental_secrets")
+      .update(fallbackPayload);
+
+    for (const eq of eqConditions) {
+      fallbackQuery = fallbackQuery.eq(eq.column, eq.value);
+    }
+
+    if (isNullCondition) {
+      fallbackQuery = fallbackQuery.is(isNullCondition.column, null);
+    }
+
+    result = await fallbackQuery.select("*").maybeSingle();
+  }
+
+  return { data: result.data, error: result.error };
+}
+
 // ─── Helper: check if chat_id is a crew member ──────────────────────────────
 
 /**
@@ -322,17 +388,13 @@ export async function claimRentalSecretsByDocSha(
       // Step 4b: Current chat_id IS a crew member (operator) — allow renter to claim
       console.log(`[user-rental-secrets] claimRentalSecretsByDocSha: operator ${secret.chat_id} → renter ${normalizedChatId} (overwrite allowed)`);
       
-      const { data: claimed, error: claimError } = await privateSchema()
-        .from("user_rental_secrets")
-        .update({
-          chat_id: normalizedChatId,
-          qr_claimed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("doc_sha256", normalizedDocSha256)
-        .eq("chat_id", secret.chat_id)  // atomic: only if still operator's
-        .select("*")
-        .maybeSingle();
+      const { data: claimed, error: claimError } = await updateRentalSecretWithQrTracking(
+        { chat_id: normalizedChatId },
+        [
+          { column: "doc_sha256", value: normalizedDocSha256 },
+          { column: "chat_id", value: secret.chat_id },
+        ],
+      );
 
       if (claimError) {
         logUserRentalSecretsError("claimRentalSecretsByDocSha.overwrite", claimError);
@@ -366,17 +428,11 @@ export async function claimRentalSecretsByDocSha(
 
     // Step 5: chat_id IS NULL — claim it atomically
     // Use UPDATE ... WHERE chat_id IS NULL to prevent race conditions
-    const { data: claimed, error: claimError } = await privateSchema()
-      .from("user_rental_secrets")
-      .update({
-        chat_id: normalizedChatId,
-        qr_claimed_at: new Date().toISOString(),  // Track when renter claimed
-        updated_at: new Date().toISOString(),
-      })
-      .eq("doc_sha256", normalizedDocSha256)
-      .is("chat_id", null)                    // atomic: only if still unclaimed
-      .select("*")
-      .maybeSingle();
+    const { data: claimed, error: claimError } = await updateRentalSecretWithQrTracking(
+      { chat_id: normalizedChatId },
+      [{ column: "doc_sha256", value: normalizedDocSha256 }],
+      { column: "chat_id" },  // IS NULL condition (atomic: only if still unclaimed)
+    );
 
     if (claimError) {
       logUserRentalSecretsError("claimRentalSecretsByDocSha.claim", claimError);
