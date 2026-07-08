@@ -20,7 +20,8 @@ import { ItemGallery } from "../components/ItemGallery";
 import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 import { crewPaletteForSurface, readableTextOnColor, withAlpha } from "../lib/theme";
 import { FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
-import { buildTelegramDeepLink, type StartappState } from "@/lib/startapp-state";
+import { encodeStartappState, type StartappState } from "@/lib/startapp-state";
+import { getTelegramWebAppAdaptiveHref } from "@/app/franchize/lib/telegram-links";
 
 // ── Russian Label Helper (VIP Bike Landing & Catalog Improvements) ──
 // Helper to get Russian label from spec_labels in rawSpecs
@@ -1222,9 +1223,10 @@ export function ItemModal({
           package: options.package || undefined,
           perk: options.perk || undefined,
         };
-        return buildTelegramDeepLink(botUsername, state);
+        const startappParam = encodeStartappState(state);
+        return getTelegramWebAppAdaptiveHref(startappParam, botUsername);
       } catch {
-        return `https://t.me/${botUsername}/app`;
+        return getTelegramWebAppAdaptiveHref("", botUsername);
       }
     },
     [item, options.rentStartDate, options.rentEndDate, options.package, options.perk, rentStartTime, rentEndTime, helmetCount, extrasSelection, botUsername],

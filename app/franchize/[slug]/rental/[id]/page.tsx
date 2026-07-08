@@ -55,7 +55,7 @@ export default async function FranchizeRentalPage({
   ]);
   const resolvedSlug = crew.slug || slug;
   const surface = crewPaletteForSurface(crew.theme);
-  const p = crew.theme.palette;
+  const p = crew.theme.palette as (typeof crew.theme.palette) & { accentTextOn?: string };
   const dealStarted = rental.found || rental.paymentStatus === "interest_paid";
   const catalogHref = `/franchize/${resolvedSlug}`;
   const profileHref = getTelegramWebAppPageHref(`franchize/${resolvedSlug}/profile`, crew.contacts.telegramBotUsername) || `/franchize/${resolvedSlug}/profile`;
@@ -77,26 +77,30 @@ export default async function FranchizeRentalPage({
         ? statusPalette.pending_confirmation
         : { badgeBg: `${p.textSecondary}20`, badgeText: p.textSecondary };
 
+  const bikeSearchHref = rental.vehicleTitle
+    ? `/franchize/${resolvedSlug}?bikeId=${encodeURIComponent(rental.vehicleTitle)}`
+    : catalogHref;
+
   // Status-aware hero subcopy & CTAs
   const heroCopy: Record<string, { subcopy: string; primaryCta: { label: string; href: string }; secondaryCta: { label: string; href: string } }> = {
     pending_confirmation: {
-      subcopy: "Заявка ждёт подтверждения оператором. Проверьте статус оплаты и контракта.",
-      primaryCta: { label: "Продолжить оформление", href: `/franchize/${resolvedSlug}/order/demo-order` },
+      subcopy: "Заявка ждёт подтверждения оператором.",
+      primaryCta: { label: "Продолжить в корзине", href: `/franchize/${resolvedSlug}/cart` },
       secondaryCta: { label: "К каталогу", href: catalogHref },
     },
     confirmed: {
-      subcopy: "Аренда подтверждена. Подготовьте документы и передайте ТС.",
-      primaryCta: { label: "Перейти к выдаче", href: `/franchize/${resolvedSlug}/order/demo-order` },
+      subcopy: "Аренда подтверждена. Готовим документы и выдачу.",
+      primaryCta: { label: "Открыть в Telegram", href: rental.telegramDeepLink },
       secondaryCta: { label: "К каталогу", href: catalogHref },
     },
     active: {
-      subcopy: "ТС у арендатора. Следите за статусом, чек-листом и сроками возврата.",
-      primaryCta: { label: "Продлить аренду", href: `/franchize/${resolvedSlug}/order/demo-order` },
+      subcopy: "ТС у арендатора. Следим за сроками возврата.",
+      primaryCta: { label: "Продлить аренду", href: bikeSearchHref },
       secondaryCta: { label: "К каталогу", href: catalogHref },
     },
     completed: {
       subcopy: "Аренда завершена. Депозит возвращён, документы подписаны.",
-      primaryCta: { label: "Арендовать снова", href: `/franchize/${resolvedSlug}?bikeId=${encodeURIComponent(rental.vehicleTitle || "")}` },
+      primaryCta: { label: "Арендовать снова", href: bikeSearchHref },
       secondaryCta: { label: "Оставить отзыв", href: contactsHref },
     },
     cancelled: {
@@ -109,7 +113,7 @@ export default async function FranchizeRentalPage({
     subcopy: rental.found
       ? "Сделка активирована. Управляйте арендой из Telegram WebApp."
       : "Сделка пока не найдена. Проверьте ссылку или напишите оператору.",
-    primaryCta: { label: "Продолжить оформление", href: `/franchize/${resolvedSlug}/order/demo-order` },
+    primaryCta: { label: "Открыть в Telegram", href: rental.telegramDeepLink },
     secondaryCta: { label: "К каталогу", href: catalogHref },
   };
   const hero = rental.found ? (heroCopy[status] || heroDefault) : heroDefault;
@@ -384,12 +388,6 @@ export default async function FranchizeRentalPage({
               <span style={{ color: p.textSecondary }}>Транспорт:</span>{" "}
               {rental.vehicleTitle}
             </p>
-            {rental.renterName && (
-              <p className="sm:col-span-2">
-                <span style={{ color: p.textSecondary }}>Арендатор:</span>{" "}
-                {rental.renterName}
-              </p>
-            )}
             {rental.contractOriginalSha256 ? (
               <p className="sm:col-span-2 break-all">
                 <span style={{ color: p.textSecondary }}>
@@ -444,7 +442,7 @@ export default async function FranchizeRentalPage({
             ) : status === "active" ? (
               <>
                 <Link
-                  href={`/franchize/${resolvedSlug}/order/demo-order`}
+                  href={bikeSearchHref}
                   className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
                   style={{
                     backgroundColor: p.accentMain,
@@ -468,7 +466,7 @@ export default async function FranchizeRentalPage({
             ) : (
               <>
                 <Link
-                  href={`/franchize/${resolvedSlug}/order/demo-order`}
+                  href={`/franchize/${resolvedSlug}/cart`}
                   className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
                   style={{
                     backgroundColor: p.accentMain,
@@ -506,7 +504,7 @@ export default async function FranchizeRentalPage({
             renterId={rental.renterId}
             status={status}
             paymentStatus={rental.paymentStatus}
-            hasPickupFreeze={Boolean(rental.metadata?.pickup_freeze?.frozen_at)}
+            hasPickupFreeze={Boolean((rental.metadata as { pickup_freeze?: { frozen_at?: unknown } } | null)?.pickup_freeze?.frozen_at)}
             palette={p}
           />
 

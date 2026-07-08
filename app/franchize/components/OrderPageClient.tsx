@@ -12,7 +12,7 @@ import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { checkFranchizeCarsAvailability, createFranchizeOrderCheckout, recordFranchizeCheckoutRecoverySnapshot, validateFranchizePromoCode } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface, focusRingOutlineStyle, readablePaletteTextOnColor } from "../lib/theme";
-import { getTelegramHandleHref, getTelegramWebAppFallbackHref, getTelegramWebAppPageHref } from "../lib/telegram-links";
+import { getTelegramHandleHref, getTelegramWebAppFallbackHref, getTelegramWebAppPageHref, getTelegramWebAppAdaptiveHref } from "../lib/telegram-links";
 import { getFranchizeFormPrefillAction, getFranchizeUserRentalSecretsAction, getRentalDocsPrefillAction } from "../profile-actions";
 
 interface OrderPageClientProps {
@@ -202,6 +202,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const contactsHref = `/franchize/${slug}/contacts`;
   const telegramSupportHref = getTelegramHandleHref(crew.contacts.telegram);
   const telegramWebAppFallbackHref = getTelegramWebAppFallbackHref("franchize", slug, crew.contacts.telegramBotUsername);
+  const [adaptiveTgFallbackHref, setAdaptiveTgFallbackHref] = useState(telegramWebAppFallbackHref);
+  useEffect(() => {
+    // After hydration, switch to device-aware href (desktop → web.telegram.org, mobile → t.me)
+    setAdaptiveTgFallbackHref(getTelegramWebAppAdaptiveHref(`franchize/${slug}`, crew.contacts.telegramBotUsername));
+  }, [slug, crew.contacts.telegramBotUsername]);
   const selectedExtraItems = useMemo(
     () => orderExtras.filter((extra) => selectedExtras.includes(extra.id)),
     [selectedExtras],
@@ -722,34 +727,14 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         </div>
       )}
 
-      <div className="mt-4 grid gap-3 rounded-3xl border p-4 text-sm md:grid-cols-[1.2fr_0.8fr]" style={surface.subtleCard}>
+      <div className="mt-4 grid gap-3 rounded-3xl border p-4 text-sm md:grid-cols-[1fr_280px]" style={surface.subtleCard}>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--order-accent)]">Что будет дальше</p>
-          <ol className="mt-3 space-y-2">
-            {[
-              `Проверим корзину, даты и контакт для ${flowLabel}.`,
-              payment === "telegram_xtr" ? `Отправим hold-счёт: ${holdPaymentAmountRub.toLocaleString("ru-RU")}₽ / ${holdPaymentAmountXtr.toLocaleString("ru-RU")} XTR, чтобы закрепить байк.` : "Передадим заявку оператору: оплату подтвердим вручную до выдачи.",
-              `После подтверждения в Telegram пришлём адрес выдачи (${pickupAddress}), список документов и ссылку на сделку.`,
-            ].map((step, index) => (
-              <li key={step} className="flex gap-2">
-                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--order-accent-soft)] text-[11px] font-semibold text-[var(--order-accent)]">{index + 1}</span>
-                <span>{step}</span>
-              </li>
-            ))}
-          </ol>
-          <p className="mt-3 rounded-2xl border border-[var(--order-border)] p-3 text-xs" style={surface.card}>
-            Безопасность оплаты и договора: сумма фиксируется в заявке, договор/чек проверяются до старта, спорные изменения подтверждаются только через оператора или Telegram.
-          </p>
-          <div className="mt-3 rounded-2xl border border-[var(--order-border)] p-3 text-xs" style={surface.card}>
-            <p className="font-semibold text-[var(--order-accent)]">Hold-бронь</p>
-            <p className="mt-1">{holdCtaLabel} — это маленький депозит, который фиксирует выбранный слот и запускает Telegram-подтверждение.</p>
-            <ul className="mt-2 space-y-1 text-[var(--order-muted)]">
-              <li>Адрес выдачи: {pickupAddress}</li>
-              <li>Документы: {requiredDocs.join(", ")}</li>
-              <li>Safety quiz: {safetyQuizPassed ? "пройден" : "нужно пройти до отправки"}</li>
-              <li>После оплаты: Telegram пришлёт карточку сделки и следующий шаг оператора.</li>
-            </ul>
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--order-accent)]">Что дальше</p>
+          <ul className="mt-2 space-y-1 text-xs" style={surface.mutedText}>
+            <li>• Проверим корзину, даты и контакт.</li>
+            <li>• {payment === "telegram_xtr" ? `Hold ${holdCtaLabel} фиксирует слот.` : "Заявка уйдёт оператору — оплату подтвердим до выдачи."}</li>
+            <li>• Адрес выдачи: {pickupAddress}. Документы: {requiredDocs.join(", ")}.</li>
+          </ul>
         </div>
         <div className="space-y-2">
           <a
@@ -759,20 +744,17 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             className="flex w-full justify-center rounded-xl bg-[var(--order-accent)] px-3 py-2 text-center text-sm font-semibold text-[var(--order-accent-contrast)] transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             style={focusRingOutlineStyle(crew.theme)}
           >
-            Написать оператору в Telegram
+            Написать оператору
           </a>
           <a
-            href={telegramWebAppFallbackHref}
+            href={adaptiveTgFallbackHref}
             target="_blank"
             rel="noreferrer"
             className="flex w-full justify-center rounded-xl border border-[var(--order-border)] px-3 py-2 text-center text-xs transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             style={focusRingOutlineStyle(crew.theme)}
           >
-            Открыть в TG
+            Открыть в Telegram
           </a>
-          <Link href={contactsHref} className="flex w-full justify-center rounded-xl border border-[var(--order-border)] px-3 py-2 text-center text-xs transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={focusRingOutlineStyle(crew.theme)}>
-            Поддержка / контакты
-          </Link>
           <div className="grid grid-cols-2 gap-2">
             <Link href={catalogHref} className="rounded-xl border border-[var(--order-border)] px-3 py-2 text-center text-xs transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={focusRingOutlineStyle(crew.theme)}>Каталог</Link>
             <Link href={profileHref} className="rounded-xl border border-[var(--order-border)] px-3 py-2 text-center text-xs transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={focusRingOutlineStyle(crew.theme)}>Профиль</Link>
