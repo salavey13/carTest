@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
-  Flame, Phone, CheckCircle, ChevronDown, ChevronRight, Plus,
+  Flame, Phone, CheckCircle, ChevronDown, ChevronRight, Plus, FileText,
   Trash2, Send, Clock, TrendingUp, Search,
   X, Bike, FileText, CircleDot, Users, Lock, AlertCircle,
   LayoutList, Columns3, MoreHorizontal, Calendar, UserPlus,
@@ -26,6 +26,13 @@ interface LeadRow {
   intentStage?: string | null;
   urgencyScore?: number | null;
   telegramChatId?: string | null;
+  troubled?: boolean;
+  troubledReason?: string | null;
+  contractCount?: number;
+  lastRentalDate?: string | null;
+  totalSpent?: number;
+  contractRef?: string | null;
+  saleCount?: number;
 }
 
 interface TodoRow {
@@ -49,7 +56,7 @@ interface LeadsClientProps {
 }
 
 type ViewMode = "list" | "board";
-type Segment = "all" | "hot" | "verified" | "warm";
+type Segment = "all" | "hot" | "verified" | "warm" | "troubled";
 type DetailTab = "contacts" | "tasks" | "notes" | "history";
 type SortMode = "recent" | "urgent" | "name" | "verified";
 
@@ -97,6 +104,7 @@ const SEGMENT_META: Record<Segment, { label: string; icon: typeof Flame; color: 
   hot:       { label: "Горячие",   icon: Flame,       color: "#ef4444" },
   verified:  { label: "Клиенты",   icon: CheckCircle, color: "#10b981" },
   warm:      { label: "Заявки",    icon: Phone,       color: "#3b82f6" },
+  troubled:  { label: "Проблемные",icon: AlertCircle, color: "#dc2626" },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -663,6 +671,43 @@ function ContactPanel({ lead, T, todos }: { lead: LeadRow; T: ThemeTokens; todos
     setTgMessage((prev) => (prev ? prev + "\n\n" : "") + todoText);
   };
 
+  const [troubledUpdating, setTroubledUpdating] = useState(false);
+  const [troubledReasonInput, setTroubledReasonInput] = useState("");
+  const [showTroubledInput, setShowTroubledInput] = useState(false);
+
+  const handleToggleTroubled = async (userId: string, reason: string) => {
+    setTroubledUpdating(true);
+    try {
+      const finalReason = reason || troubledReasonInput.trim();
+      const resp = await fetch("/api/franchize/toggle-troubled", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, reason: finalReason || undefined }),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        lead.troubled = data.troubled;
+        if (!data.troubled) {
+          lead.troubledReason = null;
+        }
+        setShowTroubledInput(false);
+        setTroubledReasonInput("");
+        window.location.reload();
+      }
+    } catch { /* ignore */ }
+    setTroubledUpdating(false);
+  };
+
+  const handleTroubledClick = () => {
+    if (lead.troubled) {
+      // Unmark — clean toggle
+      handleToggleTroubled(lead.user_id, "");
+    } else {
+      // Show reason input
+      setShowTroubledInput(!showTroubledInput);
+    }
+  };
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -684,7 +729,41 @@ function ContactPanel({ lead, T, todos }: { lead: LeadRow; T: ThemeTokens; todos
             {showTgInput ? "Закрыть" : "Уведомить"}
           </button>
         )}
+        <button onClick={handleTroubledClick}
+          className="group flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-[11px] font-medium transition hover:brightness-110"
+          style={{
+            borderColor: lead.troubled ? "#dc262640" : T.border,
+            backgroundColor: lead.troubled ? "#dc262618" : T.bgElevated,
+            color: lead.troubled ? "#dc2626" : T.text,
+          }}>
+          <AlertCircle className="h-3.5 w-3.5 transition group-hover:scale-110" style={{ color: lead.troubled ? "#dc2626" : T.accent }} />
+          {lead.troubled ? "Снять отметку" : "🚨 Отметить"}
+        </button>
       </div>
+
+      {showTroubledInput && !lead.troubled && (
+        <div className="space-y-2 rounded-xl border p-3" style={{ borderColor: "#dc262640", backgroundColor: "#dc262608" }}>
+          <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: "#dc2626" }}>
+            <AlertCircle className="h-3.5 w-3.5" />
+            Причина отметки
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={troubledReasonInput} onChange={(e) => setTroubledReasonInput(e.target.value)}
+              placeholder="Повредил байк / не оплатил …"
+              className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs outline-none"
+              style={{ borderColor: "#dc262640", backgroundColor: T.inputBg, color: T.text }}
+              onKeyDown={(e) => { if (e.key === "Enter") handleToggleTroubled(lead.user_id, troubledReasonInput.trim()); }}
+            />
+            <button onClick={() => handleToggleTroubled(lead.user_id, troubledReasonInput.trim())}
+              disabled={troubledUpdating}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+              style={{ backgroundColor: "#dc2626" }}>
+              {troubledUpdating ? "…" : "OK"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {showTgInput && lead.telegramChatId && (
         <div className="space-y-2 rounded-xl border p-3" style={{ borderColor: T.inputBorder, backgroundColor: T.bgElevated }}>
@@ -734,6 +813,17 @@ function ContactPanel({ lead, T, todos }: { lead: LeadRow; T: ThemeTokens; todos
         {lead.intentStage && <InfoTile label="Стадия" value={STAGE_LABELS[lead.intentStage] || lead.intentStage} T={T} />}
         {lead.urgencyScore != null && <InfoTile label="Приоритет" value={`${lead.urgencyScore}/100`} T={T} />}
         <InfoTile label="Источник" value={metaFor(lead.source).label} T={T} />
+        {lead.troubled && (
+          <div className="col-span-full flex items-center gap-2 rounded-lg border p-2.5" style={{ borderColor: "#dc262640", backgroundColor: "#dc262608" }}>
+            <AlertCircle className="h-4 w-4 shrink-0" style={{ color: "#dc2626" }} />
+            <div className="min-w-0 text-xs">
+              <span className="font-semibold" style={{ color: "#dc2626" }}>Проблемный клиент</span>
+              {lead.troubledReason && (
+                <span className="ml-2" style={{ color: T.textMuted }}>— {lead.troubledReason}</span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -802,7 +892,29 @@ function LeadCard({
             <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: tempColor + "15", color: tempColor }}>
               {tempLabel}
             </span>
+            {lead.troubled && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "#dc262615", color: "#dc2626" }}>
+                <AlertCircle className="h-3 w-3" />
+                Проблемный
+              </span>
+            )}
           </div>
+          {(lead.contractCount || 0) > 0 && (
+            <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px]" style={{ color: T.textMuted }}>
+              {(lead.contractCount || 0) > 0 && (
+                <span className="inline-flex items-center gap-1">
+                  <FileText className="h-3 w-3" />
+                  {lead.contractCount} дог.
+                </span>
+              )}
+              {(lead.totalSpent || 0) > 0 && (
+                <span>{new Intl.NumberFormat("ru-RU").format(lead.totalSpent)} ₽</span>
+              )}
+              {lead.lastRentalDate && (
+                <span>с {new Date(lead.lastRentalDate).toLocaleDateString("ru-RU")}</span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-1">
@@ -1088,6 +1200,7 @@ export function LeadsClient({
     if (segment !== "all") {
       result = result.filter((l) => {
         const pt = getTodosForLead(l).filter((t) => t.status !== "done").length;
+        if (segment === "troubled") return l.troubled === true;
         if (segment === "verified") return l.verified;
         if (segment === "hot") return !l.verified && ((l.urgencyScore ?? 0) >= 60 || pt > 0);
         return !l.verified && !((l.urgencyScore ?? 0) >= 60 || pt > 0);
