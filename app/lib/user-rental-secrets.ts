@@ -16,6 +16,8 @@ export interface UserRentalSecret {
   renter_passport_issued_by: string | null;   // кем выдан (issuing authority)
   renter_registration: string | null;
   renter_driver_license: string | null;
+  license_categories: string | null;       // Водительские категории (A, B, etc.)
+  license_expiry_date: string | null;      // Срок действия ВУ
   renter_birth_date: string | null;
   renter_phone: string | null;
   renter_email: string | null;

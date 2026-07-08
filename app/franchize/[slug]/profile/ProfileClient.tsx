@@ -190,6 +190,9 @@ export function FranchizeProfileClient({
       phone: string;
       passport: string;
       driverLicense: string;
+      birthDate: string;
+      licenseExpiryDate: string;
+      licenseCategories: string;
     };
   } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -592,17 +595,34 @@ export function FranchizeProfileClient({
 
             {/* Read-only summary of verified data from past rentals */}
             {rentalSecrets?.hasPreviousRentals && (
-              <div className="mb-3 grid grid-cols-2 gap-2 text-xs text-[var(--fr-profile-muted)]">
-                <div>
-                  Паспорт: <span className={rentalSecrets.savedData?.passport ? "text-[var(--fr-profile-accent)]" : ""}>
-                    {rentalSecrets.savedData?.passport ? "✓ Сохранён" : "—"}
-                  </span>
+              <div className="mb-3 grid grid-cols-1 gap-1.5 text-xs text-[var(--fr-profile-muted)]">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    Паспорт: <span className={rentalSecrets.savedData?.passport ? "text-[var(--fr-profile-accent)]" : ""}>
+                      {rentalSecrets.savedData?.passport ? "✓ Сохранён" : "—"}
+                    </span>
+                  </div>
+                  <div>
+                    ВУ: <span className={rentalSecrets.savedData?.driverLicense ? "text-[var(--fr-profile-accent)]" : ""}>
+                      {rentalSecrets.savedData?.driverLicense ? "✓ Сохранено" : "—"}
+                    </span>
+                  </div>
+                  <div>
+                    Дата рождения: <span className={rentalSecrets.savedData?.birthDate ? "text-[var(--fr-profile-accent)]" : ""}>
+                      {rentalSecrets.savedData?.birthDate || "—"}
+                    </span>
+                  </div>
+                  <div>
+                    Категории: <span className={rentalSecrets.savedData?.licenseCategories ? "text-[var(--fr-profile-accent)]" : ""}>
+                      {rentalSecrets.savedData?.licenseCategories || "—"}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  ВУ: <span className={rentalSecrets.savedData?.driverLicense ? "text-[var(--fr-profile-accent)]" : ""}>
-                    {rentalSecrets.savedData?.driverLicense ? "✓ Сохранено" : "—"}
-                  </span>
-                </div>
+                {rentalSecrets.lastRentalDate && (
+                  <div className="pt-0.5 opacity-60">
+                    Последняя аренда: {rentalSecrets.lastRentalDate}
+                  </div>
+                )}
               </div>
             )}
 

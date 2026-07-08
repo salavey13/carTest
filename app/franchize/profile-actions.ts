@@ -367,38 +367,84 @@ export async function getFranchizeUserRentalSecretsAction(params: {
       phone: string;
       passport: string;
       driverLicense: string;
+      birthDate: string;
+      licenseExpiryDate: string;
+      licenseCategories: string;
     };
   };
   error?: string;
 }> {
   try {
-    // Check for previous rentals in rental_contract_artifacts
-    const { data: artifacts, error: artifactsError } = await privateSchema()
-      .from("rental_contract_artifacts")
-      .select("created_at,renter_full_name,renter_phone,renter_passport,renter_driver_license")
-      .eq("user_id", params.userId)
+    // 1. Check user_rental_secrets (claimed secrets via QR, always has data)
+    const { data: rentalSecret, error: secretError } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("renter_full_name,renter_phone,renter_passport,renter_driver_license,renter_birth_date,license_expiry_date,license_categories,created_at")
+      .eq("chat_id", params.userId)
+      .eq("crew_slug", params.slug)
+      .eq("verification_status", "verified")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (artifactsError && artifactsError.code !== "PGRST116") {
-      // PGRST116 = no rows returned, which is fine (no previous rentals)
-      return { success: false, error: artifactsError.message };
+    if (secretError && secretError.code !== "PGRST116") {
+      return { success: false, error: secretError.message };
     }
 
-    const hasPreviousRentals = !!artifacts;
-    const lastRentalDate = artifacts?.created_at ? new Date(artifacts.created_at).toISOString().split("T")[0] : undefined;
+    // 2. Fallback to rental_contract_artifacts (if no claimed secret)
+    if (!rentalSecret) {
+      const { data: artifact } = await privateSchema()
+        .from("rental_contract_artifacts")
+        .select("renter_full_name,renter_phone,renter_passport,renter_driver_license,renter_birth_date,license_categories,license_expiry_date,created_at")
+        .eq("telegram_chat_id", params.userId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!artifact) {
+        return {
+          success: true,
+          data: {
+            hasPreviousRentals: false,
+            savedData: {
+              fullName: "", phone: "", passport: "",
+              driverLicense: "", birthDate: "",
+              licenseExpiryDate: "", licenseCategories: "",
+            },
+          },
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          hasPreviousRentals: true,
+          lastRentalDate: artifact.created_at ? new Date(artifact.created_at).toISOString().split("T")[0] : undefined,
+          savedData: {
+            fullName: artifact.renter_full_name || "",
+            phone: artifact.renter_phone || "",
+            passport: artifact.renter_passport || "",
+            driverLicense: artifact.renter_driver_license || "",
+            birthDate: artifact.renter_birth_date || "",
+            licenseExpiryDate: artifact.license_expiry_date || "",
+            licenseCategories: artifact.license_categories || "",
+          },
+        },
+      };
+    }
 
     return {
       success: true,
       data: {
-        hasPreviousRentals,
-        lastRentalDate,
+        hasPreviousRentals: true,
+        lastRentalDate: rentalSecret.created_at ? new Date(rentalSecret.created_at).toISOString().split("T")[0] : undefined,
         savedData: {
-          fullName: artifacts?.renter_full_name || "",
-          phone: artifacts?.renter_phone || "",
-          passport: artifacts?.renter_passport || "",
-          driverLicense: artifacts?.renter_driver_license || "",
+          fullName: rentalSecret.renter_full_name || "",
+          phone: rentalSecret.renter_phone || "",
+          passport: rentalSecret.renter_passport || "",
+          driverLicense: rentalSecret.renter_driver_license || "",
+          birthDate: rentalSecret.renter_birth_date || "",
+          licenseExpiryDate: rentalSecret.license_expiry_date || "",
+          licenseCategories: rentalSecret.license_categories || "",
         },
       },
     };
@@ -538,6 +584,7 @@ export async function saveRentalDocsPrefillAction(params: {
       renter_birth_date: params.birthDate ?? null,
       renter_phone: params.phone ?? null,
       license_categories: params.licenseCategories ?? null,
+      license_expiry_date: params.licenseExpiryDate ?? null,
       source_doc_key: "profile_prefill",
       verification_status: "pending" as const,
       template_version: 1,
@@ -562,6 +609,8 @@ export async function saveRentalDocsPrefillAction(params: {
         renter_passport_issued_by: upsertData.renter_passport_issued_by ?? existing.renter_passport_issued_by,
         renter_registration: upsertData.renter_registration ?? existing.renter_registration,
         renter_driver_license: upsertData.renter_driver_license ?? existing.renter_driver_license,
+        license_categories: upsertData.license_categories ?? existing.license_categories,
+        license_expiry_date: upsertData.license_expiry_date ?? existing.license_expiry_date,
         renter_birth_date: upsertData.renter_birth_date ?? existing.renter_birth_date,
         renter_phone: upsertData.renter_phone ?? existing.renter_phone,
         updated_at: new Date().toISOString(),
@@ -664,6 +713,8 @@ export async function tryVerifyUserRentalDocs(chatId: string, crewSlug: string):
       if (artifact.renter_registration) updateData.renter_registration = artifact.renter_registration;
       if (artifact.renter_driver_license) updateData.renter_driver_license = artifact.renter_driver_license;
       if (artifact.renter_birth_date) updateData.renter_birth_date = artifact.renter_birth_date;
+      if (artifact.license_categories) updateData.license_categories = artifact.license_categories;
+      if (artifact.license_expiry_date) updateData.license_expiry_date = artifact.license_expiry_date;
     }
 
     const { error: updateError } = await privateSchema()
@@ -767,19 +818,6 @@ export async function getRentalDocsPrefillAction(params: {
     const passportParts = (source.renter_passport || "").trim().split(/\s+/);
     const licenseParts = (source.renter_driver_license || "").trim().split(/\s+/);
 
-    // Try to get license categories from artifact if available
-    let licenseCategories: string | undefined;
-    if (verifiedRow) {
-      const { data: artifact } = await privateSchema()
-        .from("rental_contract_artifacts")
-        .select("license_categories")
-        .eq("telegram_chat_id", chatId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      licenseCategories = artifact?.license_categories || undefined;
-    }
-
     return {
       success: true,
       data: {
@@ -793,8 +831,8 @@ export async function getRentalDocsPrefillAction(params: {
         registrationAddress: source.renter_registration || undefined,
         licenseSeries: licenseParts[0] || undefined,
         licenseNumber: licenseParts[1] || undefined,
-        licenseCategories,
-        licenseExpiryDate: undefined, // not stored in user_rental_secrets
+        licenseCategories: source.license_categories || undefined,
+        licenseExpiryDate: source.license_expiry_date || undefined,
         verificationStatus: source.verification_status,
         hasVerifiedData: prefillVerified || !!verifiedRow,
       },
