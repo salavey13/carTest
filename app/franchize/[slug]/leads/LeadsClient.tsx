@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   Flame, Phone, CheckCircle, ChevronDown, ChevronRight, Plus,
   Trash2, Send, Clock, TrendingUp, Search,
-  X, Bike, FileText, Mail, CircleDot, Users, Lock, AlertCircle,
+  X, Bike, FileText, CircleDot, Users, Lock, AlertCircle,
   LayoutList, Columns3, MoreHorizontal, Calendar, UserPlus,
   Download, Star, Filter, ArrowUpRight, StickyNote, History,
-  MapPin, Briefcase, Zap
+  MapPin
 } from "lucide-react";
 import { validateAnalyticsPassword } from "../../server-actions/rentals-dashboard";
 
@@ -25,6 +25,7 @@ interface LeadRow {
   intentType?: string | null;
   intentStage?: string | null;
   urgencyScore?: number | null;
+  telegramChatId?: string | null;
 }
 
 interface TodoRow {
@@ -630,24 +631,105 @@ function HistoryPanel({ lead, T }: { lead: LeadRow; T: ThemeTokens }) {
 
 // ── Contact Panel ─────────────────────────────────────────────────────────────
 
-function ContactPanel({ lead, T }: { lead: LeadRow; T: ThemeTokens }) {
+function ContactPanel({ lead, T, todos }: { lead: LeadRow; T: ThemeTokens; todos?: TodoRow[] }) {
+  const [showTgInput, setShowTgInput] = useState(false);
+  const [tgMessage, setTgMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const handleTgSend = async () => {
+    if (!tgMessage.trim() || !lead.telegramChatId) return;
+    setSending(true);
+    try {
+      const resp = await fetch("/api/franchize/notify-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telegramChatId: lead.telegramChatId, message: tgMessage.trim() }),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        setSent(true);
+        setTimeout(() => { setSent(false); setShowTgInput(false); setTgMessage(""); }, 2000);
+      }
+    } catch { /* ignore */ }
+    setSending(false);
+  };
+
+  const addTodosToMessage = () => {
+    if (!todos || todos.length === 0) return;
+    const pendingTodos = todos.filter((t) => t.status !== "done");
+    if (pendingTodos.length === 0) return;
+    const todoText = pendingTodos.map((t) => `• ${t.title}`).join("\n");
+    setTgMessage((prev) => (prev ? prev + "\n\n" : "") + todoText);
+  };
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {lead.phone && (
-          <>
-            <ActionBtn href={`tel:${lead.phone}`} icon={Phone} label="Позвонить" T={T} />
-            <ActionBtn href={`sms:${lead.phone}`} icon={Mail} label="SMS" T={T} />
-          </>
+          <ActionBtn href={`tel:${lead.phone}`} icon={Phone} label="Позвонить" T={T} />
         )}
         {lead.username && (
           <ActionBtn href={`https://t.me/${lead.username}`} icon={Send} label="Telegram" T={T} external />
         )}
+        {lead.telegramChatId && (
+          <button onClick={() => setShowTgInput(!showTgInput)}
+            className="group flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-[11px] font-medium transition hover:brightness-110"
+            style={{
+              borderColor: T.border,
+              backgroundColor: showTgInput ? `${T.accent}18` : T.bgElevated,
+              color: showTgInput ? T.accent : T.text,
+            }}>
+            <Send className="h-3.5 w-3.5 transition group-hover:scale-110" style={{ color: T.accent }} />
+            {showTgInput ? "Закрыть" : "Уведомить"}
+          </button>
+        )}
       </div>
+
+      {showTgInput && lead.telegramChatId && (
+        <div className="space-y-2 rounded-xl border p-3" style={{ borderColor: T.inputBorder, backgroundColor: T.bgElevated }}>
+          <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: T.accent }}>
+            <Send className="h-3.5 w-3.5" />
+            Уведомление в Telegram
+          </div>
+          <div className="relative">
+            <textarea
+              value={tgMessage} onChange={(e) => setTgMessage(e.target.value)}
+              placeholder="Текст уведомления..."
+              rows={3}
+              className="w-full resize-none rounded-lg border px-3 py-2 pr-8 text-xs outline-none"
+              style={{ borderColor: T.inputBorder, backgroundColor: T.inputBg, color: T.text }}
+            />
+            {todos && todos.filter((t) => t.status !== "done").length > 0 && (
+              <button onClick={addTodosToMessage}
+                title="Добавить задачи в текст"
+                className="absolute right-2 top-2 rounded p-1 transition hover:opacity-80"
+                style={{ color: T.accent }}>
+                <StickyNote className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleTgSend} disabled={sending || !tgMessage.trim()}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+              style={{ backgroundColor: T.accent }}>
+              {sending ? "…" : sent ? "✅" : <><Send className="h-3 w-3" /> Отправить</>}
+            </button>
+            {todos && todos.filter((t) => t.status !== "done").length > 0 && (
+              <button onClick={addTodosToMessage}
+                className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-medium transition hover:opacity-80"
+                style={{ borderColor: T.border, color: T.textMuted }}>
+                <StickyNote className="h-3 w-3" /> + задачи
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {lead.phone && <InfoTile label="Телефон" value={lead.phone} T={T} />}
         {lead.username && <InfoTile label="Telegram" value={`@${lead.username}`} T={T} />}
+        {lead.telegramChatId && <InfoTile label="TG ID" value={lead.telegramChatId} T={T} />}
         {lead.bikeTitle && <InfoTile label="Байк" value={lead.bikeTitle} T={T} />}
         {lead.intentStage && <InfoTile label="Стадия" value={STAGE_LABELS[lead.intentStage] || lead.intentStage} T={T} />}
         {lead.urgencyScore != null && <InfoTile label="Приоритет" value={`${lead.urgencyScore}/100`} T={T} />}
@@ -688,12 +770,17 @@ function LeadCard({
       }}>
       <div className="absolute left-0 top-0 h-full w-1" style={{ backgroundColor: tempColor }} />
 
-      <div className="flex items-start gap-3 pl-2">
+          <div className="flex items-start gap-3 pl-2">
         <Avatar name={lead.full_name} source={lead.source} size={48} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="truncate text-sm font-bold" style={{ color: T.text }}>{displayName}</p>
             {lead.verified && <CheckCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400" />}
+            {lead.telegramChatId && !lead.verified && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-cyan-500/15 text-[9px]" style={{ color: "#22d3ee" }} title="Есть связь с документом">
+                <Send className="h-3 w-3" />
+              </span>
+            )}
             {pendingTodos > 0 && (
               <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500/15 px-1.5 text-[10px] font-bold text-amber-400">
                 {pendingTodos}
@@ -803,7 +890,7 @@ function DetailPanel({ lead, todos, crewId, slug, T, onClose }: {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        {tab === "contacts" && <ContactPanel lead={lead} T={T} />}
+        {tab === "contacts" && <ContactPanel lead={lead} T={T} todos={todos} />}
         {tab === "tasks" && <TodoList leadId={lead.user_id} leadName={displayName} todos={todos} crewId={crewId} slug={slug} T={T} />}
         {tab === "notes" && <NotesPanel leadId={lead.user_id} T={T} />}
         {tab === "history" && <HistoryPanel lead={lead} T={T} />}
@@ -818,7 +905,7 @@ function BoardView({
   leads, selectedId, onSelect, onDismiss, getTodosForLead, T, crewId, slug,
 }: {
   leads: LeadRow[]; selectedId: string | null; onSelect: (id: string) => void;
-  onDismiss: (id: string) => void; getTodosForLead: (id: string) => TodoRow[];
+  onDismiss: (id: string) => void;   getTodosForLead: (lead: LeadRow) => TodoRow[];
   T: ThemeTokens; crewId: string; slug: string;
 }) {
   const columnMap = useMemo(() => {
@@ -845,7 +932,7 @@ function BoardView({
           </div>
           <div className="flex-1 space-y-2 overflow-y-auto p-2">
             {columnMap[col.key].map((lead) => {
-              const pending = getTodosForLead(lead.user_id).filter((t) => t.status !== "done").length;
+              const pending = getTodosForLead(lead).filter((t) => t.status !== "done").length;
               return (
                 <div key={lead.user_id} onClick={() => onSelect(lead.user_id)}
                   className="cursor-pointer rounded-xl border p-2.5 transition hover:shadow-sm"
@@ -944,9 +1031,21 @@ export function LeadsClient({
     try { return JSON.parse(todo.description).lead_id || null; } catch { return null; }
   }, []);
 
-  const getTodosForLead = useCallback((leadId: string): TodoRow[] => {
-    return todos.filter((t) => getTodoLeadId(t) === leadId);
-  }, [todos, getTodoLeadId]);
+  const getTodoLeadPhone = useCallback((todo: TodoRow): string | null => {
+    if (!todo.description) return null;
+    try { return JSON.parse(todo.description).lead_phone || null; } catch { return null; }
+  }, []);
+
+  const getTodosForLead = useCallback((lead: LeadRow): TodoRow[] => {
+    return todos.filter((t) => {
+      const leadId = getTodoLeadId(t);
+      if (leadId === lead.user_id) return true;
+      const leadPhone = getTodoLeadPhone(t);
+      if (leadPhone && lead.phone && leadPhone === lead.phone) return true;
+      if (leadId && lead.phone && leadId === lead.phone) return true;
+      return false;
+    });
+  }, [todos, getTodoLeadId, getTodoLeadPhone]);
 
   const dedupedLeads = useMemo(() => {
     const map = new Map<string, LeadRow>();
@@ -988,7 +1087,7 @@ export function LeadsClient({
     if (filterSource !== "all") result = result.filter((l) => l.source === filterSource);
     if (segment !== "all") {
       result = result.filter((l) => {
-        const pt = getTodosForLead(l.user_id).filter((t) => t.status !== "done").length;
+        const pt = getTodosForLead(l).filter((t) => t.status !== "done").length;
         if (segment === "verified") return l.verified;
         if (segment === "hot") return !l.verified && ((l.urgencyScore ?? 0) >= 60 || pt > 0);
         return !l.verified && !((l.urgencyScore ?? 0) >= 60 || pt > 0);
@@ -1002,8 +1101,8 @@ export function LeadsClient({
     switch (sortMode) {
       case "urgent":
         return arr.sort((a, b) => {
-          const aT = getTodosForLead(a.user_id).filter((t) => t.status !== "done").length;
-          const bT = getTodosForLead(b.user_id).filter((t) => t.status !== "done").length;
+          const aT = getTodosForLead(a).filter((t) => t.status !== "done").length;
+          const bT = getTodosForLead(b).filter((t) => t.status !== "done").length;
           const aScore = (a.urgencyScore || 0) + aT * 20;
           const bScore = (b.urgencyScore || 0) + bT * 20;
           if (aScore !== bScore) return bScore - aScore;
@@ -1026,7 +1125,7 @@ export function LeadsClient({
     const verified: LeadRow[] = [];
     const warm: LeadRow[] = [];
     for (const l of sortedLeads) {
-      const pt = getTodosForLead(l.user_id).filter((t) => t.status !== "done").length;
+      const pt = getTodosForLead(l).filter((t) => t.status !== "done").length;
       if (l.verified) { verified.push(l); continue; }
       if ((l.urgencyScore ?? 0) >= 60 || pt > 0) { hot.push(l); continue; }
       warm.push(l);
@@ -1035,8 +1134,18 @@ export function LeadsClient({
   }, [sortedLeads, getTodosForLead]);
 
   const availableSources = useMemo(() => Array.from(new Set(leads.map((l) => l.source))), [leads]);
-  const hasFilters = searchQuery || filterSource !== "all";
+  const hasFilters = !!(searchQuery || filterSource !== "all");
   const selectedLead = useMemo(() => sortedLeads.find((l) => l.user_id === selectedId) || null, [sortedLeads, selectedId]);
+
+  // ── Autoscroll to detail panel on mobile when lead selected ──────────────
+  const detailRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selectedLead && detailRef.current) {
+      if (window.innerWidth < 1280) {
+        setTimeout(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      }
+    }
+  }, [selectedLead]);
 
   // ── Dismiss ────────────────────────────────────────────────────────────────
   const handleDismissLead = async (leadId: string) => {
@@ -1124,7 +1233,7 @@ export function LeadsClient({
                 isSelected={selectedId === lead.user_id}
                 onSelect={() => setSelectedId(selectedId === lead.user_id ? null : lead.user_id)}
                 onDismiss={handleDismissLead}
-                todos={getTodosForLead(lead.user_id)}
+                todos={getTodosForLead(lead)}
                 crewId={crewId}
                 slug={slug}
               />
@@ -1133,11 +1242,11 @@ export function LeadsClient({
 
           {/* Detail panel */}
           {selectedLead && (
-            <div className="xl:col-span-3">
+            <div className="xl:col-span-3" ref={detailRef}>
               <div className="sticky top-24 max-h-[calc(100vh-140px)]">
                 <DetailPanel
                   lead={selectedLead}
-                  todos={getTodosForLead(selectedLead.user_id)}
+                  todos={getTodosForLead(selectedLead)}
                   crewId={crewId}
                   slug={slug}
                   T={T}

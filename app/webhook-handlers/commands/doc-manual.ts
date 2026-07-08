@@ -1723,6 +1723,8 @@ ${qrDeepLink}`);
       ];
       if ((context.helmets || 0) > 0) todos.push({ title: `🪖 Принять ${context.helmets} шлем(а/ов)`, priority: "medium" });
       if ((context.gloves || 0) > 0) todos.push({ title: `🧤 Принять ${context.gloves} перчатки`, priority: "low" });
+      if (context.jacket) todos.push({ title: `🧥 Принять куртку`, priority: "low" });
+      if (context.boots) todos.push({ title: `👢 Принять боты`, priority: "low" });
       if (context.net) todos.push({ title: `🌐 Принять сетку`, priority: "low" });
       if (context.backpack) todos.push({ title: `👜 Принять рюкзак`, priority: "low" });
       if (context.bag) todos.push({ title: `👜 Принять сумку`, priority: "low" });
@@ -1741,6 +1743,7 @@ ${qrDeepLink}`);
             category: "lead_followup",
             description: JSON.stringify({
               lead_id: leadId,
+              lead_phone: context.clientPhone || "",
               lead_name: context.mpFullName || "",
               bike_id: bike.id,
               rental_id: rentalId || null,
@@ -1776,6 +1779,7 @@ ${qrDeepLink}`);
             category: "lead_followup",
             description: JSON.stringify({
               lead_id: leadId,
+              lead_phone: context.clientPhone || "",
               lead_name: context.mpFullName || "",
               bike_id: bike.id,
               deal_type: "sale",
