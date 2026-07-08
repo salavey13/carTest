@@ -57,6 +57,7 @@ import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets } f
 import { privateSchema } from "@/lib/private-secrets";
 import nodemailer from "nodemailer";
 import { calculatePriceForDuration } from "@/app/franchize/lib/pricing-calculator";
+import { isCrewMember } from "@/app/lib/user-rental-secrets";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026; // 👍 Fixed current year
@@ -1502,8 +1503,14 @@ ${qrDeepLink}`);
       }
     }
 
+    // Save rental secrets for 1-click next rent.
+    // If the caller is a crew member (operator creating contract for a renter),
+    // leave chat_id NULL so the operator does not accidentally load the renter's
+    // personal data in their own profile/order. The renter claims it via QR.
+    const creatorIsCrewMember = await isCrewMember(String(userId), "vip-bike");
+    const secretChatId = creatorIsCrewMember ? null : String(userId);
     const { error: secretsError } = await privateSchema().from("user_rental_secrets").insert({
-      chat_id: String(userId),
+      chat_id: secretChatId,
       crew_slug: "vip-bike",
       doc_sha256: docSha256,
       renter_full_name: context.mpFullName || null,

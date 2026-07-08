@@ -142,21 +142,27 @@ async function updateRentalSecretWithQrTracking(
 // ─── Helper: check if chat_id is a crew member ──────────────────────────────
 
 /**
- * Check if a chat_id belongs to a crew member for the given crew_slug.
- * Used to allow operators (crew members) to create secrets that renters can later claim.
+ * Check if a chat_id belongs to a crew member OR owner for the given crew_slug.
+ * Used to allow operators (crew members) to create secrets that renters can later claim,
+ * and to prevent crew members/owners from loading renter data as their own.
  */
-async function isCrewMember(chatId: string, crewSlug: string): Promise<boolean> {
+export async function isCrewMember(chatId: string, crewSlug: string): Promise<boolean> {
   try {
-    // First, find crew_id by slug
+    // First, find crew by slug
     const { data: crew, error: crewError } = await supabaseAdmin
       .from("crews")
-      .select("id")
+      .select("id, owner_id")
       .eq("slug", crewSlug)
       .maybeSingle();
 
     if (crewError || !crew) {
       console.log(`[user-rental-secrets] isCrewMember: crew not found for slug=${crewSlug}`);
       return false;
+    }
+
+    // Owner is always treated as crew
+    if (crew.owner_id === chatId) {
+      return true;
     }
 
     // Then check if chat_id is a member of this crew
@@ -191,15 +197,25 @@ export async function getUserRentalSecrets(
   if (!normalizedChatId || !normalizedCrewSlug) return null;
 
   try {
-    const { data, error } = await privateSchema()
+    let query = privateSchema()
       .from("user_rental_secrets")
       .select("*")
       .eq("chat_id", normalizedChatId)
       .eq("crew_slug", normalizedCrewSlug)
       .eq("verification_status", "verified")
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+
+    // SECURITY: crew members must not load renter data keyed under their chat_id.
+    // Operators create contracts for renters; those secrets are either unclaimed
+    // (chat_id=NULL) or (historically) keyed under the operator. Crew members'
+    // own saved data is always source_doc_key='profile_prefill'.
+    const crewMember = await isCrewMember(normalizedChatId, normalizedCrewSlug);
+    if (crewMember) {
+      query = query.eq("source_doc_key", "profile_prefill");
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
       logUserRentalSecretsError("getUserRentalSecrets", error);
@@ -255,13 +271,21 @@ export async function getAllVerifiedRentalSecrets(
   if (!normalizedChatId || !normalizedCrewSlug) return [];
 
   try {
-    const { data, error } = await privateSchema()
+    let query = privateSchema()
       .from("user_rental_secrets")
       .select("*")
       .eq("chat_id", normalizedChatId)
       .eq("crew_slug", normalizedCrewSlug)
       .eq("verification_status", "verified")
       .order("created_at", { ascending: false });
+
+    // SECURITY: crew members only see their own profile_prefill rows.
+    const crewMember = await isCrewMember(normalizedChatId, normalizedCrewSlug);
+    if (crewMember) {
+      query = query.eq("source_doc_key", "profile_prefill");
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       logUserRentalSecretsError("getAllVerifiedRentalSecrets", error);

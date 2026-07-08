@@ -428,6 +428,8 @@ export interface BuildRentalContractVariablesOptions {
   equipment?: {
     helmets?: number;
     gloves?: number;
+    jacket?: boolean;
+    boots?: boolean;
     net?: boolean;
     backpack?: boolean;
     bag?: boolean;
@@ -525,6 +527,8 @@ export function buildRentalContractVariables(
   const equipmentCostTotal =
     (eq.helmets || 0) * 1000 +
     (eq.gloves || 0) * 500 +
+    (eq.jacket ? 500 : 0) +
+    (eq.boots ? 500 : 0) +
     (eq.net ? 500 : 0) +
     (eq.backpack ? 500 : 0) +
     (eq.bag ? 500 : 0) +

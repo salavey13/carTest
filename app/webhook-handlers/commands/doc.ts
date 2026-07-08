@@ -52,7 +52,7 @@ import { logger } from "@/lib/logger";
 import { supabaseAdmin, supabaseAnon } from "@/hooks/supabase";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
-import { saveUserRentalSecrets } from "@/app/lib/user-rental-secrets";
+import { saveUserRentalSecrets, isCrewMember } from "@/app/lib/user-rental-secrets";
 import { deriveUserAccessTier, getAccessTierLabel } from "@/app/lib/derive-access-tier";
 import type { AccessTier } from "@/app/lib/ocr-constants";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
@@ -760,12 +760,17 @@ async function generateAndSendContract(
       }
     }
 
-    // Save rental secrets for 1-click next rent
+    // Save rental secrets for 1-click next rent.
+    // If the caller is a crew member (operator creating contract for a renter),
+    // leave chat_id NULL so the operator does not accidentally load the renter's
+    // personal data in their own profile/order. The renter claims it via QR.
+    const creatorIsCrewMember = await isCrewMember(String(userId), "vip-bike");
+    const secretChatId = creatorIsCrewMember ? null : String(userId);
     const { error: secretsError } = await supabaseAdmin
       .schema("private")
       .from("user_rental_secrets")
       .insert({
-        chat_id: String(userId),
+        chat_id: secretChatId,
         crew_slug: "vip-bike",
         doc_sha256: docSha256,
         renter_full_name: passport.fullName || null,

@@ -3,6 +3,7 @@
 import { createHash } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { privateSchema } from "@/lib/private-secrets";
+import { isCrewMember } from "@/app/lib/user-rental-secrets";
 
 export type FranchizeAchievementDefinition = {
   id: string;
@@ -375,23 +376,37 @@ export async function getFranchizeUserRentalSecretsAction(params: {
   error?: string;
 }> {
   try {
+    // SECURITY: crew members/operators must never load renter data as their own.
+    // When an operator creates a contract via /doc, the secret is saved with
+    // chat_id=NULL (or historically with the operator's chat_id as a placeholder).
+    // Only the operator's own profile_prefill (source_doc_key='profile_prefill')
+    // should be returned to them.
+    const userIsCrewMember = await isCrewMember(params.userId, params.slug);
+
     // 1. Check user_rental_secrets (claimed secrets via QR, always has data)
-    const { data: rentalSecret, error: secretError } = await privateSchema()
+    let secretsQuery = privateSchema()
       .from("user_rental_secrets")
-      .select("renter_full_name,renter_phone,renter_passport,renter_driver_license,renter_birth_date,license_expiry_date,license_categories,created_at")
+      .select("renter_full_name,renter_phone,renter_passport,renter_driver_license,renter_birth_date,license_expiry_date,license_categories,created_at,source_doc_key")
       .eq("chat_id", params.userId)
       .eq("crew_slug", params.slug)
       .eq("verification_status", "verified")
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+
+    if (userIsCrewMember) {
+      secretsQuery = secretsQuery.eq("source_doc_key", "profile_prefill");
+    }
+
+    const { data: rentalSecret, error: secretError } = await secretsQuery.maybeSingle();
 
     if (secretError && secretError.code !== "PGRST116") {
       return { success: false, error: secretError.message };
     }
 
     // 2. Fallback to rental_contract_artifacts (if no claimed secret)
-    if (!rentalSecret) {
+    // Crew members are NOT allowed to fallback to artifacts — those rows may
+    // contain renter data keyed under the operator's telegram_chat_id.
+    if (!rentalSecret && !userIsCrewMember) {
       const { data: artifact } = await privateSchema()
         .from("rental_contract_artifacts")
         .select("renter_full_name,renter_phone,renter_passport,renter_driver_license,renter_birth_date,license_categories,license_expiry_date,created_at")
@@ -664,6 +679,12 @@ export async function saveRentalDocsPrefillAction(params: {
  */
 export async function tryVerifyUserRentalDocs(chatId: string, crewSlug: string): Promise<boolean> {
   try {
+    // SECURITY: crew members must not auto-verify their prefill using renter data.
+    // Rental_contract_artifacts keyed under an operator's telegram_chat_id contain
+    // the renter's personal data, not the operator's.
+    const userIsCrewMember = await isCrewMember(chatId, crewSlug);
+    if (userIsCrewMember) return false;
+
     // 1. Check private.rental_contract_artifacts for contracts created for this user
     const { data: artifact } = await privateSchema()
       .from("rental_contract_artifacts")
@@ -785,9 +806,16 @@ export async function getRentalDocsPrefillAction(params: {
       .update(`profile_prefill_${chatId}_${params.slug}`)
       .digest("hex");
 
+    // SECURITY: crew members must not load renter data keyed under their chat_id.
+    const userIsCrewMember = await isCrewMember(chatId, params.slug);
+
     // 2. Auto-verify: check if user has completed rentals
-    //    If yes, upgrade prefill from "pending" to "verified" with authoritative data
-    await tryVerifyUserRentalDocs(chatId, params.slug);
+    //    If yes, upgrade prefill from "pending" to "verified" with authoritative data.
+    //    Skipped for crew members — rental_contract_artifacts keyed under their
+    //    telegram_chat_id contain renter data, not their own.
+    if (!userIsCrewMember) {
+      await tryVerifyUserRentalDocs(chatId, params.slug);
+    }
 
     // 3. Try to get the (now possibly verified) prefill record
     const { data: prefillRow } = await privateSchema()
@@ -798,16 +826,21 @@ export async function getRentalDocsPrefillAction(params: {
 
     // 4. Also check for other verified data from previous rentals
     //    (separate rows created by operator during contract generation)
-    const { data: verifiedRow } = await privateSchema()
-      .from("user_rental_secrets")
-      .select("*")
-      .eq("chat_id", chatId)
-      .eq("crew_slug", params.slug)
-      .eq("verification_status", "verified")
-      .neq("doc_sha256", docSha256) // exclude the prefill row (already fetched above)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    //    Skipped for crew members — those rows contain renter data, not their own.
+    let verifiedRow: any = null;
+    if (!userIsCrewMember) {
+      const { data: foundVerified } = await privateSchema()
+        .from("user_rental_secrets")
+        .select("*")
+        .eq("chat_id", chatId)
+        .eq("crew_slug", params.slug)
+        .eq("verification_status", "verified")
+        .neq("doc_sha256", docSha256) // exclude the prefill row (already fetched above)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      verifiedRow = foundVerified;
+    }
 
     // 5. Merge: prefer verified data from either source
     const prefillVerified = prefillRow?.verification_status === "verified";

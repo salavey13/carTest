@@ -50,3 +50,34 @@ export function getTelegramWebAppPageHref(
   const cleanPath = pagePath.replace(/^\/+/, "");
   return `https://t.me/${normalizedBot}/app?startapp=${encodeURIComponent(cleanPath)}`;
 }
+
+/**
+ * Detect desktop browser from user agent string.
+ * Used to choose between t.me deep link (mobile → opens Telegram app)
+ * and web.telegram.org (desktop → opens Telegram Web).
+ */
+export function isDesktopBrowser(userAgent?: string): boolean {
+  const ua = userAgent || (typeof navigator !== "undefined" ? navigator.userAgent : "");
+  if (!ua) return false;
+  const mobileIndicators = /Mobile|Android|iPhone|iPad|iPod|Windows Phone|webOS|BlackBerry|IEMobile|Opera Mini/i;
+  return !mobileIndicators.test(ua);
+}
+
+/**
+ * Build a Telegram WebApp href that adapts to the device.
+ * - Mobile: `https://t.me/<bot>/app?startapp=<value>` (opens Telegram app)
+ * - Desktop: `https://web.telegram.org/a/#<bot>?startapp=<value>` (opens Telegram Web)
+ */
+export function getTelegramWebAppAdaptiveHref(
+  startappValue: string,
+  botUsername?: string | null,
+  userAgent?: string,
+): string {
+  const normalizedBot = sanitizeTelegramUsername(botUsername) || DEFAULT_TELEGRAM_BOT_USERNAME;
+  if (!normalizedBot) return "";
+  const encodedValue = encodeURIComponent(startappValue);
+  if (isDesktopBrowser(userAgent)) {
+    return `https://web.telegram.org/a/#${normalizedBot}?startapp=${encodedValue}`;
+  }
+  return `https://t.me/${normalizedBot}/app?startapp=${encodedValue}`;
+}
