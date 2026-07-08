@@ -168,8 +168,8 @@ export function RentalDocsForm({
               onChange={(e) => setBirthDate(e.target.value)}
             />
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
+          <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
+            <div className="min-w-0">
               <label className={labelClass}>Серия паспорта</label>
               <input
                 className={inputClass}
@@ -181,7 +181,7 @@ export function RentalDocsForm({
               />
               <p className={exampleClass}>4 цифры</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <label className={labelClass}>Номер паспорта</label>
               <input
                 className={inputClass}
@@ -252,8 +252,8 @@ export function RentalDocsForm({
       {/* License section */}
       {activeSection === "license" && (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
+          <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
+            <div className="min-w-0">
               <label className={labelClass}>Серия ВУ</label>
               <input
                 className={inputClass}
@@ -265,7 +265,7 @@ export function RentalDocsForm({
               />
               <p className={exampleClass}>2 цифры</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <label className={labelClass}>Номер ВУ</label>
               <input
                 className={inputClass}
