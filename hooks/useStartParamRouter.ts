@@ -10,6 +10,10 @@ import { setReferrer } from "@/app/bio30/ref_actions";
 import { applyReferralCode } from "@/app/wblanding/actions_view";
 import { consumeTempFranchizeCartAction } from "@/contexts/actions";
 import { isMockUserModeEnabled } from "@/lib/mockUserMode";
+import {
+  decodeStartappState,
+  isStartappStateFresh,
+} from "@/lib/startapp-state";
 
 const START_PARAM_PAGE_MAP: Record<string, string> = {
   elon: "/elon",
@@ -248,7 +252,7 @@ export function useStartParamRouter() {
 
   useEffect(() => {
     const processStartParam = async () => {
-      const urlStartParam = searchParams.get("tgWebAppStartParam");
+      const urlStartParam = searchParams.get("tgWebAppStartParam") || searchParams.get("startapp");
       const rawStartParam = startParamPayload || urlStartParam;
       const paramToProcess = normalizeStartParamPath(rawStartParam);
       const normalizedUrlStartParam = normalizeStartParamPath(urlStartParam);
@@ -308,6 +312,39 @@ export function useStartParamRouter() {
             }
           }
           targetPath = pathname;
+        } else if (paramToProcess.startsWith("cart_")) {
+          // Structured state from website→Telegram handoff: cart_<base64url(json)>
+          // Decode and redirect to catalog with individual query params
+          const state = decodeStartappState(paramToProcess);
+          if (state) {
+            if (!isStartappStateFresh(state)) {
+              logger.warn('[ClientLayout] cart_ state expired', { bikeId: state.bikeId });
+              targetPath = `/franchize/vip-bike?startapp_expired=1&bikeId=${encodeURIComponent(state.bikeId)}`;
+            } else {
+              logger.info('[ClientLayout] cart_ state decoded', { type: state.type, bikeId: state.bikeId });
+              const params = new URLSearchParams({
+                startappState: paramToProcess,
+                startappBikeId: state.bikeId,
+              });
+              if (state.startDate) params.set('startDate', state.startDate);
+              if (state.endDate) params.set('endDate', state.endDate);
+              if (state.startTime) params.set('startTime', state.startTime);
+              if (state.endTime) params.set('endTime', state.endTime);
+              if (state.helmetCount) params.set('helmetCount', String(state.helmetCount));
+              if (state.extrasGloves) params.set('extrasGloves', 'true');
+              if (state.extrasNet) params.set('extrasNet', 'true');
+              if (state.extrasBag) params.set('extrasBag', 'true');
+              if (state.extrasJacket) params.set('extrasJacket', 'true');
+              if (state.extrasBoots) params.set('extrasBoots', 'true');
+              if (state.extrasBackpack) params.set('extrasBackpack', 'true');
+              if (state.extrasCharger) params.set('extrasCharger', 'true');
+              if (state.package) params.set('package', state.package);
+              if (state.perk) params.set('perk', state.perk);
+              targetPath = `/franchize/vip-bike?${params.toString()}`;
+            }
+          } else {
+            logger.warn('[ClientLayout] failed to decode cart_ state', { paramPreview: paramToProcess.slice(0, 50) });
+          }
         } else if (paramToProcess.startsWith("buy_")) {
           targetPath = await resolveFranchizeVehicleLink(paramToProcess, "buy") ?? undefined;
         } else if (paramToProcess.startsWith("rent_")) {
