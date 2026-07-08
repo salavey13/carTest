@@ -36,11 +36,14 @@ export interface StartappState {
   endTime?: string;
   /** Number of helmets requested. */
   helmetCount?: number;
-  /** Additional items: gloves, net, bag, coat (true/false). */
+  /** Additional items: gloves, net, bag, coat, jacket, boots, backpack, charger (true/false). */
   extrasGloves?: boolean;
   extrasNet?: boolean;
   extrasBag?: boolean;
-  extrasCoat?: boolean;
+  extrasJacket?: boolean;
+  extrasBoots?: boolean;
+  extrasBackpack?: boolean;
+  extrasCharger?: boolean;
   /** Package tier selected ("Базовый" | "Комфорт" | "Максимум"). */
   package?: string;
   /** Selected perk ("Стандарт" | "Шлем + GoPro" | "Полный комплект"). */

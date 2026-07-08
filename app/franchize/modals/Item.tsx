@@ -504,9 +504,12 @@ function PricingTable({
 export const ADDITIONAL_ITEMS = [
   { key: "helmet", label: "Шлем", icon: "🪖", price: 1000, type: "count" as const, max: 2 },
   { key: "gloves", label: "Перчатки", icon: "🧤", price: 500, type: "toggle" as const },
+  { key: "jacket", label: "Куртка", icon: "🧥", price: 500, type: "toggle" as const },
+  { key: "boots", label: "Боты/Сапоги", icon: "👢", price: 500, type: "toggle" as const },
   { key: "net", label: "Сетка", icon: "🌐", price: 500, type: "toggle" as const },
+  { key: "backpack", label: "Рюкзак", icon: "🎒", price: 500, type: "toggle" as const },
   { key: "bag", label: "Багажная сумка", icon: "👜", price: 500, type: "toggle" as const },
-  { key: "coat", label: "Дождевик", icon: "🧥", price: 500, type: "toggle" as const },
+  { key: "charger", label: "Зарядка", icon: "🔌", price: 500, type: "toggle" as const },
 ];
 
 export type AdditionalItemsSelection = Record<string, number | boolean>;
@@ -803,10 +806,11 @@ function CallbackRequestForm({
     setSubmitted(true);
   };
 
-  // Theme-aware input style using CSS variables set by getModalThemeVars
+  // Theme-aware input style — use color-mix to guarantee visible contrast from card background
   const inputStyle = {
-    backgroundColor: "var(--item-input-bg, var(--item-border))",
-    borderColor: "var(--item-border)",
+    backgroundColor: "color-mix(in srgb, var(--franchize-bg-base, #fff) 88%, var(--franchize-text-primary, #000))",
+    borderColor: "var(--item-accent)",
+    borderWidth: "1.5px",
   };
 
   if (submitted) {
@@ -822,7 +826,15 @@ function CallbackRequestForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-2xl border p-3" style={{ borderColor: "var(--item-border)", backgroundColor: "color-mix(in srgb, var(--item-border) 15%, transparent)" }}>
+    <form
+      onSubmit={handleSubmit}
+      style={{
+        touchAction: "manipulation",
+        borderColor: "var(--item-border)",
+        backgroundColor: "color-mix(in srgb, var(--item-border) 15%, transparent)",
+      }}
+      className="rounded-2xl border p-3"
+    >
       <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
         <Phone className="h-3.5 w-3.5" /> Запросить звонок
       </p>
@@ -837,7 +849,7 @@ function CallbackRequestForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="w-full rounded-lg border px-3 py-2 text-sm text-[var(--item-text)] transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
-          style={inputStyle}
+          style={{ ...inputStyle, touchAction: "manipulation" }}
           aria-label="Ваше имя"
           required
           minLength={2}
@@ -848,7 +860,7 @@ function CallbackRequestForm({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           className="w-full rounded-lg border px-3 py-2 text-sm text-[var(--item-text)] transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
-          style={inputStyle}
+          style={{ ...inputStyle, touchAction: "manipulation" }}
           aria-label="Номер телефона"
           required
           minLength={6}
@@ -1203,7 +1215,10 @@ export function ItemModal({
           extrasGloves: extrasSelection.gloves === true || undefined,
           extrasNet: extrasSelection.net === true || undefined,
           extrasBag: extrasSelection.bag === true || undefined,
-          extrasCoat: extrasSelection.coat === true || undefined,
+          extrasJacket: extrasSelection.jacket === true || undefined,
+          extrasBoots: extrasSelection.boots === true || undefined,
+          extrasBackpack: extrasSelection.backpack === true || undefined,
+          extrasCharger: extrasSelection.charger === true || undefined,
           package: options.package || undefined,
           perk: options.perk || undefined,
         };

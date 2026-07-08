@@ -715,7 +715,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     if (searchParams.get("extrasGloves") === "true") extrasParts.push("🧤 Перчатки");
     if (searchParams.get("extrasNet") === "true") extrasParts.push("🌐 Сеть");
     if (searchParams.get("extrasBag") === "true") extrasParts.push("👜 Сумка");
-    if (searchParams.get("extrasCoat") === "true") extrasParts.push("🧥 Дождевик");
+    if (searchParams.get("extrasJacket") === "true") extrasParts.push("🧥 Куртка");
+    if (searchParams.get("extrasBoots") === "true") extrasParts.push("👢 Боты");
+    if (searchParams.get("extrasBackpack") === "true") extrasParts.push("🎒 Рюкзак");
+    if (searchParams.get("extrasCharger") === "true") extrasParts.push("🔌 Зарядка");
 
     const prefill: typeof initialSelectedOptions = {
       package: (searchParams.get("package") || "Базовый") as never,
