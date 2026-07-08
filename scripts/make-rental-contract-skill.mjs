@@ -556,7 +556,8 @@ const vars = {
   bike_year: bike.specs?.year || bike.specs?.production_year || 'уточняется',
   bike_engine_cc: engine_cc || '0',
   bike_power_hp: power_hp || '0',
-  bike_power_kw: power_kw || '0',
+  // All electric bikes capped at 3kW (regulatory class limit for L1B/L2B)
+  bike_power_kw: isElectric && power_kw ? (Number(power_kw) > 3 ? '3' : power_kw) : (power_kw || '0'),
   bike_max_speed: maxSpeed || 'уточняется',
   bike_battery: battery || (isElectric ? 'уточняется' : ''),
   // Dynamic vehicle type labels
@@ -572,8 +573,49 @@ const vars = {
   // Pricing: hourly + daily + computed subtotal
   hourly_price_rub: bikeHourlyPrice,
   daily_price_rub: bikeDailyPrice,
-  subtotal_rub: arg('subtotal', String(subtotalRounded)),
+  // Equipment — accept CLI flags or fall back to 0
+  equipment_helmets: String(Number(arg('helmets', '0'))),
+  equipment_gloves: String(Number(arg('gloves', '0'))),
+  equipment_charger: arg('charger') === '1' ? 'да' : 'нет',
+  equipment_net: arg('net') === '1' ? 'да' : 'нет',
+  equipment_backpack: arg('backpack') === '1' ? 'да' : 'нет',
+  equipment_bag: arg('bag') === '1' ? 'да' : 'нет',
+  // Equipment cost
+  equipment_total_cost: String(
+    Number(arg('helmets', '0')) * 1000 +
+    Number(arg('gloves', '0')) * 500 +
+    (arg('charger') === '1' ? 500 : 0) +
+    (arg('net') === '1' ? 500 : 0) +
+    (arg('backpack') === '1' ? 500 : 0) +
+    (arg('bag') === '1' ? 500 : 0)
+  ),
+  equipment_summary: (() => {
+    const parts = [];
+    const h = Number(arg('helmets', '0'));
+    const g = Number(arg('gloves', '0'));
+    if (h > 0) parts.push(`Шлем ×${h}`);
+    if (g > 0) parts.push(`Перчатки ×${g}`);
+    if (arg('charger') === '1') parts.push('Зарядка');
+    if (arg('net') === '1') parts.push('Сетка');
+    if (arg('backpack') === '1') parts.push('Рюкзак');
+    if (arg('bag') === '1') parts.push('Сумка');
+    return parts.length > 0 ? parts.join(', ') : '—';
+  })(),
+  // totalPayable = base rent + equipment + deposit
+  subtotal_rub: String(
+    subtotalRounded +
+    Number(arg('helmets', '0')) * 1000 +
+    Number(arg('gloves', '0')) * 500 +
+    (arg('charger') === '1' ? 500 : 0) +
+    (arg('net') === '1' ? 500 : 0) +
+    (arg('backpack') === '1' ? 500 : 0) +
+    (arg('bag') === '1' ? 500 : 0) +
+    Number(bikeDeposit)
+  ),
   deposit_rub: bikeDeposit,
+  // Payment split — default: cash = deposit, bank = rent + equipment
+  payment_cash_rub: String(Number(bikeDeposit)),
+  payment_bank_rub: String(subtotalRounded + Number(arg('helmets', '0')) * 1000 + Number(arg('gloves', '0')) * 500 + (arg('charger') === '1' ? 500 : 0) + (arg('net') === '1' ? 500 : 0) + (arg('backpack') === '1' ? 500 : 0) + (arg('bag') === '1' ? 500 : 0)),
   included_mileage:'200', overage_rate:'35', included_km_per_day:'200', extra_km_fee_rub:'35',
   late_return_penalty_rub: arg('latePenalty','10000'),
   late_return_penalty_max_days: arg('latePenaltyMaxDays','90'),
