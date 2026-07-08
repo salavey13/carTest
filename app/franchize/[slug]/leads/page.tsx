@@ -1,5 +1,4 @@
 // app/franchize/[slug]/leads/page.tsx
-import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { getFranchizeBySlug } from "../../actions";
 import { crewPaletteWithCssVars } from "../../lib/theme";
@@ -31,6 +30,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
     intentType?: string | null;
     intentStage?: string | null;
     urgencyScore?: number | null;
+    telegramChatId?: string | null;
   };
 
   const leads: LeadRow[] = [];
@@ -69,6 +69,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
         bikeTitle: u.metadata?.bikeTitle || null,
         createdAt: u.created_at,
         verified: u.metadata?.source === "rental_contract" || u.metadata?.source === "sale_contract" || u.metadata?.source === "test_drive",
+        telegramChatId: u.user_id,
       });
     }
   }
@@ -98,6 +99,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
         intentType: i.intent_type,
         intentStage: i.stage,
         urgencyScore: i.urgency_score,
+        telegramChatId: i.telegram_user_id,
       });
     }
   }
@@ -121,6 +123,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
         bikeTitle: null,
         createdAt: a.created_at,
         verified: true,
+        telegramChatId: a.telegram_chat_id,
       });
     }
   }
@@ -144,6 +147,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
         bikeTitle: null,
         createdAt: s.created_at,
         verified: s.verification_status === "verified",
+        telegramChatId: s.chat_id,
       });
     }
   }
@@ -178,7 +182,6 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
           slug={slug}
         />
       </div>
-      <CrewFooter crew={crew} />
     </main>
   );
 }
