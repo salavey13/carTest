@@ -1377,10 +1377,6 @@ export async function generateBuyPdf(input: {
     };
 
     // ── Hourly rates ──────────────────────────────────────────────────────
-    if (pricePerHour > 0) {
-      drawRentalLine("1 час", formatRub(pricePerHour));
-    }
-
     if (pricePer3h > 0) {
       drawRentalLine("3 часа", formatRub(pricePer3h));
     }
