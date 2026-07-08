@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ExternalLink, Info, Sparkles } from "lucide-react";
+import { ExternalLink, Info, RefreshCw, RotateCcw, ShoppingCart, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
@@ -25,6 +25,14 @@ const statusLabel: Record<string, string> = {
   cancelled: "Отменена",
 };
 
+const statusPalette: Record<string, { badgeBg: string; badgeText: string }> = {
+  pending_confirmation: { badgeBg: "#f59e0b20", badgeText: "#f59e0b" },
+  confirmed: { badgeBg: "#3b82f620", badgeText: "#3b82f6" },
+  active: { badgeBg: "#22c55e20", badgeText: "#22c55e" },
+  completed: { badgeBg: "#6b728020", badgeText: "#6b7280" },
+  cancelled: { badgeBg: "#ef444420", badgeText: "#ef4444" },
+};
+
 export async function generateMetadata({
   params,
 }: FranchizeRentalPageProps): Promise<Metadata> {
@@ -47,23 +55,64 @@ export default async function FranchizeRentalPage({
   ]);
   const resolvedSlug = crew.slug || slug;
   const surface = crewPaletteForSurface(crew.theme);
+  const p = crew.theme.palette;
   const dealStarted = rental.found || rental.paymentStatus === "interest_paid";
   const catalogHref = `/franchize/${resolvedSlug}`;
   const profileHref = getTelegramWebAppPageHref(`franchize/${resolvedSlug}/profile`, crew.contacts.telegramBotUsername) || `/franchize/${resolvedSlug}/profile`;
   const contactsHref = `/franchize/${resolvedSlug}/contacts`;
   const telegramSupportHref = getTelegramHandleHref(crew.contacts.telegram);
+  const status = rental.status || "pending_confirmation";
+  const statusStyle = statusPalette[status] || statusPalette.pending_confirmation;
+
   const verificationText =
     rental.contractVerificationStatus === "verified"
       ? "Верифицирован"
       : rental.contractVerificationStatus === "expired"
         ? "Истёк"
         : "Не верифицирован";
-  const verificationColor =
+  const verificationStatusStyle =
     rental.contractVerificationStatus === "verified"
-      ? "#22c55e"
+      ? statusPalette.active
       : rental.contractVerificationStatus === "expired"
-        ? "#f59e0b"
-        : crew.theme.palette.textSecondary;
+        ? statusPalette.pending_confirmation
+        : { badgeBg: `${p.textSecondary}20`, badgeText: p.textSecondary };
+
+  // Status-aware hero subcopy & CTAs
+  const heroCopy: Record<string, { subcopy: string; primaryCta: { label: string; href: string }; secondaryCta: { label: string; href: string } }> = {
+    pending_confirmation: {
+      subcopy: "Заявка ждёт подтверждения оператором. Проверьте статус оплаты и контракта.",
+      primaryCta: { label: "Продолжить оформление", href: `/franchize/${resolvedSlug}/order/demo-order` },
+      secondaryCta: { label: "К каталогу", href: catalogHref },
+    },
+    confirmed: {
+      subcopy: "Аренда подтверждена. Подготовьте документы и передайте ТС.",
+      primaryCta: { label: "Перейти к выдаче", href: `/franchize/${resolvedSlug}/order/demo-order` },
+      secondaryCta: { label: "К каталогу", href: catalogHref },
+    },
+    active: {
+      subcopy: "ТС у арендатора. Следите за статусом, чек-листом и сроками возврата.",
+      primaryCta: { label: "Продлить аренду", href: `/franchize/${resolvedSlug}/order/demo-order` },
+      secondaryCta: { label: "К каталогу", href: catalogHref },
+    },
+    completed: {
+      subcopy: "Аренда завершена. Депозит возвращён, документы подписаны.",
+      primaryCta: { label: "Арендовать снова", href: `/franchize/${resolvedSlug}?bikeId=${encodeURIComponent(rental.vehicleTitle || "")}` },
+      secondaryCta: { label: "Оставить отзыв", href: contactsHref },
+    },
+    cancelled: {
+      subcopy: "Аренда отменена. Если ошиблись — свяжитесь с оператором.",
+      primaryCta: { label: "Заказать ещё раз", href: catalogHref },
+      secondaryCta: { label: "Написать оператору", href: telegramSupportHref },
+    },
+  };
+  const heroDefault = {
+    subcopy: rental.found
+      ? "Сделка активирована. Управляйте арендой из Telegram WebApp."
+      : "Сделка пока не найдена. Проверьте ссылку или напишите оператору.",
+    primaryCta: { label: "Продолжить оформление", href: `/franchize/${resolvedSlug}/order/demo-order` },
+    secondaryCta: { label: "К каталогу", href: catalogHref },
+  };
+  const hero = rental.found ? (heroCopy[status] || heroDefault) : heroDefault;
 
   return (
     <main className="min-h-screen" style={surface.page}>
@@ -77,49 +126,74 @@ export default async function FranchizeRentalPage({
         <FranchizeHero
           eyebrow={`/franchize/${resolvedSlug}/rental/${id} · сделка`}
           title="Карточка аренды"
-          subcopy={
-            rental.found
-              ? "Сделка активирована. Управляй следующим шагом аренды из Telegram WebApp или через runtime-карточку."
-              : "Сделка пока не найдена. Проверь ссылку и дождись синхронизации после оплаты XTR."
-          }
-          primaryCta={{
-            label: "Продолжить оформление",
-            href: `/franchize/${resolvedSlug}/order/demo-order`,
-          }}
-          secondaryCta={{
-            label: "К каталогу",
-            href: `/franchize/${resolvedSlug}`,
-          }}
+          subcopy={hero.subcopy}
+          primaryCta={hero.primaryCta}
+          secondaryCta={hero.secondaryCta}
         />
 
+        {/* Status badge + next steps */}
         <section className="rounded-3xl border p-4" style={surface.subtleCard}>
-          <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] max-sm:grid-cols-1">
             <div>
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+                  style={{
+                    backgroundColor: statusStyle.badgeBg,
+                    color: statusStyle.badgeText,
+                  }}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: statusStyle.badgeText }} />
+                  {statusLabel[status] || status}
+                </span>
+                {rental.found && (
+                  <span className="text-xs" style={{ color: p.textSecondary }}>
+                    ID: {rental.rentalId?.slice(0, 8)}…
+                  </span>
+                )}
+              </div>
               <p
                 className="text-xs font-semibold uppercase tracking-[0.16em]"
-                style={{ color: crew.theme.palette.accentMain }}
+                style={{ color: p.accentMain }}
               >
-                Что будет дальше
+                {status === "completed"
+                  ? "Что сделано"
+                  : status === "active"
+                    ? "Текущие задачи"
+                    : "Что будет дальше"}
               </p>
               <ol className="mt-3 space-y-2 text-sm">
                 {(rental.found
-                  ? [
-                      "Проверим статус оплаты, договора и выдачи в карточке аренды.",
-                      "Если нужен следующий шаг — продолжите оформление или откройте сделку в Telegram WebApp.",
-                      "После завершения аренды появится отзыв и финальная сверка залога/документов.",
-                    ]
+                  ? (status === "completed"
+                      ? [
+                          "ТС возвращён, документы подписаны, депозит возвращён.",
+                          "Контракт верифицирован и сохранён в истории аренд.",
+                          "Чтобы арендовать этот байк снова — нажмите «Арендовать снова».",
+                        ]
+                      : status === "active"
+                        ? [
+                            "Отслеживайте возврат ТС по чек-листу.",
+                            "После возврата — проверьте состояние, пробег и комплектацию.",
+                            "Подпишите акт возврата и верните депозит.",
+                          ]
+                        : [
+                            "Проверим статус оплаты, договора и выдачи в карточке аренды.",
+                            "Если нужен следующий шаг — продолжите оформление или откройте сделку в Telegram WebApp.",
+                            "После завершения аренды появится финальная сверка залога и документов.",
+                          ]
+                    )
                   : [
                       "Подождём синхронизацию: иногда XTR/бот присылает карточку с задержкой.",
                       "Откройте Telegram fallback или напишите оператору номер сделки.",
-                      "Если сделка не найдётся, вернитесь в каталог или профиль без потери навигации.",
+                      "Если сделка не найдётся, вернитесь в каталог или профиль.",
                     ]
                 ).map((step, index) => (
                   <li key={step} className="flex gap-2">
                     <span
                       className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
                       style={{
-                        backgroundColor: `${crew.theme.palette.accentMain}24`,
-                        color: crew.theme.palette.accentMain,
+                        backgroundColor: `${p.accentMain}24`,
+                        color: p.accentMain,
                       }}
                     >
                       {index + 1}
@@ -132,35 +206,37 @@ export default async function FranchizeRentalPage({
                 className="mt-3 rounded-2xl border p-3 text-xs"
                 style={{
                   ...surface.card,
-                  borderColor: crew.theme.palette.borderSoft,
+                  borderColor: p.borderSoft,
                 }}
               >
-                Безопасность оплаты и договора: статус договора показывается
-                отдельно, документы проверяются через verifier, а новые списания
-                или изменения условий согласуются с оператором.
+                {status === "completed"
+                  ? "История аренды сохранена. Документы доступны в верификаторе."
+                  : "Безопасность оплаты и договора: статус договора показывается отдельно, документы проверяются через verifier."}
               </p>
             </div>
             <div className="space-y-2 text-sm">
-              <a
-                href={rental.telegramDeepLink}
-                target="_blank"
-                rel="noreferrer"
-                className="flex justify-center rounded-xl px-4 py-3 font-semibold"
-                style={{
-                  backgroundColor: crew.theme.palette.accentMain,
-                  color: crew.theme.palette.accentTextOn,
-                }}
-              >
-                Открыть в TG
-              </a>
+              {status !== "completed" && status !== "cancelled" && (
+                <a
+                  href={rental.telegramDeepLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex justify-center rounded-xl px-4 py-3 font-semibold"
+                  style={{
+                    backgroundColor: p.accentMain,
+                    color: p.accentTextOn,
+                  }}
+                >
+                  Открыть в TG
+                </a>
+              )}
               <a
                 href={telegramSupportHref}
                 target="_blank"
                 rel="noreferrer"
                 className="flex justify-center rounded-xl border px-4 py-3"
                 style={{
-                  borderColor: crew.theme.palette.borderSoft,
-                  color: crew.theme.palette.textPrimary,
+                  borderColor: p.borderSoft,
+                  color: p.textPrimary,
                 }}
               >
                 Написать оператору
@@ -169,8 +245,8 @@ export default async function FranchizeRentalPage({
                 href={contactsHref}
                 className="flex justify-center rounded-xl border px-4 py-3"
                 style={{
-                  borderColor: crew.theme.palette.borderSoft,
-                  color: crew.theme.palette.textPrimary,
+                  borderColor: p.borderSoft,
+                  color: p.textPrimary,
                 }}
               >
                 Поддержка / контакты
@@ -179,14 +255,14 @@ export default async function FranchizeRentalPage({
                 <Link
                   href={catalogHref}
                   className="rounded-xl border px-3 py-2 text-center text-xs"
-                  style={{ borderColor: crew.theme.palette.borderSoft }}
+                  style={{ borderColor: p.borderSoft }}
                 >
                   Каталог
                 </Link>
                 <Link
                   href={profileHref}
                   className="rounded-xl border px-3 py-2 text-center text-xs"
-                  style={{ borderColor: crew.theme.palette.borderSoft }}
+                  style={{ borderColor: p.borderSoft }}
                 >
                   Профиль
                 </Link>
@@ -209,21 +285,21 @@ export default async function FranchizeRentalPage({
               <Link
                 href={catalogHref}
                 className="rounded-xl border px-3 py-2 text-xs"
-                style={{ borderColor: crew.theme.palette.borderSoft }}
+                style={{ borderColor: p.borderSoft }}
               >
                 Вернуться в каталог
               </Link>
               <Link
                 href={profileHref}
                 className="rounded-xl border px-3 py-2 text-xs"
-                style={{ borderColor: crew.theme.palette.borderSoft }}
+                style={{ borderColor: p.borderSoft }}
               >
                 Вернуться в профиль
               </Link>
               <Link
                 href={contactsHref}
                 className="rounded-xl border px-3 py-2 text-xs"
-                style={{ borderColor: crew.theme.palette.borderSoft }}
+                style={{ borderColor: p.borderSoft }}
               >
                 Связаться с поддержкой
               </Link>
@@ -231,32 +307,30 @@ export default async function FranchizeRentalPage({
           </section>
         ) : null}
 
-        {dealStarted && (
+        {dealStarted && status !== "completed" && status !== "cancelled" && (
           <div
-            className="mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
+            className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
             style={{
-              borderColor: crew.theme.palette.accentMain,
-              color: crew.theme.palette.accentMain,
+              borderColor: p.accentMain,
+              color: p.accentMain,
             }}
           >
             <Sparkles className="h-3.5 w-3.5" />
-            Заявка принята — продолжаем оформление 🚀
+            {status === "active" ? "ТС у арендатора" : "Заявка принята — продолжаем"}
           </div>
         )}
 
         <section className="rounded-3xl border p-4" style={surface.subtleCard}>
+          {/* Contract verification */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span
-              className="text-xs"
-              style={{ color: crew.theme.palette.textSecondary }}
-            >
-              Проверка контракта:
+            <span className="text-xs" style={{ color: p.textSecondary }}>
+              Контракт:
             </span>
             <span
               className="rounded-full border px-3 py-1 text-xs font-semibold"
               style={{
-                borderColor: verificationColor,
-                color: verificationColor,
+                borderColor: verificationStatusStyle.badgeText,
+                color: verificationStatusStyle.badgeText,
               }}
             >
               {verificationText}
@@ -265,63 +339,60 @@ export default async function FranchizeRentalPage({
               href={`/doc-verifier?integrationScope=${encodeURIComponent(rental.contractVerifierScope || `rental:${rental.rentalId}`)}&documentKey=${encodeURIComponent(rental.contractDocumentKey || `rental-${slug}-${rental.rentalId}`)}`}
               className="rounded-full border px-3 py-1 text-xs font-semibold"
               style={{
-                borderColor: crew.theme.palette.accentMain,
-                color: crew.theme.palette.accentMain,
+                borderColor: p.accentMain,
+                color: p.accentMain,
               }}
             >
               Verify contract
             </Link>
             {rental.docVerifierRecordId ? (
-              <span
-                className="text-[11px]"
-                style={{ color: crew.theme.palette.textSecondary }}
-              >
+              <span className="text-[11px]" style={{ color: p.textSecondary }}>
                 record: {rental.docVerifierRecordId.slice(0, 8)}…
               </span>
             ) : null}
             {rental.contractSourceScope ? (
-              <span
-                className="text-[11px]"
-                style={{ color: crew.theme.palette.textSecondary }}
-              >
+              <span className="text-[11px]" style={{ color: p.textSecondary }}>
                 source: {rental.contractSourceScope}
               </span>
             ) : null}
           </div>
-          <div className="grid gap-3 text-sm sm:grid-cols-2">
+
+          {/* Rental details grid */}
+          <div className="grid gap-3 text-sm sm:grid-cols-2 max-sm:grid-cols-1">
             <p>
-              <span style={{ color: crew.theme.palette.textSecondary }}>
-                Rental ID:
-              </span>{" "}
-              {rental.rentalId}
+              <span style={{ color: p.textSecondary }}>Статус:</span>{" "}
+              <span
+                className="font-semibold"
+                style={{ color: statusStyle.badgeText }}
+              >
+                {statusLabel[status] || status}
+              </span>
             </p>
-            <p>
-              <span style={{ color: crew.theme.palette.textSecondary }}>
-                Статус:
-              </span>{" "}
-              {statusLabel[rental.status] ?? rental.status}
-            </p>
-            <p>
-              <span style={{ color: crew.theme.palette.textSecondary }}>
-                Оплата:
-              </span>{" "}
-              {rental.paymentStatus}
-            </p>
-            <p>
-              <span style={{ color: crew.theme.palette.textSecondary }}>
-                Итого:
-              </span>{" "}
-              {rental.totalCost.toLocaleString("ru-RU")} ₽
-            </p>
-            <p className="sm:col-span-2">
-              <span style={{ color: crew.theme.palette.textSecondary }}>
-                Транспорт:
-              </span>{" "}
+            {rental.paymentStatus && (
+              <p>
+                <span style={{ color: p.textSecondary }}>Оплата:</span>{" "}
+                {rental.paymentStatus}
+              </p>
+            )}
+            {rental.totalCost > 0 && (
+              <p>
+                <span style={{ color: p.textSecondary }}>Итого:</span>{" "}
+                {rental.totalCost.toLocaleString("ru-RU")} ₽
+              </p>
+            )}
+            <p className={rental.totalCost > 0 ? "" : "sm:col-span-2"}>
+              <span style={{ color: p.textSecondary }}>Транспорт:</span>{" "}
               {rental.vehicleTitle}
             </p>
+            {rental.renterName && (
+              <p className="sm:col-span-2">
+                <span style={{ color: p.textSecondary }}>Арендатор:</span>{" "}
+                {rental.renterName}
+              </p>
+            )}
             {rental.contractOriginalSha256 ? (
               <p className="sm:col-span-2 break-all">
-                <span style={{ color: crew.theme.palette.textSecondary }}>
+                <span style={{ color: p.textSecondary }}>
                   Contract SHA256:
                 </span>{" "}
                 {rental.contractOriginalSha256}
@@ -330,66 +401,122 @@ export default async function FranchizeRentalPage({
           </div>
 
           {/* Interactive rental checklist — equipment, photos, checks */}
-          <div className="mt-4">
-            <RentalChecklistPanel
-              rentalId={rental.rentalId}
-              crewId={crew.id}
-              slug={resolvedSlug}
-              accentColor={crew.theme.palette.accentMain}
-              metadata={(rental.metadata as Record<string, any>) || undefined}
-              status={rental.status}
-            />
-          </div>
+          {rental.found && (
+            <div className="mt-4">
+              <RentalChecklistPanel
+                rentalId={rental.rentalId}
+                crewId={crew.id}
+                slug={resolvedSlug}
+                accentColor={p.accentMain}
+                metadata={(rental.metadata as Record<string, any>) || undefined}
+                status={status}
+              />
+            </div>
+          )}
 
-          <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            <Link
-              href={`/franchize/${resolvedSlug}/order/demo-order`}
-              className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
-              style={{
-                backgroundColor: crew.theme.palette.accentMain,
-                color: crew.theme.palette.accentTextOn,
-              }}
-            >
-              <Sparkles className="h-4 w-4" />
-              Продолжить оформление
-            </Link>
-            <Link
-              href={catalogHref}
-              className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm"
-              style={{
-                borderColor: crew.theme.palette.borderSoft,
-                color: crew.theme.palette.textPrimary,
-              }}
-            >
-              К каталогу
-            </Link>
+          {/* Status-aware action buttons */}
+          <div className="mt-5 grid gap-2 sm:grid-cols-2 max-sm:grid-cols-1">
+            {status === "completed" ? (
+              <>
+                <Link
+                  href={`/franchize/${resolvedSlug}?bikeId=${encodeURIComponent(rental.vehicleTitle || "")}`}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
+                  style={{
+                    backgroundColor: p.accentMain,
+                    color: p.accentTextOn,
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Арендовать снова
+                </Link>
+                <Link
+                  href={profileHref}
+                  className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm"
+                  style={{
+                    borderColor: p.borderSoft,
+                    color: p.textPrimary,
+                  }}
+                >
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  История аренд
+                </Link>
+              </>
+            ) : status === "active" ? (
+              <>
+                <Link
+                  href={`/franchize/${resolvedSlug}/order/demo-order`}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
+                  style={{
+                    backgroundColor: p.accentMain,
+                    color: p.accentTextOn,
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Продлить аренду
+                </Link>
+                <Link
+                  href={catalogHref}
+                  className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm"
+                  style={{
+                    borderColor: p.borderSoft,
+                    color: p.textPrimary,
+                  }}
+                >
+                  К каталогу
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href={`/franchize/${resolvedSlug}/order/demo-order`}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
+                  style={{
+                    backgroundColor: p.accentMain,
+                    color: p.accentTextOn,
+                  }}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Продолжить оформление
+                </Link>
+                <Link
+                  href={catalogHref}
+                  className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm"
+                  style={{
+                    borderColor: p.borderSoft,
+                    color: p.textPrimary,
+                  }}
+                >
+                  К каталогу
+                </Link>
+              </>
+            )}
           </div>
 
           <FranchizeRentalDocumentsPanel
             rentalId={rental.rentalId}
             ownerId={rental.ownerId}
-            status={rental.status}
+            status={status}
             metadata={rental.metadata}
-            palette={crew.theme.palette}
+            palette={p}
           />
 
           <FranchizeRentalLifecycleActions
             rentalId={rental.rentalId}
             ownerId={rental.ownerId}
             renterId={rental.renterId}
-            status={rental.status}
+            status={status}
             paymentStatus={rental.paymentStatus}
             hasPickupFreeze={Boolean(rental.metadata?.pickup_freeze?.frozen_at)}
-            palette={crew.theme.palette}
+            palette={p}
           />
 
           <div
             className="mt-4 flex items-center justify-end gap-2 text-xs"
-            style={{ color: crew.theme.palette.textSecondary }}
+            style={{ color: p.textSecondary }}
           >
             <span
               className="inline-flex h-6 w-6 items-center justify-center rounded-full border"
-              style={{ borderColor: crew.theme.palette.borderSoft }}
+              style={{ borderColor: p.borderSoft }}
               title="Deep-link fallback: если карточка открылась вне Telegram mini-app, вернёт в контекст startapp=rental-..."
               aria-label="Информация о Telegram fallback"
             >

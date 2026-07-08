@@ -721,10 +721,29 @@ if (dealType === 'rent') {
       renterSignature: 'согласие через Telegram',
       documentKey: `rental-${bike.id}-${Date.now()}`,
     },
+    // Equipment selection (CLI flags)
+    equipment: {
+      helmets: Number(arg('helmets', '0')) || 0,
+      gloves: Number(arg('gloves', '0')) || 0,
+      charger: arg('charger') === '1',
+      net: arg('net') === '1',
+      backpack: arg('backpack') === '1',
+      bag: arg('bag') === '1',
+    },
+    // Odometer reading
+    odometerBefore: Number(arg('odometerBefore', '0')) || 0,
+    // Payment split (CLI flags or default to cash=deposit, bank=rest)
+    paymentSplit: {
+      cashAmount: Number(arg('cashAmount', '0')) || 0,
+      bankAmount: Number(arg('bankAmount', '0')) || 0,
+    },
   });
 
-  // Override subtotal with calculated value
-  vars.subtotal_rub = arg('subtotal', String(subtotalRounded));
+  // The builder already computed totalPayable including equipment cost and deposit;
+  // we override subtotal only if the operator explicitly passed --subtotal.
+  if (process.argv.includes('--subtotal')) {
+    vars.subtotal_rub = arg('subtotal', String(subtotalRounded));
+  }
 
   // Add organization_representative (ИП Воробьев Р.В. — nominative) so the template
   // can use it instead of organization_short (ИП Воробьева Р.В. — genitive) where needed.
