@@ -520,6 +520,20 @@ export function buildRentalContractVariables(
   }
   const subtotalRounded = Math.round(subtotal);
 
+  // Equipment cost
+  const eq = options.equipment || {};
+  const equipmentCostTotal =
+    (eq.helmets || 0) * 1000 +
+    (eq.gloves || 0) * 500 +
+    (eq.net ? 500 : 0) +
+    (eq.backpack ? 500 : 0) +
+    (eq.bag ? 500 : 0) +
+    (eq.charger ? 500 : 0);
+
+  // Total payable = base rent + equipment + deposit
+  const depositNum = Number(deposit);
+  const totalPayable = subtotalRounded + equipmentCostTotal + depositNum;
+
   // Contract number - use meta or default format
   const contractNumber = meta.contractNumber || `${now.getDate()}.${now.getMonth() + 1}/${bike.id || "unknown"}`;
 
@@ -587,10 +601,10 @@ export function buildRentalContractVariables(
     // Engine specs
     bike_engine_cc: String(bikeSpecs.engine_cc || bikeSpecs.displacement_cc || "0"),
     bike_power_hp: String(bikeSpecs.power_hp || bikeSpecs.max_power_hp || "0"),
-    // Ducati electric bikes capped at 3kW in contracts (regulatory class limit)
+    // All electric bikes capped at 3kW in contracts (regulatory class limit for L1B/L2B)
     bike_power_kw: (() => {
       const raw = String(bikeSpecs.power_kw || "0");
-      if (isElectric && /ducati/i.test(bike.id || "")) {
+      if (isElectric) {
         const num = Number(raw);
         return num > 3 ? "3" : raw;
       }
@@ -619,7 +633,7 @@ export function buildRentalContractVariables(
     daily_price_rub: dailyPrice,
     hourly_price_rub: hourlyPrice,
     deposit_rub: deposit,
-    subtotal_rub: String(subtotalRounded), // Calculated from rental duration
+    subtotal_rub: String(totalPayable), // Rent + equipment + deposit
     // Tier-aware pricing (for quick-info and section 4.1)
     pricing_tier_label: tierLabel || 'сутки',
     pricing_tier_price_rub: String(Math.round(tierPrice || subtotalRounded)),
@@ -631,13 +645,7 @@ export function buildRentalContractVariables(
     equipment_backpack: options.equipment?.backpack ? 'да' : 'нет',
     equipment_bag: options.equipment?.bag ? 'да' : 'нет',
     equipment_charger: options.equipment?.charger ? 'да' : 'нет',
-    equipment_total_cost: String(
-      (options.equipment?.helmets || 0) * 1000 +
-      (options.equipment?.gloves || 0) * 500 +
-      (options.equipment?.net ? 500 : 0) +
-      (options.equipment?.backpack ? 500 : 0) +
-      (options.equipment?.bag ? 500 : 0)
-    ),
+    equipment_total_cost: String(equipmentCostTotal),
     equipment_summary: (() => {
       const parts: string[] = [];
       const h = options.equipment?.helmets || 0;
@@ -650,9 +658,17 @@ export function buildRentalContractVariables(
       if (options.equipment?.charger) parts.push('Зарядка');
       return parts.length > 0 ? parts.join(', ') : '—';
     })(),
-    // Payment split
-    payment_cash_rub: String(options.paymentSplit?.cashAmount || 0),
-    payment_bank_rub: String(options.paymentSplit?.bankAmount || 0),
+    // Payment split — default: cash = deposit, bank = rest (rent + equipment)
+    payment_cash_rub: String(
+      options.paymentSplit?.cashAmount != null
+        ? options.paymentSplit.cashAmount
+        : depositNum
+    ),
+    payment_bank_rub: String(
+      options.paymentSplit?.bankAmount != null
+        ? options.paymentSplit.bankAmount
+        : Math.max(0, totalPayable - (options.paymentSplit?.cashAmount ?? depositNum))
+    ),
     // Odometer
     odometer_before: String(options.odometerBefore || 0),
     bike_value_rub: bikeValue,

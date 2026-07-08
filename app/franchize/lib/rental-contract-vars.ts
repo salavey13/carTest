@@ -251,6 +251,20 @@ export async function buildTemplateVars(params: {
   }
   const subtotalRounded = Math.round(subtotal);
 
+  // Equipment cost
+  const equipmentCostTotal =
+    (params.equipmentData.helmets_count || 0) * 1000 +
+    (params.equipmentData.gloves_count || 0) * 500 +
+    (params.equipmentData.jacket ? 500 : 0) +
+    (params.equipmentData.boots ? 500 : 0) +
+    (params.equipmentData.net ? 500 : 0) +
+    (params.equipmentData.backpack ? 500 : 0) +
+    (params.equipmentData.bag ? 500 : 0) +
+    (params.equipmentData.charger ? 500 : 0);
+
+  // Total payable = base rent + equipment + deposit
+  const totalPayable = subtotalRounded + equipmentCostTotal + deposit;
+
   // Build tier label and unit from the period string (e.g., "/ 3 часа" → "3 часа", "за 3 часа")
   const tierPeriod = tierResult.period || '';
   const tierLabel = tierPeriod.replace(/^\//, '').trim() || 'сутки';
@@ -304,10 +318,10 @@ export async function buildTemplateVars(params: {
     bike_year: params.bike.specs.year || specs.production_year || 'уточняется',
     bike_engine_cc: params.bike.specs.engine_cc || '0',
     bike_power_hp: params.bike.specs.motor_hp || specs.max_power_hp || '0',
-    // Ducati electric bikes capped at 3kW in contracts (regulatory class limit)
+    // All electric bikes capped at 3kW in contracts (regulatory class limit for L1B/L2B)
     bike_power_kw: (() => {
       const raw = params.bike.specs.power_kw || specs.motor_nominal_kw || '0';
-      if (isElectric && /ducati/i.test(params.bike.id || '')) {
+      if (isElectric) {
         const num = Number(raw);
         return num > 3 ? '3' : raw;
       }
@@ -335,7 +349,7 @@ export async function buildTemplateVars(params: {
     // Pricing
     hourly_price_rub: String(hourlyPrice),
     daily_price_rub: String(dailyPrice),
-    subtotal_rub: String(subtotalRounded),
+    subtotal_rub: String(totalPayable), // Rent + equipment + deposit
     deposit_rub: String(deposit),
     // Tier-aware pricing (for quick-info and section 4.1)
     pricing_tier_label: tierLabel,
@@ -350,18 +364,18 @@ export async function buildTemplateVars(params: {
     equipment_backpack: params.equipmentData.backpack ? 'да' : 'нет',
     equipment_bag: params.equipmentData.bag ? 'да' : 'нет',
     equipment_charger: params.equipmentData.charger ? 'да' : 'нет',
-    equipment_total_cost: String(
-      (params.equipmentData.helmets_count || 0) * 1000 +
-      (params.equipmentData.gloves_count || 0) * 500 +
-      (params.equipmentData.jacket ? 500 : 0) +
-      (params.equipmentData.boots ? 500 : 0) +
-      (params.equipmentData.net ? 500 : 0) +
-      (params.equipmentData.backpack ? 500 : 0) +
-      (params.equipmentData.bag ? 500 : 0)
+    equipment_total_cost: String(equipmentCostTotal),
+    // Payment split — default: cash = deposit, bank = rest (rent + equipment)
+    payment_cash_rub: String(
+      params.paymentSplit?.cashAmount != null
+        ? params.paymentSplit.cashAmount
+        : deposit
     ),
-    // Payment split
-    payment_cash_rub: String(params.paymentSplit?.cashAmount || 0),
-    payment_bank_rub: String(params.paymentSplit?.bankAmount || 0),
+    payment_bank_rub: String(
+      params.paymentSplit?.bankAmount != null
+        ? params.paymentSplit.bankAmount
+        : Math.max(0, totalPayable - (params.paymentSplit?.cashAmount ?? deposit))
+    ),
     // Odometer
     odometer_before: String(params.pickupData.odometer_km || 0),
     included_km_per_day: String(params.contractDefaults.includedMileage || 200),

@@ -818,8 +818,8 @@ async function generateAndSendContract(
         rent_start_date: startDate || null,
         rent_end_date: endDate || null,
         daily_price: String(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
-        deposit_rub: String(bike.specs?.deposit_rub || "20000"),
-        total_sum: Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
+        deposit_rub: vars.deposit_rub || String(bike.specs?.deposit_rub || "20000"),
+        total_sum: Number(vars.subtotal_rub) || Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
         template_version: 1,
       });
     if (rentError) {
