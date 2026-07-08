@@ -3,49 +3,20 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   Flame, Phone, CheckCircle, ChevronDown, ChevronRight, Plus,
-  Trash2, Send, Clock, TrendingUp, Search,
-  X, Bike, FileText, CircleDot, Users, Lock, AlertCircle,
-  LayoutList, Columns3, MoreHorizontal, Calendar, UserPlus,
-  Download, Star, Filter, ArrowUpRight, StickyNote, History,
-  MapPin
+  Trash2, Send, Clock, TrendingUp, Search, X, Bike, FileText,
+  CircleDot, Users, Lock, AlertCircle, LayoutList, Columns3,
+  Calendar, UserPlus, Download, Star, Filter, StickyNote, History,
+  MapPin, ExternalLink, Banknote, Briefcase, ShieldAlert, Hash,
+  MessageSquare, Wallet
 } from "lucide-react";
 import { validateAnalyticsPassword } from "../../server-actions/rentals-dashboard";
+import type { LeadRow, LeadTodoRow, LeadRentalRow, LeadSaleRow } from "../../server-actions/leads";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-interface LeadRow {
-  user_id: string;
-  full_name: string | null;
-  username: string | null;
-  phone: string | null;
-  source: string;
-  bikeTitle: string | null;
-  createdAt: string | null;
-  verified: boolean;
-  intentType?: string | null;
-  intentStage?: string | null;
-  urgencyScore?: number | null;
-  telegramChatId?: string | null;
-  troubled?: boolean;
-  troubledReason?: string | null;
-  contractCount?: number;
-  lastRentalDate?: string | null;
-  totalSpent?: number;
-  contractRef?: string | null;
-  saleCount?: number;
-}
-
-interface TodoRow {
-  id: string;
-  title: string;
-  status: string;
-  priority: string;
-  description?: string | null;
-}
-
 interface LeadsClientProps {
   leads: LeadRow[];
-  todos: TodoRow[];
+  todos: LeadTodoRow[];
   crewId: string;
   slug: string;
   accentColor: string;
@@ -57,20 +28,23 @@ interface LeadsClientProps {
 
 type ViewMode = "list" | "board";
 type Segment = "all" | "hot" | "verified" | "warm" | "troubled";
-type DetailTab = "contacts" | "tasks" | "notes" | "history";
-type SortMode = "recent" | "urgent" | "name" | "verified";
+type SortMode = "recent" | "urgent" | "name" | "spent";
+type DetailSection = "contacts" | "deals" | "tasks" | "notes";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const SOURCE_META: Record<string, { label: string; icon: typeof Flame; color: string; bg: string; ring: string }> = {
-  web_callback:    { label: "Звонок",     icon: Phone,        color: "#3b82f6", bg: "#3b82f620", ring: "#3b82f640" },
-  rental_contract: { label: "Аренда",     icon: CheckCircle,  color: "#10b981", bg: "#10b98120", ring: "#10b98140" },
-  sale_contract:   { label: "Покупка",    icon: TrendingUp,   color: "#f59e0b", bg: "#f59e0b20", ring: "#f59e0b40" },
-  test_drive:      { label: "Тест-драйв", icon: Bike,         color: "#8b5cf6", bg: "#8b5cf620", ring: "#8b5cf640" },
-  dashboard_intent:{ label: "Заявка",     icon: Flame,        color: "#ef4444", bg: "#ef444420", ring: "#ef444440" },
-  rental_secret:   { label: "Документы",  icon: FileText,     color: "#06b6d4", bg: "#06b6d420", ring: "#06b6d440" },
-  profile_prefill: { label: "Профиль",    icon: FileText,     color: "#6366f1", bg: "#6366f120", ring: "#6366f140" },
-  unknown:         { label: "Клиент",     icon: Users,        color: "#64748b", bg: "#64748b20", ring: "#64748b40" },
+const SOURCE_META: Record<string, { label: string; icon: typeof Flame; color: string; bg: string }> = {
+  web_callback:    { label: "Звонок",       icon: Phone,        color: "#3b82f6", bg: "#3b82f620" },
+  rental_contract: { label: "Аренда",       icon: CheckCircle,  color: "#10b981", bg: "#10b98120" },
+  sale_contract:   { label: "Покупка",      icon: TrendingUp,   color: "#f59e0b", bg: "#f59e0b20" },
+  test_drive:      { label: "Тест-драйв",   icon: Bike,         color: "#8b5cf6", bg: "#8b5cf620" },
+  app_open:        { label: "Открыл приложение", icon: Users,   color: "#64748b", bg: "#64748b20" },
+  rent:            { label: "Аренда",       icon: Bike,         color: "#10b981", bg: "#10b98120" },
+  sale:            { label: "Покупка",      icon: TrendingUp,   color: "#f59e0b", bg: "#f59e0b20" },
+  checkout_start:  { label: "Корзина",      icon: Wallet,       color: "#06b6d4", bg: "#06b6d420" },
+  rental_secret:   { label: "Документы",    icon: FileText,     color: "#06b6d4", bg: "#06b6d420" },
+  profile_prefill: { label: "Профиль",      icon: FileText,     color: "#6366f1", bg: "#6366f120" },
+  unknown:         { label: "Клиент",       icon: Users,        color: "#64748b", bg: "#64748b20" },
 };
 
 const STAGE_LABELS: Record<string, string> = {
@@ -81,30 +55,16 @@ const STAGE_LABELS: Record<string, string> = {
   interest_paid: "Интерес",
   new: "Новый",
   contacted: "Контакт установлен",
+  viewed: "Просмотр",
+  configured: "Настроил",
 };
-
-const INTENT_LABELS: Record<string, string> = {
-  rent: "Аренда",
-  sale: "Покупка",
-  test_drive: "Тест-драйв",
-  rental_contract: "Аренда",
-  sale_contract: "Покупка",
-};
-
-const BOARD_COLUMNS = [
-  { key: "new", label: "Новые", color: "#64748b" },
-  { key: "contacted", label: "В работе", color: "#3b82f6" },
-  { key: "contract_generated", label: "Договор", color: "#f59e0b" },
-  { key: "checkout_completed", label: "Завершено", color: "#10b981" },
-  { key: "dismissed", label: "Отклонено", color: "#ef4444" },
-];
 
 const SEGMENT_META: Record<Segment, { label: string; icon: typeof Flame; color: string }> = {
-  all:       { label: "Все",       icon: Users,       color: "#64748b" },
-  hot:       { label: "Горячие",   icon: Flame,       color: "#ef4444" },
-  verified:  { label: "Клиенты",   icon: CheckCircle, color: "#10b981" },
-  warm:      { label: "Заявки",    icon: Phone,       color: "#3b82f6" },
-  troubled:  { label: "Проблемные",icon: AlertCircle, color: "#dc2626" },
+  all:       { label: "Все",         icon: Users,       color: "#64748b" },
+  hot:       { label: "Горячие",     icon: Flame,       color: "#ef4444" },
+  verified:  { label: "Клиенты",     icon: CheckCircle, color: "#10b981" },
+  warm:      { label: "Заявки",      icon: Phone,       color: "#3b82f6" },
+  troubled:  { label: "Проблемные",  icon: AlertCircle, color: "#dc2626" },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -133,6 +93,13 @@ function relativeTime(dateStr: string | null): string {
   return date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
 }
 
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" });
+}
+
 function temperatureColor(urgency: number | null | undefined, pendingTodos: number): string {
   const score = (urgency || 0) + pendingTodos * 15;
   if (score >= 90) return "#ef4444";
@@ -154,6 +121,13 @@ function isToday(dateStr: string | null): boolean {
   const d = new Date(dateStr);
   const now = new Date();
   return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+}
+
+function metaFor(source: string) { return SOURCE_META[source] || SOURCE_META.unknown; }
+
+function fmtMoney(n: number | undefined): string {
+  if (n === undefined || n === null || Number.isNaN(n)) return "0 ₽";
+  return new Intl.NumberFormat("ru-RU").format(Math.round(n)) + " ₽";
 }
 
 // ── Theme hook ────────────────────────────────────────────────────────────────
@@ -207,7 +181,7 @@ function useTheme({ isAuto, isLightTheme, textColor, bgColor, accentColor }: {
   };
 }
 
-// ── Avatar ────────────────────────────────────────────────────────────────────
+// ── UI atoms ──────────────────────────────────────────────────────────────────
 
 function Avatar({ name, source, size = 44 }: { name: string | null; source: string; size?: number }) {
   const meta = SOURCE_META[source] || SOURCE_META.unknown;
@@ -216,11 +190,7 @@ function Avatar({ name, source, size = 44 }: { name: string | null; source: stri
     <div
       className="flex shrink-0 items-center justify-center rounded-full font-bold"
       style={{
-        width: size,
-        height: size,
-        backgroundColor: meta.bg,
-        color: meta.color,
-        fontSize: size > 40 ? "14px" : "12px",
+        width: size, height: size, backgroundColor: meta.bg, color: meta.color, fontSize: size > 40 ? "14px" : "12px",
         boxShadow: `0 0 0 2px ${meta.color}25`,
       }}
     >
@@ -243,13 +213,11 @@ function SourceBadge({ source, size = "sm" }: { source: string; size?: "sm" | "m
   );
 }
 
-// ── Small UI atoms ────────────────────────────────────────────────────────────
-
-function InfoTile({ label, value, T }: { label: string; value: string; T: ThemeTokens }) {
+function InfoTile({ label, value, T, fullWidth }: { label: string; value: string; T: ThemeTokens; fullWidth?: boolean }) {
   return (
-    <div className="rounded-xl border p-2.5" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+    <div className={`rounded-xl border p-2.5 ${fullWidth ? "col-span-full" : ""}`} style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
       <p className="text-[10px] uppercase tracking-wider" style={{ color: T.textFaint }}>{label}</p>
-      <p className="mt-0.5 text-xs font-semibold" style={{ color: T.text }}>{value}</p>
+      <p className="mt-0.5 text-xs font-semibold break-words" style={{ color: T.text }}>{value}</p>
     </div>
   );
 }
@@ -267,22 +235,46 @@ function ActionBtn({ href, icon: Icon, label, T, external }: {
   );
 }
 
+function Section({ title, icon: Icon, children, T, defaultOpen = false }: {
+  title: string; icon: typeof Phone; children: React.ReactNode; T: ThemeTokens; defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-2xl border overflow-hidden" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+        style={{ backgroundColor: T.bgElevated }}
+      >
+        <div className="flex items-center gap-2 text-xs font-bold" style={{ color: T.text }}>
+          <Icon className="h-3.5 w-3.5" style={{ color: T.accent }} />
+          {title}
+        </div>
+        {open ? <ChevronDown className="h-3.5 w-3.5" style={{ color: T.textFaint }} /> : <ChevronRight className="h-3.5 w-3.5" style={{ color: T.textFaint }} />}
+      </button>
+      {open && <div className="border-t px-3 py-3" style={{ borderColor: T.border }}>{children}</div>}
+    </div>
+  );
+}
+
 // ── KPI Cards ─────────────────────────────────────────────────────────────────
 
 function KpiCards({ leads, hot, verified, todos, T }: {
-  leads: LeadRow[]; hot: LeadRow[]; verified: LeadRow[]; todos: TodoRow[]; T: ThemeTokens;
+  leads: LeadRow[]; hot: LeadRow[]; verified: LeadRow[]; todos: LeadTodoRow[]; T: ThemeTokens;
 }) {
-  const today = leads.filter((l) => isToday(l.createdAt)).length;
+  const today = leads.filter((l) => isToday(l.createdAt) || isToday(l.lastSeenAt)).length;
   const pending = todos.filter((t) => t.status !== "done").length;
+  const totalSpent = leads.reduce((s, l) => s + (l.totalSpent || 0), 0);
   const cards = [
     { label: "Всего лидов", value: leads.length, icon: Users, color: T.textMuted },
-    { label: "Новые сегодня", value: today, icon: Star, color: T.accent },
+    { label: "Активность сегодня", value: today, icon: Star, color: T.accent },
     { label: "Горячие", value: hot.length, icon: Flame, color: "#ef4444" },
     { label: "Клиенты", value: verified.length, icon: CheckCircle, color: "#10b981" },
     { label: "Задач в работе", value: pending, icon: Clock, color: "#f59e0b" },
+    { label: "Выручка", value: fmtMoney(totalSpent), icon: Banknote, color: "#10b981" },
   ];
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {cards.map((c) => {
         const Icon = c.icon;
         return (
@@ -292,7 +284,7 @@ function KpiCards({ leads, hot, verified, todos, T }: {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: T.textFaint }}>{c.label}</p>
-                <p className="mt-1 text-2xl font-black tracking-tight" style={{ color: T.text }}>{c.value}</p>
+                <p className="mt-1 text-xl font-black tracking-tight" style={{ color: T.text }}>{c.value}</p>
               </div>
               <div className="rounded-lg p-1.5" style={{ backgroundColor: T.borderSoft }}>
                 <Icon className="h-4 w-4" style={{ color: c.color }} />
@@ -322,11 +314,8 @@ function Toolbar({
   return (
     <div
       className="sticky top-0 z-10 -mx-4 space-y-3 border-b px-4 py-3 backdrop-blur-md sm:rounded-2xl sm:border"
-      style={{
-        backgroundColor: isAuto ? `color-mix(in srgb, var(--franchize-bg-base) 88%, transparent)` : T.bgCard,
-        borderColor: T.border,
-      }}>
-      {/* Row 1: search + controls */}
+      style={{ backgroundColor: isAuto ? `color-mix(in srgb, var(--franchize-bg-base) 88%, transparent)` : T.bgCard, borderColor: T.border }}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: T.textFaint }} />
@@ -337,17 +326,13 @@ function Toolbar({
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded-xl border py-2.5 pl-10 pr-9 text-sm outline-none transition focus:ring-2"
             style={{
-              backgroundColor: T.inputBg,
-              borderColor: T.inputBorder,
-              color: T.text,
+              backgroundColor: T.inputBg, borderColor: T.inputBorder, color: T.text,
               // @ts-ignore
               "--tw-ring-color": T.borderActive,
             }}
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 transition hover:opacity-80"
-              style={{ color: T.textFaint }}>
+            <button onClick={() => setSearchQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 transition hover:opacity-80" style={{ color: T.textFaint }}>
               <X className="h-3.5 w-3.5" />
             </button>
           )}
@@ -372,7 +357,7 @@ function Toolbar({
             style={{ backgroundColor: T.inputBg, borderColor: T.inputBorder, color: T.text }}>
             <option value="all">Все источники</option>
             {availableSources.map((s) => (
-              <option key={s} value={s}>{SOURCE_META[s]?.label || s}</option>
+              <option key={s} value={s}>{metaFor(s).label || s}</option>
             ))}
           </select>
 
@@ -381,7 +366,7 @@ function Toolbar({
             style={{ backgroundColor: T.inputBg, borderColor: T.inputBorder, color: T.text }}>
             <option value="recent">Свежие</option>
             <option value="urgent">🔥 Срочные</option>
-            <option value="verified">✅ Клиенты</option>
+            <option value="spent">💰 По выручке</option>
             <option value="name">А → Я</option>
           </select>
 
@@ -393,7 +378,6 @@ function Toolbar({
         </div>
       </div>
 
-      {/* Row 2: segment tabs */}
       <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
         {(Object.keys(SEGMENT_META) as Segment[]).map((key) => {
           const meta = SEGMENT_META[key];
@@ -402,11 +386,7 @@ function Toolbar({
           return (
             <button key={key} onClick={() => setSegment(key)}
               className={`flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${active ? "" : "hover:bg-black/5"}`}
-              style={active ? {
-                backgroundColor: meta.color + "15",
-                color: meta.color,
-                borderColor: meta.color + "40",
-              } : { color: T.textMuted, borderColor: "transparent" }}>
+              style={active ? { backgroundColor: meta.color + "15", color: meta.color, borderColor: meta.color + "40" } : { color: T.textMuted, borderColor: "transparent" }}>
               <Icon className="h-3.5 w-3.5" />
               {meta.label}
             </button>
@@ -417,15 +397,12 @@ function Toolbar({
   );
 }
 
-// ── Todo List ────────────────────────────────────────────────────────────────
+// ── Todos ─────────────────────────────────────────────────────────────────────
 
-function TodoList({
-  leadId, leadName, todos, crewId, slug, T,
-}: {
-  leadId: string; leadName: string; todos: TodoRow[];
-  crewId: string; slug: string; T: ThemeTokens;
+function TodoList({ leadId, leadName, todos, crewId, slug, T }: {
+  leadId: string; leadName: string; todos: LeadTodoRow[]; crewId: string; slug: string; T: ThemeTokens;
 }) {
-  const [localTodos, setLocalTodos] = useState<TodoRow[]>(todos);
+  const [localTodos, setLocalTodos] = useState<LeadTodoRow[]>(todos);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState("medium");
@@ -492,14 +469,11 @@ function TodoList({
 
       {showAddForm && (
         <div className="space-y-2 rounded-xl border p-3" style={{ borderColor: T.inputBorder, backgroundColor: T.bgElevated }}>
-          <input
-            type="text" placeholder="Что нужно сделать?"
+          <input type="text" placeholder="Что нужно сделать?"
             value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAdd()}
             className="w-full rounded-lg border px-3 py-2 text-xs outline-none"
-            style={{ borderColor: T.inputBorder, backgroundColor: T.inputBg, color: T.text }}
-            autoFocus
-          />
+            style={{ borderColor: T.inputBorder, backgroundColor: T.inputBg, color: T.text }} autoFocus />
           <div className="flex gap-2">
             <select value={newPriority} onChange={(e) => setNewPriority(e.target.value)}
               className="rounded-lg border px-2 py-1.5 text-[11px] outline-none"
@@ -509,8 +483,7 @@ function TodoList({
               <option value="high">Высокий</option>
             </select>
             <button onClick={handleAdd} disabled={saving || !newTitle.trim()}
-              className="rounded-lg px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
-              style={{ backgroundColor: T.accent }}>
+              className="rounded-lg px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40" style={{ backgroundColor: T.accent }}>
               {saving ? "…" : "Сохранить"}
             </button>
           </div>
@@ -532,14 +505,11 @@ function TodoList({
                   ? <CheckCircle className="h-4 w-4 text-emerald-400" />
                   : <CircleDot className="h-4 w-4" style={{ color: T.textFaint }} />}
               </button>
-              <span className={`flex-1 text-xs ${todo.status === "done" ? "line-through" : ""}`} style={{ color: T.text }}>
-                {todo.title}
-              </span>
+              <span className={`flex-1 text-xs ${todo.status === "done" ? "line-through" : ""}`} style={{ color: T.text }}>{todo.title}</span>
               {todo.priority === "high" && todo.status !== "done" && (
                 <span className="rounded-md bg-red-500/15 px-1.5 py-0.5 text-[9px] font-bold text-red-400">!</span>
               )}
-              <button onClick={() => handleDelete(todo.id)}
-                className="shrink-0 rounded p-1 opacity-40 transition hover:opacity-80 hover:bg-red-500/10">
+              <button onClick={() => handleDelete(todo.id)} className="shrink-0 rounded p-1 opacity-40 transition hover:opacity-80 hover:bg-red-500/10">
                 <Trash2 className="h-3 w-3" />
               </button>
             </div>
@@ -550,7 +520,7 @@ function TodoList({
   );
 }
 
-// ── Notes Panel ───────────────────────────────────────────────────────────────
+// ── Notes ─────────────────────────────────────────────────────────────────────
 
 function NotesPanel({ leadId, T }: { leadId: string; T: ThemeTokens }) {
   const storageKey = `lead_notes_${leadId}`;
@@ -577,20 +547,15 @@ function NotesPanel({ leadId, T }: { leadId: string; T: ThemeTokens }) {
   return (
     <div className="space-y-3">
       <div className="space-y-2 rounded-xl border p-3" style={{ borderColor: T.inputBorder, backgroundColor: T.bgElevated }}>
-        <textarea
-          value={draft} onChange={(e) => setDraft(e.target.value)}
-          placeholder="Заметка о клиенте..."
-          rows={3}
+        <textarea value={draft} onChange={(e) => setDraft(e.target.value)}
+          placeholder="Заметка о клиенте..." rows={3}
           className="w-full resize-none rounded-lg border px-3 py-2 text-xs outline-none"
-          style={{ borderColor: T.inputBorder, backgroundColor: T.inputBg, color: T.text }}
-        />
+          style={{ borderColor: T.inputBorder, backgroundColor: T.inputBg, color: T.text }} />
         <button onClick={addNote} disabled={!draft.trim()}
-          className="w-full rounded-lg py-2 text-xs font-bold text-white disabled:opacity-40"
-          style={{ backgroundColor: T.accent }}>
+          className="w-full rounded-lg py-2 text-xs font-bold text-white disabled:opacity-40" style={{ backgroundColor: T.accent }}>
           Добавить заметку
         </button>
       </div>
-
       {notes.length === 0 ? (
         <div className="rounded-xl border py-4 text-center" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
           <p className="text-xs" style={{ color: T.textFaint }}>Заметок пока нет</p>
@@ -609,37 +574,81 @@ function NotesPanel({ leadId, T }: { leadId: string; T: ThemeTokens }) {
   );
 }
 
-// ── History Panel ─────────────────────────────────────────────────────────────
+// ── Deals ─────────────────────────────────────────────────────────────────────
 
-function HistoryPanel({ lead, T }: { lead: LeadRow; T: ThemeTokens }) {
-  const meta = SOURCE_META[lead.source] || SOURCE_META.unknown;
-  const events = [
-    { icon: meta.icon, label: `Лид создан: ${meta.label}`, time: lead.createdAt },
-    { icon: UserPlus, label: "Добавлен в CRM", time: lead.createdAt },
-  ];
+function DealsPanel({ lead, T }: { lead: LeadRow; T: ThemeTokens }) {
   return (
-    <div className="space-y-2">
-      {events.map((e, i) => {
-        const Icon = e.icon;
-        return (
-          <div key={i} className="flex gap-3 rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: T.borderSoft }}>
-              <Icon className="h-4 w-4" style={{ color: T.accent }} />
-            </div>
-            <div>
-              <p className="text-xs font-medium" style={{ color: T.text }}>{e.label}</p>
-              <p className="text-[10px]" style={{ color: T.textFaint }}>{relativeTime(e.time)}</p>
-            </div>
-          </div>
-        );
-      })}
+    <div className="space-y-3">
+      {lead.rentals.length === 0 && lead.sales.length === 0 && (
+        <div className="rounded-xl border py-4 text-center" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+          <p className="text-xs" style={{ color: T.textFaint }}>Пока нет сделок</p>
+        </div>
+      )}
+
+      {lead.rentals.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-bold" style={{ color: T.text }}>Аренда</p>
+          {lead.rentals.map((r, i) => <RentalRow key={r.rentalId || i} rental={r} T={T} />)}
+        </div>
+      )}
+
+      {lead.sales.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-bold" style={{ color: T.text }}>Продажи</p>
+          {lead.sales.map((s, i) => <SaleRow key={s.saleId || i} sale={s} T={T} />)}
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Contact Panel ─────────────────────────────────────────────────────────────
+function RentalRow({ rental, T }: { rental: LeadRentalRow; T: ThemeTokens }) {
+  const statusMeta: Record<string, { label: string; color: string }> = {
+    active: { label: "Активна", color: "#10b981" },
+    completed: { label: "Завершена", color: "#3b82f6" },
+    confirmed: { label: "Подтверждена", color: "#8b5cf6" },
+    pending_confirmation: { label: "В обработке", color: "#f59e0b" },
+    cancelled: { label: "Отменена", color: "#64748b" },
+  };
+  const meta = statusMeta[rental.status] || { label: rental.status, color: T.textMuted };
+  return (
+    <div className="rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold" style={{ color: T.text }}>{rental.bikeTitle || "Байк"}</p>
+        <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: meta.color + "15", color: meta.color }}>{meta.label}</span>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]" style={{ color: T.textMuted }}>
+        <span><Calendar className="inline h-3 w-3 mr-1" />{formatDate(rental.startDate)} — {formatDate(rental.endDate)}</span>
+        <span><Banknote className="inline h-3 w-3 mr-1" />{fmtMoney(rental.totalCost)}</span>
+      </div>
+      {rental.rentalId && (
+        <a href={`/franchize/vip-bike/rental/${rental.rentalId}`} target="_blank" rel="noreferrer"
+          className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium" style={{ color: T.accent }}>
+          Открыть аренду <ExternalLink className="h-3 w-3" />
+        </a>
+      )}
+    </div>
+  );
+}
 
-function ContactPanel({ lead, T, todos }: { lead: LeadRow; T: ThemeTokens; todos?: TodoRow[] }) {
+function SaleRow({ sale, T }: { sale: LeadSaleRow; T: ThemeTokens }) {
+  return (
+    <div className="rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold" style={{ color: T.text }}>{sale.bikeTitle || "Байк"}</p>
+        <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: "#f59e0b15", color: "#f59e0b" }}>Продажа</span>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]" style={{ color: T.textMuted }}>
+        <span><Calendar className="inline h-3 w-3 mr-1" />{formatDate(sale.createdAt)}</span>
+        <span><Banknote className="inline h-3 w-3 mr-1" />{fmtMoney(sale.salePrice)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Contact panel ─────────────────────────────────────────────────────────────
+
+function ContactPanel({ lead, T, todos }: { lead: LeadRow; T: ThemeTokens; todos?: LeadTodoRow[] }) {
   const [showTgInput, setShowTgInput] = useState(false);
   const [tgMessage, setTgMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -687,9 +696,7 @@ function ContactPanel({ lead, T, todos }: { lead: LeadRow; T: ThemeTokens; todos
       const data = await resp.json();
       if (data.success) {
         lead.troubled = data.troubled;
-        if (!data.troubled) {
-          lead.troubledReason = null;
-        }
+        if (!data.troubled) lead.troubledReason = null;
         setShowTroubledInput(false);
         setTroubledReasonInput("");
         window.location.reload();
@@ -698,67 +705,40 @@ function ContactPanel({ lead, T, todos }: { lead: LeadRow; T: ThemeTokens; todos
     setTroubledUpdating(false);
   };
 
-  const handleTroubledClick = () => {
-    if (lead.troubled) {
-      // Unmark — clean toggle
-      handleToggleTroubled(lead.user_id, "");
-    } else {
-      // Show reason input
-      setShowTroubledInput(!showTroubledInput);
-    }
-  };
-
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {lead.phone && (
-          <ActionBtn href={`tel:${lead.phone}`} icon={Phone} label="Позвонить" T={T} />
-        )}
-        {lead.username && (
-          <ActionBtn href={`https://t.me/${lead.username}`} icon={Send} label="Telegram" T={T} external />
-        )}
+      <div className="grid grid-cols-2 gap-2">
+        {lead.phone && <ActionBtn href={`tel:${lead.phone}`} icon={Phone} label="Позвонить" T={T} />}
+        {lead.username && <ActionBtn href={`https://t.me/${lead.username}`} icon={Send} label="Telegram" T={T} external />}
         {lead.telegramChatId && (
           <button onClick={() => setShowTgInput(!showTgInput)}
             className="group flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-[11px] font-medium transition hover:brightness-110"
-            style={{
-              borderColor: T.border,
-              backgroundColor: showTgInput ? `${T.accent}18` : T.bgElevated,
-              color: showTgInput ? T.accent : T.text,
-            }}>
+            style={{ borderColor: T.border, backgroundColor: showTgInput ? `${T.accent}18` : T.bgElevated, color: showTgInput ? T.accent : T.text }}>
             <Send className="h-3.5 w-3.5 transition group-hover:scale-110" style={{ color: T.accent }} />
             {showTgInput ? "Закрыть" : "Уведомить"}
           </button>
         )}
-        <button onClick={handleTroubledClick}
+        <button onClick={() => lead.troubled ? handleToggleTroubled(lead.user_id, "") : setShowTroubledInput(!showTroubledInput)}
           className="group flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-[11px] font-medium transition hover:brightness-110"
-          style={{
-            borderColor: lead.troubled ? "#dc262640" : T.border,
-            backgroundColor: lead.troubled ? "#dc262618" : T.bgElevated,
-            color: lead.troubled ? "#dc2626" : T.text,
-          }}>
+          style={{ borderColor: lead.troubled ? "#dc262640" : T.border, backgroundColor: lead.troubled ? "#dc262618" : T.bgElevated, color: lead.troubled ? "#dc2626" : T.text }}>
           <AlertCircle className="h-3.5 w-3.5 transition group-hover:scale-110" style={{ color: lead.troubled ? "#dc2626" : T.accent }} />
-          {lead.troubled ? "Снять отметку" : "🚨 Отметить"}
+          {lead.troubled ? "Снять отметку" : "Отметить"}
         </button>
       </div>
 
       {showTroubledInput && !lead.troubled && (
         <div className="space-y-2 rounded-xl border p-3" style={{ borderColor: "#dc262640", backgroundColor: "#dc262608" }}>
           <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: "#dc2626" }}>
-            <AlertCircle className="h-3.5 w-3.5" />
-            Причина отметки
+            <AlertCircle className="h-3.5 w-3.5" /> Причина отметки
           </div>
           <div className="flex gap-2">
-            <input
-              value={troubledReasonInput} onChange={(e) => setTroubledReasonInput(e.target.value)}
+            <input value={troubledReasonInput} onChange={(e) => setTroubledReasonInput(e.target.value)}
               placeholder="Повредил байк / не оплатил …"
               className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs outline-none"
               style={{ borderColor: "#dc262640", backgroundColor: T.inputBg, color: T.text }}
-              onKeyDown={(e) => { if (e.key === "Enter") handleToggleTroubled(lead.user_id, troubledReasonInput.trim()); }}
-            />
-            <button onClick={() => handleToggleTroubled(lead.user_id, troubledReasonInput.trim())}
-              disabled={troubledUpdating}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
-              style={{ backgroundColor: "#dc2626" }}>
+              onKeyDown={(e) => { if (e.key === "Enter") handleToggleTroubled(lead.user_id, troubledReasonInput.trim()); }} />
+            <button onClick={() => handleToggleTroubled(lead.user_id, troubledReasonInput.trim())} disabled={troubledUpdating}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40" style={{ backgroundColor: "#dc2626" }}>
               {troubledUpdating ? "…" : "OK"}
             </button>
           </div>
@@ -768,44 +748,28 @@ function ContactPanel({ lead, T, todos }: { lead: LeadRow; T: ThemeTokens; todos
       {showTgInput && lead.telegramChatId && (
         <div className="space-y-2 rounded-xl border p-3" style={{ borderColor: T.inputBorder, backgroundColor: T.bgElevated }}>
           <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: T.accent }}>
-            <Send className="h-3.5 w-3.5" />
-            Уведомление в Telegram
+            <Send className="h-3.5 w-3.5" /> Уведомление в Telegram
           </div>
           <div className="relative">
-            <textarea
-              value={tgMessage} onChange={(e) => setTgMessage(e.target.value)}
-              placeholder="Текст уведомления..."
-              rows={3}
+            <textarea value={tgMessage} onChange={(e) => setTgMessage(e.target.value)}
+              placeholder="Текст уведомления..." rows={3}
               className="w-full resize-none rounded-lg border px-3 py-2 pr-8 text-xs outline-none"
-              style={{ borderColor: T.inputBorder, backgroundColor: T.inputBg, color: T.text }}
-            />
+              style={{ borderColor: T.inputBorder, backgroundColor: T.inputBg, color: T.text }} />
             {todos && todos.filter((t) => t.status !== "done").length > 0 && (
-              <button onClick={addTodosToMessage}
-                title="Добавить задачи в текст"
-                className="absolute right-2 top-2 rounded p-1 transition hover:opacity-80"
-                style={{ color: T.accent }}>
+              <button onClick={addTodosToMessage} title="Добавить задачи в текст"
+                className="absolute right-2 top-2 rounded p-1 transition hover:opacity-80" style={{ color: T.accent }}>
                 <StickyNote className="h-4 w-4" />
               </button>
             )}
           </div>
-          <div className="flex gap-2">
-            <button onClick={handleTgSend} disabled={sending || !tgMessage.trim()}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
-              style={{ backgroundColor: T.accent }}>
-              {sending ? "…" : sent ? "✅" : <><Send className="h-3 w-3" /> Отправить</>}
-            </button>
-            {todos && todos.filter((t) => t.status !== "done").length > 0 && (
-              <button onClick={addTodosToMessage}
-                className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-medium transition hover:opacity-80"
-                style={{ borderColor: T.border, color: T.textMuted }}>
-                <StickyNote className="h-3 w-3" /> + задачи
-              </button>
-            )}
-          </div>
+          <button onClick={handleTgSend} disabled={sending || !tgMessage.trim()}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40" style={{ backgroundColor: T.accent }}>
+            {sending ? "…" : sent ? "✅" : <><Send className="h-3 w-3" /> Отправить</>}
+          </button>
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2">
         {lead.phone && <InfoTile label="Телефон" value={lead.phone} T={T} />}
         {lead.username && <InfoTile label="Telegram" value={`@${lead.username}`} T={T} />}
         {lead.telegramChatId && <InfoTile label="TG ID" value={lead.telegramChatId} T={T} />}
@@ -813,14 +777,16 @@ function ContactPanel({ lead, T, todos }: { lead: LeadRow; T: ThemeTokens; todos
         {lead.intentStage && <InfoTile label="Стадия" value={STAGE_LABELS[lead.intentStage] || lead.intentStage} T={T} />}
         {lead.urgencyScore != null && <InfoTile label="Приоритет" value={`${lead.urgencyScore}/100`} T={T} />}
         <InfoTile label="Источник" value={metaFor(lead.source).label} T={T} />
+        {lead.sourceRoute && <InfoTile label="Маршрут" value={lead.sourceRoute} T={T} />}
+        {lead.contactChannel && <InfoTile label="Канал" value={lead.contactChannel} T={T} />}
+        {(lead.totalSpent || 0) > 0 && <InfoTile label="Выручка" value={fmtMoney(lead.totalSpent)} T={T} />}
+        {lead.lastRentalDate && <InfoTile label="Последняя аренда" value={formatDate(lead.lastRentalDate)} T={T} />}
         {lead.troubled && (
           <div className="col-span-full flex items-center gap-2 rounded-lg border p-2.5" style={{ borderColor: "#dc262640", backgroundColor: "#dc262608" }}>
             <AlertCircle className="h-4 w-4 shrink-0" style={{ color: "#dc2626" }} />
             <div className="min-w-0 text-xs">
               <span className="font-semibold" style={{ color: "#dc2626" }}>Проблемный клиент</span>
-              {lead.troubledReason && (
-                <span className="ml-2" style={{ color: T.textMuted }}>— {lead.troubledReason}</span>
-              )}
+              {lead.troubledReason && <span className="ml-2" style={{ color: T.textMuted }}>— {lead.troubledReason}</span>}
             </div>
           </div>
         )}
@@ -829,184 +795,130 @@ function ContactPanel({ lead, T, todos }: { lead: LeadRow; T: ThemeTokens; todos
   );
 }
 
-function metaFor(source: string) { return SOURCE_META[source] || SOURCE_META.unknown; }
+// ── Detail content (used inline on mobile and in panel on desktop) ────────────
 
-// ── Lead Card ─────────────────────────────────────────────────────────────────
-
-function LeadCard({
-  lead, T, isSelected, onSelect, onDismiss, todos, crewId, slug,
-}: {
-  lead: LeadRow; T: ThemeTokens; isSelected: boolean;
-  onSelect: () => void; onDismiss: (id: string) => void;
-  todos: TodoRow[]; crewId: string; slug: string;
+function LeadDetailContent({ lead, todos, crewId, slug, T }: {
+  lead: LeadRow; todos: LeadTodoRow[]; crewId: string; slug: string; T: ThemeTokens;
 }) {
-  const meta = SOURCE_META[lead.source] || SOURCE_META.unknown;
-  const relTime = relativeTime(lead.createdAt);
-  const stageLabel = lead.intentStage ? STAGE_LABELS[lead.intentStage] || lead.intentStage : null;
-  const intentLabel = lead.intentType ? INTENT_LABELS[lead.intentType] || lead.intentType : null;
-  const pendingTodos = todos.filter((t) => t.status !== "done").length;
-  const tempColor = temperatureColor(lead.urgencyScore, pendingTodos);
-  const tempLabel = temperatureLabel(lead.urgencyScore, pendingTodos);
-  const displayName = lead.full_name || (lead.source === "test_drive" ? "Новый тест-драйв" : "Без имени");
-
   return (
-    <div
-      onClick={onSelect}
-      className="group relative cursor-pointer overflow-hidden rounded-2xl border p-3 transition-all duration-200 hover:shadow-md"
-      style={{
-        backgroundColor: T.bgCard,
-        borderColor: isSelected ? T.borderActive : T.border,
-        boxShadow: isSelected ? `0 0 0 2px ${T.borderActive}33, ${T.shadow}` : undefined,
-      }}>
-      <div className="absolute left-0 top-0 h-full w-1" style={{ backgroundColor: tempColor }} />
+    <div className="space-y-3">
+      <Section title="Контакты и действия" icon={Phone} T={T} defaultOpen>
+        <ContactPanel lead={lead} T={T} todos={todos} />
+      </Section>
 
-          <div className="flex items-start gap-3 pl-2">
-        <Avatar name={lead.full_name} source={lead.source} size={48} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-bold" style={{ color: T.text }}>{displayName}</p>
-            {lead.verified && <CheckCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400" />}
-            {lead.telegramChatId && !lead.verified && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-cyan-500/15 text-[9px]" style={{ color: "#22d3ee" }} title="Есть связь с документом">
-                <Send className="h-3 w-3" />
-              </span>
-            )}
-            {pendingTodos > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500/15 px-1.5 text-[10px] font-bold text-amber-400">
-                {pendingTodos}
-              </span>
-            )}
+      <Section title={`Сделки (${lead.rentals.length + lead.sales.length})`} icon={Briefcase} T={T} defaultOpen={lead.rentals.length > 0 || lead.sales.length > 0}>
+        <DealsPanel lead={lead} T={T} />
+      </Section>
+
+      <Section title={`Задачи (${todos.filter(t => t.status !== "done").length})`} icon={CheckCircle} T={T}>
+        <TodoList leadId={lead.user_id} leadName={lead.full_name || "Без имени"} todos={todos} crewId={crewId} slug={slug} T={T} />
+      </Section>
+
+      <Section title="Заметки" icon={StickyNote} T={T}>
+        <NotesPanel leadId={lead.user_id} T={T} />
+      </Section>
+
+      <Section title="История" icon={History} T={T}>
+        <div className="space-y-2">
+          <div className="flex gap-3 rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: T.borderSoft }}>
+              <UserPlus className="h-4 w-4" style={{ color: T.accent }} />
+            </div>
+            <div>
+              <p className="text-xs font-medium" style={{ color: T.text }}>Добавлен в CRM</p>
+              <p className="text-[10px]" style={{ color: T.textFaint }}>{relativeTime(lead.createdAt)}</p>
+            </div>
           </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]" style={{ color: T.textMuted }}>
-            {lead.phone && <span className="truncate font-medium" style={{ color: T.text }}>{lead.phone}</span>}
-            {lead.username && <span>@{lead.username}</span>}
-            {relTime && <span>{relTime}</span>}
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <SourceBadge source={lead.source} />
-            {intentLabel && (
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: meta.bg, color: meta.color }}>
-                {intentLabel}
-              </span>
-            )}
-            <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: tempColor + "15", color: tempColor }}>
-              {tempLabel}
-            </span>
-            {lead.troubled && (
-              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "#dc262615", color: "#dc2626" }}>
-                <AlertCircle className="h-3 w-3" />
-                Проблемный
-              </span>
-            )}
-          </div>
-          {(lead.contractCount || 0) > 0 && (
-            <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px]" style={{ color: T.textMuted }}>
-              {(lead.contractCount || 0) > 0 && (
-                <span className="inline-flex items-center gap-1">
-                  <FileText className="h-3 w-3" />
-                  {lead.contractCount} дог.
-                </span>
-              )}
-              {(lead.totalSpent || 0) > 0 && (
-                <span>{new Intl.NumberFormat("ru-RU").format(lead.totalSpent)} ₽</span>
-              )}
-              {lead.lastRentalDate && (
-                <span>с {new Date(lead.lastRentalDate).toLocaleDateString("ru-RU")}</span>
-              )}
+          {lead.lastSeenAt && lead.lastSeenAt !== lead.createdAt && (
+            <div className="flex gap-3 rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: T.borderSoft }}>
+                <Clock className="h-4 w-4" style={{ color: T.accent }} />
+              </div>
+              <div>
+                <p className="text-xs font-medium" style={{ color: T.text }}>Последняя активность</p>
+                <p className="text-[10px]" style={{ color: T.textFaint }}>{relativeTime(lead.lastSeenAt)}</p>
+              </div>
             </div>
           )}
         </div>
-
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <button
-            onClick={(e) => { e.stopPropagation(); if (confirm(`Убрать «${displayName}» из списка?`)) onDismiss(lead.user_id); }}
-            className="rounded p-1.5 opacity-0 transition hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
-            style={{ color: T.textFaint }}>
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-          {isSelected ? <ChevronDown className="h-4 w-4" style={{ color: T.textFaint }} /> : <ChevronRight className="h-4 w-4" style={{ color: T.textFaint }} />}
-        </div>
-      </div>
-
-      {stageLabel && lead.bikeTitle && (
-        <div className="mt-2 flex items-center gap-2 pl-2 text-[11px]" style={{ color: T.textMuted }}>
-          {lead.bikeTitle && <span className="truncate">{lead.bikeTitle}</span>}
-          {stageLabel && <span className="shrink-0">• {stageLabel}</span>}
-        </div>
-      )}
+      </Section>
     </div>
   );
 }
 
-// ── Detail Panel ──────────────────────────────────────────────────────────────
+// ── Lead Card ─────────────────────────────────────────────────────────────────
 
-function DetailPanel({ lead, todos, crewId, slug, T, onClose }: {
-  lead: LeadRow; todos: TodoRow[]; crewId: string; slug: string; T: ThemeTokens; onClose: () => void;
+function LeadCard({
+  lead, T, isSelected, onSelect, onDismiss, todos,
+}: {
+  lead: LeadRow; T: ThemeTokens; isSelected: boolean;
+  onSelect: () => void; onDismiss: (id: string) => void;
+  todos: LeadTodoRow[];
 }) {
-  const [tab, setTab] = useState<DetailTab>("contacts");
   const meta = SOURCE_META[lead.source] || SOURCE_META.unknown;
-  const displayName = lead.full_name || (lead.source === "test_drive" ? "Новый тест-драйв" : "Без имени");
+  const relTime = relativeTime(lead.lastSeenAt || lead.createdAt);
+  const stageLabel = lead.intentStage ? STAGE_LABELS[lead.intentStage] || lead.intentStage : null;
+  const pendingTodos = todos.filter((t) => t.status !== "done").length;
+  const tempColor = temperatureColor(lead.urgencyScore, pendingTodos);
+  const tempLabel = temperatureLabel(lead.urgencyScore, pendingTodos);
+  const displayName = lead.full_name || "Без имени";
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border" style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: T.shadow }}>
-      {/* Header */}
-      <div className="flex items-start gap-3 border-b p-4" style={{ borderColor: T.border }}>
-        <Avatar name={lead.full_name} source={lead.source} size={56} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="truncate text-lg font-bold" style={{ color: T.text }}>{displayName}</h3>
-            {lead.verified && <CheckCircle className="h-4 w-4 shrink-0 text-emerald-400" />}
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: T.textMuted }}>
-            {lead.phone && <span>{lead.phone}</span>}
-            {lead.username && <span>@{lead.username}</span>}
-            <span>{relativeTime(lead.createdAt)}</span>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <SourceBadge source={lead.source} size="md" />
-            {lead.bikeTitle && (
-              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ backgroundColor: T.borderSoft, color: T.text }}>
-                <Bike className="h-3 w-3" /> {lead.bikeTitle}
-              </span>
+    <div
+      className="group relative overflow-hidden rounded-2xl border transition-all duration-200"
+      style={{
+        backgroundColor: T.bgCard,
+        borderColor: isSelected ? T.borderActive : T.border,
+        boxShadow: isSelected ? `0 0 0 2px ${T.borderActive}33, ${T.shadow}` : undefined,
+      }}
+    >
+      <div className="absolute left-0 top-0 h-full w-1" style={{ backgroundColor: tempColor }} />
+      <button onClick={onSelect} className="w-full p-3 pl-4 text-left">
+        <div className="flex items-start gap-3">
+          <Avatar name={lead.full_name} source={lead.source} size={48} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="truncate text-sm font-bold" style={{ color: T.text }}>{displayName}</p>
+              {lead.verified && <CheckCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400" />}
+              {pendingTodos > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500/15 px-1.5 text-[10px] font-bold text-amber-400">
+                  {pendingTodos}
+                </span>
+              )}
+            </div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]" style={{ color: T.textMuted }}>
+              {lead.phone && <span className="truncate font-medium" style={{ color: T.text }}>{lead.phone}</span>}
+              {lead.username && <span>@{lead.username}</span>}
+              {relTime && <span>{relTime}</span>}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <SourceBadge source={lead.source} />
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: tempColor + "15", color: tempColor }}>{tempLabel}</span>
+              {lead.troubled && (
+                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "#dc262615", color: "#dc2626" }}>
+                  <AlertCircle className="h-3 w-3" /> Проблемный
+                </span>
+              )}
+            </div>
+            {((lead.totalSpent || 0) > 0 || lead.rentals.length > 0 || lead.sales.length > 0) && (
+              <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px]" style={{ color: T.textMuted }}>
+                {lead.rentals.length > 0 && <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" />{lead.rentals.length} аренд</span>}
+                {lead.sales.length > 0 && <span className="inline-flex items-center gap-1"><TrendingUp className="h-3 w-3" />{lead.sales.length} продаж</span>}
+                {(lead.totalSpent || 0) > 0 && <span>{fmtMoney(lead.totalSpent)}</span>}
+              </div>
             )}
           </div>
-        </div>
-        <button onClick={onClose} className="rounded p-1 transition hover:bg-black/5" style={{ color: T.textFaint }}>
-          <X className="h-5 w-5" />
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex border-b" style={{ borderColor: T.border }}>
-        {([
-          { key: "contacts", label: "Контакты", icon: Phone },
-          { key: "tasks", label: "Задачи", icon: CheckCircle },
-          { key: "notes", label: "Заметки", icon: StickyNote },
-          { key: "history", label: "История", icon: History },
-        ] as { key: DetailTab; label: string; icon: typeof Phone }[]).map((t) => {
-          const Icon = t.icon;
-          const active = tab === t.key;
-          return (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 py-2.5 text-[11px] font-semibold transition sm:text-xs`}
-              style={{
-                borderColor: active ? T.accent : "transparent",
-                color: active ? T.accent : T.textMuted,
-                backgroundColor: active ? T.borderSoft : "transparent",
-              }}>
-              <Icon className="h-3.5 w-3.5" /> {t.label}
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <button
+              onClick={(e) => { e.stopPropagation(); if (confirm(`Убрать «${displayName}» из списка?`)) onDismiss(lead.user_id); }}
+              className="rounded p-1.5 opacity-0 transition hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+              style={{ color: T.textFaint }}>
+              <Trash2 className="h-3.5 w-3.5" />
             </button>
-          );
-        })}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {tab === "contacts" && <ContactPanel lead={lead} T={T} todos={todos} />}
-        {tab === "tasks" && <TodoList leadId={lead.user_id} leadName={displayName} todos={todos} crewId={crewId} slug={slug} T={T} />}
-        {tab === "notes" && <NotesPanel leadId={lead.user_id} T={T} />}
-        {tab === "history" && <HistoryPanel lead={lead} T={T} />}
-      </div>
+            {isSelected ? <ChevronDown className="h-4 w-4" style={{ color: T.textFaint }} /> : <ChevronRight className="h-4 w-4" style={{ color: T.textFaint }} />}
+          </div>
+        </div>
+      </button>
     </div>
   );
 }
@@ -1014,45 +926,52 @@ function DetailPanel({ lead, todos, crewId, slug, T, onClose }: {
 // ── Board View ────────────────────────────────────────────────────────────────
 
 function BoardView({
-  leads, selectedId, onSelect, onDismiss, getTodosForLead, T, crewId, slug,
+  leads, selectedId, onSelect, onDismiss, getTodosForLead, T,
 }: {
   leads: LeadRow[]; selectedId: string | null; onSelect: (id: string) => void;
-  onDismiss: (id: string) => void;   getTodosForLead: (lead: LeadRow) => TodoRow[];
-  T: ThemeTokens; crewId: string; slug: string;
+  onDismiss: (id: string) => void; getTodosForLead: (lead: LeadRow) => LeadTodoRow[];
+  T: ThemeTokens;
 }) {
-  const columnMap = useMemo(() => {
-    const map: Record<string, LeadRow[]> = {};
-    for (const col of BOARD_COLUMNS) map[col.key] = [];
+  const columns = useMemo(() => {
+    const map: Record<string, LeadRow[]> = { new: [], contacted: [], configured: [], contract_generated: [], completed: [] };
     for (const l of leads) {
       const key = l.intentStage || "new";
-      const col = BOARD_COLUMNS.find((c) => c.key === key) || BOARD_COLUMNS[0];
-      map[col.key].push(l);
+      const col = map[key] ? key : "new";
+      map[col].push(l);
     }
     return map;
   }, [leads]);
 
+  const colMeta: Record<string, { label: string; color: string }> = {
+    new: { label: "Новые", color: "#64748b" },
+    contacted: { label: "В работе", color: "#3b82f6" },
+    configured: { label: "Настроил", color: "#8b5cf6" },
+    contract_generated: { label: "Договор", color: "#f59e0b" },
+    completed: { label: "Завершено", color: "#10b981" },
+  };
+
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:grid-cols-5">
-      {BOARD_COLUMNS.map((col) => (
-        <div key={col.key} className="flex max-h-[calc(100vh-280px)] flex-col rounded-2xl border" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+      {Object.entries(columns).map(([key, colLeads]) => (
+        <div key={key} className="flex max-h-[calc(100vh-280px)] flex-col rounded-2xl border" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
           <div className="flex items-center justify-between border-b p-3" style={{ borderColor: T.border }}>
             <div className="flex items-center gap-2">
-              <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: col.color }} />
-              <span className="text-xs font-bold" style={{ color: T.text }}>{col.label}</span>
+              <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colMeta[key].color }} />
+              <span className="text-xs font-bold" style={{ color: T.text }}>{colMeta[key].label}</span>
             </div>
-            <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: T.borderSoft, color: T.text }}>{columnMap[col.key].length}</span>
+            <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: T.borderSoft, color: T.text }}>{colLeads.length}</span>
           </div>
           <div className="flex-1 space-y-2 overflow-y-auto p-2">
-            {columnMap[col.key].map((lead) => {
+            {colLeads.map((lead) => {
               const pending = getTodosForLead(lead).filter((t) => t.status !== "done").length;
               return (
-                <div key={lead.user_id} onClick={() => onSelect(lead.user_id)}
+                <div key={lead.user_id} onClick={() => onSelect(selectedId === lead.user_id ? "" : lead.user_id)}
                   className="cursor-pointer rounded-xl border p-2.5 transition hover:shadow-sm"
                   style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: selectedId === lead.user_id ? `0 0 0 2px ${T.borderActive}33` : undefined }}>
                   <div className="flex items-center gap-2">
                     <Avatar name={lead.full_name} source={lead.source} size={32} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-bold" style={{ color: T.text }}>{lead.full_name || (lead.source === "test_drive" ? "Новый тест-драйв" : "Без имени")}</p>
+                      <p className="truncate text-xs font-bold" style={{ color: T.text }}>{lead.full_name || "Без имени"}</p>
                       <p className="truncate text-[10px]" style={{ color: T.textMuted }}>{lead.phone || lead.username || relativeTime(lead.createdAt)}</p>
                     </div>
                     {pending > 0 && <span className="rounded-full bg-amber-500/15 px-1.5 text-[9px] font-bold text-amber-400">{pending}</span>}
@@ -1080,9 +999,7 @@ function EmptyState({ hasFilters, T }: { hasFilters: boolean; T: ThemeTokens }) 
       <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full" style={{ backgroundColor: T.borderSoft }}>
         {hasFilters ? <Filter className="h-9 w-9" style={{ color: T.textFaint }} /> : <Users className="h-9 w-9" style={{ color: T.textFaint }} />}
       </div>
-      <p className="text-base font-bold" style={{ color: T.text }}>
-        {hasFilters ? "Ничего не найдено" : "Пока нет заявок"}
-      </p>
+      <p className="text-base font-bold" style={{ color: T.text }}>{hasFilters ? "Ничего не найдено" : "Пока нет заявок"}</p>
       <p className="mt-1 max-w-xs text-sm" style={{ color: T.textFaint }}>
         {hasFilters ? "Попробуйте изменить фильтры или сбросить поиск" : "Новые заявки появятся здесь автоматически"}
       </p>
@@ -1138,17 +1055,17 @@ export function LeadsClient({
   };
 
   // ── Data processing ───────────────────────────────────────────────────────
-  const getTodoLeadId = useCallback((todo: TodoRow): string | null => {
+  const getTodoLeadId = useCallback((todo: LeadTodoRow): string | null => {
     if (!todo.description) return null;
     try { return JSON.parse(todo.description).lead_id || null; } catch { return null; }
   }, []);
 
-  const getTodoLeadPhone = useCallback((todo: TodoRow): string | null => {
+  const getTodoLeadPhone = useCallback((todo: LeadTodoRow): string | null => {
     if (!todo.description) return null;
     try { return JSON.parse(todo.description).lead_phone || null; } catch { return null; }
   }, []);
 
-  const getTodosForLead = useCallback((lead: LeadRow): TodoRow[] => {
+  const getTodosForLead = useCallback((lead: LeadRow): LeadTodoRow[] => {
     return todos.filter((t) => {
       const leadId = getTodoLeadId(t);
       if (leadId === lead.user_id) return true;
@@ -1159,41 +1076,16 @@ export function LeadsClient({
     });
   }, [todos, getTodoLeadId, getTodoLeadPhone]);
 
-  const dedupedLeads = useMemo(() => {
-    const map = new Map<string, LeadRow>();
-    const sourcePriority: Record<string, number> = {
-      rental_contract: 5, sale_contract: 4, test_drive: 3,
-      dashboard_intent: 2, web_callback: 1, rental_secret: 0,
-      profile_prefill: 0, unknown: -1,
-    };
-    for (const lead of leads) {
-      const existing = map.get(lead.user_id);
-      if (!existing) { map.set(lead.user_id, lead); continue; }
-      const leadScore = sourcePriority[lead.source] ?? 0;
-      const existScore = sourcePriority[existing.source] ?? 0;
-      if (leadScore > existScore) {
-        map.set(lead.user_id, {
-          ...lead,
-          phone: lead.phone || existing.phone,
-          full_name: lead.full_name || existing.full_name,
-          username: lead.username || existing.username,
-          bikeTitle: lead.bikeTitle || existing.bikeTitle,
-          verified: lead.verified || existing.verified,
-        });
-      }
-    }
-    return Array.from(map.values());
-  }, [leads]);
-
   const filteredLeads = useMemo(() => {
-    let result = dedupedLeads;
+    let result = leads;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter((l) =>
         (l.full_name || "").toLowerCase().includes(q) ||
         (l.phone || "").includes(q) ||
         (l.username || "").toLowerCase().includes(q) ||
-        (l.bikeTitle || "").toLowerCase().includes(q)
+        (l.bikeTitle || "").toLowerCase().includes(q) ||
+        (l.sourceRoute || "").toLowerCase().includes(q)
       );
     }
     if (filterSource !== "all") result = result.filter((l) => l.source === filterSource);
@@ -1202,12 +1094,12 @@ export function LeadsClient({
         const pt = getTodosForLead(l).filter((t) => t.status !== "done").length;
         if (segment === "troubled") return l.troubled === true;
         if (segment === "verified") return l.verified;
-        if (segment === "hot") return !l.verified && ((l.urgencyScore ?? 0) >= 60 || pt > 0);
-        return !l.verified && !((l.urgencyScore ?? 0) >= 60 || pt > 0);
+        if (segment === "hot") return !l.verified && ((l.urgencyScore ?? 0) >= 60 || pt > 0 || (l.totalSpent || 0) > 0);
+        return !l.verified && !((l.urgencyScore ?? 0) >= 60 || pt > 0 || (l.totalSpent || 0) > 0);
       });
     }
     return result;
-  }, [dedupedLeads, searchQuery, filterSource, segment, getTodosForLead]);
+  }, [leads, searchQuery, filterSource, segment, getTodosForLead]);
 
   const sortedLeads = useMemo(() => {
     const arr = [...filteredLeads];
@@ -1219,17 +1111,14 @@ export function LeadsClient({
           const aScore = (a.urgencyScore || 0) + aT * 20;
           const bScore = (b.urgencyScore || 0) + bT * 20;
           if (aScore !== bScore) return bScore - aScore;
-          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+          return new Date(b.lastSeenAt || b.createdAt || 0).getTime() - new Date(a.lastSeenAt || a.createdAt || 0).getTime();
         });
       case "name":
         return arr.sort((a, b) => (a.full_name || "яя").localeCompare(b.full_name || "яя", "ru"));
-      case "verified":
-        return arr.sort((a, b) => {
-          if (a.verified !== b.verified) return a.verified ? -1 : 1;
-          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-        });
+      case "spent":
+        return arr.sort((a, b) => (b.totalSpent || 0) - (a.totalSpent || 0));
       default:
-        return arr.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        return arr.sort((a, b) => new Date(b.lastSeenAt || b.createdAt || 0).getTime() - new Date(a.lastSeenAt || a.createdAt || 0).getTime());
     }
   }, [filteredLeads, sortMode, getTodosForLead]);
 
@@ -1240,7 +1129,7 @@ export function LeadsClient({
     for (const l of sortedLeads) {
       const pt = getTodosForLead(l).filter((t) => t.status !== "done").length;
       if (l.verified) { verified.push(l); continue; }
-      if ((l.urgencyScore ?? 0) >= 60 || pt > 0) { hot.push(l); continue; }
+      if ((l.urgencyScore ?? 0) >= 60 || pt > 0 || (l.totalSpent || 0) > 0) { hot.push(l); continue; }
       warm.push(l);
     }
     return { hot, verified, warm };
@@ -1249,16 +1138,6 @@ export function LeadsClient({
   const availableSources = useMemo(() => Array.from(new Set(leads.map((l) => l.source))), [leads]);
   const hasFilters = !!(searchQuery || filterSource !== "all");
   const selectedLead = useMemo(() => sortedLeads.find((l) => l.user_id === selectedId) || null, [sortedLeads, selectedId]);
-
-  // ── Autoscroll to detail panel on mobile when lead selected ──────────────
-  const detailRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (selectedLead && detailRef.current) {
-      if (window.innerWidth < 1280) {
-        setTimeout(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-      }
-    }
-  }, [selectedLead]);
 
   // ── Dismiss ────────────────────────────────────────────────────────────────
   const handleDismissLead = async (leadId: string) => {
@@ -1290,8 +1169,11 @@ export function LeadsClient({
             onKeyDown={(e) => e.key === "Enter" && handlePasswordSubmit()}
             placeholder="••••••••" disabled={isPasswordValidating}
             className="w-full rounded-xl border px-4 py-3 text-center tracking-widest outline-none transition focus:ring-2"
-            style={{ borderColor: T.inputBorder, backgroundColor: T.inputBg, color: T.text, // @ts-ignore
-              "--tw-ring-color": T.borderActive }} autoFocus />
+            style={{
+              borderColor: T.inputBorder, backgroundColor: T.inputBg, color: T.text,
+              // @ts-ignore
+              "--tw-ring-color": T.borderActive,
+            }} autoFocus />
           {passwordError && (
             <p className="flex items-center justify-center gap-1.5 text-center text-sm text-red-400">
               <AlertCircle className="h-4 w-4" /> {passwordError}
@@ -1311,7 +1193,7 @@ export function LeadsClient({
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
-      <KpiCards leads={dedupedLeads} hot={hot} verified={verified} todos={todos} T={T} />
+      <KpiCards leads={leads} hot={hot} verified={verified} todos={todos} T={T} />
 
       <Toolbar
         searchQuery={searchQuery} setSearchQuery={setSearchQuery}
@@ -1330,14 +1212,14 @@ export function LeadsClient({
           onSelect={(id) => setSelectedId(selectedId === id ? null : id)}
           onDismiss={handleDismissLead}
           getTodosForLead={getTodosForLead}
-          T={T} crewId={crewId} slug={slug}
+          T={T}
         />
       ) : sortedLeads.length === 0 ? (
         <EmptyState hasFilters={hasFilters} T={T} />
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           {/* List */}
-          <div className={`space-y-3 ${selectedLead ? "xl:col-span-2" : "xl:col-span-5"}`}>
+          <div className={`space-y-3 ${selectedLead ? "lg:col-span-5" : "lg:col-span-12"}`}>
             {sortedLeads.map((lead) => (
               <LeadCard
                 key={lead.user_id}
@@ -1347,27 +1229,61 @@ export function LeadsClient({
                 onSelect={() => setSelectedId(selectedId === lead.user_id ? null : lead.user_id)}
                 onDismiss={handleDismissLead}
                 todos={getTodosForLead(lead)}
-                crewId={crewId}
-                slug={slug}
               />
             ))}
           </div>
 
-          {/* Detail panel */}
+          {/* Desktop detail panel */}
           {selectedLead && (
-            <div className="xl:col-span-3" ref={detailRef}>
-              <div className="sticky top-24 max-h-[calc(100vh-140px)]">
-                <DetailPanel
-                  lead={selectedLead}
-                  todos={getTodosForLead(selectedLead)}
-                  crewId={crewId}
-                  slug={slug}
-                  T={T}
-                  onClose={() => setSelectedId(null)}
-                />
+            <div className="hidden lg:block lg:col-span-7">
+              <div className="sticky top-24 max-h-[calc(100vh-140px)] overflow-y-auto rounded-2xl border p-4" style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: T.shadow }}>
+                <div className="mb-4 flex items-start gap-3">
+                  <Avatar name={selectedLead.full_name} source={selectedLead.source} size={56} />
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-lg font-bold" style={{ color: T.text }}>{selectedLead.full_name || "Без имени"}</h3>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: T.textMuted }}>
+                      {selectedLead.phone && <span>{selectedLead.phone}</span>}
+                      {selectedLead.username && <span>@{selectedLead.username}</span>}
+                      <span>{relativeTime(selectedLead.lastSeenAt || selectedLead.createdAt)}</span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <SourceBadge source={selectedLead.source} size="md" />
+                      {selectedLead.bikeTitle && (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ backgroundColor: T.borderSoft, color: T.text }}>
+                          <Bike className="h-3 w-3" /> {selectedLead.bikeTitle}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedId(null)} className="rounded p-1 transition hover:bg-black/5" style={{ color: T.textFaint }}>
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} />
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Mobile inline expansion */}
+      {selectedLead && (
+        <div className="lg:hidden rounded-2xl border p-4" style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: T.shadow }}>
+          <div className="mb-4 flex items-start gap-3">
+            <Avatar name={selectedLead.full_name} source={selectedLead.source} size={56} />
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-lg font-bold" style={{ color: T.text }}>{selectedLead.full_name || "Без имени"}</h3>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: T.textMuted }}>
+                {selectedLead.phone && <span>{selectedLead.phone}</span>}
+                {selectedLead.username && <span>@{selectedLead.username}</span>}
+                <span>{relativeTime(selectedLead.lastSeenAt || selectedLead.createdAt)}</span>
+              </div>
+            </div>
+            <button onClick={() => setSelectedId(null)} className="rounded p-1 transition hover:bg-black/5" style={{ color: T.textFaint }}>
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} />
         </div>
       )}
     </div>

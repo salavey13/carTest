@@ -14,6 +14,7 @@ import {
   decodeStartappState,
   isStartappStateFresh,
 } from "@/lib/startapp-state";
+import { upsertFranchizeLead } from "@/app/franchize/lib/leads";
 
 const START_PARAM_PAGE_MAP: Record<string, string> = {
   elon: "/elon",
@@ -322,6 +323,37 @@ export function useStartParamRouter() {
               targetPath = `/franchize/vip-bike?startapp_expired=1&bikeId=${encodeURIComponent(state.bikeId)}`;
             } else {
               logger.info('[ClientLayout] cart_ state decoded', { type: state.type, bikeId: state.bikeId });
+
+              // Record the website→Telegram handoff as a lead.
+              if (dbUser?.user_id) {
+                void upsertFranchizeLead({
+                  slug: "vip-bike",
+                  userId: dbUser.user_id,
+                  intentType: state.type === "sale" ? "sale" : "rent",
+                  stage: "configured",
+                  bikeId: state.bikeId,
+                  sourceRoute: "/continue-in-tg",
+                  contactChannel: "telegram_bot",
+                  urgencyScore: state.type === "sale" ? 85 : 75,
+                  metadata: {
+                    startDate: state.startDate,
+                    endDate: state.endDate,
+                    startTime: state.startTime,
+                    endTime: state.endTime,
+                    helmetCount: state.helmetCount,
+                    extrasGloves: state.extrasGloves,
+                    extrasNet: state.extrasNet,
+                    extrasBag: state.extrasBag,
+                    extrasJacket: state.extrasJacket,
+                    extrasBoots: state.extrasBoots,
+                    extrasBackpack: state.extrasBackpack,
+                    extrasCharger: state.extrasCharger,
+                    package: state.package,
+                    perk: state.perk,
+                  },
+                });
+              }
+
               const params = new URLSearchParams({
                 startappState: paramToProcess,
                 startappBikeId: state.bikeId,
