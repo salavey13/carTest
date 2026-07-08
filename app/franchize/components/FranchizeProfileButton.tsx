@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, User, IdCard, MessageCircle, Send, UserPlus, Users, Moon, Sun, BarChart3, PhoneCall } from "lucide-react";
+import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, IdCard, MessageCircle, Send, UserPlus, Users, Moon, Sun, BarChart3, PhoneCall } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
@@ -301,13 +301,6 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           <DropdownMenuSeparator />
 
           <DropdownMenuItem asChild>
-            <Link href="/profile" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-              <User className="mr-2 h-4 w-4" />
-              <span className="truncate">Профиль</span>
-            </Link>
-          </DropdownMenuItem>
-
-          <DropdownMenuItem asChild>
             <Link href="/settings" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
               <Settings className="mr-2 h-4 w-4" />
               <span className="truncate">Настройки</span>
@@ -361,9 +354,9 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           )}
 
           <DropdownMenuItem asChild>
-            <Link href={franchizeProfileHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+            <Link href={franchizeProfileHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full font-semibold bg-muted/30">
               <IdCard className="mr-2 h-4 w-4 shrink-0" />
-              <span className="truncate">Профиль франшизы</span>
+              <span className="truncate">Профиль</span>
             </Link>
           </DropdownMenuItem>
 
