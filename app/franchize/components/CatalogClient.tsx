@@ -720,13 +720,30 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     if (searchParams.get("extrasBackpack") === "true") extrasParts.push("🎒 Рюкзак");
     if (searchParams.get("extrasCharger") === "true") extrasParts.push("🔌 Зарядка");
 
-    const prefill: typeof initialSelectedOptions = {
+    const extrasSelection: Record<string, number | boolean> = {};
+    if (helmetCount && Number(helmetCount) > 0) extrasSelection.helmet = Number(helmetCount);
+    if (searchParams.get("extrasGloves") === "true") extrasSelection.gloves = true;
+    if (searchParams.get("extrasNet") === "true") extrasSelection.net = true;
+    if (searchParams.get("extrasBag") === "true") extrasSelection.bag = true;
+    if (searchParams.get("extrasJacket") === "true") extrasSelection.jacket = true;
+    if (searchParams.get("extrasBoots") === "true") extrasSelection.boots = true;
+    if (searchParams.get("extrasBackpack") === "true") extrasSelection.backpack = true;
+    if (searchParams.get("extrasCharger") === "true") extrasSelection.charger = true;
+
+    const prefill: typeof selectedOptions & {
+      rentStartTime?: string;
+      rentEndTime?: string;
+      extrasSelection?: Record<string, number | boolean>;
+    } = {
       package: (searchParams.get("package") || "Базовый") as never,
       duration: "1 день",
       perk: (extrasParts.length > 0 ? extrasParts.join(", ") : (searchParams.get("perk") || "Стандарт")) as never,
       auction: auctionTickOptions[0] ?? "Без аукциона",
       rentStartDate: searchParams.get("startDate") || "",
       rentEndDate: searchParams.get("endDate") || "",
+      rentStartTime: searchParams.get("startTime") || "",
+      rentEndTime: searchParams.get("endTime") || "",
+      extrasSelection: Object.keys(extrasSelection).length > 0 ? extrasSelection : undefined,
     };
 
     // Derive a duration label from the dates so the chip looks consistent.

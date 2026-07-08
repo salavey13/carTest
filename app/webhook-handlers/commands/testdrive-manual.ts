@@ -748,38 +748,27 @@ async function generateContract(chatId: number, userId: string, context: TestDri
     try {
       const leadPhone = context.customerPhone || "";
       const leadUserId = leadPhone || String(userId);
-      // Upsert users record by phone as fallback identifier
-      if (leadPhone) {
-        await supabaseAdmin.from("users").upsert({
-          user_id: leadUserId,
-          phone: leadPhone,
-          full_name: context.customerFullName || "",
-          metadata: {
-            source: "telegram-testdrive",
-            created_via: "contract_generation",
-            is_lead: true,
-          },
-        }, { onConflict: "user_id" });
-      }
-      await supabaseAdmin.from("franchize_intents").upsert({
+      const { upsertFranchizeLead } = await import("@/app/franchize/lib/leads");
+      await upsertFranchizeLead({
         slug: "vip-bike",
-        bike_id: bike.id,
-        intent_type: "test_drive",
+        userId: leadUserId,
+        intentType: "test_drive",
         stage: "contract_generated",
-        source_route: "/testdrive",
-        contact_channel: "telegram_bot",
-        urgency_score: 85,
-        telegram_user_id: leadUserId,
+        bikeId: bike.id,
+        bikeTitle: `${bike.make} ${bike.model}`,
+        phone: leadPhone || undefined,
+        fullName: context.customerFullName || undefined,
+        sourceRoute: "/testdrive",
+        contactChannel: "telegram_bot",
+        urgencyScore: 85,
         metadata: {
-          name: context.customerFullName,
-          phone: context.customerPhone || null,
-          bikeTitle: `${bike.make} ${bike.model}`,
           dealType: "test_drive",
           operatorId: String(userId),
           hasPassport: !!(context.needPassport && context.customerSeries),
           hasLicense: !!(context.needLicense && context.licenseSeries),
         },
-      }, { onConflict: "slug,bike_id,telegram_user_id,intent_type" });
+        ensureUser: true,
+      });
     } catch (leadErr) {
       logger.warn("[/testdrive] Failed to create lead:", leadErr);
     }

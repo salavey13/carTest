@@ -22,6 +22,7 @@ import { crewPaletteForSurface, readableTextOnColor, withAlpha } from "../lib/th
 import { FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import { encodeStartappState, type StartappState } from "@/lib/startapp-state";
 import { getTelegramWebAppAdaptiveHref } from "@/app/franchize/lib/telegram-links";
+import { upsertFranchizeLead } from "@/app/franchize/lib/leads";
 
 // ── Russian Label Helper (VIP Bike Landing & Catalog Improvements) ──
 // Helper to get Russian label from spec_labels in rawSpecs
@@ -64,6 +65,12 @@ interface ItemModalProps {
     rentStartDate?: string;
     /** Rental end date (ISO string yyyy-MM-dd) */
     rentEndDate?: string;
+    /** Rental start time (HH:MM) */
+    rentStartTime?: string;
+    /** Rental end time (HH:MM) */
+    rentEndTime?: string;
+    /** Pre-selected additional items (jacket, boots, backpack, charger, gloves, net, bag). */
+    extrasSelection?: AdditionalItemsSelection;
   };
   auctionOptions: string[];
   onChangeOption: (
@@ -969,6 +976,19 @@ export function ItemModal({
     setIsInTelegram(inTg);
   }, [item?.id]);
 
+  // Sync pre-filled options from deep-link / parent into local modal state.
+  useEffect(() => {
+    if (!item) return;
+    if (options.rentStartTime) setRentStartTime(options.rentStartTime);
+    if (options.rentEndTime) setRentEndTime(options.rentEndTime);
+    if (options.extrasSelection && typeof options.extrasSelection === "object") {
+      setExtrasSelection((prev) => ({ ...prev, ...options.extrasSelection }));
+      if (typeof options.extrasSelection.helmet === "number") {
+        setHelmetCount(options.extrasSelection.helmet);
+      }
+    }
+  }, [item?.id, options.rentStartTime, options.rentEndTime, options.extrasSelection]);
+
   // Determine which CTAs to show (safe optional chaining — item may be null during close transition)
   // Only show CTAs for flows that are explicitly enabled via rent=1/sale=1 specs
   const showRentCta = isRental && (item ? hasRentPrice(item) : false);
@@ -1199,6 +1219,36 @@ export function ItemModal({
 
   // ── Bot username for deep-links (from crew config) ──
   const botUsername = (theme as any)?.telegramBotUsername || "oneBikePlsBot";
+
+  // Track a browser user who clicked "continue in Telegram" as a lead.
+  const trackContinueInTgLead = useCallback(
+    (flowType: "rental" | "sale") => {
+      void upsertFranchizeLead({
+        slug,
+        userId: item?.id ? `${flowType}-${item.id}-${Date.now()}` : `browser-${Date.now()}`,
+        intentType: flowType === "rental" ? "rent" : "sale",
+        stage: "configured",
+        bikeId: item?.id,
+        bikeTitle: item?.title,
+        sourceRoute: `/franchize/${slug}?continue_in_tg=${flowType}`,
+        contactChannel: "web_app",
+        urgencyScore: flowType === "rental" ? 75 : 85,
+        metadata: {
+          flowType,
+          startDate: options.rentStartDate,
+          endDate: options.rentEndDate,
+          startTime: rentStartTime,
+          endTime: rentEndTime,
+          helmetCount,
+          extrasSelection,
+          package: options.package,
+          perk: options.perk,
+        },
+        ensureUser: true,
+      });
+    },
+    [slug, item?.id, item?.title, options.rentStartDate, options.rentEndDate, rentStartTime, rentEndTime, helmetCount, extrasSelection, options.package, options.perk]
+  );
 
   // ── buildStartappLink — MUST be before early return (it's a hook) ──
   const buildStartappLink = useCallback(
@@ -1746,6 +1796,7 @@ export function ItemModal({
                   href={buildStartappLink("rental") || `https://t.me/${botUsername}/app`}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => trackContinueInTgLead("rental")}
                   aria-label="Продолжить бронирование в Telegram"
                   className="flex items-center justify-center gap-1 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
                 >
@@ -1776,6 +1827,7 @@ export function ItemModal({
                   href={buildStartappLink("sale") || `https://t.me/${botUsername}/app`}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => trackContinueInTgLead("sale")}
                   aria-label="Продолжить покупку в Telegram"
                   className={`flex items-center justify-center gap-1 rounded-xl border-2 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] transition hover:brightness-110 active:scale-[0.99] ${
                     showRentCta

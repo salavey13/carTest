@@ -18,11 +18,12 @@ const franchizeIntentTypes = [
   "map_click",
   "contact_click",
   "test_ride_click",
-  "test_ride",
+  "test_drive",
   "prebuy",
   "trade_in",
   "finance",
   "rent",
+  "sale",
 ] as const;
 
 const franchizeIntentStages = [
@@ -43,6 +44,7 @@ const franchizeIntentStages = [
   "manual_reserved",
   "alternative_offered",
   "closed",
+  "contract_generated",
 ] as const;
 
 const closerActionStages = {

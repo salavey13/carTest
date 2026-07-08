@@ -5,6 +5,7 @@ import { logger as globalLogger } from "@/lib/logger";
 import { isAllowedMockContext } from "@/lib/telegram-mock-context";
 import { getTelegramLaunchParamsFromWindow } from "@/lib/telegram-launch-params";
 import { fetchDbUserAction, upsertTelegramUserAction } from "@/contexts/actions";
+import { upsertFranchizeLead } from "@/app/franchize/lib/leads";
 import type { Database } from "@/types/database.types";
 import type { TelegramWebApp, WebAppInitData, WebAppUser } from "@/types/telegram";
 
@@ -173,6 +174,29 @@ export function useTelegramAuth() {
           setDbUser(persisted);
           setIsAuthenticated(true);
           setError(null);
+        }
+
+        // Track every Telegram app open as a franchize lead (only on franchize pages).
+        try {
+          if (typeof window !== "undefined") {
+            const pathMatch = window.location.pathname.match(/^\/franchize\/([^\/]+)/);
+            const slug = pathMatch?.[1];
+            if (slug && candidate.id) {
+              void upsertFranchizeLead({
+                slug,
+                userId: String(candidate.id),
+                intentType: "app_open",
+                stage: "viewed",
+                fullName: `${candidate.first_name || ""} ${candidate.last_name || ""}`.trim() || undefined,
+                username: candidate.username || undefined,
+                sourceRoute: window.location.pathname,
+                contactChannel: "telegram_bot",
+                urgencyScore: 10,
+              });
+            }
+          }
+        } catch (leadErr) {
+          globalLogger.warn("[useTelegramAuth] lead tracking failed:", leadErr);
         }
       } catch (e) {
         if (can()) {

@@ -1676,48 +1676,27 @@ ${qrDeepLink}`);
   const leadPhone = context.clientPhone || "";
   const leadUserId = leadPhone || String(userId);
   try {
-    // Ensure user exists in users table (for leads page)
-    const userMeta: Record<string, any> = {
-      source: isRent ? "rental_contract" : "sale_contract",
-      phone: leadPhone || null,
+    const { upsertFranchizeLead } = await import("@/app/franchize/lib/leads");
+    await upsertFranchizeLead({
+      slug: "vip-bike",
+      userId: leadUserId,
+      intentType: isRent ? "rent" : "sale",
+      stage: "contract_generated",
       bikeId: bike.id,
       bikeTitle: `${bike.make} ${bike.model}`,
-      updatedAt: new Date().toISOString(),
-      is_lead: true,
-    };
-    if (leadPhone) userMeta.phone = leadPhone;
-    await supabaseAdmin.from("users").upsert({
-      user_id: leadUserId,
-      phone: leadPhone || null,
-      full_name: context.mpFullName || null,
-      metadata: userMeta,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id" });
-
-    // Record intent with deal-specific state
-    const { error: intentError } = await supabaseAdmin.from("franchize_intents").upsert({
-      slug: "vip-bike",
-      bike_id: bike.id,
-      intent_type: isRent ? "rent" : "sale",
-      stage: "contract_generated",
-      source_route: "/doc-manual",
-      contact_channel: "telegram_bot",
-      urgency_score: isRent ? 90 : 85,
-      telegram_user_id: leadUserId,
+      phone: leadPhone || undefined,
+      fullName: context.mpFullName || undefined,
+      sourceRoute: "/doc-manual",
+      contactChannel: "telegram_bot",
+      urgencyScore: isRent ? 90 : 85,
       metadata: {
-        name: context.mpFullName,
-        phone: leadPhone || null,
-        bikeTitle: `${bike.make} ${bike.model}`,
         dealType: isRent ? "rent" : "sale",
         operatorId: String(userId),
         hasPassport: !!(context.mpSeries && context.mpNumber),
         hasLicense: !!(context.mlSeries && context.mlNumber),
       },
-    }, { onConflict: "slug,bike_id,telegram_user_id,intent_type" });
-
-    if (intentError) {
-      logger.error("[/doc] Failed to create franchize_intent:", intentError);
-    }
+      ensureUser: true,
+    });
 
     // ── Create crew_todos for equipment return and default checks ──────────
     if (isRent) {

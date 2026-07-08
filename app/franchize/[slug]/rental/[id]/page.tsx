@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ExternalLink, Info, RefreshCw, RotateCcw, ShoppingCart, Sparkles } from "lucide-react";
+import { ChevronDown, ExternalLink, Info, PackageCheck, RefreshCw, RotateCcw, ShoppingCart, Sparkles, Timer } from "lucide-react";
 import Link from "next/link";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
@@ -233,6 +233,46 @@ export default async function FranchizeRentalPage({
                   Открыть в TG
                 </a>
               )}
+
+              {status === "active" && (
+                <>
+                  <Link
+                    href={bikeSearchHref}
+                    className="flex items-center justify-center gap-2 rounded-xl border px-4 py-3 font-semibold"
+                    style={{
+                      borderColor: p.accentMain,
+                      color: p.accentMain,
+                    }}
+                  >
+                    <Timer className="h-4 w-4" /> Продлить аренду
+                  </Link>
+
+                  <details className="group rounded-xl border" style={{ borderColor: p.borderSoft }}>
+                    <summary
+                      className="flex cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium list-none"
+                      style={{ color: p.textPrimary }}
+                    >
+                      <PackageCheck className="h-4 w-4" />
+                      Что нужно вернуть
+                      <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+                    </summary>
+                    <div className="border-t px-4 py-3 text-xs" style={{ borderColor: p.borderSoft }}>
+                      <ul className="space-y-2" style={{ color: p.textPrimary }}>
+                        <li className="flex gap-2"><span style={{ color: p.accentMain }}>✓</span> Транспорт в том же состоянии, в каком получили</li>
+                        <li className="flex gap-2"><span style={{ color: p.accentMain }}>✓</span> Ключи от байка</li>
+                        <li className="flex gap-2"><span style={{ color: p.accentMain }}>✓</span> Шлем (если брали)</li>
+                        <li className="flex gap-2"><span style={{ color: p.accentMain }}>✓</span> Перчатки, куртка, боты, рюкзак, зарядка — если брали допы</li>
+                        <li className="flex gap-2"><span style={{ color: p.accentMain }}>✓</span> Паспорт/СТС, если оставляли в залог</li>
+                        <li className="flex gap-2"><span style={{ color: p.accentMain }}>✓</span> Полный бак / заряд по договорённости</li>
+                      </ul>
+                      <p className="mt-3" style={{ color: p.textSecondary }}>
+                        При возврате оператор проверит комплектацию, пробег и состояние. Депозит вернём после подписания акта.
+                      </p>
+                    </div>
+                  </details>
+                </>
+              )}
+
               <a
                 href={telegramSupportHref}
                 target="_blank"
