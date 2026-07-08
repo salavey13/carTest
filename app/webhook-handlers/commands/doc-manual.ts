@@ -1732,9 +1732,13 @@ ${qrDeepLink}`);
 
       const crewId = bike.crew_id || "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
       const leadId = context.clientPhone || String(userId);
-      for (const todo of todos) {
+      const baseTs = Date.now();
+      for (let ti = 0; ti < todos.length; ti++) {
+        const todo = todos[ti];
         try {
+          const todoId = `todo-${baseTs.toString(36)}-${ti}-${Math.random().toString(36).slice(2, 5)}`;
           await supabaseAdmin.from("crew_todos").insert({
+            id: todoId,
             crew_id: crewId,
             title: todo.title,
             status: "pending",
@@ -1768,9 +1772,13 @@ ${qrDeepLink}`);
 
       const crewId = bike.crew_id || "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
       const leadId = context.clientPhone || String(userId);
-      for (const todo of saleTodos) {
+      const baseTs2 = Date.now();
+      for (let si = 0; si < saleTodos.length; si++) {
+        const todo = saleTodos[si];
         try {
+          const todoId = `todo-${baseTs2.toString(36)}-s${si}-${Math.random().toString(36).slice(2, 5)}`;
           await supabaseAdmin.from("crew_todos").insert({
+            id: todoId,
             crew_id: crewId,
             title: todo.title,
             status: "pending",

@@ -31,6 +31,13 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
     intentStage?: string | null;
     urgencyScore?: number | null;
     telegramChatId?: string | null;
+    troubled?: boolean;
+    troubledReason?: string | null;
+    contractCount?: number;
+    lastRentalDate?: string | null;
+    totalSpent?: number;
+    contractRef?: string | null;
+    saleCount?: number;
   };
 
   const leads: LeadRow[] = [];
@@ -149,6 +156,115 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
         verified: s.verification_status === "verified",
         telegramChatId: s.chat_id,
       });
+    }
+  }
+
+  // ── Pull additional info from rental contract artifacts ──────────────────
+  const leadPhonesPool = leads.map((l) => l.phone).filter(Boolean);
+  if (leadPhonesPool.length > 0) {
+    const { data: rentalArtifacts } = await privateSchema()
+      .from("rental_contract_artifacts")
+      .select("renter_phone, rental_id, rent_start_date, rent_end_date, bike_make, bike_model, total_amount")
+      .in("renter_phone", leadPhonesPool)
+      .order("created_at", { ascending: false });
+    if (rentalArtifacts) {
+      for (const l of leads) {
+        if (!l.phone) continue;
+        const ra = rentalArtifacts.filter((a) => a.renter_phone === l.phone);
+        if (ra.length > 0) {
+          l.contractCount = (l.contractCount || 0) + ra.length;
+          if (!l.lastRentalDate && ra[0].rent_start_date) l.lastRentalDate = ra[0].rent_start_date;
+          const total = ra.reduce((s, a) => s + (Number(a.total_amount) || 0), 0);
+          l.totalSpent = (l.totalSpent || 0) + total;
+          l.contractRef = l.contractRef || ra[0].rental_id || null;
+        }
+      }
+    }
+  }
+
+  // ── Pull additional info from sale contract artifacts ────────────────────
+  if (leadPhonesPool.length > 0) {
+    const { data: saleArtifacts } = await privateSchema()
+      .from("sale_contract_artifacts")
+      .select("buyer_phone, sale_id, bike_make, bike_model, sale_price")
+      .in("buyer_phone", leadPhonesPool)
+      .order("created_at", { ascending: false });
+    if (saleArtifacts) {
+      for (const l of leads) {
+        if (!l.phone) continue;
+        const sa = saleArtifacts.filter((a) => a.buyer_phone === l.phone);
+        if (sa.length > 0) {
+          l.contractCount = (l.contractCount || 0) + sa.length;
+          const total = sa.reduce((s, a) => s + (Number(a.sale_price) || 0), 0);
+          l.totalSpent = (l.totalSpent || 0) + total;
+          l.contractRef = l.contractRef || sa[0].sale_id || null;
+          l.saleCount = (l.saleCount || 0) + sa.length;
+        }
+      }
+    }
+  }
+
+  // ── Enrich telegramChatId from public.users (real TG users) ──────────────
+  const allUserIds = leads.map((l) => l.user_id).filter(Boolean);
+  if (allUserIds.length > 0) {
+    const { data: tgUsers } = await supabaseAdmin
+      .from("users")
+      .select("user_id, username, full_name")
+      .in("user_id", allUserIds);
+    if (tgUsers) {
+      const tgUserIdSet = new Set(tgUsers.map((u) => u.user_id));
+      for (const l of leads) {
+        // If the user_id exists in public.users, it IS a real Telegram user_id
+        if (tgUserIdSet.has(l.user_id)) {
+          l.telegramChatId = l.user_id;
+        }
+        // Also enrich username if available from users table
+        const matchedUser = tgUsers.find((u) => u.user_id === l.user_id);
+        if (matchedUser?.username && !l.username) {
+          l.username = matchedUser.username;
+        }
+      }
+    }
+  }
+
+  // Also enrich telegramChatId from user_rental_secrets by phone match
+  const leadPhones = leads.map((l) => l.phone).filter(Boolean);
+  if (leadPhones.length > 0) {
+    const { data: secretByPhone } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("chat_id, renter_phone")
+      .in("renter_phone", leadPhones);
+    if (secretByPhone) {
+      for (const l of leads) {
+        if (!l.telegramChatId && l.phone) {
+          const match = secretByPhone.find((s) => s.renter_phone === l.phone && s.chat_id);
+          if (match) {
+            l.telegramChatId = match.chat_id;
+          }
+        }
+      }
+    }
+  }
+
+  // ── Query troubled users (metadata.troubled === true) ─────────────────────
+  const { data: troubledUsers } = await supabaseAdmin
+    .from("users")
+    .select("user_id, metadata")
+    .not("metadata->>troubled", "is", null);
+  const troubledMap = new Map<string, string | null>();
+  if (troubledUsers) {
+    for (const u of troubledUsers) {
+      const meta = u.metadata as Record<string, unknown> | null;
+      if (meta?.troubled === true) {
+        troubledMap.set(u.user_id, (meta.troubled_reason as string) || null);
+      }
+    }
+  }
+  // Mark leads that are troubled
+  for (const l of leads) {
+    if (troubledMap.has(l.user_id)) {
+      l.troubled = true;
+      l.troubledReason = troubledMap.get(l.user_id) || null;
     }
   }
 
