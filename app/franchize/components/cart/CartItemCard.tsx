@@ -137,9 +137,12 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
             )}
           </div>
 
-          {/* Orphaned item warning */}
+          {/* Orphaned item warning — theme-aware (no hardcoded gold) */}
           {!line.item && (
-            <p className="text-xs italic mt-1" style={{ color: "#FF9500" }}>
+            <p
+              className="text-xs italic mt-1"
+              style={{ color: crew.theme.mode === "light" ? "#b45309" : "#FF9500" }}
+            >
               Товар больше недоступен в каталоге
             </p>
           )}
@@ -183,8 +186,14 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
                 <p
                   className="text-2xl font-bold"
                   style={{
+                    // FIX: Removed the unconditional gold textShadow — it
+                    // looked great in dark theme but turned into a muddy
+                    // halo in light theme. Keep the accent color (brand
+                    // gold) but skip the glow in light mode.
                     color: crew.theme.palette.accentMain,
-                    textShadow: `0 0 12px ${withAlpha(crew.theme.palette.accentMain, 0.45)}`,
+                    textShadow: crew.theme.mode === "light"
+                      ? "none"
+                      : `0 0 12px ${withAlpha(crew.theme.palette.accentMain, 0.45)}`,
                   }}
                 >
                   {line.salePrice?.toLocaleString("ru-RU")} ₽

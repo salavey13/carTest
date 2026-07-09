@@ -517,7 +517,7 @@ export const ADDITIONAL_ITEMS = [
   { key: "net", label: "Сетка", icon: "🌐", price: 500, type: "toggle" as const },
   { key: "backpack", label: "Рюкзак", icon: "🎒", price: 500, type: "toggle" as const },
   { key: "bag", label: "Багажная сумка", icon: "👜", price: 500, type: "toggle" as const },
-  { key: "charger", label: "Зарядка", icon: "🔌", price: 500, type: "toggle" as const },
+  { key: "charger", label: "Зарядка", icon: "🔌", price: 0, type: "toggle" as const },
 ];
 
 export type AdditionalItemsSelection = Record<string, number | boolean>;
@@ -814,11 +814,19 @@ function CallbackRequestForm({
     setSubmitted(true);
   };
 
-  // Theme-aware input style — use color-mix to guarantee visible contrast from card background
-  const inputStyle = {
-    backgroundColor: "color-mix(in srgb, var(--franchize-bg-base, #fff) 88%, var(--franchize-text-primary, #000))",
+  // Theme-aware input style — explicit color/background/pointerEvents so
+  // the input is actually focusable and typeable inside the modal (Telegram
+  // WebApp and some mobile browsers previously failed to receive keystrokes
+  // because the color-mix background collapsed to transparent and/or
+  // touch-action="manipulation" on the form intercepted events).
+  const inputStyle: React.CSSProperties = {
+    backgroundColor: "var(--item-input-bg, var(--franchize-bg-base, #111217))",
+    color: "var(--item-text, var(--franchize-text-primary, #fff))",
     borderColor: "var(--item-accent)",
     borderWidth: "1.5px",
+    pointerEvents: "auto",
+    // Make sure iOS/Telegram don't auto-zoom or override font
+    fontSize: 16,
   };
 
   if (submitted) {
@@ -836,10 +844,11 @@ function CallbackRequestForm({
   return (
     <form
       onSubmit={handleSubmit}
+      onKeyDown={(e) => e.stopPropagation()}
       style={{
-        touchAction: "manipulation",
         borderColor: "var(--item-border)",
         backgroundColor: "color-mix(in srgb, var(--item-border) 15%, transparent)",
+        pointerEvents: "auto",
       }}
       className="rounded-2xl border p-3"
     >
@@ -853,10 +862,13 @@ function CallbackRequestForm({
       <div className="space-y-2">
         <input
           type="text"
+          inputMode="text"
+          autoComplete="name"
           placeholder="Имя"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full rounded-lg border px-3 py-2 text-sm text-[var(--item-text)] transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
+          onKeyDown={(e) => e.stopPropagation()}
+          className="w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
           style={inputStyle}
           aria-label="Ваше имя"
           required
@@ -864,10 +876,13 @@ function CallbackRequestForm({
         />
         <input
           type="tel"
+          inputMode="tel"
+          autoComplete="tel"
           placeholder="Телефон (+7 999 123-45-67)"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          className="w-full rounded-lg border px-3 py-2 text-sm text-[var(--item-text)] transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
+          onKeyDown={(e) => e.stopPropagation()}
+          className="w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
           style={inputStyle}
           aria-label="Номер телефона"
           required

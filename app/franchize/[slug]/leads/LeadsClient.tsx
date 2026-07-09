@@ -1220,17 +1220,52 @@ export function LeadsClient({
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           {/* List */}
           <div className={`space-y-3 ${selectedLead ? "lg:col-span-5" : "lg:col-span-12"}`}>
-            {sortedLeads.map((lead) => (
-              <LeadCard
-                key={lead.user_id}
-                lead={lead}
-                T={T}
-                isSelected={selectedId === lead.user_id}
-                onSelect={() => setSelectedId(selectedId === lead.user_id ? null : lead.user_id)}
-                onDismiss={handleDismissLead}
-                todos={getTodosForLead(lead)}
-              />
-            ))}
+            {sortedLeads.map((lead) => {
+              const isThisSelected = selectedId === lead.user_id;
+              return (
+                <div key={lead.user_id} className="space-y-3">
+                  <LeadCard
+                    lead={lead}
+                    T={T}
+                    isSelected={isThisSelected}
+                    onSelect={() => setSelectedId(isThisSelected ? null : lead.user_id)}
+                    onDismiss={handleDismissLead}
+                    todos={getTodosForLead(lead)}
+                  />
+                  {/* FIX: Uncollapse the lead INLINE inside the list (not as a
+                      separate bottom section) on mobile. The detail card sits
+                      right beneath the selected LeadCard so the user doesn't
+                      have to scroll all the way down. Hidden on desktop where
+                      the side panel is used. */}
+                  {isThisSelected && (
+                    <div
+                      className="lg:hidden rounded-2xl border p-4"
+                      style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: T.shadow }}
+                    >
+                      <div className="mb-3 flex items-start gap-3">
+                        <Avatar name={lead.full_name} source={lead.source} size={48} />
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-base font-bold" style={{ color: T.text }}>{lead.full_name || "Без имени"}</h3>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]" style={{ color: T.textMuted }}>
+                            {lead.phone && <span>{lead.phone}</span>}
+                            {lead.username && <span>@{lead.username}</span>}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setSelectedId(null)}
+                          aria-label="Свернуть карточку"
+                          className="rounded p-1 transition hover:bg-black/5"
+                          style={{ color: T.textFaint }}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <LeadDetailContent lead={lead} todos={getTodosForLead(lead)} crewId={crewId} slug={slug} T={T} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Desktop detail panel */}
@@ -1263,27 +1298,6 @@ export function LeadsClient({
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Mobile inline expansion */}
-      {selectedLead && (
-        <div className="lg:hidden rounded-2xl border p-4" style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: T.shadow }}>
-          <div className="mb-4 flex items-start gap-3">
-            <Avatar name={selectedLead.full_name} source={selectedLead.source} size={56} />
-            <div className="min-w-0 flex-1">
-              <h3 className="truncate text-lg font-bold" style={{ color: T.text }}>{selectedLead.full_name || "Без имени"}</h3>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: T.textMuted }}>
-                {selectedLead.phone && <span>{selectedLead.phone}</span>}
-                {selectedLead.username && <span>@{selectedLead.username}</span>}
-                <span>{relativeTime(selectedLead.lastSeenAt || selectedLead.createdAt)}</span>
-              </div>
-            </div>
-            <button onClick={() => setSelectedId(null)} className="rounded p-1 transition hover:bg-black/5" style={{ color: T.textFaint }}>
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-          <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} />
         </div>
       )}
     </div>

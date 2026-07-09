@@ -171,20 +171,43 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
         </p>
       </nav>
 
-      {/* Returning User Welcome */}
+      {/* Returning User Welcome — theme-aware (no hardcoded emerald that
+          disappears on light theme) */}
       {isReturningUser && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4"
+          className="mb-4 rounded-2xl border p-4"
+          style={{
+            borderColor: crew.theme.isAuto
+              ? "color-mix(in srgb, var(--franchize-accent-main) 35%, transparent)"
+              : `${crew.theme.palette.accentMain}40`,
+            backgroundColor: crew.theme.isAuto
+              ? "color-mix(in srgb, var(--franchize-accent-main) 10%, transparent)"
+              : `${crew.theme.palette.accentMain}1a`,
+          }}
         >
-          <p className="text-sm font-semibold text-emerald-300">
+          <p
+            className="text-sm font-semibold"
+            style={{ color: crew.theme.palette.textPrimary }}
+          >
             С возвращением{userName ? `, ${userName}` : ""}!
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {hasSavedDocs && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-200 border border-emerald-500/30">
-                <span className="text-emerald-300">✓</span>
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
+                style={{
+                  borderColor: crew.theme.isAuto
+                    ? "color-mix(in srgb, var(--franchize-accent-main) 40%, transparent)"
+                    : `${crew.theme.palette.accentMain}55`,
+                  backgroundColor: crew.theme.isAuto
+                    ? "color-mix(in srgb, var(--franchize-accent-main) 14%, transparent)"
+                    : `${crew.theme.palette.accentMain}22`,
+                  color: crew.theme.palette.textPrimary,
+                }}
+              >
+                <span style={{ color: crew.theme.palette.accentMain }}>✓</span>
                 Паспорт и права сохранены
               </span>
             )}

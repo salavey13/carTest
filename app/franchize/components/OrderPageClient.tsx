@@ -37,23 +37,7 @@ const orderExtras = [
   { id: "hotel-dropoff", label: "Доставка к отелю", amount: 900 },
 ] as const;
 
-const beginnerSafetyQuiz = [
-  {
-    id: "gear",
-    question: "Шлем, перчатки и закрытая обувь — обязательны перед выездом?",
-    correct: true,
-  },
-  {
-    id: "speed",
-    question: "Можно обгонять ведущего райдера в колонне?",
-    correct: false,
-  },
-  {
-    id: "meetup",
-    question: "Если отстал — поставить meetup-точку, а не догонять на максимуме?",
-    correct: true,
-  },
-] as const;
+const beginnerSafetyQuiz = [] as const;
 
 type CheckoutPayload = {
   orderId: string;
@@ -89,7 +73,6 @@ type CheckoutPayload = {
   }>;
   depositAmount: number;
   checkoutBlockers: Array<{ id: string; label: string }>;
-  safetyQuizPassed: boolean;
   pickupAddress: string;
   requiredDocs: string[];
   flowType: "rental" | "sale" | "mixed";
@@ -131,10 +114,6 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const [isPromoValidating, setIsPromoValidating] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
   const [promoMessage, setPromoMessage] = useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
-  const [safetyAnswers, setSafetyAnswers] = useState<Record<string, boolean | null>>(() =>
-    Object.fromEntries(beginnerSafetyQuiz.map((item) => [item.id, null])),
-  );
-  const [safetyPersisted, setSafetyPersisted] = useState(false);
   const [isReturningUser, setIsReturningUser] = useState(false);
   const [returningUserLastRental, setReturningUserLastRental] = useState<string | null>(null);
   const lastSubmitFingerprintRef = useRef<string | null>(null);
@@ -237,19 +216,16 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   }, [isInTelegramContext, payment, setValue]);
   const normalizedPromoInput = normalizePromoCode(promo);
   const hasUnvalidatedPromo = normalizedPromoInput.length > 0 && appliedPromo?.code !== normalizedPromoInput;
-  const safetyQuizPassed = safetyPersisted || beginnerSafetyQuiz.every((item) => safetyAnswers[item.id] === item.correct);
-  const safetyStorageKey = dbUser?.user_id ? `franchize:${slug}:safety-quiz:${dbUser.user_id}` : null;
-  const canSubmit = isValid && !isCartEmpty && safetyQuizPassed && !hasUnvalidatedPromo && (!requiresTelegram || hasTelegramUser);
+  const canSubmit = isValid && !isCartEmpty && !hasUnvalidatedPromo && (!requiresTelegram || hasTelegramUser);
   const checkoutMilestones = useMemo(
     () => [
       { id: "cart", label: "Байк выбран", done: !isCartEmpty },
       { id: "contact", label: "Контакт заполнен", done: recipient.trim().length > 1 && phone.trim().length > 5 && time.trim().length > 0 },
       { id: "dates", label: `Период ${flowLabel} выбран`, done: Boolean(rentalStartDate) },
       { id: "signature", label: "Электронная подпись (ФИО)", done: recipient.trim().length > 2 },
-      { id: "safety", label: "Safety quiz пройден", done: safetyQuizPassed },
       { id: "consent", label: `Условия ${flowLabel} подтверждены`, done: consent },
     ],
-    [consent, flowLabel, isCartEmpty, phone, recipient, rentalStartDate, safetyQuizPassed, time],
+    [consent, flowLabel, isCartEmpty, phone, recipient, rentalStartDate, time],
   );
   const completedMilestones = checkoutMilestones.filter((step) => step.done).length;
   const readinessPercent = Math.round((completedMilestones / checkoutMilestones.length) * 100);
@@ -261,12 +237,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       { id: "time", label: "Выберите удобное время", active: time.trim().length === 0 },
       { id: "dates", label: `Выберите дату начала ${flowLabel}`, active: !rentalStartDate },
       { id: "signature", label: "Укажите ФИО получателя для электронной подписи", active: recipient.trim().length <= 2 },
-      { id: "safety", label: "Пройдите safety quiz новичка", active: !safetyQuizPassed },
       { id: "consent", label: `Подтвердите условия ${flowLabel}`, active: !consent },
       { id: "promo", label: "Примените введённый промокод или очистите поле", active: hasUnvalidatedPromo },
       { id: "telegram", label: "Для Stars откройте страницу через Telegram WebApp", active: requiresTelegram && !hasTelegramUser },
     ].filter((item) => item.active),
-    [consent, flowLabel, hasTelegramUser, hasUnvalidatedPromo, isCartEmpty, phone, recipient, rentalStartDate, requiresTelegram, safetyQuizPassed, time],
+    [consent, flowLabel, hasTelegramUser, hasUnvalidatedPromo, isCartEmpty, phone, recipient, rentalStartDate, requiresTelegram, time],
   );
   const nextAction = checkoutBlockers[0];
   const holdAmountRub = crew.reservationHold.amountRub;
@@ -316,12 +291,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       })),
       depositAmount: holdDepositAmount,
       checkoutBlockers: checkoutBlockers.map((blocker) => ({ id: blocker.id, label: blocker.label })),
-      safetyQuizPassed,
       pickupAddress,
       requiredDocs,
       flowType,
     }),
-    [appliedPromo, cartLines, checkoutBlockers, comment, consent, deliveryMode, extrasTotal, flowType, holdDepositAmount, orderId, payment, phone, pickupAddress, promoDiscount, recipient, rentalEndDate, rentalStartDate, requiredDocs, safetyQuizPassed, selectedExtraItems, time, totalAmount, user?.id],
+    [appliedPromo, cartLines, checkoutBlockers, comment, consent, deliveryMode, extrasTotal, flowType, holdDepositAmount, orderId, payment, phone, pickupAddress, promoDiscount, recipient, rentalEndDate, rentalStartDate, requiredDocs, selectedExtraItems, time, totalAmount, user?.id],
   );
 
   const recoveryDepositAmount = flowType === "sale" ? Math.round(totalAmount * 0.1) : holdDepositAmount;
@@ -479,18 +453,6 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   }, [appliedPromo, baseOrderAmount, promo]);
 
   useEffect(() => {
-    if (!safetyStorageKey) return;
-    const stored = window.localStorage.getItem(safetyStorageKey);
-    if (stored === "passed") setSafetyPersisted(true);
-  }, [safetyStorageKey]);
-
-  useEffect(() => {
-    if (!safetyStorageKey || !safetyQuizPassed) return;
-    window.localStorage.setItem(safetyStorageKey, "passed");
-    setSafetyPersisted(true);
-  }, [safetyQuizPassed, safetyStorageKey]);
-
-  useEffect(() => {
     if (recoveryDebounceRef.current) {
       window.clearTimeout(recoveryDebounceRef.current);
     }
@@ -539,16 +501,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       extras: submitPayload.extras,
       promoCode: submitPayload.promoCode,
       promoDiscount: submitPayload.promoDiscount,
-      safetyQuizPassed,
       cartLines: submitPayload.cartLines,
     });
 
     if (isSubmitting || !canSubmit) {
-      return;
-    }
-
-    if (!safetyQuizPassed) {
-      toast.error("Пройдите safety quiz новичка перед подтверждением заказа.");
       return;
     }
 
@@ -588,7 +544,6 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         cartLines: submitPayload.cartLines,
         depositAmount: submitPayload.depositAmount,
         checkoutBlockers: submitPayload.checkoutBlockers,
-        safetyQuizPassed: submitPayload.safetyQuizPassed,
         pickupAddress: submitPayload.pickupAddress,
         requiredDocs: submitPayload.requiredDocs,
         flowType: submitPayload.flowType,
@@ -635,10 +590,6 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     }
     if (blockerId === "consent") {
       setFocus("consent");
-      return;
-    }
-    if (blockerId === "safety") {
-      document.getElementById("beginner-safety-quiz")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     if (blockerId === "promo") {
@@ -717,11 +668,17 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       <h1 className="mt-2 text-2xl font-semibold">Оформление заказа</h1>
 
       {isReturningUser && (
-        <div className="mt-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4">
-          <p className="text-sm font-semibold text-emerald-300">
+        <div
+          className="mt-4 rounded-2xl border p-4"
+          style={{
+            borderColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 30%, transparent)" : `${crew.theme.palette.accentMain}40`,
+            backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 10%, transparent)" : `${crew.theme.palette.accentMain}1a`,
+          }}
+        >
+          <p className="text-sm font-semibold" style={{ color: accentTextOn === "#16130A" ? crew.theme.palette.accentMain : textPrimary }}>
             С возвращением! {returningUserLastRental ? `Последняя аренда: ${returningUserLastRental}` : ""}
           </p>
-          <p className="mt-1 text-xs text-emerald-200/80">
+          <p className="mt-1 text-xs" style={surface.mutedText}>
             Ваши данные из прошлой аренды сохранены. Просто проверьте и подтвердите заказ.
           </p>
         </div>
@@ -831,7 +788,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               </div>
               <textarea className="min-h-20 w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Комментарий к заказ" {...register("comment")} />
               {errors.recipient || errors.phone || errors.time || errors.rentalStartDate ? (
-                <p className="text-xs text-rose-300">
+                <p className="text-xs" style={{ color: isAuto ? "var(--franchize-text-primary)" : "#b91c1c" }}>
                   {errors.recipient?.message || errors.phone?.message || errors.time?.message || errors.rentalStartDate?.message}
                 </p>
               ) : null}
@@ -864,12 +821,22 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               <p className="mt-2 text-xs" style={surface.mutedText}>Для оплаты в Stars откройте оформление из Telegram WebApp.</p>
             ) : null}
             {paymentRetryHint ? (
-              <div className="mt-2 rounded-2xl border border-amber-300/40 bg-amber-300/10 p-3">
-                <p className="text-xs text-amber-200">{paymentRetryHint}</p>
+              <div
+                className="mt-2 rounded-2xl border p-3"
+                style={{
+                  borderColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 30%, transparent)" : `${crew.theme.palette.accentMain}40`,
+                  backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 10%, transparent)" : `${crew.theme.palette.accentMain}1a`,
+                }}
+              >
+                <p className="text-xs" style={{ color: textPrimary }}>{paymentRetryHint}</p>
                 <button
                   type="button"
                   onClick={handleSwitchToFallbackPayment}
-                  className="mt-2 inline-flex items-center rounded-xl border border-amber-200/40 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:bg-amber-200/20"
+                  className="mt-2 inline-flex items-center rounded-xl border px-3 py-1 text-xs font-semibold transition hover:opacity-90"
+                  style={{
+                    borderColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 40%, transparent)" : `${crew.theme.palette.accentMain}55`,
+                    color: accentMain,
+                  }}
                 >
                   Переключиться на оплату картой
                 </button>
@@ -894,7 +861,16 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               </button>
             </div>
             {promoMessage ? (
-              <p className={`mt-2 text-xs ${promoMessage.tone === "error" ? "text-rose-300" : promoMessage.tone === "success" ? "text-emerald-300" : "text-[var(--order-muted)]"}`}>
+              <p
+                className="mt-2 text-xs"
+                style={
+                  promoMessage.tone === "error"
+                    ? { color: isAuto ? "var(--franchize-text-primary)" : "#b91c1c" }
+                    : promoMessage.tone === "success"
+                      ? { color: isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain }
+                      : surface.mutedText
+                }
+              >
                 {promoMessage.text}
               </p>
             ) : null}
@@ -932,52 +908,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             </div>
           </div>
 
-          <div id="beginner-safety-quiz" className="rounded-2xl border p-4" style={surface.card}>
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-medium">Safety quiz</p>
-              <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${safetyQuizPassed ? "bg-emerald-400/15 text-emerald-200" : "bg-amber-300/15 text-amber-200"}`}>
-                {safetyQuizPassed ? "пройден" : "3 вопроса"}
-              </span>
-            </div>
-            <div className="mt-3 space-y-2">
-              {beginnerSafetyQuiz.map((item) => {
-                const answer = safetyAnswers[item.id];
-                return (
-                  <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--order-border)] p-3" style={surface.subtleCard}>
-                    <p className="text-sm">{item.question}</p>
-                    <div className="flex shrink-0 gap-2">
-                      {[
-                        { label: "Да", value: true },
-                        { label: "Нет", value: false },
-                      ].map((option) => (
-                        <button
-                          key={option.label}
-                          type="button"
-                          onClick={() => setSafetyAnswers((current) => ({ ...current, [item.id]: option.value }))}
-                          className="rounded-lg border px-3 py-1 text-xs font-medium transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                          style={{
-                            borderColor: answer === option.value ? "var(--order-accent)" : "var(--order-border)",
-                            color: answer === option.value ? "var(--order-accent)" : "var(--order-text-primary)",
-                            ...focusRingOutlineStyle(crew.theme),
-                          }}
-                          aria-pressed={answer === option.value}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {!safetyQuizPassed ? <p className="mt-2 text-xs text-amber-200">Нужны все правильные ответы для подтверждения заказа.</p> : null}
-          </div>
-
           <label className="flex items-start gap-2 rounded-xl border p-3 text-sm" style={surface.card}>
             <input type="checkbox" className="mt-0.5" {...register("consent")} />
             <span>Согласен с условиями аренды и подтверждаю электронную подпись в Telegram WebApp.</span>
           </label>
-          {errors.consent ? <p className="text-xs text-rose-300">{errors.consent.message}</p> : null}
+          {errors.consent ? <p className="text-xs" style={{ color: isAuto ? "var(--franchize-text-primary)" : "#b91c1c" }}>{errors.consent.message}</p> : null}
         </div>
 
         <aside className="h-fit rounded-2xl border p-4" style={surface.card}>
@@ -1128,7 +1063,6 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               <li>1. Telegram подтвердит счёт и пришлёт ссылку на заказ.</li>
               <li>2. Оператор закрепит байк, адрес выдачи: {pickupAddress}.</li>
               <li>3. На выдаче проверим документы: {requiredDocs.join(", ")}.</li>
-              <li>4. Safety quiz: {safetyQuizPassed ? "готов" : "нужно пройти перед отправкой"}.</li>
             </ul>
           </div>
           <p className="mt-3 rounded-xl border border-[var(--order-border)] p-3 text-xs" style={surface.subtleCard}>
