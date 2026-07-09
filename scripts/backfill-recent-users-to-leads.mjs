@@ -32,10 +32,43 @@ function normalizePhone(phone) {
 function toIntent(user) {
   const meta = user.metadata || {};
   const source = meta.source || "app_open";
-  const isContract = ["rental_contract", "sale_contract", "test_drive"].includes(source);
-  const intentType = source === "sale_contract" ? "sale" : source === "rental_contract" ? "rent" : source === "test_drive" ? "test_drive" : "app_open";
-  const stage = isContract ? "contract_generated" : "viewed";
-  const urgency = source === "sale_contract" ? 85 : source === "rental_contract" ? 90 : source === "test_drive" ? 85 : 20;
+
+  // Map arbitrary source values to the allowed intent_type / stage check constraints.
+  let intentType;
+  let stage;
+  let urgency = 20;
+
+  switch (source) {
+    case "sale_contract":
+      intentType = "prebuy";
+      stage = "prebuy_started";
+      urgency = 85;
+      break;
+    case "rental_contract":
+      intentType = "rent";
+      stage = "configured";
+      urgency = 90;
+      break;
+    case "test_drive":
+      intentType = "test_ride";
+      stage = "test_ride_requested";
+      urgency = 85;
+      break;
+    case "web_callback":
+      intentType = "contact_click";
+      stage = "contacted";
+      urgency = 75;
+      break;
+    case "app_open":
+      intentType = "contact_click";
+      stage = "clicked";
+      urgency = 20;
+      break;
+    default:
+      intentType = "contact_click";
+      stage = "viewed";
+      urgency = 20;
+  }
 
   return {
     slug: SLUG,
@@ -46,7 +79,7 @@ function toIntent(user) {
     contact_channel: /^\d+$/.test(String(user.user_id)) ? "telegram_bot" : "web_app",
     urgency_score: urgency,
     telegram_user_id: /^\d+$/.test(String(user.user_id)) ? user.user_id : null,
-    phone: normalizePhone(user.phone || meta.phone),
+    phone: normalizePhone(meta.phone),
     metadata: {
       name: user.full_name || meta.name || null,
       username: user.username || meta.username || null,
@@ -61,6 +94,10 @@ function toIntent(user) {
   };
 }
 
+function conflictKey(intent) {
+  return `${intent.slug}|${intent.bike_id ?? "_"}|${intent.telegram_user_id ?? "_"}|${intent.intent_type}`;
+}
+
 async function main() {
   const since = new Date();
   since.setDate(since.getDate() - LOOKBACK_DAYS);
@@ -70,7 +107,7 @@ async function main() {
 
   const { data: users, error } = await supabaseAdmin
     .from("users")
-    .select("user_id, full_name, username, phone, metadata, created_at")
+    .select("user_id, full_name, username, metadata, created_at")
     .gte("created_at", since.toISOString())
     .order("created_at", { ascending: false });
 
@@ -87,16 +124,56 @@ async function main() {
     process.exit(0);
   }
 
-  const { error: upsertError } = await supabaseAdmin
+  // Fetch existing intents to emulate upsert manually (unique constraint may not exist yet).
+  const { data: existing, error: existingError } = await supabaseAdmin
     .from("franchize_intents")
-    .upsert(intents, { onConflict: "slug,bike_id,telegram_user_id,intent_type" });
+    .select("id, slug, bike_id, telegram_user_id, intent_type")
+    .eq("slug", SLUG)
+    .gte("created_at", since.toISOString());
 
-  if (upsertError) {
-    console.error("Failed to upsert intents:", upsertError);
+  if (existingError) {
+    console.error("Failed to fetch existing intents:", existingError);
     process.exit(1);
   }
 
-  console.log(`Backfilled ${intents.length} intent rows.`);
+  const existingByKey = new Map();
+  for (const row of existing || []) {
+    existingByKey.set(conflictKey(row), row.id);
+  }
+
+  const toInsert = [];
+  const toUpdate = [];
+
+  for (const intent of intents) {
+    const id = existingByKey.get(conflictKey(intent));
+    if (id) {
+      toUpdate.push({ id, ...intent });
+    } else {
+      toInsert.push(intent);
+    }
+  }
+
+  if (toInsert.length > 0) {
+    const { error: insertError } = await supabaseAdmin
+      .from("franchize_intents")
+      .insert(toInsert);
+    if (insertError) {
+      console.error("Failed to insert intents:", insertError);
+      process.exit(1);
+    }
+  }
+
+  if (toUpdate.length > 0) {
+    const { error: updateError } = await supabaseAdmin
+      .from("franchize_intents")
+      .upsert(toUpdate, { onConflict: "id" });
+    if (updateError) {
+      console.error("Failed to update intents:", updateError);
+      process.exit(1);
+    }
+  }
+
+  console.log(`Backfilled ${intents.length} intent rows: ${toInsert.length} inserted, ${toUpdate.length} updated.`);
 }
 
 main().catch((e) => {

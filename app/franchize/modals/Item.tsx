@@ -1581,12 +1581,24 @@ export function ItemModal({
             {showBuyCta && (
               <Link
                 href={`/franchize/${slug}/market/${item.id}/buy`}
-                className="inline-flex w-full items-center justify-center rounded-xl border px-2.5 py-1.5 text-xs font-medium transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-                aria-label={`Открыть страницу покупки ${item.title}`}
-                style={surface.subtleCard}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-4 py-3 text-sm font-bold uppercase tracking-wide text-[var(--item-accent-contrast)] shadow-lg shadow-[var(--item-accent)]/20 transition hover:brightness-110 hover:scale-[1.01] active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                aria-label={`Перейти на страницу покупки ${item.title}`}
               >
-                Открыть страницу покупки
+                Перейти на страницу покупки
               </Link>
+            )}
+
+            {/* Callback request — alternative to direct booking, placed before rental config */}
+            {!showCallbackForm && (
+              <button
+                type="button"
+                onClick={() => setShowCallbackForm(true)}
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-medium transition hover:opacity-80 active:scale-[0.99]"
+                style={{ borderColor: "color-mix(in srgb, var(--item-accent) 25%, transparent)", color: "var(--item-accent)" }}
+              >
+                <Phone className="h-3 w-3" />
+                Запросить звонок
+              </button>
             )}
 
             {/* ── Rental-only options (hidden for order flow) ── */}
@@ -1655,13 +1667,6 @@ export function ItemModal({
                   </>
                 )}
 
-                {/* Keep auction option */}
-                <OptionChips
-                  title="Аукцион / тик"
-                  options={auctionOptions}
-                  selected={options.auction}
-                  onSelect={(v) => onChangeOption("auction", v)}
-                />
               </>
             )}
 
@@ -1731,18 +1736,6 @@ export function ItemModal({
               </details>
             ) : null}
 
-            {/* Callback request — alternative to direct booking */}
-            {!showCallbackForm && (
-              <button
-                type="button"
-                onClick={() => setShowCallbackForm(true)}
-                className="flex w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-medium transition hover:opacity-80 active:scale-[0.99]"
-                style={{ borderColor: "color-mix(in srgb, var(--item-accent) 25%, transparent)", color: "var(--item-accent)" }}
-              >
-                <Phone className="h-3 w-3" />
-                Запросить звонок
-              </button>
-            )}
           </div>
 
           {/* Footer Buttons — dual CTA when both rent + sale available */}
