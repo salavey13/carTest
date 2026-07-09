@@ -30,8 +30,11 @@ export function OrderSummary({ cartLines, subtotal, crew }: OrderSummaryProps) {
   const grandTotal = rentPeriodTotal + buyTotal;
 
   // Discount — franchise perk (TODO: wire to crew.catalog.discountPercent when available)
-  const discountPercent = 5;
-  const discountAmount = Math.round(grandTotal * discountPercent / 100);
+  // FIX: Ditched the 5% web-app discount banner. It was always-on regardless
+  // of the user, so it devalued the promo-code flow and made the cart feel
+  // like a permanent markdown. Now only explicit promo codes grant a discount.
+  const discountPercent = 0;
+  const discountAmount = 0;
 
   return (
     <motion.aside
@@ -78,9 +81,13 @@ export function OrderSummary({ cartLines, subtotal, crew }: OrderSummaryProps) {
       <p className="text-sm" style={surface.mutedText}>
         Сумма за весь период
       </p>
+      {/* FIX: Was crew.theme.palette.accentMain (raw gold #D99A00) which is
+          the brand accent and is hard to read as body text on a light card
+          in light theme. Use the surface text color (guaranteed contrast)
+          and accent-color the currency / period pill instead. */}
       <p
         className="text-2xl font-bold"
-        style={{ color: crew.theme.palette.accentMain }}
+        style={{ color: surface.text || crew.theme.palette.textPrimary }}
       >
         {grandTotal.toLocaleString("ru-RU")} ₽
       </p>

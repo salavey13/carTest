@@ -499,7 +499,14 @@ export function FranchizeProfileClient({
                           {r.vehicleLabel}
                         </span>
                         {r.isTestRide ? (
-                          <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-600">
+                          <span
+                            className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                            style={{
+                              borderColor: withAlpha(crew.theme.palette.accentMain, 0.35),
+                              backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.12),
+                              color: crew.theme.palette.accentMain,
+                            }}
+                          >
                             Тест-драйв
                           </span>
                         ) : (
@@ -580,15 +587,17 @@ export function FranchizeProfileClient({
             Заполните заранее — данные подставятся при оформлении. Проверяются оператором при первой аренде.
           </p>
           <div className="mt-3">
-            {/* Verification status badge */}
+            {/* Verification status badge — text color is textPrimary so it
+                stays readable in both light and dark themes (gold on gold
+                washes out in light mode). */}
             {docsPrefill?.hasVerifiedData && (
               <div className="mb-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs"
                 style={{
-                  borderColor: withAlpha(crew.theme.palette.accentMain, 0.3),
-                  backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.1),
-                  color: crew.theme.palette.accentMain,
+                  borderColor: withAlpha(crew.theme.palette.accentMain, 0.35),
+                  backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.12),
+                  color: crew.theme.palette.textPrimary,
                 }}>
-                <CheckCircle className="h-4 w-4" />
+                <CheckCircle className="h-4 w-4" style={{ color: crew.theme.palette.accentMain }} />
                 <span>Документы верифицированы (завершённая аренда найдена)</span>
               </div>
             )}

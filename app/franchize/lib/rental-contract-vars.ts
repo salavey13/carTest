@@ -260,7 +260,7 @@ export async function buildTemplateVars(params: {
     (params.equipmentData.net ? 500 : 0) +
     (params.equipmentData.backpack ? 500 : 0) +
     (params.equipmentData.bag ? 500 : 0) +
-    (params.equipmentData.charger ? 500 : 0);
+    (params.equipmentData.charger ? 0 : 0);
 
   // Total payable = base rent + equipment + deposit
   const totalPayable = subtotalRounded + equipmentCostTotal + deposit;
