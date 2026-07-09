@@ -6,7 +6,6 @@ import { ThemeInitializer } from "../components/ThemeInitializer";
 import { getFranchizeBySlug } from "../actions";
 import { getFranchizeRouteCtaPolicy } from "../lib/route-cta-policy";
 import { crewPaletteWithCssVars } from "../lib/theme";
-import { FranchizeCatalogHero } from "../components/FranchizeCatalogHero";
 
 interface FranchizeSlugPageProps {
   params: Promise<{ slug: string }>;
@@ -43,7 +42,6 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
         fallbackHref={`/franchize/${crew.slug || slug}`}
         fallbackLinkLabel="Обновить каталог экипажа"
       >
-        <FranchizeCatalogHero crew={crew} slug={slug} variant="main" />
         <CatalogClient crew={crew} slug={slug} items={items} ctaPolicy={ctaPolicy} />
       </FranchizeErrorBoundary>
 

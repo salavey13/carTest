@@ -217,13 +217,13 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   return (
     <header
       // FIX: Increased top padding to accommodate Telegram MiniApp native buttons
-      // (back/settings button bar ~44px). The old 0.15rem minimum was too thin.
-      // calc(env(safe-area-inset-top) + 2.25rem) adds 36px on top of safe-area,
-      // with a minimum of 2.75rem (~44px) when safe-area is 0.
+      // (back/collapse button bar ~56px on Galaxy S25 Ultra). The old 2.75rem minimum
+      // still allowed overlap on tall native bars. We now use 3.75rem (~60px) minimum
+      // plus safe-area, with an extra 0.5rem buffer for devices like S25 Ultra.
       className="sticky top-0 z-50 border-b pb-2 backdrop-blur-2xl"
       style={{
         ...FRANCHIZE_HEADER_SAFE_AREA_STYLE,
-        paddingTop: "max(calc(env(safe-area-inset-top) + 2.25rem), 2.75rem)",
+        paddingTop: "max(calc(env(safe-area-inset-top) + 3.25rem), 3.75rem)",
         // FIX 6: isolation creates a proper stacking context for the entire header.
         isolation: "isolate",
         borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
