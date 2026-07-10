@@ -97,7 +97,7 @@ type CheckoutPayload = {
   checkoutBlockers: Array<{ id: string; label: string }>;
   pickupAddress: string;
   requiredDocs: string[];
-  flowType: "rental" | "sale" | "mixed";
+  flowType: "rental" | "sale" | "mixed" | "testdrive";
 };
 
 const orderFormSchema = z.object({
@@ -226,8 +226,15 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
   const isCartEmpty = cartLines.length === 0;
   const saleLinesCount = useMemo(() => cartLines.filter((line) => line.saleAvailable).length, [cartLines]);
-  const flowType: "rental" | "sale" | "mixed" = saleLinesCount === 0 ? "rental" : saleLinesCount === cartLines.length ? "sale" : "mixed";
-  const flowLabel = flowType === "sale" ? "покупки" : flowType === "mixed" ? "аренды/покупки" : "аренды";
+  const testdriveLinesCount = useMemo(() => cartLines.filter((line) => (line.options as any).action === "testdrive").length, [cartLines]);
+  const flowType: "rental" | "sale" | "mixed" | "testdrive" = testdriveLinesCount > 0 && testdriveLinesCount === cartLines.length
+    ? "testdrive"
+    : saleLinesCount === 0
+      ? "rental"
+      : saleLinesCount === cartLines.length
+        ? "sale"
+        : "mixed";
+  const flowLabel = flowType === "sale" ? "покупки" : flowType === "mixed" ? "аренды/покупки" : flowType === "testdrive" ? "тест-драйва" : "аренды";
   const catalogHref = `/franchize/${slug}`;
   const profileHref = isInTelegramContext
     ? `/franchize/${slug}/profile`
@@ -827,8 +834,68 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             </div>
           </div>
 
+          {/* ── Testdrive flow: simplified — name + phone, passport/license optional ── */}
+          {flowType === "testdrive" && (
+            <div className="rounded-2xl border p-4" style={surface.card}>
+              <p className="text-sm font-medium">Данные для тест-драйва</p>
+              <p className="mt-1 text-xs" style={surface.mutedText}>
+                Для тест-драйва достаточно паспорта. Водительское удостоверение — если есть категория А.
+              </p>
+              <div className="mt-3 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    className="rounded-xl border px-3 py-2 text-sm"
+                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                    placeholder="Серия паспорта"
+                    {...register("passportSeries")}
+                  />
+                  <input
+                    className="rounded-xl border px-3 py-2 text-sm"
+                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                    placeholder="Номер паспорта"
+                    {...register("passportNumber")}
+                  />
+                </div>
+                <input
+                  className="w-full rounded-xl border px-3 py-2 text-sm"
+                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                  placeholder="Дата рождения (ДД.ММ.ГГГГ)"
+                  {...register("birthDate")}
+                />
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="hasLicenseTd"
+                    className="h-4 w-4"
+                    style={{ accentColor: T.accent }}
+                    {...register("hasLicense")}
+                  />
+                  <label htmlFor="hasLicenseTd" className="text-xs" style={{ color: T.textMuted }}>
+                    Есть водительское удостоверение (категория А)
+                  </label>
+                </div>
+                {hasLicense && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      className="rounded-xl border px-3 py-2 text-sm"
+                      style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                      placeholder="Серия ВУ"
+                      {...register("licenseSeries")}
+                    />
+                    <input
+                      className="rounded-xl border px-3 py-2 text-sm"
+                      style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                      placeholder="Номер ВУ"
+                      {...register("licenseNumber")}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* ── Passport + License fields for contract generation ── */}
-          {flowType !== "sale" && (
+          {flowType !== "sale" && flowType !== "testdrive" && (
             <div className="rounded-2xl border p-4" style={surface.card}>
               <p className="text-sm font-medium">Данные для договора аренды</p>
               <p className="mt-1 text-xs" style={surface.mutedText}>

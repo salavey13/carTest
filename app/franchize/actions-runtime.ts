@@ -1548,6 +1548,42 @@ function formatMoney(value: number): string {
   return Number(value || 0).toLocaleString("ru-RU");
 }
 
+/**
+ * Convert a number to Russian words (used in testdrive contracts for
+ * "price_words" and "deposit_words" template variables).
+ * Supports numbers up to 999,999.
+ */
+function numberToWords(n: number): string {
+  const units = ["", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"];
+  const teens = ["десять", "одиннадцать", "двенадцать", "тринадцать", "четырнадцать", "пятнадцать", "шестнадцать", "семнадцать", "восемнадцать", "девятнадцать"];
+  const tens = ["", "", "двадцать", "тридцать", "сорок", "пятьдесят", "шестьдесят", "семьдесят", "восемьдесят", "девяносто"];
+  const hundreds = ["", "сто", "двести", "триста", "четыреста", "пятьсот", "шестьсот", "семьсот", "восемьсот", "девятьсот"];
+
+  if (n >= 1000000) return String(n);
+  if (n >= 1000) {
+    const th = Math.floor(n / 1000);
+    const r = n % 1000;
+    const lastTwo = th % 100, lastOne = th % 10;
+    let w = "тысяч";
+    if (lastTwo >= 11 && lastTwo <= 19) w = "тысяч";
+    else if (lastOne === 1) w = "тысяча";
+    else if (lastOne >= 2 && lastOne <= 4) w = "тысячи";
+    return numberToWords(th) + " " + w + (r > 0 ? " " + numberToWords(r) : "");
+  }
+  if (n === 0) return "ноль";
+  if (n < 10) return units[n];
+  if (n < 20) return teens[n - 10];
+  if (n < 100) {
+    const t = Math.floor(n / 10), u = n % 10;
+    return tens[t] + (u > 0 ? " " + units[u] : "");
+  }
+  if (n < 1000) {
+    const h = Math.floor(n / 100), r = n % 100;
+    return hundreds[h] + (r > 0 ? " " + numberToWords(r) : "");
+  }
+  return String(n);
+}
+
 const franchizePromoValidationSchema = z.object({
   slug: z.string().trim().min(1),
   code: z.string().trim().min(1),
@@ -1851,7 +1887,7 @@ function resolveAndValidateFranchizeDocVariables(
   };
 }
 
-type FranchizeOrderFlowType = "rental" | "sale" | "mixed";
+type FranchizeOrderFlowType = "rental" | "sale" | "mixed" | "testdrive";
 
 async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderFlowType): Promise<{ template: string; templateMode: "md" | "html" }> {
   const crewSensitive = await getCrewSensitiveDataOrDefault(slug, { source: "loadFranchizeDealTemplate" });
@@ -1864,12 +1900,17 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
   }
 
   // FIX: Both rental and sale flows now use the proper HTML templates
-  // (aligned with /doc command which reads them directly via readFileSync).
-  // Previously sale used SALE_DEAL_TEMPLATE_DEMO.md which produced the
-  // "garbage truck" legacy contract output. Now both flows use .html.
-  const isRental = flowType === "rental";
-  const localTemplateFile = isRental ? "RENTAL_DEAL_TEMPLATE.html" : "SALE_DEAL_TEMPLATE.html";
-  const defaultTemplateMode = "html" as const;
+    // (aligned with /doc command which reads them directly via readFileSync).
+    // Previously sale used SALE_DEAL_TEMPLATE_DEMO.md which produced the
+    // "garbage truck" legacy contract output. Now both flows use .html.
+    const isRental = flowType === "rental";
+    const isTestdrive = flowType === "testdrive";
+    const localTemplateFile = isRental
+      ? "RENTAL_DEAL_TEMPLATE.html"
+      : isTestdrive
+        ? "TESTDRIVE_DEAL_TEMPLATE.html"
+        : "SALE_DEAL_TEMPLATE.html";
+    const defaultTemplateMode = "html" as const;
 
   // Prefer local file (fast, no network hop, matches /doc behaviour)
   try {
@@ -1883,10 +1924,12 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
   }
 
   // Fallback: fetch from GitHub (for Vercel ephemeral builds that might
-  // not have the docs/ folder synced)
-  const remoteTemplateUrl = isRental
-    ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE.html"
-    : "https://raw.githubusercontent.com/salavey13/carTest/main/docs/SALE_DEAL_TEMPLATE.html";
+    // not have the docs/ folder synced)
+    const remoteTemplateUrl = isRental
+      ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE.html"
+      : isTestdrive
+        ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/TESTDRIVE_DEAL_TEMPLATE.html"
+        : "https://raw.githubusercontent.com/salavey13/cartTest/main/docs/SALE_DEAL_TEMPLATE.html";
   try {
     const response = await fetch(remoteTemplateUrl, { cache: "no-store" });
     if (!response.ok) {
@@ -1972,6 +2015,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
     const flowType: FranchizeOrderFlowType = payload.flowType ?? "rental";
     const isSaleFlow = flowType === "sale" || flowType === "mixed";
+    const isTestdrive = flowType === "testdrive";
     const rentDays = Math.max(...payload.cartLines.map((line) => parseDurationDays(line.options.duration)));
     const rentStartDate = payload.rentalStartDate || payload.time;
     const rentEndDate = payload.rentalEndDate || payload.time;
@@ -2060,6 +2104,74 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
       const specs = (car.specs as Record<string, unknown> | null) || {};
       const dailyPriceRub = line.pricePerDay || Math.round(line.lineTotal / Math.max(1, parseDurationDays(line.options.duration)));
+
+      // ── TESTDRIVE flow: build simple vars (customer_* not renter_*) ──
+      if (isTestdrive) {
+        const now = new Date();
+        const passportStr = [payload.passportSeries, payload.passportNumber].filter(Boolean).join(" ").trim();
+        const licenseStr = [payload.licenseSeries, payload.licenseNumber].filter(Boolean).join(" ").trim();
+        const tdVariables: Record<string, string> = {
+          contract_number: `${payload.slug.toUpperCase()}-${payload.orderId}-${bikeIndex + 1}`,
+          day: String(now.getDate()).padStart(2, "0"),
+          month: now.toLocaleString("ru-RU", { month: "long" }),
+          year: String(now.getFullYear()),
+          customer_full_name: payload.recipient || "",
+          customer_short_name: (payload.recipient || "").split(" ").map((n, i) => i === 0 ? n : `${n[0]}.`).join(" "),
+          customer_phone: docIdentity.renterPhone || payload.phone || "",
+          customer_passport_number: passportStr || "",
+          customer_passport_issued_by: payload.passportIssuedBy || "",
+          customer_passport_issue_date: payload.passportIssueDate || "",
+          customer_birth_date: payload.birthDate || docIdentity.renterBirthDate || "",
+          customer_registration: payload.registrationAddress || "",
+          license_series: payload.licenseSeries || "",
+          license_number: payload.licenseNumber || "",
+          license_issue_date: "",
+          license_expiry_date: payload.licenseExpiryDate || "",
+          license_category: payload.licenseCategories || "",
+          bike_make: car.make || "уточняется",
+          bike_model: car.model || "уточняется",
+          bike_color: String(specs.color || "уточняется"),
+          bike_year: String(specs.year || now.getFullYear()),
+          price_digits: String(payload.totalAmount || 5000),
+          price_words: numberToWords(payload.totalAmount || 5000),
+          deposit_rub: "0",
+          deposit_words: numberToWords(0),
+          organization_name: crewSecrets.organizationName,
+          organization_short: crewSecrets.organizationShort,
+          issuer_name: crewSecrets.issuerName,
+          issuer_signatory: crewSecrets.signatoryRole || crewSecrets.issuerName || "Менеджер",
+          ogrnip: crewSecrets.ogrnip,
+          inn: crewSecrets.inn,
+          legal_address: crewSecrets.legalAddress,
+          return_address: crewSecrets.returnAddress || crewSecrets.legalAddress,
+          phone: crewSecrets.email ? "" : "",
+          email: crewSecrets.email,
+          signature_timestamp: now.toLocaleString("ru-RU"),
+          document_key: `testdrive-${payload.slug}-${payload.orderId}-bike${bikeIndex}`,
+        };
+
+        const tdDocFileName = `testdrive-${payload.slug}-${payload.orderId}-bike${bikeIndex}.docx`;
+        const tdVerifierScope = `testdrive:${payload.slug}:${payload.orderId}:bike${bikeIndex}`;
+        try {
+          const { bytes, sha256 } = await buildFranchizeDocxFromTemplate({
+            integrationScope: tdVerifierScope,
+            uploadedBy: "franchize-order-system",
+            documentKey: tdVariables.document_key,
+            fileName: tdDocFileName,
+            template,
+            variables: tdVariables,
+            flowType: "testdrive" as any,
+            templateMode,
+          });
+          bikeDocs.push({
+            bytes, fileName: tdDocFileName, bikeName: `${car.make} ${car.model}`, bikeId: car.id,
+            documentKey: tdVariables.document_key, sha256,
+          });
+        } catch (tdErr) {
+          logger.error("[franchize] testdrive doc generation failed", { error: tdErr instanceof Error ? tdErr.message : String(tdErr) });
+        }
+        continue; // Skip the rental/sale builder below
+      }
 
       // Use shared builder for rental contracts
       const baseVariables = buildRentalContractVariables({
@@ -2172,7 +2284,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
     await notifyAdmin(
       [
-        `${isSaleFlow ? "🛍️ Новый franchize-заказ на покупку" : `🧾 Новый franchize-заказ на аренду (${bikeLabel})`} #${payload.orderId}`,
+        `${isSaleFlow ? "🛍️ Новый franchize-заказ на покупку" : isTestdrive ? `🏁 Новый franchize-заказ на тест-драйв (${bikeLabel})` : `🧾 Новый franchize-заказ на аренду (${bikeLabel})`} #${payload.orderId}`,
         `Crew: ${payload.slug}`,
         `Получатель: ${payload.recipient}`,
         `Телефон: ${payload.phone}`,

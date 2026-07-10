@@ -56,6 +56,13 @@ export default async function FranchizeRentalPage({
   const resolvedSlug = crew.slug || slug;
   const surface = crewPaletteForSurface(crew.theme);
   const p = crew.theme.palette as (typeof crew.theme.palette) & { accentTextOn?: string };
+  // Theme-aware values — use CSS variables when isAuto so light/dark toggle works
+  const isAuto = Boolean(crew.theme.isAuto);
+  const accent = isAuto ? "var(--franchize-accent-main)" : accent;
+  const accentTextOn = isAuto ? "var(--franchize-accent-contrast, #16130A)" : (accentTextOn ?? "#16130A");
+  const textPrimary = isAuto ? "var(--franchize-text-primary)" : textPrimary;
+  const textSecondary = isAuto ? "var(--franchize-text-secondary)" : textSecondary;
+  const borderSoft = isAuto ? "var(--franchize-border-soft)" : borderSoft;
   const dealStarted = rental.found || rental.paymentStatus === "interest_paid";
   const catalogHref = `/franchize/${resolvedSlug}`;
   const profileHref = getTelegramWebAppPageHref(`franchize/${resolvedSlug}/profile`, crew.contacts.telegramBotUsername) || `/franchize/${resolvedSlug}/profile`;
@@ -75,10 +82,10 @@ export default async function FranchizeRentalPage({
       ? statusPalette.active
       : rental.contractVerificationStatus === "expired"
         ? statusPalette.pending_confirmation
-        : { badgeBg: `${p.textSecondary}20`, badgeText: p.textSecondary };
+        : { badgeBg: `${textSecondary}20`, badgeText: textSecondary };
 
   const bikeSearchHref = rental.vehicleTitle
-    ? `/franchize/${resolvedSlug}?bikeId=${encodeURIComponent(rental.vehicleTitle)}`
+    ? `/franchize/${resolvedSlug}?vehicle=${encodeURIComponent(rental.vehicleTitle)}`
     : catalogHref;
 
   // Status-aware hero subcopy & CTAs
@@ -151,14 +158,14 @@ export default async function FranchizeRentalPage({
                   {statusLabel[status] || status}
                 </span>
                 {rental.found && (
-                  <span className="text-xs" style={{ color: p.textSecondary }}>
+                  <span className="text-xs" style={{ color: textSecondary }}>
                     ID: {rental.rentalId?.slice(0, 8)}…
                   </span>
                 )}
               </div>
               <p
                 className="text-xs font-semibold uppercase tracking-[0.16em]"
-                style={{ color: p.accentMain }}
+                style={{ color: accent }}
               >
                 {status === "completed"
                   ? "Что сделано"
@@ -196,8 +203,8 @@ export default async function FranchizeRentalPage({
                     <span
                       className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
                       style={{
-                        backgroundColor: `${p.accentMain}24`,
-                        color: p.accentMain,
+                        backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 14%, transparent)" : `${accent}24`,
+                        color: accent,
                       }}
                     >
                       {index + 1}
@@ -210,7 +217,7 @@ export default async function FranchizeRentalPage({
                 className="mt-3 rounded-2xl border p-3 text-xs"
                 style={{
                   ...surface.card,
-                  borderColor: p.borderSoft,
+                  borderColor: borderSoft,
                 }}
               >
                 {status === "completed"
@@ -226,8 +233,8 @@ export default async function FranchizeRentalPage({
                   rel="noreferrer"
                   className="flex justify-center rounded-xl px-4 py-3 font-semibold"
                   style={{
-                    backgroundColor: p.accentMain,
-                    color: p.accentTextOn,
+                    backgroundColor: accent,
+                    color: accentTextOn,
                   }}
                 >
                   Открыть в TG
@@ -240,32 +247,32 @@ export default async function FranchizeRentalPage({
                     href={bikeSearchHref}
                     className="flex items-center justify-center gap-2 rounded-xl border px-4 py-3 font-semibold"
                     style={{
-                      borderColor: p.accentMain,
-                      color: p.accentMain,
+                      borderColor: accent,
+                      color: accent,
                     }}
                   >
                     <Timer className="h-4 w-4" /> Продлить аренду
                   </Link>
 
-                  <details className="group rounded-xl border" style={{ borderColor: p.borderSoft }}>
+                  <details className="group rounded-xl border" style={{ borderColor: borderSoft }}>
                     <summary
                       className="flex cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium list-none"
-                      style={{ color: p.textPrimary }}
+                      style={{ color: textPrimary }}
                     >
                       <PackageCheck className="h-4 w-4" />
                       Что нужно вернуть
                       <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
                     </summary>
-                    <div className="border-t px-4 py-3 text-xs" style={{ borderColor: p.borderSoft }}>
-                      <ul className="space-y-2" style={{ color: p.textPrimary }}>
-                        <li className="flex gap-2"><span style={{ color: p.accentMain }}>✓</span> Транспорт в том же состоянии, в каком получили</li>
-                        <li className="flex gap-2"><span style={{ color: p.accentMain }}>✓</span> Ключи от байка</li>
-                        <li className="flex gap-2"><span style={{ color: p.accentMain }}>✓</span> Шлем (если брали)</li>
-                        <li className="flex gap-2"><span style={{ color: p.accentMain }}>✓</span> Перчатки, куртка, боты, рюкзак, зарядка — если брали допы</li>
-                        <li className="flex gap-2"><span style={{ color: p.accentMain }}>✓</span> Паспорт/СТС, если оставляли в залог</li>
-                        <li className="flex gap-2"><span style={{ color: p.accentMain }}>✓</span> Полный бак / заряд по договорённости</li>
+                    <div className="border-t px-4 py-3 text-xs" style={{ borderColor: borderSoft }}>
+                      <ul className="space-y-2" style={{ color: textPrimary }}>
+                        <li className="flex gap-2"><span style={{ color: accent }}>✓</span> Транспорт в том же состоянии, в каком получили</li>
+                        <li className="flex gap-2"><span style={{ color: accent }}>✓</span> Ключи от байка</li>
+                        <li className="flex gap-2"><span style={{ color: accent }}>✓</span> Шлем (если брали)</li>
+                        <li className="flex gap-2"><span style={{ color: accent }}>✓</span> Перчатки, куртка, боты, рюкзак, зарядка — если брали допы</li>
+                        <li className="flex gap-2"><span style={{ color: accent }}>✓</span> Паспорт/СТС, если оставляли в залог</li>
+                        <li className="flex gap-2"><span style={{ color: accent }}>✓</span> Полный бак / заряд по договорённости</li>
                       </ul>
-                      <p className="mt-3" style={{ color: p.textSecondary }}>
+                      <p className="mt-3" style={{ color: textSecondary }}>
                         При возврате оператор проверит комплектацию, пробег и состояние. Депозит вернём после подписания акта.
                       </p>
                     </div>
@@ -279,8 +286,8 @@ export default async function FranchizeRentalPage({
                 rel="noreferrer"
                 className="flex justify-center rounded-xl border px-4 py-3"
                 style={{
-                  borderColor: p.borderSoft,
-                  color: p.textPrimary,
+                  borderColor: borderSoft,
+                  color: textPrimary,
                 }}
               >
                 Написать оператору
@@ -289,8 +296,8 @@ export default async function FranchizeRentalPage({
                 href={contactsHref}
                 className="flex justify-center rounded-xl border px-4 py-3"
                 style={{
-                  borderColor: p.borderSoft,
-                  color: p.textPrimary,
+                  borderColor: borderSoft,
+                  color: textPrimary,
                 }}
               >
                 Поддержка / контакты
@@ -299,14 +306,14 @@ export default async function FranchizeRentalPage({
                 <Link
                   href={catalogHref}
                   className="rounded-xl border px-3 py-2 text-center text-xs"
-                  style={{ borderColor: p.borderSoft }}
+                  style={{ borderColor: borderSoft }}
                 >
                   Каталог
                 </Link>
                 <Link
                   href={profileHref}
                   className="rounded-xl border px-3 py-2 text-center text-xs"
-                  style={{ borderColor: p.borderSoft }}
+                  style={{ borderColor: borderSoft }}
                 >
                   Профиль
                 </Link>
@@ -329,21 +336,21 @@ export default async function FranchizeRentalPage({
               <Link
                 href={catalogHref}
                 className="rounded-xl border px-3 py-2 text-xs"
-                style={{ borderColor: p.borderSoft }}
+                style={{ borderColor: borderSoft }}
               >
                 Вернуться в каталог
               </Link>
               <Link
                 href={profileHref}
                 className="rounded-xl border px-3 py-2 text-xs"
-                style={{ borderColor: p.borderSoft }}
+                style={{ borderColor: borderSoft }}
               >
                 Вернуться в профиль
               </Link>
               <Link
                 href={contactsHref}
                 className="rounded-xl border px-3 py-2 text-xs"
-                style={{ borderColor: p.borderSoft }}
+                style={{ borderColor: borderSoft }}
               >
                 Связаться с поддержкой
               </Link>
@@ -355,8 +362,8 @@ export default async function FranchizeRentalPage({
           <div
             className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
             style={{
-              borderColor: p.accentMain,
-              color: p.accentMain,
+              borderColor: accent,
+              color: accent,
             }}
           >
             <Sparkles className="h-3.5 w-3.5" />
@@ -367,7 +374,7 @@ export default async function FranchizeRentalPage({
         <section className="rounded-3xl border p-4" style={surface.subtleCard}>
           {/* Contract verification */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="text-xs" style={{ color: p.textSecondary }}>
+            <span className="text-xs" style={{ color: textSecondary }}>
               Контракт:
             </span>
             <span
@@ -383,19 +390,19 @@ export default async function FranchizeRentalPage({
               href={`/doc-verifier?integrationScope=${encodeURIComponent(rental.contractVerifierScope || `rental:${rental.rentalId}`)}&documentKey=${encodeURIComponent(rental.contractDocumentKey || `rental-${slug}-${rental.rentalId}`)}`}
               className="rounded-full border px-3 py-1 text-xs font-semibold"
               style={{
-                borderColor: p.accentMain,
-                color: p.accentMain,
+                borderColor: accent,
+                color: accent,
               }}
             >
               Verify contract
             </Link>
             {rental.docVerifierRecordId ? (
-              <span className="text-[11px]" style={{ color: p.textSecondary }}>
+              <span className="text-[11px]" style={{ color: textSecondary }}>
                 record: {rental.docVerifierRecordId.slice(0, 8)}…
               </span>
             ) : null}
             {rental.contractSourceScope ? (
-              <span className="text-[11px]" style={{ color: p.textSecondary }}>
+              <span className="text-[11px]" style={{ color: textSecondary }}>
                 source: {rental.contractSourceScope}
               </span>
             ) : null}
@@ -404,7 +411,7 @@ export default async function FranchizeRentalPage({
           {/* Rental details grid */}
           <div className="grid gap-3 text-sm sm:grid-cols-2 max-sm:grid-cols-1">
             <p>
-              <span style={{ color: p.textSecondary }}>Статус:</span>{" "}
+              <span style={{ color: textSecondary }}>Статус:</span>{" "}
               <span
                 className="font-semibold"
                 style={{ color: statusStyle.badgeText }}
@@ -414,23 +421,23 @@ export default async function FranchizeRentalPage({
             </p>
             {rental.paymentStatus && (
               <p>
-                <span style={{ color: p.textSecondary }}>Оплата:</span>{" "}
+                <span style={{ color: textSecondary }}>Оплата:</span>{" "}
                 {rental.paymentStatus}
               </p>
             )}
             {rental.totalCost > 0 && (
               <p>
-                <span style={{ color: p.textSecondary }}>Итого:</span>{" "}
+                <span style={{ color: textSecondary }}>Итого:</span>{" "}
                 {rental.totalCost.toLocaleString("ru-RU")} ₽
               </p>
             )}
             <p className={rental.totalCost > 0 ? "" : "sm:col-span-2"}>
-              <span style={{ color: p.textSecondary }}>Транспорт:</span>{" "}
+              <span style={{ color: textSecondary }}>Транспорт:</span>{" "}
               {rental.vehicleTitle}
             </p>
             {rental.contractOriginalSha256 ? (
               <p className="sm:col-span-2 break-all">
-                <span style={{ color: p.textSecondary }}>
+                <span style={{ color: textSecondary }}>
                   Contract SHA256:
                 </span>{" "}
                 {rental.contractOriginalSha256}
@@ -445,7 +452,7 @@ export default async function FranchizeRentalPage({
                 rentalId={rental.rentalId}
                 crewId={crew.id}
                 slug={resolvedSlug}
-                accentColor={p.accentMain}
+                accentColor={accent}
                 metadata={(rental.metadata as Record<string, any>) || undefined}
                 status={status}
               />
@@ -457,11 +464,11 @@ export default async function FranchizeRentalPage({
             {status === "completed" ? (
               <>
                 <Link
-                  href={`/franchize/${resolvedSlug}?bikeId=${encodeURIComponent(rental.vehicleTitle || "")}`}
+                  href={`/franchize/${resolvedSlug}?vehicle=${encodeURIComponent(rental.vehicleTitle || "")}`}
                   className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
                   style={{
-                    backgroundColor: p.accentMain,
-                    color: p.accentTextOn,
+                    backgroundColor: accent,
+                    color: accentTextOn,
                   }}
                 >
                   <RotateCcw className="h-4 w-4" />
@@ -471,8 +478,8 @@ export default async function FranchizeRentalPage({
                   href={profileHref}
                   className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm"
                   style={{
-                    borderColor: p.borderSoft,
-                    color: p.textPrimary,
+                    borderColor: borderSoft,
+                    color: textPrimary,
                   }}
                 >
                   <ShoppingCart className="mr-2 h-4 w-4" />
@@ -485,8 +492,8 @@ export default async function FranchizeRentalPage({
                   href={bikeSearchHref}
                   className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
                   style={{
-                    backgroundColor: p.accentMain,
-                    color: p.accentTextOn,
+                    backgroundColor: accent,
+                    color: accentTextOn,
                   }}
                 >
                   <RefreshCw className="h-4 w-4" />
@@ -496,8 +503,8 @@ export default async function FranchizeRentalPage({
                   href={catalogHref}
                   className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm"
                   style={{
-                    borderColor: p.borderSoft,
-                    color: p.textPrimary,
+                    borderColor: borderSoft,
+                    color: textPrimary,
                   }}
                 >
                   К каталогу
@@ -509,8 +516,8 @@ export default async function FranchizeRentalPage({
                   href={`/franchize/${resolvedSlug}/cart`}
                   className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
                   style={{
-                    backgroundColor: p.accentMain,
-                    color: p.accentTextOn,
+                    backgroundColor: accent,
+                    color: accentTextOn,
                   }}
                 >
                   <Sparkles className="h-4 w-4" />
@@ -520,8 +527,8 @@ export default async function FranchizeRentalPage({
                   href={catalogHref}
                   className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm"
                   style={{
-                    borderColor: p.borderSoft,
-                    color: p.textPrimary,
+                    borderColor: borderSoft,
+                    color: textPrimary,
                   }}
                 >
                   К каталогу
@@ -550,11 +557,11 @@ export default async function FranchizeRentalPage({
 
           <div
             className="mt-4 flex items-center justify-end gap-2 text-xs"
-            style={{ color: p.textSecondary }}
+            style={{ color: textSecondary }}
           >
             <span
               className="inline-flex h-6 w-6 items-center justify-center rounded-full border"
-              style={{ borderColor: p.borderSoft }}
+              style={{ borderColor: borderSoft }}
               title="Deep-link fallback: если карточка открылась вне Telegram mini-app, вернёт в контекст startapp=rental-..."
               aria-label="Информация о Telegram fallback"
             >
