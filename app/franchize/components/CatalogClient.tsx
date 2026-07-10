@@ -557,6 +557,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     const grouped = orderedCategories
       .map((category) => ({
         category,
+        title: "",
         items: sortedFilteredItems.filter((item) => item.category === category),
       }))
       .filter((group) => group.items.length > 0);
@@ -566,21 +567,31 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     const baseGroups = grouped.filter((group) => group.category !== saleCategory);
     const normalized = sortWbItemLast(baseGroups);
     if (saleGroup.length === 0) return normalized;
-    return [{ category: saleCategory, items: saleGroup }, ...normalized];
+    return [{ category: saleCategory, title: "", items: saleGroup }, ...normalized];
   }, [filteredItems, mode, orderedCategories, quickFilter]);
 
   // ── VIP Bike Categorization (VIP Bike Landing & Catalog Improvements) ──
   // Categorize bikes by type + sale status for vip-bike franchize
-  // Sort by "coolness": pro tier first, then by price (expensive first), then by rating
-  const sortItemsByCoolness = (items: CatalogItemVM[]) => {
-    const tierOrder: Record<string, number> = { pro: 0, mid: 1, entry: 2, none: 3 };
+  // Sort: R7 first (client's wish), then by year (newer first), then by price
+  const sortVipBikeItems = (items: CatalogItemVM[]) => {
     return [...items].sort((a, b) => {
-      const tierA = tierOrder[getItemAccessTier(a)] ?? 3;
-      const tierB = tierOrder[getItemAccessTier(b)] ?? 3;
-      if (tierA !== tierB) return tierA - tierB;
-      // Same tier: expensive first
+      // R7 always first (client's explicit wish)
+      const aIsR7 = a.id.toLowerCase().includes('r7') || a.title.toLowerCase().includes('r7');
+      const bIsR7 = b.id.toLowerCase().includes('r7') || b.title.toLowerCase().includes('r7');
+      if (aIsR7 && !bIsR7) return -1;
+      if (!aIsR7 && bIsR7) return 1;
+
+      // Then by year (newer first)
+      const rsA = a.rawSpecs as Record<string, unknown> | undefined;
+      const rsB = b.rawSpecs as Record<string, unknown> | undefined;
+      const yearA = Number(rsA?.year) || 0;
+      const yearB = Number(rsB?.year) || 0;
+      if (yearA !== yearB) return yearB - yearA;
+
+      // Then by price (expensive first)
       if (b.pricePerDay !== a.pricePerDay) return b.pricePerDay - a.pricePerDay;
-      // Same price: higher rating first
+
+      // Then by rating
       return (b.reviewSummary.average || 0) - (a.reviewSummary.average || 0);
     });
   };
@@ -601,11 +612,17 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     });
 
     return [
-      { category: "", title: "", items: sortItemsByCoolness(electric) },
-      { category: "", title: "", items: sortItemsByCoolness(iceForSale) },
-      { category: "partners", title: "Байки партнёров", items: sortItemsByCoolness(iceRentOnly) },
+      { category: "electric", title: "", items: sortVipBikeItems(electric) },
+      { category: "ice-for-sale", title: "", items: sortVipBikeItems(iceForSale) },
+      { category: "partners", title: "Байки партнёров", items: sortVipBikeItems(iceRentOnly) },
     ].filter(g => g.items.length > 0);
   }, [items]);
+
+  // Active groups for carousel rendering + IntersectionObserver
+  // For vip-bike: use categorizedItems, for others: use itemsByCategory
+  const activeGroupsForCarousel = useMemo(() => {
+    return (slug === "vip-bike" || crew.slug === "vip-bike") ? categorizedItems : itemsByCategory;
+  }, [slug, crew.slug, categorizedItems, itemsByCategory]);
 
   const recordRentIntent = useCallback((item: CatalogItemVM, stage: "viewed" | "configured", metadata: Record<string, unknown> = {}) => {
     const strip = buildCatalogRentalStrip(item, crew);
@@ -796,12 +813,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     const rafByCategory: Record<string, number | undefined> = {};
     const cleanupByCategory: Array<() => void> = [];
 
-    itemsByCategory.forEach((group) => {
+    activeGroupsForCarousel.forEach((group) => {
       if (group.items.length > 8) return;
-      const root = carouselRefs.current[group.category];
+      const root = carouselRefs.current[group.category || group.title || "section"];
       if (!root) return;
       const cards = Array.from(root.querySelectorAll<HTMLElement>("[data-carousel-card='true']"));
       if (cards.length === 0) return;
+
+      const groupKey = group.category || group.title || "section";
 
       const observer = new IntersectionObserver(
         (entries) => {
@@ -810,7 +829,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
             .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
           if (!visible) return;
           const nextIndex = Number((visible.target as HTMLElement).dataset.carouselIndex ?? "0");
-          setCarouselActiveByCategory((prev) => (prev[group.category] === nextIndex ? prev : { ...prev, [group.category]: nextIndex }));
+          setCarouselActiveByCategory((prev) => (prev[groupKey] === nextIndex ? prev : { ...prev, [groupKey]: nextIndex }));
         },
         { root, threshold: [0.55, 0.75] },
       );
@@ -819,14 +838,15 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       observers.push(observer);
 
       const onScroll = () => {
-        if (rafByCategory[group.category]) {
-          window.cancelAnimationFrame(rafByCategory[group.category] as number);
+        if (rafByCategory[groupKey]) {
+          window.cancelAnimationFrame(rafByCategory[groupKey] as number);
         }
-        rafByCategory[group.category] = window.requestAnimationFrame(() => {
+        rafByCategory[groupKey] = window.requestAnimationFrame(() => {
           const slotWidth = cards[0]?.offsetWidth || 1;
-          const nextIndex = Math.round(root.scrollLeft / slotWidth);
-          setCarouselActiveByCategory((prev) => (prev[group.category] === nextIndex ? prev : { ...prev, [group.category]: nextIndex }));
-          rafByCategory[group.category] = undefined;
+          const gap = 12; // gap-3 = 0.75rem = 12px
+          const nextIndex = Math.round(root.scrollLeft / (slotWidth + gap));
+          setCarouselActiveByCategory((prev) => (prev[groupKey] === nextIndex ? prev : { ...prev, [groupKey]: nextIndex }));
+          rafByCategory[groupKey] = undefined;
         });
       };
 
@@ -841,7 +861,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       });
       cleanupByCategory.forEach((cleanup) => cleanup());
     };
-  }, [itemsByCategory]);
+  }, [activeGroupsForCarousel]);
 
   return (
     <>
@@ -1032,13 +1052,13 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
               {[0, 1, 2, 3].map((index) => <CatalogCardSkeleton key={index} index={index} />)}
             </div>
           </section>
-        ) : ((slug === "vip-bike" || crew.slug === "vip-bike") ? categorizedItems : itemsByCategory).length === 0 ? (
+        ) : activeGroupsForCarousel.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-4 text-sm" style={surface.mutedText}>
             По этому запросу нет готового варианта. Попробуйте другую модель, бюджет или сценарий поездки.
           </div>
         ) : (
           <div className="space-y-6">
-            {((slug === "vip-bike" || crew.slug === "vip-bike") ? categorizedItems : itemsByCategory).map((group) => (
+            {activeGroupsForCarousel.map((group) => (
               <section key={group.category || group.title || "section"} id={toCategoryId(group.category || group.title || "section")} data-category={group.title || group.category} data-count={group.items.length}>
                 {group.title && (
                 <div className="mb-4 flex items-center justify-between gap-3">
@@ -1065,7 +1085,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       aria-label={`Карусель категории ${group.category}`}
                       onKeyDown={(event) => {
                         if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
-                        const root = carouselRefs.current[group.category];
+                        const root = carouselRefs.current[group.category || group.title || "section"];
                         if (!root) return;
                         const step = root.clientWidth * 0.9;
                         root.scrollBy({ left: event.key === "ArrowRight" ? step : -step, behavior: "smooth" });
@@ -1188,32 +1208,38 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         );
                       })}
                     </div>
-                    <div className="mt-2 flex items-center justify-center gap-2" aria-label={`Пагинация карусели ${group.category}`}>
-                      {group.items.map((item, index) => {
-                        const isActive = (carouselActiveByCategory[group.category] ?? 0) === index;
-                        return (
-                          <button
-                            key={`${item.id}-dot`}
-                            type="button"
-                            aria-label={`Показать карточку ${index + 1}`}
-                            aria-current={isActive ? "true" : undefined}
-                            className="h-2.5 w-2.5 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
-                            style={{
-                              backgroundColor: isActive
-                                ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain)
-                                : `${crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary}80`,
-                              transform: isActive ? "scale(1.1)" : "scale(1)"
-                            }}
-                            onClick={() => {
-                              const root = carouselRefs.current[group.category];
-                              if (!root) return;
-                              const slotWidth = root.querySelector<HTMLElement>("[data-carousel-card='true']")?.offsetWidth || root.clientWidth;
-                              const gap = 12; // gap-3 = 0.75rem = 12px
-                              root.scrollTo({ left: (slotWidth + gap) * index, behavior: "smooth" });
-                            }}
-                          />
-                        );
-                      })}
+                    <div className="mt-3 flex items-center justify-center gap-2" aria-label={`Пагинация карусели ${group.category}`}>
+                      {(() => {
+                        const groupKey = group.category || group.title || "section";
+                        const activeIndex = carouselActiveByCategory[groupKey] ?? 0;
+                        return group.items.map((item, index) => {
+                          const isActive = activeIndex === index;
+                          return (
+                            <button
+                              key={`${item.id}-dot`}
+                              type="button"
+                              aria-label={`Показать карточку ${index + 1}`}
+                              aria-current={isActive ? "true" : undefined}
+                              className="rounded-full transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
+                              style={{
+                                width: isActive ? "24px" : "10px",
+                                height: "10px",
+                                backgroundColor: isActive
+                                  ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain)
+                                  : (crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary),
+                                opacity: isActive ? 1 : 0.4,
+                              }}
+                              onClick={() => {
+                                const root = carouselRefs.current[groupKey];
+                                if (!root) return;
+                                const slotWidth = root.querySelector<HTMLElement>("[data-carousel-card='true']")?.offsetWidth || root.clientWidth;
+                                const gap = 12; // gap-3 = 0.75rem = 12px
+                                root.scrollTo({ left: (slotWidth + gap) * index, behavior: "smooth" });
+                              }}
+                            />
+                          );
+                        });
+                      })()}
                     </div>
                   </>
                 ) : (
