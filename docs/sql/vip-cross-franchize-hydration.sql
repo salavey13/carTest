@@ -374,6 +374,46 @@ set
   contract_defaults = excluded.contract_defaults,
   updated_at = now();
 
+-- 5) Stage 3: enrich contract_defaults with organization/bank details
+update private.crew_secrets
+set
+  contract_defaults = jsonb_set(
+    jsonb_set(
+      jsonb_set(
+        jsonb_set(
+          jsonb_set(
+            jsonb_set(
+              jsonb_set(
+                jsonb_set(
+                  jsonb_set(
+                    jsonb_set(
+                      jsonb_set(
+                        coalesce(contract_defaults::jsonb, '{}'::jsonb),
+                        '{organizationName}', '"Рысан Григорий Константинович"'
+                      ),
+                      '{organizationShort}', '"ИП Рысан Г.К."'
+                    ),
+                    '{organizationRepresentative}', '"Рысан Григорий Константинович"'
+                  ),
+                  '{ogrnip}', '""'
+                ),
+                '{inn}', '""'
+              ),
+              '{bankAccount}', '""'
+            ),
+            '{bankName}', '""'
+          ),
+          '{bankCorrAccount}', '""'
+        ),
+        '{bankCity}', '""'
+      ),
+      '{email}', '""'
+    ),
+    '{legalAddress}', '"г. Нижний Новгород, ул. Стригинский переулок, дом 13б"'
+  ),
+  updated_at = now()
+where crew_slug = 'vip-cross';
+
 commit;
 
 -- Verification helpers:
