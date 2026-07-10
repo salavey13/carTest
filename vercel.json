@@ -3,6 +3,9 @@
     "app/api/fetch-crypto-prices/route.ts": {
       "memory": 1024,
       "maxDuration": 25
+    },
+    "app/api/telegramWebhook/route.ts": {
+      "maxDuration": 10
     }
   },
   "crons": [
