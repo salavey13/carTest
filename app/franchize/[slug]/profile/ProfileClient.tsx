@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Trophy, MapPin, ShoppingCart, Lock, CheckCircle, Clock, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -172,6 +172,22 @@ export function FranchizeProfileClient({
   // Apply franchize theme CSS variables for proper light/dark mode support
   useFranchizeTheme(initialCrew?.theme || fallbackCrew.theme);
   const params = useParams<{ slug: string }>();
+  // FIX: The rental/order cards below use Next.js `<Link>` for
+  // navigation, but Next.js falls back to a full page load when the
+  // target route lives in a different segment (e.g. `/rentals/[id]`
+  // vs `/franchize/[slug]/profile`) AND the user is not yet
+  // authenticated — which is exactly when the profile is opened
+  // (no session, just the password form). The browser therefore
+  // navigates with a hard reload instead of an SPA transition.
+  //
+  // We force SPA navigation by calling `router.push()` directly. This
+  // works whether the target is inside or outside the franchize
+  // segment and bypasses the `<Link>` middleware / prefetch quirks.
+  const router = useRouter();
+  const navigateSpa = (href: string) => {
+    if (!href) return;
+    router.push(href);
+  };
   const slug = initialSlug || params?.slug || initialCrew?.slug || "vip-bike";
   const crew = initialCrew || fallbackCrew;
   const [catalog, setCatalog] = useState<FranchizeAchievementDefinition[]>([]);
@@ -485,10 +501,18 @@ export function FranchizeProfileClient({
               {digest?.rentals && digest.rentals.length > 0 ? (
                 <div className="space-y-2">
                   {digest.rentals.slice(0, 3).map((r) => (
-                    <Link
+                    <div
                       key={r.rentalId}
-                      href={r.docLink}
-                      className="block rounded-xl border p-3 text-sm transition hover:opacity-90 hover:shadow-md"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => navigateSpa(r.docLink)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          navigateSpa(r.docLink);
+                        }
+                      }}
+                      className="block cursor-pointer rounded-xl border p-3 text-sm transition hover:opacity-90 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                       style={{
                         borderColor: "var(--fr-profile-border)",
                         backgroundColor: "color-mix(in srgb, var(--fr-profile-accent) 4%, transparent)",
@@ -517,7 +541,7 @@ export function FranchizeProfileClient({
                         <span>{r.status}</span>
                         {r.paymentStatus && <span>· {r.paymentStatus}</span>}
                       </div>
-                    </Link>
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -539,10 +563,18 @@ export function FranchizeProfileClient({
               {digest?.buyOrders && digest.buyOrders.length > 0 ? (
                 <div className="space-y-2">
                   {digest.buyOrders.slice(0, 3).map((o) => (
-                    <Link
+                    <div
                       key={o.orderId}
-                      href={o.docLink}
-                      className="block rounded-xl border p-3 text-sm transition hover:opacity-90 hover:shadow-md"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => navigateSpa(o.docLink)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          navigateSpa(o.docLink);
+                        }
+                      }}
+                      className="block cursor-pointer rounded-xl border p-3 text-sm transition hover:opacity-90 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                       style={{ borderColor: "var(--fr-profile-border)" }}
                     >
                       <div className="flex items-center justify-between">
@@ -560,7 +592,7 @@ export function FranchizeProfileClient({
                           📄 {o.docFileName}
                         </div>
                       )}
-                    </Link>
+                    </div>
                   ))}
                 </div>
               ) : (
