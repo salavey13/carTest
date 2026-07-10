@@ -131,11 +131,21 @@ function getDailyPrice(
   specs: BikePricingSpecs,
   days: number,
   weekendDayCount: number = 0,
+  startDateStr?: string,
 ): number {
   if (days === 1) {
-    // For single-day: use weekend rate if available AND the day is a weekend
-    if (weekendDayCount > 0 && specs.rent_weekend) {
-      return specs.rent_weekend;
+    // For single-day rentals: check if the START day is a weekend,
+    // NOT whether any day in [start, end] is a weekend.
+    // A rental from Friday 10am → Saturday 10am is a Friday rental
+    // (the bike is returned Saturday morning, the weekend hasn't started
+    // for rental purposes). The old logic used weekendDayCount which
+    // counts inclusively and would see Saturday in the range → wrong.
+    if (startDateStr) {
+      const startDay = new Date(startDateStr + "T00:00:00").getDay();
+      const isStartWeekend = startDay === 0 || startDay === 6;
+      if (isStartWeekend && specs.rent_weekend) {
+        return specs.rent_weekend;
+      }
     }
     return specs.dailyPrice ?? specs.rent_weekday ?? DEFAULT_DAILY_PRICE;
   }
@@ -191,6 +201,7 @@ function calculateBasePrice(
   hours: number,
   days: number,
   weekendDayCount: number = 0,
+  startDateStr?: string,
 ): {
   price: number;
   tier: PricingTier;
@@ -211,7 +222,7 @@ function calculateBasePrice(
     return { price, tier, baseDailyRate };
   }
 
-  const price = getDailyPrice(specs, days, weekendDayCount);
+  const price = getDailyPrice(specs, days, weekendDayCount, startDateStr);
   const tier = getPricingTier(hours, days);
   const baseDailyRate = specs.dailyPrice ?? specs.rent_weekday ?? DEFAULT_DAILY_PRICE;
 
@@ -239,6 +250,7 @@ export function calculatePrice(
     normalized.displayHours,
     days,
     weekendDayCount,
+    startDate,
   );
 
   const helmetRub = helmetCount * getHelmetPrice(hours);

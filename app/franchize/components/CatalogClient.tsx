@@ -18,6 +18,7 @@ import { SHOW_CART } from "@/lib/feature-flags";
 import { ItemModal, type FlowType } from "../modals/Item";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
+import { todayISO } from "../lib/date-utils";
 import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 import { getCatalogPropulsionSegment } from "../lib/catalog-propulsion";
 import { localImageSrc, handleImageError } from "@/lib/image-fallback";
@@ -368,7 +369,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const priceGlowStyle = getContrastingGlowStyle(accentColor);
   const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
   const { addItem } = useFranchizeCart(crew.slug || slug);
-  const [selectedOptions, setSelectedOptions] = useState({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона", rentStartDate: "", rentEndDate: "" });
+  const [selectedOptions, setSelectedOptions] = useState({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона", rentStartDate: todayISO(), rentEndDate: todayISO(), rentStartTime: "10:00", rentEndTime: "10:00" });
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchCtaFocused, setSearchCtaFocused] = useState(false);
@@ -681,8 +682,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         duration: editContext.options.duration ?? "1 день",
         perk: editContext.options.perk ?? "Стандарт",
         auction: editContext.options.auction ?? "Без аукциона",
-        rentStartDate: editContext.options.rentStartDate ?? "",
-        rentEndDate: editContext.options.rentEndDate ?? "",
+        rentStartDate: editContext.options.rentStartDate ?? todayISO(),
+        rentEndDate: editContext.options.rentEndDate ?? todayISO(),
+        rentStartTime: editContext.options.rentStartTime ?? "10:00",
+        rentEndTime: editContext.options.rentEndTime ?? "10:00",
       });
 
       // Clear the edit context

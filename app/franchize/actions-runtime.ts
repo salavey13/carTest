@@ -690,7 +690,20 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       // bare-date-as-midnight storage quirk) is still effectively in the
       // future. A stale "active" rental with a past end date is treated as
       // ended → the bike becomes available again automatically.
-      const hasOpenEnd = Number.isNaN(endTs) || endTs + RENTAL_END_GRACE_MS >= nowTs;
+      //
+      // FIX 2026-07-10: If endTs is NaN (neither agreed_end_date nor
+      // requested_end_date is set), we must NOT treat the bike as busy
+      // forever. The old logic had `Number.isNaN(endTs) || ...` which
+      // made any rental with a missing end date permanently busy. Now
+      // we fall back to start date + 24h as a last resort; if even the
+      // start date is missing, the rental is too broken to gate
+      // availability.
+      let effectiveEndTs = endTs;
+      if (Number.isNaN(effectiveEndTs)) {
+        // Fall back to start date + 24h grace
+        effectiveEndTs = Number.isNaN(startTs) ? Number.NaN : startTs + RENTAL_END_GRACE_MS;
+      }
+      const hasOpenEnd = !Number.isNaN(effectiveEndTs) && effectiveEndTs + RENTAL_END_GRACE_MS >= nowTs;
       const isActiveNow = rentalStatus === "active" && hasOpenEnd;
       const isUpcomingBooking =
         ["pending_confirmation", "confirmed"].includes(rentalStatus) && hasOpenEnd;
