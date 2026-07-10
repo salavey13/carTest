@@ -296,6 +296,7 @@ set
   updated_at = now();
 
 -- 5) Stage 3: enrich contract_defaults with organization/bank details
+--    Demo values for sly13 (service/consulting crew) — replace with real data when going live
 update private.crew_secrets
 set
   contract_defaults = jsonb_set(
@@ -316,21 +317,21 @@ set
                     ),
                     '{organizationRepresentative}', '"@SALAVEY13"'
                   ),
-                  '{ogrnip}', '""'
+                  '{ogrnip}', '"318527500042178"' -- demo OGRNIP (ИП Салaвеv)
                 ),
-                '{inn}', '""'
+                '{inn}', '"525813643088"' -- demo INN
               ),
-              '{bankAccount}', '""'
+              '{bankAccount}', '"40802810555510012345"' -- demo расчётный счёт
             ),
-            '{bankName}', '""'
+            '{bankName}', '"АО Т-Банк"' -- demo банк
           ),
-          '{bankCorrAccount}', '""'
+          '{bankCorrAccount}', '"30101810545250000974"' -- demo кор. счёт
         ),
-        '{bankCity}', '""'
+        '{bankCity}', '"г. Москва"'
       ),
       '{email}', '"salavey13@yandex.ru"'
     ),
-    '{legalAddress}', '""'
+    '{legalAddress}', '"г. Москва, ул. Ленина, д. 1, офис 42 (демо)"'
   ),
   updated_at = now()
 where crew_slug = 'sly13';
