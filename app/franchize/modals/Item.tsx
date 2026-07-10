@@ -333,6 +333,7 @@ function DurationShortcuts({
   const getPrice = (hours: number): number => {
     if (!specs) return 0;
     if (hours <= 1) return Number(specs.price_per_hour) || 0;
+    if (hours === 2) return Number(specs.price_per_2h) || Math.round((Number(specs.price_per_hour) || 0) + ((Number(specs.price_per_3h) || 0) - (Number(specs.price_per_hour) || 0)) / 2) || (Number(specs.price_per_hour) || 0) * 2;
     if (hours <= 3) return Number(specs.price_per_3h) || (Number(specs.price_per_hour) || 0) * 3;
     if (hours <= 6) return Number(specs.price_per_6h) || (Number(specs.price_per_hour) || 0) * 6;
     if (hours <= 12) return Number(specs.price_per_12h) || (Number(specs.price_per_hour) || 0) * 12;
@@ -344,6 +345,8 @@ function DurationShortcuts({
   };
 
   const hourOptions = [
+    { label: "1 час", hours: 1 },
+    { label: "2 часа", hours: 2 },
     { label: "3 часа", hours: 3 },
     { label: "6 часов", hours: 6 },
     { label: "12 часов", hours: 12 },
@@ -491,10 +494,10 @@ function PricingTable({
   const fmt = (n: number) => n.toLocaleString("ru-RU");
 
   // Extract all pricing tiers from specs
-  // NOTE: 1h tier intentionally omitted from UI — too short for meaningful test ride,
-  // and the v2 pricing formula puts it at 10% of daily (a "try-me" rate we don't
-  // advertise as a real rental option). Still in specs for backward compatibility.
+  // Show all available hourly tiers including 1h and 2h for bikes with hourly pricing
   const hourly = [
+    { label: "1 час", value: Number(specs.price_per_hour) || 0, key: "1h" },
+    { label: "2 часа", value: Number(specs.price_per_2h) || 0, key: "2h" },
     { label: "3 часа", value: Number(specs.price_per_3h) || 0, key: "3h" },
     { label: "6 часов", value: Number(specs.price_per_6h) || 0, key: "6h" },
     { label: "12 часов", value: Number(specs.price_per_12h) || 0, key: "12h" },
@@ -531,7 +534,7 @@ function PricingTable({
           <p className="mb-1.5 text-[10px] uppercase tracking-[0.08em] text-[var(--item-muted-text)]">
             Часовая аренда
           </p>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-5">
             {hourly.map((tier) => (
               <div
                 key={tier.key}
