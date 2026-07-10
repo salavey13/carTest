@@ -30,6 +30,7 @@ import {
 } from "@/app/franchize/actions";
 import { readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
+import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import { RentalDocsForm } from "../../components/RentalDocsForm";
 import {
   FranchizeOperatorLinkButton,
@@ -171,6 +172,7 @@ export function FranchizeProfileClient({
 
   // Apply franchize theme CSS variables for proper light/dark mode support
   useFranchizeTheme(initialCrew?.theme || fallbackCrew.theme);
+  const T = useCrewTokens(initialCrew?.theme || fallbackCrew.theme);
   const params = useParams<{ slug: string }>();
   // FIX: The rental/order cards below use Next.js `<Link>` for
   // navigation, but Next.js falls back to a full page load when the
@@ -283,14 +285,8 @@ export function FranchizeProfileClient({
   const unlockedCount = catalog.filter((item) =>
     unlockedSet.has(item.id),
   ).length;
-  const accentOn = readablePaletteTextOnColor(
-    crew.theme.palette.accentMain,
-    crew.theme.palette,
-  );
-  const isAuto = crew.theme.isAuto;
-  const palette = isAuto
-    ? (crew.theme.palettes?.light || crew.theme.palettes?.dark || crew.theme.palette)
-    : crew.theme.palette;
+  const accentOn = T.accentContrast;
+  const isAuto = T.isAuto;
 
   const handlePrefillSave = async () => {
     if (!dbUser?.user_id) return;
@@ -336,22 +332,20 @@ export function FranchizeProfileClient({
       animate="visible"
       className="space-y-4"
       style={{
-        // Profile-specific variables
-        ["--fr-profile-accent" as string]: crew.theme.palette.accentMain,
-        ["--fr-profile-border" as string]: crew.theme.palette.borderSoft,
-        ["--fr-profile-text" as string]: crew.theme.palette.textPrimary,
-        ["--fr-profile-muted" as string]: crew.theme.palette.textSecondary,
+        // Profile-specific variables — theme-aware via useCrewTokens
+        ["--fr-profile-accent" as string]: T.accent,
+        ["--fr-profile-border" as string]: T.borderSoft,
+        ["--fr-profile-text" as string]: T.text,
+        ["--fr-profile-muted" as string]: T.textMuted,
         // Shell variables for FranchizeOperatorPanel compatibility
-        ["--franchize-shell-bg" as string]: isAuto ? "var(--franchize-bg-base)" : palette.bgBase,
-        ["--franchize-shell-card" as string]: isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
-        ["--franchize-shell-border" as string]: isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
-        ["--franchize-shell-text" as string]: isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
-        ["--franchize-shell-muted" as string]: isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary,
-        ["--franchize-shell-accent" as string]: isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
-        ["--franchize-shell-primary-contrast" as string]: isAuto
-          ? readablePaletteTextOnColor(crew.theme.palettes?.dark?.accentMain || crew.theme.palettes?.light?.accentMain || crew.theme.palette.accentMain, crew.theme.palettes?.dark || crew.theme.palettes?.light || crew.theme.palette)
-          : readablePaletteTextOnColor(palette.accentMain, palette),
-        ["--franchize-shell-ring" as string]: isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
+        ["--franchize-shell-bg" as string]: T.bg,
+        ["--franchize-shell-card" as string]: T.bgCard,
+        ["--franchize-shell-border" as string]: T.borderSoft,
+        ["--franchize-shell-text" as string]: T.text,
+        ["--franchize-shell-muted" as string]: T.textMuted,
+        ["--franchize-shell-accent" as string]: T.accent,
+        ["--franchize-shell-primary-contrast" as string]: T.accentContrast,
+        ["--franchize-shell-ring" as string]: T.accent,
       }}
     >
       {/* Header Panel */}
@@ -424,7 +418,7 @@ export function FranchizeProfileClient({
                         ? "var(--fr-profile-accent)"
                         : "var(--fr-profile-border)",
                       backgroundColor: unlocked
-                        ? withAlpha(crew.theme.palette.accentMain, 0.09)
+                        ? withAlpha(T.accent, 0.09)
                         : "color-mix(in srgb, var(--franchize-shell-card) 70%, transparent)",
                     }}
                   >
@@ -434,8 +428,8 @@ export function FranchizeProfileClient({
                         <div
                           className="flex h-6 w-6 items-center justify-center rounded-full"
                           style={{
-                            backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.2),
-                            color: crew.theme.palette.accentMain,
+                            backgroundColor: withAlpha(T.accent, 0.2),
+                            color: T.accent,
                           }}
                         >
                           <CheckCircle className="h-4 w-4" />
@@ -463,9 +457,9 @@ export function FranchizeProfileClient({
                       <span
                         className="rounded-full px-2 py-0.5"
                         style={{
-                          backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.12),
+                          backgroundColor: withAlpha(T.accent, 0.12),
                           color: unlocked
-                            ? crew.theme.palette.accentMain
+                            ? T.accent
                             : "var(--fr-profile-muted)",
                         }}
                       >
@@ -526,9 +520,9 @@ export function FranchizeProfileClient({
                           <span
                             className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
                             style={{
-                              borderColor: withAlpha(crew.theme.palette.accentMain, 0.35),
-                              backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.12),
-                              color: crew.theme.palette.accentMain,
+                              borderColor: withAlpha(T.accent, 0.35),
+                              backgroundColor: withAlpha(T.accent, 0.12),
+                              color: T.accent,
                             }}
                           >
                             Тест-драйв
@@ -625,11 +619,11 @@ export function FranchizeProfileClient({
             {docsPrefill?.hasVerifiedData && (
               <div className="mb-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs"
                 style={{
-                  borderColor: withAlpha(crew.theme.palette.accentMain, 0.35),
-                  backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.12),
-                  color: crew.theme.palette.textPrimary,
+                  borderColor: withAlpha(T.accent, 0.35),
+                  backgroundColor: withAlpha(T.accent, 0.12),
+                  color: T.text,
                 }}>
-                <CheckCircle className="h-4 w-4" style={{ color: crew.theme.palette.accentMain }} />
+                <CheckCircle className="h-4 w-4" style={{ color: T.accent }} />
                 <span>Документы верифицированы (завершённая аренда найдена)</span>
               </div>
             )}
@@ -672,7 +666,7 @@ export function FranchizeProfileClient({
               <RentalDocsForm
                 slug={slug}
                 userId={dbUser.user_id}
-                accentColor={crew.theme.palette.accentMain}
+                accentColor={T.accent}
                 initialData={docsPrefill || undefined}
                 onSave={async (data) => {
                   return saveRentalDocsPrefillAction({ slug, userId: dbUser.user_id, ...data });
