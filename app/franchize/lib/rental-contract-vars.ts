@@ -376,6 +376,17 @@ export async function buildTemplateVars(params: {
     equipment_bag: params.equipmentData.bag ? 'да' : 'нет',
     equipment_charger: params.equipmentData.charger ? 'да' : 'нет',
     equipment_total_cost: String(equipmentCostTotal),
+    equipment_summary: (() => {
+      const parts: string[] = [];
+      if (params.equipmentData.helmets_count > 0) parts.push(`Шлем ×${params.equipmentData.helmets_count}`);
+      if (params.equipmentData.gloves_count) parts.push(`Перчатки ×${params.equipmentData.gloves_count}`);
+      if (params.equipmentData.net) parts.push('Сетка');
+      if (params.equipmentData.backpack) parts.push('Рюкзак');
+      if (params.equipmentData.bag) parts.push('Сумка');
+      if (params.equipmentData.charger) parts.push('Зарядка');
+      if (params.equipmentData.lock) parts.push('Замок');
+      return parts.length > 0 ? parts.join(', ') : '—';
+    })(),
     // Payment split — default: cash = deposit, bank = rest (rent + equipment)
     payment_cash_rub: String(
       params.paymentSplit?.cashAmount != null
@@ -406,7 +417,9 @@ export async function buildTemplateVars(params: {
     bank_city: params.crewSecrets.bankCity || 'г. Нижний Новгород',
     bank_corr_account: params.crewSecrets.bankCorrAccount || '30101810900000000603',
     issuer_signatory: params.contractDefaults.issuerRepresentative || 'Менеджер Мотосалона',
+    organization_representative: params.crewSecrets.organizationRepresentative || params.contractDefaults.issuerRepresentative || params.crewSecrets.organizationShort || 'ИП Воробьева Р.В.',
     lessor_address: params.contractDefaults.returnAddress || 'г. Нижний Новгород, пл. Комсомольская 2',
+    return_address: params.contractDefaults.returnAddress || params.crewSecrets.legalAddress || 'г. Нижний Новгород, пл. Комсомольская 2',
     email: params.crewSecrets.email || '',
 
     // Equipment/Condition
@@ -417,6 +430,7 @@ export async function buildTemplateVars(params: {
     battery_level_end: params.returnData?.battery_level_end || '____',
     bike_mileage: String(params.pickupData.odometer_km || ''),
     media_links: 'телефон',
+    damage_price_list: 'мотоцикл в сборе / царапина на пластике / прочее по расчету',
 
     // Computed
     signature_timestamp: now.toLocaleString('ru-RU'),

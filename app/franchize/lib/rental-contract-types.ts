@@ -201,6 +201,7 @@ export interface RentalContractTemplateVars {
   equipment_bag: string;         // "да" or "нет"
   equipment_charger: string;     // "да" or "нет"
   equipment_total_cost: string;  // total equipment cost
+  equipment_summary: string;     // human-readable equipment string for quick-info
   // Payment split
   payment_cash_rub: string;      // amount paid in cash
   payment_bank_rub: string;      // amount paid by bank transfer
@@ -223,7 +224,9 @@ export interface RentalContractTemplateVars {
   bank_city: string;
   bank_corr_account: string;
   issuer_signatory: string;
+  organization_representative: string;
   lessor_address: string;
+  return_address: string;
   email?: string;
 
   // Equipment/Condition
@@ -234,6 +237,7 @@ export interface RentalContractTemplateVars {
   battery_level_end?: string;
   bike_mileage: string;
   media_links: string;
+  damage_price_list: string;
 
   // Computed
   signature_timestamp: string;
