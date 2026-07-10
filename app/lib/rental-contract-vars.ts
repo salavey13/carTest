@@ -332,13 +332,29 @@ function snakeToCamel(s: string): string {
 }
 
 /**
+ * Explicit alias map: code keys → SQL hydration keys.
+ * The SQL stores pricing at top level of contractDefaults as:
+ *   includedMileage, overageRate, lateReturnPenaltyRub
+ * while the code reads as:
+ *   included_km_per_day, extra_km_fee_rub, late_return_penalty_rub
+ * Automatic snake→camel conversion doesn't bridge this gap, so we alias explicitly.
+ */
+const CONTRACT_DEFAULT_ALIASES: Record<string, string[]> = {
+  included_km_per_day: ['includedMileage', 'included_mileage'],
+  extra_km_fee_rub: ['overageRate', 'overage_rate'],
+  late_return_penalty_rub: ['lateReturnPenaltyRub', 'late_return_penalty'],
+  late_return_penalty_max_days: ['lateReturnPenaltyMaxDays', 'late_return_penalty_max_days'],
+};
+
+/**
  * Get contract defaults from crew secrets.
  * Tries multiple key formats to support both camelCase (SQL hydration)
  * and snake_case (legacy code), plus checks `defaults` sub-object:
  *   1. crewSecrets.contractDefaults[key]           — exact key
  *   2. crewSecrets.contractDefaults[camelCase]      — camelCase version
- *   3. crewSecrets.contractDefaults.defaults[key]   — snake_case in defaults sub-object
- *   4. crewSecrets.contractDefaults.defaults[camel] — camelCase in defaults sub-object
+ *   3. crewSecrets.contractDefaults[alias]          — explicit alias (SQL keys)
+ *   4. crewSecrets.contractDefaults.defaults[key]   — snake_case in defaults sub-object
+ *   5. crewSecrets.contractDefaults.defaults[camel] — camelCase in defaults sub-object
  */
 function getContractDefault(
   crewSecrets: CrewSecrets,
@@ -358,6 +374,15 @@ function getContractDefault(
   if (camel !== key) {
     value = readPath(cd, [camel], undefined);
     if (value != null) return String(value);
+  }
+
+  // Try explicit aliases (SQL hydration keys like includedMileage, overageRate)
+  const aliases = CONTRACT_DEFAULT_ALIASES[key];
+  if (aliases) {
+    for (const alias of aliases) {
+      value = readPath(cd, [alias], undefined);
+      if (value != null) return String(value);
+    }
   }
 
   // Try defaults sub-object (snake_case)
