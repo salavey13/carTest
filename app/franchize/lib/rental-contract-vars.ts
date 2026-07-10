@@ -1,6 +1,7 @@
 // /app/franchize/lib/rental-contract-vars.ts
 import type { RentalContractTemplateVars, BikeSpecs, CrewContractSecrets } from './rental-contract-types';
 import { calculatePriceForDuration } from './pricing-calculator';
+import { parseISODate } from './date-utils';
 
 const TEMPLATE_BASE_PATH = 'docs/RENTAL_DEAL_TEMPLATE.html';
 const TEMPLATE_MD_PATH = 'docs/RENTAL_DEAL_TEMPLATE.md';
@@ -15,7 +16,6 @@ function countWeekendDaysInRange(startDate: string, endDate: string): number {
     // explicit DD.MM.YYYY for legacy callers. We never auto-detect
     // MM.DD because that's the source of the "busy till 07.09.2026"
     // date-swap bug.
-    const { parseISODate } = require("@/app/franchize/lib/date-utils");
     const parseDate = (s: string): Date | null => {
       if (!s) return null;
       const iso = parseISODate(s);
@@ -196,7 +196,6 @@ export async function buildTemplateVars(params: {
     params.dates.endTime
   );
   const rentalDays = Math.max(1, Math.ceil(rentalHours / 24));
-  const isHourly = rentalHours > 0 && rentalHours < 24;
 
   // Pricing: use bike specs or fallback
   const baseDailyPrice = params.bike.specs.dailyPrice || params.bike.specs.rent_weekday || 10000;
@@ -271,7 +270,7 @@ export async function buildTemplateVars(params: {
     (params.equipmentData.net ? 500 : 0) +
     (params.equipmentData.backpack ? 500 : 0) +
     (params.equipmentData.bag ? 500 : 0) +
-    (params.equipmentData.charger ? 0 : 0);
+    0;
 
   // Total payable = base rent + equipment + deposit
   const totalPayable = subtotalRounded + equipmentCostTotal + deposit;

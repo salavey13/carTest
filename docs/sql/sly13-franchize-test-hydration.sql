@@ -295,6 +295,46 @@ set
   contract_defaults = excluded.contract_defaults,
   updated_at = now();
 
+-- 5) Stage 3: enrich contract_defaults with organization/bank details
+update private.crew_secrets
+set
+  contract_defaults = jsonb_set(
+    jsonb_set(
+      jsonb_set(
+        jsonb_set(
+          jsonb_set(
+            jsonb_set(
+              jsonb_set(
+                jsonb_set(
+                  jsonb_set(
+                    jsonb_set(
+                      jsonb_set(
+                        coalesce(contract_defaults::jsonb, '{}'::jsonb),
+                        '{organizationName}', '"SLY13 CYBERVIBE"'
+                      ),
+                      '{organizationShort}', '"SLY13"'
+                    ),
+                    '{organizationRepresentative}', '"@SALAVEY13"'
+                  ),
+                  '{ogrnip}', '""'
+                ),
+                '{inn}', '""'
+              ),
+              '{bankAccount}', '""'
+            ),
+            '{bankName}', '""'
+          ),
+          '{bankCorrAccount}', '""'
+        ),
+        '{bankCity}', '""'
+      ),
+      '{email}', '"salavey13@yandex.ru"'
+    ),
+    '{legalAddress}', '""'
+  ),
+  updated_at = now()
+where crew_slug = 'sly13';
+
 commit;
 
 -- Verification helpers
