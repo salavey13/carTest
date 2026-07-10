@@ -70,12 +70,20 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const isAllSale = saleLinesCount > 0 && saleLinesCount === cartLines.length;
   const isMixed = saleLinesCount > 0 && !isAllSale;
 
-  // CART-TODO #1: Subtotal label adapts to cart composition
+  // CART-TODO #1: Subtotal label adapts to cart composition.
+  // For pure rental carts we use the actual rental period from the
+  // first line ("3 часа", "1 день", etc.) so a 3-hour rental says
+  // "Сумма за 3 часа аренды" instead of the misleading
+  // "Сумма за 1 день аренды" that the old hardcoded label produced.
+  const firstRentalLine = cartLines.find((line) => line.flowType === "rental");
+  const rentalLabel = firstRentalLine?.rentalPeriod;
   const subtotalLabel = isAllSale
     ? "Сумма покупки"
     : isMixed
       ? "Итого (аренда + покупка)"
-      : "Сумма за 1 день аренды";
+      : rentalLabel
+        ? `Сумма ${rentalLabel} аренды`
+        : "Сумма аренды";
 
   // CART-TODO #4: CTA text adapts to flow
   const ctaLabel = isAllSale

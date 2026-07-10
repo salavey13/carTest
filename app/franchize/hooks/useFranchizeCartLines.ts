@@ -105,6 +105,8 @@ export type FranchizeCartLineVM = {
     rentStartTime?: string;
     rentEndTime?: string;
   };
+  /** Human-readable rental length, e.g. "3 часа" or "1 день". */
+  rentalPeriod?: string;
 };
 
 export function useFranchizeCartLines(
@@ -166,18 +168,41 @@ export function useFranchizeCartLines(
                 }
               })()
             : parseDurationDays(line.options.duration);
+        // `rentalDays` is now the *calendar* day count (1 for same-day,
+        // 2 for a 1-day rental, etc.). It is NO LONGER used to compute
+        // the line price — that comes from the shared pricing
+        // calculator which understands hour tiers (3h / 6h / 12h).
+        // Keeping it as calendar days lets the cart and order page
+        // still display "1 день" / "3 дня" / "2 недели" as a
+        // human-readable rental length, but the actual charge is
+        // hour-aware.
         const rentalDays = dateRangeDays;
         const packageFactor = packageMultiplier[line.options.package.toLowerCase()] ?? 1;
         const durationDiscount = durationDiscountMultiplierByDays[rentalDays] ?? 1;
         const perkFee = perkSurcharge[line.options.perk.toLowerCase()] ?? 0;
+        // Legacy day-rate-based subtotal. Used as a FALLBACK only — when
+        // the pricing calculator can't run (missing specs / no dates),
+        // the cart falls back to this so the user still sees *some*
+        // number. Once dates+time are picked, `lineTotal` below uses
+        // the calculator's `totalRub` instead.
         const lineBase = basePricePerDay * packageFactor * rentalDays + perkFee;
         const discountedLineBase = Math.round(lineBase * durationDiscount);
         const effectiveUnitPrice = Math.max(0, Math.round(discountedLineBase / Math.max(1, rentalDays)));
 
-        // Calculate priceBreakdown using shared calculator (when dates are set)
+        // FIX: Use the shared pricing calculator to compute the REAL
+        // line total. Previously `lineTotal` always used the day-rate
+        // formula above (`basePricePerDay * rentalDays`), which charged
+        // the full day rate for a 3-hour rental. The pricing
+        // calculator returns an hour-aware `totalRub` (including the
+        // 3h / 6h / 12h tiers, weekend-day blending, etc.) and that's
+        // what now drives the cart subtotal + order total.
         let priceBreakdown: FranchizeCartLineVM["priceBreakdown"] = undefined;
-        const helmetCount = parseHelmetCount(line.options.perk);
-        const helmetRub = helmetCount * 1000;
+        let lineTotal = discountedLineBase * line.qty;
+        // Human-readable period string for the cart and order summary,
+        // e.g. "3 часа" / "12 часов" / "1 день" / "3 дня". We derive it
+        // from the calculator's `breakdown.period` when available,
+        // otherwise fall back to a day-bucket label.
+        let rentalPeriod = `${rentalDays} ${rentalDays === 1 ? "день" : rentalDays < 5 ? "дня" : "дней"}`;
 
         if (item?.rawSpecs && line.options.rentStartDate && line.options.rentEndDate) {
           try {
@@ -188,10 +213,10 @@ export function useFranchizeCartLines(
               line.options.rentEndDate,
               line.options.rentStartTime || "10:00",
               line.options.rentEndTime || "10:00",
-              helmetCount
+              parseHelmetCount(line.options.perk)
             );
             priceBreakdown = {
-              totalRub: discountedLineBase * line.qty + helmetRub,
+              totalRub: result.totalRub,
               basePriceRub: result.basePriceRub,
               helmetRub: result.helmetRub,
               depositRub: result.depositRub,
@@ -199,23 +224,43 @@ export function useFranchizeCartLines(
               savingsPercent: result.savingsPercent,
               tier: result.tier,
             };
+            // The line total now follows the pricing calculator, NOT
+            // the day-rate × days formula. This is what makes a
+            // 3-hour rental cost 3 000 ₽ instead of 12 000 ₽.
+            lineTotal = result.totalRub * line.qty;
+            rentalPeriod = result.breakdown.period;
           } catch {
-            // Fallback: no priceBreakdown if calculator fails
+            // Fallback to day-rate total if the calculator throws —
+            // we still want the cart to show *something* rather than 0.
           }
         }
+
+        // Build the display label. For hour rentals we say
+        //   "3 часа · 3 000 ₽"
+        // For multi-day rentals we say
+        //   "1 день · 12 000 ₽"
+        // The fallback (no dates set) keeps the catalog's static
+        // "X ₽ / день" label so empty carts still look sensible.
+        const displayPriceLabel = priceBreakdown
+          ? `${rentalPeriod} · ${lineTotal.toLocaleString("ru-RU")} ₽`
+          : (item?.rentPriceLabel ?? `${effectiveUnitPrice.toLocaleString("ru-RU")} ₽ / день`);
 
         return {
           lineId,
           itemId: line.itemId,
           qty: line.qty,
           item,
-          pricePerDay: effectiveUnitPrice,
-          lineTotal: discountedLineBase * line.qty,
+          // `pricePerDay` is kept for backward compatibility with the
+          // cart card's "Цена за 1 день" label. For hour rentals it
+          // is 0 so we know to show the per-hour price instead.
+          pricePerDay: priceBreakdown?.tier && /hour/.test(priceBreakdown.tier) ? 0 : effectiveUnitPrice,
+          lineTotal,
           rentalDays,
+          rentalPeriod,
           saleAvailable: Boolean(item?.saleAvailable),
           salePrice: null,
           flowType: "rental" as const,
-          displayPriceLabel: item?.rentPriceLabel ?? `${effectiveUnitPrice.toLocaleString("ru-RU")} ₽ / день`,
+          displayPriceLabel,
           priceBreakdown,
           options: line.options,
         };

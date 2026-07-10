@@ -18,16 +18,22 @@ export function OrderSummary({ cartLines, subtotal, crew }: OrderSummaryProps) {
   const rentLines = cartLines.filter((l) => l.flowType === "rental");
   const buyLines = cartLines.filter((l) => l.flowType === "sale");
 
-  // Rental days from line options (NOT hardcoded!)
-  const totalRentalDays =
-    rentLines.length > 0
-      ? rentLines.reduce((sum, l) => sum + l.rentalDays, 0) / rentLines.length
-      : 0;
-
-  const rentDailyTotal = rentLines.reduce((sum, l) => sum + (l.item?.pricePerDay ?? 0) * l.qty, 0);
-  const rentPeriodTotal = rentDailyTotal * Math.round(totalRentalDays);
+  // FIX: Was multiplying the per-day rate by the calendar day count,
+  // which overcharged hour rentals. Now we read the actual line total
+  // straight from the cart line, which `useFranchizeCartLines` already
+  // computed via the shared hour-aware pricing calculator.
+  const rentTotal = rentLines.reduce((sum, l) => sum + l.lineTotal, 0);
   const buyTotal = buyLines.reduce((sum, l) => sum + (l.salePrice ?? 0), 0);
-  const grandTotal = rentPeriodTotal + buyTotal;
+  // The grand total mirrors the `subtotal` prop that was passed in,
+  // but we compute it locally too so this component is self-contained.
+  const grandTotal = rentTotal + buyTotal;
+
+  // Human-readable period string for the badge — concatenates each
+  // line's period so a cart with "3 часа" and "1 день" shows
+  // "3 часа + 1 день".
+  const periodParts = rentLines
+    .map((l) => l.rentalPeriod)
+    .filter(Boolean) as string[];
 
   // Discount — franchise perk (TODO: wire to crew.catalog.discountPercent when available)
   // FIX: Ditched the 5% web-app discount banner. It was always-on regardless
@@ -49,16 +55,28 @@ export function OrderSummary({ cartLines, subtotal, crew }: OrderSummaryProps) {
       </p>
       <p className="text-2xl font-semibold">{cartLines.length}</p>
 
-      {/* Show daily rental total only if there are rental lines */}
+      {/* Per-line breakdown so the user can see the hour-aware math. */}
       {rentLines.length > 0 && (
-        <>
-          <p className="mt-3 text-sm" style={surface.mutedText}>
-            Сумма за 1 день аренды
-          </p>
-          <p className="text-lg font-semibold">
-            {rentDailyTotal.toLocaleString("ru-RU")} ₽
-          </p>
-        </>
+        <div className="mt-3 space-y-1.5">
+          {rentLines.map((l) => (
+            <div key={l.lineId} className="flex items-baseline justify-between gap-2 text-sm">
+              <div className="min-w-0 flex-1 truncate" style={{ color: surface.text }}>
+                {l.item?.title ?? "Позиция"}
+                {l.qty > 1 && <span className="ml-1 opacity-60">× {l.qty}</span>}
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="font-semibold" style={{ color: surface.text }}>
+                  {l.lineTotal.toLocaleString("ru-RU")} ₽
+                </div>
+                {l.rentalPeriod && (
+                  <div className="text-[10px]" style={surface.mutedText}>
+                    {l.rentalPeriod}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Show buy subtotal only if there are sale lines */}
@@ -91,7 +109,7 @@ export function OrderSummary({ cartLines, subtotal, crew }: OrderSummaryProps) {
       >
         {grandTotal.toLocaleString("ru-RU")} ₽
       </p>
-      {rentLines.length > 0 && totalRentalDays > 0 && (
+      {rentLines.length > 0 && periodParts.length > 0 && (
         <span
           className="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
           style={{
@@ -101,7 +119,7 @@ export function OrderSummary({ cartLines, subtotal, crew }: OrderSummaryProps) {
           }}
         >
           <Calendar className="h-3 w-3" />
-          {Math.round(totalRentalDays)} {pluralizeDays(Math.round(totalRentalDays))} аренды
+          {periodParts.join(" + ")}
         </span>
       )}
 
