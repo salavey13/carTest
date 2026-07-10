@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, FileText, Info, Swords, X, Phone } from "lucide-react";
+import { Calendar, FileText, Info, Swords, X, Phone, Clock } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
@@ -18,11 +18,13 @@ import {
 } from "@/app/franchize/lib/catalog-propulsion";
 import { ItemGallery } from "../components/ItemGallery";
 import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
-import { crewPaletteForSurface, readableTextOnColor, withAlpha } from "../lib/theme";
+import { readableTextOnColor, withAlpha } from "../lib/theme";
 import { FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import { encodeStartappState, type StartappState } from "@/lib/startapp-state";
 import { getTelegramWebAppAdaptiveHref } from "@/app/franchize/lib/telegram-links";
 import { upsertFranchizeLead } from "@/app/franchize/lib/leads";
+import { useCrewTokens, type CrewTokens } from "@/app/franchize/lib/use-crew-tokens";
+import { addDaysISO, formatRuDateFromISO, todayISO } from "@/app/franchize/lib/date-utils";
 
 // ── Russian Label Helper (VIP Bike Landing & Catalog Improvements) ──
 // Helper to get Russian label from spec_labels in rawSpecs
@@ -65,16 +67,16 @@ interface ItemModalProps {
     rentStartDate?: string;
     /** Rental end date (ISO string yyyy-MM-dd) */
     rentEndDate?: string;
-    /** Rental start time (HH:MM) */
+    /** Rental start time (HH:mm) — defaults to "10:00" */
     rentStartTime?: string;
-    /** Rental end time (HH:MM) */
+    /** Rental end time (HH:mm) — defaults to "10:00" */
     rentEndTime?: string;
     /** Pre-selected additional items (jacket, boots, backpack, charger, gloves, net, bag). */
     extrasSelection?: AdditionalItemsSelection;
   };
   auctionOptions: string[];
   onChangeOption: (
-    key: "package" | "duration" | "perk" | "auction" | "rentStartDate" | "rentEndDate",
+    key: "package" | "duration" | "perk" | "auction" | "rentStartDate" | "rentEndDate" | "rentStartTime" | "rentEndTime",
     value: string,
   ) => void;
   onClose: () => void;
@@ -97,33 +99,19 @@ const modalFocusableSelector = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
 
-const getModalThemeVars = (theme: FranchizeTheme) => {
-  // When isAuto is true, use CSS variables that respond to global theme
-  if (theme.isAuto) {
-    return {
-      "--item-accent": "var(--franchize-accent-main)",
-      "--item-border": "var(--franchize-border-soft)",
-      "--item-input-bg": "var(--franchize-bg-base)",
-      "--item-muted-text": "var(--franchize-text-secondary)",
-      "--item-text": "var(--franchize-text-primary)",
-      "--item-accent-contrast": "var(--franchize-accent-contrast)",
-    } as React.CSSProperties;
-  }
-
-  // Use theme.palette directly when mode is explicit (dark/light)
-  const palette = theme.mode === "light" && theme.palettes?.light
-    ? theme.palettes.light
-    : theme.palettes?.dark || theme.palette;
-
-  return {
-    "--item-accent": palette.accentMain,
-    "--item-border": palette.borderSoft,
-    "--item-input-bg": palette.bgBase,
-    "--item-muted-text": palette.textSecondary,
-    "--item-text": palette.textPrimary,
-    "--item-accent-contrast": readableTextOnColor(palette.accentMain),
-  } as React.CSSProperties;
-};
+// Legacy `--item-*` CSS-var map. Kept so the dozens of existing
+// `style={{ color: 'var(--item-text)' }}` attributes in this file keep
+// working after the migration to `useCrewTokens`. The actual values
+// are populated by the `themeVars` memo inside `ItemModal` below.
+const MODAL_CSS_VAR_KEYS = [
+  "--item-accent",
+  "--item-border",
+  "--item-input-bg",
+  "--item-muted-text",
+  "--item-text",
+  "--item-accent-contrast",
+  "--item-bg-elevated",
+] as const;
 
 function OptionChips({
   title,
@@ -165,38 +153,71 @@ function OptionChips({
   );
 }
 
-/** Date picker row for rental start/end dates */
+/** Date + time pickers for rental start/end — this is the SINGLE
+ *  source of truth for the rental window. The order page reads the
+ *  values from the cart line and shows them passively, it does not
+ *  ask the user to re-pick. */
 function RentalDatePickers({
   startDate,
   endDate,
+  startTime,
+  endTime,
   onStartChange,
   onEndChange,
-  borderColor,
+  onStartTimeChange,
+  onEndTimeChange,
+  T,
 }: {
   startDate: string;
   endDate: string;
+  startTime: string;
+  endTime: string;
   onStartChange: (v: string) => void;
   onEndChange: (v: string) => void;
-  borderColor: string;
+  onStartTimeChange: (v: string) => void;
+  onEndTimeChange: (v: string) => void;
+  T: CrewTokens;
 }) {
-  // Compute min date: today (computed inline to avoid stale memo after midnight)
-  const today = (() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  })();
-
-  // End date min = start date (or today if no start)
+  const today = todayISO();
   const endMin = startDate || today;
 
+  const dayCount = (() => {
+    if (!startDate || !endDate) return null;
+    const days = (() => {
+      try {
+        const { diffDaysISO } = require("@/app/franchize/lib/date-utils");
+        return diffDaysISO(startDate, endDate);
+      } catch {
+        return null;
+      }
+    })();
+    return days;
+  })();
+
+  const baseInputStyle: React.CSSProperties = {
+    backgroundColor: T.bgElevated,
+    borderColor: T.border,
+    color: T.text,
+  };
+
   return (
-    <div className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3">
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+    <div
+      className="rounded-2xl border p-3"
+      style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}
+    >
+      <p
+        className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em]"
+        style={{ color: T.textMuted }}
+      >
         <Calendar className="h-3.5 w-3.5" />
-        Даты аренды
+        Период аренды
       </p>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block text-[10px] uppercase tracking-[0.08em] text-[var(--item-muted-text)]">
+          <label
+            className="mb-1 block text-[10px] uppercase tracking-[0.08em]"
+            style={{ color: T.textMuted }}
+          >
             Дата начала
           </label>
           <input
@@ -204,44 +225,68 @@ function RentalDatePickers({
             value={startDate}
             min={today}
             onChange={(e) => onStartChange(e.target.value)}
-            className="w-full rounded-lg border px-2.5 py-2 text-sm text-[var(--item-text)] transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
-            style={{
-              backgroundColor: "rgba(0,0,0,0.25)",
-              borderColor,
-              colorScheme: "dark",
-            }}
+            className="w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+            style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
             aria-label="Дата начала аренды"
           />
         </div>
         <div>
-          <label className="mb-1 block text-[10px] uppercase tracking-[0.08em] text-[var(--item-muted-text)]">
-            Дата окончания
+          <label
+            className="mb-1 block text-[10px] uppercase tracking-[0.08em]"
+            style={{ color: T.textMuted }}
+          >
+            Время выдачи
+          </label>
+          <input
+            type="time"
+            value={startTime}
+            onChange={(e) => onStartTimeChange(e.target.value)}
+            className="w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+            style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
+            aria-label="Время выдачи"
+          />
+        </div>
+        <div>
+          <label
+            className="mb-1 block text-[10px] uppercase tracking-[0.08em]"
+            style={{ color: T.textMuted }}
+          >
+            Дата возврата
           </label>
           <input
             type="date"
             value={endDate}
             min={endMin}
             onChange={(e) => onEndChange(e.target.value)}
-            className="w-full rounded-lg border px-2.5 py-2 text-sm text-[var(--item-text)] transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
-            style={{
-              backgroundColor: "rgba(0,0,0,0.25)",
-              borderColor,
-              colorScheme: "dark",
-            }}
-            aria-label="Дата окончания аренды"
+            className="w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+            style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
+            aria-label="Дата возврата"
+          />
+        </div>
+        <div>
+          <label
+            className="mb-1 block text-[10px] uppercase tracking-[0.08em]"
+            style={{ color: T.textMuted }}
+          >
+            Время возврата
+          </label>
+          <input
+            type="time"
+            value={endTime}
+            onChange={(e) => onEndTimeChange(e.target.value)}
+            className="w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+            style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
+            aria-label="Время возврата"
           />
         </div>
       </div>
-      {/* Quick duration hint */}
-      {startDate && endDate && (
-        <p className="mt-2 text-[11px] text-[var(--item-muted-text)]">
-          {(() => {
-            // Parse as local midnight to avoid UTC vs local off-by-one
-            const start = new Date(startDate + "T00:00:00");
-            const end = new Date(endDate + "T00:00:00");
-            const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
-            return `${days} ${ruPluralDays(days)} аренды`;
-          })()}
+      {dayCount && (
+        <p className="mt-2 text-[11px]" style={{ color: T.textMuted }}>
+          {dayCount === 1 ? "Аренда на 1 день" : `Аренда на ${dayCount} ${ruPluralDays(dayCount)}`}
+          {" · "}
+          <span className="font-semibold" style={{ color: T.text }}>
+            {formatRuDateFromISO(startDate)} {startTime} → {formatRuDateFromISO(endDate)} {endTime}
+          </span>
         </p>
       )}
     </div>
@@ -255,53 +300,42 @@ function DurationShortcuts({
   startDate,
   endDate,
   startTime,
+  endTime,
   onStartDateChange,
   onEndDateChange,
+  onStartTimeChange,
   onEndTimeChange,
-  borderColor,
+  T,
   specs,
 }: {
   startDate: string;
   endDate: string;
   startTime: string;
+  endTime: string;
   onStartDateChange: (v: string) => void;
   onEndDateChange: (v: string) => void;
+  onStartTimeChange: (v: string) => void;
   onEndTimeChange: (v: string) => void;
-  borderColor: string;
+  T: CrewTokens;
   specs?: Record<string, unknown>;
 }) {
   const fmt = (n: number) => n.toLocaleString("ru-RU");
+  const today = todayISO();
 
-  // Compute today for default
-  const today = (() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  })();
-
-  // Parse time to minutes, add hours, format back
   const addHours = (timeStr: string, hours: number): string => {
     const [h, m] = timeStr.split(":").map(Number);
-    const totalMinutes = h * 60 + m + hours * 60;
+    const totalMinutes = (h * 60 + m) + hours * 60;
     const newH = Math.floor(totalMinutes / 60) % 24;
     const newM = totalMinutes % 60;
     return `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`;
   };
 
-  // Add days to date
-  const addDays = (dateStr: string, days: number): string => {
-    const d = new Date(dateStr + "T00:00:00");
-    d.setDate(d.getDate() + days);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  };
-
-  // Get price for a duration from specs
   const getPrice = (hours: number): number => {
     if (!specs) return 0;
     if (hours <= 1) return Number(specs.price_per_hour) || 0;
     if (hours <= 3) return Number(specs.price_per_3h) || (Number(specs.price_per_hour) || 0) * 3;
     if (hours <= 6) return Number(specs.price_per_6h) || (Number(specs.price_per_hour) || 0) * 6;
     if (hours <= 12) return Number(specs.price_per_12h) || (Number(specs.price_per_hour) || 0) * 12;
-    // Daily pricing
     const days = Math.ceil(hours / 24);
     if (days === 1) return Number(specs.dailyPrice) || Number(specs.rent_weekday) || 0;
     if (days <= 4) return (Number(specs.rent_2_4d) || Number(specs.dailyPrice) || 0) * days;
@@ -327,31 +361,65 @@ function DurationShortcuts({
     const effectiveStart = startDate || today;
     onStartDateChange(effectiveStart);
     onEndDateChange(effectiveStart);
+    onStartTimeChange(startTime);
     onEndTimeChange(addHours(startTime, hours));
   };
 
   const handleDayClick = (days: number) => {
     const effectiveStart = startDate || today;
     onStartDateChange(effectiveStart);
-    onEndDateChange(addDays(effectiveStart, days));
-    onEndTimeChange(startTime); // Reset end time to match start time for clean day calculation
+    onEndDateChange(addDaysISO(effectiveStart, days));
+    onStartTimeChange(startTime);
+    onEndTimeChange(startTime);
+  };
+
+  const buttonStyle = (isActive: boolean): React.CSSProperties => ({
+    borderColor: isActive ? T.accent : T.border,
+    color: isActive ? T.accent : T.text,
+    backgroundColor: isActive ? T.accentSoft : "transparent",
+  });
+
+  const isHourActive = (h: number): boolean => {
+    if (!endDate || !startDate || endDate !== startDate) return false;
+    const [sh, sm] = startTime.split(":").map(Number);
+    const [eh, em] = endTime.split(":").map(Number);
+    const minutes = (eh * 60 + em) - (sh * 60 + sm);
+    return Number.isFinite(minutes) && minutes === h * 60;
+  };
+
+  const isDayActive = (d: number) => {
+    if (!startDate || !endDate) return false;
+    try {
+      const { diffDaysISO } = require("@/app/franchize/lib/date-utils");
+      return diffDaysISO(startDate, endDate) === d;
+    } catch {
+      return false;
+    }
   };
 
   return (
-    <div className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3">
-      <p className="mb-2 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+    <div
+      className="rounded-2xl border p-3"
+      style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}
+    >
+      <p
+        className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em]"
+        style={{ color: T.textMuted }}
+      >
+        <Clock className="h-3.5 w-3.5" />
         Быстрый выбор срока
       </p>
       <div className="flex flex-wrap gap-2">
         {hourOptions.map((opt) => {
           const price = getPrice(opt.hours);
+          const active = isHourActive(opt.hours);
           return (
             <button
               key={opt.label}
               type="button"
               onClick={() => handleHourClick(opt.hours)}
-              className="flex flex-col items-center rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-              style={{ borderColor }}
+              className="flex flex-col items-center rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+              style={buttonStyle(active)}
             >
               <span>{opt.label}</span>
               {price > 0 && (
@@ -362,13 +430,14 @@ function DurationShortcuts({
         })}
         {dayOptions.map((opt) => {
           const price = getPrice(opt.days * 24);
+          const active = isDayActive(opt.days);
           return (
             <button
               key={opt.label}
               type="button"
               onClick={() => handleDayClick(opt.days)}
-              className="flex flex-col items-center rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-              style={{ borderColor }}
+              className="flex flex-col items-center rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+              style={buttonStyle(active)}
             >
               <span>{opt.label}</span>
               {price > 0 && (
@@ -1027,8 +1096,27 @@ export function ItemModal({
       : "Позиция доступна для заказа. Оставьте заявку, и менеджер свяжется с вами для уточнения деталей.";
   }, [item?.description, isRental]);
 
-  const surface = useMemo(() => crewPaletteForSurface(theme), [theme]);
-  const themeVars = useMemo(() => getModalThemeVars(theme), [theme]);
+  const T = useCrewTokens(theme);
+  // Map the new tokens back onto the legacy `--item-*` CSS variables
+  // so the rest of the modal (gallery, badges, footer buttons, etc.)
+  // can keep using its existing CSS-var indirection. This avoids
+  // touching 200+ style attributes while we migrate the visual
+  // primitives to `T` one component at a time.
+  const themeVars: React.CSSProperties = useMemo(
+    () => ({
+      "--item-accent": T.accent,
+      "--item-border": T.borderSoft,
+      "--item-input-bg": T.bg,
+      "--item-muted-text": T.textMuted,
+      "--item-text": T.text,
+      "--item-accent-contrast": T.accentContrast,
+      "--item-bg-elevated": T.bgElevated,
+    }),
+    [T],
+  );
+  // Backward-compat shim so the dozens of existing `surface.card` /
+  // `surface.mutedText` / `surface.subtleCard` attributes keep working.
+  const surface = T.styles;
 
   useEffect(() => {
     setDescriptionExpanded(false);
@@ -1217,6 +1305,7 @@ export function ItemModal({
     const roundedEndTime = `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`;
 
     setRentEndTime(roundedEndTime);
+    onChangeOption("rentEndTime", roundedEndTime);
     onChangeOption("rentEndDate", options.rentStartDate || ""); // Same day for hourly
   }, [pricingResult, rentStartTime, options.rentStartDate, onChangeOption]);
 
@@ -1476,13 +1565,22 @@ export function ItemModal({
               {/* Availability badge + sale badge */}
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
                 <span
-                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold ${
-                    rentalStrip?.isAvailable ?? item.availabilityStatus === "available"
-                      ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-300"
-                      : "border-[var(--item-accent)]/40 bg-[var(--item-accent)]/15 text-[var(--item-accent)]"
-                  }`}
+                  className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold"
+                  style={
+                    (rentalStrip?.isAvailable ?? item.availabilityStatus === "available")
+                      ? T.styles.successBadge
+                      : { backgroundColor: T.accentSoft, color: T.accent, borderColor: T.accent }
+                  }
                 >
-                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${rentalStrip?.isAvailable ?? item.availabilityStatus === "available" ? "bg-emerald-400" : "bg-[var(--item-accent)]"}`} />
+                  <span
+                    className="inline-block h-1.5 w-1.5 rounded-full"
+                    style={{
+                      backgroundColor:
+                        (rentalStrip?.isAvailable ?? item.availabilityStatus === "available")
+                          ? (T.isLight ? "#059669" : "#34d399")
+                          : T.accent,
+                    }}
+                  />
                   {isRental
                     ? `Сегодня: ${rentalStrip?.todayLabel ?? "Уточним в Telegram"}`
                     : item.availabilityStatus === "available"
@@ -1490,12 +1588,18 @@ export function ItemModal({
                       : "Уточните наличие"}
                 </span>
                 {showBuyCta && (
-                  <span className="inline-flex rounded-full border border-[var(--item-accent)]/40 bg-[var(--item-accent)]/15 px-2.5 py-1 font-semibold text-[var(--item-accent)]">
+                  <span
+                    className="inline-flex rounded-full border px-2.5 py-1 font-semibold"
+                    style={{ backgroundColor: T.accentSoft, color: T.accent, borderColor: T.accent }}
+                  >
                     {isRental ? "Аренда + покупка" : "Доступно к покупке"}
                   </span>
                 )}
                 {isReturningUser && (
-                  <span className="inline-flex rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 font-semibold text-emerald-300">
+                  <span
+                    className="inline-flex rounded-full border px-2.5 py-1 font-semibold"
+                    style={T.styles.successBadge}
+                  >
                     С возвращением!
                   </span>
                 )}
@@ -1619,13 +1723,23 @@ export function ItemModal({
             {/* ── Rental-only options (hidden for order flow) ── */}
             {isRental && (
               <>
-                {/* ── Date picker for rental dates ── */}
+                {/* ── Date + time pickers for rental window (SINGLE source of truth) ── */}
                 <RentalDatePickers
                   startDate={options.rentStartDate ?? ""}
                   endDate={options.rentEndDate ?? ""}
+                  startTime={options.rentStartTime ?? rentStartTime}
+                  endTime={options.rentEndTime ?? rentEndTime}
                   onStartChange={(v) => onChangeOption("rentStartDate", v)}
                   onEndChange={(v) => onChangeOption("rentEndDate", v)}
-                  borderColor={theme.palette.borderSoft}
+                  onStartTimeChange={(v) => {
+                    setRentStartTime(v);
+                    onChangeOption("rentStartTime", v);
+                  }}
+                  onEndTimeChange={(v) => {
+                    setRentEndTime(v);
+                    onChangeOption("rentEndTime", v);
+                  }}
+                  T={T}
                 />
 
                 {/* Full pricing table — shows ALL available rates (before quick selection) */}
@@ -1639,11 +1753,19 @@ export function ItemModal({
                 <DurationShortcuts
                   startDate={options.rentStartDate ?? ""}
                   endDate={options.rentEndDate ?? ""}
-                  startTime={rentStartTime}
+                  startTime={options.rentStartTime ?? rentStartTime}
+                  endTime={options.rentEndTime ?? rentEndTime}
                   onStartDateChange={(v) => onChangeOption("rentStartDate", v)}
                   onEndDateChange={(v) => onChangeOption("rentEndDate", v)}
-                  onEndTimeChange={setRentEndTime}
-                  borderColor="var(--item-border)"
+                  onStartTimeChange={(v) => {
+                    setRentStartTime(v);
+                    onChangeOption("rentStartTime", v);
+                  }}
+                  onEndTimeChange={(v) => {
+                    setRentEndTime(v);
+                    onChangeOption("rentEndTime", v);
+                  }}
+                  T={T}
                   specs={item.rawSpecs ?? {}}
                 />
 

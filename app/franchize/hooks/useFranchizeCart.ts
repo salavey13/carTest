@@ -11,8 +11,14 @@ export type FranchizeCartOptions = {
   auction: string;
   buyConfigId?: string;
   buyPriceDelta?: number;
+  /** YYYY-MM-DD — start of the rental window. */
   rentStartDate?: string;
+  /** YYYY-MM-DD — end of the rental window. */
   rentEndDate?: string;
+  /** HH:mm — pickup time on rentStartDate (defaults to "10:00"). */
+  rentStartTime?: string;
+  /** HH:mm — return time on rentEndDate (defaults to "10:00"). */
+  rentEndTime?: string;
 };
 
 export type FranchizeCartLine = {
@@ -54,10 +60,14 @@ const DEFAULT_OPTIONS: FranchizeCartOptions = {
   auction: "Без аукциона",
   rentStartDate: undefined,
   rentEndDate: undefined,
+  rentStartTime: undefined,
+  rentEndTime: undefined,
 };
 
 export function buildCartLineId(itemId: string, options: FranchizeCartOptions) {
-  const normalized = `${options.package}|${options.duration}|${options.perk}|${options.auction}|${options.buyConfigId ?? "base"}|${options.buyPriceDelta ?? 0}|${options.rentStartDate ?? ""}|${options.rentEndDate ?? ""}`.toLowerCase().replace(/\s+/g, "-");
+  // Include time in the line id so two rentals on the same dates but
+  // at different pickup times end up as separate lines.
+  const normalized = `${options.package}|${options.duration}|${options.perk}|${options.auction}|${options.buyConfigId ?? "base"}|${options.buyPriceDelta ?? 0}|${options.rentStartDate ?? ""}|${options.rentEndDate ?? ""}|${options.rentStartTime ?? ""}|${options.rentEndTime ?? ""}`.toLowerCase().replace(/\s+/g, "-");
   return `${itemId}::${normalized}`;
 }
 
@@ -75,7 +85,7 @@ const sanitizeCartState = (value: unknown): FranchizeCartState => {
     const qty = typeof line.qty === "number" ? Math.floor(line.qty) : 0;
     const itemId = typeof line.itemId === "string" ? line.itemId : "";
     if (!itemId || qty <= 0) return acc;
-    const rawOptions = line.options ?? {};
+    const rawOptions = (line.options ?? {}) as Record<string, unknown>;
     const options: FranchizeCartOptions = {
       package: typeof rawOptions.package === "string" ? rawOptions.package : DEFAULT_OPTIONS.package,
       duration: typeof rawOptions.duration === "string" ? rawOptions.duration : DEFAULT_OPTIONS.duration,
@@ -85,6 +95,8 @@ const sanitizeCartState = (value: unknown): FranchizeCartState => {
       buyPriceDelta: typeof rawOptions.buyPriceDelta === "number" && Number.isFinite(rawOptions.buyPriceDelta) ? rawOptions.buyPriceDelta : undefined,
       rentStartDate: typeof rawOptions.rentStartDate === "string" ? rawOptions.rentStartDate : undefined,
       rentEndDate: typeof rawOptions.rentEndDate === "string" ? rawOptions.rentEndDate : undefined,
+      rentStartTime: typeof rawOptions.rentStartTime === "string" ? rawOptions.rentStartTime : undefined,
+      rentEndTime: typeof rawOptions.rentEndTime === "string" ? rawOptions.rentEndTime : undefined,
     };
     const normalizedLineId = buildCartLineId(itemId, options);
     const prev = acc[normalizedLineId];
@@ -114,7 +126,9 @@ const areLineOptionsEqual = (left: FranchizeCartOptions, right: FranchizeCartOpt
     (left.buyConfigId ?? null) === (right.buyConfigId ?? null) &&
     (left.buyPriceDelta ?? null) === (right.buyPriceDelta ?? null) &&
     (left.rentStartDate ?? null) === (right.rentStartDate ?? null) &&
-    (left.rentEndDate ?? null) === (right.rentEndDate ?? null)
+    (left.rentEndDate ?? null) === (right.rentEndDate ?? null) &&
+    (left.rentStartTime ?? null) === (right.rentStartTime ?? null) &&
+    (left.rentEndTime ?? null) === (right.rentEndTime ?? null)
   );
 };
 

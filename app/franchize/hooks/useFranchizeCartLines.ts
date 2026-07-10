@@ -102,6 +102,8 @@ export type FranchizeCartLineVM = {
     auction: string;
     rentStartDate?: string;
     rentEndDate?: string;
+    rentStartTime?: string;
+    rentEndTime?: string;
   };
 };
 
@@ -149,7 +151,22 @@ export function useFranchizeCartLines(
         }
 
         const basePricePerDay = item?.pricePerDay ?? 0;
-        const rentalDays = parseDurationDays(line.options.duration);
+        // Prefer real date arithmetic when the user picked explicit
+        // YYYY-MM-DD dates — this matches the selected period exactly
+        // instead of relying on the duration dropdown's coarse bucket
+        // (1/3/7 days). Falls back to the duration string otherwise.
+        const dateRangeDays =
+          line.options.rentStartDate && line.options.rentEndDate
+            ? (() => {
+                try {
+                  const { diffDaysISO } = require("@/app/franchize/lib/date-utils");
+                  return diffDaysISO(line.options.rentStartDate, line.options.rentEndDate);
+                } catch {
+                  return parseDurationDays(line.options.duration);
+                }
+              })()
+            : parseDurationDays(line.options.duration);
+        const rentalDays = dateRangeDays;
         const packageFactor = packageMultiplier[line.options.package.toLowerCase()] ?? 1;
         const durationDiscount = durationDiscountMultiplierByDays[rentalDays] ?? 1;
         const perkFee = perkSurcharge[line.options.perk.toLowerCase()] ?? 0;
@@ -169,8 +186,8 @@ export function useFranchizeCartLines(
               item.rawSpecs,
               line.options.rentStartDate,
               line.options.rentEndDate,
-              "10:00",
-              "10:00",
+              line.options.rentStartTime || "10:00",
+              line.options.rentEndTime || "10:00",
               helmetCount
             );
             priceBreakdown = {

@@ -4,7 +4,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trash2, Bike, Pencil } from "lucide-react";
+import { Trash2, Bike, Pencil, Calendar } from "lucide-react";
 import type { FranchizeCrewVM } from "../../actions";
 import type { FranchizeCartLineVM } from "../../hooks/useFranchizeCartLines";
 import { crewPaletteForSurface, withAlpha, interactionRingStyle } from "../../lib/theme";
@@ -171,6 +171,26 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
           >
             {line.flowType === "sale" ? "Покупка" : "Аренда"}
           </span>
+
+          {/* FIX: Show the rental period (date + time) inline on the card so
+              the user can verify the window without expanding the row.
+              Dates are formatted via the shared DD.MM.YYYY helper to
+              avoid the "busy till 07.09.2026" ambiguity bug. */}
+          {line.flowType === "rental" && line.options.rentStartDate && line.options.rentEndDate && (
+            <p className="mt-1 text-[11px] font-medium" style={{ color: crew.theme.palette.textPrimary }}>
+              <Calendar className="inline h-3 w-3 mr-1 opacity-60" />
+              {(() => {
+                try {
+                  const { formatRuDateFromISO } = require("@/app/franchize/lib/date-utils");
+                  const startT = line.options.rentStartTime || "10:00";
+                  const endT = line.options.rentEndTime || "10:00";
+                  return `${formatRuDateFromISO(line.options.rentStartDate)} ${startT} → ${formatRuDateFromISO(line.options.rentEndDate)} ${endT}`;
+                } catch {
+                  return `${line.options.rentStartDate} → ${line.options.rentEndDate}`;
+                }
+              })()}
+            </p>
+          )}
 
           {/* Spec badges row */}
           {line.item && <SpecBadges specs={line.item.rawSpecs ?? {}} theme={crew.theme} />}

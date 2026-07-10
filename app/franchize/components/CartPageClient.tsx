@@ -9,6 +9,7 @@ import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { crewPaletteForSurface, withAlpha } from "../lib/theme";
+import { useCrewTokens } from "../lib/use-crew-tokens";
 import { saveUserFranchizeCartAction } from "@/contexts/actions";
 import { useAppContext } from "@/contexts/AppContext";
 import { getFranchizeUserRentalSecretsAction } from "../profile-actions";
@@ -36,6 +37,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
     removeLine,
   });
   const surface = crewPaletteForSurface(crew.theme);
+  const T = useCrewTokens(crew.theme);
   const router = useRouter();
   const { dbUser, user } = useAppContext();
   const [isSaving, setIsSaving] = useState(false);

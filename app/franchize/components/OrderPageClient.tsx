@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { Calendar } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { addDays } from "date-fns";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -11,9 +11,18 @@ import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { checkFranchizeCarsAvailability, createFranchizeOrderCheckout, recordFranchizeCheckoutRecoverySnapshot, validateFranchizePromoCode } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
-import { crewPaletteForSurface, focusRingOutlineStyle, readablePaletteTextOnColor } from "../lib/theme";
+import { focusRingOutlineStyle, readablePaletteTextOnColor, withAlpha } from "../lib/theme";
 import { getTelegramHandleHref, getTelegramWebAppFallbackHref, getTelegramWebAppPageHref, getTelegramWebAppAdaptiveHref } from "../lib/telegram-links";
 import { getFranchizeFormPrefillAction, getFranchizeUserRentalSecretsAction, getRentalDocsPrefillAction } from "../profile-actions";
+import { useCrewTokens } from "../lib/use-crew-tokens";
+import {
+  parseISODate,
+  formatRuDateFromISO,
+  diffDaysISO,
+  addDaysISO,
+  isoDateTimeFromParts,
+} from "../lib/date-utils";
+import { ruPluralDays } from "../lib/catalog-utils";
 
 interface OrderPageClientProps {
   crew: FranchizeCrewVM;
@@ -83,7 +92,12 @@ const orderFormSchema = z.object({
   phone: z.string().trim().min(6, "Добавьте контактный номер"),
   time: z.string().trim().min(1, "Выберите удобное время"),
   comment: z.string().default(""),
-  rentalStartDate: z.string().trim().min(1, "Выберите дату начала аренды"),
+  // The rental period is now picked ONCE in the Item modal and
+  // passively shown on this page. We keep the field in the form
+  // (read-only) so the payload shape doesn't change for the
+  // server action. Validation is "optional" here — the cart
+  // guarantees at least one line has a date set for rental flows.
+  rentalStartDate: z.string().trim().optional(),
   payment: z.enum(["telegram_xtr", "card", "cash", "sbp"]),
   deliveryMode: z.enum(["pickup", "delivery"]),
   selectedExtras: z.array(z.string()).default([]),
@@ -153,21 +167,20 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const deliveryMode = watch("deliveryMode");
   const selectedExtras = watch("selectedExtras") ?? EMPTY_SELECTED_EXTRAS;
   const consent = Boolean(watch("consent"));
-  const surface = crewPaletteForSurface(crew.theme);
-  const isAuto = crew.theme.isAuto;
-  const accentMain = isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain;
-  const accentHover = isAuto ? "var(--franchize-accent-hover)" : crew.theme.palette.accentMainHover;
-  const borderSoft = isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft;
-  const textSecondary = isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary;
-  const textPrimary = isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary;
-  const textMuted = isAuto ? "var(--franchize-text-secondary)" : (crew.theme.palette as Record<string, string>).textMuted || textSecondary;
-  const accentTextOn = isAuto
-    ? readablePaletteTextOnColor(crew.theme.palettes?.dark?.accentMain || crew.theme.palette.accentMain, crew.theme.palettes?.dark || crew.theme.palette)
-    : (crew.theme.palette as Record<string, string>).accentTextOn;
-  const fieldStyle = {
-    borderColor: "var(--order-border)",
-    backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-bg-base) 66%, transparent)" : `${crew.theme.palette.bgBase}a8`,
-    color: isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
+  const T = useCrewTokens(crew.theme);
+  const surface = T.styles;
+  const isAuto = T.isAuto;
+  const accentMain = T.accent;
+  const accentHover = T.accentHover;
+  const borderSoft = T.borderSoft;
+  const textSecondary = T.textMuted;
+  const textPrimary = T.text;
+  const textMuted = T.textMuted;
+  const accentTextOn = T.accentContrast;
+  const fieldStyle: React.CSSProperties = {
+    borderColor: T.border,
+    backgroundColor: T.bgElevated,
+    color: T.text,
   };
 
   const isCartEmpty = cartLines.length === 0;
@@ -197,13 +210,34 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const baseOrderAmount = subtotal + extrasTotal;
   const promoDiscount = appliedPromo ? Math.min(appliedPromo.discountAmount, baseOrderAmount) : 0;
   const totalAmount = Math.max(0, baseOrderAmount - promoDiscount);
-  const maxRentalDays = useMemo(() => Math.max(1, ...cartLines.map((line) => line.rentalDays ?? 1)), [cartLines]);
-  const rentalEndDate = useMemo(() => {
-    if (!rentalStartDate) return "";
-    const start = new Date(rentalStartDate);
-    if (Number.isNaN(start.getTime())) return "";
-    return addDays(start, maxRentalDays - 1).toISOString().slice(0, 10);
-  }, [maxRentalDays, rentalStartDate]);
+  // FIX: The rental period is now picked in the Item modal and lives
+  // on the cart line options. We pull it out of the first cart line
+  // that has a date set, instead of asking the user to re-pick it
+  // here (which used to create "two sources of truth" and let the
+  // dates drift apart if the user edited the cart).
+  const firstLineWithDates = useMemo(
+    () => cartLines.find((line) => line.options.rentStartDate && line.options.rentEndDate),
+    [cartLines],
+  );
+  const resolvedStartDate = firstLineWithDates?.options.rentStartDate || "";
+  const resolvedEndDate = firstLineWithDates?.options.rentEndDate || "";
+  const resolvedStartTime = firstLineWithDates?.options.rentStartTime || "10:00";
+  const resolvedEndTime = firstLineWithDates?.options.rentEndTime || "10:00";
+  const rentalPeriodDays = useMemo(
+    () => (resolvedStartDate && resolvedEndDate ? diffDaysISO(resolvedStartDate, resolvedEndDate) : null),
+    [resolvedStartDate, resolvedEndDate],
+  );
+  const rentalStartIsoTimestamp = useMemo(
+    () => (resolvedStartDate ? isoDateTimeFromParts(resolvedStartDate, resolvedStartTime) : null),
+    [resolvedStartDate, resolvedStartTime],
+  );
+  const rentalEndIsoTimestamp = useMemo(
+    () => (resolvedEndDate ? isoDateTimeFromParts(resolvedEndDate, resolvedEndTime) : null),
+    [resolvedEndDate, resolvedEndTime],
+  );
+  // `rentalEndDate` is kept as the local YYYY-MM-DD for downstream
+  // code that expects it (submission payload, recovery snapshot).
+  const rentalEndDate = resolvedEndDate;
   const requiresTelegram = payment === "telegram_xtr";
   const hasTelegramUser = Boolean(user?.id);
   const visiblePayments = isInTelegramContext ? payments : payments.filter((p) => p.id !== "telegram_xtr");
@@ -268,8 +302,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       comment: appliedPromo
         ? [comment.trim(), `Промокод ${appliedPromo.code}: ${appliedPromo.description}${appliedPromo.discountAmount > 0 ? ` (-${appliedPromo.discountAmount.toLocaleString("ru-RU")} ₽)` : ""}`].filter(Boolean).join("\n")
         : comment.trim(),
-      rentalStartDate: rentalStartDate || undefined,
-      rentalEndDate: rentalEndDate || undefined,
+      rentalStartDate: rentalStartDate || resolvedStartDate || undefined,
+      rentalEndDate: rentalEndDate || resolvedEndDate || undefined,
       signatureName: recipient.trim() || undefined,
       signatureAccepted: consent,
       signatureFingerprint: user?.id ? `tg:${user.id}` : "manual-sign",
@@ -425,19 +459,14 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     void loadRentalSecrets();
   }, [dbUser?.user_id, setValue, slug]);
 
-  // Prefill rental dates from cart (if user selected dates in item modal)
+  // Prefill the form's rentalStartDate from the cart (read-only echo
+  // back to the user). The dates are owned by the cart line now — this
+  // page just mirrors them.
   useEffect(() => {
-    const firstLineWithDates = cartLines.find(
-      (line) => line.options.rentStartDate && line.options.rentEndDate
-    );
-    if (firstLineWithDates) {
-      const { rentStartDate, rentEndDate } = firstLineWithDates.options;
-      // Only set if form field is empty (user hasn't manually entered dates yet)
-      if (!rentalStartDate && rentStartDate) {
-        setValue("rentalStartDate", rentStartDate, { shouldDirty: false, shouldValidate: false });
-      }
+    if (resolvedStartDate && rentalStartDate !== resolvedStartDate) {
+      setValue("rentalStartDate", resolvedStartDate, { shouldDirty: false, shouldValidate: false });
     }
-  }, [cartLines, rentalStartDate, setValue]);
+  }, [resolvedStartDate, rentalStartDate, setValue]);
 
   useEffect(() => {
     if (!appliedPromo) return;
@@ -765,31 +794,45 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Имя и фамилия" {...register("recipient")} />
               <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Телефон" {...register("phone")} />
               <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Удобное время" {...register("time")} />
-              <div className="grid gap-2 sm:grid-cols-2">
-                <label className="text-xs" style={surface.mutedText}>
-                  Дата старта аренды
-                  <input
-                    type="date"
-                    className="mt-1 w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                    {...register("rentalStartDate")}
-                  />
-                </label>
-                <label className="text-xs" style={surface.mutedText}>
-                  Дата окончания (авто)
-                  <input
-                    type="date"
-                    className="mt-1 w-full rounded-xl border px-3 py-2 text-sm opacity-80"
-                    style={fieldStyle}
-                    value={rentalEndDate}
-                    readOnly
-                  />
-                </label>
-              </div>
+
+              {/* FIX: Rental period is now picked in the Item modal and
+                  echoed here as a read-only summary. The user cannot
+                  re-pick it on this page — that was the source of the
+                  "two sources of truth" bug where the cart and the
+                  order could end up with different dates. */}
+              {resolvedStartDate && resolvedEndDate ? (
+                <div
+                  className="flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-sm"
+                  style={{ borderColor: T.borderSoft, backgroundColor: T.accentSoft }}
+                >
+                  <Calendar className="h-4 w-4" style={{ color: T.accent }} />
+                  <span className="font-semibold" style={{ color: T.text }}>
+                    {formatRuDateFromISO(resolvedStartDate)} {resolvedStartTime}
+                    {" → "}
+                    {formatRuDateFromISO(resolvedEndDate)} {resolvedEndTime}
+                  </span>
+                  {rentalPeriodDays && (
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                      style={{ backgroundColor: T.accent, color: T.accentContrast }}
+                    >
+                      {rentalPeriodDays} {ruPluralDays(rentalPeriodDays)}
+                    </span>
+                  )}
+                  <Link
+                    href={catalogHref}
+                    className="ml-auto text-[11px] underline-offset-2 hover:underline"
+                    style={{ color: T.accent }}
+                  >
+                    Изменить в каталоге
+                  </Link>
+                </div>
+              ) : null}
+
               <textarea className="min-h-20 w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Комментарий к заказ" {...register("comment")} />
-              {errors.recipient || errors.phone || errors.time || errors.rentalStartDate ? (
+              {errors.recipient || errors.phone || errors.time ? (
                 <p className="text-xs" style={{ color: isAuto ? "var(--franchize-text-primary)" : "#b91c1c" }}>
-                  {errors.recipient?.message || errors.phone?.message || errors.time?.message || errors.rentalStartDate?.message}
+                  {errors.recipient?.message || errors.phone?.message || errors.time?.message}
                 </p>
               ) : null}
             </div>

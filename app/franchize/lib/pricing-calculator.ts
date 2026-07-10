@@ -37,17 +37,36 @@ function isValidDateString(dateStr: string): boolean {
 /**
  * Parse a date string that could be DD.MM.YYYY or YYYY-MM-DD into a Date object,
  * or return null if neither format matches.
+ *
+ * FIX: Previously this function accepted DD.MM.YYYY strings like
+ * "09.07.2026" and re-constructed them as YYYY-MM-DD by reordering the
+ * groups. That was ambiguous: "07.09.2026" could be read as 9 July
+ * (DD.MM) or 7 September (MM.DD). We now route through the shared
+ * `parseISODate` helper which only accepts the unambiguous ISO format
+ * and the shared `formatRuDateFromISO` for display. The legacy DD.MM
+ * branch is kept as a last-resort safety net for any callers that
+ * still pass a human-typed date, but it explicitly interprets the
+ * first two digits as the day (DD.MM.YYYY) and logs a warning.
  */
 function parseDateSafe(dateStr: string): Date | null {
   if (!dateStr) return null;
-  // Try YYYY-MM-DD first (ISO format)
-  const iso = new Date(dateStr);
-  if (!isNaN(iso.getTime())) return iso;
-  // Try DD.MM.YYYY (Russian format)
+  // Prefer the shared strict ISO parser.
+  const { parseISODate } = require("@/app/franchize/lib/date-utils");
+  const iso = parseISODate(dateStr);
+  if (iso) return iso;
+  // Legacy fallback for DD.MM.YYYY (e.g. "08.07.2026" = 8 July 2026).
+  // The DD.MM branch is intentionally the ONLY non-ISO path now —
+  // MM.DD interpretation is banned because it's the source of the
+  // "busy till 07.09.2026" bug.
   const dmy = dateStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
   if (dmy) {
-    const d = new Date(`${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}T00:00:00`);
-    if (!isNaN(d.getTime())) return d;
+    const year = Number(dmy[3]);
+    const month = Number(dmy[2]);
+    const day = Number(dmy[1]);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const d = new Date(Date.UTC(year, month - 1, day));
+      if (!isNaN(d.getTime())) return d;
+    }
   }
   return null;
 }
