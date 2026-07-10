@@ -4,6 +4,7 @@
 
 export interface BikePricingSpecs {
   price_per_hour?: number;
+  price_per_2h?: number;
   price_per_3h?: number;
   price_per_6h?: number;
   price_per_12h?: number;
@@ -116,55 +117,127 @@ export function calculatePriceForDuration(
     return { price: 0, period: 'Invalid duration', rate: 0 };
   }
 
-  // Hourly pricing tiers
+  // ── 1 hour or less ──
   if (hours <= 1) {
     const perHourRate = validatePositiveNumber(specs.price_per_hour) ?? validatePositiveNumber(specs.dailyPrice) ?? 0;
-    return { price: perHourRate * hours, period: '/ час', rate: perHourRate };
+    return { price: Math.round(perHourRate * hours), period: '/ час', rate: perHourRate };
   }
 
-  if (hours <= 3) {
-    // Prefer 3h tier price, fallback to hourly × 3
+  // ── Between 1 and 3 hours (exclusive of 3) ──
+  if (hours < 3) {
+    // Exact 2-hour tier: use price_per_2h if available
+    if (hours === 2 && validatePositiveNumber(specs.price_per_2h) !== undefined) {
+      const rate = specs.price_per_2h! / 2;
+      return { price: specs.price_per_2h!, period: '/ 2 часа', rate };
+    }
+    // Linear interpolation between price_per_hour (at h=1) and price_per_3h (at h=3)
+    const perHour = validatePositiveNumber(specs.price_per_hour);
+    const per3h = validatePositiveNumber(specs.price_per_3h);
+    if (perHour !== undefined && per3h !== undefined) {
+      // Interpolate: price = perHour + (per3h - perHour) * (hours - 1) / 2
+      const price = Math.round(perHour + (per3h - perHour) * (hours - 1) / 2);
+      const rate = price / hours;
+      const hLabel = Number.isInteger(hours) ? `${hours} часа` : `${hours} ч`;
+      return { price, period: `/ ${hLabel}`, rate };
+    }
+    // Fallback: hourly rate × hours
+    const fallbackRate = perHour ?? per3h !== undefined ? (per3h! / 3) : (validatePositiveNumber(specs.dailyPrice) ?? 0);
+    return { price: Math.round(fallbackRate * hours), period: `/ ${hours} ч`, rate: fallbackRate };
+  }
+
+  // ── Exactly 3 hours ──
+  if (hours === 3) {
     if (validatePositiveNumber(specs.price_per_3h) !== undefined) {
-      const rate = specs.price_per_3h! / 3; // Per-hour rate from 3h tier
+      const rate = specs.price_per_3h! / 3;
       return { price: specs.price_per_3h!, period: '/ 3 часа', rate };
     }
     const perHourRate = validatePositiveNumber(specs.price_per_hour) ?? validatePositiveNumber(specs.dailyPrice) ?? 0;
-    return { price: perHourRate * 3, period: '/ 3 часа', rate: perHourRate };
+    return { price: Math.round(perHourRate * 3), period: '/ 3 часа', rate: perHourRate };
   }
 
-  if (hours <= 6) {
-    // Prefer 6h tier price, fallback to 3h tier × 2, or hourly × 6
+  // ── Between 3 and 6 hours (exclusive of 6) ──
+  if (hours < 6) {
+    const per3h = validatePositiveNumber(specs.price_per_3h);
+    const per6h = validatePositiveNumber(specs.price_per_6h);
+    if (per3h !== undefined && per6h !== undefined) {
+      // Interpolate between 3h and 6h tiers
+      const price = Math.round(per3h + (per6h - per3h) * (hours - 3) / 3);
+      const rate = price / hours;
+      return { price, period: `/ ${hours} часов`, rate };
+    }
+    // Fallback to 3h rate extrapolated
+    if (per3h !== undefined) {
+      const perHourRate = per3h / 3;
+      return { price: Math.round(perHourRate * hours), period: `/ ${hours} часов`, rate: perHourRate };
+    }
+    const perHourRate = validatePositiveNumber(specs.price_per_hour) ?? validatePositiveNumber(specs.dailyPrice) ?? 0;
+    return { price: Math.round(perHourRate * hours), period: `/ ${hours} часов`, rate: perHourRate };
+  }
+
+  // ── Exactly 6 hours ──
+  if (hours === 6) {
     if (validatePositiveNumber(specs.price_per_6h) !== undefined) {
-      const rate = specs.price_per_6h! / 6; // Per-hour rate from 6h tier
+      const rate = specs.price_per_6h! / 6;
       return { price: specs.price_per_6h!, period: '/ 6 часов', rate };
     }
     if (validatePositiveNumber(specs.price_per_3h) !== undefined) {
       const perHourRate = specs.price_per_3h! / 3;
-      const price = perHourRate * 6;
-      return { price, period: '/ 6 часов', rate: perHourRate };
+      return { price: Math.round(perHourRate * 6), period: '/ 6 часов', rate: perHourRate };
     }
     const perHourRate = validatePositiveNumber(specs.price_per_hour) ?? validatePositiveNumber(specs.dailyPrice) ?? 0;
-    return { price: perHourRate * 6, period: '/ 6 часов', rate: perHourRate };
+    return { price: Math.round(perHourRate * 6), period: '/ 6 часов', rate: perHourRate };
   }
 
-  if (hours <= 12) {
-    // Prefer 12h tier price, fallback to 6h tier × 2, or hourly × 12
+  // ── Between 6 and 12 hours (exclusive of 12) ──
+  if (hours < 12) {
+    const per6h = validatePositiveNumber(specs.price_per_6h);
+    const per12h = validatePositiveNumber(specs.price_per_12h);
+    if (per6h !== undefined && per12h !== undefined) {
+      const price = Math.round(per6h + (per12h - per6h) * (hours - 6) / 6);
+      const rate = price / hours;
+      return { price, period: `/ ${hours} часов`, rate };
+    }
+    if (per6h !== undefined) {
+      const perHourRate = per6h / 6;
+      return { price: Math.round(perHourRate * hours), period: `/ ${hours} часов`, rate: perHourRate };
+    }
+    const perHourRate = validatePositiveNumber(specs.price_per_hour) ?? validatePositiveNumber(specs.dailyPrice) ?? 0;
+    return { price: Math.round(perHourRate * hours), period: `/ ${hours} часов`, rate: perHourRate };
+  }
+
+  // ── Exactly 12 hours ──
+  if (hours === 12) {
     if (validatePositiveNumber(specs.price_per_12h) !== undefined) {
-      const rate = specs.price_per_12h! / 12; // Per-hour rate from 12h tier
+      const rate = specs.price_per_12h! / 12;
       return { price: specs.price_per_12h!, period: '/ 12 часов', rate };
     }
     if (validatePositiveNumber(specs.price_per_6h) !== undefined) {
       const perHourRate = specs.price_per_6h! / 6;
-      const price = perHourRate * 12;
-      return { price, period: '/ 12 часов', rate: perHourRate };
+      return { price: Math.round(perHourRate * 12), period: '/ 12 часов', rate: perHourRate };
     }
     const perHourRate = validatePositiveNumber(specs.price_per_hour) ?? validatePositiveNumber(specs.dailyPrice) ?? 0;
-    return { price: perHourRate * 12, period: '/ 12 часов', rate: perHourRate };
+    return { price: Math.round(perHourRate * 12), period: '/ 12 часов', rate: perHourRate };
   }
 
-  // Daily pricing (more than 12 hours)
+  // ── Between 12 and 24 hours: interpolate between 12h and daily ──
+  if (hours < 24) {
+    const per12h = validatePositiveNumber(specs.price_per_12h);
+    const daily = validatePositiveNumber(specs.dailyPrice) ?? validatePositiveNumber(specs.rent_weekday);
+    if (per12h !== undefined && daily !== undefined) {
+      const price = Math.round(per12h + (daily - per12h) * (hours - 12) / 12);
+      const rate = price / hours;
+      return { price, period: `/ ${hours} часов`, rate };
+    }
+    // Fallback: daily rate
+    if (daily !== undefined) {
+      return { price: daily, period: '/ день', rate: daily };
+    }
+    const perHourRate = validatePositiveNumber(specs.price_per_hour) ?? 0;
+    return { price: Math.round(perHourRate * hours), period: `/ ${hours} часов`, rate: perHourRate };
+  }
+
+  // Daily pricing (24+ hours)
   const days = Math.ceil(hours / 24);
-  // Compute weekend days if startDate is available
   return calculatePriceForDays(specs, days, startDateStr);
 }
 
@@ -294,13 +367,14 @@ export function getDisplayPriceTier(
 function getAvailableHourlyTiers(
   specs: BikePricingSpecs
 ): { label: string; price: string; period: string } {
-  // Priority order for display: 3h > 6h > 12h > daily > hourly
+  // Priority order for display: 1h > 2h > 3h > 6h > 12h > daily
   const displayTiers: Array<{ price: number | undefined; label: string; period: string }> = [
+    { price: specs.price_per_hour, label: '1 час', period: '/ час' },
+    { price: specs.price_per_2h, label: '2 часа', period: '/ 2 часа' },
     { price: specs.price_per_3h, label: '3 часа', period: '/ 3 часа' },
     { price: specs.price_per_6h, label: '6 часов', period: '/ 6 часов' },
     { price: specs.price_per_12h, label: '12 часов', period: '/ 12 часов' },
     { price: specs.dailyPrice, label: 'День', period: '/ день' },
-    { price: specs.price_per_hour, label: 'Час', period: '/ час' },
   ];
 
   // Find first available tier

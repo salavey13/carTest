@@ -2,6 +2,7 @@ import { differenceInHours, differenceInDays } from "date-fns";
 
 export interface BikePricingSpecs {
   price_per_hour?: number;
+  price_per_2h?: number;
   price_per_3h?: number;
   price_per_6h?: number;
   price_per_12h?: number;
@@ -81,14 +82,37 @@ function normalizeHourlyRental(hours: number): {
 }
 
 function getHourlyPrice(specs: BikePricingSpecs, hours: number): number {
+  // Exact tier matches
+  if (hours === 2 && specs.price_per_2h) return specs.price_per_2h;
   if (hours === 3 && specs.price_per_3h) return specs.price_per_3h;
   if (hours === 6 && specs.price_per_6h) return specs.price_per_6h;
   if (hours === 12 && specs.price_per_12h) return specs.price_per_12h;
 
   const baseHourly = specs.price_per_hour ?? DEFAULT_HOURLY_PRICE;
-  if (hours <= 2) return baseHourly * hours;
-  if (hours <= 6) return specs.price_per_6h ?? baseHourly * 6;
-  if (hours <= 12) return specs.price_per_12h ?? baseHourly * 12;
+
+  // Interpolation for non-exact hours between tiers
+  if (hours <= 1) return baseHourly * hours;
+  if (hours < 3) {
+    // Interpolate between price_per_hour and price_per_3h
+    if (specs.price_per_3h && specs.price_per_hour) {
+      return Math.round(specs.price_per_hour + (specs.price_per_3h - specs.price_per_hour) * (hours - 1) / 2);
+    }
+    return baseHourly * hours;
+  }
+  if (hours < 6) {
+    // Interpolate between price_per_3h and price_per_6h
+    if (specs.price_per_3h && specs.price_per_6h) {
+      return Math.round(specs.price_per_3h + (specs.price_per_6h - specs.price_per_3h) * (hours - 3) / 3);
+    }
+    return specs.price_per_6h ?? baseHourly * hours;
+  }
+  if (hours < 12) {
+    // Interpolate between price_per_6h and price_per_12h
+    if (specs.price_per_6h && specs.price_per_12h) {
+      return Math.round(specs.price_per_6h + (specs.price_per_12h - specs.price_per_6h) * (hours - 6) / 6);
+    }
+    return specs.price_per_12h ?? baseHourly * hours;
+  }
 
   return baseHourly * hours;
 }

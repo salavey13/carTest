@@ -1140,6 +1140,7 @@ async function createRentalFromDocContract(
     // Use tier-aware pricing calculator (handles 3h/6h/12h tiers, weekday/weekend, multi-day)
     const specsForPricing = {
       price_per_hour: bike.specs?.price_per_hour,
+      price_per_2h: bike.specs?.price_per_2h,
       price_per_3h: bike.specs?.price_per_3h,
       price_per_6h: bike.specs?.price_per_6h,
       price_per_12h: bike.specs?.price_per_12h,
@@ -1987,6 +1988,7 @@ async function gotoPaymentSplit(chatId: number, userId: string, context: DocFlow
   // Use tier-aware pricing
   const specsForPricing = {
     price_per_hour: specs.price_per_hour,
+    price_per_2h: specs.price_per_2h,
     price_per_3h: specs.price_per_3h,
     price_per_6h: specs.price_per_6h,
     price_per_12h: specs.price_per_12h,
