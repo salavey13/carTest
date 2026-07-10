@@ -379,6 +379,24 @@ function DurationShortcuts({
     backgroundColor: isActive ? T.accentSoft : "transparent",
   });
 
+  // FIX: Mutual exclusion between hour and day balloons. Previously
+  // `isDayActive(1)` returned `true` for a same-day rental because
+  // `diffDaysISO` is inclusive (it counts both the start and end day,
+  // so a same-day rental resolves to 1). That made both "3 часа" and
+  // "1 день" light up at the same time when the user clicked either
+  // one — the user reported this as "3 hours and 12 hours both get
+  // selected" because the day balloon was visually next to the
+  // hour balloons and they read it as a second hour option.
+  //
+  // The fix is twofold:
+  //   1. `isHourActive` — unchanged, but now ONLY fires on same-day
+  //      rentals. The minute math already guarantees mutual exclusion
+  //      between 3/6/12 because their minute counts (180/360/720) are
+  //      pairwise different.
+  //   2. `isDayActive` — now refuses to fire on same-day rentals
+  //      (those are the hour balloons' territory) and uses a NON-
+  //      inclusive day count so a 1-day rental (endDate = startDate
+  //      + 1) resolves to `d === 1`, not `d === 2`.
   const isHourActive = (h: number): boolean => {
     if (!endDate || !startDate || endDate !== startDate) return false;
     const [sh, sm] = startTime.split(":").map(Number);
@@ -387,11 +405,18 @@ function DurationShortcuts({
     return Number.isFinite(minutes) && minutes === h * 60;
   };
 
-  const isDayActive = (d: number) => {
+  const isDayActive = (d: number): boolean => {
     if (!startDate || !endDate) return false;
+    // Same-day rentals belong to the hour balloons, not the day ones.
+    if (endDate === startDate) return false;
     try {
       const { diffDaysISO } = require("@/app/franchize/lib/date-utils");
-      return diffDaysISO(startDate, endDate) === d;
+      // Non-inclusive day count: a 1-day rental is endDate = startDate
+      // + 1, so `diffDaysISO - 1 === 1`. Without the -1 we'd hit
+      // `diffDaysISO === 1` which a 0-day (same-day) rental also
+      // satisfies — that's the bug that was lighting up "1 день"
+      // whenever the user picked any hour option.
+      return diffDaysISO(startDate, endDate) - 1 === d;
     } catch {
       return false;
     }
