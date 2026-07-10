@@ -2,6 +2,7 @@
 
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
+import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { floatingCartOverlayBackground } from "../lib/theme";
 import { FloatingCartIconLink } from "./FloatingCartIconLink";
 
@@ -21,10 +22,21 @@ export function FloatingCartIconLinkBySlug({ slug, href, items, accentColor, tex
   const cartState = useFranchizeCart(slug);
   const itemCount = cartState.itemCount;
 
-  // FIX: Compute subtotal by probing the cart state for price data.
-  // useFranchizeCart may store line items under various property names
-  // depending on the store implementation. We try them all defensively.
-  const subtotal = computeSubtotal(cartState, items);
+  // FIX: Compute the subtotal using the hour-aware pricing calculator
+  // (via `useFranchizeCartLines`) instead of the old day-rate × days
+  // formula. The old formula overcharged 3-hour rentals at the full
+  // day rate. The new flow returns the calculator's `lineTotal`
+  // which is `3 000 ₽` for a 3-hour rental and `12 000 ₽` for a
+  // 1-day rental — matching what the user actually saw in the cart.
+  //
+  // We always invoke the hook (hooks must be called unconditionally);
+  // when `items` is not provided we pass an empty array and fall
+  // back to the legacy cascading strategy. The hook's `subtotal`
+  // will be 0 in that case, so the legacy path takes over.
+  const lines = useFranchizeCartLines(slug, items ?? []);
+  const subtotal = items
+    ? lines.subtotal
+    : computeSubtotal(cartState, items);
 
   return (
     <FloatingCartIconLink

@@ -220,34 +220,54 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
                 </p>
               </>
             ) : (
-              // RENT flow: per-day price + ВЫГОДНО badge
+              // RENT flow: dynamic price label (hour-aware) + line total
+              // FIX: Was hardcoded "Цена за 1 день" + `line.item?.rentPriceLabel`
+              // (the catalog's static day rate) which made a 3-hour rental
+              // show "12 000 ₽ / день" even though the user selected hours.
+              // Now we read the computed `displayPriceLabel` from the cart
+              // line, which the pricing calculator produces as either
+              // "3 часа · 3 000 ₽" (hour) or "1 день · 12 000 ₽" (day).
+              // `pricePerDay` is 0 for hour rentals, so we show the
+              // per-hour label + the actual line total side by side.
               <>
                 <p className="text-xs" style={surface.mutedText}>
-                  Цена за 1 день
+                  {line.pricePerDay === 0 && line.rentalPeriod
+                    ? `Цена за ${line.rentalPeriod}`
+                    : "Цена за 1 день"}
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <AnimatePresence mode="popLayout">
                     <motion.p
-                      key={`${line.lineId}-${line.qty}`}
+                      key={`${line.lineId}-${line.qty}-${line.lineTotal}`}
                       className="text-xl font-bold"
                       initial={{ scale: 1.15, opacity: 0.6 }}
                       animate={{ scale: 1, opacity: 1 }}
                       transition={{ duration: 0.2 }}
+                      style={{ color: crew.theme.palette.textPrimary }}
                     >
-                      {line.item?.rentPriceLabel}
+                      {line.lineTotal.toLocaleString("ru-RU")} ₽
                     </motion.p>
                   </AnimatePresence>
-                  <span
-                    className="rounded px-1.5 py-0.5 text-[10px] font-bold"
-                    style={{
-                      backgroundColor: withAlpha("#00C853", 0.2),
-                      border: `1px solid ${withAlpha("#00C853", 0.3)}`,
-                      color: "#00C853",
-                    }}
-                  >
-                    ВЫГОДНО
-                  </span>
+                  {line.pricePerDay > 0 && line.rentalDays > 1 && (
+                    <span
+                      className="rounded px-1.5 py-0.5 text-[10px] font-bold"
+                      style={{
+                        backgroundColor: withAlpha("#00C853", 0.2),
+                        border: `1px solid ${withAlpha("#00C853", 0.3)}`,
+                        color: "#00C853",
+                      }}
+                    >
+                      ВЫГОДНО
+                    </span>
+                  )}
                 </div>
+                {/* For hour rentals, show the per-day reference so the
+                    user understands the math (e.g. "12 000 ₽ / день × 3 часа"). */}
+                {line.pricePerDay === 0 && line.item?.rentPriceLabel && (
+                  <p className="mt-0.5 text-[10px]" style={surface.mutedText}>
+                    базовый тариф {line.item.rentPriceLabel}
+                  </p>
+                )}
               </>
             )}
           </div>
