@@ -325,17 +325,51 @@ function resolveHourlyPrice(rentalPeriod: RentalPeriod, bikeSpecs: BikeSpecs["sp
 }
 
 /**
- * Get contract defaults from crew secrets
+ * Convert snake_case to camelCase: "included_km_per_day" → "includedKmPerDay"
+ */
+function snakeToCamel(s: string): string {
+  return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+
+/**
+ * Get contract defaults from crew secrets.
+ * Tries multiple key formats to support both camelCase (SQL hydration)
+ * and snake_case (legacy code), plus checks `defaults` sub-object:
+ *   1. crewSecrets.contractDefaults[key]           — exact key
+ *   2. crewSecrets.contractDefaults[camelCase]      — camelCase version
+ *   3. crewSecrets.contractDefaults.defaults[key]   — snake_case in defaults sub-object
+ *   4. crewSecrets.contractDefaults.defaults[camel] — camelCase in defaults sub-object
  */
 function getContractDefault(
   crewSecrets: CrewSecrets,
   key: string,
   defaultValue: string | number
 ): string {
-  if (crewSecrets.contractDefaults) {
-    const value = readPath(crewSecrets.contractDefaults, [key], defaultValue);
-    return String(value ?? defaultValue);
+  const cd = crewSecrets.contractDefaults;
+  if (!cd) return String(defaultValue);
+
+  const camel = snakeToCamel(key);
+
+  // Try direct key match
+  let value = readPath(cd, [key], undefined);
+  if (value != null) return String(value);
+
+  // Try camelCase version
+  if (camel !== key) {
+    value = readPath(cd, [camel], undefined);
+    if (value != null) return String(value);
   }
+
+  // Try defaults sub-object (snake_case)
+  value = readPath(cd, ["defaults", key], undefined);
+  if (value != null) return String(value);
+
+  // Try defaults sub-object (camelCase)
+  if (camel !== key) {
+    value = readPath(cd, ["defaults", camel], undefined);
+    if (value != null) return String(value);
+  }
+
   return String(defaultValue);
 }
 

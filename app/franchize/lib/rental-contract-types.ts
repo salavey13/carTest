@@ -239,6 +239,21 @@ export interface RentalContractTemplateVars {
   media_links: string;
   damage_price_list: string;
 
+  // СТС pledge (only when used as deposit)
+  sts_collateral?: string;       // "1" or ""
+  sts_series?: string;
+  sts_number?: string;
+  sts_issue_date?: string;
+  sts_vehicle_plate?: string;
+  sts_vehicle_vin?: string;
+  sts_vehicle_model?: string;
+  sts_vehicle_year?: string;
+  sts_owner_full_name?: string;
+  sts_owner_registration?: string;
+  sts_owner_relation?: string;
+  sts_pledge_return_days?: string;
+  sts_deposit_amount_skipped?: string;
+
   // Computed
   signature_timestamp: string;
   signature_fingerprint: string;

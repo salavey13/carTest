@@ -10,7 +10,7 @@ import type {
   DeclineContractResult,
   ContractDraftData,
 } from '../lib/rental-contract-types';
-import { buildTemplateVars } from '../lib/rental-contract-vars';
+import { buildRentalContractVariables } from '@/app/lib/rental-contract-vars';
 import {
   renderTemplateToDocx,
   uploadDocxToStorage,
@@ -313,36 +313,68 @@ export async function approveContract(
       return { success: false, error: 'No pending contract draft found' };
     }
 
-    const { data: crewSecrets } = await supabase
+    const { data: crewSecretsRow } = await supabase
       .schema('private')
       .from('crew_secrets')
       .select('contract_defaults')
       .eq('crew_slug', input.crewSlug)
       .maybeSingle();
 
-    const orgSecrets = crewSecrets?.contract_defaults
-      ? (typeof crewSecrets.contract_defaults === 'string'
-          ? JSON.parse(crewSecrets.contract_defaults)
-          : crewSecrets.contract_defaults)
+    const orgSecrets = crewSecretsRow?.contract_defaults
+      ? (typeof crewSecretsRow.contract_defaults === 'string'
+          ? JSON.parse(crewSecretsRow.contract_defaults)
+          : crewSecretsRow.contract_defaults)
       : {};
 
     const bike = rental.vehicle;
 
-    const dates = {
-      start: formatDateRu(new Date(rental.agreed_start_date || rental.requested_start_date)),
+    // ── Map web-app data shapes → canonical builder inputs ──
+
+    // Dates → RentalPeriod
+    const period = {
+      startDate: formatDateRu(new Date(rental.agreed_start_date || rental.requested_start_date)),
       startTime: formatTimeRu(new Date(rental.agreed_start_date || rental.requested_start_date)),
-      end: formatDateRu(new Date(rental.agreed_end_date || rental.requested_end_date)),
+      endDate: formatDateRu(new Date(rental.agreed_end_date || rental.requested_end_date)),
       endTime: formatTimeRu(new Date(rental.agreed_end_date || rental.requested_end_date)),
     };
 
-    const contractDefaults = {
-      includedMileage: 200,
-      overageRate: 35,
-      lateReturnPenaltyRub: 10000,
+    // Passport: "4509 123456" → series "4509" + number "123456"
+    const passportParts = (draft.renterData.passport || '').trim().split(/\s+/);
+
+    // CrewSecrets from orgSecrets (contract_defaults JSON)
+    const crewSecretsForBuilder = {
+      legalAddress: orgSecrets.legalAddress || 'г. Нижний Новгород',
+      returnAddress: orgSecrets.returnAddress || '',
+      issuerName: orgSecrets.issuerName || 'Менеджер',
+      issuerRepresentative: orgSecrets.issuerRepresentative || '',
+      signatoryRole: orgSecrets.signatoryRole || 'Менеджер Мотосалона',
+      organizationRepresentative: orgSecrets.organizationRepresentative || '',
+      organizationName: orgSecrets.organizationName || 'ИП Воробьева Р.В.',
+      organizationShort: orgSecrets.organizationShort || 'ИП Воробьева Р.В.',
+      ogrnip: orgSecrets.ogrnip || '326527500025145',
+      inn: orgSecrets.inn || '525813643035',
+      bankAccount: orgSecrets.bankAccount || '40802810942710013083',
+      bankName: orgSecrets.bankName || 'Волго-Вятский Банк ПАО Сбербанк',
+      bankCity: orgSecrets.bankCity || 'г. Нижний Новгород',
+      bankCorrAccount: orgSecrets.bankCorrAccount || '30101810900000000603',
+      email: orgSecrets.email || '',
+      // Pass through the raw contract_defaults so getContractDefault can read overage/etc.
+      contractDefaults: orgSecrets,
     };
 
-    const templateVars = await buildTemplateVars({
-      crewSlug: input.crewSlug,
+    const templateVars = buildRentalContractVariables({
+      renter: {
+        fullName: draft.renterData.full_name,
+        birthDate: draft.renterData.birth_date || '',
+        phone: draft.renterData.phone,
+        email: draft.renterData.email,
+        passportSeries: passportParts[0] || '',
+        passportNumber: passportParts.length > 1 ? passportParts.slice(1).join(' ') : passportParts[0] || '',
+        passportIssueDate: draft.renterData.passport_issue_date || '',
+        registration: draft.renterData.registration || '',
+        address: draft.renterData.address || draft.renterData.registration || '',
+        driverLicenseNumber: draft.renterData.driver_license || '',
+      },
       bike: {
         id: bike.id,
         make: bike.make,
@@ -350,12 +382,25 @@ export async function approveContract(
         specs: bike.specs || {},
         type: bike.type,
       },
-      crewSecrets: orgSecrets,
-      contractDefaults,
-      dates,
-      renterData: draft.renterData,
-      equipmentData: draft.equipmentData,
-      pickupData: draft.pickupData,
+      period,
+      crewSecrets: crewSecretsForBuilder,
+      meta: {
+        contractNumber: contractKey,
+        signatureFingerprint: 'web-app-approved',
+        renterSignature: 'электронное согласие',
+        documentKey: contractKey,
+      },
+      equipment: {
+        helmets: draft.equipmentData.helmets_count || 0,
+        gloves: draft.equipmentData.gloves_count || 0,
+        jacket: draft.equipmentData.jacket || false,
+        boots: draft.equipmentData.boots || false,
+        net: draft.equipmentData.net || false,
+        backpack: draft.equipmentData.backpack || false,
+        bag: draft.equipmentData.bag || false,
+        charger: draft.equipmentData.charger || false,
+      },
+      odometerBefore: draft.pickupData.odometer_km || 0,
     });
 
     const { buffer, sha256 } = await renderTemplateToDocx(

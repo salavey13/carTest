@@ -182,6 +182,21 @@ export async function buildTemplateVars(params: {
     savingsPercent: number;
     tier: string;
   };
+  // СТС pledge data (optional, used as deposit alternative)
+  stsPledge?: {
+    used: boolean;
+    series?: string;
+    number?: string;
+    issueDate?: string;
+    vehiclePlate?: string;
+    vehicleVin?: string;
+    vehicleModel?: string;
+    vehicleYear?: string;
+    ownerFullName?: string;
+    ownerRegistration?: string;
+    ownerRelation?: string;
+    pledgeReturnDays?: number;
+  };
 }): Promise<RentalContractTemplateVars> {
   const now = new Date();
   const isElectric = isElectricBike(params.bike.specs, params.bike.type);
@@ -436,6 +451,21 @@ export async function buildTemplateVars(params: {
     signature_fingerprint: 'web-app-generated',
     renter_signature: 'согласие через WebApp',
     document_key: `rental-${params.bike.id}-${Date.now()}`,
+
+    // СТС pledge (only when used)
+    sts_collateral: params.stsPledge?.used ? '1' : '',
+    sts_series: params.stsPledge?.series || '',
+    sts_number: params.stsPledge?.number || '',
+    sts_issue_date: params.stsPledge?.issueDate || '',
+    sts_vehicle_plate: params.stsPledge?.vehiclePlate || '',
+    sts_vehicle_vin: params.stsPledge?.vehicleVin || '',
+    sts_vehicle_model: params.stsPledge?.vehicleModel || '',
+    sts_vehicle_year: params.stsPledge?.vehicleYear || '',
+    sts_owner_full_name: params.stsPledge?.ownerFullName || '',
+    sts_owner_registration: params.stsPledge?.ownerRegistration || '',
+    sts_owner_relation: params.stsPledge?.ownerRelation || 'сам арендатор',
+    sts_pledge_return_days: String(params.stsPledge?.pledgeReturnDays || 3),
+    sts_deposit_amount_skipped: params.stsPledge?.used ? String(deposit) : '',
   };
 }
 
