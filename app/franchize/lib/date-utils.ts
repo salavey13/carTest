@@ -153,6 +153,36 @@ export function isoDateTimeFromParts(dateISO: string, timeHHmm: string): string 
 }
 
 /**
+ * Time-aware day count between two ISO dates + HH:mm times.
+ *
+ * Unlike `diffDaysISO` (which counts calendar days inclusively —
+ * Jul 10 → Jul 11 = 2), this function computes the actual number
+ * of 24-hour periods between the start datetime and end datetime.
+ * A rental from Jul 10 18:00 → Jul 11 18:00 = 1 day (24 hours),
+ * not 2 days.
+ *
+ * Returns at least 1.
+ */
+export function durationDaysFromDateTime(
+  startDate: string,
+  startTime: string,
+  endDate: string,
+  endTime: string,
+): number {
+  const s = parseISODate(startDate);
+  const e = parseISODate(endDate);
+  if (!s || !e) return 1;
+  // Build full datetime by overlaying HH:mm on the UTC date.
+  const [sh, sm] = (startTime || "10:00").split(":").map(Number);
+  const [eh, em] = (endTime || "10:00").split(":").map(Number);
+  s.setUTCHours(sh || 0, sm || 0, 0, 0);
+  e.setUTCHours(eh || 0, em || 0, 0, 0);
+  const ms = e.getTime() - s.getTime();
+  const days = Math.round(ms / 86400000);
+  return Math.max(1, days);
+}
+
+/**
  * Today as YYYY-MM-DD in UTC. Use this as a default `min` for date inputs.
  */
 export function todayISO(): string {

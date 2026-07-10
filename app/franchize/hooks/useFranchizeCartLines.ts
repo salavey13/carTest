@@ -161,8 +161,13 @@ export function useFranchizeCartLines(
           line.options.rentStartDate && line.options.rentEndDate
             ? (() => {
                 try {
-                  const { diffDaysISO } = require("@/app/franchize/lib/date-utils");
-                  return diffDaysISO(line.options.rentStartDate, line.options.rentEndDate);
+                  const { durationDaysFromDateTime } = require("@/app/franchize/lib/date-utils");
+                  return durationDaysFromDateTime(
+                    line.options.rentStartDate,
+                    line.options.rentStartTime || "10:00",
+                    line.options.rentEndDate,
+                    line.options.rentEndTime || "10:00",
+                  );
                 } catch {
                   return parseDurationDays(line.options.duration);
                 }

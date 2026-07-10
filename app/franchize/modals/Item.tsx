@@ -24,7 +24,7 @@ import { encodeStartappState, type StartappState } from "@/lib/startapp-state";
 import { getTelegramWebAppAdaptiveHref } from "@/app/franchize/lib/telegram-links";
 import { upsertFranchizeLead } from "@/app/franchize/lib/leads";
 import { useCrewTokens, type CrewTokens } from "@/app/franchize/lib/use-crew-tokens";
-import { addDaysISO, formatRuDateFromISO, todayISO } from "@/app/franchize/lib/date-utils";
+import { addDaysISO, formatRuDateFromISO, todayISO, durationDaysFromDateTime } from "@/app/franchize/lib/date-utils";
 
 // ── Russian Label Helper (VIP Bike Landing & Catalog Improvements) ──
 // Helper to get Russian label from spec_labels in rawSpecs
@@ -183,15 +183,11 @@ function RentalDatePickers({
 
   const dayCount = (() => {
     if (!startDate || !endDate) return null;
-    const days = (() => {
-      try {
-        const { diffDaysISO } = require("@/app/franchize/lib/date-utils");
-        return diffDaysISO(startDate, endDate);
-      } catch {
-        return null;
-      }
-    })();
-    return days;
+    try {
+      return durationDaysFromDateTime(startDate, startTime || "10:00", endDate, endTime || "10:00");
+    } catch {
+      return null;
+    }
   })();
 
   const baseInputStyle: React.CSSProperties = {
