@@ -11,15 +11,25 @@ const TEMPLATE_MD_PATH = 'docs/RENTAL_DEAL_TEMPLATE.md';
  */
 function countWeekendDaysInRange(startDate: string, endDate: string): number {
   try {
-    // Parse dates — handle both DD.MM.YYYY and YYYY-MM-DD
+    // Parse dates — prefer strict ISO (YYYY-MM-DD), fall back to
+    // explicit DD.MM.YYYY for legacy callers. We never auto-detect
+    // MM.DD because that's the source of the "busy till 07.09.2026"
+    // date-swap bug.
+    const { parseISODate } = require("@/app/franchize/lib/date-utils");
     const parseDate = (s: string): Date | null => {
       if (!s) return null;
-      // DD.MM.YYYY format
+      const iso = parseISODate(s);
+      if (iso) return iso;
+      // DD.MM.YYYY (first two digits = day, second = month)
       const dmy = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
-      if (dmy) return new Date(`${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}T00:00:00`);
-      // YYYY-MM-DD format
-      const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (ymd) return new Date(`${ymd[1]}-${ymd[2]}-${ymd[3]}T00:00:00`);
+      if (dmy) {
+        const year = Number(dmy[3]);
+        const month = Number(dmy[2]);
+        const day = Number(dmy[1]);
+        if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+          return new Date(Date.UTC(year, month - 1, day));
+        }
+      }
       return null;
     };
 

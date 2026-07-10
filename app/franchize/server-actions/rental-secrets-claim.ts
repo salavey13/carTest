@@ -4,6 +4,11 @@
 import { claimRentalSecretsByDocSha, type ClaimResult, type UserRentalSecret } from "@/app/lib/user-rental-secrets";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
+import {
+  parseISODate,
+  isoDateTimeFromParts,
+  addDaysISO,
+} from "@/app/franchize/lib/date-utils";
 
 /**
  * Link a rental to the claiming renter when they scan a QR deep-link.
@@ -92,17 +97,47 @@ async function createRentalFromClaimedSecret(
     // Calculate dates and pricing
     const dailyPrice = Number(artifact.daily_price || bike.specs?.dailyPrice || bike.specs?.rent_weekday || '10000');
 
-    // Use dates from artifact if available, otherwise use current date + 1 day
-    const startDate = artifact.rent_start_date
-      ? new Date(artifact.rent_start_date)
+    // FIX: Use strict ISO date parsing. Previously we did
+    //   new Date(artifact.rent_start_date)
+    // which silently accepted ambiguous DD.MM.YYYY strings (like
+    // "09.07.2026") and resolved them to September 7 instead of July 9
+    // in some V8 builds — that bug made the catalog show "busy till
+    // 07.09.2026" for a 8-9 July rental. `parseISODate` only accepts
+    // exact YYYY-MM-DD and returns null for anything else.
+    //
+    // We also compose an explicit time (10:00 → 10:00 defaults) so the
+    // stored ISO timestamp lands on local-noon instead of UTC-midnight,
+    // which dodges the MSK-off-by-one display bug.
+    const artifactStartISO = parseISODate(artifact.rent_start_date);
+    const artifactEndISO = parseISODate(artifact.rent_end_date);
+
+    const startDate = artifactStartISO
+      ? new Date(
+          // 10:00 local — converts to a clean UTC timestamp that displays
+          // as the same calendar date in every reasonable timezone.
+          (() => {
+            const iso = isoDateTimeFromParts(artifact.rent_start_date!, "10:00");
+            return iso ? new Date(iso) : new Date(artifact.rent_start_date + "T10:00:00Z");
+          })(),
+        )
       : new Date();
-    const endDate = artifact.rent_end_date
-      ? new Date(artifact.rent_end_date)
+    const endDate = artifactEndISO
+      ? new Date(
+          (() => {
+            const iso = isoDateTimeFromParts(artifact.rent_end_date!, "10:00");
+            return iso ? new Date(iso) : new Date(artifact.rent_end_date + "T10:00:00Z");
+          })(),
+        )
       : new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const hours = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60) * 10) / 10;
     const days = Math.max(1, Math.ceil(hours / 24));
     const totalCost = dailyPrice * days;
+    // Suppress unused-import warnings for the strict-parse helpers we
+    // reference by side-effect above (and the addDaysISO helper used by
+    // callers that may extend this file).
+    void parseISODate;
+    void addDaysISO;
 
     // Create rental with renter as user_id
     const { data: rental, error: rentalError } = await supabaseAdmin

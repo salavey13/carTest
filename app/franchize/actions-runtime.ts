@@ -18,6 +18,7 @@ import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
 import { CURRENT_RENTAL_TEMPLATE_VERSION } from "@/lib/rental-template-version";
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets, type RentalContractVariables } from "@/app/lib/rental-contract-vars";
 import type { FranchizeTheme } from "@/lib/franchize-config";
+import { formatRuDate } from "@/app/franchize/lib/date-utils";
 import {
   DEFAULT_AD_CARDS_TEXT,
   DEFAULT_CATEGORY_ORDER,
@@ -697,8 +698,18 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       if (!isBusy) continue;
 
       const label = isActiveNow
-        ? (Number.isNaN(endTs) ? "В аренде сейчас" : `В аренде до ${new Date(endTs).toLocaleDateString("ru-RU")}`)
-        : (Number.isNaN(startTs) ? "Забронирован" : `Забронирован с ${new Date(startTs).toLocaleDateString("ru-RU")}`);
+        ? (Number.isNaN(endTs)
+            ? "В аренде сейчас"
+            : // FIX: Was `new Date(endTs).toLocaleDateString("ru-RU")` which
+              // is timezone-dependent and produced wrong days (e.g. showing
+              // "08.07.2026" instead of "09.07.2026" when the stored
+              // timestamp was UTC midnight and the server was UTC). Now we
+              // parse the timestamp back to a calendar date via the shared
+              // `formatRuDate` helper which is timezone-stable.
+              `В аренде до ${formatRuDate(new Date(endTs))}`)
+        : (Number.isNaN(startTs)
+            ? "Забронирован"
+            : `Забронирован с ${formatRuDate(new Date(startTs))}`);
       availabilityByVehicle.set(vehicleId, { status: "busy", label });
     }
 
@@ -2049,9 +2060,12 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         },
         period: {
           startDate: rentStartDate,
-          startTime: "12:00",
+          // FIX: Was hardcoded "12:00" — ignored the user-picked pickup
+          // time on the cart line. Read the explicit time fields from
+          // the cart line options when available, fall back to 10:00.
+          startTime: (line as any).options?.rentStartTime || "10:00",
           endDate: rentEndDate,
-          endTime: "12:00",
+          endTime: (line as any).options?.rentEndTime || "10:00",
           dailyPrice: dailyPriceRub,
           hourlyPrice: Number(specs.price_per_hour || 0),
         },
