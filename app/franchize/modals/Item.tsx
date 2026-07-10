@@ -605,9 +605,11 @@ function PricingTable({
 // Additional Items — helmets, gloves, net, bag, coat
 // ───────────────────────────────────────────────────────────────────────────────
 
-/** All rentable extras with their prices (per rental, not per day). */
+/** All rentable extras with their prices (per rental, not per day).
+ *  Helmet price is dynamic: 500₽ for hourly (<24h), 1000₽ for daily+ (≥24h).
+ *  The `price` field here is the daily rate (used as fallback). */
 export const ADDITIONAL_ITEMS = [
-  { key: "helmet", label: "Шлем", icon: "🪖", price: 1000, type: "count" as const, max: 2 },
+  { key: "helmet", label: "Шлем", icon: "🪖", price: 1000, hourlyPrice: 500, type: "count" as const, max: 2 },
   { key: "gloves", label: "Перчатки", icon: "🧤", price: 500, type: "toggle" as const },
   { key: "jacket", label: "Куртка", icon: "🧥", price: 500, type: "toggle" as const },
   { key: "boots", label: "Боты/Сапоги", icon: "👢", price: 500, type: "toggle" as const },
@@ -619,12 +621,22 @@ export const ADDITIONAL_ITEMS = [
 
 export type AdditionalItemsSelection = Record<string, number | boolean>;
 
-/** Calculate total extras cost from selection. */
-export function calcExtrasTotal(sel: AdditionalItemsSelection): number {
+/** Get the effective price for an additional item based on rental duration. */
+function getAdditionalItemPrice(item: typeof ADDITIONAL_ITEMS[number], rentalHours?: number): number {
+  if (item.key === "helmet" && rentalHours !== undefined) {
+    return rentalHours < 24 ? (item.hourlyPrice ?? 500) : item.price;
+  }
+  return item.price;
+}
+
+/** Calculate total extras cost from selection.
+ *  @param rentalHours - if provided, helmet price is dynamic (500₽ for <24h, 1000₽ for ≥24h) */
+export function calcExtrasTotal(sel: AdditionalItemsSelection, rentalHours?: number): number {
   return ADDITIONAL_ITEMS.reduce((sum, item) => {
     const val = sel[item.key];
-    if (item.type === "count") return sum + (typeof val === "number" ? val : 0) * item.price;
-    return sum + (val === true ? item.price : 0);
+    const unitPrice = getAdditionalItemPrice(item, rentalHours);
+    if (item.type === "count") return sum + (typeof val === "number" ? val : 0) * unitPrice;
+    return sum + (val === true ? unitPrice : 0);
   }, 0);
 }
 
@@ -645,9 +657,11 @@ export function extrasSummary(sel: AdditionalItemsSelection): string {
 function AdditionalItems({
   selection,
   onChange,
+  rentalHours,
 }: {
   selection: AdditionalItemsSelection;
   onChange: (sel: AdditionalItemsSelection) => void;
+  rentalHours?: number;
 }) {
   return (
     <div className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3">
@@ -656,14 +670,15 @@ function AdditionalItems({
       </p>
       <div className="space-y-2">
         {ADDITIONAL_ITEMS.map((item) => {
+          const effectivePrice = getAdditionalItemPrice(item, rentalHours);
           if (item.type === "count") {
             const count = (selection[item.key] as number) || 0;
             return (
               <div key={item.key} className="flex items-center justify-between">
                 <span className="text-xs">
                   {item.icon} {item.label}
-                  {item.price > 0 && <span className="opacity-50"> +{item.price}₽</span>}
-                  {item.price === 0 && <span className="opacity-50"> бесплатно</span>}
+                  {effectivePrice > 0 && <span className="opacity-50"> +{effectivePrice}₽</span>}
+                  {effectivePrice === 0 && <span className="opacity-50"> бесплатно</span>}
                 </span>
                 <div className="flex gap-1.5">
                   {[0, 1, 2].map((n) => (
@@ -695,8 +710,8 @@ function AdditionalItems({
             >
               <span className="text-xs">
                 {item.icon} {item.label}
-                {item.price > 0 && <span className="opacity-50"> +{item.price}₽</span>}
-                {item.price === 0 && <span className="opacity-50"> бесплатно</span>}
+                {effectivePrice > 0 && <span className="opacity-50"> +{effectivePrice}₽</span>}
+                {effectivePrice === 0 && <span className="opacity-50"> бесплатно</span>}
               </span>
               <input
                 type="checkbox"
@@ -709,9 +724,9 @@ function AdditionalItems({
         })}
       </div>
       {/* Total extras cost */}
-      {calcExtrasTotal(selection) > 0 && (
+      {calcExtrasTotal(selection, rentalHours) > 0 && (
         <p className="mt-2 text-right text-xs font-bold text-[var(--item-accent)]">
-          +{calcExtrasTotal(selection).toLocaleString("ru-RU")} ₽
+          +{calcExtrasTotal(selection, rentalHours).toLocaleString("ru-RU")} ₽
         </p>
       )}
     </div>
@@ -794,7 +809,7 @@ function PriceCard({
   if (!startDate || !endDate) return null;
 
   // Dynamic import of calculatePrice (client-side only)
-  const { calculatePrice } = require("@/lib/rental-pricing-calculator");
+  const { calculatePrice, getHelmetPrice } = require("@/lib/rental-pricing-calculator");
   const result = calculatePrice(
     specs as any,
     startDate,
@@ -804,10 +819,22 @@ function PriceCard({
     helmetCount
   );
 
+  // Calculate rental hours for dynamic helmet pricing
+  const rentalHours = (() => {
+    try {
+      const start = new Date(`${startDate}T${startTime || "10:00"}`);
+      const end = new Date(`${endDate}T${endTime || "10:00"}`);
+      return Math.max(1, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+    } catch {
+      return 24; // default to daily pricing if dates are invalid
+    }
+  })();
+  const helmetUnitPrice = getHelmetPrice(rentalHours);
+
   // Add non-helmet extras to the total
-  const extrasTotal = extrasSelection ? calcExtrasTotal(extrasSelection) : 0;
+  const extrasTotal = extrasSelection ? calcExtrasTotal(extrasSelection, rentalHours) : 0;
   // Subtract helmet cost from extrasTotal (already counted in result.helmetRub)
-  const helmetFromExtras = extrasSelection ? (typeof extrasSelection.helmet === "number" ? (extrasSelection.helmet as number) * 1000 : 0) : 0;
+  const helmetFromExtras = extrasSelection ? (typeof extrasSelection.helmet === "number" ? (extrasSelection.helmet as number) * helmetUnitPrice : 0) : 0;
   const nonHelmetExtras = extrasTotal - helmetFromExtras;
   const grandTotal = result.totalRub + nonHelmetExtras;
 
@@ -849,7 +876,7 @@ function PriceCard({
             <p>• Период: {result.breakdown.period}</p>
             <p>• Тариф: {result.breakdown.ratePerPeriod}</p>
             <p>• Аренда: {fmt(result.basePriceRub)} ₽</p>
-            {result.helmetRub > 0 && <p>• Шлем: {fmt(result.helmetRub)} ₽</p>}
+            {result.helmetRub > 0 && <p>• Шлем ×{helmetCount}: {fmt(result.helmetRub)} ₽ ({fmt(helmetUnitPrice)} ₽/шт{rentalHours < 24 ? ", почасово" : ""})</p>}
             {nonHelmetExtras > 0 && extrasSelection && (
               <>
                 {ADDITIONAL_ITEMS.filter((i) => i.key !== "helmet").map((item) => {
@@ -1799,6 +1826,7 @@ export function ItemModal({
 
                 <AdditionalItems
                   selection={extrasSelection}
+                  rentalHours={pricingResult?.displayHours}
                   onChange={(sel) => {
                     setExtrasSelection(sel);
                     // Sync helmetCount for backward compat with cart/pricing

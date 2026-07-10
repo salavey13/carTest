@@ -261,9 +261,10 @@ export async function buildTemplateVars(params: {
   }
   const subtotalRounded = Math.round(subtotal);
 
-  // Equipment cost
+  // Equipment cost (helmet: 500₽ for hourly <24h, 1000₽ for daily ≥24h)
+  const helmetUnitPrice = rentalHours < 24 ? 500 : 1000;
   const equipmentCostTotal =
-    (params.equipmentData.helmets_count || 0) * 1000 +
+    (params.equipmentData.helmets_count || 0) * helmetUnitPrice +
     (params.equipmentData.gloves_count || 0) * 500 +
     (params.equipmentData.jacket ? 500 : 0) +
     (params.equipmentData.boots ? 500 : 0) +
