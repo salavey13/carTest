@@ -571,6 +571,20 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
 
   // ── VIP Bike Categorization (VIP Bike Landing & Catalog Improvements) ──
   // Categorize bikes by type + sale status for vip-bike franchize
+  // Sort by "coolness": pro tier first, then by price (expensive first), then by rating
+  const sortItemsByCoolness = (items: CatalogItemVM[]) => {
+    const tierOrder: Record<string, number> = { pro: 0, mid: 1, entry: 2, none: 3 };
+    return [...items].sort((a, b) => {
+      const tierA = tierOrder[getItemAccessTier(a)] ?? 3;
+      const tierB = tierOrder[getItemAccessTier(b)] ?? 3;
+      if (tierA !== tierB) return tierA - tierB;
+      // Same tier: expensive first
+      if (b.pricePerDay !== a.pricePerDay) return b.pricePerDay - a.pricePerDay;
+      // Same price: higher rating first
+      return (b.reviewSummary.average || 0) - (a.reviewSummary.average || 0);
+    });
+  };
+
   const categorizedItems = useMemo(() => {
     const electric = items.filter(i =>
       (i.rawSpecs as Record<string, unknown> | undefined)?.type === "Electric"
@@ -587,9 +601,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     });
 
     return [
-      { category: "", title: "", items: electric },
-      { category: "", title: "", items: iceForSale },
-      { category: "partners", title: "Байки партнёров", items: iceRentOnly },
+      { category: "", title: "", items: sortItemsByCoolness(electric) },
+      { category: "", title: "", items: sortItemsByCoolness(iceForSale) },
+      { category: "partners", title: "Байки партнёров", items: sortItemsByCoolness(iceRentOnly) },
     ].filter(g => g.items.length > 0);
   }, [items]);
 
@@ -1187,7 +1201,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             style={{
                               backgroundColor: isActive
                                 ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain)
-                                : `${crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}AA`,
+                                : `${crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary}80`,
                               transform: isActive ? "scale(1.1)" : "scale(1)"
                             }}
                             onClick={() => {
