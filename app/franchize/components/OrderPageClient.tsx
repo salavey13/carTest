@@ -57,6 +57,18 @@ type CheckoutPayload = {
   comment: string;
   rentalStartDate?: string;
   rentalEndDate?: string;
+  // ── Personal data for contract generation (aligned with /doc flow) ──
+  birthDate?: string;
+  passportSeries?: string;
+  passportNumber?: string;
+  passportIssueDate?: string;
+  passportIssuedBy?: string;
+  registrationAddress?: string;
+  licenseSeries?: string;
+  licenseNumber?: string;
+  licenseCategories?: string;
+  licenseExpiryDate?: string;
+  hasLicense?: boolean;
   signatureName?: string;
   signatureAccepted?: boolean;
   signatureFingerprint?: string;
@@ -93,6 +105,19 @@ const orderFormSchema = z.object({
   phone: z.string().trim().min(6, "Добавьте контактный номер"),
   comment: z.string().default(""),
   rentalStartDate: z.string().trim().optional(),
+  // ── Passport fields ──
+  birthDate: z.string().trim().optional(),
+  passportSeries: z.string().trim().optional(),
+  passportNumber: z.string().trim().optional(),
+  passportIssueDate: z.string().trim().optional(),
+  passportIssuedBy: z.string().trim().optional(),
+  registrationAddress: z.string().trim().optional(),
+  // ── License fields ──
+  hasLicense: z.boolean().default(true),
+  licenseSeries: z.string().trim().optional(),
+  licenseNumber: z.string().trim().optional(),
+  licenseCategories: z.string().trim().optional(),
+  licenseExpiryDate: z.string().trim().optional(),
   payment: z.enum(["telegram_xtr", "card", "cash", "sbp"]),
   deliveryMode: z.enum(["pickup", "delivery"]).default("pickup"),
   selectedExtras: z.array(z.string()).default([]),
@@ -136,6 +161,17 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       phone: "",
       comment: "",
       rentalStartDate: "",
+      birthDate: "",
+      passportSeries: "",
+      passportNumber: "",
+      passportIssueDate: "",
+      passportIssuedBy: "",
+      registrationAddress: "",
+      hasLicense: true,
+      licenseSeries: "",
+      licenseNumber: "",
+      licenseCategories: "",
+      licenseExpiryDate: "",
       promo: "",
       selectedExtras: [],
       payment: isInTelegramContext ? payments[0].id : "card",
@@ -160,6 +196,18 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const deliveryMode = watch("deliveryMode");
   const selectedExtras = watch("selectedExtras") ?? EMPTY_SELECTED_EXTRAS;
   const consent = true; // Non-blocking, auto-checked
+  // ── Passport + license watched fields ──
+  const birthDate = watch("birthDate") ?? "";
+  const passportSeries = watch("passportSeries") ?? "";
+  const passportNumber = watch("passportNumber") ?? "";
+  const passportIssueDate = watch("passportIssueDate") ?? "";
+  const passportIssuedBy = watch("passportIssuedBy") ?? "";
+  const registrationAddress = watch("registrationAddress") ?? "";
+  const hasLicense = watch("hasLicense") ?? true;
+  const licenseSeries = watch("licenseSeries") ?? "";
+  const licenseNumber = watch("licenseNumber") ?? "";
+  const licenseCategories = watch("licenseCategories") ?? "";
+  const licenseExpiryDate = watch("licenseExpiryDate") ?? "";
   const T = useCrewTokens(crew.theme);
   const surface = T.styles;
   const isAuto = T.isAuto;
@@ -292,6 +340,18 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         : comment.trim(),
       rentalStartDate: rentalStartDate || resolvedStartDate || undefined,
       rentalEndDate: rentalEndDate || resolvedEndDate || undefined,
+      // ── Personal data for contract generation ──
+      birthDate: birthDate.trim() || undefined,
+      passportSeries: passportSeries.trim() || undefined,
+      passportNumber: passportNumber.trim() || undefined,
+      passportIssueDate: passportIssueDate.trim() || undefined,
+      passportIssuedBy: passportIssuedBy.trim() || undefined,
+      registrationAddress: registrationAddress.trim() || undefined,
+      hasLicense,
+      licenseSeries: hasLicense ? (licenseSeries.trim() || undefined) : undefined,
+      licenseNumber: hasLicense ? (licenseNumber.trim() || undefined) : undefined,
+      licenseCategories: hasLicense ? (licenseCategories.trim() || undefined) : undefined,
+      licenseExpiryDate: hasLicense ? (licenseExpiryDate.trim() || undefined) : undefined,
       signatureName: recipient.trim() || undefined,
       signatureAccepted: true,
       signatureFingerprint: user?.id ? `tg:${user.id}` : "manual-sign",
@@ -317,7 +377,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       requiredDocs,
       flowType,
     }),
-    [appliedPromo, cartLines, checkoutBlockers, comment, deliveryMode, extrasTotal, flowType, holdDepositAmount, orderId, payment, phone, pickupAddress, promoDiscount, recipient, rentalEndDate, rentalStartDate, requiredDocs, selectedExtraItems, totalAmount, user?.id],
+    [appliedPromo, birthDate, cartLines, checkoutBlockers, comment, deliveryMode, extrasTotal, flowType, hasLicense, holdDepositAmount, licenseCategories, licenseExpiryDate, licenseNumber, licenseSeries, orderId, passportIssuedBy, passportIssueDate, passportNumber, passportSeries, payment, phone, pickupAddress, promoDiscount, recipient, registrationAddress, rentalEndDate, rentalStartDate, requiredDocs, selectedExtraItems, totalAmount, user?.id],
   );
 
   const recoveryDepositAmount = flowType === "sale" ? Math.round(totalAmount * 0.1) : holdDepositAmount;
@@ -431,15 +491,25 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       // 2. Load full rental docs prefill (passport, license, etc.)
       const docsRes = await getRentalDocsPrefillAction({ userId: dbUser.user_id, slug });
       if (docsRes.success && docsRes.data) {
+        const d = docsRes.data;
         // Prefill recipient from docs if not already set
-        if (docsRes.data.fullName) {
-          if (!recipient) {
-            setValue("recipient", docsRes.data.fullName, { shouldDirty: false, shouldValidate: false });
-          }
+        if (d.fullName && !recipient) {
+          setValue("recipient", d.fullName, { shouldDirty: false, shouldValidate: false });
         }
-        if (docsRes.data.phone) {
-          setValue("phone", docsRes.data.phone, { shouldDirty: false, shouldValidate: false });
-        }
+        if (d.phone) setValue("phone", d.phone, { shouldDirty: false, shouldValidate: false });
+        // ── Auto-fill passport fields for 1-click-next-rental ──
+        if (d.birthDate) setValue("birthDate", d.birthDate, { shouldDirty: false });
+        if (d.passportSeries) setValue("passportSeries", d.passportSeries, { shouldDirty: false });
+        if (d.passportNumber) setValue("passportNumber", d.passportNumber, { shouldDirty: false });
+        if (d.passportIssueDate) setValue("passportIssueDate", d.passportIssueDate, { shouldDirty: false });
+        if (d.passportIssuedBy) setValue("passportIssuedBy", d.passportIssuedBy, { shouldDirty: false });
+        if (d.registrationAddress) setValue("registrationAddress", d.registrationAddress, { shouldDirty: false });
+        // ── Auto-fill license fields ──
+        if (d.licenseSeries) setValue("licenseSeries", d.licenseSeries, { shouldDirty: false });
+        if (d.licenseNumber) setValue("licenseNumber", d.licenseNumber, { shouldDirty: false });
+        if (d.licenseCategories) setValue("licenseCategories", d.licenseCategories, { shouldDirty: false });
+        if (d.licenseExpiryDate) setValue("licenseExpiryDate", d.licenseExpiryDate, { shouldDirty: false });
+        if (!d.licenseSeries && !d.licenseNumber) setValue("hasLicense", false, { shouldDirty: false });
       }
     };
     void loadRentalSecrets();
@@ -542,6 +612,18 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         comment: submitPayload.comment,
         rentalStartDate: submitPayload.rentalStartDate,
         rentalEndDate: submitPayload.rentalEndDate,
+        // ── Personal data for contract generation ──
+        birthDate: submitPayload.birthDate,
+        passportSeries: submitPayload.passportSeries,
+        passportNumber: submitPayload.passportNumber,
+        passportIssueDate: submitPayload.passportIssueDate,
+        passportIssuedBy: submitPayload.passportIssuedBy,
+        registrationAddress: submitPayload.registrationAddress,
+        hasLicense: submitPayload.hasLicense,
+        licenseSeries: submitPayload.licenseSeries,
+        licenseNumber: submitPayload.licenseNumber,
+        licenseCategories: submitPayload.licenseCategories,
+        licenseExpiryDate: submitPayload.licenseExpiryDate,
         signatureName: values.recipient.trim(),
         signatureAccepted: true,
         signatureFingerprint: user?.id ? `tg:${user.id}` : "manual-sign",
@@ -744,6 +826,150 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               ) : null}
             </div>
           </div>
+
+          {/* ── Passport + License fields for contract generation ── */}
+          {flowType !== "sale" && (
+            <div className="rounded-2xl border p-4" style={surface.card}>
+              <p className="text-sm font-medium">Данные для договора аренды</p>
+              <p className="mt-1 text-xs" style={surface.mutedText}>
+                Заполняется один раз — при следующей аренде данные подставятся автоматически.
+              </p>
+              <div className="mt-3 space-y-3">
+                {/* Passport */}
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    className="rounded-xl border px-3 py-2 text-sm"
+                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                    placeholder="Серия паспорта (4509)"
+                    {...register("passportSeries")}
+                  />
+                  <input
+                    className="rounded-xl border px-3 py-2 text-sm"
+                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                    placeholder="Номер паспорта (123456)"
+                    {...register("passportNumber")}
+                  />
+                </div>
+                <input
+                  className="w-full rounded-xl border px-3 py-2 text-sm"
+                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                  placeholder="Дата выдачи паспорта (ДД.ММ.ГГГГ)"
+                  {...register("passportIssueDate")}
+                />
+                <input
+                  className="w-full rounded-xl border px-3 py-2 text-sm"
+                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                  placeholder="Кем выдан (ОМВД по г. Н.Новгороду)"
+                  {...register("passportIssuedBy")}
+                />
+                <input
+                  className="w-full rounded-xl border px-3 py-2 text-sm"
+                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                  placeholder="Дата рождения (ДД.ММ.ГГГГ)"
+                  {...register("birthDate")}
+                />
+                <textarea
+                  className="min-h-16 w-full rounded-xl border px-3 py-2 text-sm"
+                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                  placeholder="Адрес регистрации"
+                  {...register("registrationAddress")}
+                />
+
+                {/* License */}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="hasLicense"
+                    className="h-4 w-4"
+                    accent={T.accent}
+                    {...register("hasLicense")}
+                  />
+                  <label htmlFor="hasLicense" className="text-xs" style={{ color: T.textMuted }}>
+                    Есть водительское удостоверение
+                  </label>
+                </div>
+                {hasLicense && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        className="rounded-xl border px-3 py-2 text-sm"
+                        style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                        placeholder="Серия ВУ (99)"
+                        {...register("licenseSeries")}
+                      />
+                      <input
+                        className="rounded-xl border px-3 py-2 text-sm"
+                        style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                        placeholder="Номер ВУ (76123456)"
+                        {...register("licenseNumber")}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        className="rounded-xl border px-3 py-2 text-sm"
+                        style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                        placeholder="Категории (A, B)"
+                        {...register("licenseCategories")}
+                      />
+                      <input
+                        className="rounded-xl border px-3 py-2 text-sm"
+                        style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                        placeholder="Срок действия (ДД.ММ.ГГГГ)"
+                        {...register("licenseExpiryDate")}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* For SALE flow — only passport fields (no license needed) */}
+          {flowType === "sale" && (
+            <div className="rounded-2xl border p-4" style={surface.card}>
+              <p className="text-sm font-medium">Данные для договора купли-продажи</p>
+              <div className="mt-3 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    className="rounded-xl border px-3 py-2 text-sm"
+                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                    placeholder="Серия паспорта"
+                    {...register("passportSeries")}
+                  />
+                  <input
+                    className="rounded-xl border px-3 py-2 text-sm"
+                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                    placeholder="Номер паспорта"
+                    {...register("passportNumber")}
+                  />
+                </div>
+                <input
+                  className="w-full rounded-xl border px-3 py-2 text-sm"
+                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                  placeholder="Дата выдачи паспорта (ДД.ММ.ГГГГ)"
+                  {...register("passportIssueDate")}
+                />
+                <input
+                  className="w-full rounded-xl border px-3 py-2 text-sm"
+                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                  placeholder="Кем выдан"
+                  {...register("passportIssuedBy")}
+                />
+                <input
+                  className="w-full rounded-xl border px-3 py-2 text-sm"
+                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                  placeholder="Дата рождения (ДД.ММ.ГГГГ)"
+                  {...register("birthDate")}
+                />
+                <input
+                  className="w-full rounded-xl border px-3 py-2 text-sm"
+                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                  placeholder="Адрес регистрации"
+                  {...register("registrationAddress")}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="rounded-2xl border p-4" style={surface.card}>
             <p className="text-sm font-medium">Оплата</p>

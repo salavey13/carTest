@@ -3,6 +3,7 @@
 import { createInvoice, supabaseAdmin } from "@/lib/supabase-server";
 import { notifyAdmin, sendTelegramDocument, sendTelegramInvoice } from "@/app/actions";
 import { logger } from "@/lib/logger";
+import nodemailer from "nodemailer";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { readFile } from "fs/promises";
@@ -17,6 +18,7 @@ import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context
 import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
 import { CURRENT_RENTAL_TEMPLATE_VERSION } from "@/lib/rental-template-version";
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets, type RentalContractVariables } from "@/app/lib/rental-contract-vars";
+import { resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 import { formatRuDate } from "@/app/franchize/lib/date-utils";
 import {
@@ -2053,16 +2055,16 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         renter: {
           fullName: payload.recipient || "",
           phone: docIdentity.renterPhone || "",
-          birthDate: docIdentity.renterBirthDate || "",
+          birthDate: payload.birthDate || docIdentity.renterBirthDate || "",
           email: docIdentity.renterEmail || "",
-          passportSeries,
-          passportNumber,
-          passportIssueDate: rentalSecrets?.renter_passport_issue_date || String(readPath(userSensitive, ["passportIssueDate"], "") || readPath(userSensitive, ["passport_issue_date"], "")) || "",
-          passportIssuedBy: "", // Web app doesn't collect this
-          registration: rentalSecrets?.renter_registration || String(readPath(userSensitive, ["registration"], "")) || "",
-          address: rentalSecrets?.renter_address || payload.pickupAddress || String(readPath(userSensitive, ["renterAddress"], "") || readPath(userSensitive, ["registration"], "")) || "",
-          driverLicenseSeries,
-          driverLicenseNumber,
+          passportSeries: payload.passportSeries || passportSeries || undefined,
+          passportNumber: payload.passportNumber || passportNumber || undefined,
+          passportIssueDate: payload.passportIssueDate || rentalSecrets?.renter_passport_issue_date || String(readPath(userSensitive, ["passportIssueDate"], "") || readPath(userSensitive, ["passport_issue_date"], "")) || "",
+          passportIssuedBy: payload.passportIssuedBy || rentalSecrets?.renter_passport_issued_by || "",
+          registration: payload.registrationAddress || rentalSecrets?.renter_registration || String(readPath(userSensitive, ["registration"], "")) || "",
+          address: payload.registrationAddress || rentalSecrets?.renter_address || payload.pickupAddress || String(readPath(userSensitive, ["renterAddress"], "") || readPath(userSensitive, ["registration"], "")) || "",
+          driverLicenseSeries: payload.licenseSeries || driverLicenseSeries || undefined,
+          driverLicenseNumber: payload.licenseNumber || driverLicenseNumber || undefined,
         },
         bike: {
           id: car.id,
@@ -2314,6 +2316,129 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       }
     }
 
+    // ── Create public.rentals row (aligned with /doc flow) ────────────────
+    // This ensures the rental appears in analytics and the bike shows as busy
+    if (flowType === "rental" && payload.rentalStartDate && payload.rentalEndDate) {
+      try {
+        const startIso = new Date(`${payload.rentalStartDate}T00:00:00`).toISOString();
+        const endIso = new Date(`${payload.rentalEndDate}T23:59:59`).toISOString();
+        const crewOwnerChatId = await resolveCrewOwnerChatId(
+          supabaseAdmin,
+          (await supabaseAdmin.from("crews").select("id").eq("slug", payload.slug).maybeSingle()).data?.id || "2d5fde70-1dd3-4f0d-8d72-66ccf6908746",
+        );
+        for (const doc of bikeDocs) {
+          try {
+            const { data: rentalRow } = await supabaseAdmin
+              .from("rentals")
+              .insert({
+                user_id: crewOwnerChatId || payload.telegramUserId,
+                owner_id: crewOwnerChatId || payload.telegramUserId,
+                vehicle_id: doc.bikeName, // resolved later
+                requested_start_date: startIso,
+                requested_end_date: endIso,
+                agreed_start_date: startIso,
+                agreed_end_date: endIso,
+                status: "active",
+                payment_status: payload.payment === "telegram_xtr" ? "interest_paid" : "pending",
+                total_cost: Math.round(payload.totalAmount),
+                metadata: {
+                  source: "franchize_web_order",
+                  order_id: payload.orderId,
+                  doc_sha256: doc.sha256,
+                  document_key: doc.documentKey,
+                  renter_name: payload.recipient,
+                  renter_phone: payload.phone,
+                  flow_type: flowType,
+                },
+              })
+              .select("rental_id")
+              .maybeSingle();
+            if (rentalRow?.rental_id) {
+              logger.info("[franchize] Created rental row:", rentalRow.rental_id);
+            }
+          } catch (rentalErr) {
+            logger.warn("[franchize] Failed to create rental row:", rentalErr);
+          }
+        }
+      } catch (rentalSetupErr) {
+        logger.warn("[franchize] Rental creation setup failed:", rentalSetupErr);
+      }
+    }
+
+    // ── Create franchize_intents lead (aligned with /doc flow) ──────────
+    try {
+      const { upsertFranchizeLead } = await import("@/app/franchize/lib/leads");
+      await upsertFranchizeLead({
+        slug: payload.slug,
+        userId: payload.phone || payload.telegramUserId,
+        intentType: flowType === "sale" ? "sale" : "rent",
+        stage: "contract_generated",
+        bikeId: bikeDocs[0]?.bikeName,
+        bikeTitle: bikeDocs[0]?.bikeName,
+        phone: payload.phone || undefined,
+        fullName: payload.recipient || undefined,
+        sourceRoute: `/franchize/${payload.slug}/order/${payload.orderId}`,
+        contactChannel: "web_cart",
+        urgencyScore: flowType === "rental" ? 90 : 85,
+        metadata: {
+          dealType: flowType === "sale" ? "sale" : "rent",
+          order_id: payload.orderId,
+          hasPassport: !!(payload.passportSeries && payload.passportNumber),
+          hasLicense: !!(payload.licenseSeries && payload.licenseNumber),
+          flow_type: flowType,
+        },
+        ensureUser: true,
+      });
+    } catch (leadErr) {
+      logger.warn("[franchize] Failed to create lead:", leadErr);
+    }
+
+    // ── Send DOCX to crew email (aligned with /doc flow) ────────────────
+    try {
+      const smtpHost = process.env.SMTP_HOST || process.env.SMTP_YANDED_HOST;
+      const smtpPort = Number(process.env.SMTP_PORT || process.env.SMTP_YANDEX_PORT || 465);
+      const smtpUser = process.env.SMTP_USER || process.env.SMTP_YANDEX_USER;
+      const smtpPass = process.env.SMTP_PASS || process.env.SMTP_YANDEX_PASS;
+      const emailFrom = process.env.EMAIL_FROM || smtpUser;
+      const emailTo = process.env.EMAIL_DEFAULT_TO || crewSecrets.email || "vip_bike@mail.ru";
+      if (smtpHost && smtpUser && smtpPass) {
+        const docType = flowType === "sale" ? "купли-продажи" : "аренды";
+        const emailBody = [
+          `Договор ${docType} №${bikeDocs[0]?.documentKey || payload.orderId}`,
+          ``,
+          bikeDocs.length === 1 ? `Байк: ${bikeDocs[0].bikeName}` : `Байков: ${bikeDocs.length}`,
+          `Клиент: ${payload.recipient || "—"}`,
+          `Телефон: ${payload.phone || "—"}`,
+          ``,
+          flowType === "sale"
+            ? `Цена: ${payload.totalAmount.toLocaleString("ru-RU")} ₽`
+            : `Период: ${payload.rentalStartDate || "?"} → ${payload.rentalEndDate || "?"}`,
+          ``,
+          `Договор сгенерирован через веб-приложение.`,
+          `Документ во вложении.`,
+        ].join("\n");
+        const transporter = nodemailer.createTransport({
+          host: smtpHost, port: smtpPort, secure: smtpPort === 465,
+          auth: { user: smtpUser, pass: smtpPass },
+          connectionTimeout: 5000, greetingTimeout: 5000, socketTimeout: 8000,
+        });
+        // Fire-and-forget — don't block checkout on email
+        transporter.sendMail({
+          from: emailFrom, to: emailTo,
+          subject: `Договор ${docType} — ${bikeDocs[0]?.bikeName || payload.orderId}`,
+          text: emailBody,
+          attachments: bikeDocs.map((doc) => ({
+            filename: doc.fileName,
+            content: Buffer.from(doc.bytes),
+            contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          })),
+        }).then(() => logger.info(`[franchize] Email with DOCX sent to ${emailTo}`))
+          .catch((emailErr: any) => logger.warn("[franchize] Email send failed (non-fatal):", emailErr?.message || emailErr));
+      }
+    } catch (emailSetupErr) {
+      logger.warn("[franchize] Email setup failed:", emailSetupErr);
+    }
+
     // Save rental secrets using the first bike's document info
     const firstBikeDoc = bikeDocs[0];
     try {
@@ -2459,6 +2584,18 @@ const franchizeOrderInvoiceSchema = z.object({
   comment: z.string().trim().default(""),
   rentalStartDate: z.string().trim().optional(),
   rentalEndDate: z.string().trim().optional(),
+  // ── Structured personal data from web app (aligned with /doc flow) ──
+  birthDate: z.string().trim().optional(),
+  passportSeries: z.string().trim().optional(),
+  passportNumber: z.string().trim().optional(),
+  passportIssueDate: z.string().trim().optional(),
+  passportIssuedBy: z.string().trim().optional(),
+  registrationAddress: z.string().trim().optional(),
+  hasLicense: z.boolean().optional().default(true),
+  licenseSeries: z.string().trim().optional(),
+  licenseNumber: z.string().trim().optional(),
+  licenseCategories: z.string().trim().optional(),
+  licenseExpiryDate: z.string().trim().optional(),
   signatureName: z.string().trim().optional(),
   signatureAccepted: z.boolean().optional(),
   signatureFingerprint: z.string().trim().optional(),
