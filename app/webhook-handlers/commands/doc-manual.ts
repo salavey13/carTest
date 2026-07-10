@@ -56,7 +56,7 @@ import { convertTextDateToTimestamp, resolveCrewOwnerChatId } from "@/lib/rental
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets } from "@/app/lib/rental-contract-vars";
 import { privateSchema } from "@/lib/private-secrets";
 import nodemailer from "nodemailer";
-import { calculatePriceForDuration } from "@/app/franchize/lib/pricing-calculator";
+import { calculatePriceForDuration, getHelmetPrice } from "@/app/franchize/lib/pricing-calculator";
 import { isCrewMember } from "@/app/lib/user-rental-secrets";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -549,8 +549,8 @@ interface DocFlowContext {
   clientPhoneResolved?: boolean;  // true if operator entered phone OR skipped
 
   // ── Equipment selection (added 2026-07-06) ────────────────────────────────
-  // Additional equipment rented with the bike. Prices: helmet=1000, gloves=500,
-  // net=500, backpack=500, bag=500, charger=0 (free but tracked for return).
+  // Additional equipment rented with the bike. Prices: helmet=500 (hourly <24h) or 1000 (daily ≥24h),
+  // gloves=500, net=500, backpack=500, bag=500, charger=0 (free but tracked for return).
   helmets?: number;        // 0-2 helmets
   gloves?: number;         // 0-2 pairs of gloves
   jacket?: boolean;        // motorcycle jacket
@@ -2019,7 +2019,7 @@ async function gotoPaymentSplit(chatId: number, userId: string, context: DocFlow
   const backpack = context.backpack ? 1 : 0;
   const bag = context.bag ? 1 : 0;
 
-  const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
+  const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
   const totalAmount = rentalCost + equipmentCost;
 
   // Store total in context for later use
@@ -2578,7 +2578,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     const net = context.net ? 1 : 0;
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
-    const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
+    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
     const totalAmount = rentalCost + equipmentCost;
     context.cashAmount = Math.min(cashAmount, totalAmount);
     context.bankAmount = Math.max(0, totalAmount - cashAmount);
@@ -2968,7 +2968,7 @@ export async function handleDocCallback(
     const net = context.net ? 1 : 0;
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
-    const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
+    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
     const totalAmount = rentalCost + equipmentCost;
     context.cashAmount = totalAmount;
     context.bankAmount = 0;
@@ -3014,7 +3014,7 @@ export async function handleDocCallback(
     const net = context.net ? 1 : 0;
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
-    const equipmentCost = helmets * 1000 + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
+    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
     const totalAmount = rentalCost + equipmentCost;
     context.cashAmount = 0;
     context.bankAmount = totalAmount;

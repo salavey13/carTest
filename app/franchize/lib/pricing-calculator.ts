@@ -27,6 +27,15 @@ function validatePositiveNumber(value: number | undefined): number | undefined {
 }
 
 /**
+ * Get helmet price based on rental duration.
+ * Hourly rentals (< 24h): 500 ₽ per helmet
+ * Daily+ rentals (≥ 24h): 1000 ₽ per helmet
+ */
+export function getHelmetPrice(rentalHours: number): number {
+  return rentalHours < 24 ? 500 : 1000;
+}
+
+/**
  * Check if a date string is a valid ISO date
  */
 function isValidDateString(dateStr: string): boolean {

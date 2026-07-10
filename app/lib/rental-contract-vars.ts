@@ -522,10 +522,11 @@ export function buildRentalContractVariables(
   }
   const subtotalRounded = Math.round(subtotal);
 
-  // Equipment cost
+  // Equipment cost (helmet: 500₽ for hourly <24h, 1000₽ for daily ≥24h)
   const eq = options.equipment || {};
+  const helmetUnitPrice = rentalHours < 24 ? 500 : 1000;
   const equipmentCostTotal =
-    (eq.helmets || 0) * 1000 +
+    (eq.helmets || 0) * helmetUnitPrice +
     (eq.gloves || 0) * 500 +
     (eq.jacket ? 500 : 0) +
     (eq.boots ? 500 : 0) +

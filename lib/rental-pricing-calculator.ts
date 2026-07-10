@@ -42,10 +42,20 @@ export interface PricingResult {
   displayHours?: number;
 }
 
-const HELMET_PRICE_RUB = 1000;
+const HELMET_PRICE_DAILY_RUB = 1000;
+const HELMET_PRICE_HOURLY_RUB = 500;
 const DEFAULT_DEPOSIT_RUB = 20000;
 const DEFAULT_DAILY_PRICE = 10000;
 const DEFAULT_HOURLY_PRICE = 1000; // v2 formula: 10% of daily
+
+/**
+ * Get helmet price based on rental duration.
+ * Hourly rentals (< 24h): 500 ₽ per helmet
+ * Daily+ rentals (≥ 24h): 1000 ₽ per helmet
+ */
+export function getHelmetPrice(rentalHours: number): number {
+  return rentalHours < 24 ? HELMET_PRICE_HOURLY_RUB : HELMET_PRICE_DAILY_RUB;
+}
 
 function normalizeHourlyRental(hours: number): {
   tier: PricingTier;
@@ -231,7 +241,7 @@ export function calculatePrice(
     weekendDayCount,
   );
 
-  const helmetRub = helmetCount * HELMET_PRICE_RUB;
+  const helmetRub = helmetCount * getHelmetPrice(hours);
   const depositRub = specs.deposit_rub ?? DEFAULT_DEPOSIT_RUB;
   const totalRub = price + helmetRub;
 
