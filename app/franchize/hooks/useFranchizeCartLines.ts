@@ -152,7 +152,27 @@ export function useFranchizeCartLines(
           };
         }
 
-        const basePricePerDay = item?.pricePerDay ?? 0;
+        // ── Testdrive flow: flat 0 ₽ (test is free, only deposit is held) ──
+      const isTestdrive = line.options.action === "testdrive" || (line.options as any).duration === "10 минут";
+      if (isTestdrive) {
+        return {
+          lineId,
+          itemId: line.itemId,
+          qty: line.qty,
+          item,
+          pricePerDay: 0,
+          lineTotal: 0,
+          rentalDays: 1,
+          saleAvailable: false,
+          salePrice: null,
+          flowType: "rental" as const, // Still "rental" for cart grouping, but flowType "testdrive" detected at order page
+          displayPriceLabel: "Тест-драйв · 0 ₽ (только залог)",
+          rentalPeriod: "10 минут",
+          options: line.options,
+        };
+      }
+
+      const basePricePerDay = item?.pricePerDay ?? 0;
         // Prefer real date arithmetic when the user picked explicit
         // YYYY-MM-DD dates — this matches the selected period exactly
         // instead of relying on the duration dropdown's coarse bucket

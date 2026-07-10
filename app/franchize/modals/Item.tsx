@@ -83,6 +83,8 @@ interface ItemModalProps {
   onAddToCart: () => void | Promise<void>;
   /** Called when "Купить" (buy) CTA is clicked for sale-only flow */
   onBuyItem?: () => void | Promise<void>;
+  /** Called when "Тест-драйв" CTA is clicked — adds to cart with testdrive flow */
+  onTestdrive?: () => void | Promise<void>;
   /** Shows "С возвращением!" badge for returning users */
   isReturningUser?: boolean;
 }
@@ -1073,6 +1075,7 @@ export function ItemModal({
   onClose,
   onAddToCart,
   onBuyItem,
+  onTestdrive,
   isReturningUser = false,
 }: ItemModalProps) {
   const isRental = flowType === "rental";
@@ -1756,6 +1759,24 @@ export function ItemModal({
               >
                 Перейти на страницу покупки
               </Link>
+            )}
+
+            {/* ── Test-drive CTA ── */}
+            {showRentCta && (
+              <button
+                type="button"
+                onClick={() => onTestdrive?.()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold uppercase tracking-wide transition hover:brightness-110 hover:scale-[1.01] active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                style={{
+                  borderColor: "color-mix(in srgb, var(--item-accent) 40%, transparent)",
+                  color: "var(--item-accent)",
+                  backgroundColor: "color-mix(in srgb, var(--item-accent) 8%, transparent)",
+                }}
+                aria-label={`Записаться на тест-драйв ${item.title}`}
+              >
+                <Bike className="h-4 w-4" />
+                Записаться на тест-драйв
+              </button>
             )}
 
             {/* Callback request — alternative to direct booking, placed before rental config */}

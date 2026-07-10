@@ -1389,6 +1389,20 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           setSelectedItem(null);
         }}
         onClose={() => setSelectedItem(null)}
+        onTestdrive={() => {
+          if (!selectedItem) return;
+          void recordRentIntent(selectedItem, "configured", {
+            trigger: "modal_testdrive_cta",
+            options: { ...selectedOptions, action: "testdrive" },
+          });
+          // Testdrive: add to cart with testdrive action — duration is 10min (hardcoded)
+          addItem(selectedItem.id, {
+            ...selectedOptions,
+            action: "testdrive",
+            duration: "10 минут",
+          }, 1);
+          setSelectedItem(null);
+        }}
         onAddToCart={() => {
           if (!selectedItem) return;
           void recordRentIntent(selectedItem, "configured", {
