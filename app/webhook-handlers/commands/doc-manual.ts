@@ -575,7 +575,7 @@ interface DocFlowContext {
 async function resolveBikeById(bikeId: string): Promise<any> {
   const { data: exactMatch } = await supabaseAdmin
     .from("cars")
-    .select("id, make, model, specs, type")
+    .select("id, make, model, specs, type, crew_id, owner_id")
     .eq("id", bikeId)
     .in("type", ["bike", "ebike"])
     .maybeSingle();
@@ -583,7 +583,7 @@ async function resolveBikeById(bikeId: string): Promise<any> {
 
   const { data: candidates } = await supabaseAdmin
     .from("cars")
-    .select("id, make, model, specs, type")
+    .select("id, make, model, specs, type, crew_id, owner_id")
     .in("type", ["bike", "ebike"])
     .limit(100);
   if (!candidates?.length) return null;
@@ -1166,10 +1166,13 @@ async function createRentalFromDocContract(
 
     // Resolve crew owner for placeholder user_id
     // Fail if crew owner cannot be resolved - don't fall back to renter
-    const crewOwnerChatId = await resolveCrewOwnerChatId(supabaseAdmin, bike.crew_id);
+    // Defense-in-depth: fallback to known vip-bike crew_id if bike.crew_id is missing
+    const effectiveCrewId = bike.crew_id || "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
+    const crewOwnerChatId = await resolveCrewOwnerChatId(supabaseAdmin, effectiveCrewId);
     
     logger.info('[/doc] createRentalFromDocContract: crew owner resolution', {
-      crewId: bike.crew_id,
+      crewId: effectiveCrewId,
+      originalCrewId: bike.crew_id,
       crewOwnerChatId,
     });
     
@@ -1720,31 +1723,30 @@ ${qrDeepLink}`);
       const crewId = bike.crew_id || "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
       const leadId = context.clientPhone || String(userId);
       const baseTs = Date.now();
-      for (let ti = 0; ti < todos.length; ti++) {
-        const todo = todos[ti];
-        try {
-          const todoId = `todo-${baseTs.toString(36)}-${ti}-${Math.random().toString(36).slice(2, 5)}`;
-          await supabaseAdmin.from("crew_todos").insert({
-            id: todoId,
-            crew_id: crewId,
-            title: todo.title,
-            status: "pending",
-            priority: todo.priority,
-            assigned_to: String(userId),
-            category: "lead_followup",
-            description: JSON.stringify({
-              lead_id: leadId,
-              lead_phone: context.clientPhone || "",
-              lead_name: context.mpFullName || "",
-              bike_id: bike.id,
-              rental_id: rentalId || null,
-              rent_end_date: context.rentEndDate || null,
-            }),
-          });
-        } catch (todoErr) {
-          logger.warn("[/doc] Failed to create crew_todo:", todo.title, todoErr);
-        }
-      }
+      // Parallel insert for all todos (saves ~1-2s vs sequential)
+      const todoPromises = todos.map((todo, ti) => {
+        const todoId = `todo-${baseTs.toString(36)}-${ti}-${Math.random().toString(36).slice(2, 5)}`;
+        return supabaseAdmin.from("crew_todos").insert({
+          id: todoId,
+          crew_id: crewId,
+          title: todo.title,
+          status: "pending",
+          priority: todo.priority,
+          assigned_to: String(userId),
+          category: "lead_followup",
+          description: JSON.stringify({
+            lead_id: leadId,
+            lead_phone: context.clientPhone || "",
+            lead_name: context.mpFullName || "",
+            bike_id: bike.id,
+            rental_id: rentalId || null,
+            rent_end_date: context.rentEndDate || null,
+          }),
+        }).then(({ error }) => {
+          if (error) logger.warn("[/doc] Failed to create crew_todo:", todo.title, error);
+        });
+      });
+      await Promise.all(todoPromises);
       logger.info(`[/doc] Created ${todos.length} crew_todos for equipment return + checks`);
     }
 
@@ -1760,30 +1762,29 @@ ${qrDeepLink}`);
       const crewId = bike.crew_id || "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
       const leadId = context.clientPhone || String(userId);
       const baseTs2 = Date.now();
-      for (let si = 0; si < saleTodos.length; si++) {
-        const todo = saleTodos[si];
-        try {
-          const todoId = `todo-${baseTs2.toString(36)}-s${si}-${Math.random().toString(36).slice(2, 5)}`;
-          await supabaseAdmin.from("crew_todos").insert({
-            id: todoId,
-            crew_id: crewId,
-            title: todo.title,
-            status: "pending",
-            priority: todo.priority,
-            assigned_to: String(userId),
-            category: "lead_followup",
-            description: JSON.stringify({
-              lead_id: leadId,
-              lead_phone: context.clientPhone || "",
-              lead_name: context.mpFullName || "",
-              bike_id: bike.id,
-              deal_type: "sale",
-            }),
-          });
-        } catch (todoErr) {
-          logger.warn("[/doc] Failed to create sale crew_todo:", todo.title, todoErr);
-        }
-      }
+      // Parallel insert for all sale todos
+      const saleTodoPromises = saleTodos.map((todo, si) => {
+        const todoId = `todo-${baseTs2.toString(36)}-s${si}-${Math.random().toString(36).slice(2, 5)}`;
+        return supabaseAdmin.from("crew_todos").insert({
+          id: todoId,
+          crew_id: crewId,
+          title: todo.title,
+          status: "pending",
+          priority: todo.priority,
+          assigned_to: String(userId),
+          category: "lead_followup",
+          description: JSON.stringify({
+            lead_id: leadId,
+            lead_phone: context.clientPhone || "",
+            lead_name: context.mpFullName || "",
+            bike_id: bike.id,
+            deal_type: "sale",
+          }),
+        }).then(({ error }) => {
+          if (error) logger.warn("[/doc] Failed to create sale crew_todo:", todo.title, error);
+        });
+      });
+      await Promise.all(saleTodoPromises);
       logger.info(`[/doc] Created ${saleTodos.length} crew_todos for sale deal`);
     }
   } catch (leadErr) {
@@ -1791,20 +1792,10 @@ ${qrDeepLink}`);
   }
 
 
-  // --- Send email notification ---
-  // TO priority: explicit env override (for testing / redirection) →
-  // crew's actual email from Supabase crew_secrets → hardcoded fallback.
-  //
-  // BUG HISTORY: the fallback here used to be 'vip-bike@mail.ru' (HYPHEN),
-  // which does not exist on mail.ru. The crew's real address is
-  // 'vip_bike@mail.ru' (UNDERSCORE). The mismatch silently broke every
-  // notification email — mail.ru rejected the non-existent recipient.
-  // Now we prefer crewSecrets.email (loaded from Supabase at the top of
-  // generateContract) so the correct address is always used in production,
-  // and the hardcoded fallback matches the rest of the codebase.
-  //
-  // We also attach the generated DOCX so the crew receives the actual
-  // contract in their inbox, not just a text notification.
+  // --- Send email notification (fire-and-forget to avoid Vercel timeout) ---
+  // The DOCX was already sent via Telegram — email is a non-critical backup.
+  // We start the SMTP connection but don't block the function response on it.
+  // TO priority: explicit env override → crew's email from Supabase → hardcoded fallback.
   try {
     const smtpHost = process.env.SMTP_HOST || process.env.SMTP_YANDEX_HOST;
     const smtpPort = Number(process.env.SMTP_PORT || process.env.SMTP_YANDEX_PORT || 465);
@@ -1814,13 +1805,6 @@ ${qrDeepLink}`);
     const emailTo = process.env.EMAIL_DEFAULT_TO || crewSecrets.email || "vip_bike@mail.ru";
 
     if (smtpHost && smtpUser && smtpPass) {
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: { user: smtpUser, pass: smtpPass },
-      });
-
       const docType = isRent ? "аренды" : "купли-продажи";
       const emailBody = [
         `Договор ${docType} №${vars.document_key || vars.contract_number || bike.id}`,
@@ -1834,7 +1818,20 @@ ${qrDeepLink}`);
         `Документ во вложении.`,
       ].filter(Boolean).join("\n");
 
-      await transporter.sendMail({
+      // Fire-and-forget: start SMTP send but don't await it.
+      // The function returns immediately; email completes in background.
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+        connectionTimeout: 5000,  // 5s connection timeout
+        greetingTimeout: 5000,
+        socketTimeout: 8000,
+      });
+
+      // Don't await — let it run in background
+      transporter.sendMail({
         from: emailFrom,
         to: emailTo,
         subject: `Договор ${docType} — ${bike.make} ${bike.model}`,
@@ -1844,11 +1841,14 @@ ${qrDeepLink}`);
           content: docxBuf,
           contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         }],
+      }).then(() => {
+        logger.info(`[/doc] Email with DOCX sent to ${emailTo}`);
+      }).catch((emailErr: any) => {
+        logger.warn("[/doc] Email send failed (non-fatal):", emailErr?.message || emailErr);
       });
-      logger.info(`[/doc] Email with DOCX sent to ${emailTo}`);
     }
-  } catch (emailErr) {
-    logger.warn("[/doc] Email send failed (non-fatal):", emailErr);
+  } catch (emailSetupErr) {
+    logger.warn("[/doc] Email setup failed (non-fatal):", emailSetupErr);
   }
 
   return true;
