@@ -265,9 +265,9 @@ set
           'groupOrder', jsonb_build_array('Electro', 'Enduro', 'Naked', 'Supersport', 'Cruiser'),
           'quickLinks', jsonb_build_array('79bike Falcon PRO', 'Электро-тест', 'Выгодное комбо', 'Аренда выходного дня'),
           'tickerItems', jsonb_build_array(
-            jsonb_build_object('id', 'electro-main', 'text', '⚡ 79bike Falcon PRO: электромотоцикл без категории А от 310 000 ₽', 'href', '/franchize/vip-bike#catalog'),
-            jsonb_build_object('id', 'test-drive', 'text', '🏍 Тест-драйв в шоуруме: протестируйте электро перед покупкой', 'href', '/franchize/vip-bike#test-drive'),
-            jsonb_build_object('id', 'no-osago', 'text', '✅ Законно без ОСАГО и ПТС по правам категории B', 'href', '/franchize/vip-bike/electro-enduro')
+            jsonb_build_object('id', 'electro-main', 'text', '79bike Falcon PRO: электромотоцикл без категории А от 310 000 ₽', 'href', '/franchize/vip-bike#catalog'),
+            jsonb_build_object('id', 'test-drive', 'text', 'Тест-драйв в шоуруме: протестируйте электро перед покупкой', 'href', '/franchize/vip-bike#test-drive'),
+            jsonb_build_object('id', 'no-osago', 'text', 'Законно без ОСАГО и ПТС по правам категории B', 'href', '/franchize/vip-bike/electro-enduro')
           ),
           'showTwoColumnsMobile', true,
           'useModalDetails', true,
@@ -304,6 +304,8 @@ set
           'includedMileage', 200,
           'overageRate', 30,
           'lateReturnPenaltyRub', 5000,
+          'contractType', 'rental',
+          'contract_type', 'rental',
           'templateFields', jsonb_build_object(
             'renter_driver_license', jsonb_build_object('description', 'Водительское удостоверение', 'source', 'renter_profile.driver_license', 'required', true, 'placeholder', '5223 198296'),
             'renter_passport', jsonb_build_object('description', 'Паспорт (серия/номер)', 'source', 'renter_profile.passport', 'required', true, 'placeholder', '2209 384865'),

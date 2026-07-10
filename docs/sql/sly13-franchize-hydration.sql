@@ -220,8 +220,8 @@ set
           'groupOrder', jsonb_build_array('CyberVIBE', 'Snowboard', 'Dota2', 'Labs'),
           'quickLinks', jsonb_build_array('CyberVIBE', 'Snowboard', 'Dota2', 'Labs'),
           'tickerItems', jsonb_build_array(
-            jsonb_build_object('id', 'cyber-sprint-2026', 'text', '🚀 CyberVIBE Sprint 2026 — запуск франшиз-мейкеров через Codex + Supabase + Telegram', 'href', '/franchize/sly13#category-cybervibe'),
-            jsonb_build_object('id', 'ai-workflow', 'text', '⚡ Соберём твой личный AI-флоу за одну сессию', 'href', '/franchize/sly13')
+            jsonb_build_object('id', 'cyber-sprint-2026', 'text', 'CyberVIBE Sprint 2026 — запуск франшиз-мейкеров через Codex + Supabase + Telegram', 'href', '/franchize/sly13#category-cybervibe'),
+            jsonb_build_object('id', 'ai-workflow', 'text', 'Соберём твой личный AI-флоу за одну сессию', 'href', '/franchize/sly13')
           ),
           'showTwoColumnsMobile', true,
           'useModalDetails', true,

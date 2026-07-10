@@ -229,9 +229,9 @@ set
           'groupOrder', jsonb_build_array('Enduro', 'Cross', 'Pitbike', 'Trial', 'Kids'),
           'quickLinks', jsonb_build_array('Эндуро выходного дня', 'Все по 449', 'Выгодное комбо', 'Trial week'),
           'tickerItems', jsonb_build_array(
-            jsonb_build_object('id', 'vip-cross-weekend', 'text', '🔥 Weekend enduro: -15% на эндуро пакеты', 'href', '/franchize/vip-cross#category-enduro'),
-            jsonb_build_object('id', 'vip-cross-trial', 'text', '⚡ Trial day: полное снаряжение + инструктор бонусом', 'href', '/franchize/vip-cross#category-trial'),
-            jsonb_build_object('id', 'vip-cross-telegram', 'text', '📣 Быстрый выкуп слотов через Telegram @VIP_CROSS_NN', 'href', '/franchize/vip-cross/contacts')
+            jsonb_build_object('id', 'vip-cross-weekend', 'text', 'Weekend enduro: -15% на эндуро пакеты', 'href', '/franchize/vip-cross#category-enduro'),
+            jsonb_build_object('id', 'vip-cross-trial', 'text', 'Trial day: полное снаряжение + инструктор бонусом', 'href', '/franchize/vip-cross#category-trial'),
+            jsonb_build_object('id', 'vip-cross-telegram', 'text', 'Быстрый выкуп слотов через Telegram @VIP_CROSS_NN', 'href', '/franchize/vip-cross/contacts')
           ),
           'showTwoColumnsMobile', true,
           'useModalDetails', true,
@@ -261,6 +261,7 @@ set
           'overageRate', 25,       -- Lower rate for cross/enduro
           'lateReturnPenaltyRub', 5000,
           'contractType', 'vehicle_rental_cross',
+          'contract_type', 'rental',
           -- Template field mappings for docx generation
           'templateFields', jsonb_build_object(
             'renter_driver_license', jsonb_build_object(
