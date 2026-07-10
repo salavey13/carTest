@@ -95,9 +95,9 @@ export function RentalDocsForm({
     }
   };
 
-  // Input style helper
+  // Input style helper — let the parent surface show through; just add an accent-tinted border
   const inputClass = "w-full rounded-lg border px-3 py-2.5 text-sm transition focus:outline-none focus:ring-2";
-  const inputStyle = { borderColor: `${accentColor}30`, backgroundColor: "rgba(0,0,0,0.2)" };
+  const inputStyle = { borderColor: `${accentColor}30`, backgroundColor: "transparent" };
   const labelClass = "mb-1 block text-xs font-medium opacity-70";
   const exampleClass = "mt-0.5 text-[10px] opacity-50";
 
@@ -105,9 +105,16 @@ export function RentalDocsForm({
     <div className="space-y-4">
       {/* Verification badge */}
       {isVerified && (
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs">
-          <CheckCircle className="h-4 w-4 text-emerald-400" />
-          <span className="text-emerald-300">
+        <div
+          className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs"
+          style={{
+            borderColor: `${accentColor}40`,
+            backgroundColor: `${accentColor}1a`,
+            color: accentColor,
+          }}
+        >
+          <CheckCircle className="h-4 w-4" />
+          <span>
             Документы верифицированы (есть завершённая аренда)
           </span>
         </div>
@@ -313,9 +320,9 @@ export function RentalDocsForm({
 
       {/* Error / Success */}
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <span>{error}</span>
+        <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs" style={{ color: undefined }}>
+          <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+          <span className="text-red-500 dark:text-red-300">{error}</span>
         </div>
       )}
       {savedAt && !error && (
@@ -331,7 +338,7 @@ export function RentalDocsForm({
         onClick={handleSave}
         disabled={isSaving}
         className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-bold transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
-        style={{ backgroundColor: accentColor, color: "#fff" }}
+        style={{ backgroundColor: accentColor, color: "#16130A" }}
       >
         <Lock className="h-3.5 w-3.5" />
         {isSaving ? "Сохраняем..." : "Сохранить документы"}
