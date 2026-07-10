@@ -222,29 +222,63 @@ export async function getRentalsDashboard(input: {
     const endOfDay = new Date(`${date}T23:59:59.999Z`).toISOString();
 
     // Query rentals for the day
+    // FIX: Previously filtered only by created_at BETWEEN startOfDay/endOfDay,
+    // which hid rentals created on a different day (e.g. booked Monday for Friday).
+    // Now uses OR logic: a rental shows up on the selected day if EITHER:
+    //   1. It was created on that day (new booking), OR
+    //   2. Its rental period overlaps that day (active rental)
+    // We fetch by both conditions and dedupe by rental_id since Supabase REST
+    // doesn't support SQL OR across different columns.
     console.log("[rentals-dashboard] Querying rentals for crew:", crew.id, "date:", date, "range:", { startOfDay, endOfDay });
-    const { data: rentals, error: rentalsError } = await supabaseAdmin
-      .from("rentals")
-      .select(`
-        rental_id,
-        user_id,
-        vehicle_id,
-        status,
-        payment_status,
-        total_cost,
-        agreed_start_date,
-        agreed_end_date,
-        requested_start_date,
-        requested_end_date,
-        created_at,
-        metadata,
-        vehicle:cars!inner(id, make, model, crew_id, type, specs),
-        user:users!rentals_user_id_fkey(user_id, full_name, username, metadata)
-      `)
-      .eq("vehicle.crew_id", crew.id)
-      .gte("created_at", startOfDay)
-      .lte("created_at", endOfDay)
-      .order("created_at", { ascending: false });
+
+    const baseSelect = `
+      rental_id,
+      user_id,
+      vehicle_id,
+      status,
+      payment_status,
+      total_cost,
+      agreed_start_date,
+      agreed_end_date,
+      requested_start_date,
+      requested_end_date,
+      created_at,
+      metadata,
+      vehicle:cars!inner(id, make, model, crew_id, type, specs),
+      user:users!rentals_user_id_fkey(user_id, full_name, username, metadata)
+    `;
+
+    // Query 1: rentals created today
+    const [createdTodayResult, periodOverlappingResult] = await Promise.all([
+      supabaseAdmin
+        .from("rentals")
+        .select(baseSelect)
+        .eq("vehicle.crew_id", crew.id)
+        .gte("created_at", startOfDay)
+        .lte("created_at", endOfDay)
+        .order("created_at", { ascending: false }),
+      // Query 2: rentals whose PERIOD overlaps the selected day
+      // (start <= endOfDay AND end >= startOfDay)
+      supabaseAdmin
+        .from("rentals")
+        .select(baseSelect)
+        .eq("vehicle.crew_id", crew.id)
+        .lte("requested_start_date", endOfDay)
+        .gte("requested_end_date", startOfDay)
+        .order("created_at", { ascending: false }),
+    ]);
+
+    // Merge + dedupe by rental_id (period rentals win over created-today
+    // because they're more relevant to the selected day)
+    const rentalMap = new Map<string, any>();
+    for (const r of (createdTodayResult.data || []) as any[]) {
+      rentalMap.set(r.rental_id, r);
+    }
+    for (const r of (periodOverlappingResult.data || []) as any[]) {
+      rentalMap.set(r.rental_id, r);
+    }
+    const rentals = Array.from(rentalMap.values());
+    const rentalsError = createdTodayResult.error || periodOverlappingResult.error;
 
     if (rentalsError) {
       console.error("[rentals-dashboard] Query error:", rentalsError);

@@ -4,6 +4,7 @@ import { createHash } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { privateSchema } from "@/lib/private-secrets";
 import { isCrewMember } from "@/app/lib/user-rental-secrets";
+import { logger } from "@/lib/logger";
 
 export type FranchizeAchievementDefinition = {
   id: string;
@@ -652,6 +653,47 @@ export async function saveRentalDocsPrefillAction(params: {
 
       if (insertError) {
         return { success: false, error: insertError.message };
+      }
+    }
+
+    // ── Sync fullName + phone to franchizeFormPrefill ────────────────────────
+    // This ensures that the "Данные для заявок" prefill (used by the order
+    // page for recipient name + contact phone) always matches the rental
+    // docs the user just entered. Without this sync, the user could enter
+    // their name in the RentalDocsForm on the profile page and still see
+    // empty recipient/phone fields on the order page if they never filled
+    // the "Данные для заявок" section separately.
+    if (params.fullName || params.phone) {
+      try {
+        const { data: freshUser } = await supabaseAdmin
+          .from("users")
+          .select("metadata")
+          .eq("user_id", params.userId)
+          .maybeSingle();
+
+        const freshMeta = ((freshUser?.metadata || {}) as Record<string, any>) || {};
+        const existingPrefill = (freshMeta.franchizeFormPrefill?.[params.slug] ?? freshMeta.franchizeFormPrefill?.default ?? {}) as Record<string, unknown>;
+        const mergedPrefill: FranchizeFormPrefill = {
+          fullName: (params.fullName ?? (typeof existingPrefill.fullName === "string" ? existingPrefill.fullName : "")) ?? "",
+          phone: (params.phone ?? (typeof existingPrefill.phone === "string" ? existingPrefill.phone : "")) ?? "",
+          preferredTime: (typeof existingPrefill.preferredTime === "string" ? existingPrefill.preferredTime : "") ?? "",
+          deliveryMode: (existingPrefill.deliveryMode === "delivery" ? "delivery" : "pickup"),
+          comment: (typeof existingPrefill.comment === "string" ? existingPrefill.comment : "") ?? "",
+        };
+        const syncedMetadata = {
+          ...freshMeta,
+          franchizeFormPrefill: {
+            ...(freshMeta.franchizeFormPrefill || {}),
+            [params.slug]: mergedPrefill,
+          },
+        };
+        await supabaseAdmin
+          .from("users")
+          .update({ metadata: syncedMetadata, updated_at: new Date().toISOString() })
+          .eq("user_id", params.userId);
+      } catch (syncErr) {
+        // Non-fatal — best-effort sync to avoid blocking the rental docs save
+        logger.warn("[saveRentalDocsPrefill] prefill sync failed:", syncErr);
       }
     }
 
