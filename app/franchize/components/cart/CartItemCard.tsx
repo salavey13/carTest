@@ -7,7 +7,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Trash2, Bike, Pencil, Calendar } from "lucide-react";
 import type { FranchizeCrewVM } from "../../actions";
 import type { FranchizeCartLineVM } from "../../hooks/useFranchizeCartLines";
-import { crewPaletteForSurface, withAlpha, interactionRingStyle } from "../../lib/theme";
+import { withAlpha, interactionRingStyle } from "../../lib/theme";
+import { useCrewTokens } from "../../lib/use-crew-tokens";
 import { SpecBadges } from "./SpecBadge";
 import { QuantityControl } from "./QuantityControl";
 
@@ -21,9 +22,9 @@ interface CartItemCardProps {
 }
 
 export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelete, onEdit }: CartItemCardProps) {
-  const surface = crewPaletteForSurface(crew.theme);
+  const T = useCrewTokens(crew.theme);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const destructiveColor = crew.theme.mode === "dark" ? "#FF6B6B" : "#FF3B30";
+  const destructiveColor = T.isLight ? "#FF3B30" : "#FF6B6B";
 
   return (
     <motion.article
@@ -33,13 +34,13 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
       exit={{ opacity: 0, x: -100 }}
       transition={{ duration: 0.25 }}
       className="rounded-2xl border overflow-hidden"
-      style={surface.card}
+      style={T.styles.card}
     >
       <div className="flex gap-4 p-4">
         {/* LEFT: Product image — 9:16 portrait (tall) */}
         <div
           className="relative w-24 h-[170px] shrink-0 rounded-lg overflow-hidden"
-          style={{ backgroundColor: withAlpha(crew.theme.palette.borderSoft, 0.15) }}
+          style={{ backgroundColor: withAlpha(T.border, 0.15) }}
         >
           {line.item?.imageUrl ? (
             <Image
@@ -51,23 +52,23 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              <Bike className="h-10 w-10" style={surface.mutedText} />
+              <Bike className="h-10 w-10" style={{ color: T.textMuted }} />
             </div>
           )}
           {/* Subtle glow border on image */}
           <div
             className="absolute inset-0 rounded-lg pointer-events-none"
             style={{
-              boxShadow: `inset 0 0 12px ${withAlpha(crew.theme.palette.accentMain, 0.15)}`,
+              boxShadow: `inset 0 0 12px ${T.accentSoft}`,
             }}
           />
         </div>
 
         {/* RIGHT: Info */}
         <div className="flex-1 min-w-0">
-          {/* Title row with delete button */}
-          <div className="flex items-start justify-between gap-2 min-w-0 overflow-hidden">
-            <h2 className="text-base font-semibold truncate min-w-0 flex-1">
+          {/* Title row with edit button */}
+          <div className="flex items-start justify-between gap-2 min-w-0">
+            <h2 className="text-base font-semibold truncate min-w-0 flex-1" style={{ color: T.text }}>
               {line.item?.title ?? "Позиция недоступна"}
             </h2>
 
@@ -77,7 +78,7 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
                 onClick={() => onEdit(line.lineId)}
                 aria-label="Изменить товар"
                 className="shrink-0 flex items-center gap-1 text-xs mr-2 transition-colors"
-                style={{ color: crew.theme.palette.textSecondary }}
+                style={{ color: T.textMuted }}
                 onFocus={(e) => {
                   e.currentTarget.style.boxShadow = interactionRingStyle(crew.theme).boxShadow;
                 }}
@@ -88,10 +89,12 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
                 <Pencil className="h-3.5 w-3.5" />
               </button>
             )}
+          </div>
 
-            {/* Delete: icon + text, per megacart.png — inline confirm (NO alert!) */}
+          {/* Delete: separate line to prevent overflow during confirmation */}
+          <div className="mt-1 flex items-center">
             {confirmDelete ? (
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center gap-1">
                 <span className="text-[10px]" style={{ color: destructiveColor }}>
                   Удалить?
                 </span>
@@ -113,7 +116,7 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
                   onClick={() => setConfirmDelete(false)}
                   aria-label="Отменить удаление"
                   className="text-[10px] font-medium px-1.5 py-0.5 rounded"
-                  style={surface.mutedText}
+                  style={{ color: T.textMuted }}
                 >
                   Нет
                 </button>
@@ -122,8 +125,8 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
               <button
                 onClick={() => setConfirmDelete(true)}
                 aria-label="Удалить товар"
-                className="shrink-0 flex items-center gap-1 text-xs transition-colors sm:flex-row flex-row"
-                style={{ color: crew.theme.palette.textSecondary }}
+                className="flex items-center gap-1 text-xs transition-colors"
+                style={{ color: T.textMuted }}
                 onFocus={(e) => {
                   e.currentTarget.style.boxShadow = interactionRingStyle(crew.theme).boxShadow;
                 }}
@@ -131,17 +134,17 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
                   e.currentTarget.style.boxShadow = "";
                 }}
               >
-                <span className="hidden sm:inline">Удалить</span>
                 <Trash2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Удалить</span>
               </button>
             )}
           </div>
 
-          {/* Orphaned item warning — theme-aware (no hardcoded gold) */}
+          {/* Orphaned item warning — theme-aware */}
           {!line.item && (
             <p
               className="text-xs italic mt-1"
-              style={{ color: crew.theme.mode === "light" ? "#b45309" : "#FF9500" }}
+              style={{ color: T.isLight ? "#b45309" : "#FF9500" }}
             >
               Товар больше недоступен в каталоге
             </p>
@@ -149,35 +152,29 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
 
           {/* Short description (muted) */}
           {line.item?.subtitle && (
-            <p className="text-xs mt-0.5" style={surface.mutedText}>
+            <p className="text-xs mt-0.5" style={{ color: T.textMuted }}>
               {line.item.subtitle}
             </p>
           )}
 
-          {/* Rent/Buy badge — per megacart.png: Покупка is MUTED GRAY, Аренда uses accent */}
+          {/* Rent/Buy badge — Покупка is MUTED GRAY, Аренда uses accent */}
           <span
             className="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold"
             style={
               line.flowType === "sale"
                 ? {
-                    backgroundColor: withAlpha(crew.theme.palette.textSecondary, 0.15),
-                    color: crew.theme.palette.textSecondary,
+                    backgroundColor: withAlpha(T.textMuted, 0.15),
+                    color: T.textMuted,
                   }
-                : {
-                    backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.08),
-                    color: crew.theme.palette.accentMain,
-                  }
+                : T.styles.accentPill
             }
           >
             {line.flowType === "sale" ? "Покупка" : "Аренда"}
           </span>
 
-          {/* FIX: Show the rental period (date + time) inline on the card so
-              the user can verify the window without expanding the row.
-              Dates are formatted via the shared DD.MM.YYYY helper to
-              avoid the "busy till 07.09.2026" ambiguity bug. */}
+          {/* Rental period (date + time) inline on the card */}
           {line.flowType === "rental" && line.options.rentStartDate && line.options.rentEndDate && (
-            <p className="mt-1 text-[11px] font-medium" style={{ color: crew.theme.palette.textPrimary }}>
+            <p className="mt-1 text-[11px] font-medium" style={{ color: T.text }}>
               <Calendar className="inline h-3 w-3 mr-1 opacity-60" />
               {(() => {
                 try {
@@ -195,25 +192,21 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
           {/* Spec badges row */}
           {line.item && <SpecBadges specs={line.item.rawSpecs ?? {}} theme={crew.theme} />}
 
-          {/* Price section — Buy price is THE BIGGEST text on the card + gold glow */}
+          {/* Price section */}
           <div className="mt-2">
             {line.flowType === "sale" ? (
-              // BUY flow: largest font on card + gold glow effect
+              // BUY flow: largest font on card + glow in dark mode only
               <>
-                <p className="text-xs" style={surface.mutedText}>
+                <p className="text-xs" style={{ color: T.textMuted }}>
                   Цена покупки
                 </p>
                 <p
                   className="text-2xl font-bold"
                   style={{
-                    // FIX: Removed the unconditional gold textShadow — it
-                    // looked great in dark theme but turned into a muddy
-                    // halo in light theme. Keep the accent color (brand
-                    // gold) but skip the glow in light mode.
-                    color: crew.theme.palette.accentMain,
-                    textShadow: crew.theme.mode === "light"
+                    color: T.accent,
+                    textShadow: T.isLight
                       ? "none"
-                      : `0 0 12px ${withAlpha(crew.theme.palette.accentMain, 0.45)}`,
+                      : `0 0 12px ${withAlpha(T.accent, 0.45)}`,
                   }}
                 >
                   {line.salePrice?.toLocaleString("ru-RU")} ₽
@@ -221,16 +214,8 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
               </>
             ) : (
               // RENT flow: dynamic price label (hour-aware) + line total
-              // FIX: Was hardcoded "Цена за 1 день" + `line.item?.rentPriceLabel`
-              // (the catalog's static day rate) which made a 3-hour rental
-              // show "12 000 ₽ / день" even though the user selected hours.
-              // Now we read the computed `displayPriceLabel` from the cart
-              // line, which the pricing calculator produces as either
-              // "3 часа · 3 000 ₽" (hour) or "1 день · 12 000 ₽" (day).
-              // `pricePerDay` is 0 for hour rentals, so we show the
-              // per-hour label + the actual line total side by side.
               <>
-                <p className="text-xs" style={surface.mutedText}>
+                <p className="text-xs" style={{ color: T.textMuted }}>
                   {line.pricePerDay === 0 && line.rentalPeriod
                     ? `Цена за ${line.rentalPeriod}`
                     : "Цена за 1 день"}
@@ -243,7 +228,7 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
                       initial={{ scale: 1.15, opacity: 0.6 }}
                       animate={{ scale: 1, opacity: 1 }}
                       transition={{ duration: 0.2 }}
-                      style={{ color: crew.theme.palette.textPrimary }}
+                      style={{ color: T.text }}
                     >
                       {line.lineTotal.toLocaleString("ru-RU")} ₽
                     </motion.p>
@@ -261,10 +246,9 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
                     </span>
                   )}
                 </div>
-                {/* For hour rentals, show the per-day reference so the
-                    user understands the math (e.g. "12 000 ₽ / день × 3 часа"). */}
+                {/* For hour rentals, show the per-day reference */}
                 {line.pricePerDay === 0 && line.item?.rentPriceLabel && (
-                  <p className="mt-0.5 text-[10px]" style={surface.mutedText}>
+                  <p className="mt-0.5 text-[10px]" style={{ color: T.textMuted }}>
                     базовый тариф {line.item.rentPriceLabel}
                   </p>
                 )}
@@ -278,8 +262,8 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
               qty={line.qty}
               onDecrease={() => onDecreaseQty(line.lineId)}
               onIncrease={() => onIncreaseQty(line.lineId)}
-              borderColor={crew.theme.palette.borderSoft}
-              accentColor={crew.theme.palette.accentMain}
+              borderColor={T.borderSoft}
+              accentColor={T.accent}
             />
           )}
         </div>

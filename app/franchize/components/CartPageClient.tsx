@@ -7,8 +7,6 @@ import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { upsertFranchizeIntent } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
-import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
-import { crewPaletteForSurface, withAlpha } from "../lib/theme";
 import { useCrewTokens } from "../lib/use-crew-tokens";
 import { saveUserFranchizeCartAction } from "@/contexts/actions";
 import { useAppContext } from "@/contexts/AppContext";
@@ -16,7 +14,6 @@ import { getFranchizeUserRentalSecretsAction } from "../profile-actions";
 import {
   CartItemCard,
   OrderSummary,
-  TrustBadges,
   CheckoutButton,
   EmptyCartState,
   CartShimmerStyle,
@@ -36,7 +33,6 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
     changeLineQty,
     removeLine,
   });
-  const surface = crewPaletteForSurface(crew.theme);
   const T = useCrewTokens(crew.theme);
   const router = useRouter();
   const { dbUser, user } = useAppContext();
@@ -44,9 +40,6 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const [isReturningUser, setIsReturningUser] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [hasSavedDocs, setHasSavedDocs] = useState(false);
-
-  // Apply franchize theme CSS variables
-  useFranchizeTheme(crew.theme);
 
   // Load rental secrets for returning users (WOW effect)
   useEffect(() => {
@@ -165,9 +158,9 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
     <section
       className="mx-auto w-full max-w-5xl px-4 py-6"
       style={{
-        ["--cart-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
-        ["--cart-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
-        ["--cart-glow" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : withAlpha(crew.theme.palette.accentMain, 0.4),
+        ["--cart-accent" as string]: T.accent,
+        ["--cart-border" as string]: T.borderSoft,
+        ["--cart-glow" as string]: T.accentSoft,
       }}
     >
       <CartShimmerStyle />
@@ -175,31 +168,26 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
       <nav aria-label="Breadcrumb" className="mb-2">
         <p
           className="text-xs uppercase tracking-[0.2em]"
-          style={{ color: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain }}
+          style={{ color: T.accent }}
         >
           / FRANCHIZE / {crew.header.brandName?.toUpperCase() ?? slug.toUpperCase()} / CART
         </p>
       </nav>
 
-      {/* Returning User Welcome — theme-aware (no hardcoded emerald that
-          disappears on light theme) */}
+      {/* Returning User Welcome — theme-aware */}
       {isReturningUser && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-4 rounded-2xl border p-4"
           style={{
-            borderColor: crew.theme.isAuto
-              ? "color-mix(in srgb, var(--franchize-accent-main) 35%, transparent)"
-              : `${crew.theme.palette.accentMain}40`,
-            backgroundColor: crew.theme.isAuto
-              ? "color-mix(in srgb, var(--franchize-accent-main) 10%, transparent)"
-              : `${crew.theme.palette.accentMain}1a`,
+            borderColor: T.borderSoft,
+            backgroundColor: T.accentSoft,
           }}
         >
           <p
             className="text-sm font-semibold"
-            style={{ color: crew.theme.palette.textPrimary }}
+            style={{ color: T.text }}
           >
             С возвращением{userName ? `, ${userName}` : ""}!
           </p>
@@ -207,17 +195,9 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
             {hasSavedDocs && (
               <span
                 className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
-                style={{
-                  borderColor: crew.theme.isAuto
-                    ? "color-mix(in srgb, var(--franchize-accent-main) 40%, transparent)"
-                    : `${crew.theme.palette.accentMain}55`,
-                  backgroundColor: crew.theme.isAuto
-                    ? "color-mix(in srgb, var(--franchize-accent-main) 14%, transparent)"
-                    : `${crew.theme.palette.accentMain}22`,
-                  color: crew.theme.palette.textPrimary,
-                }}
+                style={T.styles.accentPill}
               >
-                <span style={{ color: crew.theme.palette.accentMain }}>✓</span>
+                <span style={{ color: T.accent }}>✓</span>
                 Паспорт и права сохранены
               </span>
             )}
@@ -226,8 +206,8 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
       )}
 
       {/* Title Section */}
-      <h1 className="mt-2 text-2xl font-semibold">Корзина</h1>
-      <p className="mt-2 text-sm" style={surface.mutedText}>
+      <h1 className="mt-2 text-2xl font-semibold" style={{ color: T.text }}>Корзина</h1>
+      <p className="mt-2 text-sm" style={{ color: T.textMuted }}>
         Проверьте состав заказа, количество и итог перед оформлением.
       </p>
 
@@ -285,20 +265,11 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
                   label={ctaLabel}
                   crew={crew}
                 />
-                <TrustBadges crew={crew} />
               </div>
             </div>
           </motion.div>
         </AnimatePresence>
       )}
-
-      {/* Easter Egg */}
-      <div
-        className="mt-16 text-center opacity-30 hover:opacity-100 transition-all duration-700 text-[10px] font-mono tracking-widest"
-        style={{ color: crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary }}
-      >
-        Built with neon &amp; spite — 2026 —
-      </div>
     </section>
   );
 }

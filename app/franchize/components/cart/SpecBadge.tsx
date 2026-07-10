@@ -2,7 +2,7 @@
 "use client";
 
 import type { FranchizeTheme } from "../../actions";
-import { withAlpha } from "../../lib/theme";
+import { useCrewTokens } from "../../lib/use-crew-tokens";
 import { Zap, Battery, Gauge, Palette } from "lucide-react";
 
 interface SpecBadgeProps {
@@ -12,16 +12,17 @@ interface SpecBadgeProps {
 }
 
 export function SpecBadge({ icon, value, theme }: SpecBadgeProps) {
+  const T = useCrewTokens(theme);
   return (
     <span
       className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium"
       style={{
-        backgroundColor: withAlpha(theme.palette.bgBase, 0.6),
-        border: `1px solid ${withAlpha(theme.palette.borderSoft, 0.5)}`,
-        color: theme.palette.textPrimary,
+        backgroundColor: T.bgElevated,
+        border: `1px solid ${T.borderSoft}`,
+        color: T.text,
       }}
     >
-      <span style={{ color: theme.palette.accentMain }}>{icon}</span>
+      <span style={{ color: T.accent }}>{icon}</span>
       {value}
     </span>
   );
