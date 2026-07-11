@@ -37,7 +37,7 @@ export default async function FranchizeRentalsPage({ params }: FranchizeRentalsP
         <FranchizeHero
           eyebrow={`/franchize/${resolvedSlug}/rentals · crew-operations`}
           title="Все аренды"
-          subcopy="Полный список аренд экипажа: активные, завершённые и ожидающие. Для доступа нужен пароль (команда /analytics-pass в Telegram-боте)."
+          subcopy="Все аренды экипажа. Доступ по паролю — /analytics-pass в Telegram-боте."
           primaryCta={{ label: "Вернуться в каталог", href: `/franchize/${resolvedSlug}` }}
           secondaryCta={{ label: "Аналитика аренд", href: `/franchize/${resolvedSlug}/rentals-analytics` }}
         />
