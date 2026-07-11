@@ -77,7 +77,7 @@ export async function handleCommand(update: any) {
                 text.startsWith("s_") || text.startsWith("p_")
             ))
         )) {
-            await handleSubrentManualCommand({ userId: userIdStr, userName: username, text: undefined, callbackData: text, messageId: update.callback_query.message.message_id, crewId: undefined });
+            await handleSubrentManualCommand({ userId: userIdStr, userName: username, text: undefined, callbackData: text, messageId: update.callback_query?.message?.message_id, callbackQueryId: update.callback_query?.id, crewId: undefined });
             return;
         }
 
