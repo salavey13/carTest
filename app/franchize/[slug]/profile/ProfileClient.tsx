@@ -332,11 +332,6 @@ export function FranchizeProfileClient({
       animate="visible"
       className="space-y-4"
       style={{
-        // Profile-specific variables — theme-aware via useCrewTokens
-        ["--fr-profile-accent" as string]: T.accent,
-        ["--fr-profile-border" as string]: T.borderSoft,
-        ["--fr-profile-text" as string]: T.text,
-        ["--fr-profile-muted" as string]: T.textMuted,
         // Shell variables for FranchizeOperatorPanel compatibility
         ["--franchize-shell-bg" as string]: T.bg,
         ["--franchize-shell-card" as string]: T.bgCard,
@@ -353,13 +348,13 @@ export function FranchizeProfileClient({
         <FranchizeOperatorPanel muted={false}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex-1">
-              <p className="flex items-center gap-2 text-xs font-medium tracking-wide text-[var(--fr-profile-accent)]">
+              <p className="flex items-center gap-2 text-xs font-medium tracking-wide " style={{ color: T.accent }}>
                 <VibeContentRenderer content="::FaIdBadge::" /> Профиль райдера
               </p>
-              <h1 className="mt-2 break-words text-2xl font-semibold text-[var(--fr-profile-text)]">
+              <h1 className="mt-2 break-words text-2xl font-semibold " style={{ color: T.text }}>
                 {profile?.crewName || crew.header.brandName || slug}
               </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-[var(--fr-profile-muted)]">
+              <p className="mt-2 max-w-3xl text-sm leading-relaxed " style={{ color: T.textMuted }}>
                 Персональная страница достижений, сохранённых данных и быстрых
                 возвратов в аренды экипажа.
               </p>
@@ -373,17 +368,17 @@ export function FranchizeProfileClient({
             <FranchizeOperatorStatCard
               label="Достижения"
               value={`${unlockedCount}/${catalog.length}`}
-              icon={<Trophy className="h-4 w-4" style={{ color: "var(--fr-profile-accent)" }} />}
+              icon={<Trophy className="h-4 w-4" style={{ color: T.accent }} />}
             />
             <FranchizeOperatorStatCard
               label="Открытия профиля"
               value={profile?.counters?.profileOpenCount || 0}
-              icon={<User className="h-4 w-4" style={{ color: "var(--fr-profile-accent)" }} />}
+              icon={<User className="h-4 w-4" style={{ color: T.accent }} />}
             />
             <FranchizeOperatorStatCard
               label="Последняя активность"
               value={profile?.lastActivityAt || "—"}
-              icon={<Clock className="h-4 w-4" style={{ color: "var(--fr-profile-accent)" }} />}
+              icon={<Clock className="h-4 w-4" style={{ color: T.accent }} />}
             />
           </div>
         </FranchizeOperatorPanel>
@@ -392,7 +387,7 @@ export function FranchizeProfileClient({
       {/* Achievements Panel */}
       <motion.div variants={itemVariants}>
         <FranchizeOperatorPanel>
-          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--fr-profile-text)]">
+          <h2 className="flex items-center gap-2 text-base font-semibold " style={{ color: T.text }}>
             <VibeContentRenderer content="::FaUserSecret::" /> Достижения
           </h2>
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -415,8 +410,8 @@ export function FranchizeProfileClient({
                     )}
                     style={{
                       borderColor: unlocked
-                        ? "var(--fr-profile-accent)"
-                        : "var(--fr-profile-border)",
+                        ? T.accent
+                        : T.borderSoft,
                       backgroundColor: unlocked
                         ? withAlpha(T.accent, 0.09)
                         : "color-mix(in srgb, var(--franchize-shell-card) 70%, transparent)",
@@ -438,8 +433,8 @@ export function FranchizeProfileClient({
                         <div
                           className="flex h-6 w-6 items-center justify-center rounded-full"
                           style={{
-                            backgroundColor: "color-mix(in srgb, var(--fr-profile-muted) 15%, transparent)",
-                            color: "var(--fr-profile-muted)",
+                            backgroundColor: "withAlpha(T.textMuted, 0.15)",
+                            color: T.textMuted,
                           }}
                         >
                           <Lock className="h-4 w-4" />
@@ -447,10 +442,10 @@ export function FranchizeProfileClient({
                       )}
                     </div>
 
-                    <p className="pr-8 text-sm font-semibold text-[var(--fr-profile-text)]">
+                    <p className="pr-8 text-sm font-semibold " style={{ color: T.text }}>
                       {achievement.title}
                     </p>
-                    <p className="mt-1 text-xs text-[var(--fr-profile-muted)]">
+                    <p className="mt-1 text-xs " style={{ color: T.textMuted }}>
                       {achievement.description}
                     </p>
                     <div className="mt-2 flex items-center gap-2 text-[11px]">
@@ -460,13 +455,13 @@ export function FranchizeProfileClient({
                           backgroundColor: withAlpha(T.accent, 0.12),
                           color: unlocked
                             ? T.accent
-                            : "var(--fr-profile-muted)",
+                            : T.textMuted,
                         }}
                       >
                         {achievement.triggerSources[0] || "Система"}
                       </span>
                       {unlocked && (
-                        <span className="text-[var(--fr-profile-accent)]">
+                        <span className="" style={{ color: T.accent }}>
                           ✓ Разблокировано
                         </span>
                       )}
@@ -483,13 +478,13 @@ export function FranchizeProfileClient({
       {/* Rentals and Purchases Panel */}
       <motion.div variants={itemVariants}>
         <FranchizeOperatorPanel>
-          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--fr-profile-text)]">
+          <h2 className="flex items-center gap-2 text-base font-semibold " style={{ color: T.text }}>
             <ShoppingCart className="h-4 w-4" /> Аренды и покупки
           </h2>
           <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
             {/* Rentals section */}
             <div>
-              <p className="mb-2 text-xs font-semibold text-[var(--fr-profile-muted)]">
+              <p className="mb-2 text-xs font-semibold " style={{ color: T.textMuted }}>
                 Текущие аренды
               </p>
               {digest?.rentals && digest.rentals.length > 0 ? (
@@ -507,33 +502,46 @@ export function FranchizeProfileClient({
                         }
                       }}
                       className="block cursor-pointer rounded-xl border p-3 text-sm transition hover:opacity-90 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                      style={{
-                        borderColor: "var(--fr-profile-border)",
-                        backgroundColor: "color-mix(in srgb, var(--fr-profile-accent) 4%, transparent)",
-                      }}
+                      style={T.styles.card}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-[var(--fr-profile-text)]">
-                          {r.vehicleLabel}
-                        </span>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          {r.vehicleImage && (
+                            <img
+                              src={r.vehicleImage}
+                              alt={r.vehicleLabel}
+                              className="h-12 w-12 flex-shrink-0 rounded-lg object-cover"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                            />
+                          )}
+                          <div>
+                            <span className="font-semibold" style={{ color: T.text }}>
+                              {r.vehicleLabel}
+                            </span>
+                            {r.agreedStartDate && r.agreedEndDate && (
+                              <p style={{ color: T.textMuted }} className="mt-0.5 text-[11px]">
+                                {new Date(r.agreedStartDate).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                                {" → "}
+                                {new Date(r.agreedEndDate).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                         {r.isTestRide ? (
-                          <span
-                            className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
-                            style={{
-                              borderColor: withAlpha(T.accent, 0.35),
-                              backgroundColor: withAlpha(T.accent, 0.12),
-                              color: T.accent,
-                            }}
-                          >
+                          <span style={T.styles.accentBadge} className="rounded-full px-2 py-0.5 text-[10px]">
                             Тест-драйв
                           </span>
                         ) : (
-                          <MapPin className="h-3 w-3 text-[var(--fr-profile-muted)]" />
+                          <span
+                            className="rounded-full px-2 py-0.5 text-[10px]"
+                            style={{
+                              ...T.styles.accentPill,
+                              opacity: r.status === "active" ? 1 : 0.6,
+                            }}
+                          >
+                            {r.status === "active" ? "Активна" : r.status}
+                          </span>
                         )}
-                      </div>
-                      <div className="mt-1 flex items-center gap-2 text-xs text-[var(--fr-profile-muted)]">
-                        <span>{r.status}</span>
-                        {r.paymentStatus && <span>· {r.paymentStatus}</span>}
                       </div>
                     </div>
                   ))}
@@ -551,7 +559,7 @@ export function FranchizeProfileClient({
 
             {/* Orders section */}
             <div>
-              <p className="mb-2 text-xs font-semibold text-[var(--fr-profile-muted)]">
+              <p className="mb-2 text-xs font-semibold " style={{ color: T.textMuted }}>
                 Планируемые покупки
               </p>
               {digest?.buyOrders && digest.buyOrders.length > 0 ? (
@@ -569,20 +577,20 @@ export function FranchizeProfileClient({
                         }
                       }}
                       className="block cursor-pointer rounded-xl border p-3 text-sm transition hover:opacity-90 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                      style={{ borderColor: "var(--fr-profile-border)" }}
+                      style={{ borderColor: T.borderSoft }}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs text-[var(--fr-profile-accent)]">
+                        <span className="font-mono text-xs " style={{ color: T.accent }}>
                           #{o.orderId}
                         </span>
-                        <ShoppingCart className="h-3 w-3 text-[var(--fr-profile-muted)]" />
+                        <ShoppingCart className="h-3 w-3 "  style={{ color: T.textMuted }} />
                       </div>
-                      <div className="mt-1 text-xs text-[var(--fr-profile-text)]">
+                      <div className="mt-1 text-xs " style={{ color: T.text }}>
                         {o.status} · {o.vehicleIds.slice(0, 2).join(", ")}
                         {o.vehicleIds.length > 2 && ` +${o.vehicleIds.length - 2}`}
                       </div>
                       {o.docFileName && (
-                        <div className="mt-1 text-xs text-[var(--fr-profile-muted)]">
+                        <div className="mt-1 text-xs " style={{ color: T.textMuted }}>
                           📄 {o.docFileName}
                         </div>
                       )}
@@ -606,10 +614,10 @@ export function FranchizeProfileClient({
       {/* Rental Documents Panel — editable via RentalDocsForm */}
       <motion.div variants={itemVariants}>
         <FranchizeOperatorPanel>
-          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--fr-profile-text)]">
+          <h2 className="flex items-center gap-2 text-base font-semibold " style={{ color: T.text }}>
             <Lock className="h-4 w-4" /> Документы для аренды
           </h2>
-          <p className="mt-1 text-xs text-[var(--fr-profile-muted)]">
+          <p className="mt-1 text-xs " style={{ color: T.textMuted }}>
             Заполните заранее — данные подставятся при оформлении. Проверяются оператором при первой аренде.
           </p>
           <div className="mt-3">
@@ -630,25 +638,25 @@ export function FranchizeProfileClient({
 
             {/* Read-only summary of verified data from past rentals */}
             {rentalSecrets?.hasPreviousRentals && (
-              <div className="mb-3 grid grid-cols-1 gap-1.5 text-xs text-[var(--fr-profile-muted)]">
+              <div className="mb-3 grid grid-cols-1 gap-1.5 text-xs " style={{ color: T.textMuted }}>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    Паспорт: <span className={rentalSecrets.savedData?.passport ? "text-[var(--fr-profile-accent)]" : ""}>
+                    Паспорт: <span className={rentalSecrets.savedData?.passport ? "" : ""} style={{ color: T.accent }}>
                       {rentalSecrets.savedData?.passport ? "✓ Сохранён" : "—"}
                     </span>
                   </div>
                   <div>
-                    ВУ: <span className={rentalSecrets.savedData?.driverLicense ? "text-[var(--fr-profile-accent)]" : ""}>
+                    ВУ: <span className={rentalSecrets.savedData?.driverLicense ? "" : ""} style={{ color: T.accent }}>
                       {rentalSecrets.savedData?.driverLicense ? "✓ Сохранено" : "—"}
                     </span>
                   </div>
                   <div>
-                    Дата рождения: <span className={rentalSecrets.savedData?.birthDate ? "text-[var(--fr-profile-accent)]" : ""}>
+                    Дата рождения: <span className={rentalSecrets.savedData?.birthDate ? "" : ""} style={{ color: T.accent }}>
                       {rentalSecrets.savedData?.birthDate || "—"}
                     </span>
                   </div>
                   <div>
-                    Категории: <span className={rentalSecrets.savedData?.licenseCategories ? "text-[var(--fr-profile-accent)]" : ""}>
+                    Категории: <span className={rentalSecrets.savedData?.licenseCategories ? "" : ""} style={{ color: T.accent }}>
                       {rentalSecrets.savedData?.licenseCategories || "—"}
                     </span>
                   </div>
@@ -673,7 +681,7 @@ export function FranchizeProfileClient({
                 }}
               />
             ) : (
-              <p className="py-4 text-center text-xs text-[var(--fr-profile-muted)]">
+              <p className="py-4 text-center text-xs " style={{ color: T.textMuted }}>
                 Откройте профиль в Telegram для ввода документов
               </p>
             )}
@@ -684,10 +692,10 @@ export function FranchizeProfileClient({
       {/* Form Prefills Panel */}
       <motion.div variants={itemVariants}>
         <FranchizeOperatorPanel>
-          <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--fr-profile-text)]">
+          <h2 className="flex items-center gap-2 text-base font-semibold " style={{ color: T.text }}>
             <VibeContentRenderer content="::FaClipboard::" /> Данные для заявок
           </h2>
-          <p className="mt-1 text-xs text-[var(--fr-profile-muted)]">
+          <p className="mt-1 text-xs " style={{ color: T.textMuted }}>
             Сохранённые данные будут автоматически подставляться в формы заявок
           </p>
           <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -729,7 +737,7 @@ export function FranchizeProfileClient({
             />
           </div>
           <div className="mt-3 flex items-center justify-between">
-            <p className="text-xs text-[var(--fr-profile-muted)]">
+            <p className="text-xs " style={{ color: T.textMuted }}>
               Данные сохраняются локально для вашего аккаунта
             </p>
             <Button
@@ -737,7 +745,7 @@ export function FranchizeProfileClient({
               disabled={isSaving}
               onClick={handlePrefillSave}
               style={{
-                backgroundColor: "var(--fr-profile-accent)",
+                backgroundColor: T.accent,
                 color: accentOn,
                 opacity: isSaving ? 0.7 : 1,
               }}
@@ -754,10 +762,10 @@ export function FranchizeProfileClient({
           <details className="group">
             <FranchizeOperatorPanel className="cursor-pointer transition hover:opacity-80">
               <summary className="flex cursor-pointer list-none items-center justify-between">
-                <h2 className="text-base font-semibold text-[var(--fr-profile-text)]">
+                <h2 className="text-base font-semibold " style={{ color: T.text }}>
                   Контракт интеграций
                 </h2>
-                <span className="text-xs text-[var(--fr-profile-muted)]">
+                <span className="text-xs " style={{ color: T.textMuted }}>
                   {Object.keys(capabilityContract).length} активных
                 </span>
               </summary>
@@ -767,14 +775,14 @@ export function FranchizeProfileClient({
                     key={key}
                     className="rounded-lg border p-2"
                     style={{
-                      borderColor: "var(--fr-profile-border)",
-                      backgroundColor: "color-mix(in srgb, var(--fr-profile-accent) 4%, transparent)",
+                      borderColor: T.borderSoft,
+                      backgroundColor: "withAlpha(T.accent, 0.04)",
                     }}
                   >
-                    <p className="text-xs font-semibold text-[var(--fr-profile-accent)]">
+                    <p className="text-xs font-semibold " style={{ color: T.accent }}>
                       {key}
                     </p>
-                    <p className="mt-1 text-xs text-[var(--fr-profile-muted)]">
+                    <p className="mt-1 text-xs " style={{ color: T.textMuted }}>
                       {value}
                     </p>
                   </div>

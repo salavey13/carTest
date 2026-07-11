@@ -37,7 +37,7 @@ export type FranchizeFormPrefill = {
 };
 
 export type FranchizeActivityDigest = {
-  rentals: Array<{ rentalId: string; status: string; vehicleId: string; vehicleLabel: string; docLink: string }>;
+  rentals: Array<{ rentalId: string; status: string; paymentStatus: string; isTestRide: boolean; vehicleId: string; vehicleLabel: string; vehicleImage: string | null; agreedStartDate: string | null; agreedEndDate: string | null; docLink: string }>;
   buyOrders: Array<{ orderId: string; status: string; vehicleIds: string[]; docLink: string; createdAt: string; docFileName?: string }>;
 };
 
@@ -311,7 +311,7 @@ export async function saveFranchizeNotificationPreferencesAction(params: {
 export async function getFranchizeActivityDigestAction(params: { userId: string; slug: string }): Promise<{ success: boolean; data?: FranchizeActivityDigest; error?: string }> {
   const { data: rentals, error: rentalsError } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id,status,payment_status,vehicle_id,metadata,vehicle:cars(make,model)")
+    .select("rental_id,status,payment_status,vehicle_id,agreed_start_date,agreed_end_date,metadata,vehicle:cars(make,model,image_url)")
     .or(`user_id.eq.${params.userId},owner_id.eq.${params.userId}`)
     .order("created_at", { ascending: false })
     .limit(20);
@@ -336,7 +336,10 @@ export async function getFranchizeActivityDigestAction(params: { userId: string;
         isTestRide: r.metadata?.flowType === "sale" || r.payment_status === "interest_paid",
         vehicleId: r.vehicle_id || "",
         vehicleLabel: `${r.vehicle?.make || "Bike"} ${r.vehicle?.model || ""}`.trim(),
-        docLink: `/rentals/${r.rental_id}`,
+        vehicleImage: r.vehicle?.image_url || null,
+        agreedStartDate: r.agreed_start_date || null,
+        agreedEndDate: r.agreed_end_date || null,
+        docLink: `/franchize/${params.slug}/rental/${r.rental_id}`,
       })),
       buyOrders: (orders || [])
         .filter((o: any) => ["sale", "mixed"].includes(String(o?.payload?.flowType || "")))
