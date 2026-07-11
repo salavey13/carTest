@@ -56,19 +56,67 @@ async function createRentalFromClaimedSecret(
     if (artifact.rental_id) {
       console.log('[rental-secrets-claim] Rental exists, updating user_id from operator to renter:', artifact.rental_id);
 
-      // Update rentals.user_id from operator → renter
-      const { error: updateError } = await supabaseAdmin
+      // Step 1: Read the rental to get current user_id and owner_id
+      const { data: rental, error: rentalSelectError } = await supabaseAdmin
         .from('rentals')
-        .update({ user_id: renterChatId })
+        .select('user_id, owner_id')
         .eq('rental_id', artifact.rental_id)
-        .eq('user_id', artifact.telegram_chat_id); // Safety: only if still operator's
+        .maybeSingle();
 
-      if (updateError) {
-        console.error('[rental-secrets-claim] Failed to update rental user_id:', updateError);
+      if (rentalSelectError) {
+        console.error('[rental-secrets-claim] Failed to fetch rental:', rentalSelectError);
         return null;
       }
 
-      console.log('[rental-secrets-claim] Rental user_id updated to renter:', renterChatId);
+      if (!rental) {
+        console.error('[rental-secrets-claim] Rental not found in public.rentals');
+        return null;
+      }
+
+      // Only update if still unclaimed (user_id === owner_id)
+      if (rental.user_id === rental.owner_id) {
+        const { error: updateError } = await supabaseAdmin
+          .from('rentals')
+          .update({ user_id: renterChatId })
+          .eq('rental_id', artifact.rental_id)
+          .eq('user_id', rental.owner_id); // Atomic: only if still owned by owner
+
+        if (updateError) {
+          console.error('[rental-secrets-claim] Failed to update rental user_id:', updateError);
+          return null;
+        }
+        console.log('[rental-secrets-claim] Rental user_id updated to renter:', renterChatId);
+      } else {
+        console.log('[rental-secrets-claim] Rental already claimed by another user (user_id !== owner_id)');
+      }
+
+      // Step 2: Update artifact telegram_chat_id from phone → renter's TG chat ID
+      const { error: artifactUpdateError } = await (supabaseAdmin as any)
+        .schema('private')
+        .from('rental_contract_artifacts')
+        .update({ telegram_chat_id: renterChatId })
+        .eq('original_sha256', secret.doc_sha256);
+
+      if (artifactUpdateError) {
+        console.error('[rental-secrets-claim] Failed to update artifact telegram_chat_id:', artifactUpdateError);
+        // Non-fatal — rental user_id was already updated
+      } else {
+        console.log('[rental-secrets-claim] Artifact telegram_chat_id updated to renter:', renterChatId);
+      }
+
+      // Step 3: Update user_rental_secrets chat_id if still null (defense-in-depth)
+      const { error: secretsUpdateError } = await (supabaseAdmin as any)
+        .schema('private')
+        .from('user_rental_secrets')
+        .update({ chat_id: renterChatId })
+        .eq('doc_sha256', secret.doc_sha256)
+        .is('chat_id', null);
+
+      if (secretsUpdateError) {
+        console.error('[rental-secrets-claim] Failed to update user_rental_secrets chat_id:', secretsUpdateError);
+        // Non-fatal
+      }
+
       return artifact.rental_id;
     }
 
