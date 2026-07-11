@@ -1,18 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ListOrdered, MapPin, RefreshCw, ShieldCheck } from "lucide-react";
+import { ListOrdered, RefreshCw } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { getFranchizeCrewRentalsListAction, type FranchizeActivityDigest } from "@/app/franchize/profile-actions";
-import { validateAnalyticsPassword } from "@/app/franchize/server-actions/rentals-dashboard";
 import { AnalyticsPasswordEntry } from "@/app/franchize/[slug]/rentals-analytics/analytics-components/AnalyticsPasswordEntry";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
-import { withAlpha } from "@/app/franchize/lib/theme";
-import { FranchizeOperatorPanel } from "@/app/franchize/components/FranchizeOperatorSurface";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
 
 interface RentalsListClientProps {
@@ -23,7 +20,7 @@ interface RentalsListClientProps {
 type RentalItem = FranchizeActivityDigest["rentals"][number];
 
 export function RentalsListClient({ initialSlug, crew }: RentalsListClientProps) {
-  const { dbUser } = useAppContext();
+  const { dbUser, isLoading: authLoading } = useAppContext();
   const router = useRouter();
   const params = useParams<{ slug: string }>();
   const slug = initialSlug || params?.slug || "vip-bike";
@@ -47,16 +44,17 @@ export function RentalsListClient({ initialSlug, crew }: RentalsListClientProps)
     return dbUser?.user_id || passwordAuthOwnerId;
   }, [dbUser?.user_id, passwordAuthOwnerId]);
 
-  // Show password form if not authenticated
+  // Show password form immediately if auth is settled and no TG user
   useEffect(() => {
-    if (!isAuthed && !isLoading) {
+    if (!authLoading && !dbUser && !passwordAuthOwnerId) {
       setShowPasswordEntry(true);
+      setIsLoading(false);
     }
-  }, [isAuthed, isLoading]);
+  }, [authLoading, dbUser, passwordAuthOwnerId]);
 
-  // Fetch rentals when authenticated
+  // Fetch rentals when authenticated and auth is settled
   useEffect(() => {
-    if (!isAuthed) return;
+    if (!isAuthed || authLoading) return;
 
     const fetchRentals = async () => {
       setIsLoading(true);
