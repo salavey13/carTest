@@ -93,6 +93,10 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   // FIX: If currentSlug was explicitly provided (from CrewHeader), prefer it.
   // No longer falls back to "vip-bike" — empty slug is handled gracefully.
   const effectiveSlug = currentSlug?.trim() ? currentSlug.trim().toLowerCase() : scopeSlug;
+  // Only show crew operator links (leads, rentals, analytics) if user is admin
+  // OR belongs to the crew whose page they're currently viewing.
+  const isCurrentCrewMember = !!(userCrewInfo?.slug && effectiveSlug && userCrewInfo.slug === effectiveSlug);
+  const canViewCrewLinks = userIsAdmin || isCurrentCrewMember;
   const franchizeAdminHref = `/franchize/${effectiveSlug}/admin`;
   const franchizeDashboardHref = `/franchize/${effectiveSlug}/dashboard`;
   const franchizeProfileHref = `/franchize/${effectiveSlug}/profile`;
@@ -343,8 +347,8 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             </Link>
           </DropdownMenuItem>
 
-          {/* Leads page — visible to crew owner, admin, and members */}
-          {(userIsAdmin || userCrewInfo?.slug) && effectiveSlug && (
+          {/* Leads page — visible to current crew members/owner or admin */}
+          {canViewCrewLinks && effectiveSlug && (
             <DropdownMenuItem asChild>
               <Link href={`/franchize/${effectiveSlug}/leads`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
                 <PhoneCall className="mr-2 h-4 w-4 shrink-0" />
@@ -400,7 +404,8 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             </>
           ) : null}
 
-          {effectiveSlug && (
+          {/* Rentals list — current crew members/owner or admin only */}
+          {canViewCrewLinks && effectiveSlug && (
             <DropdownMenuItem asChild>
               <Link href={`/franchize/${effectiveSlug}/rentals`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
                 <List className="mr-2 h-4 w-4" />
@@ -409,7 +414,8 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             </DropdownMenuItem>
           )}
 
-          {effectiveSlug && (
+          {/* Analytics — current crew members/owner or admin only */}
+          {canViewCrewLinks && effectiveSlug && (
             <DropdownMenuItem asChild>
               <Link href={`/franchize/${effectiveSlug}/rentals-analytics`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
                 <BarChart3 className="mr-2 h-4 w-4" />
