@@ -1398,7 +1398,15 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         bike_year: bike.specs?.year || "уточняется",
         bike_engine_cc: String(bike.specs?.engine_cc || bike.specs?.displacement_cc || "0"),
         bike_power_hp: String(bike.specs?.power_hp || bike.specs?.max_power_hp || "0"),
-        bike_power_kw: String(bike.specs?.power_kw || "0"),
+        // All electric bikes capped at 3kW in contracts (regulatory class limit for L1B/L2B)
+        bike_power_kw: (() => {
+          const raw = String(bike.specs?.power_kw || "0");
+          if (isElectric) {
+            const num = Number(raw);
+            return num > 3 ? "3" : raw;
+          }
+          return raw;
+        })(),
         bike_battery: String(bike.specs?.battery || (isElectric ? "уточняется" : "")),
         buyer_phone: context.clientPhone || "",
       };

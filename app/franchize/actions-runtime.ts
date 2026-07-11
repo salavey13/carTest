@@ -2285,7 +2285,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         },
         crewSecrets,
         meta: {
-          contractNumber: `${new Date().getDate()}.${new Date().getMonth() + 1}/${car.id}`,
+          // Sequential contract numbers for multi-bike: "11.7/falcon-pro-2025-1", "11.7/rerode-r1-plus-2"
+          // Single bike: "11.7/falcon-pro-2025" (no suffix, matches /doc format)
+          contractNumber: payload.cartLines.length > 1
+            ? `${new Date().getDate()}.${new Date().getMonth() + 1}/${car.id}-${bikeIndex + 1}`
+            : `${new Date().getDate()}.${new Date().getMonth() + 1}/${car.id}`,
           contractDate: new Date().toLocaleDateString("ru-RU"),
           signatureTimestamp: new Date().toLocaleString("ru-RU"),
           signatureFingerprint: payload.signatureFingerprint || "—",
@@ -2304,19 +2308,22 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       });
 
       // Merge with web-app specific overrides
+      // FIX: Use per-bike line.lineTotal instead of payload.totalAmount
+      // so each bike's contract shows its own price, not the order total.
       const variables: RentalContractVariables = {
         ...baseVariables,
         // Web app specific overrides that aren't in the shared builder
         rent_days: String(rentDays),
-        total_price_rub: formatMoney(payload.totalAmount),
+        total_price_rub: formatMoney(line.lineTotal || payload.totalAmount),
         // Use formatMoney for price fields that expect formatted strings
         hourly_price_rub: formatMoney(Number(specs.price_per_hour || 0)),
         daily_price_rub: formatMoney(dailyPriceRub),
-        subtotal_rub: formatMoney(payload.subtotal),
+        subtotal_rub: formatMoney(line.lineTotal || payload.subtotal),
         // Include renter_phone explicitly (shared builder has it but ensure it's present)
         renter_phone: docIdentity.renterPhone || "",
-        // Web app specific placeholders
-        equipment: "—",
+        // FIX: Don't override equipment with "—" — the shared builder already
+        // computed equipment_summary from the parsed equipment object.
+        // Only override media_links (no user-generated media in web flow).
         media_links: "—",
         // Use the web app's resolved renter_passport which may include "указывается при выдаче"
         renter_passport: rentalSecrets?.renter_passport || userSensitive.passport || payload.renterPassport || "указывается при выдаче",
