@@ -293,13 +293,21 @@ async function getAvailableBikes(): Promise<any[]> {
 }
 
 function parsePassport(text: string): { series: string; number: string; issueDate: string; issuedBy: string } | null {
-  const parts = text.trim().split(/\s+/);
+  // Normalize: replace common separators (dash, slash, comma) with space
+  // so "4509-123456" becomes "4509 123456" instead of collapsing to 10 digits.
+  const normalized = text.trim().replace(/[-–—,;/]+/g, ' ');
+  const parts = normalized.split(/\s+/);
   if (parts.length < 3) return null;
 
   let series = "", number = "", dateIdx = -1;
   for (let i = 0; i < parts.length; i++) {
     const cleaned = parts[i].replace(/\D/g, '');
-    if (!series && cleaned.length === 4) series = cleaned;
+    // FIX: handle combined 10-digit format like "4509123456"
+    // when user typed "4509-123456" and normalize didn't split it
+    if (cleaned.length === 10 && !series && !number) {
+      series = cleaned.slice(0, 4);
+      number = cleaned.slice(4);
+    } else if (!series && cleaned.length === 4) series = cleaned;
     else if (!number && cleaned.length === 6) number = cleaned;
     else if (dateIdx === -1 && /^\d{1,2}\.\d{1,2}(\.\d{2,4})?$/.test(parts[i])) dateIdx = i;
   }
@@ -498,11 +506,17 @@ async function getState(userId: string): Promise<SubrentFlowContext | null> {
 async function saveState(userId: string, context: SubrentFlowContext): Promise<void> {
   const stateName = `subrent_${context.step}`;
 
+  // FIX: onConflict ensures only ONE row per user_id, preventing duplicate
+  // rows that would cause getDocState() (doc-manual.ts) to fail with
+  // maybeSingle() on multiple matches.
   await supabaseAdmin.from("user_states").upsert({
     user_id: userId,
     state: stateName,
     context,
     created_at: new Date().toISOString(),
+  }, {
+    onConflict: "user_id",
+    ignoreDuplicates: false,
   });
 }
 
@@ -518,9 +532,10 @@ export async function handleSubrentManualCommand(params: {
   text?: string;
   callbackData?: string;
   messageId?: number;
+  callbackQueryId?: string;
   crewId?: string;
 }): Promise<void> {
-  const { userId, userName, text, callbackData, messageId, crewId } = params;
+  const { userId, userName, text, callbackData, messageId, callbackQueryId, crewId } = params;
 
   if (!TELEGRAM_BOT_TOKEN) {
     logger.error("[subrent-manual] TELEGRAM_BOT_TOKEN not set");
@@ -563,7 +578,7 @@ export async function handleSubrentManualCommand(params: {
 
     // Handle callback
     if (callbackData) {
-      await handleCallback(context, callbackData, userId, messageId ?? 0);
+      await handleCallback(context, callbackData, userId, messageId ?? 0, callbackQueryId);
       return;
     }
 
@@ -584,7 +599,19 @@ export async function handleSubrentManualCommand(params: {
   }
 }
 
-async function handleCallback(context: SubrentFlowContext, callbackData: string, userId: string, messageId: number): Promise<void> {
+async function handleCallback(context: SubrentFlowContext, callbackData: string, userId: string, messageId: number, callbackQueryId?: string): Promise<void> {
+  // Answer callback query to dismiss loading spinner on the button
+  if (callbackQueryId) {
+    try {
+      await fetch(
+        `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery?callback_query_id=${callbackQueryId}`,
+        { method: "POST" },
+      );
+    } catch (e) {
+      logger.warn("[subrent] answerCallbackQuery failed:", e);
+    }
+  }
+
   const parts = callbackData.split("_");
   const action = parts[0];
   const value = parts.slice(1).join("_"); // Capture everything after first underscore
@@ -945,6 +972,9 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       const pct = parseInt(text);
       if (!isNaN(pct) && pct > 0 && pct < 100) {
         context.ownerPercentage = pct;
+        // FIX: Set step to "payment" before calling promptNextStep so it
+        // transitions to "price" (user completed the payment/percentage step).
+        context.step = "payment";
         await promptNextStep(context, userId);
       } else {
         await sendComplexMessage({
@@ -1086,6 +1116,111 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       break;
 
     default:
+      // FIX: Gracefully handle common edge cases instead of destroying state.
+      const lowerText = text.trim().toLowerCase();
+
+      // Cancel detection — user wants to abort gracefully
+      if (lowerText === "cancel" || lowerText === "отмена" || lowerText === "назад" || lowerText === "стоп") {
+        await clearState(userId);
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "❌ Операция отменена.",
+        });
+        return;
+      }
+
+      // "bike" step expects a callback selection — user typed instead of clicking
+      if (context.step === "bike") {
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "ℹ️ Выберите мотоцикл из списка или нажмите '✏️ Новый мотоцикл'. Если нужного байка нет, нажмите '✏️ Новый мотоцикл' и введите данные вручную.",
+        });
+        return;
+      }
+
+      // "ask_email" step expects yes/no — user typed instead of clicking
+      if (context.step === "ask_email") {
+        if (lowerText.includes("да") || lowerText.includes("yes") || lowerText.includes("есть")) {
+          await sendComplexMessage({
+            botToken: TELEGRAM_BOT_TOKEN,
+            chatId: userId,
+            text: "📧 Введите email собственника:",
+          });
+          context.step = "owner_email";
+          await saveState(userId, context);
+          return;
+        }
+        if (lowerText.includes("нет") || lowerText.includes("no") || lowerText.includes("нема")) {
+          context.ownerEmail = undefined;
+          context.step = "ask_email";
+          await promptNextStep(context, userId);
+          return;
+        }
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "ℹ️ Нажмите '✅ Да' или '❌ Нет' на кнопках ниже:",
+          replyMarkup: JSON.stringify({ inline_keyboard: buildYesNoKeyboard() }),
+        });
+        return;
+      }
+
+      // "payment" step expects percentage selection — user typed instead of clicking
+      if (context.step === "payment") {
+        const typedPct = parseInt(text.replace(/\D/g, ''));
+        if (!isNaN(typedPct) && typedPct > 0 && typedPct < 100) {
+          context.ownerPercentage = typedPct;
+          context.step = "payment";
+          await promptNextStep(context, userId);
+          return;
+        }
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: `ℹ️ Выберите процент из кнопок или нажмите '✏️ Свой процент':`,
+          replyMarkup: JSON.stringify({ inline_keyboard: buildPercentageKeyboard(DEFAULT_OWNER_PERCENTAGE) }),
+        });
+        return;
+      }
+
+      // "price" step expects selection — user typed instead of clicking
+      if (context.step === "price") {
+        const typedPrice = parseInt(text.replace(/\D/g, ''));
+        if (!isNaN(typedPrice) && typedPrice > 0) {
+          context.minDailyPrice = typedPrice;
+          context.step = "price";
+          await promptNextStep(context, userId);
+          return;
+        }
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: `ℹ️ Выберите цену из кнопок или нажмите '✏️ Своя цена':`,
+          replyMarkup: JSON.stringify({ inline_keyboard: buildPriceKeyboard(DEFAULT_MIN_DAILY_PRICE) }),
+        });
+        return;
+      }
+
+      // "start" step expects callback — user typed instead of clicking
+      if (context.step === "start") {
+        const start = parseStartDate(text);
+        if (start) {
+          context.contractStartDate = start.date;
+          context.contractStartTime = start.time;
+          await sendComplexMessage({
+            botToken: TELEGRAM_BOT_TOKEN,
+            chatId: userId,
+            text: `📅 Начало: ${start.date} ${start.time}\n\nВыберите длительность договора:`,
+            replyMarkup: JSON.stringify({ inline_keyboard: buildDurationKeyboard() }),
+          });
+          context.step = "duration";
+          await saveState(userId, context);
+          return;
+        }
+      }
+
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
@@ -1096,43 +1231,123 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
 }
 
 async function promptNextStep(context: SubrentFlowContext, userId: string): Promise<void> {
-  const steps = {
+  // Full sequential step map. Every step the user can be ON maps to the NEXT
+  // step to show. Missing steps like "owner_pct_custom" or "price_custom" are
+  // text-input variants that should set context.step to their parent before
+  // calling promptNextStep.
+  const stepTransitions: Record<string, string> = {
+    ask_email: "payment",
     owner_email: "payment",
-    payment: "duration",
+    payment: "price",
+    price: "hourly",
+    hourly: "seasonal",
+    seasonal: "start",
+    start: "duration",
     duration: "confirm",
   };
 
-  const currentStep = context.step;
-  const next = steps[currentStep as keyof typeof steps];
-
-  if (next === "payment") {
-    await sendComplexMessage({
-      botToken: TELEGRAM_BOT_TOKEN,
-      chatId: userId,
-      text: `💰 Процент собственника (${DEFAULT_OWNER_PERCENTAGE}%):`,
-      replyMarkup: JSON.stringify({ inline_keyboard: buildPercentageKeyboard(DEFAULT_OWNER_PERCENTAGE) }),
-    });
-    context.step = "payment";
-    await saveState(userId, context);
-  } else if (next === "duration") {
-    await sendComplexMessage({
-      botToken: TELEGRAM_BOT_TOKEN,
-      chatId: userId,
-      text: `💰 Минимальная суточная стоимость (${DEFAULT_MIN_DAILY_PRICE} ₽):`,
-      replyMarkup: JSON.stringify({ inline_keyboard: buildPriceKeyboard(DEFAULT_MIN_DAILY_PRICE) }),
-    });
-    context.step = "price";
-    await saveState(userId, context);
-  } else if (next === "confirm") {
-    await sendComplexMessage({
-      botToken: TELEGRAM_BOT_TOKEN,
-      chatId: userId,
-      text: "📅 Введите дату и время начала договора:",
-      replyMarkup: JSON.stringify({ inline_keyboard: buildStartKeyboard() }),
-    });
-    context.step = "start";
-    await saveState(userId, context);
+  // If current step has an edit variant (e.g. edit_owner_name → owner_name),
+  // transition from the edit step back to main flow.
+  let currentStep = context.step;
+  const isEditStep = currentStep.startsWith("edit_");
+  if (isEditStep) {
+    // Strip "edit_" prefix to get the base step (e.g. edit_owner_name → owner_name)
+    // but "edit_menu" and "edit_duration" need special handling.
+    if (currentStep === "edit_menu") {
+      // Stay on edit menu — already showing options, nothing to advance
+      return;
+    }
+    if (currentStep === "edit_duration") {
+      // After editing duration, show confirmation
+      await showConfirmation(context, userId);
+      return;
+    }
+    // For edit_owner_name, edit_owner_pct, edit_start — already handled
+    // by their own cases which call showConfirmation directly.
+    return;
   }
+
+  const next = stepTransitions[currentStep];
+
+  if (!next) {
+    logger.warn("[subrent] promptNextStep: no transition from", { currentStep });
+    return;
+  }
+
+  switch (next) {
+    case "payment":
+      await sendComplexMessage({
+        botToken: TELEGRAM_BOT_TOKEN,
+        chatId: userId,
+        text: `💰 Процент собственника (${DEFAULT_OWNER_PERCENTAGE}%):`,
+        replyMarkup: JSON.stringify({ inline_keyboard: buildPercentageKeyboard(DEFAULT_OWNER_PERCENTAGE) }),
+      });
+      break;
+
+    case "price":
+      await sendComplexMessage({
+        botToken: TELEGRAM_BOT_TOKEN,
+        chatId: userId,
+        text: `💰 Минимальная суточная стоимость (${DEFAULT_MIN_DAILY_PRICE} ₽):`,
+        replyMarkup: JSON.stringify({ inline_keyboard: buildPriceKeyboard(DEFAULT_MIN_DAILY_PRICE) }),
+      });
+      break;
+
+    case "hourly":
+      await sendComplexMessage({
+        botToken: TELEGRAM_BOT_TOKEN,
+        chatId: userId,
+        text: "⏰ Введите почасовые тарифы через пробел (3ч 6ч 12ч) или нажмите 'Пропустить':",
+        replyMarkup: JSON.stringify({ inline_keyboard: [[{ text: "⏭ Пропустить", callback_data: "hourly_skip" }]] }),
+      });
+      break;
+
+    case "seasonal":
+      await sendComplexMessage({
+        botToken: TELEGRAM_BOT_TOKEN,
+        chatId: userId,
+        text: "📈 Введите сезонные тарифы (будни выходные) или нажмите 'Пропустить':",
+        replyMarkup: JSON.stringify({ inline_keyboard: [[{ text: "⏭ Пропустить", callback_data: "seasonal_skip" }]] }),
+      });
+      break;
+
+    case "start":
+      await sendComplexMessage({
+        botToken: TELEGRAM_BOT_TOKEN,
+        chatId: userId,
+        text: "📅 Введите дату и время начала договора:",
+        replyMarkup: JSON.stringify({ inline_keyboard: buildStartKeyboard() }),
+      });
+      break;
+
+    case "duration":
+      if (!context.contractStartDate || !context.contractStartTime) {
+        logger.warn("[subrent] promptNextStep: start date missing, showing start prompt again");
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "📅 Сначала укажите дату начала:",
+          replyMarkup: JSON.stringify({ inline_keyboard: buildStartKeyboard() }),
+        });
+        context.step = "start";
+        await saveState(userId, context);
+        return;
+      }
+      await sendComplexMessage({
+        botToken: TELEGRAM_BOT_TOKEN,
+        chatId: userId,
+        text: "📅 Выберите длительность договора:",
+        replyMarkup: JSON.stringify({ inline_keyboard: buildDurationKeyboard() }),
+      });
+      break;
+
+    case "confirm":
+      await showConfirmation(context, userId);
+      return; // showConfirmation already saves state
+  }
+
+  context.step = next;
+  await saveState(userId, context);
 }
 
 async function showConfirmation(context: SubrentFlowContext, userId: string): Promise<void> {
