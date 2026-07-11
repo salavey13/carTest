@@ -628,13 +628,14 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
 
     case "bike":
       if (value === "new") {
+        const isEditMode = context.step === "edit_bike";
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: `📝 *Субаренда мотоцикла в парк* (2/7)\n\nВведите данные мотоцикла:\n\n*Марка Модель*\n_Yamaha R7_\n\n*VIN*\n_JYA2... (17 символов)_\n\n*Гос. номер*\n_А123БВ777_\n\n*Год*\n_2023_\n\n*Стоимость (₽)*\n_500000_\n\n📋 Каждое поле с новой строки:`,
+          text: `📝 ${isEditMode ? "Изменить" : "Субаренда мотоцикла в парк (2/7)"} данные мотоцикла:\n\n*Марка Модель*\n_Yamaha R7_\n\n*VIN*\n_JYA2... (17 символов)_\n\n*Гос. номер*\n_А123БВ777_\n\n*Год*\n_2023_\n\n*Стоимость (₽)*\n_500000_\n\n📋 Каждое поле с новой строки:`,
           parseMode: "Markdown",
         });
-        context.step = "bike_new";
+        context.step = isEditMode ? "edit_bike_new" : "bike_new";
         await saveState(userId, context);
       } else {
         const bike = await resolveBikeById(value);
@@ -643,15 +644,19 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
           context.bikeMake = bike.make;
           context.bikeModel = bike.model;
 
-          await sendComplexMessage({
-            botToken: TELEGRAM_BOT_TOKEN,
-            chatId: userId,
-            text: `✅ *Субаренда мотоцикла в парк* (3/7)\n\nВыбран: *${bike.make} ${bike.model}*\n\n👤 Введите ФИО собственника (полностью):`,
-            parseMode: "Markdown",
-          });
-
-          context.step = "owner_name";
-          await saveState(userId, context);
+          // FIX: edit_bike — after selecting a new bike, go back to confirmation
+          if (context.step === "edit_bike") {
+            await showConfirmation(context, userId);
+          } else {
+            await sendComplexMessage({
+              botToken: TELEGRAM_BOT_TOKEN,
+              chatId: userId,
+              text: `✅ *Субаренда мотоцикла в парк* (3/7)\n\nВыбран: *${bike.make} ${bike.model}*\n\n👤 Введите ФИО собственника (полностью):`,
+              parseMode: "Markdown",
+            });
+            context.step = "owner_name";
+            await saveState(userId, context);
+          }
         }
       }
       break;
@@ -761,6 +766,19 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
         await clearState(userId);
         break;
       }
+
+      // FIX: "dur_custom" — user wants to type their own duration
+      if (value === "custom") {
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "📅 Введите длительность договора в днях (например: 30, 60, 90):",
+        });
+        context.step = "duration_custom";
+        await saveState(userId, context);
+        break;
+      }
+
       const endDate = calculateEndDate(context.contractStartDate, context.contractStartTime, callbackData);
       context.contractEndDate = endDate.date;
       context.contractEndTime = endDate.time;
@@ -799,6 +817,26 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
           text: `👤 Текущий ФИО: ${context.ownerFullName}\n\nВведите новое ФИО:`,
         });
         context.step = "edit_owner_name";
+        await saveState(userId, context);
+      } else if (value === "bike") {
+        // FIX: edit_bike was causing default case to kill state.
+        // For now, redirect to bike selection while keeping other data.
+        const bikes = await getAvailableBikes();
+        // Clear old bike data so user can re-enter
+        context.bikeId = undefined;
+        context.bikeMake = undefined;
+        context.bikeModel = undefined;
+        context.bikeVin = undefined;
+        context.bikePlate = undefined;
+        context.bikeYear = undefined;
+        context.bikeValue = undefined;
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "🏍 Выберите новый мотоцикл или нажмите '✏️ Новый мотоцикл':",
+          replyMarkup: JSON.stringify({ inline_keyboard: buildBikeKeyboard(bikes) }),
+        });
+        context.step = "edit_bike";
         await saveState(userId, context);
       } else if (value === "payment") {
         await sendComplexMessage({
@@ -851,7 +889,9 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
 async function handleTextInput(context: SubrentFlowContext, text: string, userId: string, messageId: number): Promise<void> {
   switch (context.step) {
     case "bike_new":
+    case "edit_bike_new":
       const bikeLines = text.split('\n').map(l => l.trim());
+      const isEditBike = context.step === "edit_bike_new";
       if (bikeLines.length >= 2) {
         context.bikeMake = bikeLines[0];
         context.bikeModel = bikeLines[1] || "";
@@ -871,14 +911,17 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
         return;
       }
 
-      await sendComplexMessage({
-        botToken: TELEGRAM_BOT_TOKEN,
-        chatId: userId,
-        text: `✅ Мотоцикл добавлен\n\n👤 Введите ФИО собственника (полностью):`,
-      });
-
-      context.step = "owner_name";
-      await saveState(userId, context);
+      if (isEditBike) {
+        await showConfirmation(context, userId);
+      } else {
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: `✅ Мотоцикл добавлен\n\n👤 Введите ФИО собственника (полностью):`,
+        });
+        context.step = "owner_name";
+        await saveState(userId, context);
+      }
       break;
 
     case "owner_name":
@@ -1006,6 +1049,7 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       }
       break;
 
+    case "hourly":
     case "hourly_custom":
       const hourly = text.split(/\s+/).map(n => parseInt(n.replace(/\D/g, '')));
       if (hourly.length >= 3 && hourly.every(n => !isNaN(n) && n > 0)) {
@@ -1028,6 +1072,7 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       }
       break;
 
+    case "seasonal":
     case "seasonal_custom":
       const seasonal = text.split(/\s+/).map(n => parseInt(n.replace(/\D/g, '')));
       if (seasonal.length >= 2 && seasonal.every(n => !isNaN(n) && n > 0)) {
@@ -1115,6 +1160,36 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       }
       break;
 
+    case "duration_custom":
+      const durationDays = parseInt(text.replace(/\D/g, ''));
+      if (!isNaN(durationDays) && durationDays > 0 && durationDays < 3650) {
+        if (!context.contractStartDate || !context.contractStartTime) {
+          await sendComplexMessage({
+            botToken: TELEGRAM_BOT_TOKEN,
+            chatId: userId,
+            text: "❌ Ошибка: дата начала не указана. Попробуйте /subrent заново.",
+          });
+          await clearState(userId);
+          break;
+        }
+        const [sd, sm, sy] = context.contractStartDate.split('.').map(Number);
+        const [sh, smin] = context.contractStartTime.split(':').map(Number);
+        const startDt = new Date(sy, sm - 1, sd, sh, smin);
+        const endDt = new Date(startDt);
+        endDt.setDate(endDt.getDate() + durationDays);
+        endDt.setHours(19, 0, 0, 0);
+        context.contractEndDate = `${String(endDt.getDate()).padStart(2,'0')}.${String(endDt.getMonth()+1).padStart(2,'0')}.${endDt.getFullYear()}`;
+        context.contractEndTime = "19:00";
+        await showConfirmation(context, userId);
+      } else {
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "❌ Введите число дней от 1 до 3650 (например: 30):",
+        });
+      }
+      break;
+
     default:
       // FIX: Gracefully handle common edge cases instead of destroying state.
       const lowerText = text.trim().toLowerCase();
@@ -1130,12 +1205,58 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
         return;
       }
 
-      // "bike" step expects a callback selection — user typed instead of clicking
-      if (context.step === "bike") {
+      // "bike" / "edit_bike" step expects a callback selection — user typed instead of clicking
+      if (context.step === "bike" || context.step === "edit_bike") {
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
           text: "ℹ️ Выберите мотоцикл из списка или нажмите '✏️ Новый мотоцикл'. Если нужного байка нет, нажмите '✏️ Новый мотоцикл' и введите данные вручную.",
+        });
+        return;
+      }
+
+      // "duration" / "edit_duration" step expects button — user typed instead
+      if (context.step === "duration" || context.step === "edit_duration") {
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "ℹ️ Выберите длительность договора из кнопок ниже:",
+          replyMarkup: JSON.stringify({ inline_keyboard: buildDurationKeyboard() }),
+        });
+        return;
+      }
+
+      // "confirm" step — user typed instead of clicking a button
+      if (context.step === "confirm") {
+        if (lowerText === "ok" || lowerText === "да" || lowerText === "yes" || lowerText === "подтверждаю") {
+          await generateAndSendContract(context, userId);
+          await clearState(userId);
+          return;
+        }
+        if (lowerText === "изменить" || lowerText === "edit" || lowerText === "меняй") {
+          await sendComplexMessage({
+            botToken: TELEGRAM_BOT_TOKEN,
+            chatId: userId,
+            text: `🔄 Какой параметр изменить?`,
+            replyMarkup: JSON.stringify({
+              inline_keyboard: [
+                [{ text: `👤 Собственник`, callback_data: "edit_owner" }],
+                [{ text: `🏍 Мотоцикл`, callback_data: "edit_bike" }],
+                [{ text: `💰 Оплата`, callback_data: "edit_payment" }],
+                [{ text: `📅 Даты`, callback_data: "edit_dates" }],
+                [{ text: `❌ Отменить`, callback_data: "cancel" }],
+              ],
+            }),
+          });
+          context.step = "edit_menu";
+          await saveState(userId, context);
+          return;
+        }
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "ℹ️ Нажмите '✅ Подтвердить' для генерации договора, '↩️ Изменить' для правки, или '❌ Отменить'.",
+          replyMarkup: JSON.stringify({ inline_keyboard: buildConfirmKeyboard() }),
         });
         return;
       }
@@ -1219,6 +1340,42 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
           await saveState(userId, context);
           return;
         }
+      }
+
+      // "hourly" step — user typed instead of pressing 'skip'
+      if (context.step === "hourly") {
+        const hourlyVals = text.split(/\s+/).map(n => parseInt(n.replace(/\D/g, '')));
+        if (hourlyVals.length >= 3 && hourlyVals.every(n => !isNaN(n) && n > 0)) {
+          [context.hourly3hPrice, context.hourly6hPrice, context.hourly12hPrice] = hourlyVals;
+          context.step = "hourly";
+          await promptNextStep(context, userId);
+          return;
+        }
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "❌ Введите 3 числа через пробел (например: 6000 7000 8000) или нажмите 'Пропустить':",
+          replyMarkup: JSON.stringify({ inline_keyboard: [[{ text: "⏭ Пропустить", callback_data: "hourly_skip" }]] }),
+        });
+        return;
+      }
+
+      // "seasonal" step — user typed instead of pressing 'skip'
+      if (context.step === "seasonal") {
+        const seasonalVals = text.split(/\s+/).map(n => parseInt(n.replace(/\D/g, '')));
+        if (seasonalVals.length >= 2 && seasonalVals.every(n => !isNaN(n) && n > 0)) {
+          [context.weekdayPrice, context.weekendPrice] = seasonalVals;
+          context.step = "seasonal";
+          await promptNextStep(context, userId);
+          return;
+        }
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "❌ Введите 2 числа через пробел (будни выходные) или нажмите 'Пропустить':",
+          replyMarkup: JSON.stringify({ inline_keyboard: [[{ text: "⏭ Пропустить", callback_data: "seasonal_skip" }]] }),
+        });
+        return;
       }
 
       await sendComplexMessage({
