@@ -507,13 +507,18 @@ async function saveState(userId: string, context: SubrentFlowContext): Promise<v
   const stateName = `subrent_${context.step}`;
 
   // FIX: onConflict ensures only ONE row per user_id, preventing duplicate
-  // rows that would cause getDocState() (doc-manual.ts) to fail with
-  // maybeSingle() on multiple matches.
+  // rows that would cause getState() and routing (command-handler.ts) to fail
+  // with maybeSingle() on multiple matches.
+  // FIX: explicitly set expires_at — the column is NOT NULL; without it the
+  // upsert fails silently (DEFAULT 15 min from table DDL is used, but on UPDATE
+  // via onConflict the old expires_at persists → state drops after 15 min of
+  // first save, not activity). Match doc-manual's 30-minute TTL.
   await supabaseAdmin.from("user_states").upsert({
     user_id: userId,
     state: stateName,
     context,
     created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + STATE_EXPIRY_MINUTES * 60 * 1000).toISOString(),
   }, {
     onConflict: "user_id",
     ignoreDuplicates: false,
