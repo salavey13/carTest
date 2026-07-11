@@ -859,6 +859,72 @@ async function generateAndSendContract(
       [{ text: "🚀 Открыть VIP Bike", url: process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app" }],
     ], { removeKeyboard: true, parseMode: "Markdown" });
 
+    // ── Create lead + crew_todos (aligned with /doc-manual flow) ──────────
+    try {
+      const { upsertFranchizeLead } = await import("@/app/franchize/lib/leads");
+      const leadPhone = passport.phone || "";
+      const leadUserId = leadPhone || String(userId);
+      await upsertFranchizeLead({
+        slug: "vip-bike",
+        userId: leadUserId,
+        intentType: "rent",
+        stage: "contract_generated",
+        bikeId: bike.id,
+        bikeTitle: `${bike.make} ${bike.model}`,
+        phone: leadPhone || undefined,
+        fullName: passport.fullName || undefined,
+        sourceRoute: "/doc-vlm",
+        contactChannel: "telegram_bot",
+        urgencyScore: 90,
+        metadata: {
+          dealType: "rent",
+          operatorId: String(userId),
+          hasPassport: !!(passport.series && passport.number),
+          hasLicense: !!(license.series && license.number),
+          source: "vlm",
+        },
+        ensureUser: true,
+      });
+
+      // Create crew_todos for equipment return (same pattern as doc-manual.ts)
+      const crewId = bike.crew_id || "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
+      const bikeLabel = `${bike.make} ${bike.model}`;
+      const todos: Array<{ title: string; priority: string }> = [
+        { title: `🔧 Проверить ТС при возврате: ${bikeLabel} (${endDate} 10:00)`, priority: "high" },
+        { title: `🔑 Принять ключи от ${bikeLabel}`, priority: "high" },
+        { title: `📄 Проверить документы при возврате ${bikeLabel}`, priority: "medium" },
+        { title: `🔍 Осмотр на повреждения: ${bikeLabel}`, priority: "high" },
+      ];
+      const baseTs = Date.now();
+      const todoPromises = todos.map((todo, ti) => {
+        const todoId = `todo-${baseTs.toString(36)}-vlm${ti}-${Math.random().toString(36).slice(2, 5)}`;
+        return supabaseAdmin.from("crew_todos").insert({
+          id: todoId,
+          crew_id: crewId,
+          title: todo.title,
+          status: "pending",
+          priority: todo.priority,
+          assigned_to: String(userId),
+          category: "lead_followup",
+          description: JSON.stringify({
+            lead_id: leadUserId,
+            lead_phone: leadPhone,
+            lead_name: passport.fullName || "",
+            bike_id: bike.id,
+            rental_id: null,
+            rent_end_date: endDate,
+            source: "vlm_doc",
+          }),
+        }).then(({ error }: any) => {
+          if (error) logger.warn("[/doc-vlm] Failed to create crew_todo:", todo.title, error);
+        });
+      });
+      await Promise.all(todoPromises);
+      logger.info(`[/doc-vlm] Created lead + ${todos.length} crew_todos`);
+    } catch (leadErr) {
+      logger.warn("[/doc-vlm] Failed to create lead/todos:", leadErr);
+    }
+
     // Admin notification
     await notifyAdmin(
       `📄 Новый договор через /doc\n` +
