@@ -356,6 +356,88 @@ export async function getFranchizeActivityDigestAction(params: { userId: string;
 }
 
 /**
+ * Get ALL rentals for a crew — used by /franchize/{slug}/rentals page.
+ * Accessible via password auth (operators) or TG auth (crew members/owners).
+ */
+export async function getFranchizeCrewRentalsListAction(params: {
+  slug: string;
+  actorUserId?: string;
+  isPasswordAuth?: boolean;
+}): Promise<{
+  success: boolean;
+  data?: FranchizeActivityDigest["rentals"];
+  error?: string;
+}> {
+  try {
+    const { slug, actorUserId, isPasswordAuth = false } = params;
+
+    // Get crew
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id")
+      .eq("slug", slug.trim())
+      .maybeSingle();
+
+    if (!crew) return { success: false, error: "Экипаж не найден." };
+
+    // Password auth: full access
+    if (!isPasswordAuth) {
+      // TG auth: check permissions
+      const { data: user } = await supabaseAdmin
+        .from("users")
+        .select("metadata, username")
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+
+      const userMetadata = user?.metadata as Record<string, unknown> | null;
+      const userUsername = user?.username as string | null;
+      const isAdmin = userMetadata?.role === "admin";
+      const isOwner = crew.owner_id === actorUserId;
+      const isOrudjov = userUsername?.toLowerCase().includes("orud");
+
+      const { data: crewMember } = await supabaseAdmin
+        .from("crew_members")
+        .select("user_id")
+        .eq("crew_id", crew.id)
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+
+      if (!isOwner && !isAdmin && !isOrudjov && !crewMember) {
+        return { success: false, error: "Недостаточно прав для просмотра." };
+      }
+    }
+
+    // Fetch all rentals for the crew's vehicles
+    const { data: rentals } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id,status,payment_status,vehicle_id,agreed_start_date,agreed_end_date,created_at,metadata,vehicle:cars!inner(id,make,model,crew_id,image_url)")
+      .eq("vehicle.crew_id", crew.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    const result = (rentals || []).map((r: any) => ({
+      rentalId: r.rental_id,
+      status: r.status || "unknown",
+      paymentStatus: r.payment_status || "",
+      isTestRide: r.metadata?.flowType === "sale" || r.payment_status === "interest_paid",
+      vehicleId: r.vehicle_id || "",
+      vehicleLabel: `${r.vehicle?.make || "Bike"} ${r.vehicle?.model || ""}`.trim(),
+      vehicleImage: r.vehicle?.image_url || null,
+      agreedStartDate: r.agreed_start_date || null,
+      agreedEndDate: r.agreed_end_date || null,
+      docLink: `/franchize/${slug}/rental/${r.rental_id}`,
+    }));
+
+    return { success: true, data: result };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
  * Get user's verified rental secrets (passport, license) from previous rentals
  * Used for returning user pre-fill (WOW effect)
  */

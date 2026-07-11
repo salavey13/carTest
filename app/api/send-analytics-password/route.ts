@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
                     `https://${process.env.VERCEL_URL || "your-app.vercel.app"}`;
     const analyticsUrl = `${siteUrl}/franchize/${crew.slug}/rentals-analytics`;
     const leadsUrl = `${siteUrl}/franchize/${crew.slug}/leads`;
+    const rentalsUrl = `${siteUrl}/franchize/${crew.slug}/rentals`;
 
     // Configure SMTP (Yandex first, fallback to Gmail)
     const SMTP_HOST = process.env.SMTP_YANDEX_HOST || process.env.SMTP_GMAIL_HOST || "smtp.yandex.ru";
@@ -141,12 +142,13 @@ export async function POST(request: NextRequest) {
       subject: `Пароль для аналитики — ${crew.name}`,
       text: `Здравствуйте!
 
-Ваш одноразовый пароль для доступа к аналитике и клиентам:
+Ваш одноразовый пароль для доступа к панелям управления:
 
 ${passwordData.password}
 
 Аналитика аренд: ${analyticsUrl}
 Клиенты и заявки: ${leadsUrl}
+Все аренды: ${rentalsUrl}
 
 ⏰ Пароль действителен ${expiresInText}.
 
@@ -184,6 +186,7 @@ ${crew.name}`,
       <p style="text-align: center; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
         <a href="${analyticsUrl}" class="button">📊 Аналитика</a>
         <a href="${leadsUrl}" class="button" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">👥 Клиенты</a>
+        <a href="${rentalsUrl}" class="button" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">📋 Аренды</a>
       </p>
 
       <div class="expires">

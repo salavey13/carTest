@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, IdCard, MessageCircle, Send, UserPlus, Users, Moon, Sun, BarChart3, PhoneCall } from "lucide-react";
+import { Bell, ChevronDown, LayoutDashboard, List, Palette, Settings, Shield, IdCard, MessageCircle, Send, UserPlus, Users, Moon, Sun, BarChart3, PhoneCall } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
@@ -399,6 +399,15 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
               ))}
             </>
           ) : null}
+
+          {effectiveSlug && (
+            <DropdownMenuItem asChild>
+              <Link href={`/franchize/${effectiveSlug}/rentals`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                <List className="mr-2 h-4 w-4" />
+                <span className="truncate">Все аренды</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
 
           {effectiveSlug && (
             <DropdownMenuItem asChild>
