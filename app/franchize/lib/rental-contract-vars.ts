@@ -78,7 +78,9 @@ export function getVehicleTypeLabels(isElectric: boolean) {
  */
 export function getEngineSpecLines(isElectric: boolean, bike: BikeSpecs) {
   const specs = bike as any; // Allow access to additional spec properties
-  const powerKw = bike.power_kw || specs.nominal_power_kw || specs.motor_nominal_kw || '';
+  const rawPowerKw = bike.power_kw || specs.nominal_power_kw || specs.motor_nominal_kw || '';
+  // All electric bikes capped at 3kW in contracts (regulatory class limit for L1B/L2B)
+  const powerKw = isElectric && Number(rawPowerKw) > 3 ? '3' : rawPowerKw;
   const powerHp = bike.motor_hp || specs.max_power_hp || '';
   const engineCc = bike.engine_cc || bike.displacement_cc || '';
   const maxSpeed = bike.top_speed_kmh || specs.top_speed_kmh || '';

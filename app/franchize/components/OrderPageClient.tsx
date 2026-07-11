@@ -33,7 +33,6 @@ interface OrderPageClientProps {
 }
 
 const payments = [
-  { id: "telegram_xtr", label: "Telegram Stars (XTR)", description: "Счёт в Telegram (быстрый anti-spam tip flow)" },
   { id: "card", label: "Карта", description: "Оплата картой при подтверждении" },
   { id: "cash", label: "Наличные", description: "Оплата при получении" },
   { id: "sbp", label: "СБП", description: "Перевод по QR-коду" },
@@ -118,7 +117,7 @@ const orderFormSchema = z.object({
   licenseNumber: z.string().trim().optional(),
   licenseCategories: z.string().trim().optional(),
   licenseExpiryDate: z.string().trim().optional(),
-  payment: z.enum(["telegram_xtr", "card", "cash", "sbp"]),
+  payment: z.enum(["card", "cash", "sbp"]),
   deliveryMode: z.enum(["pickup", "delivery"]).default("pickup"),
   selectedExtras: z.array(z.string()).default([]),
   promo: z.string().default(""),
@@ -174,7 +173,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       licenseExpiryDate: "",
       promo: "",
       selectedExtras: [],
-      payment: isInTelegramContext ? payments[0].id : "card",
+      payment: "card",
       deliveryMode: "pickup",
       consent: true,
     },
@@ -286,19 +285,19 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   // `rentalEndDate` is kept as the local YYYY-MM-DD for downstream
   // code that expects it (submission payload, recovery snapshot).
   const rentalEndDate = resolvedEndDate;
-  const requiresTelegram = payment === "telegram_xtr";
+  const requiresTelegram = false; // XTR payment removed
   const hasTelegramUser = Boolean(user?.id);
-  const visiblePayments = isInTelegramContext ? payments : payments.filter((p) => p.id !== "telegram_xtr");
+  const visiblePayments = payments; // Show all payments (XTR removed)
 
-  // Auto-switch from XTR to card when not in Telegram context
+  // Auto-switch from XTR to card when not in Telegram context (XTR removed, kept for safety)
   useEffect(() => {
-    if (!isInTelegramContext && payment === "telegram_xtr") {
+    if (payment === "telegram_xtr") {
       setValue("payment", "card", { shouldDirty: false, shouldValidate: true });
     }
-  }, [isInTelegramContext, payment, setValue]);
+  }, [payment, setValue]);
   const normalizedPromoInput = normalizePromoCode(promo);
   const hasUnvalidatedPromo = normalizedPromoInput.length > 0 && appliedPromo?.code !== normalizedPromoInput;
-  const canSubmit = !isCartEmpty && !hasUnvalidatedPromo && (!requiresTelegram || hasTelegramUser) && recipient.trim().length > 1 && phone.trim().length > 5;
+  const canSubmit = !isCartEmpty && !hasUnvalidatedPromo && recipient.trim().length > 1 && phone.trim().length > 5;
   const checkoutMilestones = useMemo(
     () => [
       { id: "cart", label: "Байк выбран", done: !isCartEmpty },
@@ -316,21 +315,18 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       { id: "phone", label: "Добавьте контактный номер", active: phone.trim().length <= 5 },
       { id: "dates", label: `Выберите период ${flowLabel}`, active: !rentalStartDate },
       { id: "promo", label: "Примените введённый промокод или очистите поле", active: hasUnvalidatedPromo },
-      { id: "telegram", label: "Для Stars откройте страницу через Telegram WebApp", active: requiresTelegram && !hasTelegramUser },
     ].filter((item) => item.active),
-    [flowLabel, hasTelegramUser, hasUnvalidatedPromo, isCartEmpty, phone, recipient, rentalStartDate, requiresTelegram],
+    [flowLabel, hasUnvalidatedPromo, isCartEmpty, phone, recipient, rentalStartDate],
   );
   const nextAction = checkoutBlockers[0];
   const holdAmountRub = crew.reservationHold.amountRub;
-  const holdConfiguredAmountXtr = crew.reservationHold.amountXtr;
   const holdDepositAmount = crew.reservationHold.percent
     ? Math.max(1, Math.ceil(totalAmount * (crew.reservationHold.percent / 100)))
     : holdAmountRub;
-  const holdPaymentAmountXtr = crew.reservationHold.percent ? holdDepositAmount : holdConfiguredAmountXtr;
   const holdPaymentAmountRub = crew.reservationHold.percent ? holdDepositAmount : holdAmountRub;
   const holdCtaLabel = crew.reservationHold.percent
-    ? `Забронировать за ${crew.reservationHold.percent}% / ${holdPaymentAmountXtr.toLocaleString("ru-RU")} XTR`
-    : crew.reservationHold.label;
+    ? `Забронировать за ${crew.reservationHold.percent}%`
+    : crew.reservationHold.label || "Подтвердить заказ";
   const pickupAddress = crew.reservationHold.pickupAddress || crew.contacts.address || "адрес выдачи подтвердит оператор";
   const requiredDocs = crew.reservationHold.requiredDocs.length > 0
     ? crew.reservationHold.requiredDocs
@@ -444,22 +440,16 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
   const submitLabel = isSubmitting
     ? "Подготавливаем бронь..."
-    : payment === "telegram_xtr"
-      ? holdCtaLabel
-      : "Подтвердить заказ";
+    : "Подтвердить заказ";
 
   const submitHint = isSubmitting
-    ? "Проверяем данные и отправляем действие оплаты. Обычно это занимает несколько секунд."
+    ? "Проверяем данные и отправляем заказ. Обычно это занимает несколько секунд."
     : isCartEmpty
       ? `Добавьте хотя бы один байк в корзину, чтобы перейти к подтверждению ${flowLabel}.`
-      : requiresTelegram && !hasTelegramUser
-        ? "Для оплаты Stars откройте оформление из Telegram WebApp и повторите попытку."
-        : hasUnvalidatedPromo
-          ? "Промокод введён, но ещё не применён. Нажмите «Применить» или очистите поле."
-          : appliedPromo
-            ? `Промокод ${appliedPromo.code} применён: ${appliedPromo.description}.`
-            : payment === "telegram_xtr"
-              ? `Сейчас спишется только бронь: ${holdPaymentAmountRub.toLocaleString("ru-RU")}₽ / ${holdPaymentAmountXtr.toLocaleString("ru-RU")} XTR. Остальное подтвердит оператор.`
+      : hasUnvalidatedPromo
+        ? "Промокод введён, но ещё не применён. Нажмите «Применить» или очистите поле."
+        : appliedPromo
+          ? `Промокод ${appliedPromo.code} применён: ${appliedPromo.description}.`
           : "Проверьте контакты и подтверждайте заказ.";
 
   useEffect(() => {
@@ -656,17 +646,6 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
       if (!result.success) {
         toast.error(result.error ?? "Не удалось отправить заказ.");
-        if (values.payment === "telegram_xtr") {
-          sendRecoverySnapshot("payment_failed", { force: true });
-          setPaymentRetryHint("XTR-оплата не завершилась. Проверьте Telegram WebApp и повторите отправку или выберите резервную оплату.");
-        }
-        lastSubmitFingerprintRef.current = null;
-        return;
-      }
-
-      if (values.payment === "telegram_xtr") {
-        toast.success("XTR-счёт отправлен в Telegram. После оплаты откроется franchize flow ⭐");
-        setPaymentRetryHint(null);
         lastSubmitFingerprintRef.current = null;
         return;
       }
@@ -1058,14 +1037,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 >
                   <p className="font-medium">{item.label}</p>
                   <p className="text-xs" style={surface.mutedText}>
-                    {item.id === "telegram_xtr" ? `${item.description} · ${holdCtaLabel}` : item.description}
+                    {item.description}
                   </p>
                 </button>
               ))}
             </div>
-            {requiresTelegram && !hasTelegramUser ? (
-              <p className="mt-2 text-xs" style={surface.mutedText}>Для оплаты в Stars откройте оформление из Telegram WebApp.</p>
-            ) : null}
             {paymentRetryHint ? (
               <div
                 className="mt-2 rounded-2xl border p-3"

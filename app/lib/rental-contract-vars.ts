@@ -229,8 +229,11 @@ function buildEngineSpecLines(bike: BikeSpecs, isElectric: boolean): {
   }
 
   if (isElectric) {
-    const line1 = specs.power_kw
-      ? `мощность двигателя (номинальная) ${specs.power_kw} кВт`
+    // All electric bikes capped at 3kW in contracts (regulatory class limit for L1B/L2B)
+    const rawPowerKw = specs.power_kw;
+    const cappedPowerKw = rawPowerKw && Number(rawPowerKw) > 3 ? "3" : rawPowerKw;
+    const line1 = cappedPowerKw
+      ? `мощность двигателя (номинальная) ${cappedPowerKw} кВт`
       : "";
     const line2 = specs.max_speed || specs.top_speed_kmh
       ? `максимальная конструктивная скорость ${specs.max_speed || specs.top_speed_kmh} км/ч`
@@ -592,7 +595,7 @@ export function buildRentalContractVariables(
     (eq.net ? 500 : 0) +
     (eq.backpack ? 500 : 0) +
     (eq.bag ? 500 : 0) +
-    (eq.charger ? 500 : 0);
+    0;  // charger is free — tracked for return only, not priced
 
   // Total payable = base rent + equipment + deposit
   const depositNum = Number(deposit);

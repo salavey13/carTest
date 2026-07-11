@@ -584,7 +584,7 @@ const vars = {
   equipment_total_cost: String(
     Number(arg('helmets', '0')) * 1000 +
     Number(arg('gloves', '0')) * 500 +
-    (arg('charger') === '1' ? 500 : 0) +
+    (arg('charger') === '1' ? 0 : 0) +
     (arg('net') === '1' ? 500 : 0) +
     (arg('backpack') === '1' ? 500 : 0) +
     (arg('bag') === '1' ? 500 : 0)
@@ -606,7 +606,7 @@ const vars = {
     subtotalRounded +
     Number(arg('helmets', '0')) * 1000 +
     Number(arg('gloves', '0')) * 500 +
-    (arg('charger') === '1' ? 500 : 0) +
+    (arg('charger') === '1' ? 0 : 0) +
     (arg('net') === '1' ? 500 : 0) +
     (arg('backpack') === '1' ? 500 : 0) +
     (arg('bag') === '1' ? 500 : 0) +
@@ -615,7 +615,7 @@ const vars = {
   deposit_rub: bikeDeposit,
   // Payment split — default: cash = deposit, bank = rent + equipment
   payment_cash_rub: String(Number(bikeDeposit)),
-  payment_bank_rub: String(subtotalRounded + Number(arg('helmets', '0')) * 1000 + Number(arg('gloves', '0')) * 500 + (arg('charger') === '1' ? 500 : 0) + (arg('net') === '1' ? 500 : 0) + (arg('backpack') === '1' ? 500 : 0) + (arg('bag') === '1' ? 500 : 0)),
+  payment_bank_rub: String(subtotalRounded + Number(arg('helmets', '0')) * 1000 + Number(arg('gloves', '0')) * 500 + (arg('charger') === '1' ? 0 : 0) + (arg('net') === '1' ? 500 : 0) + (arg('backpack') === '1' ? 500 : 0) + (arg('bag') === '1' ? 500 : 0)),
   included_mileage:'200', overage_rate:'35', included_km_per_day:'200', extra_km_fee_rub:'35',
   late_return_penalty_rub: arg('latePenalty','10000'),
   late_return_penalty_max_days: arg('latePenaltyMaxDays','90'),
