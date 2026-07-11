@@ -2137,6 +2137,8 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // === MULTI-BIKE DOCUMENT GENERATION ===
     // Generate one DOCX per bike in cart
     const bikeDocs: Array<{ bytes: Uint8Array; fileName: string; bikeName: string; bikeId: string; documentKey: string; sha256: string }> = [];
+    // Collect per-bike equipment data for todo creation after the loop
+    const bikeEquipment: Array<{ bikeId: string; bikeName: string; equipment: { helmets: number; gloves: number; jacket: boolean; boots: boolean; net: boolean; backpack: boolean; bag: boolean; charger: boolean } }> = [];
 
     for (let bikeIndex = 0; bikeIndex < payload.cartLines.length; bikeIndex++) {
       const line = payload.cartLines[bikeIndex];
@@ -2217,6 +2219,36 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         continue; // Skip the rental/sale builder below
       }
 
+      // ── Parse equipment from cart line perk string ──────────────────────
+      // The Item modal stores extras in the `perk` field as a human-readable
+      // string like "🪖 Шлем ×1, 🧤 Перчатки, 🔌 Зарядка" or "стандарт".
+      // We parse this back into the equipment object for the contract builder.
+      const perkStr = String((line as any).options?.perk || "").toLowerCase();
+      const equipment = {
+        helmets: (() => {
+          const m = perkStr.match(/шлем\s*×\s*(\d+)/i);
+          return m ? Number(m[1]) : 0;
+        })(),
+        gloves: /перчатк/.test(perkStr) ? 1 : 0,
+        jacket: /куртк/.test(perkStr),
+        boots: /бот[ыы]|сапог/.test(perkStr),
+        net: /сетк/.test(perkStr),
+        backpack: /рюкзак/.test(perkStr),
+        bag: /сумк|багажн/.test(perkStr),
+        charger: /зарядк/.test(perkStr),
+      };
+
+      // ── Payment split: cash = deposit, bank = rest (or all cash / all bank) ──
+      const depositNum = Number(String(specs.deposit_rub || specs.deposit || 20000).replace(/[^\d]/g, "")) || 20000;
+      const lineTotal = line.lineTotal || 0;
+      const paymentSplit = (() => {
+        if (payload.payment === "cash") {
+          return { cashAmount: lineTotal + depositNum, bankAmount: 0 };
+        }
+        // card / sbp → cash = deposit, bank = rent + equipment
+        return { cashAmount: depositNum, bankAmount: lineTotal };
+      })();
+
       // Use shared builder for rental contracts
       const baseVariables = buildRentalContractVariables({
         renter: {
@@ -2265,6 +2297,10 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         extrasTotalRub: formatMoney(payload.extrasTotal),
         // Pass cart-calculated priceBreakdown to ensure contract matches cart
         priceBreakdown: (line as any).priceBreakdown,
+        // ── Equipment selection parsed from perk string ──
+        equipment,
+        // ── Payment split based on user-selected payment method ──
+        paymentSplit,
       });
 
       // Merge with web-app specific overrides
@@ -2553,6 +2589,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     }
 
     // ── Create franchize_intents lead (aligned with /doc flow) ──────────
+    // ONE lead per order (same person), even with multiple bikes.
     try {
       const { upsertFranchizeLead } = await import("@/app/franchize/lib/leads");
       await upsertFranchizeLead({
@@ -2561,7 +2598,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         intentType: flowType === "sale" ? "sale" : "rent",
         stage: "contract_generated",
         bikeId: bikeDocs[0]?.bikeId,
-        bikeTitle: bikeDocs[0]?.bikeName,
+        bikeTitle: bikeDocs.map((d) => d.bikeName).join(", "),
         phone: payload.phone || undefined,
         fullName: payload.recipient || undefined,
         sourceRoute: `/franchize/${payload.slug}/order/${payload.orderId}`,
@@ -2573,11 +2610,98 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           hasPassport: !!(payload.passportSeries && payload.passportNumber),
           hasLicense: !!(payload.licenseSeries && payload.licenseNumber),
           flow_type: flowType,
+          bikeIds: bikeDocs.map((d) => d.bikeId),
+          bikeNames: bikeDocs.map((d) => d.bikeName),
+          bikeCount: bikeDocs.length,
         },
         ensureUser: true,
       });
     } catch (leadErr) {
       logger.warn("[franchize] Failed to create lead:", leadErr);
+    }
+
+    // ── Create crew_todos for equipment return (aligned with /doc-manual flow) ──
+    // Todos are PER BIKE — each bike has its own equipment to return.
+    // One lead, many todos. Pattern follows doc-manual.ts lines 1705-1751.
+    if (flowType === "rental" || flowType === "mixed") {
+      try {
+        const crewId = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746"; // vip-bike crew
+        const leadId = payload.phone || payload.telegramUserId;
+        const baseTs = Date.now();
+        const allTodoPromises: Promise<unknown>[] = [];
+
+        for (let bikeIndex = 0; bikeIndex < bikeDocs.length; bikeIndex++) {
+          const doc = bikeDocs[bikeIndex];
+          const line = payload.cartLines[bikeIndex];
+          const car = byId.get(line?.itemId);
+          const bikeMake = car?.make || doc.bikeName.split(" ")[0] || "Байк";
+          const bikeModel = car?.model || doc.bikeName.split(" ").slice(1).join(" ") || "";
+          const rentEndDate = payload.rentalEndDate || "";
+          const rentEndTime = (line as any)?.options?.rentEndTime || "10:00";
+
+          // Parse equipment from this bike's cart line perk string
+          const perkStr = String((line as any)?.options?.perk || "").toLowerCase();
+          const equip = {
+            helmets: (() => { const m = perkStr.match(/шлем\s*×\s*(\d+)/i); return m ? Number(m[1]) : 0; })(),
+            gloves: /перчатк/.test(perkStr) ? 1 : 0,
+            jacket: /куртк/.test(perkStr),
+            boots: /бот[ыы]|сапог/.test(perkStr),
+            net: /сетк/.test(perkStr),
+            backpack: /рюкзак/.test(perkStr),
+            bag: /сумк|багажн/.test(perkStr),
+            charger: /зарядк/.test(perkStr),
+          };
+
+          const bikeLabel = `${bikeMake} ${bikeModel}`;
+          const todos: Array<{ title: string; priority: string }> = [
+            { title: `🔧 Проверить ТС при возврате: ${bikeLabel} (${rentEndDate} ${rentEndTime})`, priority: "high" },
+            { title: `🔑 Принять ключи от ${bikeLabel}`, priority: "high" },
+            { title: `📄 Проверить документы при возврате ${bikeLabel}`, priority: "medium" },
+            { title: `🔍 Осмотр на повреждения: ${bikeLabel}`, priority: "high" },
+          ];
+          if (equip.helmets > 0) todos.push({ title: `🪖 Принять ${equip.helmets} шлем(а/ов) от ${bikeLabel}`, priority: "medium" });
+          if (equip.gloves > 0) todos.push({ title: `🧤 Принять ${equip.gloves} перчатки от ${bikeLabel}`, priority: "low" });
+          if (equip.jacket) todos.push({ title: `🧥 Принять куртку от ${bikeLabel}`, priority: "low" });
+          if (equip.boots) todos.push({ title: `👢 Принять боты от ${bikeLabel}`, priority: "low" });
+          if (equip.net) todos.push({ title: `🌐 Принять сетку от ${bikeLabel}`, priority: "low" });
+          if (equip.backpack) todos.push({ title: `🎒 Принять рюкзак от ${bikeLabel}`, priority: "low" });
+          if (equip.bag) todos.push({ title: `👜 Принять сумку от ${bikeLabel}`, priority: "low" });
+          if (equip.charger) todos.push({ title: `🔌 Принять зарядное устройство от ${bikeLabel}`, priority: "medium" });
+
+          for (let ti = 0; ti < todos.length; ti++) {
+            const todo = todos[ti];
+            const todoId = `todo-${(baseTs + bikeIndex * 1000).toString(36)}-${ti}-${Math.random().toString(36).slice(2, 5)}`;
+            allTodoPromises.push(
+              supabaseAdmin.from("crew_todos").insert({
+                id: todoId,
+                crew_id: crewId,
+                title: todo.title,
+                status: "pending",
+                priority: todo.priority,
+                assigned_to: payload.telegramUserId || null,
+                category: "lead_followup",
+                description: JSON.stringify({
+                  lead_id: leadId,
+                  lead_phone: payload.phone || "",
+                  lead_name: payload.recipient || "",
+                  bike_id: doc.bikeId,
+                  rental_id: null, // will be linked when rental row is confirmed
+                  rent_end_date: rentEndDate || null,
+                  order_id: payload.orderId,
+                  source: "web_app_checkout",
+                }),
+              }).then(({ error }) => {
+                if (error) logger.warn("[franchize] Failed to create crew_todo:", todo.title, error);
+              })
+            );
+          }
+        }
+
+        await Promise.all(allTodoPromises);
+        logger.info(`[franchize] Created ${allTodoPromises.length} crew_todos for ${bikeDocs.length} bike(s) equipment return`);
+      } catch (todoErr) {
+        logger.warn("[franchize] Failed to create crew_todos:", todoErr);
+      }
     }
 
     // ── Send DOCX to crew email (aligned with /doc flow) ────────────────
