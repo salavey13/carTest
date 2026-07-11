@@ -501,7 +501,7 @@ export function FranchizeProfileClient({
                           navigateSpa(r.docLink);
                         }
                       }}
-                      className="block cursor-pointer rounded-xl border p-3 text-sm transition hover:opacity-90 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                      className="block rounded-xl border p-3 text-sm transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                       style={T.styles.card}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -528,12 +528,12 @@ export function FranchizeProfileClient({
                           </div>
                         </div>
                         {r.isTestRide ? (
-                          <span style={T.styles.accentBadge} className="rounded-full px-2 py-0.5 text-[10px]">
+                          <span style={T.styles.accentBadge} className="rounded-full px-2 py-0.5 text-[10px] whitespace-nowrap">
                             Тест-драйв
                           </span>
                         ) : (
                           <span
-                            className="rounded-full px-2 py-0.5 text-[10px]"
+                            className="rounded-full px-2 py-0.5 text-[10px] whitespace-nowrap"
                             style={{
                               ...T.styles.accentPill,
                               opacity: r.status === "active" ? 1 : 0.6,
@@ -543,6 +543,21 @@ export function FranchizeProfileClient({
                           </span>
                         )}
                       </div>
+                      {r.status === "active" && (
+                        <div className="mt-2 flex items-center justify-end gap-2 border-t pt-2"
+                          style={{ borderColor: T.borderSoft }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateSpa(`/franchize/${slug}?vehicle=${r.vehicleId}`);
+                            }}
+                            className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold transition hover:opacity-85"
+                            style={T.styles.ctaPrimary}
+                          >
+                            Продлить
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
