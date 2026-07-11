@@ -226,11 +226,30 @@ export async function handleCommand(update: any) {
             // FIX: Use supabaseAdmin instead of supabaseAnon — user_states may have
             // RLS that blocks anon reads. State is saved with supabaseAdmin (service role),
             // so we must also read with supabaseAdmin to find it reliably.
-            const { data: subrentState } = await supabaseAdmin.from("user_states")
+            // FIX: Check error from maybeSingle() — it returns data:null on error
+            // (e.g. PGRST116 = multiple rows due to missing expires_at in old saves).
+            // In that case try cleanup + fall-through to handler.
+            const { data: subrentState, error: subrentErr } = await supabaseAdmin.from("user_states")
                 .select("state")
                 .eq("user_id", userIdStr)
                 .like("state", "subrent_%")
                 .maybeSingle();
+            if (subrentErr) {
+                logger.warn(`[command-handler] subrent state maybeSingle error (${subrentErr.code}): ${subrentErr.message}`);
+                // PGRST116 = multiple rows — likely stale duplicates from missing
+                // expires_at in old saveState. Delete all, then route to subrent
+                // handler anyway (will start fresh — better than survey handler).
+                if (subrentErr.code === "PGRST116") {
+                    await supabaseAdmin.from("user_states")
+                        .delete()
+                        .eq("user_id", userIdStr)
+                        .like("state", "subrent_%");
+                    // Route to subrent handler — context will be null → fresh start
+                    await handleSubrentManualCommand({ userId: userIdStr, userName: username, text, callbackData: undefined, crewId: undefined });
+                    return;
+                }
+                // For other errors, fall through (subrentState is already null)
+            }
             if (subrentState) {
                 await handleSubrentManualCommand({ userId: userIdStr, userName: username, text, callbackData: undefined, crewId: undefined });
                 return;
