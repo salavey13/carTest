@@ -1500,6 +1500,52 @@ ${qrDeepLink}`);
       }
     }
 
+    // ── Send DOCX to crew email (aligned with web app flow) ──────────────
+    try {
+      const smtpHost = process.env.SMTP_HOST || process.env.SMTP_YANDEX_HOST;
+      const smtpPort = Number(process.env.SMTP_PORT || process.env.SMTP_YANDEX_PORT || 465);
+      const smtpUser = process.env.SMTP_USER || process.env.SMTP_YANDEX_USER;
+      const smtpPass = process.env.SMTP_PASS || process.env.SMTP_YANDEX_PASS;
+      const emailFrom = process.env.EMAIL_FROM || smtpUser;
+      const emailTo = process.env.EMAIL_DEFAULT_TO || crewSecrets.email || "vip_bike@mail.ru";
+      if (smtpHost && smtpUser && smtpPass) {
+        const docType = isRent ? "аренды" : "купли-продажи";
+        const emailBody = [
+          `Договор ${docType} №${vars.contract_number || vars.document_key}`,
+          ``,
+          `Байк: ${bike.make} ${bike.model}`,
+          `Клиент: ${context.mpFullName || "—"}`,
+          `Телефон: ${context.clientPhone || "—"}`,
+          ``,
+          isRent
+            ? `Период: ${context.rentStartDate || "?"} ${context.rentStartTime || ""} → ${context.rentEndDate || "?"} ${context.rentEndTime || ""}`
+            : `Цена: ${context.salePrice || "?"} ₽`,
+          ``,
+          `Договор сгенерирован через /doc команду.`,
+          `Документ во вложении.`,
+        ].join("\n");
+        const transporter = nodemailer.createTransport({
+          host: smtpHost, port: smtpPort, secure: smtpPort === 465,
+          auth: { user: smtpUser, pass: smtpPass },
+          connectionTimeout: 5000, greetingTimeout: 5000, socketTimeout: 8000,
+        });
+        // Fire-and-forget — don't block the command on email
+        transporter.sendMail({
+          from: emailFrom, to: emailTo,
+          subject: `Договор ${docType} — ${bike.make} ${bike.model}`,
+          text: emailBody,
+          attachments: [{
+            filename: docFileName,
+            content: docxBuf,
+            contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          }],
+        }).then(() => logger.info(`[/doc] Email with DOCX sent to ${emailTo}`))
+          .catch((emailErr: any) => logger.warn("[/doc] Email send failed (non-fatal):", emailErr?.message || emailErr));
+      }
+    } catch (emailSetupErr) {
+      logger.warn("[/doc] Email setup failed:", emailSetupErr);
+    }
+
     let rentalId: string | null = null;
     if (isRent) {
       // Create rentals row for unified tracking (before artifact)
