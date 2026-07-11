@@ -134,13 +134,15 @@ async function resolveBikeById(bikeId: string): Promise<any> {
 }
 
 async function getAvailableBikes(): Promise<any[]> {
+  // Show bikes from vip-bike crew OR unassigned (crew_id=null).
+  // Exclude bikes from OTHER crews (e.g. custom-bobber-virus, honda-cbr600rr-sz).
+  const VIP_BIKE_CREW_ID = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
   const { data } = await supabaseAdmin
     .from("cars")
     .select("id, make, model, specs")
     .in("type", ["bike", "ebike"])
-    .not("id", "like", "vipbike%")
-    .order("make", { ascending: true })
-    .limit(20);
+    .or(`crew_id.eq.${VIP_BIKE_CREW_ID},crew_id.is.null`)
+    .order("make", { ascending: true });
   return (data || []);
 }
 

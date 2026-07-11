@@ -605,15 +605,16 @@ async function resolveBikeById(bikeId: string): Promise<any> {
 }
 
 async function getAvailableBikes(): Promise<any[]> {
-  // Filter out test/internal bikes whose id starts with "vipbike" (e.g. vipbike-test-001)
-  // These are used for development/testing and should not appear in operator selection.
+  // Show bikes from vip-bike crew OR unassigned (crew_id=null, e.g. VipBike branded).
+  // Exclude bikes from OTHER crews (e.g. custom-bobber-virus, honda-cbr600rr-sz).
+  // No .limit() — all bikes should be available for selection.
+  const VIP_BIKE_CREW_ID = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
   const { data } = await supabaseAdmin
     .from("cars")
     .select("id, make, model, specs")
     .in("type", ["bike", "ebike"])
-    .not("id", "like", "vipbike%")
-    .order("make", { ascending: true })
-    .limit(20);
+    .or(`crew_id.eq.${VIP_BIKE_CREW_ID},crew_id.is.null`)
+    .order("make", { ascending: true });
   return (data || []);
 }
 
@@ -1783,6 +1784,7 @@ ${qrDeepLink}`);
         return supabaseAdmin.from("crew_todos").insert({
           id: todoId,
           crew_id: crewId,
+          lead_id: leadId,
           title: todo.title,
           status: "pending",
           priority: todo.priority,
@@ -1822,6 +1824,7 @@ ${qrDeepLink}`);
         return supabaseAdmin.from("crew_todos").insert({
           id: todoId,
           crew_id: crewId,
+          lead_id: leadId,
           title: todo.title,
           status: "pending",
           priority: todo.priority,

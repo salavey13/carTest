@@ -565,12 +565,15 @@ async function resolveBikeById(bikeId: string): Promise<{
 // ── Get available bikes for keyboard selection ────────────────────────────────
 
 async function getAvailableBikes(): Promise<Array<{ id: string; make: string; model: string; specs?: Record<string, any> }>> {
+  // Show bikes from vip-bike crew OR unassigned (crew_id=null).
+  // Exclude bikes from OTHER crews (e.g. custom-bobber-virus, honda-cbr600rr-sz).
+  const VIP_BIKE_CREW_ID = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
   const { data } = await supabaseAdmin
     .from("cars")
     .select("id, make, model, specs")
     .in("type", ["bike", "ebike"])
-    .order("make", { ascending: true })
-    .limit(20);
+    .or(`crew_id.eq.${VIP_BIKE_CREW_ID},crew_id.is.null`)
+    .order("make", { ascending: true });
 
   return (data || []) as Array<{ id: string; make: string; model: string; specs?: Record<string, any> }>;
 }
@@ -901,6 +904,7 @@ async function generateAndSendContract(
         return supabaseAdmin.from("crew_todos").insert({
           id: todoId,
           crew_id: crewId,
+          lead_id: leadUserId,
           title: todo.title,
           status: "pending",
           priority: todo.priority,
