@@ -528,7 +528,18 @@ export async function handleSubrentManualCommand(params: {
   }
 
   try {
-    const context = await getState(userId);
+    // ── FIX: Detect /subrent re-invocation and start fresh ──
+    // When the user types /subrent again while already in a flow,
+    // clear the old state and restart. Without this, the command text
+    // "/subrent" would be processed as user input for the current step
+    // (e.g. parsed as bike data), causing confusing errors.
+    const isCommandInvocation = text?.trim().toLowerCase().startsWith("/subrent");
+    if (isCommandInvocation) {
+      await clearState(userId);
+      // Fall through to the "no context" block below which starts a fresh flow
+    }
+
+    const context = isCommandInvocation ? null : await getState(userId);
 
     // Start new flow
     if (!context) {
