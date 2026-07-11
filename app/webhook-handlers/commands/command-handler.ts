@@ -12,7 +12,7 @@ import { profileCommand } from "./profile";
 import { helpCommand } from "./help";
 import { rageSettingsCommand } from "./rageSettings";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
-import { supabaseAnon } from "@/hooks/supabase";
+import { supabaseAnon, supabaseAdmin } from "@/hooks/supabase";
 import { simCommand } from "./sim";
 import { simGoCommand } from "./sim_go";
 import { seedMarketCommand } from "./seed_market";
@@ -44,7 +44,24 @@ export async function handleCommand(update: any) {
 
         logger.info(`[Command Handler] Received: '${text}' from User: ${userIdStr}`);
 
+        // ── State-aware callback routing ──────────────────────────────────────
+        // Check user's active flow state FIRST to resolve routing conflicts
+        // between /subrent and /doc (shared prefixes: cancel, ok, s_*, p_*).
+        // Uses supabaseAdmin (bypasses RLS — user_states may not be readable by anon).
+        let userFlowState: string | null = null;
+        if (update.callback_query) {
+            const { data: flowCheck } = await supabaseAdmin
+                .from("user_states")
+                .select("state")
+                .eq("user_id", userIdStr)
+                .maybeSingle();
+            userFlowState = flowCheck?.state || null;
+            logger.info(`[Command Handler] User ${userIdStr} flow state: ${userFlowState || 'none'}`);
+        }
+
         // Handle callback queries for /subrent flow
+        // Includes subrent-specific prefixes AND shared prefixes (cancel, ok, s_, p_)
+        // when user is confirmed to be in subrent state.
         if (update.callback_query && (
             text.startsWith("bike_") ||
             text.startsWith("pct_") ||
@@ -53,14 +70,20 @@ export async function handleCommand(update: any) {
             text.startsWith("seasonal_") ||
             text.startsWith("dur_") ||
             text.startsWith("edit_") ||
-            text === "yes" || text === "no" // For subrent yes/no prompts
+            text === "yes" || text === "no" ||
+            // State-aware: route shared prefixes to subrent when in subrent flow
+            (userFlowState?.startsWith("subrent_") && (
+                text === "cancel" || text === "ok" ||
+                text.startsWith("s_") || text.startsWith("p_")
+            ))
         )) {
             await handleSubrentManualCommand({ userId: userIdStr, userName: username, text: undefined, callbackData: text, messageId: update.callback_query.message.message_id, crewId: undefined });
             return;
         }
 
         // Handle callback queries for /doc flow
-        if (update.callback_query && (
+        // Skip if user is in subrent state (shared prefixes already routed above)
+        if (update.callback_query && !userFlowState?.startsWith("subrent_") && (
             text.startsWith("doc_") ||
             text.startsWith("cat_") ||
             text.startsWith("d_") ||
@@ -200,7 +223,10 @@ export async function handleCommand(update: any) {
             if (tdHandled) return;
 
             // Check if user is in /subrent flow
-            const { data: subrentState } = await supabaseAnon.from("user_states")
+            // FIX: Use supabaseAdmin instead of supabaseAnon — user_states may have
+            // RLS that blocks anon reads. State is saved with supabaseAdmin (service role),
+            // so we must also read with supabaseAdmin to find it reliably.
+            const { data: subrentState } = await supabaseAdmin.from("user_states")
                 .select("state")
                 .eq("user_id", userIdStr)
                 .like("state", "subrent_%")
