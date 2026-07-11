@@ -705,6 +705,28 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         // Fall back to start date + 24h grace
         effectiveEndTs = Number.isNaN(startTs) ? Number.NaN : startTs + RENTAL_END_GRACE_MS;
       }
+      // ── Sanity guard: reject implausibly long rentals ──
+      // A rental whose (end − start) exceeds 30 days is almost certainly
+      // a data-entry error (the classic DD.MM ↔ MM.DD swap turns a 2-day
+      // rental into a 31-day one). We skip those so a typo can't keep a
+      // bike permanently "busy" in the catalog. Legitimate long-term
+      // rentals are rare and should be tracked via subrent contracts.
+      const MAX_RENTAL_DURATION_DAYS = 30;
+      const MAX_RENTAL_DURATION_MS = MAX_RENTAL_DURATION_DAYS * 24 * 60 * 60 * 1000;
+      if (
+        !Number.isNaN(startTs) &&
+        !Number.isNaN(effectiveEndTs) &&
+        effectiveEndTs - startTs > MAX_RENTAL_DURATION_MS
+      ) {
+        logger.warn("[franchize] skipping rental with implausible duration", {
+          rentalId: rental.rental_id,
+          vehicleId,
+          startTs: new Date(startTs).toISOString(),
+          endTs: new Date(effectiveEndTs).toISOString(),
+          durationDays: Math.round((effectiveEndTs - startTs) / 86400000),
+        });
+        continue;
+      }
       const hasOpenEnd = !Number.isNaN(effectiveEndTs) && effectiveEndTs + RENTAL_END_GRACE_MS >= nowTs;
       const isActiveNow = rentalStatus === "active" && hasOpenEnd;
       const isUpcomingBooking =

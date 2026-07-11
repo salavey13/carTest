@@ -469,8 +469,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       if (!res.success || !res.data) return;
       setValue("recipient", res.data.fullName || "");
       setValue("phone", res.data.phone || "");
-      setValue("time", res.data.preferredTime || "");
-      setValue("comment", res.data.comment || "");
+      // preferredTime has no dedicated form field — merge into comment
+      // so the operator still sees the customer's preferred time.
+      const prefillComment = res.data.comment || "";
+      const prefillTime = res.data.preferredTime || "";
+      setValue("comment", prefillComment || prefillTime);
       setValue("deliveryMode", res.data.deliveryMode || "pickup");
     };
     void loadPrefill();
@@ -558,7 +561,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         window.clearTimeout(recoveryDebounceRef.current);
       }
     };
-  }, [checkoutBlockers, flowType, hasTelegramUser, isCartEmpty, orderId, payment, phone, readinessPercent, recoveryDepositAmount, rentalEndDate, rentalStartDate, slug, submitPayload, time, totalAmount, user?.id]);
+  }, [checkoutBlockers, comment, flowType, hasTelegramUser, isCartEmpty, orderId, payment, phone, readinessPercent, recoveryDepositAmount, rentalEndDate, rentalStartDate, slug, submitPayload, totalAmount, user?.id]);
 
   const checkAvailabilityBeforeSubmit = async () => {
     const carIds = Array.from(new Set(submitPayload.cartLines.map((line) => line.itemId).filter(Boolean)));
