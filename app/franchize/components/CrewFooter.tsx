@@ -121,6 +121,16 @@ export function CrewFooter({ crew }: CrewFooterProps) {
                 </li>
               );
             })}
+            {/* Мои аренды — always visible in footer for quick access to personal rentals */}
+            <li className="border-b border-[var(--footer-border)]">
+              <Link
+                href={`/franchize/${crew.slug || ""}/rentals?my=true`}
+                className="flex items-center gap-2 py-2 transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+              >
+                <ChevronRight className="h-4 w-4" />
+                <span>Мои аренды</span>
+              </Link>
+            </li>
           </ul>
         </section>
 
