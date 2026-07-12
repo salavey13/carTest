@@ -1056,6 +1056,8 @@ export function LeadsClient({
 
   // ── Data processing ───────────────────────────────────────────────────────
   const getTodoLeadId = useCallback((todo: LeadTodoRow): string | null => {
+    // Priority: native lead_id column first, then fallback to JSON description
+    if (todo.lead_id) return todo.lead_id;
     if (!todo.description) return null;
     try { return JSON.parse(todo.description).lead_id || null; } catch { return null; }
   }, []);
@@ -1184,7 +1186,7 @@ export function LeadsClient({
             style={{ backgroundColor: T.accent, color: T.accentContrast }}>
             {isPasswordValidating ? "Проверка..." : "Войти"}
           </button>
-          <p className="text-center text-xs" style={{ color: T.textFaint }}>Пароль можно получить через бота: /analytics-pass</p>
+          <p className="text-center text-xs" style={{ color: T.textFaint }}>Пароль можно получить через бота: /analytics_pass</p>
         </div>
       </div>
     );

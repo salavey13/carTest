@@ -273,9 +273,9 @@ swap.log
 6. Телефон (+email опционально)
 7. Условия: процент, тарифы, даты → подтверждение → генерация DOCX
 
-### `/analytics-pass` — Пароль для аналитики
+### `/analytics_pass` — Пароль для аналитики
 
-**Файл:** `app/webhook-handlers/commands/analytics-pass.ts`
+**Файл:** `app/webhook-handlers/commands/analytics_pass.ts`
 **Поток:**
 1. Проверка членства в crew (`crew_members`)
 2. Генерация пароля через RPC `generate_analytics_password`

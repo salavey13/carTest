@@ -1364,7 +1364,7 @@ export async function getRentalsForExport(input: {
 /**
  * Password-based access for analytics (for PC access without Telegram).
  * Uses the analytics_passwords table for time-based password validation.
- * Passwords are generated via /analytics-pass Telegram bot command.
+ * Passwords are generated via /analytics_pass Telegram bot command.
  */
 export async function validateAnalyticsPassword(input: {
   password: string;
@@ -1398,7 +1398,7 @@ export async function validateAnalyticsPassword(input: {
     const result = validationResult[0];
     if (!result.is_valid) {
       console.log("[analytics-password] Password expired");
-      return { success: false, error: "Пароль истёк. Запросите новый через /analytics-pass" };
+      return { success: false, error: "Пароль истёк. Запросите новый через /analytics_pass" };
     }
 
     console.log("[analytics-password] Password valid, returning:", {
