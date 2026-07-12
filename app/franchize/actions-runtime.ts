@@ -2682,6 +2682,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               supabaseAdmin.from("crew_todos").insert({
                 id: todoId,
                 crew_id: crewId,
+                lead_id: leadId,
                 title: todo.title,
                 status: "pending",
                 priority: todo.priority,

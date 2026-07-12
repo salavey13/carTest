@@ -622,7 +622,7 @@ function RentalRow({ rental, T }: { rental: LeadRentalRow; T: ThemeTokens }) {
         <span><Banknote className="inline h-3 w-3 mr-1" />{fmtMoney(rental.totalCost)}</span>
       </div>
       {rental.rentalId && (
-        <a href={`/franchize/vip-bike/rental/${rental.rentalId}`} target="_blank" rel="noreferrer"
+        <a href={`/franchize/vip-bike/rental/${rental.rentalId}`}
           className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium" style={{ color: T.accent }}>
           Открыть аренду <ExternalLink className="h-3 w-3" />
         </a>
@@ -1054,6 +1054,17 @@ export function LeadsClient({
     finally { setIsPasswordValidating(false); }
   };
 
+  // ── Scroll to selected lead card ─────────────────────────────────────────
+  useEffect(() => {
+    if (!selectedId) return;
+    // Small delay to let React render the opened panel
+    const timer = setTimeout(() => {
+      const el = document.querySelector(`[data-lead-id="${selectedId}"]`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [selectedId]);
+
   // ── Data processing ───────────────────────────────────────────────────────
   const getTodoLeadId = useCallback((todo: LeadTodoRow): string | null => {
     // Priority: native lead_id column first, then fallback to JSON description
@@ -1225,7 +1236,7 @@ export function LeadsClient({
             {sortedLeads.map((lead) => {
               const isThisSelected = selectedId === lead.user_id;
               return (
-                <div key={lead.user_id} className="space-y-3">
+                <div key={lead.user_id} data-lead-id={lead.user_id} className="space-y-3">
                   <LeadCard
                     lead={lead}
                     T={T}
