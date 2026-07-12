@@ -220,7 +220,7 @@ export function useStartParamRouter() {
 
   const resolveFranchizeVehicleLink = useCallback(
     async (rawParam: string, flow: "rent" | "buy", docSha256?: string | null) => {
-      const vehicleId = rawParam.slice(4).trim().toLowerCase();
+      const vehicleId = rawParam.replace(/^(?:rent|buy)_/i, '').trim().toLowerCase();
       if (!vehicleId) return null;
       try {
         const qs = new URLSearchParams({ vehicle: vehicleId, flow });
