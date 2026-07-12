@@ -4,13 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Trophy, MapPin, ShoppingCart, Lock, CheckCircle, Clock, User } from "lucide-react";
+import { Trophy, MapPin, ShoppingCart, Lock, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
 import {
-  getFranchizeCapabilityContractAction,
   getFranchizeProfileBySlugAction,
   grantFranchizeAchievementAction,
   type FranchizeAchievementDefinition,
@@ -194,9 +193,6 @@ export function FranchizeProfileClient({
   const crew = initialCrew || fallbackCrew;
   const [catalog, setCatalog] = useState<FranchizeAchievementDefinition[]>([]);
   const [profile, setProfile] = useState<FranchizeProfileState | null>(null);
-  const [capabilityContract, setCapabilityContract] = useState<
-    Record<string, string>
-  >({});
   const [error, setError] = useState<string | null>(null);
   const [digest, setDigest] = useState<FranchizeActivityDigest | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -249,8 +245,6 @@ export function FranchizeProfileClient({
       }
       setProfile(result.data);
       setCatalog(result.catalog || []);
-      const capabilities = await getFranchizeCapabilityContractAction();
-      setCapabilityContract(capabilities);
       const [digestRes, prefillRes, operatorAccessRes, rentalSecretsRes, docsRes] = await Promise.all([
         getFranchizeActivityDigestAction({ slug, userId: dbUser.user_id }),
         getFranchizeFormPrefillAction({ slug, userId: dbUser.user_id }),
@@ -364,116 +358,17 @@ export function FranchizeProfileClient({
             </FranchizeOperatorLinkButton>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-1">
             <FranchizeOperatorStatCard
               label="Достижения"
               value={`${unlockedCount}/${catalog.length}`}
               icon={<Trophy className="h-4 w-4" style={{ color: T.accent }} />}
             />
-            <FranchizeOperatorStatCard
-              label="Открытия профиля"
-              value={profile?.counters?.profileOpenCount || 0}
-              icon={<User className="h-4 w-4" style={{ color: T.accent }} />}
-            />
-            <FranchizeOperatorStatCard
-              label="Последняя активность"
-              value={profile?.lastActivityAt || "—"}
-              icon={<Clock className="h-4 w-4" style={{ color: T.accent }} />}
-            />
           </div>
         </FranchizeOperatorPanel>
       </motion.div>
 
-      {/* Achievements Panel */}
-      <motion.div variants={itemVariants}>
-        <FranchizeOperatorPanel>
-          <h2 className="flex items-center gap-2 text-base font-semibold " style={{ color: T.text }}>
-            <VibeContentRenderer content="::FaUserSecret::" /> Достижения
-          </h2>
-          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {catalog.length === 0 ? (
-              <EmptyState
-                icon={<Trophy className="h-8 w-8" />}
-                title="Нет достижений"
-                description="Достижения появятся здесь по мере вашей активности"
-              />
-            ) : (
-              catalog.map((achievement) => {
-                const unlocked = unlockedSet.has(achievement.id);
-                return (
-                  <motion.div
-                    key={achievement.id}
-                    whileHover={{ scale: 1.02 }}
-                    className={cn(
-                      "relative overflow-hidden rounded-2xl border p-3 transition-all duration-300",
-                      unlocked && "shadow-lg"
-                    )}
-                    style={{
-                      borderColor: unlocked
-                        ? T.accent
-                        : T.borderSoft,
-                      backgroundColor: unlocked
-                        ? withAlpha(T.accent, 0.09)
-                        : "color-mix(in srgb, var(--franchize-shell-card) 70%, transparent)",
-                    }}
-                  >
-                    {/* Status indicator */}
-                    <div className="absolute right-3 top-3">
-                      {unlocked ? (
-                        <div
-                          className="flex h-6 w-6 items-center justify-center rounded-full"
-                          style={{
-                            backgroundColor: withAlpha(T.accent, 0.2),
-                            color: T.accent,
-                          }}
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                        </div>
-                      ) : (
-                        <div
-                          className="flex h-6 w-6 items-center justify-center rounded-full"
-                          style={{
-                            backgroundColor: "withAlpha(T.textMuted, 0.15)",
-                            color: T.textMuted,
-                          }}
-                        >
-                          <Lock className="h-4 w-4" />
-                        </div>
-                      )}
-                    </div>
-
-                    <p className="pr-8 text-sm font-semibold " style={{ color: T.text }}>
-                      {achievement.title}
-                    </p>
-                    <p className="mt-1 text-xs " style={{ color: T.textMuted }}>
-                      {achievement.description}
-                    </p>
-                    <div className="mt-2 flex items-center gap-2 text-[11px]">
-                      <span
-                        className="rounded-full px-2 py-0.5"
-                        style={{
-                          backgroundColor: withAlpha(T.accent, 0.12),
-                          color: unlocked
-                            ? T.accent
-                            : T.textMuted,
-                        }}
-                      >
-                        {achievement.triggerSources[0] || "Система"}
-                      </span>
-                      {unlocked && (
-                        <span className="" style={{ color: T.accent }}>
-                          ✓ Разблокировано
-                        </span>
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })
-            )}
-          </div>
-          {!!error && <p className="text-xs text-red-400">{error}</p>}
-        </FranchizeOperatorPanel>
-      </motion.div>
+      {/* Achievements Panel moved to end of page */}
 
       {/* Rentals and Purchases Panel */}
       <motion.div variants={itemVariants}>
@@ -771,58 +666,99 @@ export function FranchizeProfileClient({
         </FranchizeOperatorPanel>
       </motion.div>
 
-      {/* Capability Contract Panel - Collapsed by default */}
-      {Object.keys(capabilityContract).length > 0 && (
-        <motion.div variants={itemVariants}>
-          <details className="group">
-            <FranchizeOperatorPanel className="cursor-pointer transition hover:opacity-80">
-              <summary className="flex cursor-pointer list-none items-center justify-between">
-                <h2 className="text-base font-semibold " style={{ color: T.text }}>
-                  Контракт интеграций
-                </h2>
-                <span className="text-xs " style={{ color: T.textMuted }}>
-                  {Object.keys(capabilityContract).length} активных
-                </span>
-              </summary>
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {Object.entries(capabilityContract).map(([key, value]) => (
-                  <div
-                    key={key}
-                    className="rounded-lg border p-2"
+      {/* (Capability Contract Panel removed — not needed in profile) */}
+
+      {/* Quick Actions — removed (Заявки, Map Riders not needed in profile) */}
+
+      {/* Achievements Panel — at the very end */}
+      <motion.div variants={itemVariants}>
+        <FranchizeOperatorPanel>
+          <h2 className="flex items-center gap-2 text-base font-semibold " style={{ color: T.text }}>
+            <VibeContentRenderer content="::FaUserSecret::" /> Достижения
+          </h2>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {catalog.length === 0 ? (
+              <EmptyState
+                icon={<Trophy className="h-8 w-8" />}
+                title="Нет достижений"
+                description="Достижения появятся здесь по мере вашей активности"
+              />
+            ) : (
+              catalog.map((achievement) => {
+                const unlocked = unlockedSet.has(achievement.id);
+                return (
+                  <motion.div
+                    key={achievement.id}
+                    whileHover={{ scale: 1.02 }}
+                    className={cn(
+                      "relative overflow-hidden rounded-2xl border p-3 transition-all duration-300",
+                      unlocked && "shadow-lg"
+                    )}
                     style={{
-                      borderColor: T.borderSoft,
-                      backgroundColor: "withAlpha(T.accent, 0.04)",
+                      borderColor: unlocked
+                        ? T.accent
+                        : T.borderSoft,
+                      backgroundColor: unlocked
+                        ? withAlpha(T.accent, 0.09)
+                        : "color-mix(in srgb, var(--franchize-shell-card) 70%, transparent)",
                     }}
                   >
-                    <p className="text-xs font-semibold " style={{ color: T.accent }}>
-                      {key}
+                    {/* Status indicator */}
+                    <div className="absolute right-3 top-3">
+                      {unlocked ? (
+                        <div
+                          className="flex h-6 w-6 items-center justify-center rounded-full"
+                          style={{
+                            backgroundColor: withAlpha(T.accent, 0.2),
+                            color: T.accent,
+                          }}
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </div>
+                      ) : (
+                        <div
+                          className="flex h-6 w-6 items-center justify-center rounded-full"
+                          style={{
+                            backgroundColor: "withAlpha(T.textMuted, 0.15)",
+                            color: T.textMuted,
+                          }}
+                        >
+                          <Lock className="h-4 w-4" />
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="pr-8 text-sm font-semibold " style={{ color: T.text }}>
+                      {achievement.title}
                     </p>
                     <p className="mt-1 text-xs " style={{ color: T.textMuted }}>
-                      {value}
+                      {achievement.description}
                     </p>
-                  </div>
-                ))}
-              </div>
-            </FranchizeOperatorPanel>
-          </details>
-        </motion.div>
-      )}
-
-      {/* Quick Actions */}
-      <motion.div
-        variants={itemVariants}
-        className="grid grid-cols-1 gap-3 md:grid-cols-2"
-      >
-        {canOpenCloserDashboard && (
-          <FranchizeOperatorLinkButton href={`/franchize/${slug}/dashboard`}>
-            <VibeContentRenderer content="::FaChartBar::" className="mr-2" />
-            Заявки
-          </FranchizeOperatorLinkButton>
-        )}
-        <FranchizeOperatorLinkButton href={`/franchize/${slug}/map-riders`}>
-          <VibeContentRenderer content="::FaMap::" className="mr-2" />
-          Map Riders
-        </FranchizeOperatorLinkButton>
+                    <div className="mt-2 flex items-center gap-2 text-[11px]">
+                      <span
+                        className="rounded-full px-2 py-0.5"
+                        style={{
+                          backgroundColor: withAlpha(T.accent, 0.12),
+                          color: unlocked
+                            ? T.accent
+                            : T.textMuted,
+                        }}
+                      >
+                        {achievement.triggerSources[0] || "Система"}
+                      </span>
+                      {unlocked && (
+                        <span className="" style={{ color: T.accent }}>
+                          ✓ Разблокировано
+                        </span>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
+          </div>
+          {!!error && <p className="text-xs text-red-400">{error}</p>}
+        </FranchizeOperatorPanel>
       </motion.div>
     </motion.div>
   );
