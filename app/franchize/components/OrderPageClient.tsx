@@ -11,6 +11,8 @@ import { useAppContext } from "@/contexts/AppContext";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { checkFranchizeCarsAvailability, createFranchizeOrderCheckout, recordFranchizeCheckoutRecoverySnapshot, validateFranchizePromoCode } from "../actions";
 import { useFranchizeCartLines } from "../hooks/useFranchizeCartLines";
+import { useFranchizeCart } from "../hooks/useFranchizeCart";
+import { saveUserFranchizeCartAction } from "@/contexts/actions";
 import { focusRingOutlineStyle, readablePaletteTextOnColor, withAlpha } from "../lib/theme";
 import { getTelegramHandleHref, getTelegramWebAppFallbackHref, getTelegramWebAppPageHref, getTelegramWebAppAdaptiveHref } from "../lib/telegram-links";
 import { getFranchizeFormPrefillAction, getFranchizeUserRentalSecretsAction, getRentalDocsPrefillAction } from "../profile-actions";
@@ -142,6 +144,7 @@ function normalizePromoCode(value: string): string {
 export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientProps) {
   const { user, dbUser, isInTelegramContext } = useAppContext();
   const { cartLines, subtotal } = useFranchizeCartLines(slug, items);
+  const { clear: clearCart } = useFranchizeCart(slug);
   const [isSubmitting, startSubmitTransition] = useTransition();
   const [paymentRetryHint, setPaymentRetryHint] = useState<string | null>(null);
   const [isPromoValidating, setIsPromoValidating] = useState(false);
@@ -651,6 +654,15 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       }
 
       toast.success(submitPayload.flowType === "rental" ? "Заявка на аренду отправлена вместе с DOC-файлом." : "Заявка на покупку отправлена вместе с DOC-файлом.");
+
+      // Clear cart after successful order
+      clearCart();
+      if (dbUser?.user_id) {
+        saveUserFranchizeCartAction(dbUser.user_id, slug, {}).catch(() => {
+          // Best-effort server-side cart clear
+        });
+      }
+
       lastSubmitFingerprintRef.current = null;
     });
   };

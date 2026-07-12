@@ -404,12 +404,22 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             </>
           ) : null}
 
-          {/* Rentals list — current crew members/owner or admin only */}
+          {/* Мои аренды — for EVERY authenticated user */}
+          {effectiveSlug && (
+            <DropdownMenuItem asChild>
+              <Link href={`/franchize/${effectiveSlug}/rentals?my=true`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                <List className="mr-2 h-4 w-4" />
+                <span className="truncate">Мои аренды</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
+
+          {/* Все аренды — current crew members/owner or admin only (all crew rentals) */}
           {canViewCrewLinks && effectiveSlug && (
             <DropdownMenuItem asChild>
               <Link href={`/franchize/${effectiveSlug}/rentals`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
                 <List className="mr-2 h-4 w-4" />
-                <span className="truncate">Все аренды</span>
+                <span className="truncate">Все аренды экипажа</span>
               </Link>
             </DropdownMenuItem>
           )}
