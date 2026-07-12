@@ -2643,7 +2643,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                 requested_end_date: endIso,
                 agreed_start_date: startIso,
                 agreed_end_date: endIso,
-                status: "active",
+                status: "pending_confirmation",
                 payment_status: payload.payment === "telegram_xtr" ? "interest_paid" : "pending",
                 total_cost: Math.round(payload.totalAmount),
                 metadata: {
