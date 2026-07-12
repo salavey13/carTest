@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ListOrdered, RefreshCw } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
@@ -23,7 +23,11 @@ export function RentalsListClient({ initialSlug, crew }: RentalsListClientProps)
   const { dbUser, isLoading: authLoading } = useAppContext();
   const router = useRouter();
   const params = useParams<{ slug: string }>();
+  const searchParams = useSearchParams();
   const slug = initialSlug || params?.slug || "vip-bike";
+
+  // "Мои аренды" mode — filter by current user
+  const myOnly = searchParams?.get("my") === "true";
 
   // Password auth state
   const [showPasswordEntry, setShowPasswordEntry] = useState(false);
@@ -65,6 +69,7 @@ export function RentalsListClient({ initialSlug, crew }: RentalsListClientProps)
           slug,
           actorUserId: getActorUserId() || undefined,
           isPasswordAuth: !!passwordAuthOwnerId,
+          myOnly,
         });
 
         if (result.success && result.data) {
@@ -94,8 +99,13 @@ export function RentalsListClient({ initialSlug, crew }: RentalsListClientProps)
       active: "Активна",
       completed: "Завершена",
       cancelled: "Отменена",
+      expired: "Истекла",
     };
     return labels[status] || status;
+  };
+
+  const isActiveStatus = (status: string): boolean => {
+    return status === "active" || status === "confirmed" || status === "pending_confirmation";
   };
 
   // Password entry screen
@@ -160,7 +170,7 @@ export function RentalsListClient({ initialSlug, crew }: RentalsListClientProps)
       <div className="flex items-center gap-4 text-xs" style={{ color: T.textMuted }}>
         <span>Всего: <strong style={{ color: T.text }}>{rentals.length}</strong></span>
         <span>Активных: <strong style={{ color: T.accent }}>
-          {rentals.filter((r) => r.status === "active").length}
+          {rentals.filter((r) => isActiveStatus(r.status)).length}
         </strong></span>
       </div>
 
@@ -231,14 +241,15 @@ export function RentalsListClient({ initialSlug, crew }: RentalsListClientProps)
                       className="rounded-full px-2 py-0.5 text-[10px] whitespace-nowrap"
                       style={{
                         ...T.styles.accentPill,
-                        opacity: rental.status === "active" ? 1 : 0.6,
+                        opacity: isActiveStatus(rental.status) ? 1 : 0.6,
+                        ...(rental.status === "expired" ? { backgroundColor: T.borderSoft, color: T.textMuted } : {}),
                       }}
                     >
                       {statusLabel(rental.status)}
                     </span>
                   )}
                 </div>
-                {rental.status === "active" && (
+                {isActiveStatus(rental.status) && (
                   <div className="mt-2 flex items-center justify-end gap-2 border-t pt-2"
                     style={{ borderColor: T.borderSoft }}>
                     <button

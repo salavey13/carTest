@@ -1403,13 +1403,19 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           }, 1);
           setSelectedItem(null);
         }}
-        onAddToCart={() => {
+        onAddToCart={(extrasStr) => {
           if (!selectedItem) return;
+          const cartOptions = {
+            ...selectedOptions,
+            action: "rent",
+            // FIX: extrasStr from handler bypasses stale selectedOptions.perk
+            perk: extrasStr || selectedOptions.perk || "стандарт",
+          };
           void recordRentIntent(selectedItem, "configured", {
             trigger: "modal_rent_cta",
-            options: { ...selectedOptions, action: "rent" },
+            options: cartOptions,
           });
-          addItem(selectedItem.id, { ...selectedOptions, action: "rent" }, 1);
+          addItem(selectedItem.id, cartOptions, 1);
           setSelectedItem(null);
         }}
       />
