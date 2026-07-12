@@ -363,13 +363,15 @@ export async function getFranchizeCrewRentalsListAction(params: {
   slug: string;
   actorUserId?: string;
   isPasswordAuth?: boolean;
+  /** When true, filter by the actorUserId (only return rentals created by this user) */
+  myOnly?: boolean;
 }): Promise<{
   success: boolean;
   data?: FranchizeActivityDigest["rentals"];
   error?: string;
 }> {
   try {
-    const { slug, actorUserId, isPasswordAuth = false } = params;
+    const { slug, actorUserId, isPasswordAuth = false, myOnly = false } = params;
 
     // Get crew
     const { data: crew } = await supabaseAdmin
@@ -407,26 +409,44 @@ export async function getFranchizeCrewRentalsListAction(params: {
       }
     }
 
-    // Fetch all rentals for the crew's vehicles
-    const { data: rentals } = await supabaseAdmin
+    // Fetch rentals for the crew's vehicles
+    let query = supabaseAdmin
       .from("rentals")
-      .select("rental_id,status,payment_status,vehicle_id,agreed_start_date,agreed_end_date,created_at,metadata,vehicle:cars!inner(id,make,model,crew_id,image_url)")
-      .eq("vehicle.crew_id", crew.id)
+      .select("rental_id,status,payment_status,vehicle_id,agreed_start_date,agreed_end_date,created_at,metadata,user_id,vehicle:cars!inner(id,make,model,crew_id,image_url)")
+      .eq("vehicle.crew_id", crew.id);
+
+    // "Мои аренды" — filter by the current Telegram user (not password auth)
+    if (myOnly && actorUserId && !isPasswordAuth) {
+      query = query.eq("user_id", actorUserId);
+    }
+
+    const { data: rentals } = await query
       .order("created_at", { ascending: false })
       .limit(50);
 
-    const result = (rentals || []).map((r: any) => ({
-      rentalId: r.rental_id,
-      status: r.status || "unknown",
-      paymentStatus: r.payment_status || "",
-      isTestRide: r.metadata?.flowType === "sale" || r.payment_status === "interest_paid",
-      vehicleId: r.vehicle_id || "",
-      vehicleLabel: `${r.vehicle?.make || "Bike"} ${r.vehicle?.model || ""}`.trim(),
-      vehicleImage: r.vehicle?.image_url || null,
-      agreedStartDate: r.agreed_start_date || null,
-      agreedEndDate: r.agreed_end_date || null,
-      docLink: `/franchize/${slug}/rental/${r.rental_id}`,
-    }));
+    const now = new Date();
+    const result = (rentals || []).map((r: any) => {
+      // Date-aware status: if agreed_end_date is past and status is "active"/"confirmed",
+      // override to "expired" so the UI doesn't show past rentals as active.
+      const agreedEnd = r.agreed_end_date ? new Date(r.agreed_end_date) : null;
+      let effectiveStatus = r.status || "unknown";
+      if ((effectiveStatus === "active" || effectiveStatus === "confirmed") && agreedEnd && agreedEnd < now) {
+        effectiveStatus = "expired";
+      }
+
+      return {
+        rentalId: r.rental_id,
+        status: effectiveStatus,
+        paymentStatus: r.payment_status || "",
+        isTestRide: r.metadata?.flowType === "sale" || r.payment_status === "interest_paid",
+        vehicleId: r.vehicle_id || "",
+        vehicleLabel: `${r.vehicle?.make || "Bike"} ${r.vehicle?.model || ""}`.trim(),
+        vehicleImage: r.vehicle?.image_url || null,
+        agreedStartDate: r.agreed_start_date || null,
+        agreedEndDate: r.agreed_end_date || null,
+        docLink: `/franchize/${slug}/rental/${r.rental_id}`,
+      };
+    });
 
     return { success: true, data: result };
   } catch (error) {

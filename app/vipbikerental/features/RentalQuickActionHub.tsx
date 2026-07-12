@@ -74,7 +74,7 @@ export function RentalQuickActionHub({ items, overview, isCatalogLoading = false
                       </div>
                     ))}
                   </div>
-                  <Button asChild className="w-full sm:w-fit"><Link href={`/franchize/${crewSlug}/rentals`}>Проверить мои аренды</Link></Button>
+                  <Button asChild className="w-full sm:w-fit"><Link href={`/franchize/${crewSlug}/rentals?my=true`}>Проверить мои аренды</Link></Button>
                 </div>
               )}
               {selectedCard.id === "riders" && (

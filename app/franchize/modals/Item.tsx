@@ -80,7 +80,12 @@ interface ItemModalProps {
     value: string,
   ) => void;
   onClose: () => void;
-  onAddToCart: () => void | Promise<void>;
+  /**
+   * Called when "Добавить в корзину" CTA is clicked.
+   * Receives the computed extras string so the parent can pass it directly
+   * to addItem() instead of relying on stale React state closure.
+   */
+  onAddToCart: (extrasStr?: string) => void | Promise<void>;
   /** Called when "Купить" (buy) CTA is clicked for sale-only flow */
   onBuyItem?: () => void | Promise<void>;
   /** Called when "Тест-драйв" CTA is clicked — adds to cart with testdrive flow */
@@ -328,6 +333,22 @@ function DurationShortcuts({
     return `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`;
   };
 
+  /** Check if an ISO date string falls on a weekend */
+  const isWeekendDay = (dateStr: string): boolean => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr + "T12:00:00");
+    const day = d.getDay();
+    return day === 0 || day === 6;
+  };
+
+  const getDailyPrice = (): number => {
+    // Weekend override: rent_weekend when it's a Saturday/Sunday
+    if (isWeekendDay(startDate)) {
+      return Number(specs.rent_weekend) || Number(specs.dailyPrice) || Number(specs.rent_weekday) || 0;
+    }
+    return Number(specs.dailyPrice) || Number(specs.rent_weekday) || 0;
+  };
+
   const getPrice = (hours: number): number => {
     if (!specs) return 0;
     if (hours <= 1) return Number(specs.price_per_hour) || 0;
@@ -336,10 +357,11 @@ function DurationShortcuts({
     if (hours <= 6) return Number(specs.price_per_6h) || (Number(specs.price_per_hour) || 0) * 6;
     if (hours <= 12) return Number(specs.price_per_12h) || (Number(specs.price_per_hour) || 0) * 12;
     const days = Math.ceil(hours / 24);
-    if (days === 1) return Number(specs.dailyPrice) || Number(specs.rent_weekday) || 0;
-    if (days <= 4) return (Number(specs.rent_2_4d) || Number(specs.dailyPrice) || 0) * days;
-    if (days <= 10) return (Number(specs.rent_5_10d) || Number(specs.dailyPrice) || 0) * days;
-    return (Number(specs.rent_11_30d) || Number(specs.dailyPrice) || 0) * days;
+    const dailyPrice = getDailyPrice();
+    if (days === 1) return dailyPrice;
+    if (days <= 4) return (Number(specs.rent_2_4d) || dailyPrice) * days;
+    if (days <= 10) return (Number(specs.rent_5_10d) || dailyPrice) * days;
+    return (Number(specs.rent_11_30d) || dailyPrice) * days;
   };
 
   const hourOptions = [
@@ -1267,12 +1289,13 @@ export function ItemModal({
         // Store extras selection in perk field for cart
         // Format: "шлем×2,перчатки,сумка" or "стандарт" if nothing selected
         const extrasStr = extrasSummary(extrasSelection);
-        if (extrasStr) {
-          onChangeOption("perk", extrasStr);
-        } else {
-          onChangeOption("perk", "стандарт");
-        }
-        const result = onAddToCart();
+        const perkValue = extrasStr || "стандарт";
+        // Update parent React state for next render
+        onChangeOption("perk", perkValue);
+        // Pass extras string DIRECTLY to onAddToCart — bypasses stale closure issue
+        // where addItem reads selectedOptions.perk before React flushes state update.
+        // The parent (CatalogClient) must use this parameter to override perk in addItem().
+        const result = onAddToCart(perkValue);
         if (result instanceof Promise) {
           result.finally(() => setIsAdding(false));
         } else {
@@ -1282,7 +1305,7 @@ export function ItemModal({
         setIsAdding(false);
       }
     },
-    [isAdding, onAddToCart, helmetCount, onChangeOption],
+    [isAdding, onAddToCart, helmetCount, onChangeOption, extrasSelection],
   );
 
   const handleBuyItem = useCallback(

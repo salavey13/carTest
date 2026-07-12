@@ -2369,18 +2369,65 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       ? bikeDocs[0].bikeName
       : `${bikeCount} ${bikeCount === 2 ? "мотоцикла" : "мотоциклов"}`;
 
-    await notifyAdmin(
-      [
-        `${isSaleFlow ? "🛍️ Новый franchize-заказ на покупку" : isTestdrive ? `🏁 Новый franchize-заказ на тест-драйв (${bikeLabel})` : `🧾 Новый franchize-заказ на аренду (${bikeLabel})`} #${payload.orderId}`,
-        `Crew: ${payload.slug}`,
-        `Получатель: ${payload.recipient}`,
-        `Телефон: ${payload.phone}`,
-        `Время: ${payload.time}`,
-        `Оплата: ${payload.payment}`,
-        `Доставка: ${payload.delivery}`,
-        `Итого: ${formatMoney(payload.totalAmount)} ₽`,
-      ].join("\n"),
+    // ── Extract accessories from cart lines ──
+    const accessoryLabels = payload.cartLines
+      .map((line: any) => String(line?.options?.perk || ""))
+      .filter((p: string) => p && p !== "стандарт");
+    const accessoriesStr = accessoryLabels.length > 0
+      ? accessoryLabels.join("; ")
+      : "—";
+
+    // ── Build rental period string (times from cart line options) ──
+    const firstLine = payload.cartLines[0] as any;
+    const rentStartTime = firstLine?.options?.rentStartTime || "10:00";
+    const rentEndTime = firstLine?.options?.rentEndTime || "10:00";
+    const periodStr = payload.rentalStartDate
+      ? `${payload.rentalStartDate} ${rentStartTime} → ${payload.rentalEndDate || "..."} ${rentEndTime}`
+      : payload.time || "по согласованию";
+
+    // ── Enhanced notification with bike label for ALL flows, accessories, and actual time ──
+    const notificationParts = [
+      `${isSaleFlow ? "🛍️ Новый заказ на покупку" : isTestdrive ? "🏁 Новый заказ на тест-драйв" : "🧾 Новый заказ на аренду"} #${payload.orderId}`,
+      `Байк: ${bikeLabel}`,
+      `Crew: ${payload.slug}`,
+      `Получатель: ${payload.recipient}`,
+      `Телефон: ${payload.phone}`,
+    ];
+    // Rental period (actual dates, not just the comment field)
+    if (payload.rentalStartDate) {
+      notificationParts.push(`Период: ${periodStr}`);
+    }
+    if (payload.time && payload.time !== "по согласованию") {
+      notificationParts.push(`Комментарий: ${payload.time}`);
+    }
+    notificationParts.push(
+      `Экипировка: ${accessoriesStr}`,
+      `Оплата: ${payload.payment}`,
+      `Доставка: ${payload.delivery}`,
+      `Итого: ${formatMoney(payload.totalAmount)} ₽`,
     );
+
+    await notifyAdmin(notificationParts.join("\n"));
+
+    // ── Send notification to creator too (Issue 4) ──
+    if (payload.telegramUserId && payload.telegramUserId !== adminChatId) {
+      const userNotification = [
+        `${isSaleFlow ? "🛍️ Заказ на покупку" : isTestdrive ? "🏁 Заказ на тест-драйв" : "🧾 Заказ на аренду"} #${payload.orderId}`,
+        `Байк: ${bikeLabel}`,
+        `Статус: оформлен, договор готов`,
+        payload.rentalStartDate ? `Период: ${payload.rentalStartDate} ${rentStartTime} → ${payload.rentalEndDate || "..."} ${rentEndTime}` : "",
+      ].filter(Boolean).join("\n");
+
+      try {
+        const { sendComplexMessage } = await import("@/app/webhook-handlers/actions/sendComplexMessage");
+        await sendComplexMessage(payload.telegramUserId, userNotification);
+      } catch (userNotifyErr) {
+        logger.warn("[franchize] Failed to send notification to order creator", {
+          telegramUserId: payload.telegramUserId,
+          error: userNotifyErr instanceof Error ? userNotifyErr.message : String(userNotifyErr),
+        });
+      }
+    }
 
     const recipientSet = new Set<string>([adminChatId, payload.telegramUserId]);
     const { data: crewRow } = await supabaseAdmin
