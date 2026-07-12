@@ -197,6 +197,16 @@ export interface FranchizeCrewVM {
   };
   footer: {
     socialLinks: Array<{ label: string; href: string }>;
+    columns: Array<{
+      title: string;
+      items: Array<{
+        type: "link" | "external" | "text" | "phone";
+        label?: string;
+        value?: string;
+        href?: string;
+        icon?: string;
+      }>;
+    }>;
     textColor: string;
   };
   reservationHold: FranchizeReservationHoldVM;
@@ -567,6 +577,25 @@ function extractFooterSocialLinks(franchize: UnknownRecord, fallbackTelegram: st
   return [{ label: "Telegram", href: DEFAULT_TELEGRAM_BOT_URL }];
 }
 
+function extractFooterColumns(franchize: UnknownRecord, slug: string) {
+  const rawColumns = readArrayPath<UnknownRecord>(franchize, ["footer", "columns"]);
+  if (rawColumns.length === 0) return [];
+
+  const withSlug = (href: string) =>
+    href.includes("{slug}") ? href.replaceAll("{slug}", slug) : href;
+
+  return rawColumns.map((col) => ({
+    title: readPath(col, ["title"], ""),
+    items: (readArrayPath<UnknownRecord>(col, ["items"])).map((item) => ({
+      type: readPath(item, ["type"], "text") as "link" | "external" | "text" | "phone",
+      label: readPath(item, ["label"], ""),
+      value: readPath(item, ["value"], ""),
+      href: item.href ? withSlug(readPath(item, ["href"], "")) : undefined,
+      icon: readPath(item, ["icon"], ""),
+    })),
+  })).filter((col) => col.title || col.items.length > 0);
+}
+
 const emptyCrew = (slug: string): FranchizeCrewVM => ({
   id: "",
   slug,
@@ -614,6 +643,7 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
   ratingSummary: { average: 0, count: 0 },
   footer: {
     socialLinks: [],
+    columns: [],
     textColor: "#16130A",
   },
   reservationHold: buildFranchizeReservationHold({}, ""),
@@ -885,6 +915,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       ratingSummary: { average: crewRatingSummary.average, count: crewRatingSummary.count },
       footer: {
         socialLinks: extractFooterSocialLinks(franchize, readPath(franchize, ["contacts", "telegram"], "")),
+        columns: extractFooterColumns(franchize, crew.slug ?? safeSlug),
         textColor: readPath(franchize, ["footer", "textColor"], DEFAULT_FOOTER_TEXT_COLOR),
       },
       reservationHold: buildFranchizeReservationHold(franchize, readPath(franchize, ["contacts", "address"], "")),

@@ -136,7 +136,7 @@ set
             jsonb_build_object('label', 'О нас', 'href', '/franchize/{slug}/about'),
             jsonb_build_object('label', 'Контакты', 'href', '/franchize/{slug}/contacts'),
             jsonb_build_object('label', 'Корзина', 'href', '/franchize/{slug}/cart'),
-            jsonb_build_object('label', 'Мои аренды', 'href', '/franchize/{slug}/rentals?my=true'),
+            jsonb_build_object('label', 'Мои аренды', 'href', '/franchize/{slug}/profile'),
             jsonb_build_object('label', 'Сообщество', 'href', '/franchize/{slug}/community'),
             jsonb_build_object('label', 'Партнёрам', 'href', '/franchize/{slug}/onboarding'),
             jsonb_build_object('label', 'Продажи', 'href', '/franchize/{slug}/sales')
@@ -159,7 +159,7 @@ set
               'items', jsonb_build_array(
                 jsonb_build_object('type', 'link', 'label', 'Каталог', 'href', '/franchize/{slug}', 'icon', 'FaMotorcycle'),
                 jsonb_build_object('type', 'link', 'label', 'Тест-драйв', 'href', '/franchize/{slug}#test-drive', 'icon', 'FaMotorcycle'),
-                jsonb_build_object('type', 'link', 'label', 'Мои аренды', 'href', '/franchize/{slug}/rentals?my=true', 'icon', 'FaList'),
+                jsonb_build_object('type', 'link', 'label', 'Мои аренды', 'href', '/franchize/{slug}/profile', 'icon', 'FaList'),
                 jsonb_build_object('type', 'link', 'label', 'О нас', 'href', '/franchize/{slug}/about', 'icon', 'FaCircleInfo'),
                 jsonb_build_object('type', 'link', 'label', 'Контакты', 'href', '/franchize/{slug}/contacts', 'icon', 'FaPhone')
               )
