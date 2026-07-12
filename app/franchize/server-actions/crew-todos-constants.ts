@@ -39,6 +39,7 @@ export interface CreateTodoInput {
   description?: string;
   category: string;
   priority: TodoPriority;
+  leadId?: string | null;
 }
 
 export interface UpdateTodoInput {

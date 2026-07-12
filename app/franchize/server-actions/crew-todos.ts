@@ -282,6 +282,7 @@ export async function createCrewTodo(input: {
         category: z.string().default("general"),
         priority: z.enum(["low", "medium", "high"]).default("medium"),
         dueDate: z.string().optional(),
+        leadId: z.string().nullable().optional(),
       }),
       isPasswordAuth: z.boolean().optional(),
     }).safeParse(input);
@@ -333,6 +334,7 @@ export async function createCrewTodo(input: {
     const newTodo = {
       id: randomUUID(),
       crew_id: todo.crewId,
+      lead_id: todo.leadId || null,
       assigned_to: todo.assignedTo,
       title: todo.title,
       description: todo.description || null,

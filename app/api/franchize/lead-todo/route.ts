@@ -10,10 +10,9 @@ import { logger } from "@/lib/logger";
  * PATCH  — toggle todo status (pending ↔ done)
  * DELETE — remove a todo
  *
- * The lead_id is stored in the todo's description as JSON:
- *   { lead_id: "userId", lead_name: "Иван" }
- *
- * This avoids needing a schema migration for a lead_id column.
+ * The lead_id is stored both in the dedicated lead_id column AND as
+ * JSON inside description for backward-compatibility with older todo rows
+ * that were created before the column was added.
  */
 
 export async function POST(request: NextRequest) {
@@ -32,6 +31,7 @@ export async function POST(request: NextRequest) {
       .insert({
         id: todoId,
         crew_id: crewId,
+        lead_id: leadId,
         title,
         description: JSON.stringify({ lead_id: leadId, lead_name: leadName || "" }),
         category: "lead_followup",
