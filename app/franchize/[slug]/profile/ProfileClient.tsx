@@ -91,7 +91,7 @@ const fallbackCrew: FranchizeCrewVM = {
     showcaseGroups: [],
   },
   ratingSummary: { average: 0, count: 0 },
-  footer: { socialLinks: [], textColor: "#16130A" },
+  footer: { socialLinks: [], columns: [], textColor: "#16130A" },
 };
 
 type FranchizeProfileClientProps = {

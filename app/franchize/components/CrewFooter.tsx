@@ -35,6 +35,21 @@ export function CrewFooter({ crew }: CrewFooterProps) {
   const subBg = isAuto ? "var(--franchize-bg-base)" : withAlpha(palette.bgBase, 0.12);
   const subText = isAuto ? "var(--franchize-text-primary)" : accentText;
 
+  // Build columns from hydration data, fall back to header.menuLinks if empty
+  const columns = crew.footer.columns.length > 0
+    ? crew.footer.columns
+    : [
+        {
+          title: "Меню",
+          items: crew.header.menuLinks.map((link) => ({
+            type: "link" as const,
+            label: link.label,
+            href: link.href,
+            icon: "",
+          })),
+        },
+      ];
+
   const socialLinks =
     crew.footer.socialLinks.length > 0
       ? crew.footer.socialLinks
@@ -64,100 +79,108 @@ export function CrewFooter({ crew }: CrewFooterProps) {
       }}
     >
       <div className="mx-auto grid w-full max-w-7xl gap-x-8 gap-y-6 px-4 py-6 md:grid-cols-3">
-        <section>
-          <h3 className="text-xl font-semibold leading-none text-[var(--footer-text)]">
-            Контакты
-          </h3>
-          <ul className="mt-3 space-y-1 text-sm">
-            <li className="flex items-center gap-3 border-b border-[var(--footer-border)] py-2">
-              <MapPin className="h-4 w-4" />
-              <span>{crew.contacts.address || "Адрес скоро добавим"}</span>
-            </li>
-            <li className="flex items-center gap-3 py-2">
-              <Phone className="h-4 w-4" />
-              <span>{crew.contacts.phone || "Телефон скоро добавим"}</span>
-            </li>
-          </ul>
-        </section>
+        {columns.map((col, ci) => (
+          <section key={ci}>
+            {col.title && (
+              <h3 className="text-xl font-semibold leading-none text-[var(--footer-text)]">
+                {col.title}
+              </h3>
+            )}
+            {col.items.length > 0 && (
+              <ul className="mt-3 space-y-1 text-sm">
+                {col.items.map((item, ii) => {
+                  const key = `${ci}-${ii}`;
+                  const resolvedHref = item.href
+                    ? (item.href.includes("{slug}")
+                      ? item.href.replaceAll("{slug}", crew.slug || "")
+                      : item.href)
+                    : "";
 
-        <section>
-          <h3 className="text-xl font-semibold leading-none text-[var(--footer-text)]">
-            Меню
-          </h3>
-          <ul className="mt-3 space-y-1 text-sm">
-            {crew.header.menuLinks.map((link) => {
-              // Safety net: replace any unsubstituted {slug} with actual crew slug.
-              // The main hydration path (actions-runtime.ts:728) calls withSlug(),
-              // but some code paths (line 1196) skip it — this catches both.
-              const resolvedHref = link.href.includes("{slug}")
-                ? link.href.replaceAll("{slug}", crew.slug || "")
-                : link.href;
-              const internalHref = toInternalHref(resolvedHref);
-              return (
+                  switch (item.type) {
+                    case "link":
+                      return (
+                        <li key={key} className="border-b border-[var(--footer-border)]">
+                          <Link
+                            href={toInternalHref(resolvedHref) ?? resolvedHref}
+                            className="flex items-center gap-2 py-2 transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                          >
+                            <ChevronRight className="h-4 w-4 shrink-0" />
+                            <span>{item.label || item.value}</span>
+                          </Link>
+                        </li>
+                      );
+
+                    case "external":
+                      return (
+                        <li key={key} className="border-b border-[var(--footer-border)]">
+                          <a
+                            href={resolvedHref}
+                            className="flex items-center gap-2 py-2 transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={`${item.label || item.value} (откроется в новой вкладке)`}
+                          >
+                            <Send className="h-4 w-4 shrink-0" />
+                            <span>{item.label || item.value}</span>
+                          </a>
+                        </li>
+                      );
+
+                    case "phone":
+                      return (
+                        <li key={key} className="border-b border-[var(--footer-border)]">
+                          <a
+                            href={resolvedHref || `tel:${item.label}`}
+                            className="flex items-center gap-2 py-2 transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                          >
+                            <Phone className="h-4 w-4 shrink-0" />
+                            <span>{item.label}</span>
+                          </a>
+                        </li>
+                      );
+
+                    case "text":
+                    default:
+                      return (
+                        <li key={key} className="flex items-center gap-2 py-2 border-b border-[var(--footer-border)]">
+                          {item.icon && <MapPin className="h-4 w-4 shrink-0" />}
+                          <span>{item.label || item.value}</span>
+                        </li>
+                      );
+                  }
+                })}
+              </ul>
+            )}
+          </section>
+        ))}
+
+        {/* Social links section — always shown if available */}
+        {socialLinks.length > 0 && (
+          <section>
+            <h3 className="text-xl font-semibold leading-none text-[var(--footer-text)]">
+              Онлайн-каналы экипажа
+            </h3>
+            <ul className="mt-3 grid gap-1 text-sm">
+              {socialLinks.map((item) => (
                 <li
-                  key={`${link.href}-${link.label}`}
+                  key={`${item.label}-${item.href}`}
                   className="border-b border-[var(--footer-border)]"
                 >
-                  {internalHref === null ? (
-                    <a
-                      href={resolvedHref}
-                      className="flex items-center gap-2 py-2 transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`${link.label} (откроется в новой вкладке)`}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                      <span>{link.label}</span>
-                    </a>
-                  ) : (
-                    <Link
-                      href={internalHref}
-                      className="flex items-center gap-2 py-2 hover:opacity-90 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                      <span>{link.label}</span>
-                    </Link>
-                  )}
+                  <a
+                    href={item.href}
+                    className="flex items-center gap-2 py-2 transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`${item.label} (откроется в новой вкладке)`}
+                  >
+                    <Send className="h-4 w-4 shrink-0" />
+                    <span>{item.label}</span>
+                  </a>
                 </li>
-              );
-            })}
-            {/* Мои аренды — always visible in footer for quick access to personal rentals */}
-            <li className="border-b border-[var(--footer-border)]">
-              <Link
-                href={`/franchize/${crew.slug || ""}/rentals?my=true`}
-                className="flex items-center gap-2 py-2 transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-              >
-                <ChevronRight className="h-4 w-4" />
-                <span>Мои аренды</span>
-              </Link>
-            </li>
-          </ul>
-        </section>
-
-        <section className="">
-          <h3 className="text-xl font-semibold leading-none text-[var(--footer-text)]">
-            Онлайн-каналы экипажа
-          </h3>
-          <ul className="mt-3 grid gap-1 text-sm">
-            {socialLinks.map((item) => (
-              <li
-                key={`${item.label}-${item.href}`}
-                className="border-b border-[var(--footer-border)]"
-              >
-                <a
-                  href={item.href}
-                  className="flex items-center gap-2 py-2 transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`${item.label} (откроется в новой вкладке)`}
-                >
-                  <Send className="h-4 w-4" />
-                  <span>{item.label}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
 
       <div
