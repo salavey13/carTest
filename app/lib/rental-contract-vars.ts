@@ -198,6 +198,21 @@ function isElectricBike(bike: BikeSpecs): boolean {
 }
 
 /**
+ * Per-bike overage rate (rub per km above included mileage).
+ * Small bikes / scooters: 25, mid-range: 30, premium sport: 40, BMW F800R: 35.
+ * Used instead of a flat crew-level default so different bike tiers get
+ * appropriate per-km fees. Falls back to crew default when bike doesn't
+ * match any known model.
+ */
+function getBikeOverageRate(bikeId: string, crewDefault: number): number {
+  const id = (bikeId || '').toLowerCase();
+  if (id.includes('nibbler') || id.includes('regumoto') || id.includes('motoland-breakout') || id.includes('jilang')) return 25;
+  if (id.includes('aprilia') || id.includes('suzuki-gsx')) return 40;
+  if (id.includes('bmw-f800')) return 35;
+  return crewDefault;
+}
+
+/**
  * Build vehicle type labels based on electric vs ICE
  */
 function buildVehicleTypeLabels(isElectric: boolean) {
@@ -743,7 +758,7 @@ export function buildRentalContractVariables(
 
     // Rental terms defaults
     included_km_per_day: getContractDefault(crewSecrets, "included_km_per_day", DEFAULT_INCLUDED_KM_PER_DAY),
-    extra_km_fee_rub: getContractDefault(crewSecrets, "extra_km_fee_rub", DEFAULT_EXTRA_KM_FEE),
+    extra_km_fee_rub: getBikeOverageRate(bike.id, getContractDefault(crewSecrets, "extra_km_fee_rub", DEFAULT_EXTRA_KM_FEE)),
     late_return_penalty_rub: getContractDefault(crewSecrets, "late_return_penalty_rub", DEFAULT_LATE_RETURN_PENALTY),
     late_return_penalty_max_days: getContractDefault(crewSecrets, "late_return_penalty_max_days", DEFAULT_LATE_RETURN_PENALTY_MAX_DAYS),
 
