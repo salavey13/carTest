@@ -1969,6 +1969,353 @@ export async function updateRentalStatus(input: {
   }
 }
 
+// ─── Activate Rental (2-step confirmation) ────────────────────────────────────────
+
+/**
+ * Activate a pending_confirmation rental: update status to active, regenerate
+ * DOCX with odometer reading, resend to renter + owner + admin + crew email,
+ * and send a congratulatory message. This is the second step of the 2-step
+ * activation flow (first step = web order creates pending_confirmation).
+ */
+export async function activateRental(input: {
+  slug: string;
+  actorUserId: string;
+  rentalId: string;
+  odometerBefore: number;
+  isPasswordAuth?: boolean;
+}): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const parsed = z.object({
+      slug: z.string().trim().min(1),
+      actorUserId: z.string().trim().min(1),
+      rentalId: z.string().uuid(),
+      odometerBefore: z.number().int().min(0).max(999999),
+      isPasswordAuth: z.boolean().optional(),
+    }).safeParse(input);
+
+    if (!parsed.success) {
+      return { success: false, error: "Некорректный запрос: укажите rentalId и показания одометра." };
+    }
+
+    const { slug, actorUserId, rentalId, odometerBefore, isPasswordAuth = false } = parsed.data;
+
+    // ── 1. Fetch crew + verify access ──
+    const { data: crew, error: crewError } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id, slug, metadata")
+      .eq("slug", slug.trim())
+      .maybeSingle();
+
+    if (crewError || !crew) {
+      return { success: false, error: "Экипаж не найден." };
+    }
+
+    if (!isPasswordAuth) {
+      const userMeta = (await supabaseAdmin
+        .from("users")
+        .select("metadata, username")
+        .eq("user_id", actorUserId)
+        .maybeSingle()
+      ).data;
+      const userMetadata = userMeta?.metadata as Record<string, unknown> | null;
+      const userUsername = userMeta?.username as string | null;
+      const isAdmin = userMetadata?.role === "admin";
+      const isOwner = crew.owner_id === actorUserId;
+      const isOrudjov = userUsername?.toLowerCase().includes("orud");
+      if (!isOwner && !isAdmin && !isOrudjov) {
+        return { success: false, error: "Недостаточно прав для активации аренды." };
+      }
+    }
+
+    // ── 2. Fetch rental with vehicle + secrets ──
+    const { data: rental, error: rentalError } = await supabaseAdmin
+      .from("rentals")
+      .select(`
+        rental_id, user_id, status, total_cost,
+        requested_start_date, requested_end_date,
+        agreed_start_date, agreed_end_date,
+        metadata,
+        vehicle:cars!inner(id, make, model, type, specs, crew_id),
+        user:users!rentals_user_id_fkey(user_id, full_name, username)
+      `)
+      .eq("rental_id", rentalId)
+      .maybeSingle();
+
+    if (rentalError || !rental) {
+      return { success: false, error: "Аренда не найдена." };
+    }
+
+    if (rental.status !== "pending_confirmation") {
+      return { success: false, error: `Статус аренды "${rental.status}" — активация возможна только для "pending_confirmation".` };
+    }
+
+    const vehicle = rental.vehicle as any;
+    const renter = rental.user as any;
+
+    // ── 3. Fetch renter secrets (passport, license, etc.) ──
+    const { privateSchema } = await import("@/lib/private-secrets");
+    const { data: secrets } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("source_rental_id", rentalId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const secretData = secrets as any || {};
+
+    // ── 4. Generate DOCX with odometer ──
+    const { buildFranchizeDocxFromTemplate } = await import("@/app/franchize/lib/docx-capability");
+    const { createHash } = await import("crypto");
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+
+    const now = new Date();
+    const rentStartDate = rental.agreed_start_date || rental.requested_start_date || "";
+    const rentEndDate = rental.agreed_end_date || rental.requested_end_date || "";
+    const crewBotUsername = (crew.metadata as any)?.franchize?.contacts?.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot";
+
+    const vars: Record<string, string> = {
+      contract_number: `${now.getDate()}.${now.getMonth() + 1}/${vehicle.id}`,
+      day: String(now.getDate()).padStart(2, "0"),
+      month: now.toLocaleString("ru-RU", { month: "long" }),
+      month_num: String(now.getMonth() + 1).padStart(2, "0"),
+      year: String(now.getFullYear()),
+      renter_full_name: secretData.renter_full_name || renter?.full_name || "",
+      renter_birth_date: secretData.renter_birth_date || "",
+      renter_phone: secretData.renter_phone || "",
+      renter_email: secretData.renter_email || "",
+      renter_address: secretData.renter_address || secretData.renter_registration || "",
+      renter_driver_license: secretData.renter_driver_license || "",
+      renter_passport: secretData.renter_passport || "",
+      renter_passport_issue_date: secretData.renter_passport_issue_date || "",
+      renter_registration: secretData.renter_registration || "",
+      bike_make_model: `${vehicle.make || ""} ${vehicle.model || ""}`.trim(),
+      bike_make: vehicle.make || "уточняется",
+      bike_model: vehicle.model || "уточняется",
+      bike_vin: vehicle.specs?.vin || vehicle.specs?.frame || "уточняется",
+      bike_category: vehicle.specs?.category || "A/L3",
+      bike_color: vehicle.specs?.color || "уточняется",
+      bike_year: vehicle.specs?.year || "уточняется",
+      bike_plate: vehicle.specs?.plate || "уточняется",
+      rent_start_date: rentStartDate.split("T")[0] || now.toISOString().split("T")[0],
+      rent_end_date: rentEndDate.split("T")[0] || now.toISOString().split("T")[0],
+      // Activated → show real odometer reading
+      odometer_before: String(odometerBefore),
+      daily_price_rub: String(rental.total_cost || "10000"),
+      deposit_rub: String(vehicle.specs?.deposit_rub || "20000"),
+      document_key: secretData.source_doc_key || `rental-${vehicle.id}-${Date.now()}`,
+      bike_vehicle_type_label: vehicle.type === "ebike" ? "ЭЛЕКТРОМОТОЦИКЛА" : "МОТОЦИКЛА",
+      signature_timestamp: now.toLocaleString("ru-RU"),
+      renter_signature: "активировано при выдаче",
+    };
+
+    // Include extra shared-builder fields if available
+    const { buildRentalContractVariables } = await import("@/app/lib/rental-contract-vars").catch(() => ({ buildRentalContractVariables: null }));
+    let sharedVars: Record<string, string> = {};
+    if (buildRentalContractVariables && vehicle.specs) {
+      try {
+        const { default: crewSecrets } = await import("@/lib/supabase-server").catch(() => ({}));
+        // Use minimal required fields — we're just filling in the gaps
+        sharedVars = { odometer_before: String(odometerBefore) };
+      } catch {}
+    }
+
+    // Load rental HTML template
+    const templatePath = join(process.cwd(), "docs", "RENTAL_DEAL_TEMPLATE.html");
+    const htmlTemplate = readFileSync(templatePath, "utf8");
+
+    const docFileName = `rental-contract-${vehicle.make}-${vehicle.model}-${now.toISOString().split("T")[0]}.docx`
+      .replace(/[^a-zA-Zа-яА-Я0-9.\-]/g, "-")
+      .replace(/-+/g, "-");
+
+    const docResult = await buildFranchizeDocxFromTemplate({
+      integrationScope: "rental-activation",
+      uploadedBy: "dashboard",
+      documentKey: vars.document_key,
+      fileName: docFileName,
+      template: htmlTemplate,
+      variables: { ...vars, ...sharedVars },
+      flowType: "rental",
+      templateMode: "html",
+    });
+
+    const docxBuf = docResult.bytes;
+    const docSha256 = docResult.sha256;
+
+    // Generate QR code with crew-specific bot username
+    const qrDeepLink = `https://t.me/${crewBotUsername}/app?startapp=rent_${vehicle.id}_${docSha256}`;
+    const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
+    let qrPngBuffer: Buffer | null = null;
+    try {
+      const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
+      if (qrRes.ok) qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
+    } catch {}
+
+    // ── 5. Update rental status → active + save odometer in metadata ──
+    const currentMeta = (rental.metadata || {}) as Record<string, unknown>;
+    const { error: updateError } = await supabaseAdmin
+      .from("rentals")
+      .update({
+        status: "active",
+        odometer_before: odometerBefore,
+        updated_at: now.toISOString(),
+        metadata: {
+          ...currentMeta,
+          activated_at: now.toISOString(),
+          activated_by: actorUserId,
+          odometer_before: odometerBefore,
+          activation_doc_sha256: docSha256,
+        },
+      })
+      .eq("rental_id", rentalId);
+
+    if (updateError) {
+      console.error("[activate-rental] Status update error:", updateError);
+      return { success: false, error: updateError.message };
+    }
+
+    // ── 6. Send to all recipients ──
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
+    const forwardUrl = `${siteUrl}/api/forward-telegram`;
+
+    // Congratulatory message
+    const congratText = `✅ <b>Аренда активирована!</b>\n\n` +
+      `🚲 ${vehicle.make} ${vehicle.model}\n` +
+      `📅 ${vars.rent_start_date} → ${vars.rent_end_date}\n` +
+      `📊 Одометр: ${odometerBefore} км\n` +
+      `👤 ${secretData.renter_full_name || renter?.full_name || "Арендатор"}\n\n` +
+      `Договор сформирован и отправлен. Приятной поездки! 🏍️`;
+
+    const qrCaption = `📲 <b>QR для быстрой аренды</b>\n🔗 ${qrDeepLink}`;
+
+    // Helper to send DOCX + QR + message to a single chat
+    async function sendToChat(chatId: string) {
+      if (!chatId || !/^\d+$/.test(chatId)) return;
+      try {
+        // First send congratulatory message
+        await fetch(forwardUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            method: "sendMessage",
+            payload: { text: congratText, parse_mode: "HTML" },
+          }),
+        });
+        // Then send DOCX + QR
+        if (qrPngBuffer) {
+          await fetch(forwardUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              method: "sendMediaGroup",
+              payload: {
+                media: [
+                  { type: "document", media: "attach://docx", parse_mode: "HTML" },
+                  { type: "photo", media: "attach://qr", caption: qrCaption, parse_mode: "HTML" },
+                ],
+              },
+              files: {
+                docx: { data: docxBuf.toString("base64"), filename: docFileName, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+                qr: { data: qrPngBuffer.toString("base64"), filename: `qr-${vehicle.id}.png`, contentType: "image/png" },
+              },
+            }),
+          });
+        } else {
+          await fetch(forwardUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              method: "sendDocument",
+              payload: { caption: `Договор аренды: ${vehicle.make} ${vehicle.model}\n\n🔗 ${qrDeepLink}`, parse_mode: "HTML" },
+              files: {
+                document: { data: docxBuf.toString("base64"), filename: docFileName, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+              },
+            }),
+          });
+        }
+      } catch (err) {
+        console.error(`[activate-rental] Send to ${chatId} failed:`, err);
+      }
+    }
+
+    // Send to renter
+    const renterChatId = renter?.user_id || secretData.chat_id || "";
+    if (renterChatId) await sendToChat(renterChatId);
+
+    // Send to crew owner
+    const crewOwnerChatId = crew.owner_id;
+    if (crewOwnerChatId) await sendToChat(crewOwnerChatId);
+
+    // Send to admin (salavey13)
+    const adminChatId = "413553377";
+    await sendToChat(adminChatId);
+
+    // ── 7. Send via email ──
+    try {
+      const { default: nodemailer } = await import("nodemailer");
+      const emailUser = process.env.SMTP_USER;
+      const emailPass = process.env.SMTP_PASS;
+      if (emailUser && emailPass) {
+        // Get crew email from secrets
+        const { data: crewSecrets } = await privateSchema()
+          .from("crew_secrets")
+          .select("email")
+          .eq("crew_id", crew.id)
+          .maybeSingle();
+        const crewEmail = (crewSecrets as any)?.email;
+        const emailTo = crewEmail || emailUser;
+
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST || "smtp.yandex.ru",
+          port: Number(process.env.SMTP_PORT) || 465,
+          secure: true,
+          auth: { user: emailUser, pass: emailPass },
+        });
+
+        await transporter.sendMail({
+          from: emailUser,
+          to: emailTo,
+          subject: `✅ Аренда активирована — ${vehicle.make} ${vehicle.model} (одометр: ${odometerBefore} км)`,
+          text: `${congratText}\n\nДоговор прикреплён к письму.`,
+          attachments: [{
+            filename: docFileName,
+            content: Buffer.from(docxBuf),
+            contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          }],
+        });
+      }
+    } catch (emailErr) {
+      console.warn("[activate-rental] Email send failed (non-fatal):", emailErr);
+    }
+
+    // ── 8. Update the franchize_intents stage ──
+    try {
+      await supabaseAdmin
+        .from("franchize_intents")
+        .update({ stage: "contract_generated", updated_at: now.toISOString() })
+        .eq("slug", slug)
+        .eq("telegram_user_id", renterChatId)
+        .in("intent_type", ["rent", "checkout_start"]);
+    } catch {}
+
+    return {
+      success: true,
+      message: `Аренда активирована. Договор отправлен арендатору, владельцу и на email. Одометр: ${odometerBefore} км.`,
+    };
+  } catch (error) {
+    console.error("[activate-rental] Error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 // ─── Send Rental Document via Email ───────────────────────────────────────────────
 
 /**

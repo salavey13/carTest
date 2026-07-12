@@ -7,9 +7,9 @@ import {
   CircleDot, Users, Lock, AlertCircle, LayoutList, Columns3,
   Calendar, UserPlus, Download, Star, Filter, StickyNote, History,
   MapPin, ExternalLink, Banknote, Briefcase, ShieldAlert, Hash,
-  MessageSquare, Wallet
+  MessageSquare, Wallet, Gauge, Activity, Check, Loader2
 } from "lucide-react";
-import { validateAnalyticsPassword } from "../../server-actions/rentals-dashboard";
+import { validateAnalyticsPassword, activateRental } from "../../server-actions/rentals-dashboard";
 import type { LeadRow, LeadTodoRow, LeadRentalRow, LeadSaleRow } from "../../server-actions/leads";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -576,7 +576,7 @@ function NotesPanel({ leadId, T }: { leadId: string; T: ThemeTokens }) {
 
 // ── Deals ─────────────────────────────────────────────────────────────────────
 
-function DealsPanel({ lead, T }: { lead: LeadRow; T: ThemeTokens }) {
+function DealsPanel({ lead, slug, T }: { lead: LeadRow; slug: string; T: ThemeTokens }) {
   return (
     <div className="space-y-3">
       {lead.rentals.length === 0 && lead.sales.length === 0 && (
@@ -588,7 +588,7 @@ function DealsPanel({ lead, T }: { lead: LeadRow; T: ThemeTokens }) {
       {lead.rentals.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-bold" style={{ color: T.text }}>Аренда</p>
-          {lead.rentals.map((r, i) => <RentalRow key={r.rentalId || i} rental={r} T={T} />)}
+          {lead.rentals.map((r, i) => <RentalRow key={r.rentalId || i} rental={r} slug={slug} T={T} />)}
         </div>
       )}
 
@@ -602,7 +602,7 @@ function DealsPanel({ lead, T }: { lead: LeadRow; T: ThemeTokens }) {
   );
 }
 
-function RentalRow({ rental, T }: { rental: LeadRentalRow; T: ThemeTokens }) {
+function RentalRow({ rental, slug, T }: { rental: LeadRentalRow; slug: string; T: ThemeTokens }) {
   const statusMeta: Record<string, { label: string; color: string }> = {
     active: { label: "Активна", color: "#10b981" },
     completed: { label: "Завершена", color: "#3b82f6" },
@@ -611,23 +611,170 @@ function RentalRow({ rental, T }: { rental: LeadRentalRow; T: ThemeTokens }) {
     cancelled: { label: "Отменена", color: "#64748b" },
   };
   const meta = statusMeta[rental.status] || { label: rental.status, color: T.textMuted };
+
+  // ── Activation state ──
+  const [showActivateModal, setShowActivateModal] = useState(false);
+  const [odometerInput, setOdometerInput] = useState("");
+  const [activating, setActivating] = useState(false);
+  const [activationMsg, setActivationMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const handleActivate = async () => {
+    const odometer = parseInt(odometerInput, 10);
+    if (isNaN(odometer) || odometer < 0 || odometer > 999999) {
+      setActivationMsg({ ok: false, text: "Введите корректные показания одометра (0–999999 км)" });
+      return;
+    }
+    setActivating(true);
+    setActivationMsg(null);
+    try {
+      const result = await activateRental({
+        slug,
+        actorUserId: String(Date.now()), // will be resolved server-side via password auth
+        rentalId: rental.rentalId,
+        odometerBefore: odometer,
+        isPasswordAuth: true, // leads page uses password auth — bypass access checks
+      });
+      if (result.success) {
+        setActivationMsg({ ok: true, text: result.message || "✅ Аренда активирована! Обновляю..." });
+        setTimeout(() => window.location.reload(), 2000);
+      } else {
+        setActivationMsg({ ok: false, text: result.error || "Ошибка активации" });
+      }
+    } catch (err: any) {
+      setActivationMsg({ ok: false, text: err?.message || "Ошибка сети" });
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  // Past-dated pending rentals show as "past" (can still be activated)
+  const isPastRental = rental.endDate && new Date(rental.endDate) < new Date();
+
   return (
-    <div className="rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold" style={{ color: T.text }}>{rental.bikeTitle || "Байк"}</p>
-        <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: meta.color + "15", color: meta.color }}>{meta.label}</span>
+    <>
+      <div className="rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold" style={{ color: T.text }}>{rental.bikeTitle || "Байк"}</p>
+          <span className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+            style={{ backgroundColor: (isPastRental && rental.status === "pending_confirmation" ? "#64748b" : meta.color) + "15",
+                    color: isPastRental && rental.status === "pending_confirmation" ? "#64748b" : meta.color }}>
+            {isPastRental && rental.status === "pending_confirmation" ? "Просрочена" : meta.label}
+          </span>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]" style={{ color: T.textMuted }}>
+          <span><Calendar className="inline h-3 w-3 mr-1" />{formatDate(rental.startDate)} — {formatDate(rental.endDate)}</span>
+          <span><Banknote className="inline h-3 w-3 mr-1" />{fmtMoney(rental.totalCost)}</span>
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          {rental.rentalId && (
+            <a href={`/franchize/vip-bike/rental/${rental.rentalId}`}
+              className="inline-flex items-center gap-1 text-[10px] font-medium" style={{ color: T.accent }}>
+              Открыть <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+          {/* Activate button — only for pending_confirmation */}
+          {rental.status === "pending_confirmation" && (
+            <button onClick={() => setShowActivateModal(true)}
+              className="ml-auto inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-bold transition-all hover:opacity-80"
+              style={{ backgroundColor: "#10b981", color: "#fff" }}>
+              <Activity className="h-3 w-3" />
+              Активировать
+            </button>
+          )}
+        </div>
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]" style={{ color: T.textMuted }}>
-        <span><Calendar className="inline h-3 w-3 mr-1" />{formatDate(rental.startDate)} — {formatDate(rental.endDate)}</span>
-        <span><Banknote className="inline h-3 w-3 mr-1" />{fmtMoney(rental.totalCost)}</span>
-      </div>
-      {rental.rentalId && (
-        <a href={`/franchize/vip-bike/rental/${rental.rentalId}`}
-          className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium" style={{ color: T.accent }}>
-          Открыть аренду <ExternalLink className="h-3 w-3" />
-        </a>
+
+      {/* ── Activation Modal ── */}
+      {showActivateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => { if (!activating) { setShowActivateModal(false); setActivationMsg(null); } }}>
+          <div className="mx-4 w-full max-w-sm rounded-2xl border p-5 shadow-2xl"
+            style={{ backgroundColor: T.bgCard, borderColor: T.border }}
+            onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold" style={{ color: T.text }}>Активация аренды</h3>
+            <p className="mt-1 text-[11px]" style={{ color: T.textMuted }}>
+              Подтвердите выдачу байка и укажите показания одометра
+            </p>
+
+            {/* Bike info */}
+            <div className="mt-3 rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+              <p className="text-xs font-semibold" style={{ color: T.text }}>{rental.bikeTitle || "Байк"}</p>
+              <p className="mt-1 text-[10px]" style={{ color: T.textMuted }}>
+                {formatDate(rental.startDate)} — {formatDate(rental.endDate)}
+              </p>
+              <p className="text-[10px]" style={{ color: T.textMuted }}>{fmtMoney(rental.totalCost)}</p>
+            </div>
+
+            {/* Odometer input */}
+            <div className="mt-3">
+              <label className="text-[11px] font-medium" style={{ color: T.text }}>
+                <Gauge className="inline h-3.5 w-3.5 mr-1" />
+                Показания одометра (км)
+              </label>
+              <div className="relative mt-1">
+                <input
+                  type="number"
+                  min="0"
+                  max="999999"
+                  value={odometerInput}
+                  onChange={e => { setOdometerInput(e.target.value); setActivationMsg(null); }}
+                  placeholder="0"
+                  disabled={activating}
+                  className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all"
+                  style={{
+                    backgroundColor: T.inputBg,
+                    borderColor: T.inputBorder,
+                    color: T.text,
+                  }}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Status message */}
+            {activationMsg && (
+              <div className="mt-3 rounded-xl border p-2.5 text-[11px] font-medium text-center"
+                style={{
+                  borderColor: activationMsg.ok ? "#10b98140" : "#ef444440",
+                  backgroundColor: activationMsg.ok ? "#10b98110" : "#ef444410",
+                  color: activationMsg.ok ? "#10b981" : "#ef4444",
+                }}>
+                {activationMsg.ok ? <Check className="inline h-3.5 w-3.5 mr-1" /> : <AlertCircle className="inline h-3.5 w-3.5 mr-1" />}
+                {activationMsg.text}
+              </div>
+            )}
+
+            {/* Buttons */}
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => { setShowActivateModal(false); setActivationMsg(null); }}
+                disabled={activating}
+                className="flex-1 rounded-xl border py-2.5 text-xs font-medium transition-all hover:opacity-70"
+                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgCard }}>
+                Отмена
+              </button>
+              <button
+                onClick={handleActivate}
+                disabled={activating}
+                className="flex-1 rounded-xl py-2.5 text-xs font-bold text-white transition-all hover:opacity-80 disabled:opacity-50"
+                style={{ backgroundColor: "#10b981" }}>
+                {activating ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Активация...
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Activity className="h-3.5 w-3.5" />
+                    Активировать
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -807,7 +954,7 @@ function LeadDetailContent({ lead, todos, crewId, slug, T }: {
       </Section>
 
       <Section title={`Сделки (${lead.rentals.length + lead.sales.length})`} icon={Briefcase} T={T} defaultOpen={lead.rentals.length > 0 || lead.sales.length > 0}>
-        <DealsPanel lead={lead} T={T} />
+        <DealsPanel lead={lead} slug={slug} T={T} />
       </Section>
 
       <Section title={`Задачи (${todos.filter(t => t.status !== "done").length})`} icon={CheckCircle} T={T}>

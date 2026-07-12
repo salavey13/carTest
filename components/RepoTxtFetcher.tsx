@@ -144,7 +144,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "lib/htmlToDocx.ts",
         "app/franchize/lib/docx-capability.ts",
         "app/franchize/lib/rental-contract-types.ts",
-        "app/franchize/lib/rental-contract-vars.ts",
+        "app/lib/rental-contract-vars.ts",
         "app/franchize/lib/pricing-calculator.ts",
         "app/franchize/lib/theme.ts",
         "app/franchize/lib/theme-resolver.ts",
