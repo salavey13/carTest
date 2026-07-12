@@ -1,5 +1,5 @@
 /**
- * /analytics-pass command
+ * /analytics_pass command
  * =====================
  * Generates a time-based password for analytics access and sends it to crew email.
  * Only available to crew members.
