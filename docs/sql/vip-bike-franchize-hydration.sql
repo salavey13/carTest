@@ -151,7 +151,7 @@ set
             jsonb_build_object(
               'title', 'VIP BIKE ELECTRO',
               'items', jsonb_build_array(
-                jsonb_build_object('type', 'text', 'value', 'Электромотоциклы в Нижнем Новгороде. 79bike: мощно, быстро, законно, без ОСАГО.')
+                jsonb_build_object('type', 'text', 'value', 'Электромотоциклы в Нижнем Новгороде. мощно, быстро, законно, без ОСАГО.')
               )
             ),
             jsonb_build_object(
