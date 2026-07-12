@@ -1919,7 +1919,10 @@ function resolveAndValidateFranchizeDocVariables(
   payload: FranchizeOrderNotifyPayload,
   userSensitive: UnknownRecord,
 ): FranchizeOrderDocVariables {
-  const birthDate = formatDateDdMmYyyy(resolveFranchizeDocField("renterBirthDate", payload, userSensitive, ""));
+  // FIX: Web app client sends `birthDate`, not `renterBirthDate`.
+  // Check both sources directly, then fall back to userSensitive chain.
+  const rawBirthDate = String(readPath(payload, ["birthDate"], "") || readPath(payload, ["renterBirthDate"], "")).trim();
+  const birthDate = formatDateDdMmYyyy(rawBirthDate || resolveFranchizeDocField("renterBirthDate", payload, userSensitive, ""));
   const normalizedBirthDate = birthDate || "указывается при выдаче";
   const phone = formatPhoneRu(resolveFranchizeDocField("renterPhone", payload, userSensitive, payload.phone || ""));
   const email = resolveFranchizeDocField("renterEmail", payload, userSensitive, "указывается при выдаче");
@@ -2356,10 +2359,25 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         // computed equipment_summary from the parsed equipment object.
         // Only override media_links (no user-generated media in web flow).
         media_links: "—",
-        // Use the web app's resolved renter_passport which may include "указывается при выдаче"
-        renter_passport: rentalSecrets?.renter_passport || userSensitive.passport || payload.renterPassport || "указывается при выдаче",
-        // Use the web app's resolved renter_driver_license
-        renter_driver_license: rentalSecrets?.renter_driver_license || userSensitive.driverLicense || payload.renterDriverLicense || "указывается при выдаче",
+        // FIX: Web app client sends structured passportSeries+passportNumber, not
+        // combined renterPassport. Combine them explicitly so user-entered data
+        // isn't lost to the "указывается при выдаче" fallback. Priority:
+        // 1. rentalSecrets (verified from past contract)
+        // 2. userSensitive (from Telegram profile)
+        // 3. structured fields from web app order form (passportSeries+passportNumber)
+        // 4. legacy combined field (payload.renterPassport — rarely set)
+        // 5. placeholder
+        renter_passport: rentalSecrets?.renter_passport
+          || userSensitive.passport
+          || [payload.passportSeries, payload.passportNumber].filter(Boolean).join(" ").trim()
+          || payload.renterPassport
+          || "указывается при выдаче",
+        // Same fix for driver license: web app sends licenseSeries+licenseNumber
+        renter_driver_license: rentalSecrets?.renter_driver_license
+          || userSensitive.driverLicense
+          || (payload.hasLicense === false ? "" : [payload.licenseSeries, payload.licenseNumber].filter(Boolean).join(" ").trim())
+          || payload.renterDriverLicense
+          || "указывается при выдаче",
       };
 
       const docFileName = `rental-${car.make}-${car.model}-${rentStartDate || new Date().toISOString().slice(0, 10)}.docx`.replace(/\s+/g, '-');
@@ -2643,7 +2661,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                 requested_end_date: endIso,
                 agreed_start_date: startIso,
                 agreed_end_date: endIso,
-                status: "pending_confirmation",
+                status: "active", // active = needs-approval (admin sees "в аренде", can confirm via dashboard)
                 payment_status: payload.payment === "telegram_xtr" ? "interest_paid" : "pending",
                 total_cost: Math.round(payload.totalAmount),
                 metadata: {
