@@ -338,7 +338,6 @@ function buildEquipmentKeyboard(context: DocFlowContext): KeyboardButton[][] {
   const boots = context.boots || false;
   const net = context.net || false;
   const backpack = context.backpack || false;
-  const bag = context.bag || false;
   const charger = context.charger || false;
 
   return [
@@ -355,7 +354,6 @@ function buildEquipmentKeyboard(context: DocFlowContext): KeyboardButton[][] {
       { text: `${backpack ? "✅" : "⬜"} Рюкзак`, callback_data: "eq_backpack" },
     ],
     [
-      { text: `${bag ? "✅" : "⬜"} Сумка`, callback_data: "eq_bag" },
       { text: `${charger ? "✅" : "⬜"} Зарядка`, callback_data: "eq_charger" },
     ],
     [{ text: "✅ Готово", callback_data: "eq_done" }],

@@ -585,7 +585,7 @@ function PricingTable({
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
-// Additional Items — helmets, gloves, net, bag, coat
+// Additional Items — helmets, gloves, net, coat, backpack, charger
 // ───────────────────────────────────────────────────────────────────────────────
 
 /** All rentable extras with their prices (per rental, not per day).
@@ -598,7 +598,6 @@ export const ADDITIONAL_ITEMS = [
   { key: "boots", label: "Боты/Сапоги", icon: "👢", price: 500, type: "toggle" as const },
   { key: "net", label: "Сетка", icon: "🌐", price: 500, type: "toggle" as const },
   { key: "backpack", label: "Рюкзак", icon: "🎒", price: 500, type: "toggle" as const },
-  { key: "bag", label: "Багажная сумка", icon: "👜", price: 500, type: "toggle" as const },
   { key: "charger", label: "Зарядка", icon: "🔌", price: 0, type: "toggle" as const },
 ];
 

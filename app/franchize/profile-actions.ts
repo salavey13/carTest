@@ -424,13 +424,16 @@ export async function getFranchizeCrewRentalsListAction(params: {
       .order("created_at", { ascending: false })
       .limit(50);
 
-    const now = new Date();
+    const now = Date.now();
+    const RENTAL_END_GRACE_MS = 24 * 60 * 60 * 1000; // 24h grace (matches actions-runtime.ts)
     const result = (rentals || []).map((r: any) => {
-      // Date-aware status: if agreed_end_date is past and status is "active"/"confirmed",
-      // override to "expired" so the UI doesn't show past rentals as active.
-      const agreedEnd = r.agreed_end_date ? new Date(r.agreed_end_date) : null;
+      // Date-aware status: if agreed_end_date is past (plus 24h grace) and status
+      // is "active"/"confirmed", override to "expired" so the UI doesn't show past
+      // rentals as active. The grace period absorbs the bare-date-as-midnight quirk
+      // and timezone fuzz between client entry and server interpretation.
+      const agreedEndTs = r.agreed_end_date ? Date.parse(r.agreed_end_date) : Number.NaN;
       let effectiveStatus = r.status || "unknown";
-      if ((effectiveStatus === "active" || effectiveStatus === "confirmed") && agreedEnd && agreedEnd < now) {
+      if ((effectiveStatus === "active" || effectiveStatus === "confirmed") && !Number.isNaN(agreedEndTs) && (agreedEndTs + RENTAL_END_GRACE_MS < now)) {
         effectiveStatus = "expired";
       }
 
