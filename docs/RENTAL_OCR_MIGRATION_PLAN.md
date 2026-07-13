@@ -37,7 +37,10 @@ Replace legacy VLM OCR in rental-repo (`app/lib/vlm-extract.ts`) with Oleg's mul
 │  (Order Page)   │
 └────────┬────────┘
          │
-         │ 1. User uploads passport/license photo
+         │ 1. User uploads document photos (3 types):
+         │    - passport_mainpage (главная страница паспорта)
+         │    - passport_registration (страница с пропиской)
+         │    - drivers_licence (водительское удостоверение)
          │ 2. Client reduces resolution (max 1920px, JPEG q85)
          │
          ▼
@@ -67,11 +70,14 @@ Replace legacy VLM OCR in rental-repo (`app/lib/vlm-extract.ts`) with Oleg's mul
 │   bike.ru)      │
 └────────┬────────┘
          │
-         │ 6. Download photo from Supabase Storage
-         │ 7. Run OCR (gen-api.ru / Groq / Z.AI / local)
-         │ 8. Save to user_rental_secrets
-         │ 9. Update rentals.passport_photo_path / license_photo_path
-         │ 10. Delete photo from docpix (cleanup)
+          │ 6. Download photo from Supabase Storage
+          │ 7. Run OCR (gen-api.ru Gemini only)
+          │ 8. Save to user_rental_secrets
+          │ 9. Update rentals photo paths:
+          │    - passport_mainpage_photo
+          │    - passport_registration_photo
+          │    - drivers_licence_frontal_photo
+          │ 10. Delete photo from docpix (cleanup)
          │
          ▼
 ┌─────────────────┐
@@ -151,8 +157,16 @@ export async function POST(request: NextRequest) {
   const imageBuffer = Buffer.from(await fileData.arrayBuffer());
   const base64 = imageBuffer.toString("base64");
   
-  // 3. Run OCR
-  const ocrResult = await recognizeDocument(docType, { base64 });
+  // 3. Determine OCR document type based on photo type
+  const ocrDocTypeMap = {
+    "passport_mainpage": "passport",
+    "passport_registration": "registration",
+    "drivers_licence": "license",
+  };
+  const ocrDocType = ocrDocTypeMap[docType];
+  
+  // 4. Run OCR
+  const ocrResult = await recognizeDocument(ocrDocType, { base64 });
   
   if (ocrResult.mock) {
     return NextResponse.json({
@@ -161,7 +175,7 @@ export async function POST(request: NextRequest) {
     });
   }
   
-  // 4. Save to user_rental_secrets
+  // 5. Save to user_rental_secrets (different fields based on doc type)
   const { data: existingSecrets } = await privateSchema()
     .from("user_rental_secrets")
     .select("*")
@@ -171,19 +185,22 @@ export async function POST(request: NextRequest) {
   const secretData = {
     chat_id: rental.user_id,
     source_rental_id: rentalId,
-    [`${docType}_photo_path`]: storagePath,
-    ...(docType === "passport" ? {
-      renter_full_name: ocrResult.fields.fullName,
-      renter_passport: `${ocrResult.fields.passportSeries} ${ocrResult.fields.passportNumber}`,
-      renter_passport_issue_date: ocrResult.fields.passportIssuedDate,
-      renter_registration: ocrResult.fields.registrationAddress,
-      renter_birth_date: ocrResult.fields.birthDate,
-    } : {
-      renter_driver_license: ocrResult.fields.licenseNumber,
-      license_categories: ocrResult.fields.licenseCategories,
-      license_expiry_date: ocrResult.fields.licenseValidUntil,
-    }),
+    [`${docType}_photo`]: storagePath,
   };
+  
+  // Add OCR results based on document type
+  if (docType === "passport_mainpage") {
+    secretData.renter_full_name = ocrResult.fields.fullName;
+    secretData.renter_passport = `${ocrResult.fields.passportSeries} ${ocrResult.fields.passportNumber}`;
+    secretData.renter_passport_issue_date = ocrResult.fields.passportIssuedDate;
+    secretData.renter_birth_date = ocrResult.fields.birthDate;
+  } else if (docType === "passport_registration") {
+    secretData.renter_registration = ocrResult.fields.registrationAddress;
+  } else if (docType === "drivers_licence") {
+    secretData.renter_driver_license = ocrResult.fields.licenseNumber;
+    secretData.license_categories = ocrResult.fields.licenseCategories;
+    secretData.license_expiry_date = ocrResult.fields.licenseValidUntil;
+  }
   
   if (existingSecrets) {
     await privateSchema()
@@ -196,10 +213,10 @@ export async function POST(request: NextRequest) {
       .insert(secretData);
   }
   
-  // 5. Update rental with photo path
+  // 6. Update rental with photo path
   await supabaseAdmin
     .from("rentals")
-    .update({ [`${docType}_photo_path`]: storagePath })
+    .update({ [`${docType}_photo`]: storagePath })
     .eq("rental_id", rentalId);
   
   // 6. Cleanup: delete photo from docpix (152-ФЗ compliance)
@@ -283,11 +300,13 @@ USING (auth.role() = 'service_role');
 -- supabase/migrations/YYYYMMDDHHMMSS_add_rental_photo_fields.sql
 
 ALTER TABLE public.rentals
-ADD COLUMN IF NOT EXISTS passport_photo_path text,
-ADD COLUMN IF NOT EXISTS license_photo_path text;
+ADD COLUMN IF NOT EXISTS passport_mainpage_photo text,
+ADD COLUMN IF NOT EXISTS passport_registration_photo text,
+ADD COLUMN IF NOT EXISTS drivers_licence_frontal_photo text;
 
-COMMENT ON COLUMN public.rentals.passport_photo_path IS 'Supabase Storage path (docpix bucket) — temporary, deleted after OCR';
-COMMENT ON COLUMN public.rentals.license_photo_path IS 'Supabase Storage path (docpix bucket) — temporary, deleted after OCR';
+COMMENT ON COLUMN public.rentals.passport_mainpage_photo IS 'Supabase Storage path (docpix bucket) — temporary, deleted after OCR';
+COMMENT ON COLUMN public.rentals.passport_registration_photo IS 'Supabase Storage path (docpix bucket) — temporary, deleted after OCR';
+COMMENT ON COLUMN public.rentals.drivers_licence_frontal_photo IS 'Supabase Storage path (docpix bucket) — temporary, deleted after OCR';
 ```
 
 **Migration 3: Add Photo References to User Rental Secrets**
@@ -295,11 +314,13 @@ COMMENT ON COLUMN public.rentals.license_photo_path IS 'Supabase Storage path (d
 -- supabase/migrations/YYYYMMDDHHMMSS_add_secrets_photo_fields.sql
 
 ALTER TABLE private.user_rental_secrets
-ADD COLUMN IF NOT EXISTS passport_photo_path text,
-ADD COLUMN IF NOT EXISTS license_photo_path text;
+ADD COLUMN IF NOT EXISTS passport_mainpage_photo text,
+ADD COLUMN IF NOT EXISTS passport_registration_photo text,
+ADD COLUMN IF NOT EXISTS drivers_licence_frontal_photo text;
 
-COMMENT ON COLUMN private.user_rental_secrets.passport_photo_path IS 'Supabase Storage path (docpix bucket) — kept for audit';
-COMMENT ON COLUMN private.user_rental_secrets.license_photo_path IS 'Supabase Storage path (docpix bucket) — kept for audit';
+COMMENT ON COLUMN private.user_rental_secrets.passport_mainpage_photo IS 'Supabase Storage path (docpix bucket) — kept for audit';
+COMMENT ON COLUMN private.user_rental_secrets.passport_registration_photo IS 'Supabase Storage path (docpix bucket) — kept for audit';
+COMMENT ON COLUMN private.user_rental_secrets.drivers_licence_frontal_photo IS 'Supabase Storage path (docpix bucket) — kept for audit';
 ```
 
 ### Phase 5: Update WebApp to Call VPS OCR API (Day 3)

@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { CrewFooter } from "../components/CrewFooter";
 import { CrewHeader } from "../components/CrewHeader";
 import { CatalogClient } from "../components/CatalogClient";
 import { FranchizeErrorBoundary } from "../components/ErrorBoundary";
 import { ThemeInitializer } from "../components/ThemeInitializer";
+import { JoinCrewBanner } from "../components/JoinCrewBanner";
 import { getFranchizeBySlug } from "../actions";
 import { getFranchizeRouteCtaPolicy } from "../lib/route-cta-policy";
 import { crewPaletteWithCssVars } from "../lib/theme";
@@ -20,6 +22,9 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
   return (
     <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
       <ThemeInitializer defaultTheme="dark" />
+      <Suspense>
+        <JoinCrewBanner slug={slug} />
+      </Suspense>
       {/*
         FIX: Wrap CrewHeader in FranchizeErrorBoundary so that any runtime
         error inside the header (including FranchizeProfileButton's Radix

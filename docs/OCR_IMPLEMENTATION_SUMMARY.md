@@ -25,12 +25,16 @@
 - **Flow:**
   1. Validates rental exists
   2. Downloads photo from docpix bucket
-  3. Runs OCR via `recognizeDocument()`
-  4. Converts ISO dates to DD.MM.YYYY
-  5. Updates `user_rental_secrets` (private schema)
-  6. Updates `rentals.passport_photo_path` / `license_photo_path`
-  7. Deletes photo from docpix (152-ФЗ compliance)
-  8. Returns `{ success: true, fields }`
+  3. Maps docType to OCR type (passport_mainpage → passport, passport_registration → registration, drivers_licence → license)
+  4. Runs OCR via `recognizeDocument()`
+  5. Converts ISO dates to DD.MM.YYYY
+  6. Updates `user_rental_secrets` (private schema) with appropriate fields based on docType
+  7. Updates rentals photo paths:
+     - `passport_mainpage_photo`
+     - `passport_registration_photo`
+     - `drivers_licence_frontal_photo`
+  8. Deletes photo from docpix (152-ФЗ compliance)
+  9. Returns `{ success: true, fields }`
 - **Timeout:** 60s (VPS has no limit)
 
 ### 3. Photo Upload Button Component (`app/franchize/components/PhotoUploadButton.tsx`)
@@ -47,8 +51,10 @@
 - **Flow:**
   1. Accepts `{ rentalId, updates: { passport_verified, license_verified, ... } }`
   2. Merges checklist updates into `rentals.metadata.checklist`
-  3. If `passport_verified = true`, sets `passport_photo_path = null`
-  4. If `license_verified = true`, sets `license_photo_path = null`
+  3. If `passport_verified = true`, sets:
+     - `passport_mainpage_photo = null`
+     - `passport_registration_photo = null`
+  4. If `license_verified = true`, sets `drivers_licence_frontal_photo = null`
   5. Returns `{ success: true, checklist, allCompleted }`
 
 ### 5. Supabase Migrations
@@ -56,9 +62,12 @@
   - Creates non-public `docpix` bucket
   - RLS policy: service_role only
 - **20260113120001_add_photo_fields_to_rentals.sql**
-  - Adds `passport_photo_path` and `license_photo_path` to `rentals` table
+  - Adds 3 photo path columns to `rentals` table:
+    - `passport_mainpage_photo`
+    - `passport_registration_photo`
+    - `drivers_licence_frontal_photo`
 - **20260113120002_add_photo_fields_to_user_rental_secrets.sql**
-  - Adds same fields to `user_rental_secrets` (private schema)
+  - Adds same 3 columns to `user_rental_secrets` (private schema)
 
 ### 6. Environment Variables (`.env.local`)
 ```bash
@@ -81,7 +90,10 @@ OCR_MODE=genapi
 │  (Order Page)   │
 └────────┬────────┘
          │
-         │ 1. User uploads passport/license photo
+         │ 1. User uploads document photos (3 types):
+         │    - passport_mainpage (главная страница паспорта)
+         │    - passport_registration (страница с пропиской)
+         │    - drivers_licence (водительское удостоверение)
          │ 2. Client reduces resolution (max 1920px, JPEG q85)
          │
          ▼
