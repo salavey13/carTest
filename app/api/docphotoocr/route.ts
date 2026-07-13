@@ -49,6 +49,13 @@ function isoToDmy(iso: string | null | undefined): string | null {
 export async function POST(request: NextRequest): Promise<NextResponse<OcrResponse>> {
   let storagePath: string | undefined;
   
+  // Маппинг docType → имя колонки в БД (единый для rentals и user_rental_secrets)
+  const photoColumnMap: Record<string, string> = {
+    "passport_mainpage": "passport_mainpage_photo",
+    "passport_registration": "passport_registration_photo",
+    "drivers_licence": "drivers_licence_frontal_photo",
+  };
+  
   try {
     // 1. Парсим входные данные
     const body = (await request.json()) as OcrRequest;
@@ -141,12 +148,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<OcrRespon
       .limit(1)
       .maybeSingle();
     
-    // Маппинг docType → имя колонки в БД
-    const photoColumnMap: Record<string, string> = {
-      "passport_mainpage": "passport_mainpage_photo",
-      "passport_registration": "passport_registration_photo",
-      "drivers_licence": "drivers_licence_frontal_photo",
-    };
     const photoColumn = photoColumnMap[docType];
     
     const secretData: Record<string, any> = {
@@ -185,14 +186,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<OcrRespon
     }
     
     // 8. Обновляем rentals с photo path
-    // Маппинг docType → имя колонки в БД
-    const photoColumnMap: Record<string, string> = {
-      "passport_mainpage": "passport_mainpage_photo",
-      "passport_registration": "passport_registration_photo",
-      "drivers_licence": "drivers_licence_frontal_photo",
-    };
-    const photoColumn = photoColumnMap[docType];
-    
     await supabaseAdmin
       .from("rentals")
       .update({ [photoColumn]: storagePath })
