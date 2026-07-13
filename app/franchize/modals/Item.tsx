@@ -92,6 +92,8 @@ interface ItemModalProps {
   onTestdrive?: () => void | Promise<void>;
   /** Shows "С возвращением!" badge for returning users */
   isReturningUser?: boolean;
+  /** Display mode from catalog filter — overrides flowType for content visibility */
+  displayMode?: "rent" | "sale";
 }
 
 const packageOptions = ["Базовый", "Комфорт", "Максимум"];
@@ -1061,8 +1063,9 @@ export function ItemModal({
   onBuyItem,
   onTestdrive,
   isReturningUser = false,
+  displayMode,
 }: ItemModalProps) {
-  const isRental = flowType === "rental";
+  const isRental = displayMode ? displayMode === "rent" : flowType === "rental";
   const modalRef = useRef<HTMLDivElement>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
@@ -1113,8 +1116,12 @@ export function ItemModal({
 
   // Determine which CTAs to show (safe optional chaining — item may be null during close transition)
   // Only show CTAs for flows that are explicitly enabled via rent=1/sale=1 specs
-  const showRentCta = isRental && (item ? hasRentPrice(item) : false);
-  const showBuyCta = item ? hasSalePrice(item) : false;
+  const showRentCta = displayMode
+    ? displayMode === "rent" && (item ? hasRentPrice(item) : false)
+    : isRental && (item ? hasRentPrice(item) : false);
+  const showBuyCta = displayMode
+    ? displayMode === "sale" && (item ? hasSalePrice(item) : false)
+    : item ? hasSalePrice(item) : false;
 
   const gallery = useMemo(() => {
     if (!item) return [];
@@ -1452,8 +1459,8 @@ export function ItemModal({
     ? `${calculatedPrice.price} ${calculatedPrice.period}`
     : item.rentPriceLabel;
 
-  const showRentInSpecs = hasRentPrice(item);
-  const showSaleInSpecs = hasSalePrice(item);
+  const showRentInSpecs = displayMode ? displayMode === "rent" && hasRentPrice(item) : hasRentPrice(item);
+  const showSaleInSpecs = displayMode ? displayMode === "sale" && hasSalePrice(item) : hasSalePrice(item);
 
   // Compact multi-day price reference (not shown in DurationShortcuts hourly balloons).
   // Only 2-4d, 5-10d, 11-30d — hourly/1d prices are covered by DurationShortcuts + PriceCard.
@@ -1629,7 +1636,7 @@ export function ItemModal({
                     className="inline-flex rounded-full border px-2.5 py-1 font-semibold"
                     style={{ backgroundColor: T.accentSoft, color: T.accent, borderColor: T.accent }}
                   >
-                    {isRental ? "Аренда + покупка" : "Доступно к покупке"}
+                    Доступно к покупке
                   </span>
                 )}
                 {isReturningUser && (

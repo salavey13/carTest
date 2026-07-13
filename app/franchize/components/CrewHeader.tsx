@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Menu, ShoppingCart } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { Menu } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { localImageSrc } from "@/lib/image-fallback";
 import { HeaderMenu } from "../modals/HeaderMenu";
@@ -12,7 +12,6 @@ import { FranchizeProfileButton, CrewButtonErrorBoundary } from "./FranchizeProf
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
-import { toCategoryId } from "../lib/navigation";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
 import { readablePaletteTextOnColor, withAlpha } from "../lib/theme";
@@ -36,25 +35,20 @@ interface CrewHeaderProps {
 
 export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [], items, showRail = true }: CrewHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [catalogLinks, setCatalogLinks] = useState<string[]>([]);
   const [isCompact, setIsCompact] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const displayMode = searchParams.get("mode") === "sale" ? "sale" : "rent";
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const headerLogoHref = crew.header.logoHref || mainCatalogPath;
-  const railRef = useRef<HTMLDivElement | null>(null);
   const prevPathnameRef = useRef<string | null>(null);
-  const [indicatorStyle, setIndicatorStyle] = useState<{ width: number; left: number; opacity: number }>({ width: 0, left: 0, opacity: 0 });
 
   // Apply franchize theme CSS variables
   useFranchizeTheme(crew.theme);
 
   const activePillText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
   const { itemCount } = useFranchizeCart(crew.slug);
-
-  // Track whether user is manually scrolling the rail (to prevent auto-scroll from fighting it)
-  const isUserScrollingRef = useRef(false);
-  const userScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Logo loading state machine ──
   const [brokenLogoUrls, setBrokenLogoUrls] = useState<Record<string, true>>({});
@@ -75,14 +69,13 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
     ensureSpookyKeyframes();
   }, []);
 
-  // Reset active category when navigating away from main catalog
+  // Reset state when navigating away from main catalog
   useEffect(() => {
     const prev = prevPathnameRef.current;
     prevPathnameRef.current = pathname;
 
     if (prev !== null && prev !== pathname && pathname !== mainCatalogPath) {
-      const timer = setTimeout(() => setActiveCategory(null), 0);
-      return () => clearTimeout(timer);
+      // reserved for future cleanup
     }
   }, [pathname, mainCatalogPath]);
 
@@ -93,38 +86,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
-
-  const defaultGroupLinks = useMemo(
-    () => Array.from(new Set([...crew.catalog.showcaseGroups.map((group) => group.label), ...crew.catalog.categories, ...groupLinks].filter(Boolean))),
-    [crew.catalog.categories, crew.catalog.showcaseGroups, groupLinks],
-  );
-
-  const visibleRailLinks = useMemo(() => {
-    if (pathname === mainCatalogPath && catalogLinks.length > 0) {
-      return catalogLinks.map((label) => ({
-        label,
-        href: `${mainCatalogPath}#${toCategoryId(label)}`,
-        active: activeCategory === label,
-        categoryLabel: label,
-      }));
-    }
-
-    if (pathname !== mainCatalogPath && sectionLinks.length > 0) {
-      const normalizedSectionLinks = sectionLinks
-        .filter((link) => link.label.trim() && link.href.trim())
-        .filter((link) => SHOW_CART || link.label.toLowerCase() !== "корзина")
-        .map((link) => ({ ...link, categoryLabel: link.label }));
-
-      if (normalizedSectionLinks.length > 0) return normalizedSectionLinks;
-    }
-
-    return defaultGroupLinks.map((label) => ({
-      label,
-      href: pathname === mainCatalogPath ? `#${toCategoryId(label)}` : `${mainCatalogPath}#${toCategoryId(label)}`,
-      active: activeCategory === label,
-      categoryLabel: label,
-    }));
-  }, [activeCategory, catalogLinks, defaultGroupLinks, mainCatalogPath, pathname, sectionLinks]);
 
   // --- FIXED: Hysteresis Scroll Listener ---
   useEffect(() => {
@@ -145,74 +106,6 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  useEffect(() => {
-    if (pathname !== mainCatalogPath) {
-      setActiveCategory(null);
-      return;
-    }
-
-    const hydrateSections = () => {
-      const sections = Array.from(document.querySelectorAll<HTMLElement>("section[data-category]"));
-      const labels = sections.map((section) => section.getAttribute("data-category")?.trim() ?? "").filter(Boolean);
-      setCatalogLinks(Array.from(new Set(labels)));
-      return sections;
-    };
-
-    let sections = hydrateSections();
-    if (sections.length === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((entry) => entry.isIntersecting);
-        if (visible.length === 0) return;
-        const mostVisible = visible.sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        const category = mostVisible?.target.getAttribute("data-category");
-        if (category) setActiveCategory(category);
-      },
-      { rootMargin: "-95px 0px -55% 0px", threshold: [0.2, 0.4, 0.65, 0.9] },
-    );
-
-    sections.forEach((section) => observer.observe(section));
-
-    const mutationObserver = new MutationObserver(() => {
-      observer.disconnect();
-      sections = hydrateSections();
-      sections.forEach((section) => observer.observe(section));
-    });
-
-    const catalogRoot = document.getElementById("catalog-sections");
-    if (catalogRoot) mutationObserver.observe(catalogRoot, { childList: true, subtree: true });
-
-    return () => {
-      observer.disconnect();
-      mutationObserver.disconnect();
-    };
-  }, [mainCatalogPath, pathname]);
-
-  // --- Плавный скролл активного бейджа (pill) в центр экрана ---
-  useEffect(() => {
-    if (isUserScrollingRef.current) return;
-
-    const activeRailLink = visibleRailLinks.find(
-      (link) => link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href)),
-    );
-    if (!activeRailLink || !railRef.current) return;
-
-    const activeEl = Array.from(railRef.current.querySelectorAll<HTMLElement>("[data-category-pill]")).find(
-      (element) => element.dataset.categoryPill === activeRailLink.categoryLabel,
-    );
-
-    if (activeEl) {
-      const container = railRef.current;
-      const scrollLeft = activeEl.offsetLeft - container.clientWidth / 2 + activeEl.clientWidth / 2;
-
-      container.scrollTo({
-        left: scrollLeft,
-        behavior: "smooth",
-      });
-    }
-  }, [activePath, pathname, activeCategory, visibleRailLinks]);
 
   return (
     <header
@@ -402,58 +295,45 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
         </div>
       </div>
 
-      {showRail && visibleRailLinks.length > 0 && (
+      {showRail && (
         <div
           className="-mx-4 mt-1 border-t px-4 pt-2"
           style={{ borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft }}
         >
-          <div
-            ref={railRef}
-            className="relative mx-auto flex w-full max-w-7xl gap-2 overflow-x-auto no-scrollbar pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
-            onScroll={() => {
-              isUserScrollingRef.current = true;
-              if (userScrollTimerRef.current) clearTimeout(userScrollTimerRef.current);
-              userScrollTimerRef.current = setTimeout(() => {
-                isUserScrollingRef.current = false;
-              }, 1500);
-            }}
-          >
-            {visibleRailLinks.map((link) => {
-              const isActive = link.active || (!link.href.startsWith("#") && (pathname === link.href || activePath === link.href));
+          <div className="mx-auto flex w-full max-w-7xl gap-2 pb-1">
+            {([
+              { key: "rent" as const, label: "Аренда" },
+              { key: "sale" as const, label: "Продажа" },
+            ]).map((pill) => {
+              const isActive = displayMode === pill.key;
               return (
-                <Link
-                  key={`${link.label}-${link.href}`}
-                  href={link.href}
-                  data-category-pill={link.categoryLabel}
-                  aria-current={isActive ? "location" : undefined}
-                  aria-label={`Перейти к разделу ${link.label}`}
-                  className="shrink-0 snap-start rounded-full bg-[var(--pill-bg)] px-3 py-2 text-xs font-medium tracking-wide text-[var(--pill-text)] no-underline transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 select-none"
+                <button
+                  key={pill.key}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => {
+                    const params = new URLSearchParams(searchParams.toString());
+                    if (pill.key === "rent") {
+                      params.delete("mode");
+                    } else {
+                      params.set("mode", pill.key);
+                    }
+                    const qs = params.toString();
+                    // Always navigate to catalog path so the filter takes effect
+                    router.push(qs ? `${mainCatalogPath}?${qs}` : mainCatalogPath, { scroll: false });
+                  }}
+                  className="shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 select-none"
                   style={{
-                    ["--pill-bg" as string]: isActive
+                    backgroundColor: isActive
                       ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain)
                       : (crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard),
-                    ["--pill-text" as string]: isActive
+                    color: isActive
                       ? activePillText
                       : (crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary),
-                    textDecoration: "none",
-                  }}
-                  onClick={(event) => {
-                    setActiveCategory(link.categoryLabel);
-                    if (link.href.includes("#")) {
-                      const hash = link.href.split("#")[1];
-                      if (hash) {
-                        const target = document.getElementById(hash);
-                        if (target) {
-                          event.preventDefault();
-                          target.scrollIntoView({ behavior: "smooth", block: "start" });
-                          window.history.replaceState(null, "", `#${hash}`);
-                        }
-                      }
-                    }
                   }}
                 >
-                  {link.label}
-                </Link>
+                  {pill.label}
+                </button>
               );
             })}
           </div>
