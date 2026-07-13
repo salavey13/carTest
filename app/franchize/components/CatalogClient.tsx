@@ -1062,7 +1062,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         ) : (
           <div className="space-y-6">
             {activeGroupsForCarousel.map((group) => (
-              <section key={group.category || group.title || "section"} id={toCategoryId(group.category || group.title || "section")} data-category={group.title || group.category} data-count={group.items.length}>
+              <section key={group.title || group.category || "section"} id={toCategoryId(group.title || group.category || "section")} data-category={group.title || group.category} data-count={group.items.length}>
                 {group.title && (
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <h2 className="text-2xl font-bold uppercase leading-tight tracking-tight text-[var(--catalog-text)]">
