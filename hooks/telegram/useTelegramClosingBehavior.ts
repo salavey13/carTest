@@ -20,6 +20,17 @@ export function useTelegramClosingBehavior(tg: TelegramWebApp | null, enabled: b
       tg.enableClosingConfirmation?.();
     }
 
+    // Disable native vertical swipe-down gesture that collapses the WebApp.
+    // This prevents accidental closure when users scroll near the top edge.
+    // Available since Telegram WebApp v6.0+, no version gate needed.
+    try {
+      if (typeof tg.disableVerticalSwipes === "function") {
+        tg.disableVerticalSwipes();
+      }
+    } catch {
+      // Ignore if not supported
+    }
+
     tg.expand?.();
 
     // Fullscreen requires v7.7+ - check version before calling
