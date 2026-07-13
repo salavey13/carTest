@@ -94,7 +94,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
         role="dialog"
         aria-modal="true"
         aria-labelledby="franchize-header-menu-title"
-        className="pointer-events-auto mt-[calc(max(env(safe-area-inset-top),0.5rem)+0.5rem)] max-h-[calc(100dvh-max(env(safe-area-inset-top),0.5rem)-1rem)] w-full max-w-sm overflow-y-auto rounded-2xl border border-[var(--header-menu-border)] bg-[var(--header-menu-bg)] p-4 text-[var(--header-menu-text)] shadow-2xl"
+        className="pointer-events-auto mt-[calc(max(env(safe-area-inset-top),0.5rem)+1rem)] max-h-[calc(100dvh-max(env(safe-area-inset-top),0.5rem)-1rem)] w-full max-w-sm overflow-y-auto rounded-2xl border border-[var(--header-menu-border)] bg-[var(--header-menu-bg)] p-4 text-[var(--header-menu-text)] shadow-2xl"
         style={{
           ["--header-menu-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard,
           ["--header-menu-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
