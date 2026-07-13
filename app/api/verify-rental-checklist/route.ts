@@ -7,12 +7,15 @@
  * Flow:
  * 1. Оператор в LEADS page сравнивает фото с OCR данными
  * 2. Оператор нажимает "Верифицировать паспорт" / "Верифицировать права"
- * 3. Этот endpoint обновляет metadata.checklist, удаляет фото из Storage и убирает reference
- * 4. 152-ФЗ compliance: фото удаляются немедленно после верификации
+ * 3. Этот endpoint обновляет metadata.checklist и удаляет photo path
+ * 4. Фото уже удалены из docpix bucket (в /api/docphotoocr), остается только убрать reference
+ * 5. После успешной верификации вызывает activateRentalIfReady (fire-and-forget)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
+import { activateRentalIfReady } from "@/app/franchize/server-actions/rental-activation";
+import { completeRentalVerificationTodo } from "@/app/franchize/server-actions/rental-verification-todos";
 
 export const runtime = "nodejs";
 
@@ -200,6 +203,35 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyChe
         { success: false, error: `Update failed: ${updateError.message}` },
         { status: 500 }
       );
+    }
+
+    // 7. Auto-complete verification todos based on checklist updates
+    // This integrates with the rental verification todos system
+    try {
+      if (updates.passport_verified) {
+        // Passport mainpage and registration are verified together
+        await completeRentalVerificationTodo(rentalId, "passport_mainpage");
+        await completeRentalVerificationTodo(rentalId, "passport_registration");
+        console.log(`[verify-rental-checklist] Auto-completed passport todos for rental ${rentalId}`);
+      }
+
+      if (updates.license_verified) {
+        await completeRentalVerificationTodo(rentalId, "drivers_license");
+        console.log(`[verify-rental-checklist] Auto-completed license todo for rental ${rentalId}`);
+      }
+
+      if (updates.odometer_before !== undefined && updates.odometer_before !== null) {
+        await completeRentalVerificationTodo(rentalId, "odometer");
+        console.log(`[verify-rental-checklist] Auto-completed odometer todo for rental ${rentalId}`);
+      }
+
+      if (updates.dates_confirmed) {
+        await completeRentalVerificationTodo(rentalId, "dates");
+        console.log(`[verify-rental-checklist] Auto-completed dates todo for rental ${rentalId}`);
+      }
+    } catch (todoErr) {
+      // Non-fatal: log but don't fail the verification
+      console.error("[verify-rental-checklist] Failed to auto-complete todos:", todoErr);
     }
 
     return NextResponse.json({
