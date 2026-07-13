@@ -93,11 +93,11 @@ export async function activateRentalIfReady(
     }
 
     // 3. Check all verification todos are completed
-    const { data: todos, error: todosError } = await supabaseAdmin
+    // Todos are stored in crew_todos with rental_id in description JSON
+    const { data: allTodos, error: todosError } = await supabaseAdmin
       .from("crew_todos")
-      .select("id, title, status, category")
-      .eq("lead_id", rentalId)
-      .eq("category", "verification");
+      .select("id, title, status, category, description")
+      .eq("category", "rental_verification");
 
     if (todosError) {
       logger.error("[activateRentalIfReady] Failed to fetch todos", { 
@@ -111,6 +111,16 @@ export async function activateRentalIfReady(
         error: `Failed to fetch todos: ${todosError.message}`,
       };
     }
+
+    // Filter todos by rental_id in description JSON
+    const todos = (allTodos || []).filter((todo) => {
+      try {
+        const desc = JSON.parse(todo.description || "{}");
+        return desc.rental_id === rentalId;
+      } catch {
+        return false;
+      }
+    });
 
     // If no verification todos exist, don't activate (wait for todos to be created)
     if (!todos || todos.length === 0) {
@@ -176,7 +186,15 @@ export async function activateRentalIfReady(
     }
 
     // 5. Send notifications (fire-and-forget, don't block on errors)
-    await sendActivationNotifications(rental as RentalData);
+    // Use setImmediate to not block the response
+    setImmediate(() => {
+      sendActivationNotifications(rental as RentalData).catch((err) => {
+        logger.error("[activateRentalIfReady] Failed to send notifications", {
+          rentalId,
+          error: err,
+        });
+      });
+    });
 
     logger.info("[activateRentalIfReady] Rental activated successfully", { rentalId });
 
@@ -288,15 +306,41 @@ async function sendTelegramMessage(
   text: string
 ): Promise<boolean> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const forwardUrl = process.env.NEXT_PUBLIC_FORWARD_TELEGRAM_URL || "https://v0-car-test.vercel.app/api/forward-telegram";
 
-  if (!botToken) {
-    logger.warn("[sendTelegramMessage] TELEGRAM_BOT_TOKEN not configured");
-    return false;
+  // Try direct Telegram API first if token is available
+  if (botToken) {
+    try {
+      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: "HTML",
+        }),
+      });
+
+      if (response.ok) {
+        return true;
+      }
+
+      logger.warn("[sendTelegramMessage] Direct Telegram API failed, trying forward-telegram", {
+        chatId,
+        status: response.status,
+      });
+    } catch (error) {
+      logger.warn("[sendTelegramMessage] Direct Telegram API error, trying forward-telegram", {
+        chatId,
+        error,
+      });
+    }
   }
 
+  // Fallback to forward-telegram endpoint
   try {
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const response = await fetch(url, {
+    const response = await fetch(forwardUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -308,7 +352,7 @@ async function sendTelegramMessage(
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error("[sendTelegramMessage] Telegram API error", {
+      logger.error("[sendTelegramMessage] Forward-telegram API error", {
         chatId,
         status: response.status,
         error: errorText,
@@ -318,7 +362,7 @@ async function sendTelegramMessage(
 
     return true;
   } catch (error) {
-    logger.error("[sendTelegramMessage] Failed to send message", {
+    logger.error("[sendTelegramMessage] Failed to send message via forward-telegram", {
       chatId,
       error,
     });
