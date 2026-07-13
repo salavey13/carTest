@@ -7,8 +7,8 @@
  * Flow:
  * 1. Оператор в LEADS page сравнивает фото с OCR данными
  * 2. Оператор нажимает "Верифицировать паспорт" / "Верифицировать права"
- * 3. Этот endpoint обновляет metadata.checklist и удаляет photo path
- * 4. Фото уже удалены из docpix bucket (в /api/docphotoocr), остается только убрать reference
+ * 3. Этот endpoint обновляет metadata.checklist, удаляет фото из Storage и убирает reference
+ * 4. 152-ФЗ compliance: фото удаляются немедленно после верификации
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -32,6 +32,7 @@ interface VerifyChecklistRequest {
     dates_confirmed?: boolean;
     payment_verified?: boolean;
   };
+  verifiedBy?: string; // operator ID for audit
 }
 
 interface VerifyChecklistResponse {
@@ -41,10 +42,43 @@ interface VerifyChecklistResponse {
   error?: string;
 }
 
+interface VerificationLogEntry {
+  type: string;
+  timestamp: string;
+  verified_by?: string;
+  photos_deleted: string[];
+}
+
+/**
+ * Delete photos from Supabase Storage (fire-and-forget, non-blocking)
+ */
+async function deletePhotosFromStorage(paths: string[], rentalId: string): Promise<string[]> {
+  const deletedPaths: string[] = [];
+  
+  for (const path of paths) {
+    if (!path) continue;
+    
+    try {
+      const { error } = await supabaseAdmin.storage.from("docpix").remove([path]);
+      
+      if (error) {
+        console.warn(`[verify-rental-checklist] Failed to delete ${path} for rental #${rentalId}:`, error.message);
+      } else {
+        console.log(`[verify-rental-checklist] Deleted ${path} for rental #${rentalId}`);
+        deletedPaths.push(path);
+      }
+    } catch (err) {
+      console.warn(`[verify-rental-checklist] Exception deleting ${path} for rental #${rentalId}:`, err);
+    }
+  }
+  
+  return deletedPaths;
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse<VerifyChecklistResponse>> {
   try {
     const body = (await request.json()) as VerifyChecklistRequest;
-    const { rentalId, updates } = body;
+    const { rentalId, updates, verifiedBy } = body;
 
     if (!rentalId || !updates) {
       return NextResponse.json(
@@ -97,21 +131,65 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyChe
       },
     };
 
-    // 5. Cleanup: remove photo paths after verification
+    // 5. Verification log for audit (152-ФЗ compliance)
+    const verificationLog: VerificationLogEntry[] = metadata.verification_log || [];
+    const timestamp = new Date().toISOString();
+
+    // 6. Cleanup: delete photos from Storage and remove references after verification
     if (updates.passport_verified) {
+      const passportPhotosToDelete: string[] = [];
+      
       if (rental.passport_mainpage_photo) {
+        passportPhotosToDelete.push(rental.passport_mainpage_photo);
         updatePayload.passport_mainpage_photo = null;
       }
       if (rental.passport_registration_photo) {
+        passportPhotosToDelete.push(rental.passport_registration_photo);
         updatePayload.passport_registration_photo = null;
+      }
+
+      // Delete from Storage (fire-and-forget, non-blocking)
+      if (passportPhotosToDelete.length > 0) {
+        const deletedPaths = await deletePhotosFromStorage(passportPhotosToDelete, rentalId);
+        
+        // Add audit log entry
+        verificationLog.push({
+          type: "passport_verified",
+          timestamp,
+          verified_by: verifiedBy,
+          photos_deleted: deletedPaths,
+        });
       }
     }
 
-    if (updates.license_verified && rental.drivers_licence_frontal_photo) {
-      updatePayload.drivers_licence_frontal_photo = null;
+    if (updates.license_verified) {
+      const licensePhotosToDelete: string[] = [];
+      
+      if (rental.drivers_licence_frontal_photo) {
+        licensePhotosToDelete.push(rental.drivers_licence_frontal_photo);
+        updatePayload.drivers_licence_frontal_photo = null;
+      }
+
+      // Delete from Storage (fire-and-forget, non-blocking)
+      if (licensePhotosToDelete.length > 0) {
+        const deletedPaths = await deletePhotosFromStorage(licensePhotosToDelete, rentalId);
+        
+        // Add audit log entry
+        verificationLog.push({
+          type: "license_verified",
+          timestamp,
+          verified_by: verifiedBy,
+          photos_deleted: deletedPaths,
+        });
+      }
     }
 
-    // 6. Update rental
+    // 7. Update metadata with verification log
+    if (verificationLog.length > 0) {
+      updatePayload.metadata.verification_log = verificationLog;
+    }
+
+    // 8. Update rental
     const { error: updateError } = await supabaseAdmin
       .from("rentals")
       .update(updatePayload)
