@@ -515,6 +515,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
       // 2. Load full rental docs prefill (passport, license, etc.)
       const docsRes = await getRentalDocsPrefillAction({ userId: dbUser.user_id, slug });
+      
+      // 3. Load latest rental data with per-field source tracking
+      const latestRes = await getLatestRentalDataWithSource({ userId: dbUser.user_id, slug });
+
       if (docsRes.success && docsRes.data) {
         const d = docsRes.data;
         
@@ -544,6 +548,28 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             hasLicense: Boolean(d.licenseSeries || d.licenseNumber),
           });
           setPrefillBannerVisible(true);
+        } else if (latestRes.success && latestRes.data?.hasData) {
+          // Fallback to latest rental data with source tracking
+          const latest = latestRes.data;
+          setPrefillData({
+            hasData: true,
+            source: latest.source,
+            lastRentalDate: latest.lastRentalDate,
+            fullName: latest.fullName,
+            phone: latest.phone,
+            birthDate: latest.birthDate,
+            passportSeries: latest.passportSeries,
+            passportNumber: latest.passportNumber,
+            passportIssuedBy: latest.passportIssuedBy,
+            passportIssueDate: latest.passportIssueDate,
+            registrationAddress: latest.registrationAddress,
+            licenseSeries: latest.licenseSeries,
+            licenseNumber: latest.licenseNumber,
+            licenseCategories: latest.licenseCategories,
+            licenseExpiryDate: latest.licenseExpiryDate,
+            hasLicense: latest.hasLicense,
+          });
+          setPrefillBannerVisible(true);
         } else {
           // No verified data, do basic auto-fill for recipient/phone only
           if (d.fullName && !recipient) {
@@ -551,6 +577,28 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           }
           if (d.phone) setValue("phone", d.phone, { shouldDirty: false, shouldValidate: false });
         }
+      } else if (latestRes.success && latestRes.data?.hasData) {
+        // If docsRes failed but latestRes succeeded, use latest data
+        const latest = latestRes.data;
+        setPrefillData({
+          hasData: true,
+          source: latest.source,
+          lastRentalDate: latest.lastRentalDate,
+          fullName: latest.fullName,
+          phone: latest.phone,
+          birthDate: latest.birthDate,
+          passportSeries: latest.passportSeries,
+          passportNumber: latest.passportNumber,
+          passportIssuedBy: latest.passportIssuedBy,
+          passportIssueDate: latest.passportIssueDate,
+          registrationAddress: latest.registrationAddress,
+          licenseSeries: latest.licenseSeries,
+          licenseNumber: latest.licenseNumber,
+          licenseCategories: latest.licenseCategories,
+          licenseExpiryDate: latest.licenseExpiryDate,
+          hasLicense: latest.hasLicense,
+        });
+        setPrefillBannerVisible(true);
       }
     };
     void loadRentalSecrets();
@@ -895,28 +943,6 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     }
   };
 
-  // Apply prefill data to form fields
-  const applyPrefillData = () => {
-    if (!prefillData?.hasData) return;
-
-    if (prefillData.fullName) setValue("recipient", prefillData.fullName, { shouldDirty: true, shouldValidate: true });
-    if (prefillData.phone) setValue("phone", prefillData.phone, { shouldDirty: true, shouldValidate: true });
-    if (prefillData.birthDate) setValue("birthDate", prefillData.birthDate, { shouldDirty: true });
-    if (prefillData.passportSeries) setValue("passportSeries", prefillData.passportSeries, { shouldDirty: true });
-    if (prefillData.passportNumber) setValue("passportNumber", prefillData.passportNumber, { shouldDirty: true });
-    if (prefillData.passportIssuedBy) setValue("passportIssuedBy", prefillData.passportIssuedBy, { shouldDirty: true });
-    if (prefillData.passportIssueDate) setValue("passportIssueDate", prefillData.passportIssueDate, { shouldDirty: true });
-    if (prefillData.registrationAddress) setValue("registrationAddress", prefillData.registrationAddress, { shouldDirty: true });
-    if (prefillData.licenseSeries) setValue("licenseSeries", prefillData.licenseSeries, { shouldDirty: true });
-    if (prefillData.licenseNumber) setValue("licenseNumber", prefillData.licenseNumber, { shouldDirty: true });
-    if (prefillData.licenseCategories) setValue("licenseCategories", prefillData.licenseCategories, { shouldDirty: true });
-    if (prefillData.licenseExpiryDate) setValue("licenseExpiryDate", prefillData.licenseExpiryDate, { shouldDirty: true });
-    if (prefillData.hasLicense !== undefined) setValue("hasLicense", prefillData.hasLicense, { shouldDirty: true });
-
-    setPrefillBannerVisible(false);
-    toast.success("Данные из профиля применены");
-  };
-
   return (
     <section
       className="mx-auto w-full max-w-4xl px-4 py-6"
@@ -952,48 +978,6 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <p className="mt-1 text-xs" style={surface.mutedText}>
             Ваши данные из прошлой аренды сохранены. Просто проверьте и подтвердите заказ.
           </p>
-        </div>
-      )}
-
-      {prefillBannerVisible && prefillData?.hasData && (
-        <div
-          className="mt-4 rounded-2xl border-2 p-4"
-          style={{
-            borderColor: accentMain,
-            backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 8%, transparent)" : `${crew.theme.palette.accentMain}14`,
-          }}
-        >
-          <p className="text-sm font-semibold" style={{ color: textPrimary }}>
-            Использовать данные из профиля?
-          </p>
-          <p className="mt-1 text-xs" style={surface.mutedText}>
-            У вас есть сохранённые документы (паспорт, водительское удостоверение). Мы можем заполнить форму автоматически.
-          </p>
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={applyPrefillData}
-              className="rounded-xl px-4 py-2 text-sm font-semibold transition hover:opacity-90"
-              style={{
-                backgroundColor: accentMain,
-                color: accentTextOn,
-              }}
-            >
-              Да, заполнить автоматически
-            </button>
-            <button
-              type="button"
-              onClick={() => setPrefillBannerVisible(false)}
-              className="rounded-xl border px-4 py-2 text-sm font-semibold transition hover:opacity-90"
-              style={{
-                borderColor: borderSoft,
-                color: textPrimary,
-                backgroundColor: "transparent",
-              }}
-            >
-              Нет, заполнить вручную
-            </button>
-          </div>
         </div>
       )}
 
