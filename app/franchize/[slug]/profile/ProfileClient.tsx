@@ -22,6 +22,7 @@ import {
   getFranchizeUserRentalSecretsAction,
   getRentalDocsPrefillAction,
   saveRentalDocsPrefillAction,
+  getProfileDocsStatusAction,
 } from "@/app/franchize/profile-actions";
 import {
   getFranchizeOperatorDashboardAccess,
@@ -31,6 +32,7 @@ import { readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import { RentalDocsForm } from "../../components/RentalDocsForm";
+import { PhotoUploadButton } from "../../components/PhotoUploadButton";
 import {
   FranchizeOperatorLinkButton,
   FranchizeOperatorPanel,
@@ -227,6 +229,12 @@ export function FranchizeProfileClient({
     licenseSeries?: string; licenseNumber?: string; licenseCategories?: string;
     licenseExpiryDate?: string; verificationStatus?: string; hasVerifiedData?: boolean;
   } | null>(null);
+  // Profile document photos status (uploaded/verified)
+  const [profileDocsStatus, setProfileDocsStatus] = useState<{
+    passportMainpage: { uploaded: boolean; verified: boolean };
+    passportRegistration: { uploaded: boolean; verified: boolean };
+    driversLicence: { uploaded: boolean; verified: boolean };
+  } | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -245,17 +253,19 @@ export function FranchizeProfileClient({
       }
       setProfile(result.data);
       setCatalog(result.catalog || []);
-      const [digestRes, prefillRes, operatorAccessRes, rentalSecretsRes, docsRes] = await Promise.all([
+      const [digestRes, prefillRes, operatorAccessRes, rentalSecretsRes, docsRes, profileDocsRes] = await Promise.all([
         getFranchizeActivityDigestAction({ slug, userId: dbUser.user_id }),
         getFranchizeFormPrefillAction({ slug, userId: dbUser.user_id }),
         getFranchizeOperatorDashboardAccess({ slug }),
         getFranchizeUserRentalSecretsAction({ slug, userId: dbUser.user_id }),
         getRentalDocsPrefillAction({ slug, userId: dbUser.user_id }),
+        getProfileDocsStatusAction({ slug, userId: dbUser.user_id }),
       ]);
       if (digestRes.success && digestRes.data) setDigest(digestRes.data);
       if (prefillRes.success && prefillRes.data) setPrefill(prefillRes.data);
       if (rentalSecretsRes.success && rentalSecretsRes.data) setRentalSecrets(rentalSecretsRes.data);
       if (docsRes.success && docsRes.data) setDocsPrefill(docsRes.data);
+      if (profileDocsRes.success && profileDocsRes.data) setProfileDocsStatus(profileDocsRes.data);
       setCanOpenCloserDashboard(
         Boolean(operatorAccessRes.success && operatorAccessRes.canOpen),
       );
@@ -515,6 +525,176 @@ export function FranchizeProfileClient({
                   actionLabel="Каталог"
                   actionHref={`/franchize/${slug}`}
                 />
+              )}
+            </div>
+          </div>
+        </FranchizeOperatorPanel>
+      </motion.div>
+
+      {/* Profile Document Photos Panel */}
+      <motion.div variants={itemVariants}>
+        <FranchizeOperatorPanel>
+          <h2 className="flex items-center gap-2 text-base font-semibold " style={{ color: T.text }}>
+            <VibeContentRenderer content="::FaCamera::" /> Мои документы
+          </h2>
+          <p className="mt-1 text-xs " style={{ color: T.textMuted }}>
+            Загрузите фото документов для ускорения оформления аренды. Данные будут распознаны автоматически.
+          </p>
+          <div className="mt-4 space-y-4">
+            {/* Passport Main Page */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium" style={{ color: T.text }}>
+                  Паспорт (главная страница)
+                </span>
+                {profileDocsStatus?.passportMainpage.verified ? (
+                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                    style={{
+                      backgroundColor: withAlpha("#10b981", 0.15),
+                      color: "#10b981",
+                    }}>
+                    <CheckCircle className="h-3 w-3" />
+                    Верифицирован
+                  </span>
+                ) : profileDocsStatus?.passportMainpage.uploaded ? (
+                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                    style={{
+                      backgroundColor: withAlpha("#f59e0b", 0.15),
+                      color: "#f59e0b",
+                    }}>
+                    ⏳ Ожидает верификации
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                    style={{
+                      backgroundColor: withAlpha("#ef4444", 0.15),
+                      color: "#ef4444",
+                    }}>
+                    ❌ Не загружен
+                  </span>
+                )}
+              </div>
+              {dbUser?.user_id && (
+                <PhotoUploadButton
+                  docType="passport_mainpage"
+                  rentalId={`profile_${dbUser.user_id}`}
+                  chatId={dbUser.user_id}
+                  onSuccess={() => {
+                    // Refresh status after upload
+                    getProfileDocsStatusAction({ slug, userId: dbUser.user_id }).then((res) => {
+                      if (res.success && res.data) setProfileDocsStatus(res.data);
+                    });
+                  }}
+                />
+              )}
+              {profileDocsStatus?.passportMainpage.uploaded && !profileDocsStatus?.passportMainpage.verified && (
+                <p className="text-xs italic" style={{ color: T.textMuted }}>
+                  Нельзя загрузить новое фото до верификации текущего
+                </p>
+              )}
+            </div>
+
+            {/* Passport Registration Page */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium" style={{ color: T.text }}>
+                  Паспорт (страница с пропиской)
+                </span>
+                {profileDocsStatus?.passportRegistration.verified ? (
+                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                    style={{
+                      backgroundColor: withAlpha("#10b981", 0.15),
+                      color: "#10b981",
+                    }}>
+                    <CheckCircle className="h-3 w-3" />
+                    Верифицирован
+                  </span>
+                ) : profileDocsStatus?.passportRegistration.uploaded ? (
+                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                    style={{
+                      backgroundColor: withAlpha("#f59e0b", 0.15),
+                      color: "#f59e0b",
+                    }}>
+                    ⏳ Ожидает верификации
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                    style={{
+                      backgroundColor: withAlpha("#ef4444", 0.15),
+                      color: "#ef4444",
+                    }}>
+                    ❌ Не загружен
+                  </span>
+                )}
+              </div>
+              {dbUser?.user_id && (
+                <PhotoUploadButton
+                  docType="passport_registration"
+                  rentalId={`profile_${dbUser.user_id}`}
+                  chatId={dbUser.user_id}
+                  onSuccess={() => {
+                    getProfileDocsStatusAction({ slug, userId: dbUser.user_id }).then((res) => {
+                      if (res.success && res.data) setProfileDocsStatus(res.data);
+                    });
+                  }}
+                />
+              )}
+              {profileDocsStatus?.passportRegistration.uploaded && !profileDocsStatus?.passportRegistration.verified && (
+                <p className="text-xs italic" style={{ color: T.textMuted }}>
+                  Нельзя загрузить новое фото до верификации текущего
+                </p>
+              )}
+            </div>
+
+            {/* Driver's License */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium" style={{ color: T.text }}>
+                  Водительское удостоверение
+                </span>
+                {profileDocsStatus?.driversLicence.verified ? (
+                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                    style={{
+                      backgroundColor: withAlpha("#10b981", 0.15),
+                      color: "#10b981",
+                    }}>
+                    <CheckCircle className="h-3 w-3" />
+                    Верифицирован
+                  </span>
+                ) : profileDocsStatus?.driversLicence.uploaded ? (
+                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                    style={{
+                      backgroundColor: withAlpha("#f59e0b", 0.15),
+                      color: "#f59e0b",
+                    }}>
+                    ⏳ Ожидает верификации
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                    style={{
+                      backgroundColor: withAlpha("#ef4444", 0.15),
+                      color: "#ef4444",
+                    }}>
+                    ❌ Не загружен
+                  </span>
+                )}
+              </div>
+              {dbUser?.user_id && (
+                <PhotoUploadButton
+                  docType="drivers_licence"
+                  rentalId={`profile_${dbUser.user_id}`}
+                  chatId={dbUser.user_id}
+                  onSuccess={() => {
+                    getProfileDocsStatusAction({ slug, userId: dbUser.user_id }).then((res) => {
+                      if (res.success && res.data) setProfileDocsStatus(res.data);
+                    });
+                  }}
+                />
+              )}
+              {profileDocsStatus?.driversLicence.uploaded && !profileDocsStatus?.driversLicence.verified && (
+                <p className="text-xs italic" style={{ color: T.textMuted }}>
+                  Нельзя загрузить новое фото до верификации текущего
+                </p>
               )}
             </div>
           </div>

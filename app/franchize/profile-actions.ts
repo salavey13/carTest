@@ -912,6 +912,62 @@ export async function tryVerifyUserRentalDocs(chatId: string, crewSlug: string):
 }
 
 /**
+ * Get profile document photos status (passport, license).
+ * Checks private.user_rental_secrets for profile_${userId} rental_id.
+ */
+export async function getProfileDocsStatusAction(params: {
+  userId: string;
+  slug: string;
+}): Promise<{
+  success: boolean;
+  data?: {
+    passportMainpage: { uploaded: boolean; verified: boolean };
+    passportRegistration: { uploaded: boolean; verified: boolean };
+    driversLicence: { uploaded: boolean; verified: boolean };
+  };
+}> {
+  try {
+    const { data: user } = await supabaseAdmin
+      .from("users")
+      .select("user_id")
+      .eq("user_id", params.userId)
+      .maybeSingle();
+
+    if (!user) return { success: false };
+
+    const chatId = user.user_id;
+    const profileRentalId = `profile_${chatId}`;
+
+    // Check user_rental_secrets for profile documents
+    const { data: profileSecrets } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("source_rental_id", profileRentalId)
+      .maybeSingle();
+
+    const status = {
+      passportMainpage: {
+        uploaded: Boolean(profileSecrets?.passport_mainpage_photo),
+        verified: profileSecrets?.verification_status === "verified" && Boolean(profileSecrets?.passport_mainpage_photo),
+      },
+      passportRegistration: {
+        uploaded: Boolean(profileSecrets?.passport_registration_photo),
+        verified: profileSecrets?.verification_status === "verified" && Boolean(profileSecrets?.passport_registration_photo),
+      },
+      driversLicence: {
+        uploaded: Boolean(profileSecrets?.drivers_licence_frontal_photo),
+        verified: profileSecrets?.verification_status === "verified" && Boolean(profileSecrets?.drivers_licence_frontal_photo),
+      },
+    };
+
+    return { success: true, data: status };
+  } catch (error) {
+    console.error("[getProfileDocsStatusAction] error:", error);
+    return { success: false };
+  }
+}
+
+/**
  * Get user-entered passport/license data for pre-fill.
  * Reads from private.user_rental_secrets WHERE source_doc_key = "profile_prefill".
  *
@@ -1018,6 +1074,123 @@ export async function getRentalDocsPrefillAction(params: {
         licenseExpiryDate: source.license_expiry_date || undefined,
         verificationStatus: source.verification_status,
         hasVerifiedData: prefillVerified || !!verifiedRow,
+      },
+    };
+  } catch {
+    return { success: false };
+  }
+}
+
+/**
+ * Get latest rental data with source tracking for pre-fill indicators.
+ * Returns data from the most recent verified rental with source metadata.
+ */
+export async function getLatestRentalDataWithSource(params: {
+  userId: string;
+  slug: string;
+}): Promise<{
+  success: boolean;
+  data?: {
+    hasData: boolean;
+    source: "previous_rental" | "ocr" | "profile_prefill" | null;
+    lastRentalDate?: string;
+    fullName?: string;
+    phone?: string;
+    birthDate?: string;
+    passportSeries?: string;
+    passportNumber?: string;
+    passportIssuedBy?: string;
+    passportIssueDate?: string;
+    registrationAddress?: string;
+    licenseSeries?: string;
+    licenseNumber?: string;
+    licenseCategories?: string;
+    licenseExpiryDate?: string;
+    hasLicense?: boolean;
+    // Per-field source tracking
+    fieldSources?: Record<string, "previous_rental" | "ocr" | "profile_prefill">;
+  };
+}> {
+  try {
+    const userIsCrewMember = await isCrewMember(params.userId, params.slug);
+
+    // Query for the most recent verified rental data
+    let query = privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("chat_id", params.userId)
+      .eq("crew_slug", params.slug)
+      .eq("verification_status", "verified")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (userIsCrewMember) {
+      query = query.eq("source_doc_key", "profile_prefill");
+    }
+
+    const { data: latestSecret, error } = await query.maybeSingle();
+
+    if (error && error.code !== "PGRST116") {
+      return { success: false };
+    }
+
+    if (!latestSecret) {
+      return {
+        success: true,
+        data: {
+          hasData: false,
+          source: null,
+        },
+      };
+    }
+
+    // Determine source based on source_doc_key and metadata
+    let source: "previous_rental" | "ocr" | "profile_prefill" = "previous_rental";
+    if (latestSecret.source_doc_key === "profile_prefill") {
+      source = "profile_prefill";
+    } else if (latestSecret.source_doc_key?.startsWith("ocr_") || latestSecret.metadata?.ocr_provider) {
+      source = "ocr";
+    }
+
+    // Parse passport and license strings
+    const passportParts = (latestSecret.renter_passport || "").trim().split(/\s+/);
+    const licenseParts = (latestSecret.renter_driver_license || "").trim().split(/\s+/);
+
+    const hasLicense = !!(licenseParts[0] || licenseParts[1] || latestSecret.license_categories);
+
+    // Build field-level source tracking
+    const fieldSources: Record<string, "previous_rental" | "ocr" | "profile_prefill"> = {};
+    const fields = [
+      "fullName", "phone", "birthDate", "passportSeries", "passportNumber",
+      "passportIssuedBy", "passportIssueDate", "registrationAddress",
+      "licenseSeries", "licenseNumber", "licenseCategories", "licenseExpiryDate"
+    ];
+    fields.forEach(field => {
+      fieldSources[field] = source;
+    });
+
+    return {
+      success: true,
+      data: {
+        hasData: true,
+        source,
+        lastRentalDate: latestSecret.created_at
+          ? new Date(latestSecret.created_at).toISOString().split("T")[0]
+          : undefined,
+        fullName: latestSecret.renter_full_name || undefined,
+        phone: latestSecret.renter_phone || undefined,
+        birthDate: latestSecret.renter_birth_date || undefined,
+        passportSeries: passportParts[0] || undefined,
+        passportNumber: passportParts[1] || undefined,
+        passportIssuedBy: latestSecret.renter_passport_issued_by || undefined,
+        passportIssueDate: latestSecret.renter_passport_issue_date || undefined,
+        registrationAddress: latestSecret.renter_registration || undefined,
+        licenseSeries: licenseParts[0] || undefined,
+        licenseNumber: licenseParts[1] || undefined,
+        licenseCategories: latestSecret.license_categories || undefined,
+        licenseExpiryDate: latestSecret.license_expiry_date || undefined,
+        hasLicense,
+        fieldSources,
       },
     };
   } catch {

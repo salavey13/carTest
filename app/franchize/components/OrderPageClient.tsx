@@ -15,7 +15,7 @@ import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { saveUserFranchizeCartAction } from "@/contexts/actions";
 import { focusRingOutlineStyle, readablePaletteTextOnColor, withAlpha } from "../lib/theme";
 import { getTelegramHandleHref, getTelegramWebAppFallbackHref, getTelegramWebAppPageHref, getTelegramWebAppAdaptiveHref } from "../lib/telegram-links";
-import { getFranchizeFormPrefillAction, getFranchizeUserRentalSecretsAction, getRentalDocsPrefillAction } from "../profile-actions";
+import { getFranchizeFormPrefillAction, getFranchizeUserRentalSecretsAction, getRentalDocsPrefillAction, getLatestRentalDataWithSource } from "../profile-actions";
 import { useCrewTokens } from "../lib/use-crew-tokens";
 import {
   parseISODate,
@@ -153,6 +153,27 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const [promoMessage, setPromoMessage] = useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
   const [isReturningUser, setIsReturningUser] = useState(false);
   const [returningUserLastRental, setReturningUserLastRental] = useState<string | null>(null);
+  // ── Pre-fill state with source tracking ──
+  const [prefillData, setPrefillData] = useState<{
+    hasData: boolean;
+    source: "previous_rental" | "ocr" | "profile_prefill" | null;
+    lastRentalDate?: string;
+    fullName?: string;
+    phone?: string;
+    birthDate?: string;
+    passportSeries?: string;
+    passportNumber?: string;
+    passportIssuedBy?: string;
+    passportIssueDate?: string;
+    registrationAddress?: string;
+    licenseSeries?: string;
+    licenseNumber?: string;
+    licenseCategories?: string;
+    licenseExpiryDate?: string;
+    hasLicense?: boolean;
+  } | null>(null);
+  const [prefillBannerVisible, setPrefillBannerVisible] = useState(false);
+  const [fieldSources, setFieldSources] = useState<Record<string, "previous_rental" | "ocr" | "profile_prefill" | "manual">>({});
   const lastSubmitFingerprintRef = useRef<string | null>(null);
   const lastRecoveryFingerprintRef = useRef<string | null>(null);
   const recoveryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -496,24 +517,40 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       const docsRes = await getRentalDocsPrefillAction({ userId: dbUser.user_id, slug });
       if (docsRes.success && docsRes.data) {
         const d = docsRes.data;
-        // Prefill recipient from docs if not already set
-        if (d.fullName && !recipient) {
-          setValue("recipient", d.fullName, { shouldDirty: false, shouldValidate: false });
+        
+        // Check if we have verified data from profile
+        const hasVerifiedProfileData = d.hasVerifiedData && (
+          d.passportSeries || d.passportNumber || d.licenseSeries || d.licenseNumber
+        );
+
+        if (hasVerifiedProfileData) {
+          // Store prefill data and show banner instead of auto-filling
+          setPrefillData({
+            hasData: true,
+            source: d.verificationStatus === "verified" ? "previous_rental" : "profile_prefill",
+            lastRentalDate: res.data?.lastRentalDate,
+            fullName: d.fullName,
+            phone: d.phone,
+            birthDate: d.birthDate,
+            passportSeries: d.passportSeries,
+            passportNumber: d.passportNumber,
+            passportIssuedBy: d.passportIssuedBy,
+            passportIssueDate: d.passportIssueDate,
+            registrationAddress: d.registrationAddress,
+            licenseSeries: d.licenseSeries,
+            licenseNumber: d.licenseNumber,
+            licenseCategories: d.licenseCategories,
+            licenseExpiryDate: d.licenseExpiryDate,
+            hasLicense: Boolean(d.licenseSeries || d.licenseNumber),
+          });
+          setPrefillBannerVisible(true);
+        } else {
+          // No verified data, do basic auto-fill for recipient/phone only
+          if (d.fullName && !recipient) {
+            setValue("recipient", d.fullName, { shouldDirty: false, shouldValidate: false });
+          }
+          if (d.phone) setValue("phone", d.phone, { shouldDirty: false, shouldValidate: false });
         }
-        if (d.phone) setValue("phone", d.phone, { shouldDirty: false, shouldValidate: false });
-        // ── Auto-fill passport fields for 1-click-next-rental ──
-        if (d.birthDate) setValue("birthDate", d.birthDate, { shouldDirty: false });
-        if (d.passportSeries) setValue("passportSeries", d.passportSeries, { shouldDirty: false });
-        if (d.passportNumber) setValue("passportNumber", d.passportNumber, { shouldDirty: false });
-        if (d.passportIssueDate) setValue("passportIssueDate", d.passportIssueDate, { shouldDirty: false });
-        if (d.passportIssuedBy) setValue("passportIssuedBy", d.passportIssuedBy, { shouldDirty: false });
-        if (d.registrationAddress) setValue("registrationAddress", d.registrationAddress, { shouldDirty: false });
-        // ── Auto-fill license fields ──
-        if (d.licenseSeries) setValue("licenseSeries", d.licenseSeries, { shouldDirty: false });
-        if (d.licenseNumber) setValue("licenseNumber", d.licenseNumber, { shouldDirty: false });
-        if (d.licenseCategories) setValue("licenseCategories", d.licenseCategories, { shouldDirty: false });
-        if (d.licenseExpiryDate) setValue("licenseExpiryDate", d.licenseExpiryDate, { shouldDirty: false });
-        if (!d.licenseSeries && !d.licenseNumber) setValue("hasLicense", false, { shouldDirty: false });
       }
     };
     void loadRentalSecrets();
@@ -731,6 +768,155 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     toast.message("Переключили на резервную оплату картой. Проверьте данные и отправьте заказ снова.");
   };
 
+  // ── Pre-fill functions ──
+  const applyPrefillData = () => {
+    if (!prefillData?.hasData) return;
+
+    const source = prefillData.source || "previous_rental";
+    const newSources: Record<string, "previous_rental" | "ocr" | "profile_prefill" | "manual"> = {};
+
+    // Apply all fields and track sources
+    if (prefillData.fullName) {
+      setValue("recipient", prefillData.fullName, { shouldDirty: true, shouldValidate: true });
+      newSources.recipient = source;
+    }
+    if (prefillData.phone) {
+      setValue("phone", prefillData.phone, { shouldDirty: true, shouldValidate: true });
+      newSources.phone = source;
+    }
+    if (prefillData.birthDate) {
+      setValue("birthDate", prefillData.birthDate, { shouldDirty: true, shouldValidate: true });
+      newSources.birthDate = source;
+    }
+    if (prefillData.passportSeries) {
+      setValue("passportSeries", prefillData.passportSeries, { shouldDirty: true, shouldValidate: true });
+      newSources.passportSeries = source;
+    }
+    if (prefillData.passportNumber) {
+      setValue("passportNumber", prefillData.passportNumber, { shouldDirty: true, shouldValidate: true });
+      newSources.passportNumber = source;
+    }
+    if (prefillData.passportIssuedBy) {
+      setValue("passportIssuedBy", prefillData.passportIssuedBy, { shouldDirty: true, shouldValidate: true });
+      newSources.passportIssuedBy = source;
+    }
+    if (prefillData.passportIssueDate) {
+      setValue("passportIssueDate", prefillData.passportIssueDate, { shouldDirty: true, shouldValidate: true });
+      newSources.passportIssueDate = source;
+    }
+    if (prefillData.registrationAddress) {
+      setValue("registrationAddress", prefillData.registrationAddress, { shouldDirty: true, shouldValidate: true });
+      newSources.registrationAddress = source;
+    }
+    if (prefillData.hasLicense !== undefined) {
+      setValue("hasLicense", prefillData.hasLicense, { shouldDirty: true, shouldValidate: true });
+    }
+    if (prefillData.licenseSeries) {
+      setValue("licenseSeries", prefillData.licenseSeries, { shouldDirty: true, shouldValidate: true });
+      newSources.licenseSeries = source;
+    }
+    if (prefillData.licenseNumber) {
+      setValue("licenseNumber", prefillData.licenseNumber, { shouldDirty: true, shouldValidate: true });
+      newSources.licenseNumber = source;
+    }
+    if (prefillData.licenseCategories) {
+      setValue("licenseCategories", prefillData.licenseCategories, { shouldDirty: true, shouldValidate: true });
+      newSources.licenseCategories = source;
+    }
+    if (prefillData.licenseExpiryDate) {
+      setValue("licenseExpiryDate", prefillData.licenseExpiryDate, { shouldDirty: true, shouldValidate: true });
+      newSources.licenseExpiryDate = source;
+    }
+
+    setFieldSources(newSources);
+    setPrefillBannerVisible(false);
+    toast.success("Данные из предыдущей аренды заполнены. Проверьте и подтвердите.");
+  };
+
+  const clearAllPrefillFields = () => {
+    setValue("recipient", "", { shouldDirty: true, shouldValidate: true });
+    setValue("phone", "", { shouldDirty: true, shouldValidate: true });
+    setValue("birthDate", "", { shouldDirty: true, shouldValidate: true });
+    setValue("passportSeries", "", { shouldDirty: true, shouldValidate: true });
+    setValue("passportNumber", "", { shouldDirty: true, shouldValidate: true });
+    setValue("passportIssuedBy", "", { shouldDirty: true, shouldValidate: true });
+    setValue("passportIssueDate", "", { shouldDirty: true, shouldValidate: true });
+    setValue("registrationAddress", "", { shouldDirty: true, shouldValidate: true });
+    setValue("hasLicense", true, { shouldDirty: true, shouldValidate: true });
+    setValue("licenseSeries", "", { shouldDirty: true, shouldValidate: true });
+    setValue("licenseNumber", "", { shouldDirty: true, shouldValidate: true });
+    setValue("licenseCategories", "", { shouldDirty: true, shouldValidate: true });
+    setValue("licenseExpiryDate", "", { shouldDirty: true, shouldValidate: true });
+    setFieldSources({});
+    toast.message("Все поля очищены. Введите данные заново.");
+  };
+
+  const dismissPrefillBanner = () => {
+    setPrefillBannerVisible(false);
+    // Mark all fields as manual
+    const manualSources: Record<string, "manual"> = {};
+    Object.keys(fieldSources).forEach(key => {
+      manualSources[key] = "manual";
+    });
+    setFieldSources(manualSources);
+  };
+
+  const getFieldSourceIcon = (fieldName: string): string => {
+    const source = fieldSources[fieldName];
+    if (!source) return "";
+    switch (source) {
+      case "previous_rental":
+        return "🔄";
+      case "ocr":
+        return "📷";
+      case "profile_prefill":
+        return "🔄";
+      case "manual":
+        return "✏️";
+      default:
+        return "";
+    }
+  };
+
+  const getFieldSourceTooltip = (fieldName: string): string => {
+    const source = fieldSources[fieldName];
+    if (!source) return "";
+    switch (source) {
+      case "previous_rental":
+        return "Данные из предыдущей аренды";
+      case "ocr":
+        return "Данные распознаны с фото";
+      case "profile_prefill":
+        return "Данные из профиля";
+      case "manual":
+        return "Введено вручную";
+      default:
+        return "";
+    }
+  };
+
+  // Apply prefill data to form fields
+  const applyPrefillData = () => {
+    if (!prefillData?.hasData) return;
+
+    if (prefillData.fullName) setValue("recipient", prefillData.fullName, { shouldDirty: true, shouldValidate: true });
+    if (prefillData.phone) setValue("phone", prefillData.phone, { shouldDirty: true, shouldValidate: true });
+    if (prefillData.birthDate) setValue("birthDate", prefillData.birthDate, { shouldDirty: true });
+    if (prefillData.passportSeries) setValue("passportSeries", prefillData.passportSeries, { shouldDirty: true });
+    if (prefillData.passportNumber) setValue("passportNumber", prefillData.passportNumber, { shouldDirty: true });
+    if (prefillData.passportIssuedBy) setValue("passportIssuedBy", prefillData.passportIssuedBy, { shouldDirty: true });
+    if (prefillData.passportIssueDate) setValue("passportIssueDate", prefillData.passportIssueDate, { shouldDirty: true });
+    if (prefillData.registrationAddress) setValue("registrationAddress", prefillData.registrationAddress, { shouldDirty: true });
+    if (prefillData.licenseSeries) setValue("licenseSeries", prefillData.licenseSeries, { shouldDirty: true });
+    if (prefillData.licenseNumber) setValue("licenseNumber", prefillData.licenseNumber, { shouldDirty: true });
+    if (prefillData.licenseCategories) setValue("licenseCategories", prefillData.licenseCategories, { shouldDirty: true });
+    if (prefillData.licenseExpiryDate) setValue("licenseExpiryDate", prefillData.licenseExpiryDate, { shouldDirty: true });
+    if (prefillData.hasLicense !== undefined) setValue("hasLicense", prefillData.hasLicense, { shouldDirty: true });
+
+    setPrefillBannerVisible(false);
+    toast.success("Данные из профиля применены");
+  };
+
   return (
     <section
       className="mx-auto w-full max-w-4xl px-4 py-6"
@@ -769,6 +955,114 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         </div>
       )}
 
+      {prefillBannerVisible && prefillData?.hasData && (
+        <div
+          className="mt-4 rounded-2xl border-2 p-4"
+          style={{
+            borderColor: accentMain,
+            backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 8%, transparent)" : `${crew.theme.palette.accentMain}14`,
+          }}
+        >
+          <p className="text-sm font-semibold" style={{ color: textPrimary }}>
+            Использовать данные из профиля?
+          </p>
+          <p className="mt-1 text-xs" style={surface.mutedText}>
+            У вас есть сохранённые документы (паспорт, водительское удостоверение). Мы можем заполнить форму автоматически.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={applyPrefillData}
+              className="rounded-xl px-4 py-2 text-sm font-semibold transition hover:opacity-90"
+              style={{
+                backgroundColor: accentMain,
+                color: accentTextOn,
+              }}
+            >
+              Да, заполнить автоматически
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrefillBannerVisible(false)}
+              className="rounded-xl border px-4 py-2 text-sm font-semibold transition hover:opacity-90"
+              style={{
+                borderColor: borderSoft,
+                color: textPrimary,
+                backgroundColor: "transparent",
+              }}
+            >
+              Нет, заполнить вручную
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Pre-fill banner with source indicators ── */}
+      {prefillBannerVisible && prefillData?.hasData && (
+        <div
+          className="mt-4 rounded-2xl border-2 p-4"
+          style={{
+            borderColor: accentMain,
+            backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 8%, transparent)" : `${crew.theme.palette.accentMain}14`,
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <div className="text-2xl">🔄</div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold" style={{ color: textPrimary }}>
+                Использовать данные из предыдущей аренды?
+              </p>
+              <p className="mt-1 text-xs" style={surface.mutedText}>
+                {prefillData.lastRentalDate && `Последняя аренда: ${prefillData.lastRentalDate}. `}
+                Мы можем заполнить все поля автоматически — вам останется только проверить.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={applyPrefillData}
+                  className="rounded-xl px-4 py-2 text-xs font-semibold transition hover:brightness-110"
+                  style={{
+                    backgroundColor: accentMain,
+                    color: accentTextOn,
+                  }}
+                >
+                  Да, использовать
+                </button>
+                <button
+                  type="button"
+                  onClick={dismissPrefillBanner}
+                  className="rounded-xl border px-4 py-2 text-xs transition hover:opacity-80"
+                  style={{
+                    borderColor: borderSoft,
+                    color: textSecondary,
+                  }}
+                >
+                  Нет, ввести новые
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Clear all fields button (when prefill data is applied) ── */}
+      {Object.keys(fieldSources).length > 0 && (
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={clearAllPrefillFields}
+            className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs transition hover:opacity-80"
+            style={{
+              color: textSecondary,
+              border: `1px solid ${borderSoft}`,
+            }}
+          >
+            <span>🗑️</span>
+            <span>Очистить все поля</span>
+          </button>
+        </div>
+      )}
+
       <div className="mt-4 flex flex-wrap gap-2">
         <Link href={catalogHref} className="rounded-xl border px-3 py-2 text-center text-xs transition hover:opacity-90" style={{ ...surface.subtleCard, ...focusRingOutlineStyle(crew.theme) } as React.CSSProperties}>Каталог</Link>
         <a
@@ -787,8 +1081,38 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           <div className="rounded-2xl border p-4" style={surface.card}>
             <p className="text-sm font-medium">Данные получателя</p>
             <div className="mt-3 space-y-3">
-              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Имя и фамилия" {...register("recipient")} />
-              <input className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }} placeholder="Телефон" {...register("phone")} />
+              <div className="relative">
+                <input
+                  className="w-full rounded-xl border px-3 py-2 pr-8 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                  placeholder="Имя и фамилия"
+                  {...register("recipient")}
+                />
+                {getFieldSourceIcon("recipient") && (
+                  <span
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-sm"
+                    title={getFieldSourceTooltip("recipient")}
+                  >
+                    {getFieldSourceIcon("recipient")}
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  className="w-full rounded-xl border px-3 py-2 pr-8 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                  placeholder="Телефон"
+                  {...register("phone")}
+                />
+                {getFieldSourceIcon("phone") && (
+                  <span
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-sm"
+                    title={getFieldSourceTooltip("phone")}
+                  >
+                    {getFieldSourceIcon("phone")}
+                  </span>
+                )}
+              </div>
 
               {/* Rental period — picked in the Item modal, shown read-only here */}
               {resolvedStartDate && resolvedEndDate ? (
@@ -896,6 +1220,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               <p className="mt-1 text-xs" style={surface.mutedText}>
                 Заполняется один раз — при следующей аренде данные подставятся автоматически.
               </p>
+              {Object.keys(fieldSources).length > 0 && (
+                <p className="mt-1 text-[10px]" style={{ color: textSecondary }}>
+                  🔄 из предыдущей аренды · 📷 распознано с фото · ✏️ введено вручную
+                </p>
+              )}
               <div className="mt-3 space-y-3">
                 {/* Passport - 2 photos */}
                 {user?.id && (
@@ -913,43 +1242,103 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                   </>
                 )}
                 <div className="grid grid-cols-2 gap-3">
-                  <input
-                    className="rounded-xl border px-3 py-2 text-sm"
-                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                    placeholder="Серия паспорта (4509)"
-                    {...register("passportSeries")}
-                  />
-                  <input
-                    className="rounded-xl border px-3 py-2 text-sm"
-                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                    placeholder="Номер паспорта (123456)"
-                    {...register("passportNumber")}
-                  />
+                  <div className="relative">
+                    <input
+                      className="w-full rounded-xl border px-3 py-2 pr-8 text-sm"
+                      style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                      placeholder="Серия паспорта (4509)"
+                      {...register("passportSeries")}
+                    />
+                    {getFieldSourceIcon("passportSeries") && (
+                      <span
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-sm"
+                        title={getFieldSourceTooltip("passportSeries")}
+                      >
+                        {getFieldSourceIcon("passportSeries")}
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      className="w-full rounded-xl border px-3 py-2 pr-8 text-sm"
+                      style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                      placeholder="Номер паспорта (123456)"
+                      {...register("passportNumber")}
+                    />
+                    {getFieldSourceIcon("passportNumber") && (
+                      <span
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-sm"
+                        title={getFieldSourceTooltip("passportNumber")}
+                      >
+                        {getFieldSourceIcon("passportNumber")}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <input
-                  className="w-full rounded-xl border px-3 py-2 text-sm"
-                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                  placeholder="Дата выдачи паспорта (ДД.ММ.ГГГГ)"
-                  {...register("passportIssueDate")}
-                />
-                <input
-                  className="w-full rounded-xl border px-3 py-2 text-sm"
-                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                  placeholder="Кем выдан (ОМВД по г. Н.Новгороду)"
-                  {...register("passportIssuedBy")}
-                />
-                <input
-                  className="w-full rounded-xl border px-3 py-2 text-sm"
-                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                  placeholder="Дата рождения (ДД.ММ.ГГГГ)"
-                  {...register("birthDate")}
-                />
-                <textarea
-                  className="min-h-16 w-full rounded-xl border px-3 py-2 text-sm"
-                  style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                  placeholder="Адрес регистрации"
-                  {...register("registrationAddress")}
-                />
+                <div className="relative">
+                  <input
+                    className="w-full rounded-xl border px-3 py-2 pr-8 text-sm"
+                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                    placeholder="Дата выдачи паспорта (ДД.ММ.ГГГГ)"
+                    {...register("passportIssueDate")}
+                  />
+                  {getFieldSourceIcon("passportIssueDate") && (
+                    <span
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-sm"
+                      title={getFieldSourceTooltip("passportIssueDate")}
+                    >
+                      {getFieldSourceIcon("passportIssueDate")}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    className="w-full rounded-xl border px-3 py-2 pr-8 text-sm"
+                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                    placeholder="Кем выдан (ОМВД по г. Н.Новгороду)"
+                    {...register("passportIssuedBy")}
+                  />
+                  {getFieldSourceIcon("passportIssuedBy") && (
+                    <span
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-sm"
+                      title={getFieldSourceTooltip("passportIssuedBy")}
+                    >
+                      {getFieldSourceIcon("passportIssuedBy")}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    className="w-full rounded-xl border px-3 py-2 pr-8 text-sm"
+                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                    placeholder="Дата рождения (ДД.ММ.ГГГГ)"
+                    {...register("birthDate")}
+                  />
+                  {getFieldSourceIcon("birthDate") && (
+                    <span
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-sm"
+                      title={getFieldSourceTooltip("birthDate")}
+                    >
+                      {getFieldSourceIcon("birthDate")}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <textarea
+                    className="min-h-16 w-full rounded-xl border px-3 py-2 pr-8 text-sm"
+                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                    placeholder="Адрес регистрации"
+                    {...register("registrationAddress")}
+                  />
+                  {getFieldSourceIcon("registrationAddress") && (
+                    <span
+                      className="absolute right-2 top-2 text-sm"
+                      title={getFieldSourceTooltip("registrationAddress")}
+                    >
+                      {getFieldSourceIcon("registrationAddress")}
+                    </span>
+                  )}
+                </div>
 
                 {/* License */}
                 <div className="flex items-center gap-2 pt-1">
@@ -974,32 +1363,72 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                       />
                     )}
                     <div className="grid grid-cols-2 gap-3">
-                      <input
-                        className="rounded-xl border px-3 py-2 text-sm"
-                        style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                        placeholder="Серия ВУ (99)"
-                        {...register("licenseSeries")}
-                      />
-                      <input
-                        className="rounded-xl border px-3 py-2 text-sm"
-                        style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                        placeholder="Номер ВУ (76123456)"
-                        {...register("licenseNumber")}
-                      />
+                      <div className="relative">
+                        <input
+                          className="w-full rounded-xl border px-3 py-2 pr-8 text-sm"
+                          style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                          placeholder="Серия ВУ (99)"
+                          {...register("licenseSeries")}
+                        />
+                        {getFieldSourceIcon("licenseSeries") && (
+                          <span
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-sm"
+                            title={getFieldSourceTooltip("licenseSeries")}
+                          >
+                            {getFieldSourceIcon("licenseSeries")}
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <input
+                          className="w-full rounded-xl border px-3 py-2 pr-8 text-sm"
+                          style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                          placeholder="Номер ВУ (76123456)"
+                          {...register("licenseNumber")}
+                        />
+                        {getFieldSourceIcon("licenseNumber") && (
+                          <span
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-sm"
+                            title={getFieldSourceTooltip("licenseNumber")}
+                          >
+                            {getFieldSourceIcon("licenseNumber")}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      <input
-                        className="rounded-xl border px-3 py-2 text-sm"
-                        style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                        placeholder="Категории (A, B)"
-                        {...register("licenseCategories")}
-                      />
-                      <input
-                        className="rounded-xl border px-3 py-2 text-sm"
-                        style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                        placeholder="Срок действия (ДД.ММ.ГГГГ)"
-                        {...register("licenseExpiryDate")}
-                      />
+                      <div className="relative">
+                        <input
+                          className="w-full rounded-xl border px-3 py-2 pr-8 text-sm"
+                          style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                          placeholder="Категории (A, B)"
+                          {...register("licenseCategories")}
+                        />
+                        {getFieldSourceIcon("licenseCategories") && (
+                          <span
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-sm"
+                            title={getFieldSourceTooltip("licenseCategories")}
+                          >
+                            {getFieldSourceIcon("licenseCategories")}
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <input
+                          className="w-full rounded-xl border px-3 py-2 pr-8 text-sm"
+                          style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                          placeholder="Срок действия (ДД.ММ.ГГГГ)"
+                          {...register("licenseExpiryDate")}
+                        />
+                        {getFieldSourceIcon("licenseExpiryDate") && (
+                          <span
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-sm"
+                            title={getFieldSourceTooltip("licenseExpiryDate")}
+                          >
+                            {getFieldSourceIcon("licenseExpiryDate")}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
