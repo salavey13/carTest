@@ -141,10 +141,18 @@ export async function POST(request: NextRequest): Promise<NextResponse<OcrRespon
       .limit(1)
       .maybeSingle();
     
+    // Маппинг docType → имя колонки в БД
+    const photoColumnMap: Record<string, string> = {
+      "passport_mainpage": "passport_mainpage_photo",
+      "passport_registration": "passport_registration_photo",
+      "drivers_licence": "drivers_licence_frontal_photo",
+    };
+    const photoColumn = photoColumnMap[docType];
+    
     const secretData: Record<string, any> = {
       chat_id: chatId,
       source_rental_id: rentalId,
-      [`${docType}_photo`]: storagePath,
+      [photoColumn]: storagePath,
     };
     
     // Сохраняем распознанные данные в зависимости от типа документа
@@ -177,9 +185,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<OcrRespon
     }
     
     // 8. Обновляем rentals с photo path
+    // Маппинг docType → имя колонки в БД
+    const photoColumnMap: Record<string, string> = {
+      "passport_mainpage": "passport_mainpage_photo",
+      "passport_registration": "passport_registration_photo",
+      "drivers_licence": "drivers_licence_frontal_photo",
+    };
+    const photoColumn = photoColumnMap[docType];
+    
     await supabaseAdmin
       .from("rentals")
-      .update({ [`${docType}_photo`]: storagePath })
+      .update({ [photoColumn]: storagePath })
       .eq("rental_id", rentalId);
     
     // 8. Cleanup: удаляем фото из docpix (152-ФЗ compliance)
