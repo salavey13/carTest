@@ -2681,6 +2681,20 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               logger.warn("[franchize] Rental insert error:", { error: rentalInsertError.message, bikeId: doc.bikeId });
             } else if (rentalRow?.rental_id) {
               logger.info("[franchize] Created rental row:", rentalRow.rental_id, "bike:", doc.bikeId);
+              
+              // Create verification todos for this rental (5 todos: passport mainpage, 
+              // passport registration, drivers license, odometer, dates)
+              try {
+                const { createRentalVerificationTodos } = await import("@/app/franchize/server-actions/rental-verification-todos");
+                const todosResult = await createRentalVerificationTodos(rentalRow.rental_id, crewId);
+                if (todosResult.success) {
+                  logger.info(`[franchize] Created ${todosResult.created} verification todos for rental ${rentalRow.rental_id}`);
+                } else {
+                  logger.warn(`[franchize] Failed to create verification todos for rental ${rentalRow.rental_id}:`, todosResult.error);
+                }
+              } catch (todoErr) {
+                logger.warn("[franchize] Failed to create verification todos (non-fatal):", todoErr);
+              }
             }
           } catch (rentalErr) {
             logger.warn("[franchize] Failed to create rental row:", rentalErr);
