@@ -217,13 +217,13 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   return (
     <header
       // FIX: Increased top padding to accommodate Telegram MiniApp native buttons
-      // and camera cutouts on iPhone / Galaxy S25 Ultra. We now use 4.75rem (~76px)
+      // and camera cutouts on iPhone / Galaxy S25 Ultra. We now use 5.0rem (~80px)
       // minimum plus safe-area, with an extra 0.75rem buffer for devices like S25 Ultra
       // whose native bar is ~68px.
       className="sticky top-0 z-50 border-b pb-2 backdrop-blur-2xl"
       style={{
         ...FRANCHIZE_HEADER_SAFE_AREA_STYLE,
-        paddingTop: "max(calc(env(safe-area-inset-top) + 4rem), 4.75rem)",
+        paddingTop: "max(calc(env(safe-area-inset-top) + 4.2rem), 4.95rem)",
         // FIX 6: isolation creates a proper stacking context for the entire header.
         isolation: "isolate",
         borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
