@@ -56,7 +56,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyChe
     // 1. Fetch current rental
     const { data: rental, error: rentalError } = await supabaseAdmin
       .from("rentals")
-      .select("metadata, passport_photo_path, license_photo_path")
+      .select("metadata, passport_mainpage_photo, passport_registration_photo, drivers_licence_frontal_photo")
       .eq("rental_id", rentalId)
       .single();
 
@@ -98,12 +98,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyChe
     };
 
     // 5. Cleanup: remove photo paths after verification
-    if (updates.passport_verified && rental.passport_photo_path) {
-      updatePayload.passport_photo_path = null;
+    if (updates.passport_verified) {
+      if (rental.passport_mainpage_photo) {
+        updatePayload.passport_mainpage_photo = null;
+      }
+      if (rental.passport_registration_photo) {
+        updatePayload.passport_registration_photo = null;
+      }
     }
 
-    if (updates.license_verified && rental.license_photo_path) {
-      updatePayload.license_photo_path = null;
+    if (updates.license_verified && rental.drivers_licence_frontal_photo) {
+      updatePayload.drivers_licence_frontal_photo = null;
     }
 
     // 6. Update rental

@@ -488,6 +488,63 @@ export async function getCrewForInvite(slug: string) {
     }
 }
 
+/**
+ * Auto-join crew by invite link — adds user directly as active member.
+ * No pending state, no owner confirmation. Used by ?join_crew=true flow.
+ */
+export async function autoJoinCrew(userId: string, username: string, crewId: string, crewSlug: string) {
+    noStore();
+    if (!userId || !crewId) return { success: false, error: "User and Crew ID are required." };
+    try {
+        // Check if user is already an active member of THIS crew
+        const { data: sameMembership } = await supabaseAdmin
+            .from('crew_members')
+            .select('crew_id')
+            .eq('user_id', userId)
+            .eq('crew_id', crewId)
+            .eq('membership_status', 'active')
+            .maybeSingle();
+        if (sameMembership) return { success: true, alreadyMember: true };
+
+        // Check if user is active in ANOTHER crew
+        const { data: otherMembership } = await supabaseAdmin
+            .from('crew_members')
+            .select('crew_id, crews(name)')
+            .eq('user_id', userId)
+            .eq('membership_status', 'active')
+            .maybeSingle();
+        if (otherMembership) return { success: false, error: "Вы уже являетесь активным участником другого экипажа." };
+
+        // Upsert user record (ensure they exist in users table)
+        await supabaseAdmin.from('users').upsert(
+            { user_id: userId, username: username || 'rider' },
+            { onConflict: 'user_id', ignoreDuplicates: true }
+        );
+
+        // Add as active member directly
+        const { error } = await supabaseAdmin.from('crew_members').upsert(
+            { user_id: userId, crew_id: crewId, membership_status: 'active', role: 'member' },
+            { onConflict: 'crew_id, user_id' }
+        );
+        if (error) throw error;
+
+        // Notify owner (informational only, no action needed)
+        const { data: crew } = await supabaseAdmin.from('crews').select('owner_id, name').eq('id', crewId).single();
+        if (crew?.owner_id) {
+            try {
+                await sendComplexMessage(crew.owner_id, `👤 @${username || 'rider'} присоединился к вашему экипажу *'${crew.name}'* по приглашению.`);
+            } catch (notifyErr) {
+                logger.warn('[autoJoinCrew] Failed to notify owner (non-critical):', notifyErr);
+            }
+        }
+
+        return { success: true, alreadyMember: false };
+    } catch (e) {
+        logger.error('[autoJoinCrew]', e);
+        return { success: false, error: e instanceof Error ? e.message : "Unknown error." };
+    }
+}
+
 export async function getEditableVehiclesForUser(userId: string): Promise<{ 
     success: boolean; 
     data?: Vehicle[];

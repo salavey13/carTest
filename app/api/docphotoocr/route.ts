@@ -25,7 +25,7 @@ export const maxDuration = 60; // VPS не имеет ограничений, н
 interface OcrRequest {
   storagePath: string; // Путь в Supabase Storage (docpix bucket)
   rentalId: string;
-  docType: "passport" | "license";
+  docType: "passport_mainpage" | "passport_registration" | "drivers_licence";
   chatId: string; // Telegram chat_id пользователя
 }
 
@@ -62,9 +62,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<OcrRespon
       );
     }
     
-    if (docType !== "passport" && docType !== "license") {
+    if (docType !== "passport_mainpage" && docType !== "passport_registration" && docType !== "drivers_licence") {
       return NextResponse.json(
-        { success: false, error: 'Invalid docType. Must be "passport" or "license"' },
+        { success: false, error: 'Invalid docType. Must be "passport_mainpage", "passport_registration", or "drivers_licence"' },
         { status: 400 }
       );
     }
@@ -98,10 +98,18 @@ export async function POST(request: NextRequest): Promise<NextResponse<OcrRespon
     const imageBuffer = Buffer.from(await fileData.arrayBuffer());
     const base64 = imageBuffer.toString("base64");
     
-    // 4. Запускаем OCR
+    // 4. Определяем тип документа для OCR
+    const ocrDocTypeMap: Record<string, DocKind> = {
+      "passport_mainpage": "passport",
+      "passport_registration": "registration",
+      "drivers_licence": "license",
+    };
+    const ocrDocType = ocrDocTypeMap[docType];
+    
+    // 5. Запускаем OCR
     let ocrResult;
     try {
-      ocrResult = await recognizeDocument(docType as DocKind, { base64 });
+      ocrResult = await recognizeDocument(ocrDocType, { base64 });
     } catch (err) {
       // OCR failed — cleanup и возвращаем ошибку
       console.error("[OCR] Failed:", err);
@@ -115,7 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<OcrRespon
       });
     }
     
-    // 5. Конвертируем ISO даты в DD.MM.YYYY
+    // 6. Конвертируем ISO даты в DD.MM.YYYY
     const fields = { ...ocrResult.fields };
     const dateFields = ["birthDate", "passportIssuedDate", "licenseIssuedDate", "licenseValidUntil"];
     for (const field of dateFields) {
@@ -124,7 +132,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<OcrRespon
       }
     }
     
-    // 6. Обновляем user_rental_secrets
+    // 7. Обновляем user_rental_secrets
     const { data: existingSecrets } = await privateSchema()
       .from("user_rental_secrets")
       .select("*")
@@ -136,19 +144,20 @@ export async function POST(request: NextRequest): Promise<NextResponse<OcrRespon
     const secretData: Record<string, any> = {
       chat_id: chatId,
       source_rental_id: rentalId,
-      [`${docType}_photo_path`]: storagePath,
+      [`${docType}_photo`]: storagePath,
     };
     
-    if (docType === "passport") {
+    // Сохраняем распознанные данные в зависимости от типа документа
+    if (docType === "passport_mainpage") {
       secretData.renter_full_name = fields.fullName || null;
       secretData.renter_passport = fields.passportSeries && fields.passportNumber
         ? `${fields.passportSeries} ${fields.passportNumber}`
         : null;
       secretData.renter_passport_issue_date = fields.passportIssuedDate || null;
-      secretData.renter_registration = fields.registrationAddress || null;
       secretData.renter_birth_date = fields.birthDate || null;
-    } else {
-      // license
+    } else if (docType === "passport_registration") {
+      secretData.renter_registration = fields.registrationAddress || null;
+    } else if (docType === "drivers_licence") {
       secretData.renter_driver_license = fields.licenseNumber || null;
       secretData.license_categories = fields.licenseCategories || null;
       secretData.license_expiry_date = fields.licenseValidUntil || null;
@@ -167,10 +176,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<OcrRespon
         .insert(secretData);
     }
     
-    // 7. Обновляем rentals с photo path
+    // 8. Обновляем rentals с photo path
     await supabaseAdmin
       .from("rentals")
-      .update({ [`${docType}_photo_path`]: storagePath })
+      .update({ [`${docType}_photo`]: storagePath })
       .eq("rental_id", rentalId);
     
     // 8. Cleanup: удаляем фото из docpix (152-ФЗ compliance)

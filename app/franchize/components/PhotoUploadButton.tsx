@@ -8,7 +8,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface PhotoUploadButtonProps {
-  docType: "passport" | "license";
+  docType: "passport_mainpage" | "passport_registration" | "drivers_licence";
   rentalId: string;
   chatId: string;
   onSuccess?: () => void;
@@ -123,11 +123,14 @@ export function PhotoUploadButton({ docType, rentalId, chatId, onSuccess }: Phot
       });
 
       // 4. Показываем success message
+      const successMessages = {
+        passport_mainpage: "✅ Главная страница паспорта загружена! Данные будут обработаны автоматически.",
+        passport_registration: "✅ Страница с пропиской загружена! Данные будут обработаны автоматически.",
+        drivers_licence: "✅ Водительское удостоверение загружено! Данные будут обработаны автоматически.",
+      };
       setMessage({
         type: "success",
-        text: docType === "passport"
-          ? "✅ Фото паспорта загружено! Данные будут обработаны автоматически."
-          : "✅ Фото прав загружено! Данные будут обработаны автоматически.",
+        text: successMessages[docType],
       });
 
       // 5. Вызываем onSuccess callback
@@ -196,7 +199,9 @@ export function PhotoUploadButton({ docType, rentalId, chatId, onSuccess }: Phot
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             <span>
-              {docType === "passport" ? "Загрузить фото паспорта" : "Загрузить фото прав"}
+              {docType === "passport_mainpage" && "Загрузить главную страницу паспорта"}
+              {docType === "passport_registration" && "Загрузить страницу с пропиской"}
+              {docType === "drivers_licence" && "Загрузить водительское удостоверение"}
             </span>
           </>
         )}
@@ -217,9 +222,9 @@ export function PhotoUploadButton({ docType, rentalId, chatId, onSuccess }: Phot
 
       {/* Подсказка */}
       <p className="text-xs" style={{ color: "#6b7280" }}>
-        {docType === "passport"
-          ? "Сфотографируйте разворот паспорта с фото и данными"
-          : "Сфотографируйте лицевую сторону водительского удостоверения"}
+        {docType === "passport_mainpage" && "Сфотографируйте разворот паспорта с фото и основными данными"}
+        {docType === "passport_registration" && "Сфотографируйте страницу паспорта с адресом регистрации (пропиской)"}
+        {docType === "drivers_licence" && "Сфотографируйте лицевую сторону водительского удостоверения"}
       </p>
     </div>
   );

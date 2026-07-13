@@ -897,13 +897,20 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 Заполняется один раз — при следующей аренде данные подставятся автоматически.
               </p>
               <div className="mt-3 space-y-3">
-                {/* Passport */}
+                {/* Passport - 2 photos */}
                 {user?.id && (
-                  <PhotoUploadButton
-                    docType="passport"
-                    rentalId={orderId}
-                    chatId={String(user.id)}
-                  />
+                  <>
+                    <PhotoUploadButton
+                      docType="passport_mainpage"
+                      rentalId={orderId}
+                      chatId={String(user.id)}
+                    />
+                    <PhotoUploadButton
+                      docType="passport_registration"
+                      rentalId={orderId}
+                      chatId={String(user.id)}
+                    />
+                  </>
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   <input
@@ -961,7 +968,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                   <div className="space-y-3">
                     {user?.id && (
                       <PhotoUploadButton
-                        docType="license"
+                        docType="drivers_licence"
                         rentalId={orderId}
                         chatId={String(user.id)}
                       />
