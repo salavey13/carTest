@@ -7,9 +7,10 @@ import {
   CircleDot, Users, Lock, AlertCircle, LayoutList, Columns3,
   Calendar, UserPlus, Download, Star, Filter, StickyNote, History,
   MapPin, ExternalLink, Banknote, Briefcase, ShieldAlert, Hash,
-  MessageSquare, Wallet, Gauge, Activity, Check, Loader2
+  MessageSquare, Wallet, Gauge, Activity, Check, Loader2, XCircle,
+  RotateCcw
 } from "lucide-react";
-import { validateAnalyticsPassword, activateRental } from "../../server-actions/rentals-dashboard";
+import { validateAnalyticsPassword, activateRental, updateRentalStatus } from "../../server-actions/rentals-dashboard";
 import type { LeadRow, LeadTodoRow, LeadRentalRow, LeadSaleRow } from "../../server-actions/leads";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -618,6 +619,21 @@ function RentalRow({ rental, slug, T }: { rental: LeadRentalRow; slug: string; T
   const [activating, setActivating] = useState(false);
   const [activationMsg, setActivationMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // ── Decline state ──
+  const [showDeclineModal, setShowDeclineModal] = useState(false);
+  const [declineMessage, setDeclineMessage] = useState("");
+  const [declining, setDeclining] = useState(false);
+  const [declineMsg, setDeclineMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // ── Complete state ──
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [completeOdometer, setCompleteOdometer] = useState("");
+  const [completing, setCompleting] = useState(false);
+  const [completeMsg, setCompleteMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // ── Odometer pre-fill: suggest last known odometer from bike specs ──
+  const lastOdometer = rental.metadata?.last_known_odometer as number | undefined;
+
   const handleActivate = async () => {
     const odometer = parseInt(odometerInput, 10);
     if (isNaN(odometer) || odometer < 0 || odometer > 999999) {
@@ -629,10 +645,10 @@ function RentalRow({ rental, slug, T }: { rental: LeadRentalRow; slug: string; T
     try {
       const result = await activateRental({
         slug,
-        actorUserId: String(Date.now()), // will be resolved server-side via password auth
+        actorUserId: String(Date.now()),
         rentalId: rental.rentalId,
         odometerBefore: odometer,
-        isPasswordAuth: true, // leads page uses password auth — bypass access checks
+        isPasswordAuth: true,
       });
       if (result.success) {
         setActivationMsg({ ok: true, text: result.message || "✅ Аренда активирована! Обновляю..." });
@@ -644,6 +660,65 @@ function RentalRow({ rental, slug, T }: { rental: LeadRentalRow; slug: string; T
       setActivationMsg({ ok: false, text: err?.message || "Ошибка сети" });
     } finally {
       setActivating(false);
+    }
+  };
+
+  const handleDecline = async () => {
+    if (!declineMessage.trim()) {
+      setDeclineMsg({ ok: false, text: "Укажите причину отклонения" });
+      return;
+    }
+    setDeclining(true);
+    setDeclineMsg(null);
+    try {
+      const result = await updateRentalStatus({
+        slug,
+        actorUserId: String(Date.now()),
+        rentalId: rental.rentalId,
+        status: "cancelled",
+        operatorMessage: declineMessage.trim(),
+        isPasswordAuth: true,
+      });
+      if (result.success) {
+        setDeclineMsg({ ok: true, text: result.message || "✅ Аренда отклонена. Обновляю..." });
+        setTimeout(() => window.location.reload(), 2000);
+      } else {
+        setDeclineMsg({ ok: false, text: result.error || "Ошибка" });
+      }
+    } catch (err: any) {
+      setDeclineMsg({ ok: false, text: err?.message || "Ошибка сети" });
+    } finally {
+      setDeclining(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    const odometer = parseInt(completeOdometer, 10);
+    if (isNaN(odometer) || odometer < 0 || odometer > 999999) {
+      setCompleteMsg({ ok: false, text: "Введите корректные показания одометра (0–999999 км)" });
+      return;
+    }
+    setCompleting(true);
+    setCompleteMsg(null);
+    try {
+      const result = await updateRentalStatus({
+        slug,
+        actorUserId: String(Date.now()),
+        rentalId: rental.rentalId,
+        status: "completed",
+        odometerAfter: odometer,
+        isPasswordAuth: true,
+      });
+      if (result.success) {
+        setCompleteMsg({ ok: true, text: result.message || "✅ Аренда завершена. Обновляю..." });
+        setTimeout(() => window.location.reload(), 2000);
+      } else {
+        setCompleteMsg({ ok: false, text: result.error || "Ошибка" });
+      }
+    } catch (err: any) {
+      setCompleteMsg({ ok: false, text: err?.message || "Ошибка сети" });
+    } finally {
+      setCompleting(false);
     }
   };
 
@@ -665,7 +740,7 @@ function RentalRow({ rental, slug, T }: { rental: LeadRentalRow; slug: string; T
           <span><Calendar className="inline h-3 w-3 mr-1" />{formatDate(rental.startDate)} — {formatDate(rental.endDate)}</span>
           <span><Banknote className="inline h-3 w-3 mr-1" />{fmtMoney(rental.totalCost)}</span>
         </div>
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
           {rental.rentalId && (
             <a href={`/franchize/vip-bike/rental/${rental.rentalId}`}
               className="inline-flex items-center gap-1 text-[10px] font-medium" style={{ color: T.accent }}>
@@ -674,11 +749,28 @@ function RentalRow({ rental, slug, T }: { rental: LeadRentalRow; slug: string; T
           )}
           {/* Activate button — only for pending_confirmation */}
           {rental.status === "pending_confirmation" && (
-            <button onClick={() => setShowActivateModal(true)}
+            <>
+              <button onClick={() => setShowActivateModal(true)}
+                className="ml-auto inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-bold transition-all hover:opacity-80"
+                style={{ backgroundColor: "#10b981", color: "#fff" }}>
+                <Activity className="h-3 w-3" />
+                Активировать
+              </button>
+              <button onClick={() => setShowDeclineModal(true)}
+                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-bold transition-all hover:opacity-80"
+                style={{ backgroundColor: "#ef4444", color: "#fff" }}>
+                <XCircle className="h-3 w-3" />
+                Отклонить
+              </button>
+            </>
+          )}
+          {/* Complete button — only for active */}
+          {rental.status === "active" && (
+            <button onClick={() => { setShowCompleteModal(true); setCompleteOdometer(String(lastOdometer || "")); }}
               className="ml-auto inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-bold transition-all hover:opacity-80"
-              style={{ backgroundColor: "#10b981", color: "#fff" }}>
-              <Activity className="h-3 w-3" />
-              Активировать
+              style={{ backgroundColor: "#3b82f6", color: "#fff" }}>
+              <CheckCircle className="h-3 w-3" />
+              Завершить
             </button>
           )}
         </div>
@@ -695,8 +787,6 @@ function RentalRow({ rental, slug, T }: { rental: LeadRentalRow; slug: string; T
             <p className="mt-1 text-[11px]" style={{ color: T.textMuted }}>
               Подтвердите выдачу байка и укажите показания одометра
             </p>
-
-            {/* Bike info */}
             <div className="mt-3 rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
               <p className="text-xs font-semibold" style={{ color: T.text }}>{rental.bikeTitle || "Байк"}</p>
               <p className="mt-1 text-[10px]" style={{ color: T.textMuted }}>
@@ -704,34 +794,28 @@ function RentalRow({ rental, slug, T }: { rental: LeadRentalRow; slug: string; T
               </p>
               <p className="text-[10px]" style={{ color: T.textMuted }}>{fmtMoney(rental.totalCost)}</p>
             </div>
-
-            {/* Odometer input */}
             <div className="mt-3">
               <label className="text-[11px] font-medium" style={{ color: T.text }}>
                 <Gauge className="inline h-3.5 w-3.5 mr-1" />
                 Показания одометра (км)
               </label>
-              <div className="relative mt-1">
-                <input
-                  type="number"
-                  min="0"
-                  max="999999"
-                  value={odometerInput}
-                  onChange={e => { setOdometerInput(e.target.value); setActivationMsg(null); }}
-                  placeholder="0"
-                  disabled={activating}
-                  className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all"
-                  style={{
-                    backgroundColor: T.inputBg,
-                    borderColor: T.inputBorder,
-                    color: T.text,
-                  }}
-                  autoFocus
-                />
-              </div>
+              <input
+                type="number" min="0" max="999999"
+                value={odometerInput}
+                onChange={e => { setOdometerInput(e.target.value); setActivationMsg(null); }}
+                placeholder={lastOdometer ? `~${lastOdometer} (предыдущий)` : "0"}
+                disabled={activating}
+                className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all"
+                style={{ backgroundColor: T.inputBg, borderColor: T.inputBorder, color: T.text }}
+                autoFocus
+              />
+              {lastOdometer && !odometerInput && (
+                <p className="mt-1 text-[10px]" style={{ color: T.textFaint }}>
+                  <RotateCcw className="inline h-3 w-3 mr-0.5" />
+                  Предыдущий: {lastOdometer} км
+                </p>
+              )}
             </div>
-
-            {/* Status message */}
             {activationMsg && (
               <div className="mt-3 rounded-xl border p-2.5 text-[11px] font-medium text-center"
                 style={{
@@ -743,31 +827,173 @@ function RentalRow({ rental, slug, T }: { rental: LeadRentalRow; slug: string; T
                 {activationMsg.text}
               </div>
             )}
-
-            {/* Buttons */}
             <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => { setShowActivateModal(false); setActivationMsg(null); }}
-                disabled={activating}
+              <button onClick={() => { setShowActivateModal(false); setActivationMsg(null); }} disabled={activating}
                 className="flex-1 rounded-xl border py-2.5 text-xs font-medium transition-all hover:opacity-70"
                 style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgCard }}>
                 Отмена
               </button>
-              <button
-                onClick={handleActivate}
-                disabled={activating}
+              <button onClick={handleActivate} disabled={activating}
                 className="flex-1 rounded-xl py-2.5 text-xs font-bold text-white transition-all hover:opacity-80 disabled:opacity-50"
                 style={{ backgroundColor: "#10b981" }}>
                 {activating ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Активация...
-                  </span>
+                  <span className="inline-flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" />Активация...</span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Activity className="h-3.5 w-3.5" />
-                    Активировать
-                  </span>
+                  <span className="inline-flex items-center gap-1.5"><Activity className="h-3.5 w-3.5" />Активировать</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Decline Modal ── */}
+      {showDeclineModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => { if (!declining) { setShowDeclineModal(false); setDeclineMsg(null); } }}>
+          <div className="mx-4 w-full max-w-sm rounded-2xl border p-5 shadow-2xl"
+            style={{ backgroundColor: T.bgCard, borderColor: T.border }}
+            onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold" style={{ color: "#ef4444" }}>
+              <XCircle className="inline h-4 w-4 mr-1" />
+              Отклонение аренды
+            </h3>
+            <p className="mt-1 text-[11px]" style={{ color: T.textMuted }}>
+              Укажите причину — она будет отправлена арендатору
+            </p>
+            <div className="mt-3 rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+              <p className="text-xs font-semibold" style={{ color: T.text }}>{rental.bikeTitle || "Байк"}</p>
+              <p className="mt-1 text-[10px]" style={{ color: T.textMuted }}>
+                {formatDate(rental.startDate)} — {formatDate(rental.endDate)}
+              </p>
+            </div>
+            <div className="mt-3">
+              <label className="text-[11px] font-medium" style={{ color: T.text }}>
+                <MessageSquare className="inline h-3.5 w-3.5 mr-1" />
+                Сообщение арендатору
+              </label>
+              <textarea
+                value={declineMessage}
+                onChange={e => { setDeclineMessage(e.target.value); setDeclineMsg(null); }}
+                placeholder="Например: Байк на зарядке. Предлагаем перенести на завтра или выбрать другой байк."
+                disabled={declining}
+                rows={4}
+                className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all resize-none"
+                style={{ backgroundColor: T.inputBg, borderColor: T.inputBorder, color: T.text }}
+                autoFocus
+              />
+              <p className="mt-1 text-[10px]" style={{ color: T.textFaint }}>
+                Быстрые причины:
+              </p>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {["Байк на зарядке", "Байк на ремонте", "Нет свободных дат", "Перенос на другие даты"].map((reason) => (
+                  <button key={reason}
+                    onClick={() => { setDeclineMessage(reason); setDeclineMsg(null); }}
+                    className="rounded-lg border px-2 py-0.5 text-[9px] font-medium transition-all hover:opacity-70"
+                    style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated }}>
+                    {reason}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {declineMsg && (
+              <div className="mt-3 rounded-xl border p-2.5 text-[11px] font-medium text-center"
+                style={{
+                  borderColor: declineMsg.ok ? "#10b98140" : "#ef444440",
+                  backgroundColor: declineMsg.ok ? "#10b98110" : "#ef444410",
+                  color: declineMsg.ok ? "#10b981" : "#ef4444",
+                }}>
+                {declineMsg.ok ? <Check className="inline h-3.5 w-3.5 mr-1" /> : <AlertCircle className="inline h-3.5 w-3.5 mr-1" />}
+                {declineMsg.text}
+              </div>
+            )}
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => { setShowDeclineModal(false); setDeclineMsg(null); }} disabled={declining}
+                className="flex-1 rounded-xl border py-2.5 text-xs font-medium transition-all hover:opacity-70"
+                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgCard }}>
+                Отмена
+              </button>
+              <button onClick={handleDecline} disabled={declining}
+                className="flex-1 rounded-xl py-2.5 text-xs font-bold text-white transition-all hover:opacity-80 disabled:opacity-50"
+                style={{ backgroundColor: "#ef4444" }}>
+                {declining ? (
+                  <span className="inline-flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" />Отклоняю...</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5"><XCircle className="h-3.5 w-3.5" />Отклонить</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Complete Modal ── */}
+      {showCompleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => { if (!completing) { setShowCompleteModal(false); setCompleteMsg(null); } }}>
+          <div className="mx-4 w-full max-w-sm rounded-2xl border p-5 shadow-2xl"
+            style={{ backgroundColor: T.bgCard, borderColor: T.border }}
+            onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold" style={{ color: "#3b82f6" }}>
+              <CheckCircle className="inline h-4 w-4 mr-1" />
+              Завершение аренды
+            </h3>
+            <p className="mt-1 text-[11px]" style={{ color: T.textMuted }}>
+              Укажите финальные показания одометра при возврате байка
+            </p>
+            <div className="mt-3 rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+              <p className="text-xs font-semibold" style={{ color: T.text }}>{rental.bikeTitle || "Байк"}</p>
+              <p className="mt-1 text-[10px]" style={{ color: T.textMuted }}>
+                {formatDate(rental.startDate)} — {formatDate(rental.endDate)}
+              </p>
+              <p className="text-[10px]" style={{ color: T.textMuted }}>{fmtMoney(rental.totalCost)}</p>
+            </div>
+            <div className="mt-3">
+              <label className="text-[11px] font-medium" style={{ color: T.text }}>
+                <Gauge className="inline h-3.5 w-3.5 mr-1" />
+                Финальный одометр (км)
+              </label>
+              <input
+                type="number" min="0" max="999999"
+                value={completeOdometer}
+                onChange={e => { setCompleteOdometer(e.target.value); setCompleteMsg(null); }}
+                placeholder={lastOdometer ? `~${lastOdometer} (примерно)` : "0"}
+                disabled={completing}
+                className="mt-1 w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all"
+                style={{ backgroundColor: T.inputBg, borderColor: T.inputBorder, color: T.text }}
+                autoFocus
+              />
+              {lastOdometer && (
+                <p className="mt-1 text-[10px]" style={{ color: T.textFaint }}>
+                  <RotateCcw className="inline h-3 w-3 mr-0.5" />
+                  Предыдущий: {lastOdometer} км — используйте как отправную точку
+                </p>
+              )}
+            </div>
+            {completeMsg && (
+              <div className="mt-3 rounded-xl border p-2.5 text-[11px] font-medium text-center"
+                style={{
+                  borderColor: completeMsg.ok ? "#10b98140" : "#ef444440",
+                  backgroundColor: completeMsg.ok ? "#10b98110" : "#ef444410",
+                  color: completeMsg.ok ? "#10b981" : "#ef4444",
+                }}>
+                {completeMsg.ok ? <Check className="inline h-3.5 w-3.5 mr-1" /> : <AlertCircle className="inline h-3.5 w-3.5 mr-1" />}
+                {completeMsg.text}
+              </div>
+            )}
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => { setShowCompleteModal(false); setCompleteMsg(null); }} disabled={completing}
+                className="flex-1 rounded-xl border py-2.5 text-xs font-medium transition-all hover:opacity-70"
+                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgCard }}>
+                Отмена
+              </button>
+              <button onClick={handleComplete} disabled={completing}
+                className="flex-1 rounded-xl py-2.5 text-xs font-bold text-white transition-all hover:opacity-80 disabled:opacity-50"
+                style={{ backgroundColor: "#3b82f6" }}>
+                {completing ? (
+                  <span className="inline-flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" />Завершаю...</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5"><CheckCircle className="h-3.5 w-3.5" />Завершить</span>
                 )}
               </button>
             </div>
@@ -967,6 +1193,7 @@ function LeadDetailContent({ lead, todos, crewId, slug, T }: {
 
       <Section title="История" icon={History} T={T}>
         <div className="space-y-2">
+          {/* CRM entry */}
           <div className="flex gap-3 rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: T.borderSoft }}>
               <UserPlus className="h-4 w-4" style={{ color: T.accent }} />
@@ -976,6 +1203,45 @@ function LeadDetailContent({ lead, todos, crewId, slug, T }: {
               <p className="text-[10px]" style={{ color: T.textFaint }}>{relativeTime(lead.createdAt)}</p>
             </div>
           </div>
+
+          {/* Rental status changes */}
+          {lead.rentals.length > 0 && lead.rentals.map((r) => {
+            const history = (r.metadata?.history as Array<{ status: string; at: string; message?: string }>) || [];
+            if (history.length === 0) return null;
+            const statusLabels: Record<string, { label: string; color: string; icon: any }> = {
+              pending_confirmation: { label: "Заявка создана", color: "#f59e0b", icon: Clock },
+              active: { label: "Активирована", color: "#10b981", icon: Activity },
+              completed: { label: "Завершена", color: "#3b82f6", icon: CheckCircle },
+              cancelled: { label: "Отклонена", color: "#ef4444", icon: X },
+              confirmed: { label: "Подтверждена", color: "#8b5cf6", icon: CheckCircle },
+              disputed: { label: "В споре", color: "#ef4444", icon: ShieldAlert },
+            };
+            return history.map((h, i) => {
+              const sMeta = statusLabels[h.status] || { label: h.status, color: T.textMuted, icon: Clock };
+              const Icon = sMeta.icon;
+              return (
+                <div key={`${r.rentalId}-${i}`} className="flex gap-3 rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: sMeta.color + "20" }}>
+                    <Icon className="h-4 w-4" style={{ color: sMeta.color }} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium" style={{ color: T.text }}>
+                      {sMeta.label}
+                      <span className="ml-1.5 text-[10px] font-normal" style={{ color: T.textFaint }}>— {r.bikeTitle || "Байк"}</span>
+                    </p>
+                    <p className="text-[10px]" style={{ color: T.textFaint }}>{relativeTime(h.at)}</p>
+                    {h.message && (
+                      <p className="mt-1 rounded-lg bg-white/5 px-2 py-1 text-[10px] italic" style={{ color: T.textMuted, borderLeft: `2px solid ${sMeta.color}` }}>
+                        {h.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            });
+          })}
+
+          {/* Last activity */}
           {lead.lastSeenAt && lead.lastSeenAt !== lead.createdAt && (
             <div className="flex gap-3 rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: T.borderSoft }}>

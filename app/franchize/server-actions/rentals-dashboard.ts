@@ -1884,14 +1884,20 @@ export async function updateRentalStatus(input: {
   actorUserId: string;
   rentalId: string;
   status: "pending_confirmation" | "confirmed" | "active" | "completed" | "cancelled" | "disputed";
+  operatorMessage?: string;       // Decline reason or completion note — sent to renter via Telegram
+  odometerBefore?: number;        // For activation — starting odometer
+  odometerAfter?: number;         // For completion — final odometer
   isPasswordAuth?: boolean;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
     const parsed = z.object({
       slug: z.string().trim().min(1),
       actorUserId: z.string().trim().min(1),
       rentalId: z.string().uuid(),
       status: z.enum(["pending_confirmation", "confirmed", "active", "completed", "cancelled", "disputed"]),
+      operatorMessage: z.string().max(2000).optional(),
+      odometerBefore: z.number().int().min(0).max(999999).optional(),
+      odometerAfter: z.number().int().min(0).max(999999).optional(),
       isPasswordAuth: z.boolean().optional(),
     }).safeParse(input);
 
@@ -1899,12 +1905,12 @@ export async function updateRentalStatus(input: {
       return { success: false, error: "Некорректный запрос." };
     }
 
-    const { slug, actorUserId, rentalId, status, isPasswordAuth = false } = parsed.data;
+    const { slug, actorUserId, rentalId, status, operatorMessage, odometerBefore, odometerAfter, isPasswordAuth = false } = parsed.data;
 
     // Get crew and verify access
     const { data: crew, error: crewError } = await supabaseAdmin
       .from("crews")
-      .select("id, owner_id")
+      .select("id, owner_id, metadata")
       .eq("slug", slug.trim())
       .maybeSingle();
 
@@ -1915,43 +1921,66 @@ export async function updateRentalStatus(input: {
 
     // Auth check - allow owners, admins, orudjov, and crew members
     if (!isPasswordAuth) {
-      const userMetadata = (await supabaseAdmin
+      const userQuery = await supabaseAdmin
         .from("users")
         .select("metadata, username")
         .eq("user_id", actorUserId)
-        .maybeSingle()
-      ).data?.metadata as Record<string, unknown> | null;
-
-      const userUsername = (await supabaseAdmin
-        .from("users")
-        .select("username")
-        .eq("user_id", actorUserId)
-        .maybeSingle()
-      ).data?.username as string | null;
-
+        .maybeSingle();
+      const userMetadata = userQuery.data?.metadata as Record<string, unknown> | null;
+      const userUsername = userQuery.data?.username as string | null;
       const isAdmin = userMetadata?.role === "admin";
       const isOwner = crew.owner_id === actorUserId;
       const isOrudjov = userUsername?.toLowerCase().includes("orud");
-
-      // Check if user is a crew member
       const { data: crewMember } = await supabaseAdmin
         .from("crew_members")
         .select("user_id")
         .eq("crew_id", crew.id)
         .eq("user_id", actorUserId)
         .maybeSingle();
-
-      const isCrewMember = !!crewMember;
-
-      if (!isOwner && !isAdmin && !isOrudjov && !isCrewMember) {
+      if (!isOwner && !isAdmin && !isOrudjov && !crewMember) {
         return { success: false, error: "Недостаточно прав для обновления статуса." };
       }
     }
 
-    // Update rental status
+    // ── Fetch current rental for metadata merge + renter chat_id ──
+    const { data: rental } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id, status as old_status, metadata, user_id, vehicle:cars(make, model)")
+      .eq("rental_id", rentalId)
+      .maybeSingle();
+
+    const currentMeta = (rental?.metadata || {}) as Record<string, unknown>;
+    const history = (currentMeta.history || []) as Array<{ status: string; at: string; by?: string; message?: string }>;
+    const now = new Date();
+
+    // Append this status change to history
+    history.push({
+      status,
+      at: now.toISOString(),
+      by: actorUserId,
+      message: operatorMessage || undefined,
+    });
+
+    // Build update payload
+    const updatePayload: Record<string, unknown> = {
+      status,
+      updated_at: now.toISOString(),
+      metadata: {
+        ...currentMeta,
+        history,
+        last_status_change_at: now.toISOString(),
+        last_status_change_by: actorUserId,
+        last_status_change_message: operatorMessage || null,
+      },
+    };
+
+    // Store odometer values if provided
+    if (odometerBefore != null) updatePayload.odometer_before = odometerBefore;
+    if (odometerAfter != null) updatePayload.odometer_after = odometerAfter;
+
     const { error: updateError } = await supabaseAdmin
       .from("rentals")
-      .update({ status, updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq("rental_id", rentalId);
 
     if (updateError) {
@@ -1959,7 +1988,74 @@ export async function updateRentalStatus(input: {
       return { success: false, error: updateError.message };
     }
 
-    return { success: true };
+    // ── If operator provided a message → notify renter via Telegram ──
+    if (operatorMessage && rental?.user_id) {
+      const renterChatId = rental.user_id;
+      const vehicle = rental?.vehicle as { make?: string; model?: string } | null;
+      const bikeName = vehicle ? `${vehicle.make || ""} ${vehicle.model || ""}`.trim() : "байк";
+
+      const statusLabels: Record<string, string> = {
+        active: "активирована",
+        completed: "завершена",
+        cancelled: "отклонена",
+        confirmed: "подтверждена",
+        disputed: "в споре",
+      };
+      const statusLabel = statusLabels[status] || status;
+
+      const messageText = `ℹ️ <b>Аренда ${statusLabel}</b>\n\n` +
+        `🚲 ${bikeName}\n` +
+        `📋 Статус: <b>${statusLabel}</b>\n\n` +
+        `📝 Сообщение оператора:\n${operatorMessage}\n\n` +
+        `По вопросам — пишите в чат.`;
+
+      try {
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
+        await fetch(`${siteUrl}/api/forward-telegram`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: renterChatId,
+            method: "sendMessage",
+            payload: { text: messageText, parse_mode: "HTML" },
+          }),
+          signal: AbortSignal.timeout(10000),
+        });
+      } catch (tgErr) {
+        console.warn("[update-rental-status] TG notify failed (non-fatal):", tgErr);
+      }
+    }
+
+    // ── If completed with odometer → save to bike specs for next-rental prefill ──
+    if (status === "completed" && odometerAfter != null && rental) {
+      try {
+        const vehicle = rental?.vehicle as { id?: string } | null;
+        if (vehicle?.id) {
+          const { data: car } = await supabaseAdmin
+            .from("cars")
+            .select("specs")
+            .eq("id", vehicle.id)
+            .maybeSingle();
+          if (car) {
+            const specs = (car.specs || {}) as Record<string, unknown>;
+            await supabaseAdmin
+              .from("cars")
+              .update({ specs: { ...specs, last_known_odometer: odometerAfter } })
+              .eq("id", vehicle.id);
+          }
+        }
+      } catch (odoErr) {
+        console.warn("[update-rental-status] Odometer save failed (non-fatal):", odoErr);
+      }
+    }
+
+    const msgParts: string[] = [];
+    msgParts.push(`Статус изменён на «${status}»`);
+    if (operatorMessage) msgParts.push("уведомление отправлено арендатору");
+    if (odometerBefore != null) msgParts.push(`одометр: ${odometerBefore} км`);
+    if (odometerAfter != null) msgParts.push(`финальный одометр: ${odometerAfter} км`);
+
+    return { success: true, message: msgParts.join(", ") + "." };
   } catch (error) {
     console.error("[update-rental-status] Error:", error);
     return {
@@ -2191,7 +2287,8 @@ export async function activateRental(input: {
     const qrCaption = `📲 <b>QR для быстрой аренды</b>\n🔗 ${qrDeepLink}`;
 
     // Helper to send DOCX + QR + message to a single chat
-    async function sendToChat(chatId: string) {
+    // If skipQr=true → renter already has QR from initial DOCX, no need to resend
+    async function sendToChat(chatId: string, opts?: { skipQr?: boolean }) {
       if (!chatId || !/^\d+$/.test(chatId)) return;
       try {
         // First send congratulatory message
@@ -2203,9 +2300,28 @@ export async function activateRental(input: {
             method: "sendMessage",
             payload: { text: congratText, parse_mode: "HTML" },
           }),
+          signal: AbortSignal.timeout(8000),
         });
-        // Then send DOCX + QR
-        if (qrPngBuffer) {
+        // Then send DOCX (always) + QR (only if skipQr is not set)
+        if (opts?.skipQr) {
+          // Renter already has QR → just send the final DOCX
+          await fetch(forwardUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              method: "sendDocument",
+              payload: {
+                caption: `📄 <b>Финальный договор</b>\n🚲 ${vehicle.make} ${vehicle.model}\n📊 Одометр: ${odometerBefore} км\n\nСкачайте для подписи. Ваш QR-код для быстрой аренды уже доступен в истории.`,
+                parse_mode: "HTML",
+              },
+              files: {
+                document: { data: docxBuf.toString("base64"), filename: docFileName, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+              },
+            }),
+            signal: AbortSignal.timeout(15000),
+          });
+        } else if (qrPngBuffer) {
           await fetch(forwardUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -2223,6 +2339,7 @@ export async function activateRental(input: {
                 qr: { data: qrPngBuffer.toString("base64"), filename: `qr-${vehicle.id}.png`, contentType: "image/png" },
               },
             }),
+            signal: AbortSignal.timeout(15000),
           });
         } else {
           await fetch(forwardUrl, {
@@ -2236,6 +2353,7 @@ export async function activateRental(input: {
                 document: { data: docxBuf.toString("base64"), filename: docFileName, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
               },
             }),
+            signal: AbortSignal.timeout(15000),
           });
         }
       } catch (err) {
@@ -2243,15 +2361,18 @@ export async function activateRental(input: {
       }
     }
 
-    // Send to renter
+    // Determine if renter already has linked TG account (had secrets → already got QR during DOCX creation)
     const renterChatId = renter?.user_id || secretData.chat_id || "";
-    if (renterChatId) await sendToChat(renterChatId);
+    const renterAlreadyLinked = !!renterChatId; // Has existing TG account → no need for QR
 
-    // Send to crew owner
+    // Send to renter — skip QR if already linked
+    if (renterChatId) await sendToChat(renterChatId, { skipQr: renterAlreadyLinked });
+
+    // Send to crew owner — always include QR (they may forward it)
     const crewOwnerChatId = crew.owner_id;
     if (crewOwnerChatId) await sendToChat(crewOwnerChatId);
 
-    // Send to admin (salavey13)
+    // Send to admin (salavey13) — always include QR
     const adminChatId = "413553377";
     await sendToChat(adminChatId);
 
