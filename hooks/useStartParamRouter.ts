@@ -437,9 +437,9 @@ export function useStartParamRouter() {
           const content = paramToProcess.substring(5);
           if (content.endsWith("_join_crew")) {
             const slug = content.substring(0, content.length - 10);
-            targetPath = `/wb/${slug}?join_crew=true`;
+            targetPath = `/franchize/${slug}?join_crew=true`;
           } else {
-            targetPath = `/wb/${content}`;
+            targetPath = `/franchize/${content}`;
           }
         } else if (paramToProcess.startsWith("viz_")) {
           const simId = paramToProcess.substring(4);

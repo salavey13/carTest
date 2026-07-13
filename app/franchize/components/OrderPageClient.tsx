@@ -26,6 +26,7 @@ import {
   durationDaysFromDateTime,
 } from "../lib/date-utils";
 import { ruPluralDays } from "../lib/catalog-utils";
+import { PhotoUploadButton } from "./PhotoUploadButton";
 
 interface OrderPageClientProps {
   crew: FranchizeCrewVM;
@@ -897,6 +898,13 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               </p>
               <div className="mt-3 space-y-3">
                 {/* Passport */}
+                {user?.id && (
+                  <PhotoUploadButton
+                    docType="passport"
+                    rentalId={orderId}
+                    chatId={String(user.id)}
+                  />
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <input
                     className="rounded-xl border px-3 py-2 text-sm"
@@ -951,6 +959,13 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 </div>
                 {hasLicense && (
                   <div className="space-y-3">
+                    {user?.id && (
+                      <PhotoUploadButton
+                        docType="license"
+                        rentalId={orderId}
+                        chatId={String(user.id)}
+                      />
+                    )}
                     <div className="grid grid-cols-2 gap-3">
                       <input
                         className="rounded-xl border px-3 py-2 text-sm"
