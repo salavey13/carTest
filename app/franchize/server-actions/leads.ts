@@ -12,6 +12,7 @@ export interface LeadRentalRow {
   endDate: string | null;
   bikeTitle: string | null;
   totalCost: number;
+  metadata?: Record<string, unknown> | null; // Status change history, etc.
 }
 
 export interface LeadSaleRow {
@@ -260,7 +261,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     // 5. Active/past rentals
     const { data: rentals } = await supabaseAdmin
       .from("rentals")
-      .select("rental_id, user_id, status, payment_status, requested_start_date, requested_end_date, total_cost, vehicle:cars(make, model)")
+      .select("rental_id, user_id, status, payment_status, requested_start_date, requested_end_date, total_cost, metadata, vehicle:cars(make, model)")
       .order("created_at", { ascending: false })
       .limit(500);
 
@@ -278,6 +279,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
           endDate: r.requested_end_date,
           bikeTitle,
           totalCost: Number(r.total_cost) || 0,
+          metadata: r.metadata ? (r.metadata as Record<string, unknown>) : null,
         };
         if (!existing) {
           leadMap.set(r.user_id, {
