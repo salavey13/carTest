@@ -13,6 +13,9 @@ export interface LeadRentalRow {
   bikeTitle: string | null;
   totalCost: number;
   metadata?: Record<string, unknown> | null; // Status change history, etc.
+  passportMainpagePhoto?: string | null;
+  passportRegistrationPhoto?: string | null;
+  driversLicenceFrontalPhoto?: string | null;
 }
 
 export interface LeadSaleRow {
@@ -261,7 +264,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     // 5. Active/past rentals
     const { data: rentals } = await supabaseAdmin
       .from("rentals")
-      .select("rental_id, user_id, status, payment_status, requested_start_date, requested_end_date, total_cost, metadata, vehicle:cars(make, model)")
+      .select("rental_id, user_id, status, payment_status, requested_start_date, requested_end_date, total_cost, metadata, passport_mainpage_photo, passport_registration_photo, drivers_licence_frontal_photo, vehicle:cars(make, model)")
       .order("created_at", { ascending: false })
       .limit(500);
 
@@ -280,6 +283,9 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
           bikeTitle,
           totalCost: Number(r.total_cost) || 0,
           metadata: r.metadata ? (r.metadata as Record<string, unknown>) : null,
+          passportMainpagePhoto: (r as any).passport_mainpage_photo || null,
+          passportRegistrationPhoto: (r as any).passport_registration_photo || null,
+          driversLicenceFrontalPhoto: (r as any).drivers_licence_frontal_photo || null,
         };
         if (!existing) {
           leadMap.set(r.user_id, {
@@ -433,5 +439,129 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
   } catch (error) {
     logger.error("[getFranchizeLeads] failed:", error);
     return { success: false, error: "Не удалось загрузить лиды" };
+  }
+}
+
+// ── Document Verification ──────────────────────────────────────────────────────
+
+export interface DocVerificationData {
+  rentalId: string;
+  photos: {
+    passportMainpage: { path: string | null; signedUrl: string | null };
+    passportRegistration: { path: string | null; signedUrl: string | null };
+    driversLicence: { path: string | null; signedUrl: string | null };
+  };
+  ocrData: {
+    fullName: string | null;
+    passport: string | null;
+    passportIssuedBy: string | null;
+    passportIssueDate: string | null;
+    birthDate: string | null;
+    registration: string | null;
+    driverLicense: string | null;
+  };
+  checklist: {
+    passportVerified: boolean;
+    licenseVerified: boolean;
+    equipmentHandover: boolean;
+    odometerBefore: boolean;
+    datesConfirmed: boolean;
+    paymentVerified: boolean;
+  };
+}
+
+export interface GetRentalDocVerificationResult {
+  success: boolean;
+  data?: DocVerificationData;
+  error?: string;
+}
+
+/**
+ * Get document verification data for a rental.
+ * Returns signed URLs for photos, OCR data from user_rental_secrets, and checklist status.
+ */
+export async function getRentalDocVerification(rentalId: string): Promise<GetRentalDocVerificationResult> {
+  if (!rentalId) {
+    return { success: false, error: "rentalId is required" };
+  }
+
+  try {
+    // 1. Fetch rental with photo paths and metadata
+    const { data: rental, error: rentalError } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id, user_id, metadata, passport_mainpage_photo, passport_registration_photo, drivers_licence_frontal_photo")
+      .eq("rental_id", rentalId)
+      .single();
+
+    if (rentalError || !rental) {
+      return { success: false, error: "Rental not found" };
+    }
+
+    // 2. Generate signed URLs for photos (5 min expiry)
+    const photoPaths = {
+      passportMainpage: (rental as any).passport_mainpage_photo as string | null,
+      passportRegistration: (rental as any).passport_registration_photo as string | null,
+      driversLicence: (rental as any).drivers_licence_frontal_photo as string | null,
+    };
+
+    const signedUrls: Record<string, string | null> = {};
+    for (const [key, path] of Object.entries(photoPaths)) {
+      if (path) {
+        const { data: urlData, error: urlError } = await supabaseAdmin.storage
+          .from("docpix")
+          .createSignedUrl(path, 300); // 5 minutes
+        if (urlError || !urlData?.signedUrl) {
+          logger.warn(`[getRentalDocVerification] Failed to create signed URL for ${key}: ${urlError?.message || "no URL"}`);
+          signedUrls[key] = null;
+        } else {
+          signedUrls[key] = urlData.signedUrl;
+        }
+      } else {
+        signedUrls[key] = null;
+      }
+    }
+
+    // 3. Fetch OCR data from user_rental_secrets
+    const { data: secrets } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("renter_full_name, renter_passport, renter_passport_issued_by, renter_passport_issue_date, renter_birth_date, renter_registration, renter_driver_license")
+      .eq("source_rental_id", rentalId)
+      .maybeSingle();
+
+    // 4. Extract checklist from metadata
+    const metadata = (rental.metadata || {}) as Record<string, any>;
+    const checklist = metadata.checklist || {};
+
+    return {
+      success: true,
+      data: {
+        rentalId,
+        photos: {
+          passportMainpage: { path: photoPaths.passportMainpage, signedUrl: signedUrls.passportMainpage || null },
+          passportRegistration: { path: photoPaths.passportRegistration, signedUrl: signedUrls.passportRegistration || null },
+          driversLicence: { path: photoPaths.driversLicence, signedUrl: signedUrls.driversLicence || null },
+        },
+        ocrData: {
+          fullName: secrets?.renter_full_name || null,
+          passport: secrets?.renter_passport || null,
+          passportIssuedBy: secrets?.renter_passport_issued_by || null,
+          passportIssueDate: secrets?.renter_passport_issue_date || null,
+          birthDate: secrets?.renter_birth_date || null,
+          registration: secrets?.renter_registration || null,
+          driverLicense: secrets?.renter_driver_license || null,
+        },
+        checklist: {
+          passportVerified: !!checklist.passport_verified,
+          licenseVerified: !!checklist.license_verified,
+          equipmentHandover: !!(checklist.equipment_handover?.keys && checklist.equipment_handover?.helmet),
+          odometerBefore: !!checklist.odometer_before,
+          datesConfirmed: !!checklist.dates_confirmed,
+          paymentVerified: !!checklist.payment_verified,
+        },
+      },
+    };
+  } catch (error) {
+    logger.error("[getRentalDocVerification] failed:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
   }
 }
