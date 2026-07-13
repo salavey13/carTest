@@ -234,6 +234,22 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyChe
       console.error("[verify-rental-checklist] Failed to auto-complete todos:", todoErr);
     }
 
+    // 8. Fire-and-forget: try to activate rental if all verification todos are done
+    // This doesn't block the response - activation happens asynchronously
+    setImmediate(async () => {
+      try {
+        const result = await activateRentalIfReady(rentalId);
+        if (result.activated) {
+          console.log(`[verify-rental-checklist] Rental auto-activated: ${rentalId}`);
+        } else if (result.message) {
+          console.log(`[verify-rental-checklist] Activation check: ${result.message}`);
+        }
+      } catch (err) {
+        // Fire-and-forget: log error but don't affect the response
+        console.error(`[verify-rental-checklist] Activation failed for ${rentalId}:`, err);
+      }
+    });
+
     return NextResponse.json({
       success: true,
       checklist: updatedChecklist,
