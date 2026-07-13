@@ -613,8 +613,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     });
 
     return [
-      { category: "electric", title: "", items: sortVipBikeItems(electric) },
-      { category: "ice-for-sale", title: "", items: sortVipBikeItems(iceForSale) },
+      { category: "electric", title: "Электро", items: sortVipBikeItems(electric) },
+      { category: "ice-for-sale", title: "В продаже", items: sortVipBikeItems(iceForSale) },
       { category: "partners", title: "Байки партнёров", items: sortVipBikeItems(iceRentOnly) },
     ].filter(g => g.items.length > 0);
   }, [items]);
