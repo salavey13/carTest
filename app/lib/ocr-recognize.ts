@@ -19,7 +19,8 @@
  * поля + сырой ответ модели (для аудита/правок оператором).
  */
 
-"use server";
+// NOTE: This is a utility module, not a server action.
+// It's used by server actions but doesn't need "use server" directive.
 
 // ── Конфиг ──────────────────────────────────────────────────────────────────
 
