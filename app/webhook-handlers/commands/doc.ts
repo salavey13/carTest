@@ -61,6 +61,8 @@ import { createHash, randomUUID } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { buildRentalContractVariables, type BikeSpecs, type RenterData, type RentalPeriod, type CrewSecrets, type DocumentMeta } from "@/app/lib/rental-contract-vars";
+import { getDefaultCrewId } from "@/lib/default-crew";
+import { createLeadFollowupTodos } from "@/app/franchize/server-actions/crew-todos";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DOC_STATE_EXPIRY_MINUTES = 30;
@@ -567,7 +569,7 @@ async function resolveBikeById(bikeId: string): Promise<{
 async function getAvailableBikes(): Promise<Array<{ id: string; make: string; model: string; specs?: Record<string, any> }>> {
   // Show bikes from vip-bike crew OR unassigned (crew_id=null).
   // Exclude bikes from OTHER crews (e.g. custom-bobber-virus, honda-cbr600rr-sz).
-  const VIP_BIKE_CREW_ID = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
+  const VIP_BIKE_CREW_ID = getDefaultCrewId();
   const { data } = await supabaseAdmin
     .from("cars")
     .select("id, make, model, specs")
@@ -889,56 +891,35 @@ async function generateAndSendContract(
         ensureUser: true,
       });
 
-      // Create crew_todos for equipment return (same pattern as doc-manual.ts)
-      const crewId = bike.crew_id || "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
+      // Create crew_todos for equipment return
+      const crewId = bike.crew_id || getDefaultCrewId();
       const bikeLabel = `${bike.make} ${bike.model}`;
-      const todos: Array<{ title: string; priority: string }> = [
-        { title: `🔧 Проверить ТС при возврате: ${bikeLabel} (${endDate} 10:00)`, priority: "high" },
-        { title: `🔑 Принять ключи от ${bikeLabel}`, priority: "high" },
-        { title: `📄 Проверить документы при возврате ${bikeLabel}`, priority: "medium" },
-        { title: `🔍 Осмотр на повреждения: ${bikeLabel}`, priority: "high" },
+      const todos = [
+        { title: `🔧 Проверить ТС при возврате: ${bikeLabel} (${endDate} 10:00)`, priority: "high" as const },
+        { title: `🔑 Принять ключи от ${bikeLabel}`, priority: "high" as const },
+        { title: `📄 Проверить документы при возврате ${bikeLabel}`, priority: "medium" as const },
+        { title: `🔍 Осмотр на повреждения: ${bikeLabel}`, priority: "high" as const },
       ];
-      // Idempotency: check if todos already exist for this lead+bike
-      const { data: existingTodos } = await supabaseAdmin
-        .from("crew_todos")
-        .select("id, title")
-        .eq("crew_id", crewId)
-        .eq("lead_id", leadUserId)
-        .eq("category", "lead_followup")
-        .eq("status", "pending");
 
-      const existingTitles = new Set((existingTodos || []).map((t: any) => t.title));
-      const newTodos = todos.filter((t) => !existingTitles.has(t.title));
+      const todoResult = await createLeadFollowupTodos({
+        crewId,
+        leadId: leadUserId,
+        leadPhone,
+        leadName: passport.fullName || "",
+        bikeId: bike.id,
+        todos,
+        assignedTo: String(userId),
+        metadata: {
+          rental_id: null,
+          rent_end_date: endDate,
+          source: "vlm_doc",
+        },
+      });
 
-      if (newTodos.length === 0) {
-        logger.info("[/doc-vlm] Todos already exist for lead, skipping creation");
+      if (todoResult.success) {
+        logger.info(`[/doc-vlm] Created ${todoResult.created} crew_todos (${todoResult.skipped} skipped as duplicates)`);
       } else {
-        const todoPromises = newTodos.map((todo) => {
-          const todoId = `todo-${randomUUID()}`;
-          return supabaseAdmin.from("crew_todos").insert({
-            id: todoId,
-            crew_id: crewId,
-            lead_id: leadUserId,
-            title: todo.title,
-            status: "pending",
-            priority: todo.priority,
-            assigned_to: String(userId),
-            category: "lead_followup",
-            description: JSON.stringify({
-              lead_id: leadUserId,
-              lead_phone: leadPhone,
-              lead_name: passport.fullName || "",
-              bike_id: bike.id,
-              rental_id: null,
-              rent_end_date: endDate,
-              source: "vlm_doc",
-            }),
-          }).then(({ error }: any) => {
-            if (error) logger.warn("[/doc-vlm] Failed to create crew_todo:", todo.title, error);
-          });
-        });
-        await Promise.all(todoPromises);
-        logger.info(`[/doc-vlm] Created ${newTodos.length} crew_todos (${todos.length - newTodos.length} skipped as duplicates)`);
+        logger.warn("[/doc-vlm] Failed to create crew_todos:", todoResult.error);
       }
     } catch (leadErr) {
       logger.warn("[/doc-vlm] Failed to create lead/todos:", leadErr);
