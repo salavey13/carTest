@@ -49,7 +49,7 @@ import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { deriveUserAccessTier, getAccessTierLabel } from "@/app/lib/derive-access-tier";
 import type { AccessTier } from "@/app/lib/ocr-constants";
 import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { convertTextDateToTimestamp, resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
@@ -1775,33 +1775,48 @@ ${qrDeepLink}`);
 
       const crewId = bike.crew_id || "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
       const leadId = context.clientPhone || String(userId);
-      const baseTs = Date.now();
-      // Parallel insert for all todos (saves ~1-2s vs sequential)
-      const todoPromises = todos.map((todo, ti) => {
-        const todoId = `todo-${baseTs.toString(36)}-${ti}-${Math.random().toString(36).slice(2, 5)}`;
-        return supabaseAdmin.from("crew_todos").insert({
-          id: todoId,
-          crew_id: crewId,
-          lead_id: leadId,
-          title: todo.title,
-          status: "pending",
-          priority: todo.priority,
-          assigned_to: String(userId),
-          category: "lead_followup",
-          description: JSON.stringify({
+
+      // Idempotency: check if todos already exist for this lead
+      const { data: existingRentTodos } = await supabaseAdmin
+        .from("crew_todos")
+        .select("id, title")
+        .eq("crew_id", crewId)
+        .eq("lead_id", leadId)
+        .eq("category", "lead_followup")
+        .eq("status", "pending");
+
+      const existingRentTitles = new Set((existingRentTodos || []).map((t: any) => t.title));
+      const newRentTodos = todos.filter((t) => !existingRentTitles.has(t.title));
+
+      if (newRentTodos.length === 0) {
+        logger.info("[/doc] Rent todos already exist for lead, skipping creation");
+      } else {
+        const todoPromises = newRentTodos.map((todo) => {
+          const todoId = `todo-${randomUUID()}`;
+          return supabaseAdmin.from("crew_todos").insert({
+            id: todoId,
+            crew_id: crewId,
             lead_id: leadId,
-            lead_phone: context.clientPhone || "",
-            lead_name: context.mpFullName || "",
-            bike_id: bike.id,
-            rental_id: rentalId || null,
-            rent_end_date: context.rentEndDate || null,
-          }),
-        }).then(({ error }) => {
-          if (error) logger.warn("[/doc] Failed to create crew_todo:", todo.title, error);
+            title: todo.title,
+            status: "pending",
+            priority: todo.priority,
+            assigned_to: String(userId),
+            category: "lead_followup",
+            description: JSON.stringify({
+              lead_id: leadId,
+              lead_phone: context.clientPhone || "",
+              lead_name: context.mpFullName || "",
+              bike_id: bike.id,
+              rental_id: rentalId || null,
+              rent_end_date: context.rentEndDate || null,
+            }),
+          }).then(({ error }) => {
+            if (error) logger.warn("[/doc] Failed to create crew_todo:", todo.title, error);
+          });
         });
-      });
-      await Promise.all(todoPromises);
-      logger.info(`[/doc] Created ${todos.length} crew_todos for equipment return + checks`);
+        await Promise.all(todoPromises);
+        logger.info(`[/doc] Created ${newRentTodos.length} crew_todos for equipment return + checks (${todos.length - newRentTodos.length} skipped)`);
+      }
     }
 
     // ── Create crew_todos for SALE deals ────────────────────────────────────
@@ -1815,32 +1830,47 @@ ${qrDeepLink}`);
 
       const crewId = bike.crew_id || "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
       const leadId = context.clientPhone || String(userId);
-      const baseTs2 = Date.now();
-      // Parallel insert for all sale todos
-      const saleTodoPromises = saleTodos.map((todo, si) => {
-        const todoId = `todo-${baseTs2.toString(36)}-s${si}-${Math.random().toString(36).slice(2, 5)}`;
-        return supabaseAdmin.from("crew_todos").insert({
-          id: todoId,
-          crew_id: crewId,
-          lead_id: leadId,
-          title: todo.title,
-          status: "pending",
-          priority: todo.priority,
-          assigned_to: String(userId),
-          category: "lead_followup",
-          description: JSON.stringify({
+
+      // Idempotency: check if sale todos already exist for this lead
+      const { data: existingSaleTodos } = await supabaseAdmin
+        .from("crew_todos")
+        .select("id, title")
+        .eq("crew_id", crewId)
+        .eq("lead_id", leadId)
+        .eq("category", "lead_followup")
+        .eq("status", "pending");
+
+      const existingSaleTitles = new Set((existingSaleTodos || []).map((t: any) => t.title));
+      const newSaleTodos = saleTodos.filter((t) => !existingSaleTitles.has(t.title));
+
+      if (newSaleTodos.length === 0) {
+        logger.info("[/doc] Sale todos already exist for lead, skipping creation");
+      } else {
+        const saleTodoPromises = newSaleTodos.map((todo) => {
+          const todoId = `todo-${randomUUID()}`;
+          return supabaseAdmin.from("crew_todos").insert({
+            id: todoId,
+            crew_id: crewId,
             lead_id: leadId,
-            lead_phone: context.clientPhone || "",
-            lead_name: context.mpFullName || "",
-            bike_id: bike.id,
-            deal_type: "sale",
-          }),
-        }).then(({ error }) => {
-          if (error) logger.warn("[/doc] Failed to create sale crew_todo:", todo.title, error);
+            title: todo.title,
+            status: "pending",
+            priority: todo.priority,
+            assigned_to: String(userId),
+            category: "lead_followup",
+            description: JSON.stringify({
+              lead_id: leadId,
+              lead_phone: context.clientPhone || "",
+              lead_name: context.mpFullName || "",
+              bike_id: bike.id,
+              deal_type: "sale",
+            }),
+          }).then(({ error }) => {
+            if (error) logger.warn("[/doc] Failed to create sale crew_todo:", todo.title, error);
+          });
         });
-      });
-      await Promise.all(saleTodoPromises);
-      logger.info(`[/doc] Created ${saleTodos.length} crew_todos for sale deal`);
+        await Promise.all(saleTodoPromises);
+        logger.info(`[/doc] Created ${newSaleTodos.length} crew_todos for sale deal (${saleTodos.length - newSaleTodos.length} skipped)`);
+      }
     }
   } catch (leadErr) {
     logger.warn("[/doc] Failed to create lead:", leadErr);
