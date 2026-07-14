@@ -13,6 +13,7 @@ import {
 import { validateAnalyticsPassword, activateRental, updateRentalStatus } from "../../server-actions/rentals-dashboard";
 import { getRentalDocVerification, type DocVerificationData } from "../../server-actions/leads";
 import type { LeadRow, LeadTodoRow, LeadRentalRow, LeadSaleRow } from "../../server-actions/leads";
+import { getLeadNotes, createLeadNote, deleteLeadNote, type LeadNote } from "../../server-actions/lead-notes";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -524,27 +525,69 @@ function TodoList({ leadId, leadName, todos, crewId, slug, T }: {
 
 // ── Notes ─────────────────────────────────────────────────────────────────────
 
-function NotesPanel({ leadId, T }: { leadId: string; T: ThemeTokens }) {
-  const storageKey = `lead_notes_${leadId}`;
-  const [notes, setNotes] = useState<{ id: string; text: string; at: string }[]>([]);
+function NotesPanel({ leadId, crewId, T }: { leadId: string; crewId: string; T: ThemeTokens }) {
+  const [notes, setNotes] = useState<LeadNote[]>([]);
   const [draft, setDraft] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
+  // Load notes from DB
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await getLeadNotes(leadId, crewId);
+        if (!cancelled && result.success && result.data) {
+          setNotes(result.data);
+        }
+      } catch (err) {
+        console.error("[NotesPanel] Failed to load notes:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [leadId, crewId]);
+
+  const addNote = async () => {
+    if (!draft.trim() || saving) return;
+    setSaving(true);
     try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) setNotes(JSON.parse(raw));
-    } catch { /* ignore */ }
-  }, [storageKey]);
-
-  useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(notes));
-  }, [notes, storageKey]);
-
-  const addNote = () => {
-    if (!draft.trim()) return;
-    setNotes([{ id: `n-${Date.now()}`, text: draft.trim(), at: new Date().toISOString() }, ...notes]);
-    setDraft("");
+      const result = await createLeadNote({
+        leadId,
+        crewId,
+        text: draft.trim(),
+      });
+      if (result.success && result.data) {
+        setNotes([result.data, ...notes]);
+        setDraft("");
+      }
+    } catch (err) {
+      console.error("[NotesPanel] Failed to create note:", err);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const deleteNote = async (noteId: string) => {
+    if (!confirm("Удалить заметку?")) return;
+    try {
+      const result = await deleteLeadNote(noteId);
+      if (result.success) {
+        setNotes(notes.filter((n) => n.id !== noteId));
+      }
+    } catch (err) {
+      console.error("[NotesPanel] Failed to delete note:", err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="rounded-xl border py-4 text-center" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+        <p className="text-xs" style={{ color: T.textFaint }}>Загрузка заметок...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -553,9 +596,9 @@ function NotesPanel({ leadId, T }: { leadId: string; T: ThemeTokens }) {
           placeholder="Заметка о клиенте..." rows={3}
           className="w-full resize-none rounded-lg border px-3 py-2 text-xs outline-none"
           style={{ borderColor: T.inputBorder, backgroundColor: T.inputBg, color: T.text }} />
-        <button onClick={addNote} disabled={!draft.trim()}
+        <button onClick={addNote} disabled={!draft.trim() || saving}
           className="w-full rounded-lg py-2 text-xs font-bold text-white disabled:opacity-40" style={{ backgroundColor: T.accent }}>
-          Добавить заметку
+          {saving ? "Сохранение..." : "Добавить заметку"}
         </button>
       </div>
       {notes.length === 0 ? (
@@ -566,8 +609,13 @@ function NotesPanel({ leadId, T }: { leadId: string; T: ThemeTokens }) {
         <div className="space-y-2">
           {notes.map((n) => (
             <div key={n.id} className="rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
-              <p className="text-xs leading-relaxed" style={{ color: T.text }}>{n.text}</p>
-              <p className="mt-1 text-[10px]" style={{ color: T.textFaint }}>{relativeTime(n.at)}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-xs leading-relaxed flex-1" style={{ color: T.text }}>{n.text}</p>
+                <button onClick={() => deleteNote(n.id)} className="shrink-0 rounded p-1 opacity-40 transition hover:opacity-80 hover:bg-red-500/10">
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+              <p className="mt-1 text-[10px]" style={{ color: T.textFaint }}>{relativeTime(n.created_at)}</p>
             </div>
           ))}
         </div>
@@ -1592,7 +1640,7 @@ function LeadDetailContent({ lead, todos, crewId, slug, T }: {
       </Section>
 
       <Section title="Заметки" icon={StickyNote} T={T}>
-        <NotesPanel leadId={lead.user_id} T={T} />
+        <NotesPanel leadId={lead.user_id} crewId={crewId} T={T} />
       </Section>
 
       <Section title="История" icon={History} T={T}>
