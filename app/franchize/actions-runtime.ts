@@ -2646,7 +2646,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
         // Resolve crew owner once (avoid N+1 queries)
         const { data: crewRow } = await supabaseAdmin.from("crews").select("id, owner_id").eq("slug", payload.slug).maybeSingle();
-        const crewId = crewRow?.id || "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
+        if (!crewRow?.id) {
+          logger.error("[franchize] Crew not found for slug:", payload.slug, "— skipping rental creation");
+          throw new Error(`Crew not found for slug: ${payload.slug}`);
+        }
+        const crewId = crewRow.id;
         const crewOwnerChatId = await resolveCrewOwnerChatId(supabaseAdmin, crewId);
 
         for (const doc of bikeDocs) {
@@ -2742,7 +2746,12 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // One lead, many todos. Pattern follows doc-manual.ts lines 1705-1751.
     if (flowType === "rental" || flowType === "mixed") {
       try {
-        const crewId = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746"; // vip-bike crew
+        // Resolve crew from slug (no hardcoded fallback)
+        const { data: crewRowForTodos } = await supabaseAdmin.from("crews").select("id").eq("slug", payload.slug).maybeSingle();
+        if (!crewRowForTodos?.id) {
+          logger.warn("[franchize] Cannot create crew_todos: crew not found for slug:", payload.slug);
+        } else {
+        const crewId = crewRowForTodos.id;
         const leadId = payload.phone || payload.telegramUserId;
         const baseTs = Date.now();
         const allTodoPromises: Promise<unknown>[] = [];
@@ -2817,6 +2826,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
         await Promise.all(allTodoPromises);
         logger.info(`[franchize] Created ${allTodoPromises.length} crew_todos for ${bikeDocs.length} bike(s) equipment return`);
+        } // close else (crew found)
       } catch (todoErr) {
         logger.warn("[franchize] Failed to create crew_todos:", todoErr);
       }

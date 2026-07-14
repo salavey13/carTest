@@ -58,7 +58,6 @@ import { privateSchema } from "@/lib/private-secrets";
 import nodemailer from "nodemailer";
 import { calculatePriceForDuration, getHelmetPrice } from "@/app/franchize/lib/pricing-calculator";
 import { isCrewMember } from "@/app/lib/user-rental-secrets";
-import { getDefaultCrewId } from "@/lib/default-crew";
 import { createLeadFollowupTodos } from "@/app/franchize/server-actions/crew-todos";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -605,15 +604,26 @@ async function resolveBikeById(bikeId: string): Promise<any> {
 }
 
 async function getAvailableBikes(): Promise<any[]> {
+  // Resolve crew_id from slug (no hardcoded UUID)
+  const { data: crew } = await supabaseAdmin
+    .from("crews")
+    .select("id")
+    .eq("slug", "vip-bike")
+    .maybeSingle();
+
+  if (!crew?.id) {
+    console.error("[getAvailableBikes] Crew not found for slug: vip-bike");
+    return [];
+  }
+
   // Show bikes from vip-bike crew OR unassigned (crew_id=null, e.g. VipBike branded).
   // Exclude bikes from OTHER crews (e.g. custom-bobber-virus, honda-cbr600rr-sz).
   // No .limit() — all bikes should be available for selection.
-  const VIP_BIKE_CREW_ID = getDefaultCrewId();
   const { data } = await supabaseAdmin
     .from("cars")
     .select("id, make, model, specs")
     .in("type", ["bike", "ebike"])
-    .or(`crew_id.eq.${VIP_BIKE_CREW_ID},crew_id.is.null`)
+    .or(`crew_id.eq.${crew.id},crew_id.is.null`)
     .order("make", { ascending: true });
   return (data || []);
 }
@@ -1167,8 +1177,11 @@ async function createRentalFromDocContract(
 
     // Resolve crew owner for placeholder user_id
     // Fail if crew owner cannot be resolved - don't fall back to renter
-    // Defense-in-depth: fallback to known vip-bike crew_id if bike.crew_id is missing
-    const effectiveCrewId = bike.crew_id || getDefaultCrewId();
+    if (!bike.crew_id) {
+      logger.error("[/doc] Bike has no crew_id, cannot resolve crew owner", { bikeId: bike.id });
+      return null;
+    }
+    const effectiveCrewId = bike.crew_id;
     const crewOwnerChatId = await resolveCrewOwnerChatId(supabaseAdmin, effectiveCrewId);
     
     logger.info('[/doc] createRentalFromDocContract: crew owner resolution', {
@@ -1775,7 +1788,10 @@ ${qrDeepLink}`);
       if (context.bag) todos.push({ title: `👜 Принять сумку`, priority: "low" });
       if (context.charger) todos.push({ title: `🔌 Принять зарядное устройство`, priority: "medium" });
 
-      const crewId = bike.crew_id || getDefaultCrewId();
+      if (!bike.crew_id) {
+        logger.error("[/doc] Bike has no crew_id, cannot create rent todos", { bikeId: bike.id });
+      } else {
+      const crewId = bike.crew_id;
       const leadId = context.clientPhone || String(userId);
 
       const result = await createLeadFollowupTodos({
@@ -1797,6 +1813,7 @@ ${qrDeepLink}`);
       } else {
         logger.warn("[/doc] Failed to create crew_todos:", result.error);
       }
+      } // close else (bike has crew_id for rent)
     }
 
     // ── Create crew_todos for SALE deals ────────────────────────────────────
@@ -1808,7 +1825,10 @@ ${qrDeepLink}`);
         { title: `💳 Проконтролировать оплату (${context.salePrice || "?"} ₽)`, priority: "medium" },
       ];
 
-      const crewId = bike.crew_id || getDefaultCrewId();
+      if (!bike.crew_id) {
+        logger.error("[/doc] Bike has no crew_id, cannot create sale todos", { bikeId: bike.id });
+      } else {
+      const crewId = bike.crew_id;
       const leadId = context.clientPhone || String(userId);
 
       const result = await createLeadFollowupTodos({
@@ -1829,6 +1849,7 @@ ${qrDeepLink}`);
       } else {
         logger.warn("[/doc] Failed to create sale crew_todos:", result.error);
       }
+      } // close else (bike has crew_id for sale)
     }
   } catch (leadErr) {
     logger.warn("[/doc] Failed to create lead:", leadErr);
