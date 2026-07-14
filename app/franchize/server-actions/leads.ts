@@ -54,6 +54,7 @@ export interface LeadRow {
 
 export interface LeadTodoRow {
   id: string;
+  lead_id?: string | null;
   title: string;
   description?: string | null;
   status: string;
@@ -426,7 +427,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     // 11. Lead-linked todos
     const { data: todos } = await supabaseAdmin
       .from("crew_todos")
-      .select("id, title, description, status, priority, category, created_at, completed_at, assigned_to")
+      .select("id, lead_id, title, description, status, priority, category, created_at, completed_at, assigned_to")
       .eq("crew_id", crewId)
       .eq("category", "lead_followup")
       .order("created_at", { ascending: false });
