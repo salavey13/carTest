@@ -57,7 +57,7 @@ import { deriveUserAccessTier, getAccessTierLabel } from "@/app/lib/derive-acces
 import type { AccessTier } from "@/app/lib/ocr-constants";
 import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
 import { vlmExtractDocument } from "@/app/lib/vlm-extract";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { buildRentalContractVariables, type BikeSpecs, type RenterData, type RentalPeriod, type CrewSecrets, type DocumentMeta } from "@/app/lib/rental-contract-vars";
@@ -898,33 +898,48 @@ async function generateAndSendContract(
         { title: `📄 Проверить документы при возврате ${bikeLabel}`, priority: "medium" },
         { title: `🔍 Осмотр на повреждения: ${bikeLabel}`, priority: "high" },
       ];
-      const baseTs = Date.now();
-      const todoPromises = todos.map((todo, ti) => {
-        const todoId = `todo-${baseTs.toString(36)}-vlm${ti}-${Math.random().toString(36).slice(2, 5)}`;
-        return supabaseAdmin.from("crew_todos").insert({
-          id: todoId,
-          crew_id: crewId,
-          lead_id: leadUserId,
-          title: todo.title,
-          status: "pending",
-          priority: todo.priority,
-          assigned_to: String(userId),
-          category: "lead_followup",
-          description: JSON.stringify({
+      // Idempotency: check if todos already exist for this lead+bike
+      const { data: existingTodos } = await supabaseAdmin
+        .from("crew_todos")
+        .select("id, title")
+        .eq("crew_id", crewId)
+        .eq("lead_id", leadUserId)
+        .eq("category", "lead_followup")
+        .eq("status", "pending");
+
+      const existingTitles = new Set((existingTodos || []).map((t: any) => t.title));
+      const newTodos = todos.filter((t) => !existingTitles.has(t.title));
+
+      if (newTodos.length === 0) {
+        logger.info("[/doc-vlm] Todos already exist for lead, skipping creation");
+      } else {
+        const todoPromises = newTodos.map((todo) => {
+          const todoId = `todo-${randomUUID()}`;
+          return supabaseAdmin.from("crew_todos").insert({
+            id: todoId,
+            crew_id: crewId,
             lead_id: leadUserId,
-            lead_phone: leadPhone,
-            lead_name: passport.fullName || "",
-            bike_id: bike.id,
-            rental_id: null,
-            rent_end_date: endDate,
-            source: "vlm_doc",
-          }),
-        }).then(({ error }: any) => {
-          if (error) logger.warn("[/doc-vlm] Failed to create crew_todo:", todo.title, error);
+            title: todo.title,
+            status: "pending",
+            priority: todo.priority,
+            assigned_to: String(userId),
+            category: "lead_followup",
+            description: JSON.stringify({
+              lead_id: leadUserId,
+              lead_phone: leadPhone,
+              lead_name: passport.fullName || "",
+              bike_id: bike.id,
+              rental_id: null,
+              rent_end_date: endDate,
+              source: "vlm_doc",
+            }),
+          }).then(({ error }: any) => {
+            if (error) logger.warn("[/doc-vlm] Failed to create crew_todo:", todo.title, error);
+          });
         });
-      });
-      await Promise.all(todoPromises);
-      logger.info(`[/doc-vlm] Created lead + ${todos.length} crew_todos`);
+        await Promise.all(todoPromises);
+        logger.info(`[/doc-vlm] Created ${newTodos.length} crew_todos (${todos.length - newTodos.length} skipped as duplicates)`);
+      }
     } catch (leadErr) {
       logger.warn("[/doc-vlm] Failed to create lead/todos:", leadErr);
     }
