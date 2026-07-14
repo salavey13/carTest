@@ -403,6 +403,8 @@ export async function approveContract(
       odometerBefore: draft.pickupData.odometer_km || 0,
     });
 
+    const dates = { start: period.startDate, end: period.endDate };
+
     const { buffer, sha256 } = await renderTemplateToDocx(
       templateVars as unknown as Record<string, string>
     );
