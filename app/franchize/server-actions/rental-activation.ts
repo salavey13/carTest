@@ -78,8 +78,8 @@ export async function activateRentalIfReady(
       };
     }
 
-    // Only activate from pending status
-    if (rental.status !== "pending") {
+    // Only activate from pending or pending_confirmation status
+    if (rental.status !== "pending" && rental.status !== "pending_confirmation") {
       logger.warn("[activateRentalIfReady] Rental not in pending status", { 
         rentalId, 
         status: rental.status 
@@ -88,7 +88,7 @@ export async function activateRentalIfReady(
         success: false,
         activated: false,
         rentalId,
-        error: `Rental status is ${rental.status}, expected pending`,
+        error: `Rental status is ${rental.status}, expected pending or pending_confirmation`,
       };
     }
 

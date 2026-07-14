@@ -2474,6 +2474,12 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       `Доставка: ${payload.delivery}`,
       `Итого: ${formatMoney(payload.totalAmount)} ₽`,
     );
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://vip-bike.ru";
+    notificationParts.push(
+      ``,
+      `🔗 Аренда: ${siteUrl}/franchize/${payload.slug}/rentals`,
+      `📋 Лиды: ${siteUrl}/franchize/${payload.slug}/leads`,
+    );
 
     await notifyAdmin(notificationParts.join("\n"));
 
@@ -2677,9 +2683,10 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             const { data: rentalRow, error: rentalInsertError } = await supabaseAdmin
               .from("rentals")
               .insert({
-                user_id: crewOwnerChatId || payload.telegramUserId,
+                user_id: payload.telegramUserId,
                 owner_id: crewOwnerChatId || payload.telegramUserId,
                 vehicle_id: doc.bikeId, // FIX: was bikeName (a label), now uses actual bike ID
+                crew_id: crewId,
                 requested_start_date: startIso,
                 requested_end_date: endIso,
                 agreed_start_date: startIso,
@@ -2709,7 +2716,8 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               // passport registration, drivers license, odometer, dates)
               try {
                 const { createRentalVerificationTodos } = await import("@/app/franchize/server-actions/rental-verification-todos");
-                const todosResult = await createRentalVerificationTodos(rentalRow.rental_id, crewId);
+                const leadId = payload.phone || payload.telegramUserId;
+                const todosResult = await createRentalVerificationTodos(rentalRow.rental_id, crewId, leadId);
                 if (todosResult.success) {
                   logger.info(`[franchize] Created ${todosResult.created} verification todos for rental ${rentalRow.rental_id}`);
                 } else {
@@ -2824,7 +2832,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                 title: todo.title,
                 status: "pending",
                 priority: todo.priority,
-                assigned_to: payload.telegramUserId || null,
+                assigned_to: null,
                 category: "lead_followup",
                 description: JSON.stringify({
                   lead_id: leadId,
