@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
+import { verifyCrewAccess } from "../_auth";
 
 /**
  * Toggle the "troubled" flag on a user.
@@ -14,6 +15,10 @@ import { logger } from "@/lib/logger";
  */
 export async function POST(request: NextRequest) {
   try {
+    // Auth check: only crew members can toggle troubled flags
+    const auth = await verifyCrewAccess(request);
+    if (auth.ok === false) return auth.response;
+
     const body = await request.json();
     const { userId, reason } = body;
 
@@ -32,8 +37,8 @@ export async function POST(request: NextRequest) {
     const isCurrentlyTroubled = currentMeta.troubled === true;
 
     if (isCurrentlyTroubled) {
-      // Remove troubled flag
-      const { [String("troubled")]: _, [String("troubled_reason")]: __, ...restMeta } = currentMeta as Record<string, unknown>;
+      // Remove troubled flag — clean up all three keys (troubled, troubled_reason, troubled_at)
+      const { [String("troubled")]: _, [String("troubled_reason")]: __, [String("troubled_at")]: ___, ...restMeta } = currentMeta as Record<string, unknown>;
       await supabaseAdmin.from("users").update({
         metadata: restMeta,
         updated_at: new Date().toISOString(),
