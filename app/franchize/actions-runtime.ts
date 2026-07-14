@@ -2566,6 +2566,10 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       });
     }
 
+    if (bikeDocs.length === 0) {
+      throw new Error("No valid bikes found in cart for document generation");
+    }
+
     // ── Upload DOCX to Supabase Storage (aligned with /doc command) ──
     // This ensures contracts are permanently stored and can be re-downloaded.
     for (const doc of bikeDocs) {
@@ -2594,10 +2598,6 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           error: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
         });
       }
-    }
-
-    if (bikeDocs.length === 0) {
-      throw new Error("No valid bikes found in cart for document generation");
     }
 
     const adminChatId = process.env.ADMIN_CHAT_ID;
@@ -2629,7 +2629,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
     // ── Enhanced notification with bike label for ALL flows, accessories, and actual time ──
     const notificationParts = [
-      `${isSaleFlow ? "🛍️ Новый заказ на покупку" : isTestdrive ? "🏁 Новый заказ на тест-драйв" : "🧾 Новый заказ на аренду"} #${payload.orderId}`,
+      `${flowType === "mixed" ? "📦 Смешанный заказ (аренда + покупка)" : isSaleFlow ? "🛍️ Новый заказ на покупку" : isTestdrive ? "🏁 Новый заказ на тест-драйв" : "🧾 Новый заказ на аренду"} #${payload.orderId}`,
       `Байк: ${bikeLabel}`,
       `Crew: ${payload.slug}`,
       `Получатель: ${payload.recipient}`,
@@ -2660,7 +2660,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // ── Send notification to creator too (Issue 4) ──
     if (payload.telegramUserId && payload.telegramUserId !== adminChatId) {
       const userNotification = [
-        `${isSaleFlow ? "🛍️ Заказ на покупку" : isTestdrive ? "🏁 Заказ на тест-драйв" : "🧾 Заказ на аренду"} #${payload.orderId}`,
+        `${flowType === "mixed" ? "📦 Смешанный заказ" : isSaleFlow ? "🛍️ Заказ на покупку" : isTestdrive ? "🏁 Заказ на тест-драйв" : "🧾 Заказ на аренду"} #${payload.orderId}`,
         `Байк: ${bikeLabel}`,
         `Статус: оформлен, договор готов`,
         payload.rentalStartDate ? `Период: ${payload.rentalStartDate} ${rentStartTime} → ${payload.rentalEndDate || "..."} ${rentEndTime}` : "",
@@ -2769,6 +2769,38 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           }
         } else {
           // ── Rental/testdrive contract artifacts ────────────────────────────
+          // Use per-bike price from cart line (aligned with sale artifacts)
+          const bikeIndex = bikeDocs.indexOf(doc);
+          const cartLine = payload.cartLines[bikeIndex];
+          const bikePrice = cartLine?.lineTotal || payload.totalAmount;
+
+          // Dedup by semantic key: same renter + same bike + same start date = duplicate (retry)
+          const { data: existingRental } = await supabaseAdmin
+            .schema("private")
+            .from("rental_contract_artifacts")
+            .select("id, storage_path")
+            .eq("renter_full_name", payload.recipient || "")
+            .eq("resolved_bike_id", doc.bikeId)
+            .eq("rent_start_date", rentStartDate || "")
+            .maybeSingle();
+
+          if (existingRental) {
+            logger.info("[franchize] Duplicate rental detected (same renter+bike+date), skipping", {
+              existingId: existingRental.id,
+              documentKey: doc.documentKey,
+            });
+            // Backfill storage_path on existing record if missing
+            if (!existingRental.storage_path && (doc as any).storagePath) {
+              await supabaseAdmin
+                .schema("private")
+                .from("rental_contract_artifacts")
+                .update({ storage_path: (doc as any).storagePath })
+                .eq("id", existingRental.id);
+              logger.info("[franchize] Backfilled storage_path on existing rental artifact");
+            }
+            continue; // Skip insert for this bike
+          }
+
           const { error: artifactError } = await supabaseAdmin
             .schema("private")
             .from("rental_contract_artifacts")
@@ -2792,7 +2824,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               rent_end_date: rentEndDate || null,
               daily_price: null,
               deposit_rub: null,
-              total_sum: payload.totalAmount,
+              total_sum: bikePrice,
               template_version: CURRENT_RENTAL_TEMPLATE_VERSION,
               metadata: {
                 flow_type: flowType,
@@ -2811,7 +2843,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           }
         }
       } catch (artifactError) {
-        logger.error("[franchize] Exception saving rental_contract_artifact", {
+        logger.error("[franchize] Exception saving contract artifact", {
           documentKey: doc.documentKey,
           error: artifactError instanceof Error ? artifactError.message : String(artifactError),
         });
@@ -2905,7 +2937,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
     // ── Create public.rentals row (aligned with /doc flow) ────────────────
     // This ensures the rental appears in analytics and the bike shows as busy
-    if (flowType === "rental" && payload.rentalStartDate && payload.rentalEndDate) {
+    if ((flowType === "rental" || flowType === "mixed") && payload.rentalStartDate && payload.rentalEndDate) {
       try {
         // time-aware ISO timestamps (use cart-line times if available)
         const firstLine = payload.cartLines[0];
@@ -2924,6 +2956,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         const crewOwnerChatId = await resolveCrewOwnerChatId(supabaseAdmin, crewId);
 
         for (const doc of bikeDocs) {
+          // For mixed flow, only create rental rows for rental bikes (not sale bikes)
+          const bikeIndex = bikeDocs.indexOf(doc);
+          const bikeFlowType = bikeFlowTypes[bikeIndex];
+          if (bikeFlowType === "sale") continue; // Skip sale bikes in mixed flow
+
           try {
             const { data: rentalRow, error: rentalInsertError } = await supabaseAdmin
               .from("rentals")
@@ -2938,7 +2975,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                 agreed_end_date: endIso,
                 status: "pending_confirmation", // 2-step: operator activates via LEADS page → active
                 payment_status: payload.payment === "telegram_xtr" ? "interest_paid" : "pending",
-                total_cost: Math.round(payload.totalAmount),
+                total_cost: Math.round(payload.cartLines[bikeIndex]?.lineTotal || payload.totalAmount),
                 metadata: {
                   source: "franchize_web_order",
                   order_id: payload.orderId,
