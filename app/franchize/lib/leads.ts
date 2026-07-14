@@ -48,11 +48,18 @@ function sanitizeUserId(id: string): string {
   return s;
 }
 
-function normalizePhone(phone?: string | null): string | null {
+export function normalizePhone(phone?: string | null): string | null {
   if (!phone) return null;
   const digits = phone.replace(/\D/g, "");
   if (digits.length < 10) return null;
-  return digits.startsWith("7") || digits.startsWith("8") ? `+${digits}` : `+${digits}`;
+  // Normalize Russian numbers: 8xxxxxxxxxx → +7xxxxxxxxxx
+  if (digits.length === 11 && digits.startsWith("8")) {
+    return `+7${digits.slice(1)}`;
+  }
+  if (digits.startsWith("7") && digits.length === 11) {
+    return `+${digits}`;
+  }
+  return `+${digits}`;
 }
 
 /**

@@ -97,7 +97,8 @@ export async function activateRentalIfReady(
     const { data: allTodos, error: todosError } = await supabaseAdmin
       .from("crew_todos")
       .select("id, title, status, category, description")
-      .eq("category", "rental_verification");
+      .eq("category", "rental_verification")
+      .eq("crew_id", rental.crew_id);
 
     if (todosError) {
       logger.error("[activateRentalIfReady] Failed to fetch todos", { 

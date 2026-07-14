@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
+import { normalizePhone } from "@/app/franchize/lib/leads";
 
 /**
  * Register a callback lead from the web site.
@@ -24,8 +25,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Normalize phone: strip everything except digits and +
-    const normalizedPhone = phone.replace(/[^\d+]/g, "");
+    // Normalize phone using centralized helper (handles 8→+7 conversion)
+    const normalizedPhone = normalizePhone(phone) || phone.replace(/[^\d+]/g, "");
     // Use phone as user_id (this is the key insight — phone = user_id for leads)
     const userId = normalizedPhone;
 

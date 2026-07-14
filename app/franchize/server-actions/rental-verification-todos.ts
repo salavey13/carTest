@@ -71,23 +71,26 @@ const VERIFICATION_TODO_TEMPLATES: Array<{
  */
 export async function createRentalVerificationTodos(
   rentalId: string,
-  crewId: string = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746"
+  crewId: string = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746",
+  leadId?: string | null
 ): Promise<{ success: boolean; created: number; error?: string }> {
   try {
     if (!rentalId) {
       return { success: false, created: 0, error: "rentalId is required" };
     }
 
-    console.log(`[rental-verification-todos] Creating todos for rental ${rentalId}`);
+    console.log(`[rental-verification-todos] Creating todos for rental ${rentalId}${leadId ? `, lead ${leadId}` : ""}`);
 
     const todosToInsert = VERIFICATION_TODO_TEMPLATES.map((template) => ({
       id: randomUUID(),
       crew_id: crewId,
+      lead_id: leadId || null,
       title: template.title,
       description: JSON.stringify({
         rental_id: rentalId,
         todo_type: template.type,
         source: "rental_verification_system",
+        lead_id: leadId || null,
       }),
       category: "rental_verification",
       status: "pending",
@@ -121,7 +124,8 @@ export async function createRentalVerificationTodos(
  */
 export async function completeRentalVerificationTodo(
   rentalId: string,
-  todoType: RentalVerificationTodoType
+  todoType: RentalVerificationTodoType,
+  crewId?: string
 ): Promise<{ success: boolean; completed: boolean; error?: string }> {
   try {
     if (!rentalId || !todoType) {
@@ -131,11 +135,17 @@ export async function completeRentalVerificationTodo(
     console.log(`[rental-verification-todos] Completing todo ${todoType} for rental ${rentalId}`);
 
     // Find the todo by rental_id in description JSON and todo_type
-    const { data: todos, error: findError } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("crew_todos")
       .select("id, status, description")
       .eq("category", "rental_verification")
       .eq("status", "pending");
+
+    if (crewId) {
+      query = query.eq("crew_id", crewId);
+    }
+
+    const { data: todos, error: findError } = await query;
 
     if (findError) {
       console.error("[rental-verification-todos] Find error:", findError);
@@ -192,7 +202,8 @@ export async function completeRentalVerificationTodo(
  * Проверяет, все ли 5 verification todos выполнены для данной аренды.
  */
 export async function checkAllTodosCompleted(
-  rentalId: string
+  rentalId: string,
+  crewId?: string
 ): Promise<{ success: boolean; data?: CheckAllTodosCompletedResult; error?: string }> {
   try {
     if (!rentalId) {
@@ -202,10 +213,16 @@ export async function checkAllTodosCompleted(
     console.log(`[rental-verification-todos] Checking completion for rental ${rentalId}`);
 
     // Fetch all verification todos for this rental
-    const { data: allTodos, error: fetchError } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("crew_todos")
       .select("id, status, description, created_at, completed_at")
       .eq("category", "rental_verification");
+
+    if (crewId) {
+      query = query.eq("crew_id", crewId);
+    }
+
+    const { data: allTodos, error: fetchError } = await query;
 
     if (fetchError) {
       console.error("[rental-verification-todos] Fetch error:", fetchError);
@@ -259,18 +276,25 @@ export async function checkAllTodosCompleted(
  * Получает все verification todos для данной аренды (для UI).
  */
 export async function getRentalVerificationTodos(
-  rentalId: string
+  rentalId: string,
+  crewId?: string
 ): Promise<{ success: boolean; data?: RentalVerificationTodo[]; error?: string }> {
   try {
     if (!rentalId) {
       return { success: false, error: "rentalId is required" };
     }
 
-    const { data: allTodos, error: fetchError } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("crew_todos")
       .select("id, title, status, description, created_at, completed_at")
       .eq("category", "rental_verification")
       .order("created_at", { ascending: true });
+
+    if (crewId) {
+      query = query.eq("crew_id", crewId);
+    }
+
+    const { data: allTodos, error: fetchError } = await query;
 
     if (fetchError) {
       console.error("[rental-verification-todos] Fetch error:", fetchError);
