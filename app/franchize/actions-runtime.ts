@@ -10,7 +10,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { getCrewSensitiveDataOrDefault, getUserSensitiveDataOrDefault, saveCrewSensitiveData } from "@/lib/private-secrets";
 import { getUserRentalSecrets as getVerifiedRentalSecrets, saveUserRentalSecrets } from "@/app/lib/user-rental-secrets";
-import { buildFranchizeDocxFromTemplate } from "@/app/franchize/lib/docx-capability";
+import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
 import { upsertFranchizeIntent } from "@/app/franchize/server-actions/intents";
 import { cloneFranchizeContentBlocks, readFranchizeContentBlocks, type FranchizeContentBlocks } from "@/app/franchize/lib/content-blocks";
 import { resolveFranchizeTheme, resolvePaletteByMode } from "@/app/franchize/lib/theme-resolver";
@@ -2091,17 +2091,56 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const flowType: FranchizeOrderFlowType = payload.flowType ?? "rental";
     const isSaleFlow = flowType === "sale" || flowType === "mixed";
     const isTestdrive = flowType === "testdrive";
+
+    // For mixed flow, determine each bike's individual flow type
+    // based on whether it has rental pricing or sale pricing
+    const bikeFlowTypes = payload.cartLines.map((line) => {
+      if (isTestdrive) return "testdrive";
+      if (flowType === "sale") return "sale";
+      if (flowType === "rental") return "rental";
+      // Mixed flow: check if this specific bike is for sale or rent
+      const car = byId.get(line.itemId);
+      const specs = (car?.specs as Record<string, unknown> | null) || {};
+      const hasSalePrice = Boolean(specs.sale_price && Number(specs.sale_price) > 0);
+      const hasRentalPrice = Boolean(line.pricePerDay && line.pricePerDay > 0);
+      // If both, prefer sale (explicit sale intent)
+      if (hasSalePrice) return "sale";
+      if (hasRentalPrice) return "rental";
+      // Default to rental
+      return "rental";
+    });
+
     const rentDays = Math.max(...payload.cartLines.map((line) => parseDurationDays(line.options.duration)));
     const rentStartDate = payload.rentalStartDate || payload.time;
     const rentEndDate = payload.rentalEndDate || payload.time;
 
-    // FIX: Use the correct template for each flow type.
-    // Previously, all flows were forced to "rental" template, which meant
-    // sale flow got SALE_DEAL_TEMPLATE.html loaded but filled with rental
-    // variables (renter_* not buyer_*), producing mostly empty fields.
-    // Now: testdrive → testdrive template, sale → sale template, rental → rental template.
-    const templateFlowType = isTestdrive ? "testdrive" : (isSaleFlow ? "sale" : "rental");
-    const { template, templateMode } = await loadFranchizeDealTemplate(payload.slug, templateFlowType);
+    // Load templates based on what flow types are present in the cart.
+    // For mixed flow, we need BOTH rental and sale templates so each bike
+    // gets the correct one. For pure flows, only one template is loaded.
+    const needsRentalTemplate = bikeFlowTypes.includes("rental");
+    const needsSaleTemplate = bikeFlowTypes.includes("sale");
+    const needsTestdriveTemplate = bikeFlowTypes.includes("testdrive");
+
+    let rentalTemplate: string | null = null;
+    let saleTemplate: string | null = null;
+    let testdriveTemplate: string | null = null;
+    let templateMode: "md" | "html" = "html";
+
+    if (needsRentalTemplate) {
+      const result = await loadFranchizeDealTemplate(payload.slug, "rental");
+      rentalTemplate = result.template;
+      templateMode = result.templateMode;
+    }
+    if (needsSaleTemplate) {
+      const result = await loadFranchizeDealTemplate(payload.slug, "sale");
+      saleTemplate = result.template;
+      templateMode = result.templateMode;
+    }
+    if (needsTestdriveTemplate) {
+      const result = await loadFranchizeDealTemplate(payload.slug, "testdrive");
+      testdriveTemplate = result.template;
+      templateMode = result.templateMode;
+    }
     const privateReadContext = { source: "buildFranchizeOrderDocAndNotify", orderId: payload.orderId };
     const userSensitive = await getUserSensitiveDataOrDefault(payload.telegramUserId, privateReadContext);
     const crewSensitive = await getCrewSensitiveDataOrDefault(payload.slug, privateReadContext);
@@ -2203,7 +2242,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       const dailyPriceRub = line.pricePerDay || Math.round(line.lineTotal / Math.max(1, parseDurationDays(line.options.duration)));
 
       // ── SALE flow: build sale-specific variables (aligned with /doc command) ──
-      if (isSaleFlow && !isTestdrive) {
+      if (bikeFlowTypes[bikeIndex] === "sale") {
         const now = new Date();
         const salePrice = String(line.lineTotal || payload.totalAmount || "390000");
         const isElectric = String(specs.type || "").toLowerCase() === "electric" || /электро|electric|e-bike/i.test(String(specs.type || specs.fuel_type || ""));
@@ -2291,7 +2330,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           uploadedBy: "franchize-order-system",
           documentKey: saleVariables.document_key,
           fileName: saleDocFileName,
-          template,
+          template: saleTemplate!,
           variables: saleVariables,
           flowType: "sale",
           templateMode,
@@ -2310,7 +2349,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       }
 
       // ── TESTDRIVE flow: build simple vars (customer_* not renter_*) ──
-      if (isTestdrive) {
+      if (bikeFlowTypes[bikeIndex] === "testdrive") {
         const now = new Date();
         const passportStr = [payload.passportSeries, payload.passportNumber].filter(Boolean).join(" ").trim();
         const licenseStr = [payload.licenseSeries, payload.licenseNumber].filter(Boolean).join(" ").trim();
@@ -2362,7 +2401,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             uploadedBy: "franchize-order-system",
             documentKey: tdVariables.document_key,
             fileName: tdDocFileName,
-            template,
+            template: testdriveTemplate!,
             variables: tdVariables,
             flowType: "testdrive" as any,
             templateMode,
@@ -2511,7 +2550,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         uploadedBy: "franchize-order-system",
         documentKey: variables.document_key,
         fileName: docFileName,
-        template,
+        template: rentalTemplate!,
         variables,
         flowType,
         templateMode,
@@ -2525,6 +2564,36 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         documentKey: variables.document_key,
         sha256,
       });
+    }
+
+    // ── Upload DOCX to Supabase Storage (aligned with /doc command) ──
+    // This ensures contracts are permanently stored and can be re-downloaded.
+    for (const doc of bikeDocs) {
+      try {
+        const uploadResult = await uploadDocxToStorage({
+          crewSlug: payload.slug,
+          contractKey: doc.documentKey,
+          buffer: Buffer.from(doc.bytes),
+          metadata: {
+            source: "franchize-web-order",
+            flow_type: flowType,
+            bike_id: doc.bikeId,
+            bike_name: doc.bikeName,
+            order_id: payload.orderId,
+          },
+        });
+        // Attach storage_path to doc object for later use in artifacts
+        (doc as any).storagePath = uploadResult.storagePath;
+        logger.info("[franchize] DOCX uploaded to storage:", {
+          documentKey: doc.documentKey,
+          storagePath: uploadResult.storagePath,
+        });
+      } catch (uploadErr) {
+        logger.warn("[franchize] Storage upload failed (non-fatal):", {
+          documentKey: doc.documentKey,
+          error: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
+        });
+      }
     }
 
     if (bikeDocs.length === 0) {
@@ -2633,12 +2702,43 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
         if (flowType === "sale") {
           // ── Sale contract artifacts (aligned with /doc command) ──────────
-          const salePrice = String(payload.totalAmount || "0");
+          // Use per-bike price from cart line (not order total)
+          const bikeIndex = bikeDocs.indexOf(doc);
+          const cartLine = payload.cartLines[bikeIndex];
+          const salePrice = String(cartLine?.lineTotal || payload.totalAmount || "0");
+
+          // Dedup by semantic key: same buyer + same bike = duplicate (retry)
+          const { data: existingSale } = await supabaseAdmin
+            .schema("private")
+            .from("sale_contract_artifacts")
+            .select("id, storage_path")
+            .eq("buyer_full_name", payload.recipient || "")
+            .eq("resolved_bike_id", doc.bikeId)
+            .maybeSingle();
+
+          if (existingSale) {
+            logger.info("[franchize] Duplicate sale detected (same buyer+bike), skipping", {
+              existingId: existingSale.id,
+              documentKey: doc.documentKey,
+            });
+            // Backfill storage_path on existing record if missing
+            if (!existingSale.storage_path && (doc as any).storagePath) {
+              await supabaseAdmin
+                .schema("private")
+                .from("sale_contract_artifacts")
+                .update({ storage_path: (doc as any).storagePath })
+                .eq("id", existingSale.id);
+              logger.info("[franchize] Backfilled storage_path on existing sale artifact");
+            }
+            continue; // Skip insert for this bike
+          }
+
           const { error: artifactError } = await supabaseAdmin
             .schema("private")
             .from("sale_contract_artifacts")
             .insert({
               contract_key: doc.documentKey,
+              storage_path: (doc as any).storagePath || null,
               original_sha256: doc.sha256,
               requested_bike_id: null,
               resolved_bike_id: doc.bikeId,
@@ -2674,6 +2774,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             .from("rental_contract_artifacts")
             .insert({
               contract_key: doc.documentKey,
+              storage_path: (doc as any).storagePath || null,
               original_sha256: doc.sha256,
               requested_bike_id: null,
               resolved_bike_id: doc.bikeId, // FIX: now properly resolved to actual bike ID
