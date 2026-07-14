@@ -110,15 +110,65 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       if (row.contactChannel && !existing.contactChannel) existing.contactChannel = row.contactChannel;
     };
 
-    // 1. Users with lead source metadata + all recent users
-    const { data: usersLeads } = await supabaseAdmin
-      .from("users")
-      .select("user_id, full_name, username, phone, metadata, created_at")
-      .or(`metadata->>source.in.(web_callback,rental_contract,sale_contract,test_drive,telegram-testdrive),metadata->>is_lead.eq.true`)
-      .neq("metadata->>is_dismissed_lead", "true")
-      .order("created_at", { ascending: false })
-      .limit(500);
+    // ── Parallel fetch of independent lead sources (steps 1-6) ──
+    const [
+      usersLeadsResult,
+      intentLeadsResult,
+      artifactUsersResult,
+      secretUsersResult,
+      rentalsResult,
+      saleArtifactsResult,
+    ] = await Promise.all([
+      // 1. Users with lead source metadata
+      supabaseAdmin
+        .from("users")
+        .select("user_id, full_name, username, phone, metadata, created_at")
+        .or(`metadata->>source.in.(web_callback,rental_contract,sale_contract,test_drive,telegram-testdrive),metadata->>is_lead.eq.true`)
+        .neq("metadata->>is_dismissed_lead", "true")
+        .order("created_at", { ascending: false })
+        .limit(500),
+      // 2. franchize_intents (the canonical lead ledger)
+      supabaseAdmin
+        .from("franchize_intents")
+        .select("telegram_user_id, phone, intent_type, stage, urgency_score, source_route, contact_channel, last_seen_at, created_at, metadata, bike_id")
+        .eq("slug", safeSlug)
+        .neq("stage", "dismissed")
+        .order("last_seen_at", { ascending: false })
+        .limit(800),
+      // 3. Rental contract artifacts
+      privateSchema()
+        .from("rental_contract_artifacts")
+        .select("telegram_chat_id, renter_full_name, renter_phone, rental_id, rent_start_date, rent_end_date, bike_make, bike_model, total_amount, created_at")
+        .order("created_at", { ascending: false })
+        .limit(300),
+      // 4. Rental secrets
+      privateSchema()
+        .from("user_rental_secrets")
+        .select("chat_id, renter_full_name, renter_phone, verification_status, source_doc_key, created_at")
+        .order("created_at", { ascending: false })
+        .limit(300),
+      // 5. Active/past rentals
+      supabaseAdmin
+        .from("rentals")
+        .select("rental_id, user_id, status, payment_status, requested_start_date, requested_end_date, total_cost, metadata, passport_mainpage_photo, passport_registration_photo, drivers_licence_frontal_photo, vehicle:cars(make, model)")
+        .order("created_at", { ascending: false })
+        .limit(500),
+      // 6. Sale contract artifacts
+      privateSchema()
+        .from("sale_contract_artifacts")
+        .select("buyer_phone, sale_id, bike_make, bike_model, sale_price, created_at")
+        .order("created_at", { ascending: false })
+        .limit(200),
+    ]);
 
+    const usersLeads = usersLeadsResult.data;
+    const intentLeads = intentLeadsResult.data;
+    const artifactUsers = artifactUsersResult.data;
+    const secretUsers = secretUsersResult.data;
+    const rentals = rentalsResult.data;
+    const saleArtifacts = saleArtifactsResult.data;
+
+    // 1. Users with lead source metadata
     if (usersLeads) {
       for (const u of usersLeads) {
         const meta = u.metadata as Record<string, unknown> | null;
@@ -139,15 +189,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       }
     }
 
-    // 2. franchize_intents (the canonical lead ledger)
-    const { data: intentLeads } = await supabaseAdmin
-      .from("franchize_intents")
-      .select("telegram_user_id, phone, intent_type, stage, urgency_score, source_route, contact_channel, last_seen_at, created_at, metadata, bike_id")
-      .eq("slug", safeSlug)
-      .neq("stage", "dismissed")
-      .order("last_seen_at", { ascending: false })
-      .limit(800);
-
+    // 2. franchize_intents
     if (intentLeads) {
       for (const i of intentLeads) {
         if (!i.telegram_user_id && !i.phone) continue;
@@ -176,12 +218,6 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     }
 
     // 3. Rental contract artifacts
-    const { data: artifactUsers } = await privateSchema()
-      .from("rental_contract_artifacts")
-      .select("telegram_chat_id, renter_full_name, renter_phone, rental_id, rent_start_date, rent_end_date, bike_make, bike_model, total_amount, created_at")
-      .order("created_at", { ascending: false })
-      .limit(300);
-
     if (artifactUsers) {
       for (const a of artifactUsers) {
         if (!a.telegram_chat_id && !a.renter_phone) continue;
@@ -229,12 +265,6 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     }
 
     // 4. Rental secrets
-    const { data: secretUsers } = await privateSchema()
-      .from("user_rental_secrets")
-      .select("chat_id, renter_full_name, renter_phone, verification_status, source_doc_key, created_at")
-      .order("created_at", { ascending: false })
-      .limit(300);
-
     if (secretUsers) {
       for (const s of secretUsers) {
         if (!s.chat_id) continue;
@@ -263,12 +293,6 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     }
 
     // 5. Active/past rentals
-    const { data: rentals } = await supabaseAdmin
-      .from("rentals")
-      .select("rental_id, user_id, status, payment_status, requested_start_date, requested_end_date, total_cost, metadata, passport_mainpage_photo, passport_registration_photo, drivers_licence_frontal_photo, vehicle:cars(make, model)")
-      .order("created_at", { ascending: false })
-      .limit(500);
-
     if (rentals) {
       for (const r of rentals) {
         if (!r.user_id) continue;
@@ -311,12 +335,6 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     }
 
     // 6. Sale contract artifacts
-    const { data: saleArtifacts } = await privateSchema()
-      .from("sale_contract_artifacts")
-      .select("buyer_phone, sale_id, bike_make, bike_model, sale_price, created_at")
-      .order("created_at", { ascending: false })
-      .limit(200);
-
     if (saleArtifacts) {
       for (const s of saleArtifacts) {
         const id = s.buyer_phone || "";
@@ -352,48 +370,59 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       }
     }
 
-    // 7. Enrich telegramChatId and username from public.users
+    // ── Parallel enrichment (steps 7-9, 11) ──
     const allUserIds = Array.from(leadMap.keys()).filter((id) => /^\d+$/.test(id));
-    if (allUserIds.length > 0) {
-      const { data: tgUsers } = await supabaseAdmin
-        .from("users")
-        .select("user_id, username, full_name, phone")
-        .in("user_id", allUserIds);
-      if (tgUsers) {
-        for (const l of leadMap.values()) {
-          const match = tgUsers.find((u) => u.user_id === l.user_id);
-          if (match) {
-            l.telegramChatId = l.user_id;
-            if (match.username && !l.username) l.username = match.username;
-            if (match.full_name && !l.full_name) l.full_name = match.full_name;
-            if (match.phone && !l.phone) l.phone = match.phone;
-          }
+    const leadPhones = Array.from(leadMap.values()).map((l) => l.phone).filter(Boolean) as string[];
+
+    const [tgUsersResult, secretByPhoneResult, troubledUsersResult, todosResult] = await Promise.all([
+      // 7. Enrich from public.users
+      allUserIds.length > 0
+        ? supabaseAdmin.from("users").select("user_id, username, full_name, phone").in("user_id", allUserIds)
+        : { data: [], error: null },
+      // 8. Enrich from secrets by phone
+      leadPhones.length > 0
+        ? privateSchema().from("user_rental_secrets").select("chat_id, renter_phone").in("renter_phone", leadPhones) as Promise<{ data: Array<{ chat_id: string | null; renter_phone: string | null }> | null }>
+        : { data: [], error: null },
+      // 9. Troubled users
+      supabaseAdmin.from("users").select("user_id, metadata").not("metadata->>troubled", "is", null),
+      // 11. Lead-linked todos (filtered by crew_id + category on DB side)
+      supabaseAdmin
+        .from("crew_todos")
+        .select("id, lead_id, title, description, status, priority, category, created_at, completed_at, assigned_to")
+        .eq("crew_id", crewId)
+        .eq("category", "lead_followup")
+        .order("created_at", { ascending: false }),
+    ]);
+
+    const tgUsers = tgUsersResult.data;
+    const secretByPhone = secretByPhoneResult.data;
+    const troubledUsers = troubledUsersResult.data;
+    const todos = todosResult.data;
+
+    // 7. Enrich telegramChatId and username from public.users
+    if (tgUsers) {
+      for (const l of leadMap.values()) {
+        const match = tgUsers.find((u) => u.user_id === l.user_id);
+        if (match) {
+          l.telegramChatId = l.user_id;
+          if (match.username && !l.username) l.username = match.username;
+          if (match.full_name && !l.full_name) l.full_name = match.full_name;
+          if (match.phone && !l.phone) l.phone = match.phone;
         }
       }
     }
 
     // 8. Enrich telegramChatId from secrets by phone match
-    const leadPhones = Array.from(leadMap.values()).map((l) => l.phone).filter(Boolean);
-    if (leadPhones.length > 0) {
-      const { data: secretByPhone } = await privateSchema()
-        .from("user_rental_secrets")
-        .select("chat_id, renter_phone")
-        .in("renter_phone", leadPhones) as { data: Array<{ chat_id: string | null; renter_phone: string | null }> | null };
-      if (secretByPhone) {
-        for (const l of leadMap.values()) {
-          if (!l.telegramChatId && l.phone) {
-            const match = secretByPhone.find((s) => s.renter_phone === l.phone && s.chat_id);
-            if (match) l.telegramChatId = match.chat_id;
-          }
+    if (secretByPhone) {
+      for (const l of leadMap.values()) {
+        if (!l.telegramChatId && l.phone) {
+          const match = secretByPhone.find((s) => s.renter_phone === l.phone && s.chat_id);
+          if (match) l.telegramChatId = match.chat_id;
         }
       }
     }
 
     // 9. Troubled users
-    const { data: troubledUsers } = await supabaseAdmin
-      .from("users")
-      .select("user_id, metadata")
-      .not("metadata->>troubled", "is", null);
     const troubledMap = new Map<string, string | null>();
     if (troubledUsers) {
       for (const u of troubledUsers) {
@@ -424,18 +453,31 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       l.contractRef = lastRental?.rentalId || l.sales[0]?.saleId || null;
     }
 
-    // 11. Lead-linked todos
-    const { data: todos } = await supabaseAdmin
-      .from("crew_todos")
-      .select("id, lead_id, title, description, status, priority, category, created_at, completed_at, assigned_to")
-      .eq("crew_id", crewId)
-      .eq("category", "lead_followup")
-      .order("created_at", { ascending: false });
+    // ── Server-side filtering: only return todos matching loaded leads ──
+    const leadUserIds = new Set(Array.from(leadMap.keys()));
+    const leadPhonesSet = new Set(
+      Array.from(leadMap.values()).map((l) => l.phone).filter(Boolean) as string[]
+    );
+
+    const filteredTodos = (todos || []).filter((t) => {
+      // Check lead_id column
+      if (t.lead_id && leadUserIds.has(t.lead_id)) return true;
+      if (t.lead_id && leadPhonesSet.has(t.lead_id)) return true;
+      // Fallback: check description JSON
+      if (t.description) {
+        try {
+          const desc = JSON.parse(t.description);
+          if (desc.lead_id && (leadUserIds.has(desc.lead_id) || leadPhonesSet.has(desc.lead_id))) return true;
+          if (desc.lead_phone && leadPhonesSet.has(desc.lead_phone)) return true;
+        } catch { /* ignore */ }
+      }
+      return false;
+    });
 
     return {
       success: true,
       leads: Array.from(leadMap.values()),
-      todos: (todos || []).map((t) => ({ ...t, description: t.description })),
+      todos: filteredTodos.map((t) => ({ ...t, description: t.description })),
     };
   } catch (error) {
     logger.error("[getFranchizeLeads] failed:", error);
