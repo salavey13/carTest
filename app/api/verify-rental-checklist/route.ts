@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { activateRentalIfReady } from "@/app/franchize/server-actions/rental-activation";
 import { completeRentalVerificationTodo } from "@/app/franchize/server-actions/rental-verification-todos";
+import { verifyCrewAccess } from "@/app/api/franchize/_auth";
 
 export const runtime = "nodejs";
 
@@ -80,6 +81,10 @@ async function deletePhotosFromStorage(paths: string[], rentalId: string): Promi
 
 export async function POST(request: NextRequest): Promise<NextResponse<VerifyChecklistResponse>> {
   try {
+    // Auth check: only crew members can verify rental checklists
+    const auth = await verifyCrewAccess(request);
+    if (auth.ok === false) return auth.response;
+
     const body = (await request.json()) as VerifyChecklistRequest;
     const { rentalId, updates, verifiedBy } = body;
 

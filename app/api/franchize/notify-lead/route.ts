@@ -1,6 +1,7 @@
 // app/api/franchize/notify-lead/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
+import { verifyCrewAccess } from "../_auth";
 
 /**
  * Send a Telegram notification to a lead.
@@ -11,6 +12,10 @@ import { logger } from "@/lib/logger";
  */
 export async function POST(request: NextRequest) {
   try {
+    // Auth check: only crew members can send notifications
+    const auth = await verifyCrewAccess(request);
+    if (auth.ok === false) return auth.response;
+
     const body = await request.json();
     const { telegramChatId, message } = body;
 

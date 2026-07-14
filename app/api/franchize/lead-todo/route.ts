@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
+import { verifyCrewAccess } from "../_auth";
 
 /**
  * Manage lead-linked todos in crew_todos.
@@ -19,6 +20,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { crewId, slug, leadId, leadName, title, priority } = body;
+
+    // Auth check: only crew members can create lead todos
+    const auth = await verifyCrewAccess(request, crewId);
+    if (auth.ok === false) return auth.response;
 
     if (!crewId || !leadId || !title) {
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
@@ -58,6 +63,10 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const { todoId, status } = body;
 
+    // Auth check: only crew members can update todos
+    const auth = await verifyCrewAccess(request);
+    if (auth.ok === false) return auth.response;
+
     if (!todoId || !status) {
       return NextResponse.json({ success: false, error: "Missing todoId or status" }, { status: 400 });
     }
@@ -92,6 +101,10 @@ export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
     const { todoId, dismissLead, leadId, crewId } = body;
+
+    // Auth check: only crew members can delete todos / dismiss leads
+    const auth = await verifyCrewAccess(request, crewId);
+    if (auth.ok === false) return auth.response;
 
     // Dismiss a lead entirely (mark franchize_intents as dismissed)
     if (dismissLead && leadId) {
