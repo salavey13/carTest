@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { CrewFooter } from "../components/CrewFooter";
 import { CrewHeader } from "../components/CrewHeader";
 import { CatalogClient } from "../components/CatalogClient";
+import { DisplayModeProvider } from "../components/DisplayModeContext";
 import { FranchizeErrorBoundary } from "../components/ErrorBoundary";
 import { ThemeInitializer } from "../components/ThemeInitializer";
 import { JoinCrewBanner } from "../components/JoinCrewBanner";
@@ -33,6 +34,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
         bubbling up to the page-level error.tsx which shows the full-screen
         "Экипаж временно недоступен" fallback.
       */}
+      <DisplayModeProvider>
       <FranchizeErrorBoundary
         resetKey={slug}
         fallbackTitle="Шапка недоступна"
@@ -201,6 +203,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
           </div>
         </div>
       </section>
+      </DisplayModeProvider>
 
       <CrewFooter crew={crew} />
     </main>

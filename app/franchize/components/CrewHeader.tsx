@@ -4,12 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { localImageSrc } from "@/lib/image-fallback";
 import { HeaderMenu } from "../modals/HeaderMenu";
 import { FranchizeProfileButton, CrewButtonErrorBoundary } from "./FranchizeProfileButton";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
+import { useDisplayMode } from "./DisplayModeContext";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
@@ -37,9 +38,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   const [menuOpen, setMenuOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const displayMode = searchParams.get("mode") === "sale" ? "sale" : "rent";
+  const { displayMode, setDisplayMode } = useDisplayMode();
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const headerLogoHref = crew.header.logoHref || mainCatalogPath;
   const prevPathnameRef = useRef<string | null>(null);
@@ -312,15 +311,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                   type="button"
                   aria-pressed={isActive}
                   onClick={() => {
-                    const params = new URLSearchParams(searchParams.toString());
-                    if (pill.key === "rent") {
-                      params.delete("mode");
-                    } else {
-                      params.set("mode", pill.key);
-                    }
-                    const qs = params.toString();
-                    // Always navigate to catalog path so the filter takes effect
-                    router.push(qs ? `${mainCatalogPath}?${qs}` : mainCatalogPath, { scroll: false });
+                    setDisplayMode(pill.key);
                   }}
                   className="shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 select-none"
                   style={{

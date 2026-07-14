@@ -14,6 +14,7 @@ import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { upsertFranchizeIntent } from "../actions";
 import { hasRentPrice, hasSalePrice } from "../lib/catalog-utils";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
+import { useDisplayMode } from "./DisplayModeContext";
 import { SHOW_CART } from "@/lib/feature-flags";
 import { ItemModal, type FlowType } from "../modals/Item";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
@@ -381,7 +382,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const [carouselParallaxByItem, setCarouselParallaxByItem] = useState<Record<string, { x: number; y: number }>>({});
   const [carouselLoadedByItem, setCarouselLoadedByItem] = useState<Record<string, true>>({});
   const searchParams = useSearchParams();
-  const displayMode = (searchParams.get("mode") === "sale" ? "sale" : "rent") as "rent" | "sale";
+  const { displayMode } = useDisplayMode();
   const { user, dbUser } = useAppContext();
   const lastQueryViewedVehicleRef = useRef<string>("");
   const recordRentIntentRef = useRef<

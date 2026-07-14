@@ -984,10 +984,29 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         imageUrl: mediaUrls[0] ?? "",
         mediaUrls,
         pricePerDay: car.daily_price ?? 0,
-        rentPriceLabel:
-          (typeof readPath(specs, ["rent_price_label"], "") === "string" && String(readPath(specs, ["rent_price_label"], "")).trim().length > 0)
-            ? String(readPath(specs, ["rent_price_label"], "")).trim()
-            : `${Number(car.daily_price ?? 0).toLocaleString("ru-RU")} ₽ / день`,
+        rentPriceLabel: (() => {
+          // 1. Pre-formatted label from specs (highest priority)
+          const preformatted = readPath(specs, ["rent_price_label"], "");
+          if (typeof preformatted === "string" && preformatted.trim().length > 0) {
+            return preformatted.trim();
+          }
+          // 2. Weekday + weekend dual pricing
+          const weekday = Number(readPath(specs, ["rent_weekday"], 0));
+          const weekend = Number(readPath(specs, ["rent_weekend"], 0));
+          if (weekday > 0 && weekend > 0) {
+            return `${weekday.toLocaleString("ru-RU")} ₽ будни / ${weekend.toLocaleString("ru-RU")} ₽ выходные`;
+          }
+          // 3. Weekday only
+          if (weekday > 0) {
+            return `${weekday.toLocaleString("ru-RU")} ₽ / день (будни)`;
+          }
+          // 4. Weekend only
+          if (weekend > 0) {
+            return `${weekend.toLocaleString("ru-RU")} ₽ / день (выходные)`;
+          }
+          // 5. Fallback to daily_price
+          return `${Number(car.daily_price ?? 0).toLocaleString("ru-RU")} ₽ / день`;
+        })(),
         category: subtype,
         availabilityStatus: availabilityByVehicle.get(car.id)?.status ?? fallbackStatus,
         availabilityLabel: availabilityByVehicle.get(car.id)?.label ?? fallbackLabel,
