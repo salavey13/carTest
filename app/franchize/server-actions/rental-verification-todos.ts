@@ -2,7 +2,6 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { randomUUID } from "crypto";
-import { getDefaultCrewId } from "@/lib/default-crew";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,7 +71,7 @@ const VERIFICATION_TODO_TEMPLATES: Array<{
  */
 export async function createRentalVerificationTodos(
   rentalId: string,
-  crewId: string = getDefaultCrewId(),
+  crewId: string,
   leadId?: string | null
 ): Promise<{ success: boolean; created: number; error?: string }> {
   try {

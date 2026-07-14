@@ -61,7 +61,6 @@ import { createHash, randomUUID } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { buildRentalContractVariables, type BikeSpecs, type RenterData, type RentalPeriod, type CrewSecrets, type DocumentMeta } from "@/app/lib/rental-contract-vars";
-import { getDefaultCrewId } from "@/lib/default-crew";
 import { createLeadFollowupTodos } from "@/app/franchize/server-actions/crew-todos";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -520,11 +519,12 @@ async function resolveBikeById(bikeId: string): Promise<{
   model: string;
   specs: Record<string, any>;
   type: string;
+  crew_id: string | null;
 } | null> {
   // Try exact match first
   const { data: exactMatch } = await supabaseAdmin
     .from("cars")
-    .select("id, make, model, specs, type")
+    .select("id, make, model, specs, type, crew_id")
     .eq("id", bikeId)
     .in("type", ["bike", "ebike"])
     .maybeSingle();
@@ -534,7 +534,7 @@ async function resolveBikeById(bikeId: string): Promise<{
   // Fuzzy search: match against make, model, or ID substring
   const { data: candidates } = await supabaseAdmin
     .from("cars")
-    .select("id, make, model, specs, type")
+    .select("id, make, model, specs, type, crew_id")
     .in("type", ["bike", "ebike"])
     .limit(100);
 
@@ -567,14 +567,25 @@ async function resolveBikeById(bikeId: string): Promise<{
 // ── Get available bikes for keyboard selection ────────────────────────────────
 
 async function getAvailableBikes(): Promise<Array<{ id: string; make: string; model: string; specs?: Record<string, any> }>> {
+  // Resolve crew_id from slug (no hardcoded UUID)
+  const { data: crew } = await supabaseAdmin
+    .from("crews")
+    .select("id")
+    .eq("slug", "vip-bike")
+    .maybeSingle();
+
+  if (!crew?.id) {
+    console.error("[getAvailableBikes] Crew not found for slug: vip-bike");
+    return [];
+  }
+
   // Show bikes from vip-bike crew OR unassigned (crew_id=null).
   // Exclude bikes from OTHER crews (e.g. custom-bobber-virus, honda-cbr600rr-sz).
-  const VIP_BIKE_CREW_ID = getDefaultCrewId();
   const { data } = await supabaseAdmin
     .from("cars")
     .select("id, make, model, specs")
     .in("type", ["bike", "ebike"])
-    .or(`crew_id.eq.${VIP_BIKE_CREW_ID},crew_id.is.null`)
+    .or(`crew_id.eq.${crew.id},crew_id.is.null`)
     .order("make", { ascending: true });
 
   return (data || []) as Array<{ id: string; make: string; model: string; specs?: Record<string, any> }>;
@@ -892,7 +903,10 @@ async function generateAndSendContract(
       });
 
       // Create crew_todos for equipment return
-      const crewId = bike.crew_id || getDefaultCrewId();
+      if (!bike.crew_id) {
+        logger.error("[/doc-vlm] Bike has no crew_id, cannot create todos", { bikeId: bike.id });
+      } else {
+      const crewId = bike.crew_id;
       const bikeLabel = `${bike.make} ${bike.model}`;
       const todos = [
         { title: `🔧 Проверить ТС при возврате: ${bikeLabel} (${endDate} 10:00)`, priority: "high" as const },
@@ -921,6 +935,7 @@ async function generateAndSendContract(
       } else {
         logger.warn("[/doc-vlm] Failed to create crew_todos:", todoResult.error);
       }
+      } // close else (bike has crew_id)
     } catch (leadErr) {
       logger.warn("[/doc-vlm] Failed to create lead/todos:", leadErr);
     }

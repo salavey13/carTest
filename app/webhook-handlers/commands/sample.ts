@@ -23,6 +23,13 @@ export async function sampleCommand(chatId: number, userId: number, username?: s
       .limit(1)
       .maybeSingle();
 
+    // Resolve crew_id from slug for fallback bike data
+    const { data: fallbackCrew } = await supabaseAdmin
+      .from("crews")
+      .select("id")
+      .eq("slug", "vip-bike")
+      .maybeSingle();
+
     const bikeData = bike || {
       id: "sample-bike",
       make: "79bike",
@@ -46,7 +53,7 @@ export async function sampleCommand(chatId: number, userId: number, username?: s
         vin: "SAMPLE1234567890",
         category: "A/L3",
       },
-      crew_id: "2d5fde70-1dd3-4f0d-8d72-66ccf6908746",
+      crew_id: fallbackCrew?.id || null,
     };
 
     // Dummy crew secrets
