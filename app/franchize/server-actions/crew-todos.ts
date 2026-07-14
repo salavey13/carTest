@@ -744,3 +744,82 @@ export async function getCrewTodoStats(input: {
     };
   }
 }
+
+/**
+ * Create lead followup todos with idempotency check.
+ * Centralizes the logic used by /doc, /doc-manual, and rental verification.
+ */
+export async function createLeadFollowupTodos(input: {
+  crewId: string;
+  leadId: string;
+  leadPhone?: string;
+  leadName?: string;
+  bikeId?: string;
+  todos: Array<{ title: string; priority: "low" | "medium" | "high" }>;
+  assignedTo?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<{ success: boolean; created: number; skipped: number; error?: string }> {
+  try {
+    const { crewId, leadId, leadPhone, leadName, bikeId, todos, assignedTo, metadata } = input;
+
+    // Idempotency: check if todos already exist for this lead
+    const { data: existingTodos } = await supabaseAdmin
+      .from("crew_todos")
+      .select("id, title")
+      .eq("crew_id", crewId)
+      .eq("lead_id", leadId)
+      .eq("category", "lead_followup")
+      .eq("status", "pending");
+
+    const existingTitles = new Set((existingTodos || []).map((t: any) => t.title));
+    const newTodos = todos.filter((t) => !existingTitles.has(t.title));
+
+    if (newTodos.length === 0) {
+      return { success: true, created: 0, skipped: todos.length };
+    }
+
+    const todoPromises = newTodos.map((todo) => {
+      const todoId = `todo-${randomUUID()}`;
+      return supabaseAdmin.from("crew_todos").insert({
+        id: todoId,
+        crew_id: crewId,
+        lead_id: leadId,
+        title: todo.title,
+        status: "pending",
+        priority: todo.priority,
+        assigned_to: assignedTo || null,
+        category: "lead_followup",
+        description: JSON.stringify({
+          lead_id: leadId,
+          lead_phone: leadPhone || "",
+          lead_name: leadName || "",
+          bike_id: bikeId || null,
+          ...(metadata || {}),
+        }),
+      }).then(({ error }: any) => {
+        if (error) {
+          console.warn("[createLeadFollowupTodos] Failed to create todo:", todo.title, error);
+          return false;
+        }
+        return true;
+      });
+    });
+
+    const results = await Promise.all(todoPromises);
+    const created = results.filter(Boolean).length;
+
+    return {
+      success: true,
+      created,
+      skipped: todos.length - newTodos.length,
+    };
+  } catch (error) {
+    console.error("[createLeadFollowupTodos] Error:", error);
+    return {
+      success: false,
+      created: 0,
+      skipped: 0,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
