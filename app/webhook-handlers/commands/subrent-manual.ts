@@ -32,10 +32,29 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { privateSchema } from "@/lib/private-secrets";
 import nodemailer from "nodemailer";
+import { getCrewBikes, getAllBikes } from "../lib/crew-access";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026;
 const STATE_EXPIRY_MINUTES = 30;
+
+/**
+ * Read the selected crew slug from user_states context.
+ * Falls back to "vip-bike" if not set.
+ */
+async function getSubrentCrewSlug(userId: string): Promise<string> {
+  try {
+    const { data } = await supabaseAdmin
+      .from("user_states")
+      .select("context")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const selectedCrew = (data?.context as any)?.selectedCrew;
+    return selectedCrew || "vip-bike";
+  } catch {
+    return "vip-bike";
+  }
+}
 
 // ── Constants ───────────────────────────────────────────────────────────────────
 
@@ -280,28 +299,11 @@ async function resolveBikeById(bikeId: string): Promise<any> {
   return bestScore > 0 ? best : null;
 }
 
-async function getAvailableBikes(): Promise<any[]> {
-  // Resolve crew_id from slug (no hardcoded UUID)
-  const { data: crew } = await supabaseAdmin
-    .from("crews")
-    .select("id")
-    .eq("slug", "vip-bike")
-    .maybeSingle();
-
-  if (!crew?.id) {
-    console.error("[getAvailableBikes] Crew not found for slug: vip-bike");
-    return [];
+async function getAvailableBikes(crewSlug?: string): Promise<any[]> {
+  if (crewSlug) {
+    return await getCrewBikes(crewSlug);
   }
-
-  // Show bikes from vip-bike crew OR unassigned (crew_id=null).
-  // Exclude bikes from OTHER crews (e.g. custom-bobber-virus, honda-cbr600rr-sz).
-  const { data } = await supabaseAdmin
-    .from("cars")
-    .select("id, make, model, specs")
-    .in("type", ["bike", "ebike"])
-    .or(`crew_id.eq.${crew.id},crew_id.is.null`)
-    .order("make", { ascending: true });
-  return (data || []);
+  return await getAllBikes();
 }
 
 function parsePassport(text: string): { series: string; number: string; issueDate: string; issuedBy: string } | null {
@@ -575,7 +577,7 @@ export async function handleSubrentManualCommand(params: {
 
     // Start new flow
     if (!context) {
-      const bikes = await getAvailableBikes();
+      const bikes = await getAvailableBikes(crewId || await getSubrentCrewSlug(userId));
 
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
@@ -838,7 +840,7 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
       } else if (value === "bike") {
         // FIX: edit_bike was causing default case to kill state.
         // For now, redirect to bike selection while keeping other data.
-        const bikes = await getAvailableBikes();
+        const bikes = await getAvailableBikes(context.crewId || await getSubrentCrewSlug(userId));
         // Clear old bike data so user can re-enter
         context.bikeId = undefined;
         context.bikeMake = undefined;
@@ -1569,11 +1571,11 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
     }
 
     // Load crew secrets
-    const crewId = context.crewId || "default";
+    const resolvedCrewSlug = context.crewId || (await getSubrentCrewSlug(userId)) || "vip-bike";
     const { data: crewSecrets } = await privateSchema()
       .from("crew_secrets")
       .select("*")
-      .eq("crew_slug", crewId)
+      .eq("crew_slug", resolvedCrewSlug)
       .maybeSingle();
 
     // Generate contract number
@@ -1697,7 +1699,7 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
     try {
       const contractKey = `subrent-${contractNumber}-${Date.now()}`;
       const uploadResult = await uploadDocxToStorage({
-        crewSlug: "vip-bike",
+        crewSlug: resolvedCrewSlug,
         contractKey,
         buffer: Buffer.from(docBuffer),
         metadata: { source: "subrent-telegram", owner: context.ownerFullName || "" },
@@ -1800,7 +1802,7 @@ ${context.bikeMake} ${context.bikeModel}
           contract_start_time: context.contractStartTime || null,
           contract_end_date: context.contractEndDate || null,
           contract_end_time: context.contractEndTime || null,
-          crew_id: context.crewId || null,
+          crew_id: resolvedCrewSlug || null,
           template_version: 1,
         });
         logger.info("[subrent] Contract artifact saved");
