@@ -4462,6 +4462,7 @@ const checkFranchizeAvailabilitySchema = z.object({
   carIds: z.array(z.string().trim().min(1)).min(1),
   rentalStartDate: z.string().trim().min(1),
   rentalEndDate: z.string().trim().min(1),
+  slug: z.string().trim().min(1).optional(),
 });
 
 export async function checkFranchizeCarsAvailability(input: unknown): Promise<{ success: boolean; unavailableCarIds?: string[]; error?: string }> {
@@ -4470,7 +4471,27 @@ export async function checkFranchizeCarsAvailability(input: unknown): Promise<{ 
     return { success: false, error: parsed.error.issues[0]?.message ?? "Некорректный запрос проверки доступности." };
   }
 
-  const { carIds, rentalStartDate, rentalEndDate } = parsed.data;
+  const { carIds, rentalStartDate, rentalEndDate, slug } = parsed.data;
+
+  // If slug is provided, validate that all carIds belong to this crew
+  if (slug) {
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+    if (!crew) {
+      return { success: false, error: "Экипаж не найден." };
+    }
+    const { data: validCars, error: carsError } = await supabaseAdmin
+      .from("cars")
+      .select("id")
+      .in("id", carIds)
+      .eq("crew_id", crew.id);
+    if (carsError || !validCars || validCars.length !== carIds.length) {
+      return { success: false, error: "Некоторые байки не принадлежат вашему экипажу." };
+    }
+  }
   const startAt = new Date(`${rentalStartDate}T00:00:00.000Z`);
   const endAt = new Date(`${rentalEndDate}T23:59:59.999Z`);
   if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || endAt < startAt) {

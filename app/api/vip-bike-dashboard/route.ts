@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { differenceInHours, differenceInDays, startOfDay, endOfDay, subDays, format } from "date-fns";
 import { ru } from "date-fns/locale";
 
+
 // Helper: Parse DD.MM.YYYY to Date
 function parseRuDate(dateStr: string): Date | null {
   if (!dateStr) return null;
@@ -33,13 +34,31 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const dateParam = searchParams.get("date");
+    const crewSlugParam = searchParams.get("crew_slug");
     const targetDate = dateParam ? new Date(dateParam) : new Date();
 
     const dateStart = startOfDay(targetDate).toISOString();
     const dateEnd = endOfDay(targetDate).toISOString();
 
-    // Fetch active rentals from public.rentals
-    const { data: activeRentals, error: rentalsError } = await supabaseAdmin
+    // Resolve crew if crew_slug param provided — filters all queries to one crew
+    let crewFilterRentals: { field: string; value: any } | null = null;
+    let crewFilterArtifacts: { field: string; value: string } | null = null;
+    if (crewSlugParam) {
+      const { data: crew } = await supabaseAdmin
+        .from("crews")
+        .select("id, slug")
+        .eq("slug", crewSlugParam.trim())
+        .maybeSingle();
+      if (crew) {
+        crewFilterRentals = { field: "crew_id", value: crew.id };
+        crewFilterArtifacts = { field: "crew_slug", value: crew.slug };
+      }
+    }
+
+    // ── Build base queries with optional crew filter ──
+
+    // Active rentals from public.rentals
+    let rentalsQuery = supabaseAdmin
       .from("rentals")
       .select(`
         id,
@@ -58,20 +77,28 @@ export async function GET(request: NextRequest) {
       `)
       .in("status", ["active", "overdue"])
       .order("start_date", { ascending: false });
+    if (crewFilterRentals) {
+      rentalsQuery = (rentalsQuery as any)[crewFilterRentals.field](crewFilterRentals.value);
+    }
+    const { data: activeRentals, error: rentalsError } = await rentalsQuery;
 
     if (rentalsError) {
       console.error("[dashboard] rentals query failed:", rentalsError);
       return NextResponse.json({ error: "Failed to fetch rentals" }, { status: 500 });
     }
 
-    // Fetch rental artifacts for the target date
-    const { data: rentalArtifacts, error: artifactsError } = await supabaseAdmin
+    // Rental artifacts for the target date (private schema)
+    let rentalArtifactsQuery = supabaseAdmin
       .schema("private")
       .from("rental_contract_artifacts")
       .select("*")
       .gte("created_at", dateStart)
       .lte("created_at", dateEnd)
       .order("created_at", { ascending: false });
+    if (crewFilterArtifacts) {
+      rentalArtifactsQuery = rentalArtifactsQuery.eq(crewFilterArtifacts.field, crewFilterArtifacts.value);
+    }
+    const { data: rentalArtifacts, error: artifactsError } = await rentalArtifactsQuery;
 
     if (artifactsError) {
       console.error("[dashboard] rental artifacts query failed:", artifactsError);
@@ -88,14 +115,18 @@ export async function GET(request: NextRequest) {
     }
     const deduplicatedRentals = Array.from(rentalArtifactsMap.values());
 
-    // Fetch sale artifacts for the target date
-    const { data: saleArtifacts, error: salesError } = await supabaseAdmin
+    // Sale artifacts for the target date (private schema)
+    let saleArtifactsQuery = supabaseAdmin
       .schema("private")
       .from("sale_contract_artifacts")
       .select("*")
       .gte("created_at", dateStart)
       .lte("created_at", dateEnd)
       .order("created_at", { ascending: false });
+    if (crewFilterArtifacts) {
+      saleArtifactsQuery = saleArtifactsQuery.eq(crewFilterArtifacts.field, crewFilterArtifacts.value);
+    }
+    const { data: saleArtifacts, error: salesError } = await saleArtifactsQuery;
 
     if (salesError) {
       console.error("[dashboard] sale artifacts query failed:", salesError);
@@ -119,19 +150,27 @@ export async function GET(request: NextRequest) {
       const dayStart = startOfDay(dayDate).toISOString();
       const dayEnd = endOfDay(dayDate).toISOString();
 
-      const [{ count: rentalCount }] = await supabaseAdmin
+      let weeklyRentQuery = supabaseAdmin
         .schema("private")
         .from("rental_contract_artifacts")
         .select("*", { count: "exact", head: true })
         .gte("created_at", dayStart)
         .lte("created_at", dayEnd);
+      if (crewFilterArtifacts) {
+        weeklyRentQuery = weeklyRentQuery.eq(crewFilterArtifacts.field, crewFilterArtifacts.value);
+      }
+      const [{ count: rentalCount }] = await weeklyRentQuery;
 
-      const [{ count: saleCount }] = await supabaseAdmin
+      let weeklySaleQuery = supabaseAdmin
         .schema("private")
         .from("sale_contract_artifacts")
         .select("*", { count: "exact", head: true })
         .gte("created_at", dayStart)
         .lte("created_at", dayEnd);
+      if (crewFilterArtifacts) {
+        weeklySaleQuery = weeklySaleQuery.eq(crewFilterArtifacts.field, crewFilterArtifacts.value);
+      }
+      const [{ count: saleCount }] = await weeklySaleQuery;
 
       weeklyData.push({
         date: format(dayDate, "d MMM", { locale: ru }),

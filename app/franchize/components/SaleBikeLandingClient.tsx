@@ -723,6 +723,7 @@ export function SaleBikeLandingClient({
       carIds: [item.id],
       rentalStartDate: today,
       rentalEndDate: weekLater,
+      slug: resolvedSlug,
     });
     if ((availability.unavailableCarIds?.length ?? 0) > 0) {
       setReservationState("error");
