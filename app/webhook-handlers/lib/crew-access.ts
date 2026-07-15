@@ -136,15 +136,43 @@ export async function getAllBikes(): Promise<
 
 /**
  * Build a crew selection inline keyboard from a list of crews.
+ * Shows owner/member badges when showBadges=true (user has crew access),
+ * or plain names when showBadges=false (general public).
  */
-export function buildCrewSelectionKeyboard(crews: CrewInfo[]): KeyboardButton[][] {
+export function buildCrewSelectionKeyboard(crews: CrewInfo[], showBadges: boolean = true): KeyboardButton[][] {
   const rows: KeyboardButton[][] = [];
   for (const crew of crews) {
-    const label = crew.isOwner ? `👑 ${crew.name}` : `👤 ${crew.name}`;
+    const label = showBadges && crew.isOwner ? `👑 ${crew.name}` 
+      : showBadges ? `👤 ${crew.name}` 
+      : `🏍 ${crew.name}`;
     rows.push([{ text: label, callback_data: `crewsel_${crew.slug}` }]);
   }
   rows.push([{ text: "❌ Отменить", callback_data: "crewsel_cancel" }]);
   return rows;
+}
+
+/**
+ * Get ALL crews in the system (for general public selection).
+ * Used when user is not a member of any crew — they can still
+ * pick a crew to use its templates/secrets.
+ */
+export async function getAllCrews(): Promise<CrewInfo[]> {
+  try {
+    const { data: crews } = await supabaseAdmin
+      .from("crews")
+      .select("id, slug, brand_name")
+      .order("brand_name", { ascending: true });
+
+    return (crews || []).map((c) => ({
+      id: c.id,
+      slug: c.slug,
+      name: c.brand_name || c.slug,
+      isOwner: false, // general public is never owner
+    }));
+  } catch (error) {
+    logger.error("[crew-access] Error getting all crews:", error);
+    return [];
+  }
 }
 
 /**
