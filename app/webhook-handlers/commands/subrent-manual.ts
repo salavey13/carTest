@@ -28,11 +28,9 @@ import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessag
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
 import { createHash } from "crypto";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { privateSchema } from "@/lib/private-secrets";
 import nodemailer from "nodemailer";
-import { getCrewBikes, getAllBikes } from "../lib/crew-access";
+import { getCrewBikes, getAllBikes, loadTemplateForCrew } from "../lib/crew-access";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026;
@@ -1670,9 +1668,8 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
       insurance_territory: crewSecrets?.insurance_territory || "Нижегородской области",
     };
 
-    // Load template
-    const templatePath = join(process.cwd(), "docs", "SUBRENTAL_DEAL_TEMPLATE.html");
-    const template = readFileSync(templatePath, "utf-8");
+    // Load template — check crew-specific first
+    const template = loadTemplateForCrew("subrental", resolvedCrewSlug);
 
     // Generate DOCX
     const docFileName = `subrental-${context.bikeMake}-${context.bikeModel}-${now.toISOString().split("T")[0]}.docx`

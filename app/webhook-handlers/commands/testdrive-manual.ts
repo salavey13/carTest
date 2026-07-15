@@ -29,7 +29,7 @@ import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franc
 import { privateSchema } from "@/lib/private-secrets";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared } from "../lib/crew-access";
+import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrew } from "../lib/crew-access";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026;
@@ -574,13 +574,12 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       document_key: `testdrive-${bike.id}-${Date.now()}`,
     };
 
-    // Load template
-    const templatePath = join(process.cwd(), "docs", "TESTDRIVE_DEAL_TEMPLATE.html");
+    // Load template — check crew-specific first
     let htmlTemplate: string;
     try {
-      htmlTemplate = readFileSync(templatePath, "utf8");
-    } catch (readErr) {
-      logger.error("[/testdrive] Failed to read HTML template", templatePath, readErr);
+      htmlTemplate = loadTemplateForCrew("testdrive", crewSlug);
+    } catch (templateErr) {
+      logger.error("[/testdrive] Failed to load template:", templateErr);
       await sendComplexMessage(chatId, "🚨 Ошибка: шаблон договора не найден.", [], { removeKeyboard: true });
       return false;
     }

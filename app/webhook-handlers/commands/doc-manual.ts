@@ -59,7 +59,7 @@ import nodemailer from "nodemailer";
 import { calculatePriceForDuration, getHelmetPrice } from "@/app/franchize/lib/pricing-calculator";
 import { isCrewMember } from "@/app/lib/user-rental-secrets";
 import { createLeadFollowupTodos } from "@/app/franchize/server-actions/crew-todos";
-import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared } from "../lib/crew-access";
+import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrew } from "../lib/crew-access";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026; // 👍 Fixed current year
@@ -1414,14 +1414,13 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       };
     }
 
-    // Load HTML template based on deal type
-    const templateFileName = isRent ? "RENTAL_DEAL_TEMPLATE.html" : "SALE_DEAL_TEMPLATE.html";
-    const templatePath = join(process.cwd(), "docs", templateFileName);
+    // Load HTML template based on deal type — check crew-specific first
+    const templateKey = isRent ? "rental" : "sale";
     let htmlTemplate: string;
     try {
-      htmlTemplate = readFileSync(templatePath, "utf8");
-    } catch (readErr) {
-      logger.error("[/doc] Failed to read HTML template", templatePath, readErr);
+      htmlTemplate = loadTemplateForCrew(templateKey, resolvedSlug);
+    } catch (templateErr) {
+      logger.error("[/doc] Failed to load template:", templateErr);
       await sendComplexMessage(chatId, "🚨 Ошибка: шаблон договора не найден. Обратитесь к администратору.", [], { removeKeyboard: true });
       return false;
     }
