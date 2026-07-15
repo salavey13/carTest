@@ -28,6 +28,7 @@ import { handleSubrentManualCommand } from "./subrent-manual";
 import { analyticsPassCommand } from "./analytics_pass";
 import { testDriveCommand, handleTestDriveText, handleTestDriveCallback } from "./testdrive-manual";
 import { sampleCommand } from "./sample";
+import { getUserCrews, buildCrewSelectionKeyboard } from "../lib/crew-access";
 
 import { escapeTelegramMarkdown } from "@/lib/utils"; // Helper для Markdown escape
 
@@ -115,6 +116,55 @@ export async function handleCommand(update: any) {
             if (handled) return;
         }
 
+        // ── Crew selection callback (for /doc, /testdrive, /subrent) ──
+        if (update.callback_query && text.startsWith("crewsel_")) {
+            const crewSlug = text.replace("crewsel_", "");
+            const userIdStrLocal = String(update.callback_query.from.id);
+            const chatIdLocal = update.callback_query.message.chat.id;
+
+            if (crewSlug === "cancel") {
+                await sendComplexMessage(chatIdLocal, "❌ Отменено.", [], { removeKeyboard: true });
+                return;
+            }
+
+            // Clear any pending state first
+            await supabaseAdmin
+                .from("user_states")
+                .delete()
+                .eq("user_id", userIdStrLocal)
+                .like("state", "pending_%");
+
+            // Store the selected crew in user_states (using a stable key pattern)
+            await supabaseAdmin
+                .from("user_states")
+                .upsert({
+                    user_id: userIdStrLocal,
+                    state: `crew_selected_${crewSlug}`,
+                    context: { selectedCrew: crewSlug, selectedAt: Date.now() },
+                    updated_at: new Date().toISOString(),
+                }, { onConflict: "user_id" });
+
+            // Check if there's a pending command to resume
+            const currentState = userFlowState || "";
+            if (currentState.startsWith("pending_doc_")) {
+                const { docCommand: docCmd } = await import("./doc-manual");
+                const bestPhotoVariant = update.callback_query.message?.photo?.length
+                    ? [update.callback_query.message.photo[update.callback_query.message.photo.length - 1]]
+                    : [];
+                const documentFiles = update.callback_query.message?.document ? [update.callback_query.message.document] : [];
+                await docCmd(chatIdLocal, Number(userIdStrLocal), undefined, "/doc", bestPhotoVariant, documentFiles);
+            } else if (currentState.startsWith("pending_td_")) {
+                const { testDriveCommand: tdCmd } = await import("./testdrive-manual");
+                await tdCmd(chatIdLocal, Number(userIdStrLocal), undefined, "/testdrive");
+            } else if (currentState.startsWith("pending_subrent_")) {
+                const { handleSubrentManualCommand: srCmd } = await import("./subrent-manual");
+                await srCmd({ userId: userIdStrLocal, userName: undefined, text: "/subrent", callbackData: undefined, crewId: crewSlug });
+            } else {
+                await sendComplexMessage(chatIdLocal, "✅ Выбран экипаж. Используйте команду снова.", [], { removeKeyboard: true });
+            }
+            return;
+        }
+
         // Новые handlers для rules
         if (command.startsWith('/approve_')) {
             const id = command.split('_')[1];
@@ -174,13 +224,63 @@ export async function handleCommand(update: any) {
             "/profile": () => profileCommand(chatId, userId, username),
             "/analytics_pass": () => analyticsPassCommand(chatId, userId, username),
             "/sample": () => sampleCommand(chatId, userId, username),
-            "/testdrive": () => testDriveCommand(chatId, userId, username, text),
-            "/doc": () => {
-                const bestPhotoVariant = update.message?.photo?.length
-                    ? [update.message.photo[update.message.photo.length - 1]]
-                    : [];
-                const documentFiles = update.message?.document ? [update.message.document] : [];
-                return docCommand(chatId, userId, username, text, bestPhotoVariant, documentFiles);
+            "/testdrive": async () => {
+                const crews = await getUserCrews(userIdStr);
+                if (crews.length === 0) {
+                    await sendComplexMessage(chatId, "⛔ Команда доступна только членам экипажа.", [], { removeKeyboard: true });
+                    return;
+                }
+                if (crews.length === 1) {
+                    // Auto-select single crew
+                    await supabaseAdmin.from("user_states").upsert({
+                        user_id: userIdStr,
+                        state: `crew_selected_${crews[0].slug}`,
+                        context: { selectedCrew: crews[0].slug, selectedAt: Date.now() },
+                    }, { onConflict: "user_id" });
+                    return testDriveCommand(chatId, userId, username, text);
+                }
+                // Multiple crews — show selection
+                await supabaseAdmin.from("user_states").upsert({
+                    user_id: userIdStr,
+                    state: `pending_td_${Date.now()}`,
+                    context: { pendingCommand: "/testdrive" },
+                }, { onConflict: "user_id" });
+                await sendComplexMessage(
+                    chatId,
+                    "👥 Выберите экипаж для команды /testdrive:",
+                    buildCrewSelectionKeyboard(crews),
+                    { keyboardType: "inline" },
+                );
+            },
+            "/doc": async () => {
+                const crews = await getUserCrews(userIdStr);
+                if (crews.length === 0) {
+                    await sendComplexMessage(chatId, "⛔ Команда доступна только членам экипажа.", [], { removeKeyboard: true });
+                    return;
+                }
+                if (crews.length === 1) {
+                    await supabaseAdmin.from("user_states").upsert({
+                        user_id: userIdStr,
+                        state: `crew_selected_${crews[0].slug}`,
+                        context: { selectedCrew: crews[0].slug, selectedAt: Date.now() },
+                    }, { onConflict: "user_id" });
+                    const bestPhotoVariant = update.message?.photo?.length
+                        ? [update.message.photo[update.message.photo.length - 1]]
+                        : [];
+                    const documentFiles = update.message?.document ? [update.message.document] : [];
+                    return docCommand(chatId, userId, username, text, bestPhotoVariant, documentFiles);
+                }
+                await supabaseAdmin.from("user_states").upsert({
+                    user_id: userIdStr,
+                    state: `pending_doc_${Date.now()}`,
+                    context: { pendingCommand: "/doc" },
+                }, { onConflict: "user_id" });
+                await sendComplexMessage(
+                    chatId,
+                    "👥 Выберите экипаж для команды /doc:",
+                    buildCrewSelectionKeyboard(crews),
+                    { keyboardType: "inline" },
+                );
             },
             "/codex": () => {
                 const bestPhotoVariant = update.message?.photo?.length
@@ -189,12 +289,31 @@ export async function handleCommand(update: any) {
                 const documentFiles = update.message?.document ? [update.message.document] : [];
                 return codexCommand(chatId, userIdStr, username, text, bestPhotoVariant, documentFiles);
             },
-            "/subrent": () => {
-                const bestPhotoVariant = update.message?.photo?.length
-                    ? [update.message.photo[update.message.photo.length - 1]]
-                    : [];
-                const documentFiles = update.message?.document ? [update.message.document] : [];
-                return handleSubrentManualCommand({ userId: userIdStr, userName: username, text, callbackData: undefined, crewId: undefined });
+            "/subrent": async () => {
+                const crews = await getUserCrews(userIdStr);
+                if (crews.length === 0) {
+                    await sendComplexMessage(chatId, "⛔ Команда доступна только членам экипажа.", [], { removeKeyboard: true });
+                    return;
+                }
+                if (crews.length === 1) {
+                    await supabaseAdmin.from("user_states").upsert({
+                        user_id: userIdStr,
+                        state: `crew_selected_${crews[0].slug}`,
+                        context: { selectedCrew: crews[0].slug, selectedAt: Date.now() },
+                    }, { onConflict: "user_id" });
+                    return handleSubrentManualCommand({ userId: userIdStr, userName: username, text, callbackData: undefined, crewId: crews[0].slug });
+                }
+                await supabaseAdmin.from("user_states").upsert({
+                    user_id: userIdStr,
+                    state: `pending_subrent_${Date.now()}`,
+                    context: { pendingCommand: "/subrent" },
+                }, { onConflict: "user_id" });
+                await sendComplexMessage(
+                    chatId,
+                    "👥 Выберите экипаж для команды /subrent:",
+                    buildCrewSelectionKeyboard(crews),
+                    { keyboardType: "inline" },
+                );
             },
         };
 
