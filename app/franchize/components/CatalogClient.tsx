@@ -382,7 +382,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const [carouselParallaxByItem, setCarouselParallaxByItem] = useState<Record<string, { x: number; y: number }>>({});
   const [carouselLoadedByItem, setCarouselLoadedByItem] = useState<Record<string, true>>({});
   const searchParams = useSearchParams();
-  const { displayMode } = useDisplayMode();
+  const { displayMode, isTransitioning } = useDisplayMode();
   const { user, dbUser } = useAppContext();
   const lastQueryViewedVehicleRef = useRef<string>("");
   const recordRentIntentRef = useRef<
@@ -663,6 +663,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
 
   const openItem = (item: CatalogItemVM) => {
     setSelectedItem(item);
+    // Focus the modal's close button after it renders
+    setTimeout(() => {
+      const closeButton = document.querySelector('[data-modal-close="true"]') as HTMLElement;
+      closeButton?.focus();
+    }, 100);
     const defaultOptions = {
       package: "Базовый",
       duration: "1 день",
@@ -877,7 +882,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   return (
     <>
       <section
-        className="mx-auto w-full max-w-7xl px-4 pb-6 pt-8 2xl:max-w-[1600px]"
+        className="relative mx-auto w-full max-w-7xl px-4 pb-6 pt-8 2xl:max-w-[1600px]"
         id="catalog-sections"
         style={{
           ["--catalog-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
@@ -1053,6 +1058,15 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           )}
         </div>
 
+        {isTransitioning && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--catalog-bg)]/80 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--catalog-accent)] border-t-transparent" />
+              <p className="text-sm text-[var(--catalog-muted)]">Переключаем режим...</p>
+            </div>
+          </div>
+        )}
+
         {items.length === 0 ? (
           <section aria-label="Загружаем каталог" className="space-y-4">
             <div className="flex items-center justify-between gap-3">
@@ -1063,9 +1077,29 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
               {[0, 1, 2, 3].map((index) => <CatalogCardSkeleton key={index} index={index} />)}
             </div>
           </section>
-        ) : activeGroupsForCarousel.length === 0 ? (
-          <div className="rounded-2xl border border-dashed p-4 text-sm" style={surface.mutedText}>
-            По этому запросу нет готового варианта. Попробуйте другую модель, бюджет или сценарий поездки.
+        ) : activeGroupsForCarousel.length === 0 && !isTransitioning ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="mb-4 text-6xl">🔍</div>
+            <h3 className="mb-2 text-lg font-semibold text-[var(--catalog-text)]">
+              {displayMode === "rent" ? "Нет байков в аренду" : "Нет байков для продажи"}
+            </h3>
+            <p className="mb-4 text-sm text-[var(--catalog-muted)]">
+              {searchQuery
+                ? "Попробуйте изменить поисковый запрос или сбросить фильтры"
+                : "В этом режиме пока нет доступных байков"}
+            </p>
+            {(searchQuery || quickFilter !== "all") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setQuickFilter("all");
+                }}
+                className="rounded-full bg-[var(--catalog-accent)] px-6 py-2 text-sm font-semibold text-[var(--catalog-accent-contrast)] transition hover:opacity-90"
+              >
+                Сбросить фильтры
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-6">

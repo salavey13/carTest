@@ -7,11 +7,13 @@ type DisplayMode = "rent" | "sale";
 interface DisplayModeContextValue {
   displayMode: DisplayMode;
   setDisplayMode: (mode: DisplayMode) => void;
+  isTransitioning: boolean;
 }
 
 const DisplayModeContext = createContext<DisplayModeContextValue>({
   displayMode: "rent",
   setDisplayMode: () => {},
+  isTransitioning: false,
 });
 
 export function DisplayModeProvider({
@@ -22,6 +24,7 @@ export function DisplayModeProvider({
   initialMode?: DisplayMode;
 }) {
   const [displayMode, setDisplayModeState] = useState<DisplayMode>(initialMode);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // On mount, read the actual mode from the URL (handles deep-links / refreshes
   // where the server component doesn't pass searchParams down).
@@ -36,7 +39,11 @@ export function DisplayModeProvider({
   }, []);
 
   const setDisplayMode = useCallback((mode: DisplayMode) => {
+    if (mode === displayMode) return; // Skip if same mode
+
+    setIsTransitioning(true);
     setDisplayModeState(mode);
+
     // Update URL without triggering Next.js server re-render
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -47,10 +54,13 @@ export function DisplayModeProvider({
       }
       window.history.replaceState(null, "", url.pathname + url.search);
     }
-  }, []);
+
+    // Clear transition flag after animation completes
+    setTimeout(() => setIsTransitioning(false), 300);
+  }, [displayMode]);
 
   return (
-    <DisplayModeContext.Provider value={{ displayMode, setDisplayMode }}>
+    <DisplayModeContext.Provider value={{ displayMode, setDisplayMode, isTransitioning }}>
       {children}
     </DisplayModeContext.Provider>
   );

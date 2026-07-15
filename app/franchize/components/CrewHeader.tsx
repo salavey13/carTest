@@ -15,6 +15,7 @@ import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
+import { hasRentPrice, hasSalePrice } from "../lib/catalog-utils";
 import { readablePaletteTextOnColor, withAlpha } from "../lib/theme";
 import { SHOW_CART } from "@/lib/feature-flags";
 import {
@@ -38,7 +39,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   const [menuOpen, setMenuOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const pathname = usePathname();
-  const { displayMode, setDisplayMode } = useDisplayMode();
+  const { displayMode, setDisplayMode, isTransitioning } = useDisplayMode();
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const headerLogoHref = crew.header.logoHref || mainCatalogPath;
   const prevPathnameRef = useRef<string | null>(null);
@@ -299,21 +300,22 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
           className="-mx-4 mt-1 border-t px-4 pt-2"
           style={{ borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft }}
         >
-          <div className="mx-auto flex w-full max-w-7xl gap-2 pb-1">
+          <div className="mx-auto flex w-full max-w-7xl gap-2 pb-1" role="tablist" aria-label="Режим отображения каталога">
             {([
-              { key: "rent" as const, label: "Аренда" },
-              { key: "sale" as const, label: "Продажа" },
+              { key: "rent" as const, label: "Аренда", count: items?.filter(hasRentPrice).length ?? 0 },
+              { key: "sale" as const, label: "Продажа", count: items?.filter(hasSalePrice).length ?? 0 },
             ]).map((pill) => {
               const isActive = displayMode === pill.key;
               return (
                 <button
                   key={pill.key}
                   type="button"
-                  aria-pressed={isActive}
-                  onClick={() => {
-                    setDisplayMode(pill.key);
-                  }}
-                  className="shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 select-none"
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls="catalog-sections"
+                  onClick={() => setDisplayMode(pill.key)}
+                  disabled={isTransitioning}
+                  className="shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 select-none disabled:opacity-50 active:scale-95"
                   style={{
                     backgroundColor: isActive
                       ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain)
@@ -321,9 +323,15 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                     color: isActive
                       ? activePillText
                       : (crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary),
+                    transform: isActive ? "scale(1.05)" : "scale(1)",
                   }}
                 >
                   {pill.label}
+                  {pill.count > 0 && (
+                    <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-black/10 px-1.5 py-0.5 text-[10px] font-semibold">
+                      {pill.count}
+                    </span>
+                  )}
                 </button>
               );
             })}
