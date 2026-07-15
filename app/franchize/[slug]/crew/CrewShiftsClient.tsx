@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { supabaseAdmin } from '@/lib/supabase-server';
 import { Loading } from '@/components/Loading';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -47,52 +46,15 @@ export function FranchizeCrewShiftsClient({ crewSlug }: { crewSlug: string }) {
         if (!crewSlug) return;
 
         try {
-            // Get crew ID from slug
-            const { data: crew } = await supabaseAdmin
-                .from('crews')
-                .select('id')
-                .eq('slug', crewSlug)
-                .single();
-
-            if (!crew) return;
-
-            // Get active shifts (no clock_out_time)
-            const { data: activeShifts } = await supabaseAdmin
-                .from('crew_member_shifts')
-                .select('*')
-                .eq('crew_id', crew.id)
-                .is('clock_out_time', null)
-                .order('clock_in_time', { ascending: false });
-
-            if (activeShifts) {
-                // Enrich with member info
-                const enriched = await Promise.all(
-                    activeShifts.map(async (shift) => {
-                        const { data: memberData } = await supabaseAdmin
-                            .from('users')
-                            .select('id, username, avatar_url')
-                            .eq('id', shift.member_id)
-                            .single();
-
-                        const { data: crewMemberData } = await supabaseAdmin
-                            .from('crew_members')
-                            .select('live_status')
-                            .eq('crew_id', crew.id)
-                            .eq('user_id', shift.member_id)
-                            .single();
-
-                        return {
-                            ...shift,
-                            member: memberData ? {
-                                user_id: memberData.id,
-                                username: memberData.username || 'Unknown',
-                                avatar_url: memberData.avatar_url,
-                                live_status: crewMemberData?.live_status || 'offline'
-                            } : undefined
-                        };
-                    })
-                );
-                setShifts(enriched);
+            const response = await fetch(`/api/crew/shifts?slug=${encodeURIComponent(crewSlug)}`);
+            if (!response.ok) {
+                console.error('Failed to load shifts:', await response.text());
+                setLoading(false);
+                return;
+            }
+            const data = await response.json();
+            if (data?.shifts) {
+                setShifts(data.shifts);
             }
             setLoading(false);
         } catch (error) {

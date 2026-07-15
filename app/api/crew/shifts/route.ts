@@ -85,7 +85,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Crew not found" }, { status: 404 });
     }
 
-    // Get active shifts
+    // Get active shifts (no clock_out_time)
     const { data: shifts } = await supabaseAdmin
       .from("crew_member_shifts")
       .select("*")
@@ -93,7 +93,42 @@ export async function GET(request: Request) {
       .is("clock_out_time", null)
       .order("clock_in_time", { ascending: false });
 
-    return NextResponse.json({ success: true, shifts: shifts || [] });
+    // Enrich shifts with member info
+    const enrichedShifts = shifts
+      ? await Promise.all(
+          shifts.map(async (shift) => {
+            const [memberData, crewMemberData] = await Promise.all([
+              supabaseAdmin
+                .from("users")
+                .select("id, username, avatar_url")
+                .eq("id", shift.member_id)
+                .single()
+                .then((r) => r.data),
+              supabaseAdmin
+                .from("crew_members")
+                .select("live_status")
+                .eq("crew_id", crew.id)
+                .eq("user_id", shift.member_id)
+                .single()
+                .then((r) => r.data),
+            ]);
+
+            return {
+              ...shift,
+              member: memberData
+                ? {
+                    user_id: memberData.id,
+                    username: memberData.username || "Unknown",
+                    avatar_url: memberData.avatar_url,
+                    live_status: crewMemberData?.live_status || "offline",
+                  }
+                : undefined,
+            };
+          })
+        )
+      : [];
+
+    return NextResponse.json({ success: true, shifts: enrichedShifts });
   } catch (error) {
     console.error("Shift API error:", error);
     return NextResponse.json(
