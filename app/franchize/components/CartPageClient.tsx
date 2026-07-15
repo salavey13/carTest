@@ -53,7 +53,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
       // If user has previous rentals, show returning user indicators
       if (res.data.hasPreviousRentals) {
         setIsReturningUser(true);
-        setUserName(res.data.savedData.fullName ?? null);
+        setUserName(res.data.savedData?.fullName ?? null);
         setHasSavedDocs(true);
       }
     };
