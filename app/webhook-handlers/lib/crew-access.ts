@@ -1,0 +1,202 @@
+/**
+ * crew-access.ts
+ * ==============
+ * Shared utility for multi-crew access control in Telegram bot commands.
+ *
+ * Checks if a Telegram user is a member/owner of any crew, and provides
+ * crew selection UI when the user belongs to multiple crews.
+ *
+ * Used by: /doc, /testdrive, /subrent command handlers
+ */
+
+import { logger } from "@/lib/logger";
+import { supabaseAdmin } from "@/hooks/supabase";
+import { sendComplexMessage, type KeyboardButton } from "../actions/sendComplexMessage";
+
+export interface CrewInfo {
+  id: string;
+  slug: string;
+  name: string;
+  isOwner: boolean;
+}
+
+/**
+ * Get all crews where the given telegram user is an owner or active member.
+ * Returns empty array if user has no crew access.
+ */
+export async function getUserCrews(telegramUserId: string): Promise<CrewInfo[]> {
+  try {
+    // 1. Find crews where user is owner
+    const { data: ownedCrews } = await supabaseAdmin
+      .from("crews")
+      .select("id, slug, brand_name")
+      .eq("owner_id", telegramUserId);
+
+    // 2. Find crews where user is an active member
+    const { data: memberships } = await supabaseAdmin
+      .from("crew_members")
+      .select("crew_id")
+      .eq("user_id", telegramUserId)
+      .eq("membership_status", "active");
+
+    const memberCrewIds = (memberships || []).map((m) => m.crew_id);
+
+    let memberCrews: { id: string; slug: string; brand_name: string }[] = [];
+    if (memberCrewIds.length > 0) {
+      const { data: crews } = await supabaseAdmin
+        .from("crews")
+        .select("id, slug, brand_name")
+        .in("id", memberCrewIds);
+      memberCrews = (crews || []).filter(
+        (c) => !(ownedCrews || []).some((oc) => oc.id === c.id) // don't double-count owned
+      );
+    }
+
+    const allCrews: CrewInfo[] = [
+      ...(ownedCrews || []).map((c) => ({
+        id: c.id,
+        slug: c.slug,
+        name: c.brand_name || c.slug,
+        isOwner: true,
+      })),
+      ...memberCrews.map((c) => ({
+        id: c.id,
+        slug: c.slug,
+        name: c.brand_name || c.slug,
+        isOwner: false,
+      })),
+    ];
+
+    return allCrews;
+  } catch (error) {
+    logger.error("[crew-access] Error getting user crews:", error);
+    return [];
+  }
+}
+
+/**
+ * Get available bikes for a given crew slug.
+ * Returns bikes assigned to the crew OR unassigned bikes (crew_id = null).
+ */
+export async function getCrewBikes(
+  crewSlug: string,
+): Promise<Array<{ id: string; make: string; model: string; type?: string; specs?: Record<string, any> }>> {
+  try {
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id")
+      .eq("slug", crewSlug)
+      .maybeSingle();
+
+    if (!crew?.id) {
+      logger.warn(`[crew-access] Crew not found for slug: ${crewSlug}`);
+      return [];
+    }
+
+    const { data } = await supabaseAdmin
+      .from("cars")
+      .select("id, make, model, type, specs")
+      .in("type", ["bike", "ebike"])
+      .or(`crew_id.eq.${crew.id},crew_id.is.null`)
+      .order("make", { ascending: true });
+
+    return (data || []) as Array<{
+      id: string;
+      make: string;
+      model: string;
+      type?: string;
+      specs?: Record<string, any>;
+    }>;
+  } catch (error) {
+    logger.error(`[crew-access] Error getting bikes for crew ${crewSlug}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Get all bikes (regardless of crew) for backup/fallback.
+ */
+export async function getAllBikes(): Promise<
+  Array<{ id: string; make: string; model: string; type?: string; specs?: Record<string, any> }>
+> {
+  const { data } = await supabaseAdmin
+    .from("cars")
+    .select("id, make, model, type, specs")
+    .in("type", ["bike", "ebike"])
+    .order("make", { ascending: true });
+
+  return (data || []) as Array<{
+    id: string;
+    make: string;
+    model: string;
+    type?: string;
+    specs?: Record<string, any>;
+  }>;
+}
+
+/**
+ * Build a crew selection inline keyboard from a list of crews.
+ */
+export function buildCrewSelectionKeyboard(crews: CrewInfo[]): KeyboardButton[][] {
+  const rows: KeyboardButton[][] = [];
+  for (const crew of crews) {
+    const label = crew.isOwner ? `👑 ${crew.name}` : `👤 ${crew.name}`;
+    rows.push([{ text: label, callback_data: `crewsel_${crew.slug}` }]);
+  }
+  rows.push([{ text: "❌ Отменить", callback_data: "crewsel_cancel" }]);
+  return rows;
+}
+
+/**
+ * Get all crew slugs for a user (for the command handler to pre-check).
+ * Returns a list of unique crew slugs.
+ */
+export async function getUserCrewSlugs(telegramUserId: string): Promise<string[]> {
+  const crews = await getUserCrews(telegramUserId);
+  return crews.map((c) => c.slug);
+}
+
+/**
+ * Check if a user has access to ANY crew.
+ */
+export async function userHasCrewAccess(telegramUserId: string): Promise<boolean> {
+  const crews = await getUserCrews(telegramUserId);
+  return crews.length > 0;
+}
+
+/**
+ * Load crew secrets for contract defaults from crew_secrets table.
+ * Handles both JSON and raw object formats.
+ */
+export async function loadCrewSecrets(
+  crewSlug: string,
+  fallbacks: Record<string, string>,
+): Promise<Record<string, string>> {
+  try {
+    const { data: secretsData } = await supabaseAdmin
+      .from("crew_secrets")
+      .select("contract_defaults")
+      .eq("crew_slug", crewSlug)
+      .maybeSingle();
+
+    let cd: Record<string, any> = {};
+    if (secretsData?.contract_defaults) {
+      cd =
+        typeof secretsData.contract_defaults === "string"
+          ? JSON.parse(secretsData.contract_defaults)
+          : secretsData.contract_defaults;
+    }
+
+    // Merge: actual values override fallbacks
+    const result: Record<string, string> = { ...fallbacks };
+    for (const [key, val] of Object.entries(cd)) {
+      if (val && typeof val === "string") {
+        result[key] = val;
+      }
+    }
+    return result;
+  } catch (error) {
+    logger.warn(`[crew-access] Failed to load crew_secrets for ${crewSlug}, using fallbacks:`, error);
+    return { ...fallbacks };
+  }
+}
