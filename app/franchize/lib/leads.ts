@@ -9,6 +9,7 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { upsertFranchizeIntent } from "@/app/franchize/server-actions/intents";
 import type { FranchizeIntentInput } from "@/app/franchize/server-actions/intents";
+import { normalizePhone } from "./phone-utils";
 
 export type FranchizeIntentType = FranchizeIntentInput["intentType"];
 export type FranchizeIntentStage = FranchizeIntentInput["stage"];
@@ -46,20 +47,6 @@ function sanitizeUserId(id: string): string {
   if (!s) return "anonymous";
   if (s.length > 128) return s.slice(0, 128);
   return s;
-}
-
-export function normalizePhone(phone?: string | null): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 10) return null;
-  // Normalize Russian numbers: 8xxxxxxxxxx → +7xxxxxxxxxx
-  if (digits.length === 11 && digits.startsWith("8")) {
-    return `+7${digits.slice(1)}`;
-  }
-  if (digits.startsWith("7") && digits.length === 11) {
-    return `+${digits}`;
-  }
-  return `+${digits}`;
 }
 
 /**
