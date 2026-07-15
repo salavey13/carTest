@@ -59,10 +59,32 @@ import nodemailer from "nodemailer";
 import { calculatePriceForDuration, getHelmetPrice } from "@/app/franchize/lib/pricing-calculator";
 import { isCrewMember } from "@/app/lib/user-rental-secrets";
 import { createLeadFollowupTodos } from "@/app/franchize/server-actions/crew-todos";
+import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared } from "../lib/crew-access";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026; // 👍 Fixed current year
 const DOC_STATE_EXPIRY_MINUTES = 30;
+
+// ── Crew slug resolution ────────────────────────────────────────────────────
+
+/**
+ * Read the selected crew slug from user_states context.selectedCrew.
+ * Falls back to "vip-bike" if not set.
+ */
+async function getDocCrewSlug(userId: string): Promise<string> {
+  try {
+    const { data } = await supabaseAdmin
+      .from("user_states")
+      .select("context")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const selectedCrew = (data?.context as any)?.selectedCrew;
+    return selectedCrew || "vip-bike";
+  } catch (error) {
+    logger.warn("[/doc] Failed to read crew slug from user_states, using default:", error);
+    return "vip-bike";
+  }
+}
 
 // ── Constants (minimal inline keyboards) ─────────────────────────────────────
 // Simplified: we only care about A, B (M included), or no license. C/C1 ignored.
@@ -603,29 +625,12 @@ async function resolveBikeById(bikeId: string): Promise<any> {
   return bestScore > 0 ? best : null;
 }
 
-async function getAvailableBikes(): Promise<any[]> {
-  // Resolve crew_id from slug (no hardcoded UUID)
-  const { data: crew } = await supabaseAdmin
-    .from("crews")
-    .select("id")
-    .eq("slug", "vip-bike")
-    .maybeSingle();
-
-  if (!crew?.id) {
-    console.error("[getAvailableBikes] Crew not found for slug: vip-bike");
-    return [];
+async function getAvailableBikes(crewSlug?: string): Promise<any[]> {
+  if (crewSlug) {
+    return await getCrewBikes(crewSlug);
   }
-
-  // Show bikes from vip-bike crew OR unassigned (crew_id=null, e.g. VipBike branded).
-  // Exclude bikes from OTHER crews (e.g. custom-bobber-virus, honda-cbr600rr-sz).
-  // No .limit() — all bikes should be available for selection.
-  const { data } = await supabaseAdmin
-    .from("cars")
-    .select("id, make, model, specs")
-    .in("type", ["bike", "ebike"])
-    .or(`crew_id.eq.${crew.id},crew_id.is.null`)
-    .order("make", { ascending: true });
-  return (data || []);
+  // Fallback: return ALL bikes (for admin use)
+  return await getAllBikes();
 }
 
 // ── Smart parsers (current year = 2026) ─────────────────────────────────────
@@ -1022,63 +1027,45 @@ function parseStsVin(text: string): string | null {
  * Load crew secrets for contract defaults.
  * Returns RentalCrewSecrets type compatible with buildRentalContractVariables.
  */
-async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<RentalCrewSecrets> {
-  try {
-    const { data: secretsData } = await supabaseAdmin
-      .from("crew_secrets")
-      .select("contract_defaults")
-      .eq("crew_slug", crewSlug)
-      .maybeSingle();
+async function loadCrewSecrets(crewSlug: string): Promise<RentalCrewSecrets> {
+  const fallbacks: Record<string, string> = {
+    organizationName: "Мотосалон ВипБайкЭлектро",
+    organizationShort: "ИП Воробьев Р.В.",
+    organizationRepresentative: "ИП Воробьев Р.В.",
+    issuerRepresentative: "Сидоров Илья Олегович",
+    ogrnip: "326527500025145",
+    inn: "525813643035",
+    bankAccount: "40802810942710013083",
+    bankName: "Волго-Вятский Банк ПАО Сбербанк",
+    bankCity: "г. Нижний Новгород",
+    bankCorrAccount: "30101810900000000603",
+    email: "vip_bike@mail.ru",
+    legalAddress: "г. Нижний Новгород, пл. Комсомольская 2",
+    issuerName: "Воробьев Р.В.",
+    signatoryRole: "Менеджер Мотосалона",
+    returnAddress: "г. Нижний Новгород, пл. Комсомольская 2",
+  };
 
-    let contractDefaults: Record<string, any> = {};
-    if (secretsData?.contract_defaults) {
-      contractDefaults = typeof secretsData.contract_defaults === "string"
-        ? JSON.parse(secretsData.contract_defaults)
-        : secretsData.contract_defaults;
-    }
+  const merged = await loadCrewSecretsShared(crewSlug, fallbacks);
 
-    // Extract contract defaults with fallbacks - matching RentalCrewSecrets shape
-    const secrets: RentalCrewSecrets = {
-      organizationName: contractDefaults.organizationName || "Мотосалон ВипБайкЭлектро",
-      organizationShort: contractDefaults.organizationShort || "ИП Воробьев Р.В.",
-      ogrnip: contractDefaults.ogrnip || "326527500025145",
-      inn: contractDefaults.inn || "525813643035",
-      bankAccount: contractDefaults.bankAccount || "40802810942710013083",
-      bankName: contractDefaults.bankName || "Волго-Вятский Банк ПАО Сбербанк",
-      bankCity: contractDefaults.bankCity || "г. Нижний Новгород",
-      bankCorrAccount: contractDefaults.bankCorrAccount || "30101810900000000603",
-      email: contractDefaults.email || "vip_bike@mail.ru",
-      legalAddress: contractDefaults.legalAddress || "г. Нижний Новгород, пл. Комсомольская 2",
-      issuerName: contractDefaults.issuerName || "Воробьев Р.В.",
-      signatoryRole: contractDefaults.signatoryRole || "Менеджер Мотосалона",
-      organizationRepresentative: contractDefaults.organizationRepresentative || "ИП Воробьев Р.В.",
-      issuerRepresentative: contractDefaults.issuerRepresentative || "Сидоров Илья Олегович",
-      returnAddress: contractDefaults.returnAddress || "Н. Н. пл. Комсомольская 2",
-      contractDefaults,
-    };
-    return secrets;
-  } catch (error) {
-    logger.warn("[/doc] Failed to load crew_secrets, using fallbacks:", error);
-    // Return fallback values matching RentalCrewSecrets shape
-    const fallbackDefaults: RentalCrewSecrets = {
-      organizationName: "Мотосалон ВипБайкЭлектро",
-      organizationShort: "ИП Воробьев Р.В.",
-      organizationRepresentative: "ИП Воробьев Р.В.",
-      issuerRepresentative: "Сидоров Илья Олегович",
-      ogrnip: "326527500025145",
-      inn: "525813643035",
-      bankAccount: "40802810942710013083",
-      bankName: "Волго-Вятский Банк ПАО Сбербанк",
-      bankCity: "г. Нижний Новгород",
-      bankCorrAccount: "30101810900000000603",
-      email: "vip_bike@mail.ru",
-      legalAddress: "г. Нижний Новгород, пл. Комсомольская 2",
-      issuerName: "Воробьев Р.В.",
-      signatoryRole: "Менеджер Мотосалона",
-      returnAddress: "Н. Н. пл. Комсомольская 2",
-    };
-    return { ...fallbackDefaults, contractDefaults: {} };
-  }
+  return {
+    organizationName: merged.organizationName || fallbacks.organizationName,
+    organizationShort: merged.organizationShort || fallbacks.organizationShort,
+    ogrnip: merged.ogrnip || fallbacks.ogrnip,
+    inn: merged.inn || fallbacks.inn,
+    bankAccount: merged.bankAccount || fallbacks.bankAccount,
+    bankName: merged.bankName || fallbacks.bankName,
+    bankCity: merged.bankCity || fallbacks.bankCity,
+    bankCorrAccount: merged.bankCorrAccount || fallbacks.bankCorrAccount,
+    email: merged.email || fallbacks.email,
+    legalAddress: merged.legalAddress || fallbacks.legalAddress,
+    issuerName: merged.issuerName || fallbacks.issuerName,
+    signatoryRole: merged.signatoryRole || fallbacks.signatoryRole,
+    organizationRepresentative: merged.organizationRepresentative || fallbacks.organizationRepresentative,
+    issuerRepresentative: merged.issuerRepresentative || merged.organizationRepresentative || fallbacks.organizationRepresentative,
+    returnAddress: merged.returnAddress || fallbacks.returnAddress,
+    contractDefaults: merged,
+  };
 }
 
 /**
@@ -1244,7 +1231,7 @@ async function createRentalFromDocContract(
   }
 }
 
-async function generateContract(chatId: number, userId: string, context: DocFlowContext): Promise<boolean> {
+async function generateContract(chatId: number, userId: string, context: DocFlowContext, crewSlug?: string): Promise<boolean> {
   try {
     const bike = await resolveBikeById(context.bikeId);
     if (!bike) {
@@ -1253,7 +1240,8 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
     }
 
     // Load crew secrets for contract defaults
-    const crewSecrets = await loadCrewSecrets();
+    const resolvedSlug = crewSlug || await getDocCrewSlug(userId);
+    const crewSecrets = await loadCrewSecrets(resolvedSlug);
 
     const isElectric = bike.type === "ebike" || /электро|electric|e-bike|ebike/i.test(String(bike.specs?.type || bike.specs?.fuel_type || ""));
     const isRent = context.dealType === "rent";
@@ -1461,7 +1449,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
     let docStoragePath: string | null = null;
     try {
       const uploadResult = await uploadDocxToStorage({
-        crewSlug: "vip-bike",
+        crewSlug: resolvedSlug,
         contractKey: vars.document_key,
         buffer: docxBuf,
         metadata: {
@@ -1579,11 +1567,11 @@ ${qrDeepLink}`);
     // If the caller is a crew member (operator creating contract for a renter),
     // leave chat_id NULL so the operator does not accidentally load the renter's
     // personal data in their own profile/order. The renter claims it via QR.
-    const creatorIsCrewMember = await isCrewMember(String(userId), "vip-bike");
+    const creatorIsCrewMember = await isCrewMember(String(userId), resolvedSlug);
     const secretChatId = creatorIsCrewMember ? null : String(userId);
     const { error: secretsError } = await privateSchema().from("user_rental_secrets").insert({
       chat_id: secretChatId,
-      crew_slug: "vip-bike",
+      crew_slug: resolvedSlug,
       doc_sha256: docSha256,
       renter_full_name: context.mpFullName || null,
       renter_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
@@ -1750,7 +1738,7 @@ ${qrDeepLink}`);
   try {
     const { upsertFranchizeLead } = await import("@/app/franchize/lib/leads");
     await upsertFranchizeLead({
-      slug: "vip-bike",
+      slug: resolvedSlug,
       userId: leadUserId,
       intentType: isRent ? "rent" : "sale",
       stage: "contract_generated",
@@ -2283,7 +2271,8 @@ export async function handleDocText(userId: string, chatId: number, text: string
     context.clientPhoneResolved = true;
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, `✅ Телефон клиента: ${cleaned}\n\n⏳ Генерирую...`, [], { removeKeyboard: true });
-    const success = await generateContract(chatId, userId, context);
+    const crewSlug = await getDocCrewSlug(userId);
+    const success = await generateContract(chatId, userId, context, crewSlug);
     if (success) {
       await clearState(userId);
     }
@@ -3290,8 +3279,9 @@ export async function handleDocCallback(
       );
       return true;
     }
+    const docCrewSlug = await getDocCrewSlug(userId);
     await sendComplexMessage(chatId, "⏳ Генерирую...", [], { removeKeyboard: true });
-    const success = await generateContract(chatId, userId, context);
+    const success = await generateContract(chatId, userId, context, docCrewSlug);
     if (success) {
       await clearState(userId);
     }
@@ -3301,8 +3291,9 @@ export async function handleDocCallback(
   if (callbackData === "ph_skip") {
     context.clientPhoneResolved = true;
     await setState(userId, "confirm", context);
+    const docCrewSlug = await getDocCrewSlug(userId);
     await sendComplexMessage(chatId, "⏳ Генерирую...", [], { removeKeyboard: true });
-    const success = await generateContract(chatId, userId, context);
+    const success = await generateContract(chatId, userId, context, docCrewSlug);
     if (success) {
       await clearState(userId);
     }
@@ -3325,6 +3316,9 @@ export async function docCommand(
 ) {
   const userIdStr = String(userId);
   logger.info(`[/doc] ${userIdStr}: ${text}`);
+
+  // Resolve crew slug from user_states context
+  const crewSlug = await getDocCrewSlug(userIdStr);
 
   // TODO: future OCR support — photos and documents are available here
   // if (photos?.length) { /* OCR pipeline */ }
@@ -3351,7 +3345,7 @@ export async function docCommand(
     return;
   }
 
-  const bikes = await getAvailableBikes();
+  const bikes = await getAvailableBikes(crewSlug);
   if (!bikes.length) {
     await sendComplexMessage(chatId, "🚲 Нет байков.", [], { removeKeyboard: true });
     return;
