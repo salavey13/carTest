@@ -716,6 +716,7 @@ async function generateContract(chatId: number, userId: string, context: TestDri
           .from("rental_contract_artifacts")
           .insert({
             contract_key: vars.document_key,
+            crew_slug: crewSlug,
             storage_path: docStoragePath,
             original_sha256: docSha256,
             requested_bike_id: bike.id,

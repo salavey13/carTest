@@ -1601,6 +1601,7 @@ ${qrDeepLink}`);
 
       const rentInsert: Record<string, any> = {
         contract_key: vars.document_key,
+        crew_slug: resolvedSlug,
         storage_path: docStoragePath,
         original_sha256: docSha256,
         requested_bike_id: context.bikeId,
@@ -1692,6 +1693,7 @@ ${qrDeepLink}`);
         // sale_contract_artifacts is in private schema — use explicit columns only
         const { error: saleError } = await privateSchema().from("sale_contract_artifacts").insert({
           contract_key: vars.document_key,
+          crew_slug: resolvedSlug,
           storage_path: docStoragePath,
           original_sha256: docSha256,
           requested_bike_id: context.bikeId,

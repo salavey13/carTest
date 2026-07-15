@@ -822,6 +822,7 @@ async function generateAndSendContract(
       .from("rental_contract_artifacts")
       .insert({
         contract_key: vars.document_key,
+        crew_slug: "vip-bike",
         original_sha256: docSha256,
         requested_bike_id: context.bikeId,
         resolved_bike_id: bike.id,

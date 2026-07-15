@@ -135,28 +135,32 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
         .neq("stage", "dismissed")
         .order("last_seen_at", { ascending: false })
         .limit(800),
-      // 3. Rental contract artifacts
+      // 3. Rental contract artifacts (crew-filtered by crew_slug)
       privateSchema()
         .from("rental_contract_artifacts")
         .select("telegram_chat_id, renter_full_name, renter_phone, rental_id, rent_start_date, rent_end_date, bike_make, bike_model, total_amount, created_at")
+        .eq("crew_slug", safeSlug)
         .order("created_at", { ascending: false })
         .limit(300),
-      // 4. Rental secrets
+      // 4. Rental secrets (crew-filtered by crew_slug)
       privateSchema()
         .from("user_rental_secrets")
         .select("chat_id, renter_full_name, renter_phone, verification_status, source_doc_key, created_at")
+        .eq("crew_slug", safeSlug)
         .order("created_at", { ascending: false })
         .limit(300),
-      // 5. Active/past rentals
+      // 5. Active/past rentals (crew-filtered by crew_id)
       supabaseAdmin
         .from("rentals")
-        .select("rental_id, user_id, status, payment_status, requested_start_date, requested_end_date, total_cost, metadata, passport_mainpage_photo, passport_registration_photo, drivers_licence_frontal_photo, vehicle:cars(make, model)")
+        .select("rental_id, user_id, status, payment_status, requested_start_date, requested_end_date, total_cost, metadata, passport_mainpage_photo, passport_registration_photo, drivers_licence_frontal_photo, crew_id, vehicle:cars(make, model)")
+        .eq("crew_id", crewId)
         .order("created_at", { ascending: false })
         .limit(500),
-      // 6. Sale contract artifacts
+      // 6. Sale contract artifacts (crew-filtered by crew_slug)
       privateSchema()
         .from("sale_contract_artifacts")
         .select("buyer_phone, sale_id, bike_make, bike_model, sale_price, created_at")
+        .eq("crew_slug", safeSlug)
         .order("created_at", { ascending: false })
         .limit(200),
     ]);
@@ -379,9 +383,9 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       allUserIds.length > 0
         ? supabaseAdmin.from("users").select("user_id, username, full_name, phone").in("user_id", allUserIds)
         : { data: [], error: null },
-      // 8. Enrich from secrets by phone
+      // 8. Enrich from secrets by phone (crew-filtered)
       leadPhones.length > 0
-        ? privateSchema().from("user_rental_secrets").select("chat_id, renter_phone").in("renter_phone", leadPhones) as Promise<{ data: Array<{ chat_id: string | null; renter_phone: string | null }> | null }>
+        ? privateSchema().from("user_rental_secrets").select("chat_id, renter_phone").eq("crew_slug", safeSlug).in("renter_phone", leadPhones) as Promise<{ data: Array<{ chat_id: string | null; renter_phone: string | null }> | null }>
         : { data: [], error: null },
       // 9. Troubled users
       supabaseAdmin.from("users").select("user_id, metadata").not("metadata->>troubled", "is", null),
