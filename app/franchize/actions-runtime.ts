@@ -1988,6 +1988,18 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
         : "SALE_DEAL_TEMPLATE.html";
     const defaultTemplateMode = "html" as const;
 
+  // Check crew-specific template in crewDocs/ first
+  const crewDocPath = path.join(process.cwd(), "docs", "crewDocs", `${slug}_${localTemplateFile}`);
+  try {
+    const crewTemplate = await readFile(crewDocPath, "utf8");
+    if (crewTemplate.trim().length > 0) {
+      logger.info(`[franchize] Using crew-specific template: ${slug}_${localTemplateFile}`);
+      return { template: crewTemplate, templateMode: defaultTemplateMode };
+    }
+  } catch (crewDocErr) {
+    logger.info(`[franchize] No crew-specific template for ${slug}, using general: ${localTemplateFile}`);
+  }
+
   // Prefer local file (fast, no network hop, matches /doc behaviour)
   try {
     const localTemplatePath = path.join(process.cwd(), "docs", localTemplateFile);

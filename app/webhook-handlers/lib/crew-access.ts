@@ -228,3 +228,70 @@ export async function loadCrewSecrets(
     return { ...fallbacks };
   }
 }
+
+// ── Crew-specific template loading ─────────────────────────────────────────
+
+import { readFileSync } from "fs";
+import { join } from "path";
+
+const CREW_DOCS_DIR = "docs/crewDocs";
+const GENERAL_DOCS_DIR = "docs";
+
+/**
+ * Template names mapped to their file names.
+ */
+const TEMPLATE_FILES: Record<string, string> = {
+  rental: "RENTAL_DEAL_TEMPLATE.html",
+  sale: "SALE_DEAL_TEMPLATE.html",
+  testdrive: "TESTDRIVE_DEAL_TEMPLATE.html",
+  subrental: "SUBRENTAL_DEAL_TEMPLATE.html",
+  commercial_proposal: "COMMERCIAL_PROPOSAL_TEMPLATE.html",
+};
+
+/**
+ * Load a contract template, checking for crew-specific version first.
+ *
+ * Priority:
+ *   1. `docs/crewDocs/{crewSlug}_{templateFile}` — crew-specific override
+ *   2. `docs/{templateFile}` — general fallback
+ *
+ * @param templateKey — one of "rental", "sale", "testdrive", "subrental", "commercial_proposal"
+ * @param crewSlug — crew slug (e.g. "vip-bike", "custom-bobber-virus")
+ * @returns template HTML string
+ * @throws if neither file exists
+ */
+export function loadTemplateForCrew(templateKey: string, crewSlug?: string): string {
+  const templateFile = TEMPLATE_FILES[templateKey];
+  if (!templateFile) {
+    throw new Error(`[crew-access] Unknown template key: ${templateKey}`);
+  }
+
+  // 1. Try crew-specific template
+  if (crewSlug) {
+    const crewPath = join(process.cwd(), CREW_DOCS_DIR, `${crewSlug}_${templateFile}`);
+    try {
+      const crewTemplate = readFileSync(crewPath, "utf8");
+      if (crewTemplate.trim().length > 0) {
+        logger.info(`[crew-access] Using crew-specific template: ${crewSlug}_${templateFile}`);
+        return crewTemplate;
+      }
+    } catch {
+      logger.info(`[crew-access] No crew-specific template for ${crewSlug}, using general: ${templateFile}`);
+    }
+  }
+
+  // 2. Fall back to general template
+  const generalPath = join(process.cwd(), GENERAL_DOCS_DIR, templateFile);
+  try {
+    const generalTemplate = readFileSync(generalPath, "utf8");
+    if (generalTemplate.trim().length > 0) {
+      return generalTemplate;
+    }
+  } catch {
+    // continue to error
+  }
+
+  throw new Error(
+    `[crew-access] Template not found: ${templateFile} (crew: ${crewSlug || "none"})`,
+  );
+}
