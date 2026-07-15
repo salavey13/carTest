@@ -1,4 +1,4 @@
-//"use server";
+"use server";
 
 // Centralized franchize lead/intent helpers.
 // All flows that produce a lead (/doc, /testdrive, web cart, continue-in-TG,
