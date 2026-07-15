@@ -40,6 +40,8 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const [isReturningUser, setIsReturningUser] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [hasSavedDocs, setHasSavedDocs] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState<string>("");
 
   // Load rental secrets for returning users (WOW effect)
   useEffect(() => {
@@ -87,6 +89,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
 
   const handleProceed = async () => {
     setIsSaving(true);
+    setLoadingMessage("Сохраняем корзину...");
     const flow = isAllSale ? "sale" : isMixed ? "mixed" : "rental";
     const intentPromise = upsertFranchizeIntent({
       slug,
@@ -119,15 +122,27 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
     }
     // Generate a real order ID instead of hardcoded "demo-order"
     const orderId = `order-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    setLoadingMessage("Переходим к оформлению...");
     router.push(`/franchize/${slug}/order/${orderId}?flow=${flow}`);
   };
 
   const handleDelete = useCallback(
     (lineId: string) => {
-      removeLine(lineId);
+      setConfirmDeleteId(lineId);
     },
-    [removeLine],
+    [],
   );
+
+  const confirmDelete = useCallback(() => {
+    if (confirmDeleteId) {
+      removeLine(confirmDeleteId);
+      setConfirmDeleteId(null);
+    }
+  }, [confirmDeleteId, removeLine]);
+
+  const cancelDelete = useCallback(() => {
+    setConfirmDeleteId(null);
+  }, []);
 
   const handleEdit = useCallback(
     (lineId: string) => {
@@ -269,6 +284,58 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
             </div>
           </motion.div>
         </AnimatePresence>
+      )}
+
+      {/* Confirmation dialog for item removal */}
+      {confirmDeleteId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-delete-title"
+        >
+          <div className="mx-4 max-w-sm rounded-2xl border bg-[var(--cart-bg)] p-6 shadow-2xl" style={{ borderColor: T.borderSoft }}>
+            <h3 id="confirm-delete-title" className="mb-2 text-lg font-semibold" style={{ color: T.text }}>
+              Удалить из корзины?
+            </h3>
+            <p className="mb-4 text-sm" style={{ color: T.textMuted }}>
+              Вы уверены, что хотите удалить этот байк из корзины?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={cancelDelete}
+                autoFocus
+                className="flex-1 rounded-xl border px-4 py-2 text-sm font-medium transition hover:opacity-80"
+                style={{ borderColor: T.borderSoft, color: T.text }}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="flex-1 rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600"
+              >
+                Удалить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading overlay during checkout */}
+      {isSaving && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Оформление заказа"
+        >
+          <div className="flex flex-col items-center gap-3 rounded-2xl border bg-[var(--cart-bg)] p-8 shadow-2xl" style={{ borderColor: T.borderSoft }}>
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--cart-accent)] border-t-transparent" />
+            <p className="text-sm font-medium" style={{ color: T.text }}>{loadingMessage}</p>
+          </div>
+        </div>
       )}
     </section>
   );

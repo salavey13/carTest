@@ -734,7 +734,13 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       });
 
       if (!result.success) {
-        toast.error(result.error ?? "Не удалось отправить заказ.");
+        toast.error(result.error ?? "Не удалось отправить заказ.", {
+          duration: 10000,
+          action: {
+            label: "Повторить",
+            onClick: () => handleSubmit(onSubmitValid)(),
+          },
+        });
         lastSubmitFingerprintRef.current = null;
         return;
       }
@@ -1060,7 +1066,31 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         </a>
       </div>
 
-      <form className="mt-6 grid gap-4 md:grid-cols-[1fr_300px]" onSubmit={handleSubmit(onSubmitValid)}>
+      {/* ── Checkout progress indicator ── */}
+      <div className="mt-6 mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--order-accent)] text-sm font-bold text-[var(--order-accent-contrast)]">
+            1
+          </div>
+          <span className="text-sm font-medium" style={{ color: T.text }}>Контактные данные</span>
+        </div>
+        <div className="mx-3 h-px flex-1" style={{ backgroundColor: T.borderSoft }} />
+        <div className="flex items-center gap-2">
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-full border-2 text-sm font-medium"
+            style={{
+              borderColor: canSubmit ? T.accent : T.borderSoft,
+              backgroundColor: canSubmit ? T.accent : "transparent",
+              color: canSubmit ? T.accentContrast : T.textMuted,
+            }}
+          >
+            2
+          </div>
+          <span className="text-sm" style={{ color: canSubmit ? T.text : T.textMuted }}>Подтверждение</span>
+        </div>
+      </div>
+
+      <form className="grid gap-4 md:grid-cols-[1fr_300px]" onSubmit={handleSubmit(onSubmitValid)}>
 <div className="space-y-4">
           <div className="rounded-2xl border p-4" style={surface.card}>
             <p className="text-sm font-medium">Данные получателя</p>
