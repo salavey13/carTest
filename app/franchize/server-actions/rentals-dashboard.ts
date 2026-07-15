@@ -541,8 +541,14 @@ export async function getSalesDashboard(input: {
     const startOfDay = new Date(`${date}T00:00:00.000Z`).toISOString();
     const endOfDay = new Date(`${date}T23:59:59.999Z`).toISOString();
 
-    // Query sales from private.sale_contract_artifacts
-    // Join with cars to filter by crew_id and get bike details
+    // Pre-fetch this crew's bike IDs for filtering
+    const { data: crewBikes } = await supabaseAdmin
+      .from("cars")
+      .select("id")
+      .eq("crew_id", crew.id);
+    const crewBikeIds = (crewBikes || []).map(b => b.id);
+
+    // Query sales from private.sale_contract_artifacts (crew-filtered by resolved_bike_id)
     const { data: sales, error: salesError } = await privateSchema()
       .from("sale_contract_artifacts")
       .select(`
@@ -557,6 +563,7 @@ export async function getSalesDashboard(input: {
         created_at,
         resolved_bike_id
       `)
+      .in("resolved_bike_id", crewBikeIds.length ? crewBikeIds : ["__none__"])
       .gte("created_at", startOfDay)
       .lte("created_at", endOfDay)
       .order("created_at", { ascending: false });
@@ -566,7 +573,7 @@ export async function getSalesDashboard(input: {
       return { success: false, error: salesError.message };
     }
 
-    // Fetch bike details for all sales and filter by crew
+    // Fetch bike details for all sales
     const bikeIds = (sales || []).map(s => s.resolved_bike_id).filter(Boolean) as string[];
     const bikeDetailsBy_id = new Map<string, { id: string; make: string; model: string; crew_id: string; type: string }>();
 
@@ -589,11 +596,6 @@ export async function getSalesDashboard(input: {
     for (const sale of sales || []) {
       const bikeId = sale.resolved_bike_id || "";
       const bike = bikeDetailsBy_id.get(bikeId);
-
-      // Skip if bike doesn't belong to this crew
-      if (bike && bike.crew_id !== crew.id) {
-        continue;
-      }
 
       // Dedupe key: buyer_name + bike_id (using buyer_full_name as identifier)
       const dedupeKey = `${sale.buyer_full_name || "unknown"}::${bikeId}`;

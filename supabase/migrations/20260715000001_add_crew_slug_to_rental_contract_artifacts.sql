@@ -12,12 +12,13 @@ WHERE a.original_sha256 = s.doc_sha256
   AND a.crew_slug IS NULL;
 
 -- Fallback backfill: derive crew_slug from rentals → cars → crews
+-- rental_id in rental_contract_artifacts is UUID, rentals.rental_id is UUID
 UPDATE private.rental_contract_artifacts a
 SET crew_slug = cr.slug
 FROM public.rentals r
 JOIN public.cars c ON c.id = r.vehicle_id
 JOIN public.crews cr ON cr.id = c.crew_id
-WHERE a.rental_id = r.rental_id::text
+WHERE a.rental_id = r.rental_id
   AND a.crew_slug IS NULL;
 
 -- Any remaining NULL crew_slug — mark as 'unknown' (should not happen in practice)

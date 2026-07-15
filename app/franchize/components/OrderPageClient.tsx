@@ -648,7 +648,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     const endDate = submitPayload.rentalEndDate || submitPayload.rentalStartDate;
     if (!carIds.length || !startDate || !endDate) return true;
 
-    const result = await checkFranchizeCarsAvailability({ carIds, rentalStartDate: startDate, rentalEndDate: endDate });
+    const result = await checkFranchizeCarsAvailability({ carIds, rentalStartDate: startDate, rentalEndDate: endDate, slug });
     if (!result.success) {
       toast.error(result.error ?? "Не удалось проверить доступность байка.");
       return false;

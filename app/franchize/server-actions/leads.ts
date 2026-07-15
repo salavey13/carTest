@@ -110,24 +110,17 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       if (row.contactChannel && !existing.contactChannel) existing.contactChannel = row.contactChannel;
     };
 
-    // ── Parallel fetch of independent lead sources (steps 1-6) ──
+    // ── Parallel fetch of independent lead sources (steps 1-5) ──
+    // NOTE: `users` table is NOT a primary source (no crew filter available).
+    // Users are enriched later from public.users by user_id (step 7).
     const [
-      usersLeadsResult,
       intentLeadsResult,
       artifactUsersResult,
       secretUsersResult,
       rentalsResult,
       saleArtifactsResult,
     ] = await Promise.all([
-      // 1. Users with lead source metadata
-      supabaseAdmin
-        .from("users")
-        .select("user_id, full_name, username, phone, metadata, created_at")
-        .or(`metadata->>source.in.(web_callback,rental_contract,sale_contract,test_drive,telegram-testdrive),metadata->>is_lead.eq.true`)
-        .neq("metadata->>is_dismissed_lead", "true")
-        .order("created_at", { ascending: false })
-        .limit(500),
-      // 2. franchize_intents (the canonical lead ledger)
+      // 1. franchize_intents (the canonical lead ledger — crew-filtered by slug)
       supabaseAdmin
         .from("franchize_intents")
         .select("telegram_user_id, phone, intent_type, stage, urgency_score, source_route, contact_channel, last_seen_at, created_at, metadata, bike_id")
@@ -135,28 +128,28 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
         .neq("stage", "dismissed")
         .order("last_seen_at", { ascending: false })
         .limit(800),
-      // 3. Rental contract artifacts (crew-filtered by crew_slug)
+      // 2. Rental contract artifacts (crew-filtered) (crew-filtered by crew_slug)
       privateSchema()
         .from("rental_contract_artifacts")
         .select("telegram_chat_id, renter_full_name, renter_phone, rental_id, rent_start_date, rent_end_date, bike_make, bike_model, total_amount, created_at")
         .eq("crew_slug", safeSlug)
         .order("created_at", { ascending: false })
         .limit(300),
-      // 4. Rental secrets (crew-filtered by crew_slug)
+      // 3. Rental secrets (crew-filtered) (crew-filtered by crew_slug)
       privateSchema()
         .from("user_rental_secrets")
         .select("chat_id, renter_full_name, renter_phone, verification_status, source_doc_key, created_at")
         .eq("crew_slug", safeSlug)
         .order("created_at", { ascending: false })
         .limit(300),
-      // 5. Active/past rentals (crew-filtered by crew_id)
+      // 4. Active/past rentals (crew-filtered) (crew-filtered by crew_id)
       supabaseAdmin
         .from("rentals")
         .select("rental_id, user_id, status, payment_status, requested_start_date, requested_end_date, total_cost, metadata, passport_mainpage_photo, passport_registration_photo, drivers_licence_frontal_photo, crew_id, vehicle:cars(make, model)")
         .eq("crew_id", crewId)
         .order("created_at", { ascending: false })
         .limit(500),
-      // 6. Sale contract artifacts (crew-filtered by crew_slug)
+      // 5. Sale contract artifacts (crew-filtered) (crew-filtered by crew_slug)
       privateSchema()
         .from("sale_contract_artifacts")
         .select("buyer_phone, sale_id, bike_make, bike_model, sale_price, created_at")
@@ -165,35 +158,13 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
         .limit(200),
     ]);
 
-    const usersLeads = usersLeadsResult.data;
     const intentLeads = intentLeadsResult.data;
     const artifactUsers = artifactUsersResult.data;
     const secretUsers = secretUsersResult.data;
     const rentals = rentalsResult.data;
     const saleArtifacts = saleArtifactsResult.data;
 
-    // 1. Users with lead source metadata
-    if (usersLeads) {
-      for (const u of usersLeads) {
-        const meta = u.metadata as Record<string, unknown> | null;
-        addOrMerge({
-          user_id: u.user_id,
-          full_name: u.full_name,
-          username: u.username,
-          phone: u.phone || (meta?.phone as string) || null,
-          source: (meta?.source as string) || "unknown",
-          bikeTitle: (meta?.bikeTitle as string) || null,
-          createdAt: u.created_at,
-          lastSeenAt: (meta?.updatedAt as string) || u.created_at,
-          verified: ["rental_contract", "sale_contract", "test_drive"].includes(meta?.source as string),
-          telegramChatId: /^\d+$/.test(u.user_id) ? u.user_id : null,
-          rentals: [],
-          sales: [],
-        });
-      }
-    }
-
-    // 2. franchize_intents
+    // ── Franchize intents
     if (intentLeads) {
       for (const i of intentLeads) {
         if (!i.telegram_user_id && !i.phone) continue;
@@ -221,7 +192,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       }
     }
 
-    // 3. Rental contract artifacts
+    // 2. Rental contract artifacts (crew-filtered)
     if (artifactUsers) {
       for (const a of artifactUsers) {
         if (!a.telegram_chat_id && !a.renter_phone) continue;
@@ -268,7 +239,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       }
     }
 
-    // 4. Rental secrets
+    // 3. Rental secrets (crew-filtered)
     if (secretUsers) {
       for (const s of secretUsers) {
         if (!s.chat_id) continue;
@@ -296,7 +267,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       }
     }
 
-    // 5. Active/past rentals
+    // 4. Active/past rentals (crew-filtered)
     if (rentals) {
       for (const r of rentals) {
         if (!r.user_id) continue;
@@ -338,7 +309,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       }
     }
 
-    // 6. Sale contract artifacts
+    // 5. Sale contract artifacts (crew-filtered)
     if (saleArtifacts) {
       for (const s of saleArtifacts) {
         const id = s.buyer_phone || "";
