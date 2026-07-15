@@ -61,6 +61,7 @@ function logFranchizeCheckoutFailure(
 }
 
 type RentalAvailabilityRow = {
+  rental_id: string | null;
   vehicle_id: string | null;
   status: string | null;
   agreed_start_date: string | null;
@@ -2088,7 +2089,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           .join("\n")
       : "| Без доп. опций | 0 | 0 ₽ | 0 ₽ |";
 
-    const flowType: FranchizeOrderFlowType = payload.flowType ?? "rental";
+    const flowType = (payload.flowType ?? "rental") as FranchizeOrderFlowType;
     const isSaleFlow = flowType === "sale" || flowType === "mixed";
     const isTestdrive = flowType === "testdrive";
 
@@ -2552,7 +2553,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         fileName: docFileName,
         template: rentalTemplate!,
         variables,
-        flowType,
+        flowType: flowType as any,
         templateMode,
       });
 
@@ -2709,7 +2710,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
           // Dedup by semantic key: same buyer + same bike = duplicate (retry)
           const { data: existingSale } = await supabaseAdmin
-            .schema("private")
+            .schema("private" as any)
             .from("sale_contract_artifacts")
             .select("id, storage_path")
             .eq("buyer_full_name", payload.recipient || "")
@@ -2724,7 +2725,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             // Backfill storage_path on existing record if missing
             if (!existingSale.storage_path && (doc as any).storagePath) {
               await supabaseAdmin
-                .schema("private")
+                .schema("private" as any)
                 .from("sale_contract_artifacts")
                 .update({ storage_path: (doc as any).storagePath })
                 .eq("id", existingSale.id);
@@ -2734,7 +2735,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           }
 
           const { error: artifactError } = await supabaseAdmin
-            .schema("private")
+            .schema("private" as any)
             .from("sale_contract_artifacts")
             .insert({
               contract_key: doc.documentKey,
@@ -2776,7 +2777,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
           // Dedup by semantic key: same renter + same bike + same start date = duplicate (retry)
           const { data: existingRental } = await supabaseAdmin
-            .schema("private")
+            .schema("private" as any)
             .from("rental_contract_artifacts")
             .select("id, storage_path")
             .eq("renter_full_name", payload.recipient || "")
@@ -2792,7 +2793,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             // Backfill storage_path on existing record if missing
             if (!existingRental.storage_path && (doc as any).storagePath) {
               await supabaseAdmin
-                .schema("private")
+                .schema("private" as any)
                 .from("rental_contract_artifacts")
                 .update({ storage_path: (doc as any).storagePath })
                 .eq("id", existingRental.id);
@@ -2802,7 +2803,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           }
 
           const { error: artifactError } = await supabaseAdmin
-            .schema("private")
+            .schema("private" as any)
             .from("rental_contract_artifacts")
             .insert({
               contract_key: doc.documentKey,
@@ -3107,7 +3108,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             const todo = todos[ti];
             const todoId = `todo-${(baseTs + bikeIndex * 1000).toString(36)}-${ti}-${Math.random().toString(36).slice(2, 5)}`;
             allTodoPromises.push(
-              supabaseAdmin.from("crew_todos").insert({
+              Promise.resolve(supabaseAdmin.from("crew_todos").insert({
                 id: todoId,
                 crew_id: crewId,
                 lead_id: leadId,
@@ -3128,7 +3129,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                 }),
               }).then(({ error }) => {
                 if (error) logger.warn("[franchize] Failed to create crew_todo:", todo.title, error);
-              })
+              }))
             );
           }
         }
@@ -4671,7 +4672,7 @@ export async function getTodayRentalsAnalytics(input: unknown) {
     if (userIds.length > 0) {
       const { data: users } = await supabaseAdmin
         .from("users")
-        .select("user_id, metadata")
+        .select("user_id, username, metadata")
         .in("user_id", userIds);
 
       for (const user of users ?? []) {

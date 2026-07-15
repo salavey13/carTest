@@ -32,7 +32,7 @@ export interface UpsertFranchizeLeadInput {
   /** Where the lead came from (e.g. "/doc-manual", "/cart", "item-modal", "dashboard"). */
   sourceRoute?: string | null;
   /** Contact channel label. */
-  contactChannel?: "telegram_bot" | "web_app" | "callback" | "unknown";
+  contactChannel?: "telegram_bot" | "web_app" | "callback" | "web_cart" | "unknown";
   /** 0-100 urgency score. */
   urgencyScore?: number;
   /** Free-form metadata. Will be merged with existing metadata on conflict. */
