@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
-import { normalizePhone } from "@/app/franchize/lib/leads";
+import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 
 /**
  * Register a callback lead from the web site.
