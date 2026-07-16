@@ -282,7 +282,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                 telegramBotUsername={crew.contacts.telegramBotUsername}
               />
             </CrewButtonErrorBoundary>
-            {SHOW_CART && (
+            {SHOW_CART && isInTelegramContext && (
               <FloatingCartIconLinkBySlug
                 slug={crew.slug}
                 href={`/franchize/${crew.slug}/cart`}
