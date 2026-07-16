@@ -50,7 +50,7 @@ export function CommercialOffersAnalyticsClient({ initialSlug, initialDate, crew
     if (!actorUserId) { setLoading(false); setRefreshing(false); return; }
     if (showRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const result = await getCommercialProposalsDashboard({ slug: initialSlug?.trim() || "vip-bike", actorUserId, date, isPasswordAuth: !!passwordAuthOwnerId });
+      const result = await getCommercialProposalsDashboard({ slug: initialSlug.trim(), actorUserId, date, isPasswordAuth: !!passwordAuthOwnerId });
       if (!result.success) {
         if (result.error?.includes("прав") || result.error?.includes("доступ")) { toast.error("Требуется пароль"); return; }
         toast.error(result.error || "Не удалось загрузить КП");

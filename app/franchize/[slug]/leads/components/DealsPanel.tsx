@@ -187,8 +187,8 @@ function RentalRow({ rental, slug, T }: RentalRowProps) {
           <span><Banknote className="inline h-3 w-3 mr-1" />{fmtMoney(rental.totalCost)}</span>
         </div>
         <div className="mt-2 flex items-center gap-2 flex-wrap">
-          {rental.rentalId && (
-            <a href={`/franchize/vip-bike/rental/${rental.rentalId}`}
+            {rental.rentalId && (
+            <a href={`/franchize/${slug}/rental/${rental.rentalId}`}
               className="inline-flex items-center gap-1 text-[10px] font-medium" style={{ color: T.accent }}>
               Открыть <ExternalLink className="h-3 w-3" />
             </a>

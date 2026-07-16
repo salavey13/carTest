@@ -263,7 +263,7 @@ const COLORS: PdfColors = {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function normalizeSlug(value: string) {
-  return (value || "vip-bike").trim().toLowerCase() || "vip-bike";
+  return value.trim().toLowerCase();
 }
 
 function readString(value: unknown) {
