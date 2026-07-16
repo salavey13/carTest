@@ -41,8 +41,8 @@ const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string; compactLabel?: 
   { key: "entry", label: "Базовый", compactLabel: "Базов.", tierColor: "#22c55e" },
   { key: "mid", label: "Средний", compactLabel: "Средн.", tierColor: "#eab308" },
   { key: "pro", label: "Профи", tierColor: "#ef4444" },
-  { key: "budget", label: "До 5000" },
-  { key: "premium", label: "Премиум 7000+" },
+  { key: "budget", label: "До 8000" },
+  { key: "premium", label: "Премиум 10000+" },
   { key: "newbie", label: "Для новичка", compactLabel: "Для новичков" },
   { key: "topRated", label: "Лучшие отзывы" },
 ];
@@ -514,10 +514,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
 
   const matchesQuickFilter = (item: CatalogItemVM, filter: QuickFilterKey) => {
     if (filter === "budget") {
-      return item.pricePerDay <= 5000;
+      return item.pricePerDay <= 8000;
     }
     if (filter === "premium") {
-      return item.pricePerDay >= 7000;
+      return item.pricePerDay >= 10000;
     }
     if (filter === "newbie") {
       return /naked|neo|scooter|300|400/i.test(`${item.category} ${item.title}`);
