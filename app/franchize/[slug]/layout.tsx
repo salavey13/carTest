@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: Omit<FranchizeSlugLayoutProps
     const { crew, items } = await getFranchizeBySlug(slug);
     const title = `${crew.header.brandName} | oneSitePls`;
     const description = crew.header.subtitle?.trim() || `Каталог, аренда и покупка техники экипажа ${crew.header.brandName}.`;
-    const image = toAbsoluteFranchizeUrl(siteUrl, crew.header.logoUrl || items.find((item) => item.imageUrl)?.imageUrl || "/icon0.svg");
+    const image = toAbsoluteFranchizeUrl(siteUrl, crew.header.logoUrl || items.find((item) => item.imageUrl)?.imageUrl || "/favicon.svg");
     const path = `/franchize/${crew.slug || slug}`;
     const keywords = [
       crew.header.brandName,
