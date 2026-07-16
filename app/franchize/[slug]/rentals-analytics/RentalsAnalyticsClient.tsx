@@ -13,8 +13,6 @@ import {
   Clock,
   AlertCircle,
   RefreshCw,
-  ShieldCheck,
-  Sparkles,
   TrendingUp,
   Zap,
   Eye,
@@ -41,7 +39,6 @@ import {
   getRentalsDateRange,
   getRentalsForExport,
   getSalesDashboard,
-  validateAnalyticsPassword,
   getCommercialProposalsDashboard,
   getSubrentContractsDashboard,
   updateRentalStatus,
@@ -73,6 +70,7 @@ import { SubrentsSection } from "./analytics-components/SubrentsSection";
 import { SalesListSection } from "./analytics-components/SalesListSection";
 import { CommercialProposalsListSection } from "./analytics-components/CommercialProposalsListSection";
 import { TodosSection } from "./analytics-components/TodosSection";
+import { RentalStatusChangeModal } from "./analytics-components/RentalStatusChangeModal";
 import {
   getAllChecklistStates,
   updateChecklistState,
@@ -91,6 +89,8 @@ import { RentalHandoffModal } from "./RentalHandoffModal";
 import { RentalsCalendar } from "./RentalsCalendar";
 import { AnalyticsCrossNav } from "./analytics-components/AnalyticsCrossNav";
 import { withAlpha } from "@/app/franchize/lib/theme";
+import { AnalyticsPasswordEntry } from "@/app/franchize/components/AnalyticsPasswordEntry";
+import { AnalyticsLoading } from "@/app/franchize/components/AnalyticsLoading";
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────────
 
@@ -182,11 +182,8 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const [analyticsView, setAnalyticsView] = useState<"table" | "calendar">("table");
 
   // Password auth
-  const [showPasswordEntry, setShowPasswordEntry] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [isPasswordValidating, setIsPasswordValidating] = useState(false);
   const [passwordAuthOwnerId, setPasswordAuthOwnerId] = useState<string | null>(null);
+  const shouldShowPassword = !authLoading && !dbUser && !passwordAuthOwnerId;
 
   // Pull-to-refresh state
   const [pullState, setPullState] = useState<"idle" | "pulling" | "refreshing">("idle");
@@ -197,13 +194,6 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const startYRef = useRef(0);
   const currentYRef = useRef(0);
   const datePickerRef = useRef<HTMLDivElement>(null);
-
-  // Show password prompt immediately if no auth available
-  useEffect(() => {
-    if (!authLoading && !dbUser && !passwordAuthOwnerId) {
-      setShowPasswordEntry(true);
-    }
-  }, [authLoading, dbUser, passwordAuthOwnerId]);
 
   // Close date picker when clicking outside
   useEffect(() => {
@@ -564,38 +554,6 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     }
   };
 
-  // ─── Password handling ─────────────────────────────────────────────────────────
-
-  const handlePasswordSubmit = async () => {
-    if (!passwordInput.trim()) return;
-
-    setIsPasswordValidating(true);
-    setPasswordError(null);
-
-    try {
-      const result = await validateAnalyticsPassword({ password: passwordInput });
-      if (!result.success) {
-        setPasswordError(result.error || "Неверный пароль");
-        return;
-      }
-
-      // Verify the returned slug matches the current crew
-      if (result.slug && result.slug !== initialSlug?.trim()) {
-        setPasswordError(`Пароль для другого экипажа: ${result.slug}`);
-        return;
-      }
-
-      setPasswordAuthOwnerId(result.ownerId || null);
-      setShowPasswordEntry(false);
-      setPasswordInput("");
-      toast.success("Доступ разрешён");
-    } catch (error) {
-      setPasswordError("Ошибка проверки пароля");
-    } finally {
-      setIsPasswordValidating(false);
-    }
-  };
-
   // ─── Checklist handling ───────────────────────────────────────────────────────
 
   const toggleChecklistItem = async (type: "handout" | "return", itemId: string) => {
@@ -904,123 +862,19 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const textSecondary = "var(--franchize-text-secondary)";
   const borderSoft = "var(--franchize-border-soft)";
 
-  // ─── Password entry screen ────────────────────────────────────────────────────
+  // ─── Loading / Password entry screens ─────────────────────────────────────────
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: bgBase }}>
-        <div className="relative">
-          {/* Outer glow ring */}
-          <div
-            className="absolute inset-0 rounded-full blur-xl animate-pulse"
-            style={{ backgroundColor: withAlpha(accentMain, 0.2) }}
-          />
-          {/* Main spinner */}
-          <div className="relative w-12 h-12 md:w-16 md:h-16">
-            <div className="absolute inset-0 rounded-full border-3 md:border-4" style={{ borderColor: withAlpha(accentMain, 0.15) }} />
-            <div
-              className="absolute inset-0 rounded-full border-3 md:border-4 border-t-transparent animate-spin"
-              style={{ borderColor: accentMain, borderTopColor: "transparent" }}
-            />
-            {/* Center dot */}
-            <div
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full animate-pulse"
-              style={{ backgroundColor: accentMain }}
-            />
-          </div>
-        </div>
-      </div>
-    );
+    return <AnalyticsLoading accentMain={accentMain} bgBase={bgBase} />;
   }
 
-  if (showPasswordEntry) {
+  if (shouldShowPassword) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: bgBase }}>
-        <div className="w-full max-w-sm relative">
-          {/* Animated glow effect */}
-          <div
-            className="absolute -inset-3 md:-inset-4 rounded-full blur-2xl md:blur-3xl animate-pulse"
-            style={{ backgroundColor: withAlpha(accentMain, 0.15) }}
-          />
-
-          <div
-            className="relative rounded-2xl md:rounded-3xl p-6 md:p-8 border shadow-xl md:shadow-2xl"
-            style={{ backgroundColor: bgCard, borderColor: borderSoft }}
-          >
-            <div className="text-center mb-6 md:mb-8">
-              <div
-                className="w-16 h-16 md:w-20 md:h-20 mx-auto mb-4 md:mb-6 rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg"
-                style={{
-                  background: `linear-gradient(135deg, ${accentMain}, ${accentHover})`,
-                  boxShadow: `0 10px 40px ${withAlpha(accentMain, 0.3)}`,
-                }}
-              >
-                <ShieldCheck className="w-8 h-8 md:w-10 md:h-10" style={{ color: "#FFFFFF" }} />
-              </div>
-              <h1 className="text-2xl md:text-3xl font-black tracking-tight" style={{ backgroundImage: `linear-gradient(to right, ${accentMain}, ${accentHover})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                Аналитика
-              </h1>
-              <p className="text-xs md:text-sm mt-1.5 md:mt-2" style={{ color: textSecondary }}>Введите пароль для доступа</p>
-            </div>
-
-            <div className="relative">
-              <input
-                type="password"
-                value={passwordInput}
-                onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(null); }}
-                onKeyDown={(e) => e.key === "Enter" && void handlePasswordSubmit()}
-                placeholder="••••••••"
-                disabled={isPasswordValidating}
-                className="w-full px-4 md:px-6 py-3 md:py-4 rounded-lg md:rounded-xl border-2 text-center tracking-widest text-base md:text-lg transition-all focus:outline-none focus:ring-2"
-                style={{
-                  backgroundColor: withAlpha(bgCard, 0.5),
-                  borderColor: borderSoft,
-                  color: textPrimary,
-                }}
-                autoFocus
-              />
-              {passwordError && (
-                <p className="mt-2 md:mt-3 text-center text-xs md:text-sm flex items-center justify-center gap-1.5 md:gap-2" style={{ color: "#ef4444" }}>
-                  <AlertCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                  {passwordError}
-                </p>
-              )}
-            </div>
-
-            <button
-              onClick={handlePasswordSubmit}
-              disabled={isPasswordValidating || !passwordInput.trim()}
-              className="w-full mt-4 md:mt-6 px-4 md:px-6 py-3 md:py-4 font-bold rounded-lg md:rounded-xl transition-all hover:scale-[1.02] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-1.5 md:gap-2 text-sm md:text-base relative overflow-hidden"
-              style={{
-                background: `linear-gradient(to right, ${accentMain}, ${accentHover})`,
-                boxShadow: `0 4px 20px ${withAlpha(accentMain, 0.4)}`,
-                color: "#000000",
-              }}
-            >
-              {isPasswordValidating ? (
-                <>
-                  <div className="relative">
-                    <RefreshCw className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
-                    {/* Spinner glow */}
-                    <div className="absolute inset-0 blur-lg" style={{ backgroundColor: withAlpha("#FFFFFF", 0.3) }} />
-                  </div>
-                  Проверка...
-                  {/* Shimmer effect */}
-                  <div
-                    className="absolute inset-0 -translate-x-full animate-[shimmer_1s_infinite]"
-                    style={{ background: `linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)` }}
-                  />
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
-                  Войти
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
+      <AnalyticsPasswordEntry
+        crewName={crew.name}
+        slug={initialSlug.trim()}
+        onAuthenticated={(ownerId) => setPasswordAuthOwnerId(ownerId)}
+      />
     );
   }
 
@@ -2053,113 +1907,17 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
         />
       )}
 
-      {/* Status Change Modal */}
-      {statusChangeModalOpen && statusChangeRental && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 backdrop-blur-sm"
-            style={{ backgroundColor: withAlpha("#000000", 0.5) }}
-            onClick={() => setStatusChangeModalOpen(false)}
-          />
-
-          {/* Modal */}
-          <div
-            className="relative rounded-2xl p-6 max-w-sm w-full"
-            style={{
-              backgroundColor: bgCard,
-              borderColor: withAlpha(borderSoft, 0.5),
-              borderWidth: "1px",
-              boxShadow: `0 20px 60px ${withAlpha("#000000", 0.3)}`,
-            }}
-          >
-            <h3 className="text-lg font-black mb-4" style={{ color: textPrimary }}>
-              Изменить статус
-            </h3>
-            <p className="text-sm mb-4" style={{ color: textSecondary }}>
-              {statusChangeRental.vehicle?.make} {statusChangeRental.vehicle?.model}
-              <br />
-              <span className="text-xs">{statusChangeRental.user?.full_name || statusChangeRental.user?.username}</span>
-            </p>
-
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              {([
-                { value: "pending_confirmation", label: "Ожидает", icon: AlertCircle, color: "#fbbf24" },
-                { value: "confirmed", label: "Подтв.", icon: CheckCircle2, color: "#34d399" },
-                { value: "active", label: "Активна", icon: Clock, color: "#60a5fa" },
-                { value: "completed", label: "Завершена", icon: CheckCircle2, color: "#4ade80" },
-                { value: "cancelled", label: "Отменена", icon: XCircle, color: "#f87171" },
-                { value: "disputed", label: "Спор", icon: AlertCircle, color: "#ef4444" },
-              ] as const).map((status) => {
-                const Icon = status.icon;
-                const isSelected = statusChangeRental?.status === status.value;
-                const isUpdating = updatingRentalStatus === statusChangeRental.rental_id;
-
-                return (
-                  <button
-                    key={status.value}
-                    onClick={() => void handleStatusChange(statusChangeRental, status.value)}
-                    disabled={isUpdating}
-                    className="relative px-3 py-2 rounded-lg text-xs font-bold transition-all duration-300 disabled:opacity-50 overflow-hidden"
-                    style={
-                      isSelected
-                        ? {
-                            backgroundColor: `linear-gradient(135deg, ${withAlpha(status.color, 0.25)}, ${withAlpha(status.color, 0.15)})`,
-                            borderColor: withAlpha(status.color, 0.4),
-                            color: status.color,
-                            borderWidth: "1.5px",
-                            boxShadow: `0 0 15px ${withAlpha(status.color, 0.2)}`
-                          }
-                        : {
-                            backgroundColor: withAlpha(bgCard, 0.6),
-                            borderColor: borderSoft,
-                            color: textSecondary,
-                            borderWidth: "1px"
-                          }
-                    }
-                    onMouseEnter={(e) => {
-                      if (!isSelected && !isUpdating) {
-                        e.currentTarget.style.borderColor = status.color;
-                        e.currentTarget.style.color = status.color;
-                        e.currentTarget.style.backgroundColor = withAlpha(status.color, 0.1);
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected && !isUpdating) {
-                        e.currentTarget.style.borderColor = borderSoft;
-                        e.currentTarget.style.color = textSecondary;
-                        e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.6);
-                      }
-                    }}
-                  >
-                    {isUpdating ? (
-                      <RefreshCw className="w-4 h-4 mx-auto animate-spin" style={{ color: status.color }} />
-                    ) : (
-                      <div className="flex items-center justify-center gap-1.5">
-                        <Icon className="w-3.5 h-3.5" style={{ color: isSelected ? status.color : textSecondary }} />
-                        <span>{status.label}</span>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            <button
-              onClick={() => setStatusChangeModalOpen(false)}
-              className="w-full px-4 py-2 rounded-lg text-sm font-bold transition-all"
-              style={{
-                backgroundColor: withAlpha(borderSoft, 0.2),
-                color: textSecondary,
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = withAlpha(borderSoft, 0.3)}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = withAlpha(borderSoft, 0.2)}
-            >
-              Отмена
-            </button>
-          </div>
-        </div>
-      )}
+      <RentalStatusChangeModal
+        isOpen={statusChangeModalOpen}
+        rental={statusChangeRental}
+        updatingRentalStatus={updatingRentalStatus}
+        onStatusChange={handleStatusChange}
+        onClose={() => setStatusChangeModalOpen(false)}
+        bgCard={bgCard}
+        borderSoft={borderSoft}
+        textPrimary={textPrimary}
+        textSecondary={textSecondary}
+      />
     </div>
   );
 }

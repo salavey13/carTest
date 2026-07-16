@@ -91,6 +91,9 @@ export type VipBikeExperience =
  * factors in intent decay when computing confidence.
  */
 export interface VipBikeUserProfile {
+  /** Crew slug for building correct franchise URLs */
+  slug?: string;
+
   /** Behavioral segment — drives section ordering and featured categories */
   segment: VipBikeSegment;
 
