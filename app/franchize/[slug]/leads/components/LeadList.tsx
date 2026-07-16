@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useVirtualList } from "../hooks/useVirtualList";
 import { LeadCard } from "./LeadCard";
+import { LeadDetailContent } from "./LeadDetailContent";
 import { X } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
 import { metaFor, getInitials } from "../leads-utils";
@@ -77,7 +78,7 @@ export function LeadList({
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                {/* Inline detail - would import LeadDetailContent here */}
+                <LeadDetailContent lead={lead} todos={getTodosForLead(lead)} crewId={crewId} slug={slug} T={T} />
               </div>
             )}
           </div>
