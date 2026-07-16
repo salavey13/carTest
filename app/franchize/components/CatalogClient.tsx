@@ -882,7 +882,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   return (
     <>
       <section
-        className="relative mx-auto w-full max-w-7xl px-4 pb-6 pt-8 2xl:max-w-[1600px]"
+        className="relative mx-auto w-full max-w-7xl px-4 pb-6 pt-8 xl:max-w-[1440px] 2xl:max-w-[1800px]"
         id="catalog-sections"
         style={{
           ["--catalog-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
@@ -1146,7 +1146,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       data-catalog-item="true"
                       data-carousel-card="true"
                       data-carousel-index={index}
-                      className="group w-[calc(50vw-14px)] shrink-0 snap-start overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-[border-color] duration-300 hover:!border-[var(--catalog-accent)] sm:w-[260px] sm:max-w-[280px]"
+                      className="group w-[calc(50vw-14px)] shrink-0 snap-start overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-[border-color] duration-300 hover:!border-[var(--catalog-accent)] sm:w-[220px] sm:max-w-[240px]"
                       style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
                     >
                       <button
@@ -1181,7 +1181,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               src={localImageSrc(item.imageUrl)}
                               alt={item.title}
                               fill
-                              sizes="(max-width: 1279px) 46vw, 260px"
+                              sizes="(max-width: 1279px) 46vw, 220px"
                               className="object-cover transition-transform duration-300 ease-out"
                               style={{ transform: `scale(1.04) translate3d(${parallax.x * 4}px, ${parallax.y * 4}px, 0)` }}
                               onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
@@ -1285,7 +1285,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                     </div>
                   </>
                 ) : (
-                <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                   {group.items.map((item) => {
                     const rentalStrip = buildCatalogRentalStrip(item, crew);
                     const visibleSpecs = getVisibleSpecChips(item);
@@ -1313,7 +1313,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               src={localImageSrc(item.imageUrl)}
                               alt={item.title}
                               fill
-                              sizes="(max-width: 1279px) 50vw, (max-width: 1535px) 33vw, 25vw"
+                              sizes="(max-width: 767px) 50vw, (max-width: 1023px) 33vw, (max-width: 1279px) 25vw, (max-width: 1535px) 20vw, 16vw"
                               className="object-cover"
                               onError={handleImageError(item.imageUrl)}
                             />
