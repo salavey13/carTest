@@ -81,7 +81,7 @@ const DEFAULT_NOTIFICATION_PREFERENCES: FranchizeNotificationPreferences = {
 };
 
 function normalizeSlug(slug: string): string {
-  return (slug || "vip-bike").trim().toLowerCase() || "vip-bike";
+  return slug.trim().toLowerCase();
 }
 
 function asRecord(value: unknown): Record<string, any> {
@@ -131,14 +131,14 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
 }
 
 export async function getFranchizeAchievementCatalogAction(slug: string): Promise<FranchizeAchievementDefinition[]> {
-  return getCatalogBySlug((slug || "vip-bike").trim().toLowerCase());
+  return getCatalogBySlug(slug.trim().toLowerCase());
 }
 
 export async function getFranchizeProfileBySlugAction(params: {
   slug: string;
   userId: string;
 }): Promise<{ success: boolean; data?: FranchizeProfileState; error?: string; catalog?: FranchizeAchievementDefinition[] }> {
-  const slug = (params.slug || "vip-bike").trim().toLowerCase();
+  const slug = params.slug.trim().toLowerCase();
   if (!params.userId) {
     return { success: false, error: "userId is required", catalog: getCatalogBySlug(slug) };
   }
@@ -174,7 +174,7 @@ export async function grantFranchizeAchievementAction(params: {
   context?: Record<string, unknown>;
   incrementCounters?: Record<string, number>;
 }): Promise<{ success: boolean; alreadyUnlocked?: boolean; error?: string }> {
-  const slug = (params.slug || "vip-bike").trim().toLowerCase();
+  const slug = params.slug.trim().toLowerCase();
   if (!params.userId || !params.achievementId) {
     return { success: false, error: "userId and achievementId are required" };
   }

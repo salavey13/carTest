@@ -600,7 +600,10 @@ function applyVisibilityRules(sectionOrder: SectionId[], profile: VipBikeUserPro
  *   - A/B testing CTAs independently
  *   - Analytics: "CTA resolver v2 increased click-through by 20%"
  */
-export function resolveCTA(profile: VipBikeUserProfile): PrimaryCTA {
+export function resolveCTA(profile: VipBikeUserProfile, slug?: string): PrimaryCTA {
+  // Build franchise base path with dynamic slug fallback to "vip-bike"
+  const f = (path: string) => slug ? `/franchize/${slug}${path}` : `/franchize/vip-bike${path}`;
+
   // Not surveyed → onboarding CTA
   if (!profile.onboardingCompleted && profile.confidence < 0.3) {
     return {
@@ -620,23 +623,23 @@ export function resolveCTA(profile: VipBikeUserProfile): PrimaryCTA {
   switch (effectiveIntent) {
     case "buy":
       return profile.experience === "beginner"
-        ? { label: "Подобрать первый байк", href: "/franchize/vip-bike", isExternal: false, variant: "accent" }
-        : { label: "Выбрать покупку", href: "/franchize/vip-bike", isExternal: false, variant: "accent" };
+        ? { label: "Подобрать первый байк", href: f(""), isExternal: false, variant: "accent" }
+        : { label: "Выбрать покупку", href: f(""), isExternal: false, variant: "accent" };
 
     case "rent":
       return profile.experience === "beginner"
-        ? { label: "Первый выезд", href: "/franchize/vip-bike", isExternal: false, variant: "accent" }
-        : { label: "Выбрать аренду", href: "/franchize/vip-bike", isExternal: false, variant: "accent" };
+        ? { label: "Первый выезд", href: f(""), isExternal: false, variant: "accent" }
+        : { label: "Выбрать аренду", href: f(""), isExternal: false, variant: "accent" };
 
     case "community":
-      return { label: "Открыть карту", href: "/franchize/vip-bike/map-riders", isExternal: false, variant: "accent" };
+      return { label: "Открыть карту", href: f("/map-riders"), isExternal: false, variant: "accent" };
 
     case "explore":
     default:
       if (profile.segment === "electro") {
-        return { label: "Изучить электро", href: "/franchize/vip-bike", isExternal: false, variant: "brand-yellow" };
+        return { label: "Изучить электро", href: f(""), isExternal: false, variant: "brand-yellow" };
       }
-      return { label: "Смотреть подборку", href: "/franchize/vip-bike", isExternal: false, variant: "outline" };
+      return { label: "Смотреть подборку", href: f(""), isExternal: false, variant: "outline" };
   }
 }
 
@@ -995,7 +998,7 @@ export function resolveVipBikeExperience(
     const universal = PRESETS.find((p) => p.name === "universal")!;
     return {
       heroMode: resolveHero(profile),
-      primaryCTA: resolveCTA(profile),
+      primaryCTA: resolveCTA(profile, profile.slug),
       sectionOrder: applyVisibilityRules(universal.sectionOrder, profile),
       featuredSections: [],
       featuredCategory: "all",
@@ -1015,7 +1018,7 @@ export function resolveVipBikeExperience(
   // ── Compose from modular resolvers ──
   const heroMode = resolveHero(profile);
   const sectionOrder = resolveSectionPriority(profile);
-  const primaryCTA = resolveCTA(profile);
+  const primaryCTA = resolveCTA(profile, profile.slug);
   const featuredSections = resolveFeaturedSections(profile);
 
   // ── Determine onboarding variant ──
