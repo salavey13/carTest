@@ -31,8 +31,8 @@ import {
   SpookyLetter,
   SPOOKY_ACCENT_VAR,
 } from "@/app/franchize/lib/spooky-avatar";
-import { getTelegramWebAppAdaptiveHref } from "@/app/franchize/lib/telegram-links";
 
+ 
 // FIX: Removed hardcoded "https://t.me/oneBikePlsBot/app".
 // The Telegram WebApp URL should come from crew metadata (contacts.telegramBotUsername).
 // For now, we construct it dynamically when a slug is available.
@@ -213,15 +213,17 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
       );
     }
     // Outside Telegram (browser) — ALWAYS produce a working link.
-    // Use crew-specific bot if available, fallback to oneBikePlsBot (same pattern as Item modal).
+    // Use crew-specific bot if available, fallback to oneBikePlsBot.
+    // Use t.me format (not web.telegram.org) — t.me properly redirects to Telegram Web on desktop.
     const botName = telegramBotUsername || "oneBikePlsBot";
-    const adaptiveHref = getTelegramWebAppAdaptiveHref(`franchize/${effectiveSlug}/profile`, botName);
-    // Ultimate fallback: if adaptiveHref is empty, link to chat with the bot
-    const href = adaptiveHref || `https://t.me/${botName}`;
-    const label = adaptiveHref ? "Открыть в TG" : "Написать в TG";
+    const startappValue = effectiveSlug ? `franchize/${effectiveSlug}/profile` : "";
+    const tmeHref = startappValue
+      ? `https://t.me/${botName}/app?startapp=${encodeURIComponent(startappValue)}`
+      : `https://t.me/${botName}`;
+    const label = tmeHref.includes("/app?startapp=") ? "Открыть в TG" : "Написать в TG";
     return (
       <a
-        href={href}
+        href={tmeHref}
         target="_blank"
         rel="noopener noreferrer"
         aria-label={label}
