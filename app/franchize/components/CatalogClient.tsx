@@ -520,7 +520,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       return item.pricePerDay >= 10000;
     }
     if (filter === "newbie") {
-      return /naked|neo|scooter|300|400/i.test(`${item.category} ${item.title}`);
+      return getItemAccessTier(item) === "entry";
     }
     if (filter === "topRated") {
       return item.reviewSummary.count > 0 && item.reviewSummary.average >= 4.5;
@@ -543,14 +543,19 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const quickFilterCounts = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
     const searchFiltered = items.filter((item) => !query || [item.title, item.subtitle, item.description, item.category].join(" ").toLowerCase().includes(query));
+    // Also respect header filter (rent vs sale mode)
+    const modeFiltered = searchFiltered.filter(item => {
+      if (displayMode === "rent") return hasRentPrice(item);
+      return hasSalePrice(item);
+    });
     return QUICK_FILTERS.reduce<Record<QuickFilterKey, number>>(
       (acc, filter) => {
-        acc[filter.key] = searchFiltered.filter((item) => matchesQuickFilter(item, filter.key)).length;
+        acc[filter.key] = modeFiltered.filter((item) => matchesQuickFilter(item, filter.key)).length;
         return acc;
       },
       { all: 0, budget: 0, premium: 0, newbie: 0, topRated: 0, entry: 0, mid: 0, pro: 0 },
     );
-  }, [items, searchQuery]);
+  }, [items, searchQuery, displayMode]);
 
   const itemsByCategory = useMemo(() => {
     const sortedFilteredItems = quickFilter === "topRated"
@@ -917,7 +922,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           <input
             id="catalog-search-input"
             type="text"
-            placeholder="Найдите по названию или сценарию"
+            placeholder="Найдите по названию"
             autoComplete="off"
             aria-describedby="catalog-results-status"
             value={searchQuery}
@@ -938,7 +943,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
               type="button"
               aria-label="Очистить поиск по каталогу"
               onClick={() => setSearchQuery("")}
-              className="absolute bottom-2 right-16 top-2 rounded-full px-3 text-xs font-medium transition active:scale-95 md:right-24"
+              className="absolute bottom-2 right-24 top-2 rounded-full px-3 text-xs font-medium transition active:scale-95"
               onFocus={() => setClearFocused(true)}
               onBlur={() => setClearFocused(false)}
               style={{
