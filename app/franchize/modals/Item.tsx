@@ -1949,14 +1949,14 @@ export function ItemModal({
                 type="button"
                 onClick={() => {
                   const templateType = isRental ? "RENTAL" : "SALE";
-                  const rawBase = "https://raw.githubusercontent.com/salavey13/carTest/main";
+                  const viewerBase = "https://htmlpreview.github.io/?https://raw.githubusercontent.com/salavey13/carTest/main";
                   const crewPath = `docs/crewDocs/${slug}_${templateType}_DEAL_TEMPLATE.html`;
                   const genericPath = `docs/${templateType}_DEAL_TEMPLATE.html`;
-                  const genericUrl = `${rawBase}/${genericPath}`;
+                  const genericUrl = `${viewerBase}/${genericPath}`;
 
-                  fetch(`${rawBase}/${crewPath}`, { method: "HEAD" })
+                  fetch(`https://raw.githubusercontent.com/salavey13/carTest/main/${crewPath}`, { method: "HEAD" })
                     .then((res) => {
-                      window.open(res.ok ? `${rawBase}/${crewPath}` : genericUrl, "_blank", "noopener");
+                      window.open(res.ok ? `${viewerBase}/${crewPath}` : genericUrl, "_blank", "noopener");
                     })
                     .catch(() => {
                       window.open(genericUrl, "_blank", "noopener");
