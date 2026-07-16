@@ -1755,6 +1755,7 @@ ${context.bikeMake} ${context.bikeModel}
       const { data: existingSubrent } = await privateSchema()
         .from("subrent_contract_artifacts")
         .select("id, storage_path")
+        .eq("crew_slug", resolvedCrewSlug)
         .eq("owner_full_name", context.ownerFullName || "")
         .eq("bike_make", context.bikeMake || "")
         .eq("bike_model", context.bikeModel || "")

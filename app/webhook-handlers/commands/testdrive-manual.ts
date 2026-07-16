@@ -689,11 +689,12 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       logger.warn("[/testdrive] user_rental_secrets save failed (non-fatal):", secretsErr);
     }
 
-    // 2. rental_contract_artifacts (private schema) — dedup by renter+bike
+    // 2. rental_contract_artifacts (private schema) — dedup by renter+bike (scoped to crew)
     try {
       const { data: existingRental } = await privateSchema()
         .from("rental_contract_artifacts")
         .select("id, storage_path")
+        .eq("crew_slug", crewSlug)
         .eq("renter_full_name", context.customerFullName || "")
         .eq("requested_bike_id", bike.id)
         .maybeSingle();
