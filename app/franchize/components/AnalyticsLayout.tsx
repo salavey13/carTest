@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { Lock } from "lucide-react";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { FranchizePageShell } from "@/app/franchize/components/FranchizePageShell";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";

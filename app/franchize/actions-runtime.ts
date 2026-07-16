@@ -212,6 +212,7 @@ export interface FranchizeCrewVM {
   };
   reservationHold: FranchizeReservationHoldVM;
   contentBlocks: FranchizeContentBlocks;
+  reviewsLink?: string;
 }
 
 export interface FranchizeReservationHoldVM {
