@@ -1652,6 +1652,7 @@ ${qrDeepLink}`);
       const { data: existingRental } = await privateSchema()
         .from("rental_contract_artifacts")
         .select("id, storage_path")
+        .eq("crew_slug", resolvedSlug)
         .eq("renter_full_name", context.mpFullName || "")
         .eq("requested_bike_id", context.bikeId)
         .eq("rent_start_date", context.rentStartDate || "")
@@ -1679,6 +1680,7 @@ ${qrDeepLink}`);
       const { data: existingSale } = await privateSchema()
         .from("sale_contract_artifacts")
         .select("id, storage_path")
+        .eq("crew_slug", resolvedSlug)
         .eq("buyer_full_name", context.mpFullName || "")
         .eq("requested_bike_id", context.bikeId)
         .maybeSingle();

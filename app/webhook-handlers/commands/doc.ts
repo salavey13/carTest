@@ -44,6 +44,10 @@
  *   - FIX 1: Document delivery via direct Telegram API (telegramSendDocument/telegramSendPhoto)
  *   - FIX 2: Better error logging for Supabase inserts (log .message, .code, .details, .hint)
  *   - FIX 3: rental_contract_artifacts uses private schema with correct columns
+ *
+ * DEPRECATED: Superseded by doc-manual.ts (command-handler.ts imports from ./doc-manual).
+ * Kept as reference + backwards compat for legacy user_states.
+ * Crew-isolated: dynamically resolves crew_slug via getDocCrewSlug().
  */
 
 "use server";
@@ -72,7 +76,7 @@ const DOC_STATE_EXPIRY_MINUTES = 30;
  * Load crew secrets for contract defaults.
  * Returns CrewSecrets type compatible with buildRentalContractVariables.
  */
-async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<CrewSecrets> {
+async function loadCrewSecrets(crewSlug: string = ""): Promise<CrewSecrets> {
   try {
     const { data: secretsData } = await supabaseAdmin
       .from("crew_secrets")
@@ -128,6 +132,27 @@ async function loadCrewSecrets(crewSlug: string = "vip-bike"): Promise<CrewSecre
       contractDefaults: {},
     };
     return fallbackDefaults;
+  }
+}
+
+// ── Crew slug resolution ────────────────────────────────────────────────────
+
+/**
+ * Resolve crew_slug for a user from their user_states.selectedCrew.
+ * Falls back to "vip-bike" if not set (backwards compatible).
+ */
+async function getDocCrewSlug(userId: string): Promise<string> {
+  try {
+    const { data } = await supabaseAdmin
+      .from("user_states")
+      .select("context")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const selectedCrew = (data?.context as any)?.selectedCrew;
+    return selectedCrew || "vip-bike";
+  } catch (error) {
+    logger.warn("[/doc] Failed to read crew slug from user_states, using default:", error);
+    return "vip-bike";
   }
 }
 
@@ -269,6 +294,8 @@ interface DocFlowContext {
   categories?: string[];
   accessTier?: AccessTier;
   extractionProvider?: "zai-vlm" | "manual";
+  // Crew context
+  crewSlug?: string;
   // Manual input state
   manualStep?: string;
   // Manual passport fields
@@ -566,21 +593,22 @@ async function resolveBikeById(bikeId: string): Promise<{
 
 // ── Get available bikes for keyboard selection ────────────────────────────────
 
-async function getAvailableBikes(): Promise<Array<{ id: string; make: string; model: string; specs?: Record<string, any> }>> {
+async function getAvailableBikes(crewSlug?: string): Promise<Array<{ id: string; make: string; model: string; specs?: Record<string, any> }>> {
+  const slug = crewSlug || "vip-bike";
   // Resolve crew_id from slug (no hardcoded UUID)
   const { data: crew } = await supabaseAdmin
     .from("crews")
     .select("id")
-    .eq("slug", "vip-bike")
+    .eq("slug", slug)
     .maybeSingle();
 
   if (!crew?.id) {
-    console.error("[getAvailableBikes] Crew not found for slug: vip-bike");
+    console.error(`[getAvailableBikes] Crew not found for slug: ${slug}`);
     return [];
   }
 
-  // Show bikes from vip-bike crew OR unassigned (crew_id=null).
-  // Exclude bikes from OTHER crews (e.g. custom-bobber-virus, honda-cbr600rr-sz).
+  // Show bikes from this crew OR unassigned (crew_id=null).
+  // Exclude bikes from OTHER crews.
   const { data } = await supabaseAdmin
     .from("cars")
     .select("id, make, model, specs")
@@ -598,8 +626,10 @@ async function generateAndSendContract(
   userId: string,
   context: DocFlowContext,
   scheduleText: string,
+  crewSlug?: string,
 ): Promise<boolean> {
   try {
+    const slug = crewSlug || context.crewSlug || "vip-bike";
     const bike = await resolveBikeById(context.bikeId);
     if (!bike) {
       await sendComplexMessage(chatId, "🚨 Не удалось найти указанный байк. Попробуйте /doc снова.", [], { removeKeyboard: true });
@@ -614,7 +644,7 @@ async function generateAndSendContract(
     const endDate = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
     // Load crew secrets for contract defaults
-    const crewSecrets = await loadCrewSecrets("vip-bike");
+    const crewSecrets = await loadCrewSecrets(slug);
 
     // Build template vars using shared builder
     const vars = buildRentalContractVariables({
@@ -780,14 +810,14 @@ async function generateAndSendContract(
     // If the caller is a crew member (operator creating contract for a renter),
     // leave chat_id NULL so the operator does not accidentally load the renter's
     // personal data in their own profile/order. The renter claims it via QR.
-    const creatorIsCrewMember = await isCrewMember(String(userId), "vip-bike");
+    const creatorIsCrewMember = await isCrewMember(String(userId), slug);
     const secretChatId = creatorIsCrewMember ? null : String(userId);
     const { error: secretsError } = await supabaseAdmin
       .schema("private")
       .from("user_rental_secrets")
       .insert({
         chat_id: secretChatId,
-        crew_slug: "vip-bike",
+        crew_slug: slug,
         doc_sha256: docSha256,
         renter_full_name: passport.fullName || null,
         renter_passport: `${passport.series || ""} ${passport.number || ""}`.trim() || null,
@@ -822,7 +852,7 @@ async function generateAndSendContract(
       .from("rental_contract_artifacts")
       .insert({
         contract_key: vars.document_key,
-        crew_slug: "vip-bike",
+        crew_slug: slug,
         original_sha256: docSha256,
         requested_bike_id: context.bikeId,
         resolved_bike_id: bike.id,
@@ -882,7 +912,7 @@ async function generateAndSendContract(
       const leadPhone = passport.phone || "";
       const leadUserId = leadPhone || String(userId);
       await upsertFranchizeLead({
-        slug: "vip-bike",
+        slug: slug,
         userId: leadUserId,
         intentType: "rent",
         stage: "contract_generated",
@@ -1611,6 +1641,9 @@ export async function docCommand(
   const userIdStr = String(userId);
   logger.info(`[/doc] User: ${userIdStr}, Text: "${text}"`);
 
+  // Resolve crew slug from user_states (backwards compatible: defaults to "vip-bike")
+  const resolvedCrewSlug = await getDocCrewSlug(userIdStr);
+
   // Check ZAI configuration early
   const zaiBaseUrl = process.env.ZAI_BASE_URL;
   const zaiApiKey = process.env.ZAI_API_KEY;
@@ -1655,6 +1688,7 @@ export async function docCommand(
       bikeId: bike.id,
       bikeMake: bike.make,
       bikeModel: bike.model,
+      crewSlug: resolvedCrewSlug,
     };
 
     // If photo/document was sent with /doc caption, treat it as passport
@@ -1704,7 +1738,7 @@ export async function docCommand(
   }
 
   // /doc without args — show bike selection
-  const bikes = await getAvailableBikes();
+  const bikes = await getAvailableBikes(resolvedCrewSlug);
 
   if (bikes.length === 0) {
     await sendComplexMessage(chatId, "🚲 В каталоге пока нет доступных байков. Попробуйте позже.", [], { removeKeyboard: true });
