@@ -608,8 +608,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const categorizedItems = useMemo(() => {
     const isRent = displayMode === "rent";
 
-    // Filter by display mode
-    const filtered = items.filter(item => {
+    // First apply search + quickFilter (filteredItems has them), then split by display mode
+    // FIX: was `items` — quickFilter/search had no effect on vip-bike crew
+    const filtered = filteredItems.filter(item => {
       if (isRent) return hasRentPrice(item);
       return hasSalePrice(item);
     });
@@ -625,7 +626,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       { category: "electric", title: "Электро", items: sortVipBikeItems(electric) },
       { category: "ice", title: "ДВС", items: sortVipBikeItems(ice) },
     ].filter(g => g.items.length > 0);
-  }, [items, displayMode]);
+  }, [filteredItems, displayMode]);
 
   // Active groups for carousel rendering + IntersectionObserver
   // For vip-bike: use categorizedItems, for others: use itemsByCategory
