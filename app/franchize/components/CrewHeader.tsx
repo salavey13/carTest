@@ -11,6 +11,7 @@ import { HeaderMenu } from "../modals/HeaderMenu";
 import { FranchizeProfileButton, CrewButtonErrorBoundary } from "./FranchizeProfileButton";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { useDisplayMode } from "./DisplayModeContext";
+import { useAppContext } from "@/contexts/AppContext";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
@@ -40,6 +41,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   const [isCompact, setIsCompact] = useState(false);
   const pathname = usePathname();
   const { displayMode, setDisplayMode, isTransitioning } = useDisplayMode();
+  const { isInTelegramContext } = useAppContext();
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const headerLogoHref = crew.header.logoHref || mainCatalogPath;
   const prevPathnameRef = useRef<string | null>(null);
@@ -116,7 +118,9 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
       className="sticky top-0 z-50 border-b pb-2 backdrop-blur-2xl"
       style={{
         ...FRANCHIZE_HEADER_SAFE_AREA_STYLE,
-        paddingTop: "max(calc(env(safe-area-inset-top) + 4.2rem), 4.95rem)",
+        paddingTop: isInTelegramContext
+          ? "max(calc(env(safe-area-inset-top) + 4.2rem), 4.95rem)"
+          : "calc(max(env(safe-area-inset-top), 0px) + 1.45rem)",
         // FIX 6: isolation creates a proper stacking context for the entire header.
         isolation: "isolate",
         borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,

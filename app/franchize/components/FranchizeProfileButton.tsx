@@ -31,6 +31,7 @@ import {
   SpookyLetter,
   SPOOKY_ACCENT_VAR,
 } from "@/app/franchize/lib/spooky-avatar";
+import { getTelegramWebAppAdaptiveHref } from "@/app/franchize/lib/telegram-links";
 
 // FIX: Removed hardcoded "https://t.me/oneBikePlsBot/app".
 // The Telegram WebApp URL should come from crew metadata (contacts.telegramBotUsername).
@@ -211,8 +212,24 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
         </button>
       );
     }
-    // Outside Telegram (browser) — show WebApp link
+    // Outside Telegram (browser) — fallback: if bot username is set but WebApp URL missing, link to chat
     if (!telegramWebAppUrl) {
+      const chatLink = telegramBotUsername ? `https://t.me/${telegramBotUsername}` : "";
+      if (chatLink) {
+        return (
+          <a
+            href={chatLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Открыть Telegram"
+            className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            style={{ backgroundColor: bgColor, color: textColor, borderColor }}
+          >
+            <Send className="h-4 w-4" />
+            <span className="hidden sm:inline">Открыть Telegram</span>
+          </a>
+        );
+      }
       return (
         <button
           type="button"
@@ -225,9 +242,11 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
         </button>
       );
     }
+    // use adaptive href for desktop vs mobile
+    const adaptiveHref = getTelegramWebAppAdaptiveHref(`franchize/${effectiveSlug}/profile`, telegramBotUsername);
     return (
       <a
-        href={telegramProfileDeepLink}
+        href={adaptiveHref}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Открыть в Telegram"
