@@ -11,8 +11,8 @@
   </defs>
   <!-- Rounded square background -->
   <rect x="2" y="2" width="60" height="60" rx="14" ry="14" fill="url(#bg)"/>
-  <!-- Motorcycle group rotated 45° for dynamic look -->
-  <g transform="rotate(25, 32, 36)" stroke="url(#gold)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Motorcycle group rotated -25° for wheelie look (front wheel up) -->
+  <g transform="rotate(-25, 32, 36)" stroke="url(#gold)" fill="none" stroke-linecap="round" stroke-linejoin="round">
     <!-- Rear wheel -->
     <circle cx="18" cy="44" r="9" stroke-width="2.5"/>
     <circle cx="18" cy="44" r="2.5" fill="url(#gold)"/>
