@@ -1,10 +1,10 @@
 "use client";
 
-import { Calendar, Tag, FileText, BarChart3 } from "lucide-react";
+import { Calendar, Tag, FileText, BarChart3, Users } from "lucide-react";
 import { withAlpha } from "@/app/franchize/lib/theme";
 
 interface AnalyticsCrossNavProps {
-  activePage: "rentals" | "sales" | "commercial";
+  activePage: "rentals" | "sales" | "commercial" | "leads";
   basePath: string;
   bgCard: string;
   borderSoft: string;
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { key: "rentals" as const, label: "Аренды", icon: Calendar, suffix: "/rentals-analytics" },
   { key: "sales" as const, label: "Продажи", icon: Tag, suffix: "/sales-analytics" },
   { key: "commercial" as const, label: "КП", icon: FileText, suffix: "/commercial-offers-analytics" },
+  { key: "leads" as const, label: "Клиенты", icon: Users, suffix: "/leads" },
 ];
 
 export function AnalyticsCrossNav({

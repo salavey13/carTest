@@ -43,7 +43,7 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
     if (!actorUserId) { setLoading(false); setRefreshing(false); return; }
     if (showRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const result = await getSalesDashboard({ slug: initialSlug?.trim() || "vip-bike", actorUserId, date, isPasswordAuth: !!passwordAuthOwnerId });
+      const result = await getSalesDashboard({ slug: initialSlug.trim(), actorUserId, date, isPasswordAuth: !!passwordAuthOwnerId });
       if (!result.success) {
         if (result.error?.includes("прав") || result.error?.includes("доступ")) { toast.error("Требуется пароль"); return; }
         toast.error(result.error || "Не удалось загрузить продажи");

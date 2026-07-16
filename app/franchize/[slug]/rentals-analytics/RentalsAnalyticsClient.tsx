@@ -89,6 +89,7 @@ import {
 } from "@/app/franchize/server-actions/crew-todos";
 import { RentalHandoffModal } from "./RentalHandoffModal";
 import { RentalsCalendar } from "./RentalsCalendar";
+import { AnalyticsCrossNav } from "./analytics-components/AnalyticsCrossNav";
 import { withAlpha } from "@/app/franchize/lib/theme";
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────────
@@ -260,7 +261,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
     try {
       const result = await getRentalsDashboard({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         date,
         verificationStatus: verificationFilter === "all" ? undefined : verificationFilter,
@@ -294,7 +295,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
     try {
       const result = await getRentalsDateRange({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         isPasswordAuth: !!passwordAuthOwnerId,
       });
@@ -318,7 +319,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     setLoadingSales(true);
     try {
       const result = await getSalesDashboard({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         date,
         isPasswordAuth: !!passwordAuthOwnerId,
@@ -345,7 +346,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     setLoadingProposals(true);
     try {
       const result = await getCommercialProposalsDashboard({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         date,
         isPasswordAuth: !!passwordAuthOwnerId,
@@ -372,7 +373,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     setLoadingSubrents(true);
     try {
       const result = await getSubrentContractsDashboard({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         date,
         isPasswordAuth: !!passwordAuthOwnerId,
@@ -399,7 +400,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     setLoadingApplications(true);
     try {
       const result = await getSubrentApplications({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         status: "pending",
         isPasswordAuth: !!passwordAuthOwnerId,
@@ -422,7 +423,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     setProcessingApplication(applicationId);
     try {
       const result = await approveSubrentApplication({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         applicationId,
         isPasswordAuth: !!passwordAuthOwnerId,
@@ -450,7 +451,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     setProcessingApplication(applicationId);
     try {
       const result = await declineSubrentApplication({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         applicationId,
         isPasswordAuth: !!passwordAuthOwnerId,
@@ -635,7 +636,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     setUpdatingRentalStatus(rental.rental_id);
     try {
       const result = await updateRentalStatus({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         rentalId: rental.rental_id,
         status: newStatus,
@@ -664,7 +665,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     setRegeneratingQr(rental.rental_id);
     try {
       const result = await regenerateRentalQr({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         rentalId: rental.rental_id,
         isPasswordAuth: !!passwordAuthOwnerId,
@@ -692,7 +693,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     setSendingEmail(rental.rental_id);
     try {
       const result = await sendRentalDocByEmail({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         rentalId: rental.rental_id,
         isPasswordAuth: !!passwordAuthOwnerId,
@@ -717,7 +718,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
     try {
       const result = await getRentalsForExport({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         date: selectedDate,
         isPasswordAuth: !!passwordAuthOwnerId,
@@ -746,7 +747,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
     try {
       const result = await getMessageTemplates({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         channel: "telegram",
       });
@@ -784,7 +785,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
     try {
       const result = await sendTemplateMessage({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         rentalId: rental.rental_id,
         templateKey,
@@ -813,7 +814,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
     setCompletingRental(rental.rental_id);
     try {
       const result = await updateRentalStatus({
-        slug: initialSlug?.trim() || "vip-bike",
+        slug: initialSlug.trim(),
         actorUserId,
         rentalId: rental.rental_id,
         status: "completed",
@@ -837,7 +838,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
   const handleShareQr = (rental: RentalDashboardItem) => {
     // Generate deep link using startparam format: rental_{slug}_{rentalId}
-    const slug = initialSlug?.trim() || "vip-bike";
+    const slug = initialSlug.trim();
     const startParam = `rental_${slug}_${rental.rental_id}`;
     const deepLink = `https://t.me/oneBikePlsBot/app?startapp=${startParam}`;
 
@@ -1207,6 +1208,16 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
         {/* MAIN CONTENT */}
         <main className="flex-1 overflow-y-auto overflow-x-visible relative z-0">
           <div className="w-full px-2 md:px-4 py-4 md:py-6 space-y-4 md:space-y-6">
+
+            {/* Cross-analytics navigation */}
+            <AnalyticsCrossNav
+              activePage="rentals"
+              basePath={`/franchize/${initialSlug.trim()}`}
+              bgCard={bgCard}
+              borderSoft={borderSoft}
+              accentMain={accentMain}
+              textSecondary={textSecondary}
+            />
 
             {/* STATS ROW */}
               <RentalsStatsRow

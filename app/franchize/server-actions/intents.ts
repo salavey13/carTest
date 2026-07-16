@@ -78,7 +78,7 @@ export type FranchizeCloserIntentVM = {
 };
 
 function normalizeSlug(value: string) {
-  return (value || "vip-bike").trim().toLowerCase() || "vip-bike";
+  return value.trim().toLowerCase();
 }
 
 function asRecord(value: unknown): UnknownRecord {

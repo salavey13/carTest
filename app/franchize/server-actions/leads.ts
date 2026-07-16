@@ -73,7 +73,7 @@ export interface GetFranchizeLeadsResult {
 }
 
 export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeadsResult> {
-  const safeSlug = (slug || "vip-bike").trim();
+  const safeSlug = slug.trim();
   try {
     const { data: crew, error: crewError } = await supabaseAdmin
       .from("crews")

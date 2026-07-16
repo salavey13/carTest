@@ -4,6 +4,7 @@ import { getFranchizeBySlug } from "../../actions";
 import { crewPaletteWithCssVars } from "../../lib/theme";
 import { getFranchizeLeads, type LeadRow, type LeadTodoRow } from "../../server-actions/leads";
 import { LeadsClient } from "./LeadsClient";
+import { AnalyticsLeadsNav } from "../../components/AnalyticsLeadsNav";
 
 interface LeadsPageProps {
   params: Promise<{ slug: string }>;
@@ -30,6 +31,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
         <p className="mt-1 text-sm" style={{ color: "var(--franchize-text-secondary, inherit)" }}>
           Все, кто оставил заявку, интересовался техникой или оформлял аренду
         </p>
+        <AnalyticsLeadsNav slug={crew.slug || slug} />
         <LeadsClient
           leads={leads}
           todos={todos}
