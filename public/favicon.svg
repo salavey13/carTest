@@ -4,25 +4,36 @@
       <stop offset="0%" stop-color="#1A1A1A"/>
       <stop offset="100%" stop-color="#0A0A0A"/>
     </linearGradient>
-    <linearGradient id="bolt" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#FFD700"/>
-      <stop offset="100%" stop-color="#FFC125"/>
+      <stop offset="100%" stop-color="#FFAA00"/>
     </linearGradient>
   </defs>
   <!-- Rounded square background -->
   <rect x="2" y="2" width="60" height="60" rx="14" ry="14" fill="url(#bg)"/>
-  <!-- Motorcycle wheel (rear) -->
-  <circle cx="22" cy="46" r="10" fill="none" stroke="url(#bolt)" stroke-width="2.5"/>
-  <circle cx="22" cy="46" r="3" fill="url(#bolt)"/>
-  <!-- Motorcycle wheel (front) -->
-  <circle cx="50" cy="46" r="10" fill="none" stroke="url(#bolt)" stroke-width="2.5"/>
-  <circle cx="50" cy="46" r="3" fill="url(#bolt)"/>
-  <!-- Motorcycle body / frame -->
-  <path d="M22 46 L30 30 L36 22 L48 22 L48 32 L36 32 L32 38 L32 46" fill="none" stroke="url(#bolt)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Seat -->
-  <path d="M28 30 L34 30" fill="none" stroke="url(#bolt)" stroke-width="4" stroke-linecap="round"/>
-  <!-- Handlebars -->
-  <path d="M44 22 L46 17 L50 17" fill="none" stroke="url(#bolt)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Lightning bolt overlay -->
-  <polygon points="38,12 28,30 35,30 30,46 44,26 37,26 42,12" fill="#FFD700" opacity="0.3"/>
+  <!-- Motorcycle group rotated 45° for dynamic look -->
+  <g transform="rotate(25, 32, 36)" stroke="url(#gold)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Rear wheel -->
+    <circle cx="18" cy="44" r="9" stroke-width="2.5"/>
+    <circle cx="18" cy="44" r="2.5" fill="url(#gold)"/>
+    <!-- Front wheel -->
+    <circle cx="50" cy="44" r="9" stroke-width="2.5"/>
+    <circle cx="50" cy="44" r="2.5" fill="url(#gold)"/>
+    <!-- Main frame / body: sweeping from rear hub up to seat, then across to head -->
+    <path d="M18 44 L24 28 Q27 22 32 22 L44 22" stroke-width="3"/>
+    <!-- Down tube: from head down to engine area -->
+    <path d="M44 22 L46 36 Q46 42 42 44" stroke-width="2.5"/>
+    <!-- Seat -->
+    <path d="M28 25 L38 25" stroke-width="4.5"/>
+    <!-- Tail/rear fender sweep -->
+    <path d="M18 44 Q14 36 16 30" stroke-width="2"/>
+    <!-- Handlebars -->
+    <path d="M42 22 L43 16 Q44 14 48 15" stroke-width="2.5"/>
+    <!-- Exhaust / engine detail -->
+    <path d="M38 42 Q36 46 32 47 Q28 48 24 46" stroke-width="1.5" opacity="0.6"/>
+  </g>
+  <!-- Lightning bolt accent -->
+  <g transform="translate(36, 8) scale(0.5)">
+    <polygon points="20,0 8,24 16,24 6,44 28,18 18,18 26,0" fill="#FFD700" opacity="0.8"/>
+  </g>
 </svg>
