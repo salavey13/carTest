@@ -273,6 +273,7 @@ set
           ),
           'showTwoColumnsMobile', true,
           'useModalDetails', true,
+          'rewiewsLink', 'https://yandex.ru/maps/org/vip_bike_electro/81589395232/reviews/',
           'promoBanners', jsonb_build_array(
             jsonb_build_object(
               'id', 'electro-2026',
