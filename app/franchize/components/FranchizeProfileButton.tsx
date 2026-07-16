@@ -197,7 +197,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   }, [tempCartId, telegramWebAppUrl]);
 
   if (!hasUser) {
-    // Inside Telegram WebApp but auth not resolved yet — show loading state, not a link to ourselves
+    // Inside Telegram WebApp but auth not resolved yet — show loading state
     if (isInTelegramContext) {
       return (
         <button
@@ -212,49 +212,24 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
         </button>
       );
     }
-    // Outside Telegram (browser) — fallback: if bot username is set but WebApp URL missing, link to chat
-    if (!telegramWebAppUrl) {
-      const chatLink = telegramBotUsername ? `https://t.me/${telegramBotUsername}` : "";
-      if (chatLink) {
-        return (
-          <a
-            href={chatLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Открыть Telegram"
-            className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-            style={{ backgroundColor: bgColor, color: textColor, borderColor }}
-          >
-            <Send className="h-4 w-4" />
-            <span className="hidden sm:inline">Открыть Telegram</span>
-          </a>
-        );
-      }
-      return (
-        <button
-          type="button"
-          aria-label="Войти через Telegram"
-          className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-          style={{ backgroundColor: bgColor, color: textColor, borderColor }}
-        >
-          <Send className="h-4 w-4" />
-          <span className="hidden sm:inline">Войти</span>
-        </button>
-      );
-    }
-    // use adaptive href for desktop vs mobile
-    const adaptiveHref = getTelegramWebAppAdaptiveHref(`franchize/${effectiveSlug}/profile`, telegramBotUsername);
+    // Outside Telegram (browser) — ALWAYS produce a working link.
+    // Use crew-specific bot if available, fallback to oneBikePlsBot (same pattern as Item modal).
+    const botName = telegramBotUsername || "oneBikePlsBot";
+    const adaptiveHref = getTelegramWebAppAdaptiveHref(`franchize/${effectiveSlug}/profile`, botName);
+    // Ultimate fallback: if adaptiveHref is empty, link to chat with the bot
+    const href = adaptiveHref || `https://t.me/${botName}`;
+    const label = adaptiveHref ? "Открыть в TG" : "Написать в TG";
     return (
       <a
-        href={adaptiveHref}
+        href={href}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Открыть в Telegram"
+        aria-label={label}
         className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
         style={{ backgroundColor: bgColor, color: textColor, borderColor }}
       >
         <Send className="h-4 w-4" />
-        <span className="hidden sm:inline">Открыть в TG</span>
+        <span className="hidden sm:inline">{label}</span>
       </a>
     );
   }
