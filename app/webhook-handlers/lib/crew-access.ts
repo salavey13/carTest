@@ -29,7 +29,7 @@ export async function getUserCrews(telegramUserId: string): Promise<CrewInfo[]> 
     // 1. Find crews where user is owner
     const { data: ownedCrews } = await supabaseAdmin
       .from("crews")
-      .select("id, slug, brand_name")
+      .select("id, slug, name")
       .eq("owner_id", telegramUserId);
 
     // 2. Find crews where user is an active member
@@ -41,11 +41,11 @@ export async function getUserCrews(telegramUserId: string): Promise<CrewInfo[]> 
 
     const memberCrewIds = (memberships || []).map((m) => m.crew_id);
 
-    let memberCrews: { id: string; slug: string; brand_name: string }[] = [];
+    let memberCrews: { id: string; slug: string; name: string }[] = [];
     if (memberCrewIds.length > 0) {
       const { data: crews } = await supabaseAdmin
         .from("crews")
-        .select("id, slug, brand_name")
+        .select("id, slug, name")
         .in("id", memberCrewIds);
       memberCrews = (crews || []).filter(
         (c) => !(ownedCrews || []).some((oc) => oc.id === c.id) // don't double-count owned
@@ -56,13 +56,13 @@ export async function getUserCrews(telegramUserId: string): Promise<CrewInfo[]> 
       ...(ownedCrews || []).map((c) => ({
         id: c.id,
         slug: c.slug,
-        name: c.brand_name || c.slug,
+        name: c.name || c.slug,
         isOwner: true,
       })),
       ...memberCrews.map((c) => ({
         id: c.id,
         slug: c.slug,
-        name: c.brand_name || c.slug,
+        name: c.name || c.slug,
         isOwner: false,
       })),
     ];
@@ -160,13 +160,13 @@ export async function getAllCrews(): Promise<CrewInfo[]> {
   try {
     const { data: crews } = await supabaseAdmin
       .from("crews")
-      .select("id, slug, brand_name")
-      .order("brand_name", { ascending: true });
+      .select("id, slug, name")
+      .order("name", { ascending: true });
 
     return (crews || []).map((c) => ({
       id: c.id,
       slug: c.slug,
-      name: c.brand_name || c.slug,
+      name: c.name || c.slug,
       isOwner: false, // general public is never owner
     }));
   } catch (error) {
