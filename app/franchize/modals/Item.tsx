@@ -1945,16 +1945,29 @@ export function ItemModal({
               <p className="mb-1 text-[10px] text-[var(--item-muted-text)]">
                 ⚡ Бронирование и оплата — в Telegram-боте
               </p>
-              <a
-                href={`https://t.me/${botUsername}?start=sample`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => {
+                  const templateType = isRental ? "RENTAL" : "SALE";
+                  const rawBase = "https://raw.githubusercontent.com/salavey13/carTest/main";
+                  const crewPath = `docs/crewDocs/${slug}_${templateType}_DEAL_TEMPLATE.html`;
+                  const genericPath = `docs/${templateType}_DEAL_TEMPLATE.html`;
+                  const genericUrl = `${rawBase}/${genericPath}`;
+
+                  fetch(`${rawBase}/${crewPath}`, { method: "HEAD" })
+                    .then((res) => {
+                      window.open(res.ok ? `${rawBase}/${crewPath}` : genericUrl, "_blank", "noopener");
+                    })
+                    .catch(() => {
+                      window.open(genericUrl, "_blank", "noopener");
+                    });
+                }}
                 className="inline-flex items-center gap-1 transition hover:opacity-70 text-[10px]"
                 style={{ color: "var(--item-accent)" }}
               >
                 <FileText className="h-3 w-3" />
                 Образец договора
-              </a>
+              </button>
             </div>
           )}
           <div
