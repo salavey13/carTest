@@ -17,9 +17,7 @@ export const metadata: Metadata = {
   description: "Электромонтаж под ключ в новостройках, школах, больницах и на промышленных объектах. Бригада из 5 сертифицированных специалистов. Гарантия 3 года.",
   keywords: ["электромонтаж", "электрик", "высокое напряжение", "электрощит", "проводка", "новостройки", "NN VOLT"],
   authors: [{ name: "NN VOLT" }],
-  icons: {
-    icon: "/logo.svg",
-  },
+  // Icons inherited from root layout (favicon.svg)
 };
 
 export default function NNVoltLayout({

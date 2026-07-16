@@ -6,9 +6,7 @@ export const metadata: Metadata = {
     "Интерактивная заявка на расчёт сметы электромонтажных работ от NN VOLT. Заполните форму, скачайте готовый файл и отправьте его бригадиру.",
   keywords: ["заявка", "смета", "электромонтаж", "NN VOLT", "электрик", "расчёт"],
   authors: [{ name: "NN VOLT" }],
-  icons: {
-    icon: "/logo.svg",
-  },
+  // Icons inherited from root layout (favicon.svg)
 };
 
 export default function ZaprosSmetiLayout({
