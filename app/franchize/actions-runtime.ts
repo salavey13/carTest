@@ -2741,42 +2741,73 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       : payload.time || "по согласованию";
 
     // ── Enhanced notification with bike label for ALL flows, accessories, and actual time ──
+    const flowEmoji = isServiceFlow ? "🔧" : flowType === "mixed" ? "📦" : isSaleFlow ? "🛍️" : isTestdrive ? "🏁" : "🧾";
+    const flowLabel = isServiceFlow ? "Новая сервисная заявка" : flowType === "mixed" ? "Смешанный заказ (аренда + покупка)" : isSaleFlow ? "Новый заказ на покупку" : isTestdrive ? "Новый заказ на тест-драйв" : "Новый заказ на аренду";
+
+    // For service flow, bike label should list actual service items
+    const serviceBikeNames = isServiceFlow
+      ? payload.cartLines.map((line) => {
+          const car = byId.get(line.itemId);
+          return car ? `${car.make} ${car.model}` : (line as any).itemName || line.itemId;
+        }).join(", ")
+      : null;
+
     const notificationParts = [
-      `${flowType === "mixed" ? "📦 Смешанный заказ (аренда + покупка)" : isSaleFlow ? "🛍️ Новый заказ на покупку" : isTestdrive ? "🏁 Новый заказ на тест-драйв" : "🧾 Новый заказ на аренду"} #${payload.orderId}`,
-      `Байк: ${bikeLabel}`,
+      `${flowEmoji} ${flowLabel} #${payload.orderId}`,
+      `Байк: ${isServiceFlow ? (serviceBikeNames ?? bikeLabel) : bikeLabel}`,
       `Crew: ${payload.slug}`,
       `Получатель: ${payload.recipient}`,
       `Телефон: ${payload.phone}`,
     ];
-    // Rental period (actual dates, not just the comment field)
-    if (payload.rentalStartDate) {
+    // For service, show visit date instead of rental period
+    if (isServiceFlow && payload.rentalStartDate) {
+      notificationParts.push(`Дата визита: ${payload.rentalStartDate}`);
+    } else if (payload.rentalStartDate) {
       notificationParts.push(`Период: ${periodStr}`);
     }
     if (payload.time && payload.time !== "по согласованию") {
       notificationParts.push(`Комментарий: ${payload.time}`);
     }
+    if (!isServiceFlow) {
+      notificationParts.push(
+        `Экипировка: ${accessoriesStr}`,
+      );
+    }
     notificationParts.push(
-      `Экипировка: ${accessoriesStr}`,
       `Оплата: ${payload.payment}`,
       `Доставка: ${payload.delivery}`,
       `Итого: ${formatMoney(payload.totalAmount)} ₽`,
     );
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://vip-bike.ru";
-    notificationParts.push(
-      ``,
-      `🔗 Аренда: ${siteUrl}/franchize/${payload.slug}/rentals`,
-      `📋 Лиды: ${siteUrl}/franchize/${payload.slug}/leads`,
-    );
+    if (isServiceFlow) {
+      notificationParts.push(
+        ``,
+        `🔧 Сервис: ${siteUrl}/franchize/${payload.slug}/leads`,
+        `📋 Лиды: ${siteUrl}/franchize/${payload.slug}/leads`,
+      );
+    } else {
+      notificationParts.push(
+        ``,
+        `🔗 Аренда: ${siteUrl}/franchize/${payload.slug}/rentals`,
+        `📋 Лиды: ${siteUrl}/franchize/${payload.slug}/leads`,
+      );
+    }
 
     await notifyAdmin(notificationParts.join("\n"));
 
     // ── Send notification to creator too (Issue 4) ──
     if (payload.telegramUserId && payload.telegramUserId !== adminChatId) {
+      const userFlowEmoji = isServiceFlow ? "🔧" : flowType === "mixed" ? "📦" : isSaleFlow ? "🛍️" : isTestdrive ? "🏁" : "🧾";
+      const userFlowLabel = isServiceFlow ? "Сервисная заявка" : flowType === "mixed" ? "Смешанный заказ" : isSaleFlow ? "Заказ на покупку" : isTestdrive ? "Заказ на тест-драйв" : "Заказ на аренду";
       const userNotification = [
-        `${flowType === "mixed" ? "📦 Смешанный заказ" : isSaleFlow ? "🛍️ Заказ на покупку" : isTestdrive ? "🏁 Заказ на тест-драйв" : "🧾 Заказ на аренду"} #${payload.orderId}`,
-        `Байк: ${bikeLabel}`,
-        `Статус: оформлен, договор готов`,
-        payload.rentalStartDate ? `Период: ${payload.rentalStartDate} ${rentStartTime} → ${payload.rentalEndDate || "..."} ${rentEndTime}` : "",
+        `${userFlowEmoji} ${userFlowLabel} #${payload.orderId}`,
+        `Байк: ${isServiceFlow ? (serviceBikeNames ?? bikeLabel) : bikeLabel}`,
+        `Статус: ${isServiceFlow ? "заявка принята" : "оформлен, договор готов"}`,
+        isServiceFlow && payload.rentalStartDate
+          ? `Дата визита: ${payload.rentalStartDate}`
+          : payload.rentalStartDate
+            ? `Период: ${payload.rentalStartDate} ${rentStartTime} → ${payload.rentalEndDate || "..."} ${rentEndTime}`
+            : "",
       ].filter(Boolean).join("\n");
 
       try {
@@ -3137,13 +3168,22 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     try {
       const { upsertFranchizeLead } = await import("@/app/franchize/lib/leads");
       const resolvedIntentType = flowType === "sale" ? "sale" : flowType === "service" ? "service" : "rent";
+
+      // For service flow, resolve actual service item names for the lead title
+      const serviceItemTitles = isServiceFlow
+        ? payload.cartLines.map((line) => {
+            const car = byId.get(line.itemId);
+            return car ? `${car.make} ${car.model}` : (line as any).itemName || line.itemId;
+          }).join(", ")
+        : null;
+
       await upsertFranchizeLead({
         slug: payload.slug,
         userId: payload.phone || payload.telegramUserId,
         intentType: resolvedIntentType,
         stage: "contract_generated",
-        bikeId: bikeDocs[0]?.bikeId,
-        bikeTitle: bikeDocs.map((d) => d.bikeName).join(", "),
+        bikeId: isServiceFlow ? payload.cartLines[0]?.itemId : bikeDocs[0]?.bikeId,
+        bikeTitle: isServiceFlow ? (serviceItemTitles ?? "Сервисная заявка") : bikeDocs.map((d) => d.bikeName).join(", "),
         phone: payload.phone || undefined,
         fullName: payload.recipient || undefined,
         sourceRoute: `/franchize/${payload.slug}/order/${payload.orderId}`,
@@ -3155,9 +3195,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           hasPassport: !!(payload.passportSeries && payload.passportNumber),
           hasLicense: !!(payload.licenseSeries && payload.licenseNumber),
           flow_type: flowType,
-          bikeIds: bikeDocs.map((d) => d.bikeId),
-          bikeNames: bikeDocs.map((d) => d.bikeName),
-          bikeCount: bikeDocs.length,
+          bikeIds: isServiceFlow ? payload.cartLines.map((l) => l.itemId) : bikeDocs.map((d) => d.bikeId),
+          bikeNames: isServiceFlow ? (serviceItemTitles?.split(", ") ?? []) : bikeDocs.map((d) => d.bikeName),
+          bikeCount: isServiceFlow ? payload.cartLines.length : bikeDocs.length,
         },
         ensureUser: true,
       });
