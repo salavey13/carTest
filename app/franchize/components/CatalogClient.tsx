@@ -615,13 +615,13 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   };
 
   const categorizedItems = useMemo(() => {
-    const isRent = displayMode === "rent";
-
     // First apply search + quickFilter (filteredItems has them), then split by display mode
     // FIX: was `items` — quickFilter/search had no effect on vip-bike crew
     const filtered = filteredItems.filter(item => {
-      if (isRent) return hasRentPrice(item);
-      return hasSalePrice(item);
+      if (displayMode === "rent") return hasRentPrice(item);
+      if (displayMode === "sale") return hasSalePrice(item);
+      if (displayMode === "service") return hasServicePrice(item);
+      return true;
     });
 
     const electric = filtered.filter(i =>
