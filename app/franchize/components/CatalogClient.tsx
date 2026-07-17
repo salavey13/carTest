@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { toCategoryId } from "../lib/navigation";
@@ -1150,6 +1150,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         const rentalStrip = buildCatalogRentalStrip(item, crew);
                         const parallax = carouselParallaxByItem[item.id] ?? { x: 0, y: 0 };
                         const specChips = getVisibleSpecChips(item);
+                        const isService = hasServicePrice(item);
                         return (
                     <article
                       key={item.id}
@@ -1179,8 +1180,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           setCarouselParallaxByItem((prev) => ({ ...prev, [item.id]: { x: 0, y: 0 } }));
                         }}
                       >
-                        {/* ── Image area (9:16 portrait) with speed badge ── */}
-                        <div className="relative aspect-[9/16] w-full overflow-hidden">
+                        {/* ── Image area (9:16 for bikes, square for services) ── */}
+                        <div className={`relative w-full overflow-hidden ${isService ? 'aspect-square' : 'aspect-[9/16]'}`}>
                           {item.imageUrl && !carouselLoadedByItem[item.id] && (
                             <div className="absolute inset-0 overflow-hidden bg-[var(--catalog-bg)]/30">
                               <div className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent" />
@@ -1197,6 +1198,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
                               onError={handleImageError(item.imageUrl)}
                             />
+                          ) : isService ? (
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-center transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]" style={{ backgroundColor: withAlpha(accentColor, 0.06), color: surface.mutedText.color }}>
+                              <Wrench className="h-10 w-10 opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" />
+                              <span className="text-[10px] font-medium opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</span>
+                            </div>
                           ) : (
                             <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается</div>
                           )}
@@ -1303,6 +1309,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                   {group.items.map((item) => {
                     const rentalStrip = buildCatalogRentalStrip(item, crew);
                     const visibleSpecs = getVisibleSpecChips(item);
+                    const isService = hasServicePrice(item);
                     return (
                     <article
                       key={item.id}
@@ -1320,8 +1327,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
                         style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
                       >
-                        {/* ── Image area (9:16 portrait) with spec badges ── */}
-                        <div className="relative aspect-[9/16] w-full">
+                        {/* ── Image area (9:16 for bikes, square for services) ── */}
+                        <div className={`relative w-full ${isService ? 'aspect-square' : 'aspect-[9/16]'}`}>
                           {item.imageUrl ? (
                             <Image
                               src={localImageSrc(item.imageUrl)}
@@ -1331,6 +1338,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               className="object-cover"
                               onError={handleImageError(item.imageUrl)}
                             />
+                          ) : isService ? (
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-center transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]" style={{ backgroundColor: withAlpha(accentColor, 0.06), color: surface.mutedText.color }}>
+                              <Wrench className="h-10 w-10 opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" />
+                              <span className="text-[10px] font-medium opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</span>
+                            </div>
                           ) : (
                             <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается</div>
                           )}
