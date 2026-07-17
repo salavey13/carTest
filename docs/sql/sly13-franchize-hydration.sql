@@ -170,7 +170,7 @@ set
           'phone', '',
           'email', '',
           'telegram', '@SALAVEY13',
-          'telegramBotUsername', '',
+          'telegramBotUsername', 'oneBikePlsBot',
           'workingHours', 'По договорённости',
           'map', jsonb_build_object(
             'imageUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/nnmap.jpg',
