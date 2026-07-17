@@ -1,7 +1,7 @@
 -- ============================================================
 -- SLY13 Crew — Catalog Items Seed
 -- Crew ID: 6be3846b-f350-4558-a6c3-44b43b6760de
--- Type: wbitem (service/educational items, NOT bikes)
+-- Type: service (educational/consulting items)
 -- ============================================================
 
 -- 1. Vibe-сессия «Аудит»
@@ -14,7 +14,7 @@ values (
   5000,
   '',
   'https://t.me/SALAVEY13',
-  'wbitem',
+  'service',
   '{"service": true, "dailyPrice": 5000, "subtype": "vibe-session"}'::jsonb,
   '6be3846b-f350-4558-a6c3-44b43b6760de'
 )
@@ -39,7 +39,7 @@ values (
   7000,
   '',
   'https://t.me/SALAVEY13',
-  'wbitem',
+  'service',
   '{"service": true, "dailyPrice": 7000, "subtype": "vibe-session"}'::jsonb,
   '6be3846b-f350-4558-a6c3-44b43b6760de'
 )
@@ -64,7 +64,7 @@ values (
   25000,
   '',
   'https://t.me/SALAVEY13',
-  'wbitem',
+  'service',
   '{"service": true, "dailyPrice": 25000, "subtype": "crew-setup"}'::jsonb,
   '6be3846b-f350-4558-a6c3-44b43b6760de'
 )
@@ -89,7 +89,7 @@ values (
   60000,
   '',
   'https://t.me/SALAVEY13',
-  'wbitem',
+  'service',
   '{"service": true, "dailyPrice": 60000, "subtype": "crew-setup"}'::jsonb,
   '6be3846b-f350-4558-a6c3-44b43b6760de'
 )
@@ -114,7 +114,7 @@ values (
   3000,
   '',
   'https://t.me/SALAVEY13',
-  'wbitem',
+  'service',
   '{"service": true, "dailyPrice": 3000, "subtype": "education"}'::jsonb,
   '6be3846b-f350-4558-a6c3-44b43b6760de'
 )
@@ -139,7 +139,7 @@ values (
   12000,
   '',
   'https://t.me/SALAVEY13',
-  'wbitem',
+  'service',
   '{"service": true, "dailyPrice": 12000, "subtype": "education"}'::jsonb,
   '6be3846b-f350-4558-a6c3-44b43b6760de'
 )
@@ -164,7 +164,7 @@ values (
   15000,
   '',
   'https://t.me/SALAVEY13',
-  'wbitem',
+  'service',
   '{"service": true, "dailyPrice": 15000, "subtype": "maintenance"}'::jsonb,
   '6be3846b-f350-4558-a6c3-44b43b6760de'
 )

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 
-type DisplayMode = "rent" | "sale";
+type DisplayMode = "rent" | "sale" | "service";
 
 interface DisplayModeContextValue {
   displayMode: DisplayMode;
@@ -32,7 +32,7 @@ export function DisplayModeProvider({
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const urlMode = params.get("mode");
-    if (urlMode === "sale" || urlMode === "rent") {
+    if (urlMode === "sale" || urlMode === "rent" || urlMode === "service") {
       setDisplayModeState(urlMode);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
