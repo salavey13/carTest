@@ -213,6 +213,14 @@ export interface FranchizeCrewVM {
   reservationHold: FranchizeReservationHoldVM;
   contentBlocks: FranchizeContentBlocks;
   reviewsLink?: string;
+  cta: CtaBlock;
+}
+
+export interface CtaBlock {
+  title: string;
+  description: string;
+  buttonLabel: string;
+  buttonHref: string;
 }
 
 export interface FranchizeReservationHoldVM {
@@ -650,6 +658,12 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
   },
   reservationHold: buildFranchizeReservationHold({}, ""),
   contentBlocks: cloneFranchizeContentBlocks(),
+  cta: {
+    title: "Тест-драйв",
+    description: "",
+    buttonLabel: "Записаться",
+    buttonHref: "",
+  },
 });
 
 export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugResult> {
@@ -922,6 +936,12 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       },
       reservationHold: buildFranchizeReservationHold(franchize, readPath(franchize, ["contacts", "address"], "")),
       contentBlocks: readFranchizeContentBlocks(franchize),
+      cta: {
+        title: readPath(franchize, ["cta", "title"], "Тест-драйв"),
+        description: readPath(franchize, ["cta", "description"], ""),
+        buttonLabel: readPath(franchize, ["cta", "buttonLabel"], "Записаться"),
+        buttonHref: readPath(franchize, ["cta", "buttonHref"], ""),
+      },
     };
 
     const items: CatalogItemVM[] = (cars ?? [])
