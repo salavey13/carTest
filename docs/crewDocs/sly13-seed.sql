@@ -165,7 +165,7 @@ values (
   '',
   'https://t.me/SALAVEY13',
   'service',
-  '{"service": true, "dailyPrice": 15000, "subtype": "maintenance"}'::jsonb,
+  '{"service": true, "dailyPrice": 15000, "subtype": "maintenance", "rent_price_label": "15 000 ₽ / месяц"}'::jsonb,
   '6be3846b-f350-4558-a6c3-44b43b6760de'
 )
 on conflict (id) do update set
