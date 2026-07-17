@@ -1065,7 +1065,10 @@ export function ItemModal({
   isReturningUser = false,
   displayMode,
 }: ItemModalProps) {
-  const isRental = displayMode ? displayMode === "rent" : flowType === "rental";
+  // Service items (vibe sessions, education, etc.) always use "order" flow — hide rental UI
+  const isServiceItem = (item?.rawSpecs as Record<string, unknown>)?.service === true;
+  const effectiveFlowType = isServiceItem ? "order" : flowType;
+  const isRental = displayMode ? displayMode === "rent" : effectiveFlowType === "rental";
   const modalRef = useRef<HTMLDivElement>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
