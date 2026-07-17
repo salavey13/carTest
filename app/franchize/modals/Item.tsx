@@ -1981,7 +1981,7 @@ export function ItemModal({
               <button
                 type="button"
                 onClick={() => {
-                  const templateType = isRental ? "RENTAL" : "SALE";
+                  const templateType = isServiceItem ? "SERVICE" : (isRental ? "RENTAL" : "SALE");
                   const viewerBase = "https://htmlpreview.github.io/?https://raw.githubusercontent.com/salavey13/carTest/main";
                   const crewPath = `docs/crewDocs/${slug}_${templateType}_DEAL_TEMPLATE.html`;
                   const genericPath = `docs/${templateType}_DEAL_TEMPLATE.html`;

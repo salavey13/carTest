@@ -1,0 +1,97 @@
+<!-- /docs/SERVICE_DEAL_TEMPLATE.html -->
+<!-- 2026-07-17: Service request template — a simplified notification document -->
+<!-- for service items (maintenance, vibe-sessions, education, etc.).       -->
+<!-- Unlike RENTAL/SALE templates (1 bike per doc), this supports a list    -->
+<!-- of services (cart items) via {{services_table}} HTML block.            -->
+<!-- No official legal boilerplate — Telegram user ID is enough for         -->
+<!-- notifications. Optional phone number may be collected on order page.   -->
+<!-- Engine: buildFranchizeDocxFromTemplate() supports {{placeholder}} vars -->
+<!--         and {{#if var}}...{{else}}...{{/if}} conditional blocks.       -->
+<style>
+  @page { size: A4; margin: 20mm 20mm 25mm 25mm; }
+  .doc-container { max-width: 17cm; margin: 0 auto; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.4; color: #000; }
+  .doc-container p { max-width: 100%; overflow-wrap: break-word; }
+</style>
+<div class="doc-container">
+
+<p style="text-align: center; font-weight: bold; font-size: 13pt; margin-top: 14pt;">ЗАЯВКА № {{contract_number}}</p>
+<p style="text-align: center; font-weight: bold; font-size: 12pt;">на сервисное обслуживание</p>
+
+<table style="width: 100%; border: none; margin-top: 11pt;">
+<tr><td style="border: none; width: 50%;">г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">{{service_date}}</td></tr>
+</table>
+
+<!-- Quick-info box for fast verification -->
+<table style="width: 100%; border: 2px solid #333; margin-top: 12pt; margin-bottom: 12pt; font-size: 10pt;">
+<tr><td style="border: 1px solid #999; padding: 4pt 8pt; font-weight: bold; background: #f0f0f0;" colspan="2">КРАТКАЯ ИНФОРМАЦИЯ</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; width: 40%;">Экипаж:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{crew_name}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Клиент (Telegram):</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{tg_user_id}}</td></tr>
+{{#if customer_phone}}
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Телефон:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{customer_phone}}</td></tr>
+{{/if}}
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Дата записи:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{service_date}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Услуг в заявке:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{service_count}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Итого:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{total_price}} ₽</td></tr>
+</table>
+
+<p style="text-align: center; font-weight: bold;">Состав заявки</p>
+
+<table style="width: 100%; border-collapse: collapse; margin-top: 8pt;">
+<tr style="border: 1px solid #000;">
+  <th style="border: 1px solid #000; padding: 4pt; width: 5%;">№</th>
+  <th style="border: 1px solid #000; padding: 4pt; width: 50%;">Наименование услуги</th>
+  <th style="border: 1px solid #000; padding: 4pt; width: 15%;">Кол-во</th>
+  <th style="border: 1px solid #000; padding: 4pt; width: 15%;">Цена, ₽</th>
+  <th style="border: 1px solid #000; padding: 4pt; width: 15%;">Сумма, ₽</th>
+</tr>
+{{services_table}}
+<tr style="border: 1px solid #000;">
+  <td style="border: 1px solid #000; padding: 4pt; text-align: right; font-weight: bold;" colspan="4">ИТОГО:</td>
+  <td style="border: 1px solid #000; padding: 4pt; text-align: center; font-weight: bold;">{{total_price}}</td>
+</tr>
+</table>
+
+<div style="margin-top: 14pt;">
+  <p style="text-align: justify;">
+    <b>Клиент (Telegram ID):</b> {{tg_user_id}}
+  </p>
+  {{#if customer_phone}}
+  <p style="text-align: justify;">
+    <b>Телефон для связи:</b> {{customer_phone}}
+  </p>
+  {{/if}}
+  <p style="text-align: justify;">
+    <b>Уведомление о готовности / напоминание</b> направляется клиенту через Telegram на указанный ID.
+  </p>
+  <p style="text-align: justify;">
+    Настоящий документ не является договором и не требует подписания сторонами.
+    Сервисные работы выполняются после подтверждения заявки оператором экипажа.
+    Оплата производится по факту выполнения работ согласно прейскуранту.
+  </p>
+</div>
+
+<br>
+
+<table style="width: 100%; border: none; margin-top: 12pt;">
+<tr>
+<td style="border: none; width: 50%; vertical-align: top; text-align: justify;">
+<b>Исполнитель:</b><br>
+{{crew_name}}<br>
+{{#if legal_address}}{{legal_address}}<br>{{/if}}
+{{#if ogrnip}}ОГРНИП: {{ogrnip}}<br>{{/if}}
+{{#if inn}}ИНН: {{inn}}<br>{{/if}}
+{{#if phone}}Телефон: {{phone}}<br>{{/if}}
+</td>
+<td style="border: none; width: 50%; vertical-align: top; text-align: justify;">
+<b>Заказчик:</b><br>
+Telegram ID: {{tg_user_id}}<br>
+{{#if customer_phone}}Телефон: {{customer_phone}}{{/if}}
+</td>
+</tr>
+</table>
+
+<p style="margin-top: 14pt; text-align: center; font-size: 9pt; color: #666;">
+  Документ сформирован автоматически. Дубликат направлен в Telegram.
+</p>
+
+</div>
