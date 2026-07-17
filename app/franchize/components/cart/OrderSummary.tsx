@@ -18,10 +18,12 @@ export function OrderSummary({ cartLines, subtotal, crew }: OrderSummaryProps) {
   const T = useCrewTokens(crew.theme);
   const rentLines = cartLines.filter((l) => l.flowType === "rental");
   const buyLines = cartLines.filter((l) => l.flowType === "sale");
+  const serviceLines = cartLines.filter((l) => l.flowType === "service");
 
   const rentTotal = rentLines.reduce((sum, l) => sum + l.lineTotal, 0);
   const buyTotal = buyLines.reduce((sum, l) => sum + (l.salePrice ?? 0), 0);
-  const grandTotal = rentTotal + buyTotal;
+  const serviceTotal = serviceLines.reduce((sum, l) => sum + l.lineTotal, 0);
+  const grandTotal = rentTotal + buyTotal + serviceTotal;
 
   const periodParts = rentLines
     .map((l) => l.rentalPeriod)
@@ -61,6 +63,25 @@ export function OrderSummary({ cartLines, subtotal, crew }: OrderSummaryProps) {
                     {l.rentalPeriod}
                   </div>
                 )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Service lines breakdown */}
+      {serviceLines.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          {serviceLines.map((l) => (
+            <div key={l.lineId} className="flex items-baseline justify-between gap-2 text-sm">
+              <div className="min-w-0 flex-1 truncate" style={{ color: T.text }}>
+                {l.item?.title ?? "Услуга"}
+                {l.qty > 1 && <span className="ml-1 opacity-60">× {l.qty}</span>}
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="font-semibold" style={{ color: T.text }}>
+                  {l.lineTotal.toLocaleString("ru-RU")} ₽
+                </div>
               </div>
             </div>
           ))}

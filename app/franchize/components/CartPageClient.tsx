@@ -62,8 +62,10 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
 
   // ── Flow detection for UI labels ──
   const saleLinesCount = cartLines.filter((line) => line.flowType === "sale").length;
+  const serviceLinesCount = cartLines.filter((line) => line.flowType === "service").length;
   const isAllSale = saleLinesCount > 0 && saleLinesCount === cartLines.length;
-  const isMixed = saleLinesCount > 0 && !isAllSale;
+  const isAllService = serviceLinesCount > 0 && serviceLinesCount === cartLines.length;
+  const isMixed = (saleLinesCount > 0 || serviceLinesCount > 0) && !isAllSale && !isAllService;
 
   // CART-TODO #1: Subtotal label adapts to cart composition.
   // For pure rental carts we use the actual rental period from the
@@ -74,23 +76,27 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const rentalLabel = firstRentalLine?.rentalPeriod;
   const subtotalLabel = isAllSale
     ? "Сумма покупки"
-    : isMixed
-      ? "Итого (аренда + покупка)"
-      : rentalLabel
-        ? `Сумма ${rentalLabel} аренды`
-        : "Сумма аренды";
+    : isAllService
+      ? "Сумма заказа"
+      : isMixed
+        ? "Итого"
+        : rentalLabel
+          ? `Сумма ${rentalLabel} аренды`
+          : "Сумма аренды";
 
   // CART-TODO #4: CTA text adapts to flow
   const ctaLabel = isAllSale
     ? "Перейти к оформлению покупки"
-    : isMixed
-      ? "Перейти к оформлению"
-      : "Перейти к оформлению аренды";
+    : isAllService
+      ? "Перейти к оформлению заявки"
+      : isMixed
+        ? "Перейти к оформлению"
+        : "Перейти к оформлению аренды";
 
   const handleProceed = async () => {
     setIsSaving(true);
     setLoadingMessage("Сохраняем корзину...");
-    const flow = isAllSale ? "sale" : isMixed ? "mixed" : "rental";
+    const flow = isAllSale ? "sale" : isAllService ? "service" : isMixed ? "mixed" : "rental";
     const intentPromise = upsertFranchizeIntent({
       slug,
       bikeId: cartLines[0]?.item?.id ?? cartLines[0]?.itemId,
