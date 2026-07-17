@@ -14,20 +14,9 @@ import {
   AlertCircle,
   RefreshCw,
   TrendingUp,
-  Zap,
   Eye,
   QrCode,
-  Edit,
-  MoreVertical,
-  Phone,
   Globe,
-  Mail,
-  MessageSquare,
-  Send,
-  List,
-  Share2,
-  Plus,
-  X,
   BarChart3,
   Tag,
   FileText,
@@ -65,6 +54,8 @@ import {
 } from "@/app/franchize/server-actions/message-templates";
 import { useSupabaseRealtime } from "@/app/franchize/hooks/useSupabaseRealtime";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
+import { RentalsViewControls } from "./analytics-components/RentalsViewControls";
+import { RentalRowActions } from "./analytics-components/RentalRowActions";
 import { RentalsStatsRow } from "./analytics-components/RentalsStatsRow";
 import { SubrentsSection } from "./analytics-components/SubrentsSection";
 import { SalesListSection } from "./analytics-components/SalesListSection";
@@ -1092,62 +1083,17 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                 textSecondary={textSecondary}
               />
 
-            {/* FILTER BAR */}
-            <div className="flex items-center gap-2 md:gap-3 overflow-x-visible pb-2 px-1 flex-wrap">
-              <span className="text-[10px] md:text-xs font-black uppercase tracking-widest whitespace-nowrap" style={{ color: textSecondary, opacity: 0.7 }}>Фильтр:</span>
-              {[
-                { value: "all", label: "Все", icon: Eye },
-                { value: "verified", label: "Проверены", icon: CheckCircle2 },
-                { value: "pending", label: "Ожидают", icon: Clock },
-              ].map((filter) => {
-                const Icon = filter.icon;
-                const isActive = verificationFilter === filter.value;
-                return (
-                  <button
-                    key={filter.value}
-                    onClick={() => setVerificationFilter(isActive ? "all" : (filter.value as any))}
-                    className="relative px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl border flex items-center gap-1.5 md:gap-2 text-xs md:text-sm font-bold transition-all duration-300 whitespace-nowrap group"
-                    style={
-                      isActive
-                        ? {
-                            background: `linear-gradient(135deg, ${withAlpha(accentMain, 0.2)}, ${withAlpha(accentMain, 0.1)})`,
-                            borderColor: withAlpha(accentMain, 0.4),
-                            color: accentMain,
-                            borderWidth: "1.5px",
-                            boxShadow: `0 0 20px ${withAlpha(accentMain, 0.15)}`
-                          }
-                        : {
-                            backgroundColor: withAlpha(bgCard, 0.5),
-                            borderColor: borderSoft,
-                            color: textSecondary,
-                            borderWidth: "1px"
-                          }
-                    }
-                    onMouseEnter={(e) => {
-                      if (!isActive) {
-                        e.currentTarget.style.borderColor = withAlpha(borderSoft, 1);
-                        e.currentTarget.style.color = textPrimary;
-                        e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.7);
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) {
-                        e.currentTarget.style.borderColor = borderSoft;
-                        e.currentTarget.style.color = textSecondary;
-                        e.currentTarget.style.backgroundColor = withAlpha(bgCard, 0.5);
-                      }
-                    }}
-                  >
-                    {/* Active glow effect */}
-                    {isActive && (
-                      <div className="absolute inset-0 rounded-lg md:rounded-xl blur-md animate-pulse" style={{ backgroundColor: withAlpha(accentMain, 0.2) }} />
-                    )}
-                    <Icon className="w-3.5 h-3.5 md:w-4 md:h-4 relative z-10" />
-                    <span className="relative z-10">{filter.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <RentalsViewControls
+              verificationFilter={verificationFilter}
+              onVerificationFilterChange={setVerificationFilter}
+              analyticsView={analyticsView}
+              onAnalyticsViewChange={setAnalyticsView}
+              accentMain={accentMain}
+              bgCard={bgCard}
+              borderSoft={borderSoft}
+              textPrimary={textPrimary}
+              textSecondary={textSecondary}
+            />
 
             {/* CHECKLISTS & TODOS */}
             <div className="grid lg:grid-cols-2 gap-3 md:gap-4">
@@ -1227,39 +1173,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                 borderWidth: "1px"
               }}
             >
-              {/* View toggle buttons */}
-              <div className="px-4 md:px-5 pt-2.5 md:pt-3 flex items-center gap-2">
-                <button
-                  onClick={() => setAnalyticsView("table")}
-                  className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all flex items-center gap-1.5 md:gap-2 ${
-                    analyticsView === "table" ? "opacity-100" : "opacity-60"
-                  }`}
-                  style={{
-                    backgroundColor: analyticsView === "table" ? withAlpha(accentMain, 0.2) : "transparent",
-                    borderColor: analyticsView === "table" ? withAlpha(accentMain, 0.3) : borderSoft,
-                    borderWidth: "1px",
-                    color: analyticsView === "table" ? accentMain : textSecondary,
-                  }}
-                >
-                  <List className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                  <span className="hidden sm:inline">Таблица</span>
-                </button>
-                <button
-                  onClick={() => setAnalyticsView("calendar")}
-                  className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all flex items-center gap-1.5 md:gap-2 ${
-                    analyticsView === "calendar" ? "opacity-100" : "opacity-60"
-                  }`}
-                  style={{
-                    backgroundColor: analyticsView === "calendar" ? withAlpha(accentMain, 0.2) : "transparent",
-                    borderColor: analyticsView === "calendar" ? withAlpha(accentMain, 0.3) : borderSoft,
-                    borderWidth: "1px",
-                    color: analyticsView === "calendar" ? accentMain : textSecondary,
-                  }}
-                >
-                  <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                  <span className="hidden sm:inline">Календарь</span>
-                </button>
-              </div>
+
 
               {analyticsView === "calendar" ? (
                 <div className="px-4 md:px-5 pb-4 md:pb-6">
@@ -1423,238 +1337,41 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                                 <span style={{ color: borderSoft }}>—</span>
                               )}
                             </td>
-                            <td className="px-3 md:px-5 py-3 md:py-4 text-center">
-                              <div className="flex items-center justify-center gap-1 md:gap-1.5 flex-wrap">
-                                {/* Handout button */}
-                                <button
-                                  onClick={() => {
-                                    setHandoffModalRental(rental);
-                                    setHandoffModalPhase("handout");
-                                    setHandoffModalOpen(true);
-                                  }}
-                                  className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group"
-                                  style={
-                                    rental.handoutCompleted
-                                      ? {
-                                          backgroundColor: `linear-gradient(135deg, #10b981, #059669)`,
-                                          color: "white",
-                                          boxShadow: `0 4px 12px ${withAlpha("#10b981", 0.4)}`,
-                                          border: "none"
-                                        }
-                                      : {
-                                          backgroundColor: withAlpha("#10b981", 0.15),
-                                          borderColor: withAlpha("#10b981", 0.4),
-                                          color: "#34d399",
-                                          border: "1.5px solid"
-                                        }
-                                  }
-                                >
-                                  {rental.handoutCompleted && (
-                                    <div className="absolute inset-0 bg-white/20 blur-sm" />
-                                  )}
-                                  <span className="relative z-10">→</span>
-                                </button>
-                                {/* Return button */}
-                                <button
-                                  onClick={() => {
-                                    setHandoffModalRental(rental);
-                                    setHandoffModalPhase("return");
-                                    setHandoffModalOpen(true);
-                                  }}
-                                  className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group"
-                                  style={
-                                    rental.returnCompleted
-                                      ? {
-                                          backgroundColor: `linear-gradient(135deg, #3b82f6, #2563eb)`,
-                                          color: "white",
-                                          boxShadow: `0 4px 12px ${withAlpha("#3b82f6", 0.4)}`,
-                                          border: "none"
-                                        }
-                                      : {
-                                          backgroundColor: withAlpha("#3b82f6", 0.15),
-                                          borderColor: withAlpha("#3b82f6", 0.4),
-                                          color: "#60a5fa",
-                                          border: "1.5px solid"
-                                        }
-                                  }
-                                >
-                                  {rental.returnCompleted && (
-                                    <div className="absolute inset-0 bg-white/20 blur-sm" />
-                                  )}
-                                  <span className="relative z-10">←</span>
-                                </button>
-                                {/* QR Regenerate button */}
-                                {rental.documentSecret && (
-                                  <button
-                                    onClick={() => void handleQrRegeneration(rental)}
-                                    disabled={regeneratingQr === rental.rental_id}
-                                    className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group disabled:opacity-50"
-                                    style={{
-                                      backgroundColor: regeneratingQr === rental.rental_id
-                                        ? withAlpha("#f59e0b", 0.25)
-                                        : withAlpha("#f59e0b", 0.15),
-                                      borderColor: withAlpha("#f59e0b", 0.4),
-                                      color: "#f59e0b",
-                                      border: "1.5px solid"
-                                    }}
-                                  >
-                                    {regeneratingQr === rental.rental_id ? (
-                                      <RefreshCw className="w-3 h-3 md:w-3.5 md:h-3.5 animate-spin relative z-10" />
-                                    ) : (
-                                      <QrCode className="w-3 h-3 md:w-3.5 md:h-3.5 relative z-10" />
-                                    )}
-                                  </button>
-                                )}
-                                {/* Status change button */}
-                                <button
-                                  onClick={() => {
-                                    setStatusChangeRental(rental);
-                                    setStatusChangeModalOpen(true);
-                                  }}
-                                  disabled={updatingRentalStatus === rental.rental_id}
-                                  className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group disabled:opacity-50"
-                                  style={{
-                                    backgroundColor: withAlpha(accentMain, 0.15),
-                                    borderColor: withAlpha(accentMain, 0.4),
-                                    color: accentMain,
-                                    border: "1.5px solid"
-                                  }}
-                                >
-                                  {updatingRentalStatus === rental.rental_id ? (
-                                    <RefreshCw className="w-3 h-3 md:w-3.5 md:h-3.5 animate-spin relative z-10" />
-                                  ) : (
-                                    <Edit className="w-3 h-3 md:w-3.5 md:h-3.5 relative z-10" />
-                                  )}
-                                </button>
-                                {/* Message button with dropdown */}
-                                {rental.documentSecret && (
-                                  <div className="relative">
-                                    <button
-                                      onClick={() => setMessageMenuOpen(messageMenuOpen === rental.rental_id ? null : rental.rental_id)}
-                                      disabled={sendingMessage === rental.rental_id}
-                                      className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group disabled:opacity-50"
-                                      style={{
-                                        backgroundColor: sendingMessage === rental.rental_id
-                                          ? withAlpha("#8b5cf6", 0.25)
-                                          : withAlpha("#8b5cf6", 0.15),
-                                        borderColor: withAlpha("#8b5cf6", 0.4),
-                                        color: "#8b5cf6",
-                                        border: "1.5px solid"
-                                      }}
-                                      title="Отправить сообщение"
-                                    >
-                                      {sendingMessage === rental.rental_id ? (
-                                        <RefreshCw className="w-3 h-3 md:w-3.5 md:h-3.5 animate-spin relative z-10" />
-                                      ) : (
-                                        <MessageSquare className="w-3 h-3 md:w-3.5 md:h-3.5 relative z-10" />
-                                      )}
-                                    </button>
-
-                                    {/* Dropdown menu */}
-                                    {messageMenuOpen === rental.rental_id && (
-                                      <>
-                                        {/* Backdrop */}
-                                        <div
-                                          className="fixed inset-0 z-40"
-                                          onClick={() => setMessageMenuOpen(null)}
-                                        />
-                                        {/* Menu */}
-                                        <div
-                                          className="absolute right-0 top-full mt-1 z-50 rounded-lg shadow-xl py-1 min-w-[200px]"
-                                          style={{
-                                            backgroundColor: bgCard,
-                                            borderColor: borderSoft,
-                                            borderWidth: "1px",
-                                          }}
-                                        >
-                                          <div className="px-2 py-1.5 border-b text-xs font-bold" style={{ borderColor: withAlpha(borderSoft, 0.3), color: textSecondary }}>
-                                            Быстрые сообщения
-                                          </div>
-                                          {messageTemplates.map((template) => (
-                                            <button
-                                              key={template.id}
-                                              onClick={() => void handleSendMessage(rental, template.key)}
-                                              className="w-full px-3 py-2 text-left text-xs hover:opacity-80 transition-colors flex items-center gap-2"
-                                              style={{ color: textPrimary }}
-                                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = withAlpha(accentMain, 0.1)}
-                                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                                            >
-                                              <Send className="w-3 h-3 flex-shrink-0" style={{ color: "#8b5cf6" }} />
-                                              <span className="truncate">{template.name}</span>
-                                            </button>
-                                          ))}
-                                          {messageTemplates.length === 0 && (
-                                            <div className="px-3 py-2 text-xs" style={{ color: textSecondary }}>
-                                              Нет шаблонов
-                                            </div>
-                                          )}
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                )}
-                                {/* Email button */}
-                                {rental.documentSecret && (
-                                  <button
-                                    onClick={() => void handleSendEmail(rental)}
-                                    disabled={sendingEmail === rental.rental_id}
-                                    className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group disabled:opacity-50 hidden sm:block"
-                                    style={{
-                                      backgroundColor: sendingEmail === rental.rental_id
-                                        ? withAlpha("#06b6d4", 0.25)
-                                        : withAlpha("#06b6d4", 0.15),
-                                      borderColor: withAlpha("#06b6d4", 0.4),
-                                      color: "#06b6d4",
-                                      border: "1.5px solid"
-                                    }}
-                                    title="Отправить на email"
-                                  >
-                                    {sendingEmail === rental.rental_id ? (
-                                      <RefreshCw className="w-3 h-3 md:w-3.5 md:h-3.5 animate-spin relative z-10" />
-                                    ) : (
-                                      <Mail className="w-3 h-3 md:w-3.5 md:h-3.5 relative z-10" />
-                                    )}
-                                  </button>
-                                )}
-                                {/* Mark as complete button */}
-                                {rental.status !== "completed" && (
-                                  <button
-                                    onClick={() => void handleMarkComplete(rental)}
-                                    disabled={completingRental === rental.rental_id}
-                                    className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group disabled:opacity-50"
-                                    style={{
-                                      backgroundColor: completingRental === rental.rental_id
-                                        ? withAlpha("#10b981", 0.25)
-                                        : withAlpha("#10b981", 0.15),
-                                      borderColor: withAlpha("#10b981", 0.4),
-                                      color: "#10b981",
-                                      border: "1.5px solid"
-                                    }}
-                                    title="Завершить аренду"
-                                  >
-                                    {completingRental === rental.rental_id ? (
-                                      <RefreshCw className="w-3 h-3 md:w-3.5 md:h-3.5 animate-spin relative z-10" />
-                                    ) : (
-                                      <CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5 relative z-10" />
-                                    )}
-                                  </button>
-                                )}
-                                {/* QR Share button - for crew members to quickly access rental */}
-                                <button
-                                  onClick={() => handleShareQr(rental)}
-                                  className="relative px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all duration-300 overflow-hidden group"
-                                  style={{
-                                    backgroundColor: withAlpha("#8b5cf6", 0.15),
-                                    borderColor: withAlpha("#8b5cf6", 0.4),
-                                    color: "#8b5cf6",
-                                    border: "1.5px solid"
-                                  }}
-                                  title="Скопировать ссылку для быстрого доступа"
-                                >
-                                  <Share2 className="w-3 h-3 md:w-3.5 md:h-3.5 relative z-10" />
-                                </button>
-                              </div>
-                            </td>
+                            <RentalRowActions
+                              rental={rental}
+                              messageTemplates={messageTemplates}
+                              messageMenuOpen={messageMenuOpen}
+                              regeneratingQr={regeneratingQr}
+                              sendingMessage={sendingMessage}
+                              sendingEmail={sendingEmail}
+                              completingRental={completingRental}
+                              updatingRentalStatus={updatingRentalStatus}
+                              accentMain={accentMain}
+                              bgCard={bgCard}
+                              borderSoft={borderSoft}
+                              textPrimary={textPrimary}
+                              textSecondary={textSecondary}
+                              onHandout={(r) => {
+                                setHandoffModalRental(r);
+                                setHandoffModalPhase("handout");
+                                setHandoffModalOpen(true);
+                              }}
+                              onReturn={(r) => {
+                                setHandoffModalRental(r);
+                                setHandoffModalPhase("return");
+                                setHandoffModalOpen(true);
+                              }}
+                              onQrRegeneration={handleQrRegeneration}
+                              onStatusChange={(r) => {
+                                setStatusChangeRental(r);
+                                setStatusChangeModalOpen(true);
+                              }}
+                              onSendMessage={handleSendMessage}
+                              onSendEmail={handleSendEmail}
+                              onMarkComplete={handleMarkComplete}
+                              onShareQr={handleShareQr}
+                              onToggleMessageMenu={setMessageMenuOpen}
+                            />
                           </tr>
                         );
                       })}
