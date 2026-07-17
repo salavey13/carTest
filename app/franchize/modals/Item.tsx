@@ -1785,6 +1785,36 @@ export function ItemModal({
               </button>
             )}
 
+            {/* ── Date picker for service items (scheduling) ── */}
+            {isServiceItem && (
+              <div
+                className="rounded-2xl border p-3"
+                style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}
+              >
+                <p
+                  className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em]"
+                  style={{ color: T.textMuted }}
+                >
+                  <Calendar className="h-3.5 w-3.5" />
+                  Дата для записи
+                </p>
+                <input
+                  type="date"
+                  value={options.rentStartDate || todayISO()}
+                  min={todayISO()}
+                  onChange={(e) => onChangeOption("rentStartDate", e.target.value)}
+                  className="w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+                  style={{
+                    backgroundColor: T.bgElevated,
+                    borderColor: T.border,
+                    color: T.text,
+                    colorScheme: T.isLight ? "light" : "dark",
+                  }}
+                  aria-label="Дата для записи на сервис"
+                />
+              </div>
+            )}
+
             {/* ── Rental-only options (hidden for order flow) ── */}
             {isRental && (
               <>

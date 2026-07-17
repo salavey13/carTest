@@ -12,6 +12,8 @@ const isSpecExplicitlyEnabled = (rawSpecs: Record<string, unknown> | undefined, 
 
 /** True when item is available for rent (rent=1 or legacy pricePerDay>0 with no rent=0) */
 export const hasRentPrice = (item: CatalogItemVM): boolean => {
+  // Service items are never rentable
+  if (hasServicePrice(item)) return false;
   const rs = item.rawSpecs as Record<string, unknown> | undefined;
   // If rent spec exists, it must be explicitly enabled
   if (rs && "rent" in rs) {
@@ -37,6 +39,8 @@ export const hasServicePrice = (item: CatalogItemVM): boolean => {
 
 /** True when item is available for sale with a valid sale price AND sale=1 spec is explicitly set */
 export const hasSalePrice = (item: CatalogItemVM): boolean => {
+  // Service items are never for sale
+  if (hasServicePrice(item)) return false;
   const rs = item.rawSpecs as Record<string, unknown> | undefined;
   // If sale spec exists, it must be explicitly enabled
   if (rs && "sale" in rs) {
