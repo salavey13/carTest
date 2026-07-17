@@ -16,7 +16,7 @@ import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
-import { hasRentPrice, hasSalePrice } from "../lib/catalog-utils";
+import { hasRentPrice, hasSalePrice, hasServicePrice } from "../lib/catalog-utils";
 import { readablePaletteTextOnColor, withAlpha } from "../lib/theme";
 import { SHOW_CART } from "@/lib/feature-flags";
 import {
@@ -308,7 +308,9 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             {([
               { key: "rent" as const, label: "Аренда", count: items?.filter(hasRentPrice).length ?? 0 },
               { key: "sale" as const, label: "Продажа", count: items?.filter(hasSalePrice).length ?? 0 },
-            ]).map((pill) => {
+              { key: "service" as const, label: "Сервис", count: items?.filter(hasServicePrice).length ?? 0 },
+            ].filter((pill) => pill.count > 0 || pill.key === "rent" || pill.key === "sale")
+            ).map((pill) => {
               const isActive = displayMode === pill.key;
               return (
                 <button

@@ -25,6 +25,16 @@ export const hasRentPrice = (item: CatalogItemVM): boolean => {
   return item.pricePerDay > 0;
 };
 
+/** True when item is a service item (type="service" or specs.service=true) */
+export const hasServicePrice = (item: CatalogItemVM): boolean => {
+  const rs = item.rawSpecs as Record<string, unknown> | undefined;
+  // Check specs.service flag or item type
+  if (rs && (rs.service === true || rs.service === 1 || String(rs.service).toLowerCase() === "true")) {
+    return true;
+  }
+  return false;
+};
+
 /** True when item is available for sale with a valid sale price AND sale=1 spec is explicitly set */
 export const hasSalePrice = (item: CatalogItemVM): boolean => {
   const rs = item.rawSpecs as Record<string, unknown> | undefined;
