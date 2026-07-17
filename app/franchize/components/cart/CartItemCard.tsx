@@ -169,7 +169,7 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
                 : T.styles.accentPill
             }
           >
-            {line.flowType === "sale" ? "Покупка" : "Аренда"}
+            {line.flowType === "sale" ? "Покупка" : line.flowType === "service" ? "Сервис" : "Аренда"}
           </span>
 
           {/* Rental period (date + time) inline on the card */}

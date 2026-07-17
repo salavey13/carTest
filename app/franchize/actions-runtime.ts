@@ -1984,11 +1984,11 @@ function resolveAndValidateFranchizeDocVariables(
   };
 }
 
-type FranchizeOrderFlowType = "rental" | "sale" | "mixed" | "testdrive";
+type FranchizeOrderFlowType = "rental" | "sale" | "mixed" | "testdrive" | "service";
 
 async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderFlowType): Promise<{ template: string; templateMode: "md" | "html" }> {
   const crewSensitive = await getCrewSensitiveDataOrDefault(slug, { source: "loadFranchizeDealTemplate" });
-  const secureTemplateKey = flowType === "rental" ? "rentalDealTemplate" : "saleDealTemplate";
+  const secureTemplateKey = flowType === "rental" ? "rentalDealTemplate" : flowType === "service" ? "serviceDealTemplate" : "saleDealTemplate";
   const secureTemplate = readPath(crewSensitive.docTemplates ?? {}, [secureTemplateKey], "");
   if (typeof secureTemplate === "string" && secureTemplate.trim().length > 0) {
     // Auto-detect mode from stored template content
@@ -2002,11 +2002,14 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
     // "garbage truck" legacy contract output. Now both flows use .html.
     const isRental = flowType === "rental";
     const isTestdrive = flowType === "testdrive";
+    const isService = flowType === "service";
     const localTemplateFile = isRental
       ? "RENTAL_DEAL_TEMPLATE.html"
       : isTestdrive
         ? "TESTDRIVE_DEAL_TEMPLATE.html"
-        : "SALE_DEAL_TEMPLATE.html";
+        : isService
+          ? "SERVICE_DEAL_TEMPLATE.html"
+          : "SALE_DEAL_TEMPLATE.html";
     const defaultTemplateMode = "html" as const;
 
   // Check crew-specific template in crewDocs/ first
@@ -2038,7 +2041,9 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
       ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE.html"
       : isTestdrive
         ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/TESTDRIVE_DEAL_TEMPLATE.html"
-        : "https://raw.githubusercontent.com/salavey13/cartTest/main/docs/SALE_DEAL_TEMPLATE.html";
+        : isService
+          ? "https://raw.githubusercontent.com/salavey13/cartTest/main/docs/SERVICE_DEAL_TEMPLATE.html"
+          : "https://raw.githubusercontent.com/salavey13/cartTest/main/docs/SALE_DEAL_TEMPLATE.html";
   try {
     const response = await fetch(remoteTemplateUrl, { cache: "no-store" });
     if (!response.ok) {
@@ -2125,10 +2130,12 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const flowType = (payload.flowType ?? "rental") as FranchizeOrderFlowType;
     const isSaleFlow = flowType === "sale" || flowType === "mixed";
     const isTestdrive = flowType === "testdrive";
+    const isServiceFlow = flowType === "service";
 
     // For mixed flow, determine each bike's individual flow type
     // based on whether it has rental pricing or sale pricing
     const bikeFlowTypes = payload.cartLines.map((line) => {
+      if (isServiceFlow) return "service";
       if (isTestdrive) return "testdrive";
       if (flowType === "sale") return "sale";
       if (flowType === "rental") return "rental";
@@ -2154,10 +2161,12 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const needsRentalTemplate = bikeFlowTypes.includes("rental");
     const needsSaleTemplate = bikeFlowTypes.includes("sale");
     const needsTestdriveTemplate = bikeFlowTypes.includes("testdrive");
+    const needsServiceTemplate = bikeFlowTypes.includes("service");
 
     let rentalTemplate: string | null = null;
     let saleTemplate: string | null = null;
     let testdriveTemplate: string | null = null;
+    let serviceTemplate: string | null = null;
     let templateMode: "md" | "html" = "html";
 
     if (needsRentalTemplate) {
@@ -2173,6 +2182,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     if (needsTestdriveTemplate) {
       const result = await loadFranchizeDealTemplate(payload.slug, "testdrive");
       testdriveTemplate = result.template;
+      templateMode = result.templateMode;
+    }
+    if (needsServiceTemplate) {
+      const result = await loadFranchizeDealTemplate(payload.slug, "service");
+      serviceTemplate = result.template;
       templateMode = result.templateMode;
     }
     const privateReadContext = { source: "buildFranchizeOrderDocAndNotify", orderId: payload.orderId };
@@ -2264,6 +2278,66 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // Collect per-bike equipment data for todo creation after the loop
     const bikeEquipment: Array<{ bikeId: string; bikeName: string; equipment: { helmets: number; gloves: number; jacket: boolean; boots: boolean; net: boolean; backpack: boolean; bag: boolean; charger: boolean } }> = [];
 
+    // ── SERVICE flow: generate a SINGLE consolidated document ──
+    // Unlike rental/sale (one doc per bike), service creates one doc
+    // listing all service items in a table, to simplify crew operations.
+    if (isServiceFlow && serviceTemplate) {
+      const now = new Date();
+      const serviceLines = payload.cartLines.map((line, idx) => {
+        const car = byId.get(line.itemId);
+        const itemPrice = line.lineTotal || 0;
+        return {
+          index: idx + 1,
+          name: car ? `${car.make} ${car.model}` : (line as any).itemName || line.itemId,
+          qty: line.qty,
+          unitPrice: line.pricePerDay || Math.round(itemPrice / Math.max(1, line.qty)),
+          total: itemPrice,
+        };
+      });
+      const totalServicePrice = serviceLines.reduce((sum, sl) => sum + sl.total, 0);
+      const serviceTableRows = serviceLines.map((sl) =>
+        `| ${sl.index} | ${sl.name} | ${sl.qty} | ${formatMoney(sl.unitPrice)} | ${formatMoney(sl.total)} |`
+      ).join("\n");
+      const passportStr = [payload.passportSeries, payload.passportNumber].filter(Boolean).join(" ").trim();
+
+      const svVariables: Record<string, string> = {
+        contract_number: `${payload.slug.toUpperCase()}-SRV-${payload.orderId}`,
+        service_date: now.toLocaleDateString("ru-RU"), // formatRuDateFromISO not imported here
+        crew_name: crewSecrets.organizationName,
+        tg_user_id: payload.telegramUserId || payload.recipient || "—",
+        customer_phone: docIdentity.renterPhone || payload.phone || "",
+        service_count: String(serviceLines.length),
+        total_price: formatMoney(totalServicePrice),
+        services_table: serviceTableRows,
+        legal_address: crewSecrets.legalAddress,
+        ogrnip: crewSecrets.ogrnip,
+        inn: crewSecrets.inn,
+        phone: crewSecrets.email ? "" : "",
+        document_key: `service-${payload.slug}-${payload.orderId}`,
+      };
+
+      const svDocFileName = `service-${payload.slug}-${payload.orderId}.docx`;
+      const svVerifierScope = `service:${payload.slug}:${payload.orderId}`;
+      try {
+        const { bytes, sha256 } = await buildFranchizeDocxFromTemplate({
+          integrationScope: svVerifierScope,
+          uploadedBy: "franchize-order-system",
+          documentKey: svVariables.document_key,
+          fileName: svDocFileName,
+          template: serviceTemplate,
+          variables: svVariables,
+          flowType: "service" as any,
+          templateMode,
+        });
+        bikeDocs.push({
+          bytes, fileName: svDocFileName, bikeName: "service", bikeId: "service",
+          documentKey: svVariables.document_key, sha256,
+        });
+      } catch (svErr) {
+        logger.error("[franchize] service doc generation failed", { error: svErr instanceof Error ? svErr.message : String(svErr) });
+      }
+    }
+
     for (let bikeIndex = 0; bikeIndex < payload.cartLines.length; bikeIndex++) {
       const line = payload.cartLines[bikeIndex];
       const car = byId.get(line.itemId);
@@ -2274,6 +2348,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
       const specs = (car.specs as Record<string, unknown> | null) || {};
       const dailyPriceRub = line.pricePerDay || Math.round(line.lineTotal / Math.max(1, parseDurationDays(line.options.duration)));
+
+      // ── SERVICE flow: already handled as consolidated doc above — skip per-bike ──
+      if (bikeFlowTypes[bikeIndex] === "service") {
+        continue;
+      }
 
       // ── SALE flow: build sale-specific variables (aligned with /doc command) ──
       if (bikeFlowTypes[bikeIndex] === "sale") {
@@ -2971,7 +3050,8 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
     // ── Create public.rentals row (aligned with /doc flow) ────────────────
     // This ensures the rental appears in analytics and the bike shows as busy
-    if ((flowType === "rental" || flowType === "mixed") && payload.rentalStartDate && payload.rentalEndDate) {
+    // Service orders don't create rentals — they create a lead for the crew to process
+    if ((flowType === "rental" || flowType === "mixed") && !isServiceFlow && payload.rentalStartDate && payload.rentalEndDate) {
       try {
         // time-aware ISO timestamps (use cart-line times if available)
         const firstLine = payload.cartLines[0];
@@ -3056,10 +3136,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // ONE lead per order (same person), even with multiple bikes.
     try {
       const { upsertFranchizeLead } = await import("@/app/franchize/lib/leads");
+      const resolvedIntentType = flowType === "sale" ? "sale" : flowType === "service" ? "service" : "rent";
       await upsertFranchizeLead({
         slug: payload.slug,
         userId: payload.phone || payload.telegramUserId,
-        intentType: flowType === "sale" ? "sale" : "rent",
+        intentType: resolvedIntentType,
         stage: "contract_generated",
         bikeId: bikeDocs[0]?.bikeId,
         bikeTitle: bikeDocs.map((d) => d.bikeName).join(", "),
@@ -3067,9 +3148,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         fullName: payload.recipient || undefined,
         sourceRoute: `/franchize/${payload.slug}/order/${payload.orderId}`,
         contactChannel: "web_cart",
-        urgencyScore: flowType === "rental" ? 90 : 85,
+        urgencyScore: flowType === "rental" ? 90 : flowType === "service" ? 70 : 85,
         metadata: {
-          dealType: flowType === "sale" ? "sale" : "rent",
+          dealType: resolvedIntentType,
           order_id: payload.orderId,
           hasPassport: !!(payload.passportSeries && payload.passportNumber),
           hasLicense: !!(payload.licenseSeries && payload.licenseNumber),
@@ -3240,6 +3321,67 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       }
     }
 
+    // ── Service flow: create PER-ITEM crew_todos ──
+    if (isServiceFlow) {
+      try {
+        const { data: crewRowForSvcTodos } = await supabaseAdmin.from("crews").select("id").eq("slug", payload.slug).maybeSingle();
+        if (crewRowForSvcTodos?.id) {
+          const crewId = crewRowForSvcTodos.id;
+          const leadId = payload.phone || payload.telegramUserId;
+          const baseTs = Date.now();
+          const svcTodoPromises: Promise<unknown>[] = [];
+
+          const clientLabel = payload.recipient || payload.phone || payload.telegramUserId || "клиент";
+
+          for (let serviceIndex = 0; serviceIndex < payload.cartLines.length; serviceIndex++) {
+            const line = payload.cartLines[serviceIndex];
+            const car = byId.get(line.itemId);
+            const serviceName = car ? `${car.make} ${car.model}` : (line as any).itemName || line.itemId;
+
+            const perItemTodos: Array<{ title: string; priority: string }> = [
+              { title: `🛠 Сервисная заявка: ${serviceName}`, priority: "high" },
+              { title: `📞 Связаться с клиентом по ${serviceName}: ${clientLabel}`, priority: "high" },
+              { title: `📅 Согласовать дату возврата по ${serviceName} с ${payload.recipient || "клиентом"}`, priority: "medium" },
+            ];
+
+            for (let ti = 0; ti < perItemTodos.length; ti++) {
+              const todo = perItemTodos[ti];
+              const todoId = `todo-svc-${(baseTs + serviceIndex * 1000).toString(36)}-${ti}-${Math.random().toString(36).slice(2, 5)}`;
+              svcTodoPromises.push(
+                Promise.resolve(supabaseAdmin.from("crew_todos").insert({
+                  id: todoId,
+                  crew_id: crewId,
+                  lead_id: leadId,
+                  title: todo.title,
+                  status: "pending",
+                  priority: todo.priority,
+                  assigned_to: null,
+                  category: "lead_followup",
+                  description: JSON.stringify({
+                    lead_id: leadId,
+                    lead_phone: payload.phone || "",
+                    lead_name: payload.recipient || "",
+                    order_id: payload.orderId,
+                    service_item_id: line.itemId,
+                    service_item_name: serviceName,
+                    source: "web_app_checkout_service",
+                    deal_type: "service",
+                  }),
+                }).then(({ error }) => {
+                  if (error) logger.warn("[franchize] Failed to create service crew_todo:", todo.title, error);
+                }))
+              );
+            }
+          }
+
+          await Promise.all(svcTodoPromises);
+          logger.info(`[franchize] Created ${svcTodoPromises.length} service crew_todos for ${payload.cartLines.length} service item(s)`);
+        }
+      } catch (svcTodoErr) {
+        logger.warn("[franchize] Failed to create service crew_todos:", svcTodoErr);
+      }
+    }
+
     // ── Send DOCX to crew email (aligned with /doc flow) ────────────────
     try {
       const smtpHost = process.env.SMTP_HOST || process.env.SMTP_YANDEX_HOST;
@@ -3249,7 +3391,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       const emailFrom = process.env.EMAIL_FROM || smtpUser;
       const emailTo = process.env.EMAIL_DEFAULT_TO || crewSecrets.email || "vip_bike@mail.ru";
       if (smtpHost && smtpUser && smtpPass) {
-        const docType = flowType === "sale" ? "купли-продажи" : "аренды";
+        const docType = flowType === "sale" ? "купли-продажи" : flowType === "service" ? "сервисных работ" : "аренды";
         const emailBody = [
           `Договор ${docType} №${bikeDocs[0]?.documentKey || payload.orderId}`,
           ``,
@@ -3500,7 +3642,7 @@ const franchizeOrderInvoiceSchema = z.object({
   safetyQuizPassed: z.boolean().optional(),
   pickupAddress: z.string().trim().optional(),
   requiredDocs: z.array(z.string().trim().min(1).max(120)).max(12).default([]),
-  flowType: z.enum(["rental", "sale", "mixed"]).default("rental"),
+  flowType: z.enum(["rental", "sale", "mixed", "testdrive", "service"]).default("rental"),
 });
 
 export async function submitFranchizeOrderNotification(input: unknown): Promise<{ success: boolean; error?: string }> {
@@ -3839,7 +3981,7 @@ function summarizeFranchizeIntentCartLines(payload: FranchizeOrderInvoicePayload
 async function recordFranchizeOrderIntent(
   payload: FranchizeOrderInvoicePayload,
   input: {
-    intentType: "checkout_start" | "payment_failure" | "hold_created" | "payment_success" | "rent";
+    intentType: "checkout_start" | "payment_failure" | "hold_created" | "payment_success" | "rent" | "sale" | "service";
     stage: "checkout_started" | "payment_failed" | "hold_created" | "payment_confirmed";
     urgencyScore: number;
     sourceRoute?: string;
@@ -4451,10 +4593,15 @@ export async function createFranchizeOrderCheckout(
   franchizeCheckoutRateLimits.set(throttleKey, now);
   const effectiveTotal = totalResult.totalAmount;
   const validatedPayload = { ...payload, ...totalResult, totalAmount: effectiveTotal };
+  const orderIntentType: "rent" | "sale" | "service" = validatedPayload.flowType === "service"
+    ? "service"
+    : validatedPayload.flowType === "sale"
+      ? "sale"
+      : "rent";
   await recordFranchizeOrderIntent(validatedPayload, {
-    intentType: "rent",
+    intentType: orderIntentType,
     stage: "checkout_started",
-    urgencyScore: validatedPayload.flowType === "rental" ? 75 : 85,
+    urgencyScore: validatedPayload.flowType === "rental" ? 75 : validatedPayload.flowType === "service" ? 65 : 85,
   });
 
   try {

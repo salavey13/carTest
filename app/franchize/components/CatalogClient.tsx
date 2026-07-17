@@ -1472,9 +1472,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         }}
         onAddToCart={(extrasStr) => {
           if (!selectedItem) return;
+          const isServiceItem = hasServicePrice(selectedItem);
           const cartOptions = {
             ...selectedOptions,
-            action: "rent",
+            action: isServiceItem ? "service" : "rent",
             // FIX: extrasStr from handler bypasses stale selectedOptions.perk
             perk: extrasStr || selectedOptions.perk || "стандарт",
           };

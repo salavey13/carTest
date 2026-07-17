@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { FranchizeCartState } from "./useFranchizeCart";
 import type { CatalogItemVM } from "../actions";
 import { useFranchizeCart } from "./useFranchizeCart";
+import { hasServicePrice } from "../lib/catalog-utils";
 
 const packageMultiplier: Record<string, number> = {
   base: 1,
@@ -68,7 +69,7 @@ function parseHelmetCount(perk: string): number {
 }
 
 
-export type CartFlowType = "rental" | "sale";
+export type CartFlowType = "rental" | "sale" | "service";
 
 export type FranchizeCartLineVM = {
   lineId: string;
@@ -165,9 +166,37 @@ export function useFranchizeCartLines(
           rentalDays: 1,
           saleAvailable: false,
           salePrice: null,
-          flowType: "rental" as const, // Still "rental" for cart grouping, but flowType "testdrive" detected at order page
+          flowType: "rental" as const,
           displayPriceLabel: "Тест-драйв · 0 ₽ (только залог)",
           rentalPeriod: "10 минут",
+          options: line.options,
+        };
+      }
+
+      // ── Service flow: flat price from item specs / rentPriceLabel ──
+      const isServiceAction = line.options.action === "service" || (item && hasServicePrice(item));
+      if (isServiceAction) {
+        // Resolve service price: try rawSpecs.service_price, then rentPriceLabel, fallback 0
+        const servicePrice = resolveSalePrice(item); // reuse — reads first numeric price
+        const unitPrice = servicePrice > 0 ? servicePrice : 0;
+        // RentPriceLabel may contain formatted price text (e.g. "2 000 ₽")
+        // but we prefer a clean numeric display
+        const displayLabel = unitPrice > 0
+          ? `${unitPrice.toLocaleString("ru-RU")} ₽`
+          : (item?.rentPriceLabel ?? "0 ₽");
+        return {
+          lineId,
+          itemId: line.itemId,
+          qty: line.qty,
+          item,
+          pricePerDay: unitPrice,
+          lineTotal: unitPrice * line.qty,
+          rentalDays: 1,
+          saleAvailable: false,
+          salePrice: null,
+          flowType: "service" as const,
+          displayPriceLabel: displayLabel,
+          rentalPeriod: undefined,
           options: line.options,
         };
       }

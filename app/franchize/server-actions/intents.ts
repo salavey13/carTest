@@ -24,6 +24,7 @@ const franchizeIntentTypes = [
   "finance",
   "rent",
   "sale",
+  "service",
 ] as const;
 
 const franchizeIntentStages = [

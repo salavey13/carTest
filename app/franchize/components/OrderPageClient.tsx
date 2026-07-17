@@ -20,6 +20,7 @@ import { useCrewTokens } from "../lib/use-crew-tokens";
 import {
   parseISODate,
   formatRuDateFromISO,
+  todayISO,
   diffDaysISO,
   addDaysISO,
   isoDateTimeFromParts,
@@ -99,7 +100,7 @@ type CheckoutPayload = {
   checkoutBlockers: Array<{ id: string; label: string }>;
   pickupAddress: string;
   requiredDocs: string[];
-  flowType: "rental" | "sale" | "mixed" | "testdrive";
+  flowType: "rental" | "sale" | "mixed" | "testdrive" | "service";
 };
 
 const orderFormSchema = z.object({
@@ -251,14 +252,17 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const isCartEmpty = cartLines.length === 0;
   const saleLinesCount = useMemo(() => cartLines.filter((line) => line.saleAvailable).length, [cartLines]);
   const testdriveLinesCount = useMemo(() => cartLines.filter((line) => (line.options as any).action === "testdrive").length, [cartLines]);
-  const flowType: "rental" | "sale" | "mixed" | "testdrive" = testdriveLinesCount > 0 && testdriveLinesCount === cartLines.length
+  const serviceLinesCount = useMemo(() => cartLines.filter((line) => line.flowType === "service").length, [cartLines]);
+  const flowType: "rental" | "sale" | "mixed" | "testdrive" | "service" = testdriveLinesCount > 0 && testdriveLinesCount === cartLines.length
     ? "testdrive"
-    : saleLinesCount === 0
-      ? "rental"
-      : saleLinesCount === cartLines.length
-        ? "sale"
-        : "mixed";
-  const flowLabel = flowType === "sale" ? "покупки" : flowType === "mixed" ? "аренды/покупки" : flowType === "testdrive" ? "тест-драйва" : "аренды";
+    : serviceLinesCount > 0 && serviceLinesCount === cartLines.length
+      ? "service"
+      : saleLinesCount === 0
+        ? "rental"
+        : saleLinesCount === cartLines.length
+          ? "sale"
+          : "mixed";
+  const flowLabel = flowType === "sale" ? "покупки" : flowType === "mixed" ? "аренды/покупки" : flowType === "testdrive" ? "тест-драйва" : flowType === "service" ? "сервиса" : "аренды";
   const catalogHref = `/franchize/${slug}`;
   const profileHref = isInTelegramContext
     ? `/franchize/${slug}/profile`
@@ -309,7 +313,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   );
   // `rentalEndDate` is kept as the local YYYY-MM-DD for downstream
   // code that expects it (submission payload, recovery snapshot).
-  const rentalEndDate = resolvedEndDate;
+  // For service flow, end date = start date (single visit date).
+  const rentalEndDate = flowType === "service" ? rentalStartDate : resolvedEndDate;
   const requiresTelegram = false; // XTR payment removed
   const hasTelegramUser = Boolean(user?.id);
   const visiblePayments = payments; // Show all payments (XTR removed)
@@ -323,25 +328,32 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const normalizedPromoInput = normalizePromoCode(promo);
   const hasUnvalidatedPromo = normalizedPromoInput.length > 0 && appliedPromo?.code !== normalizedPromoInput;
   const canSubmit = !isCartEmpty && !hasUnvalidatedPromo && recipient.trim().length > 1 && phone.trim().length > 5;
+  const isServiceFlowType = flowType === "service";
   const checkoutMilestones = useMemo(
-    () => [
-      { id: "cart", label: "Байк выбран", done: !isCartEmpty },
-      { id: "contact", label: "Контакт заполнен", done: recipient.trim().length > 1 && phone.trim().length > 5 },
-      { id: "dates", label: `Период ${flowLabel} выбран`, done: Boolean(rentalStartDate) },
-    ],
-    [flowLabel, isCartEmpty, phone, recipient, rentalStartDate],
+    () => {
+      const milestones = [
+        { id: "cart", label: isServiceFlowType ? "Услуга выбрана" : "Байк выбран", done: !isCartEmpty },
+        { id: "contact", label: "Контакт заполнен", done: recipient.trim().length > 1 && phone.trim().length > 5 },
+      ];
+      milestones.push({ id: "dates", label: isServiceFlowType ? "Дата визита выбрана" : `Период ${flowLabel} выбран`, done: Boolean(rentalStartDate) });
+      return milestones;
+    },
+    [flowLabel, isCartEmpty, phone, recipient, rentalStartDate, isServiceFlowType],
   );
   const completedMilestones = checkoutMilestones.filter((step) => step.done).length;
   const readinessPercent = Math.round((completedMilestones / checkoutMilestones.length) * 100);
   const checkoutBlockers = useMemo(
-    () => [
-      { id: "cart", label: "Добавьте хотя бы один байк в корзину", active: isCartEmpty },
-      { id: "recipient", label: "Укажите имя получателя", active: recipient.trim().length <= 1 },
-      { id: "phone", label: "Добавьте контактный номер", active: phone.trim().length <= 5 },
-      { id: "dates", label: `Выберите период ${flowLabel}`, active: !rentalStartDate },
-      { id: "promo", label: "Примените введённый промокод или очистите поле", active: hasUnvalidatedPromo },
-    ].filter((item) => item.active),
-    [flowLabel, hasUnvalidatedPromo, isCartEmpty, phone, recipient, rentalStartDate],
+    () => {
+      const blockers = [
+        { id: "cart", label: isServiceFlowType ? "Добавьте услуги в корзину" : "Добавьте хотя бы один байк в корзину", active: isCartEmpty },
+        { id: "recipient", label: "Укажите имя получателя", active: recipient.trim().length <= 1 },
+        { id: "phone", label: "Добавьте контактный номер", active: phone.trim().length <= 5 },
+        { id: "dates", label: isServiceFlowType ? "Выберите желаемую дату визита" : `Выберите период ${flowLabel}`, active: !rentalStartDate },
+      ];
+      blockers.push({ id: "promo", label: "Примените введённый промокод или очистите поле", active: hasUnvalidatedPromo });
+      return blockers.filter((item) => item.active);
+    },
+    [flowLabel, hasUnvalidatedPromo, isCartEmpty, phone, recipient, rentalStartDate, isServiceFlowType],
   );
   const nextAction = checkoutBlockers[0];
   const holdAmountRub = crew.reservationHold.amountRub;
@@ -437,7 +449,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
   const sendRecoverySnapshot = (stage: "checkout_started" | "payment_failed", options?: { force?: boolean }) => {
     if (isCartEmpty || submitPayload.cartLines.length === 0) return;
-    const meaningful = stage === "payment_failed" || phone.trim().length > 5 || Boolean(rentalStartDate) || readinessPercent >= 67;
+    const meaningful = stage === "payment_failed" || phone.trim().length > 5 || (isServiceFlowType ? readinessPercent >= 50 : Boolean(rentalStartDate)) || readinessPercent >= 67;
     if (!meaningful) return;
 
     const snapshot = buildRecoverySnapshot(stage);
@@ -467,10 +479,13 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     ? "Подготавливаем бронь..."
     : "Подтвердить заказ";
 
+  const cartEmptyMsg = flowType === "service"
+    ? "Добавьте хотя бы одну услугу в корзину, чтобы перейти к оформлению."
+    : `Добавьте хотя бы один байк в корзину, чтобы перейти к подтверждению ${flowLabel}.`;
   const submitHint = isSubmitting
     ? "Проверяем данные и отправляем заказ. Обычно это занимает несколько секунд."
     : isCartEmpty
-      ? `Добавьте хотя бы один байк в корзину, чтобы перейти к подтверждению ${flowLabel}.`
+      ? cartEmptyMsg
       : hasUnvalidatedPromo
         ? "Промокод введён, но ещё не применён. Нажмите «Применить» или очистите поле."
         : appliedPromo
@@ -644,6 +659,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
   const checkAvailabilityBeforeSubmit = async () => {
     const carIds = Array.from(new Set(submitPayload.cartLines.map((line) => line.itemId).filter(Boolean)));
+    if (isServiceFlowType) return true; // Service items don't need date-based availability
     const startDate = submitPayload.rentalStartDate;
     const endDate = submitPayload.rentalEndDate || submitPayload.rentalStartDate;
     if (!carIds.length || !startDate || !endDate) return true;
@@ -745,7 +761,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         return;
       }
 
-      toast.success(submitPayload.flowType === "rental" ? "Заявка на аренду отправлена вместе с DOC-файлом." : "Заявка на покупку отправлена вместе с DOC-файлом.");
+      toast.success(submitPayload.flowType === "rental" ? "Заявка на аренду отправлена вместе с DOC-файлом." : submitPayload.flowType === "service" ? "Сервисная заявка отправлена." : "Заявка на покупку отправлена вместе с DOC-файлом.");
 
       // Clear cart after successful order
       clearCart();
@@ -1128,8 +1144,24 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 )}
               </div>
 
+              {/* Service start date — when the client brings the bike in */}
+              {isServiceFlowType && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium" style={{ color: T.textMuted }}>
+                    Желаемая дата визита
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                    style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
+                    min={todayISO()}
+                    {...register("rentalStartDate")}
+                  />
+                </div>
+              )}
+
               {/* Rental period — picked in the Item modal, shown read-only here */}
-              {resolvedStartDate && resolvedEndDate ? (
+              {!isServiceFlowType && resolvedStartDate && resolvedEndDate ? (
                 <div
                   className="flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-sm"
                   style={{ borderColor: T.borderSoft, backgroundColor: T.accentSoft }}
@@ -1228,7 +1260,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           )}
 
           {/* ── Passport + License fields for contract generation ── */}
-          {flowType !== "sale" && flowType !== "testdrive" && (
+          {flowType !== "sale" && flowType !== "testdrive" && flowType !== "service" && (
             <div className="rounded-2xl border p-4" style={surface.card}>
               <p className="text-sm font-medium">Данные для договора аренды</p>
               <p className="mt-1 text-xs" style={surface.mutedText}>
