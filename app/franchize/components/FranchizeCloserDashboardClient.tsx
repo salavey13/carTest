@@ -104,6 +104,7 @@ export function FranchizeCloserDashboardClient({
   const [closerActionIntentId, setCloserActionIntentId] = useState<
     string | null
   >(null);
+  const [filterIntentType, setFilterIntentType] = useState<string | null>(null);
   const closerLoadRequestRef = useRef(0);
 
   const slug = initialSlug?.trim() || "vip-bike";
@@ -139,11 +140,6 @@ export function FranchizeCloserDashboardClient({
   useEffect(() => {
     void loadCloserIntents();
   }, [loadCloserIntents]);
-
-  const hotCloserCount = useMemo(
-    () => closerIntents.filter((item) => item.stage !== "closed").length,
-    [closerIntents],
-  );
 
   const handleCopyTelegramReply = useCallback(async (intent: CloserIntent) => {
     try {
@@ -251,6 +247,14 @@ export function FranchizeCloserDashboardClient({
     </div>
   );
 
+  const displayedIntents = useMemo(
+    () =>
+      filterIntentType
+        ? closerIntents.filter((i) => i.intentType === filterIntentType)
+        : closerIntents,
+    [closerIntents, filterIntentType],
+  );
+
   if (isLoading) return <Loading text="Загружаем заявки экипажа..." />;
 
   return (
@@ -269,11 +273,11 @@ export function FranchizeCloserDashboardClient({
             Панель обработки заявок
           </p>
           <h1 className="mt-2 break-words text-2xl font-semibold text-[var(--fr-dashboard-text)]">
-            {brandName}: горячие заявки
+            {brandName}: очередь заявок
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-[var(--fr-dashboard-muted)]">
-            Единая рабочая очередь для продаж: заявки защищённо собираются
-            на сервере, сортируются по приоритету и сохраняют историю действий.
+            Единая рабочая очередь: заявки на аренду, продажу и сервис защищённо
+            собираются на сервере, сортируются по приоритету и сохраняют историю действий.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -291,16 +295,19 @@ export function FranchizeCloserDashboardClient({
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <FranchizeOperatorStatCard
-          label="Горячие заявки"
-          value={hotCloserCount}
+          label="Аренда"
+          value={closerIntents.filter((i) => i.intentType === "rent").length}
+          detail="активных"
         />
         <FranchizeOperatorStatCard
-          label="Всего сигналов"
-          value={closerIntents.length}
+          label="Продажа"
+          value={closerIntents.filter((i) => i.intentType === "sale").length}
+          detail="активных"
         />
         <FranchizeOperatorStatCard
-          label="Режим"
-          value="Копирование ответа + ручное закрытие"
+          label="Сервис"
+          value={closerIntents.filter((i) => i.intentType === "service").length}
+          detail="активных"
         />
       </div>
       <FranchizeOperatorPanel className="mt-4">
@@ -320,17 +327,49 @@ export function FranchizeCloserDashboardClient({
           </Button>
         </div>
 
-        {!closerIntents.length ? (
+        {/* Filter tabs */}
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {[
+            { id: null, label: `Все (${closerIntents.length})` },
+            { id: "rent", label: `Аренда (${closerIntents.filter((i) => i.intentType === "rent").length})` },
+            { id: "sale", label: `Продажа (${closerIntents.filter((i) => i.intentType === "sale").length})` },
+            { id: "service", label: `Сервис (${closerIntents.filter((i) => i.intentType === "service").length})` },
+          ].map((tab) => (
+            <button
+              key={String(tab.id)}
+              type="button"
+              onClick={() => setFilterIntentType(tab.id)}
+              className="rounded-full px-3 py-1 text-xs font-medium transition"
+              style={{
+                backgroundColor:
+                  filterIntentType === tab.id
+                    ? "var(--fr-dashboard-accent)"
+                    : withAlpha(crew.theme.palette.bgCard, 0.72),
+                color:
+                  filterIntentType === tab.id
+                    ? accentOn
+                    : "var(--fr-dashboard-text)",
+                border: "1px solid var(--fr-dashboard-border)",
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Empty state */}
+        {!displayedIntents.length ? (
           <p
             className="mt-3 rounded-xl border px-3 py-2 text-xs text-[var(--fr-dashboard-muted)]"
             style={{ borderColor: "var(--fr-dashboard-border)" }}
           >
-            Заявок пока нет. После оформления, возврата к брошенной заявке
-            или предзаказа здесь появятся карточки для обработки.
+            {filterIntentType
+              ? `Заявок типа "${filterIntentType}" пока нет.`
+              : "Заявок пока нет. После оформления, возврата к брошенной заявке или предзаказа здесь появятся карточки для обработки."}
           </p>
         ) : (
           <div className="mt-3 space-y-3">
-            {closerIntents.map((intent) => (
+            {displayedIntents.map((intent) => (
               <article
                 key={intent.id}
                 className="rounded-2xl border p-2 sm:p-3"

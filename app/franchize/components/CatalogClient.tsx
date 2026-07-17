@@ -644,15 +644,16 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   }, [slug, crew.slug, categorizedItems, itemsByCategory]);
 
   const recordRentIntent = useCallback((item: CatalogItemVM, stage: "viewed" | "configured", metadata: Record<string, unknown> = {}) => {
+    const isServiceItem = hasServicePrice(item);
     const strip = buildCatalogRentalStrip(item, crew);
     return upsertFranchizeIntent({
       slug: resolvedSlug,
       bikeId: item.id,
-      intentType: "rent",
+      intentType: isServiceItem ? "service" : "rent",
       stage,
       sourceRoute: `/franchize/${resolvedSlug}`,
       contactChannel: "catalog_card",
-      urgencyScore: stage === "configured" ? 68 : 42,
+      urgencyScore: stage === "configured" ? (isServiceItem ? 60 : 68) : 42,
       telegramUserId: user?.id ? String(user.id) : dbUser?.user_id ? String(dbUser.user_id) : undefined,
       phone: typeof (dbUser as { phone?: unknown } | null)?.phone === "string" ? (dbUser as { phone?: string } | null)?.phone : undefined,
       metadata: {
