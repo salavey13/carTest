@@ -567,6 +567,69 @@ ${input.reason ? `<b>Причина:</b> ${input.reason}` : ''}
 }
 
 // ============================================================================
+// sendRentalMessage — send a message from renter to crew owner via TG bot
+// ============================================================================
+
+export async function sendRentalMessage(
+  rentalId: string,
+  message: string,
+  actorUserId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!message?.trim()) {
+      return { success: false, error: "Сообщение не может быть пустым" };
+    }
+
+    const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: rental, error } = await supabaseAdmin
+      .from("rentals")
+      .select("owner_id, rental_id")
+      .eq("rental_id", rentalId)
+      .maybeSingle();
+
+    if (error || !rental) {
+      return { success: false, error: "Аренда не найдена" };
+    }
+
+    const ownerChatId = rental.owner_id;
+    if (!ownerChatId) {
+      return { success: false, error: "Владелец не найден" };
+    }
+
+    const forwardApiUrl =
+      process.env.FORWARD_TELEGRAM_API ||
+      "https://v0-car-test.vercel.app/api/forward-telegram";
+
+    const resp = await fetch(forwardApiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: ownerChatId,
+        method: "sendMessage",
+        payload: {
+          text: `📩 Сообщение по аренде #${rentalId.slice(0, 8)}:\n\n${message.trim()}`,
+          parse_mode: "Markdown",
+        },
+      }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error("[sendRentalMessage] forward-telegram error:", errText);
+      return { success: false, error: "Не удалось отправить сообщение" };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("[sendRentalMessage] Error:", error);
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+// ============================================================================
 // Legacy runtime exports
 // ============================================================================
 
