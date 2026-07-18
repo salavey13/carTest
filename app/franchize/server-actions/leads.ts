@@ -449,10 +449,20 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       return false;
     });
 
+    // Deduplicate by title + lead_id — same todo was created multiple times
+    const seenTodoKey = new Set<string>();
+    const dedupedTodos: typeof filteredTodos = [];
+    for (const t of filteredTodos) {
+      const key = `${t.lead_id}|${t.title}`;
+      if (seenTodoKey.has(key)) continue;
+      seenTodoKey.add(key);
+      dedupedTodos.push(t);
+    }
+
     return {
       success: true,
       leads: Array.from(leadMap.values()),
-      todos: filteredTodos.map((t) => ({ ...t, description: t.description })),
+      todos: dedupedTodos.map((t) => ({ ...t, description: t.description })),
     };
   } catch (error) {
     logger.error("[getFranchizeLeads] failed:", error);

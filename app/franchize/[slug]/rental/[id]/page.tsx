@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ChevronDown, ExternalLink, Info, PackageCheck, RefreshCw, RotateCcw, ShoppingCart, Sparkles, Timer } from "lucide-react";
+import { ExternalLink, Info, RefreshCw, RotateCcw, ShoppingCart, Sparkles, Timer } from "lucide-react";
 import Link from "next/link";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
@@ -9,6 +9,7 @@ import { FranchizePageShell } from "../../../components/FranchizePageShell";
 import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRentalDocumentsPanel";
 import { RentalChecklistPanel } from "../../../components/RentalChecklistPanel";
 import { RentalMessageInput } from "../../../components/RentalMessageInput";
+import { RentalReturnChecklist } from "../../../components/RentalReturnChecklist";
 import { RentalTelegramGuard } from "../../../components/RentalTelegramGuard";
 import { getTelegramWebAppPageHref } from "../../../lib/telegram-links";
 import { crewPaletteForSurface, readablePaletteTextOnColor } from "../../../lib/theme";
@@ -234,35 +235,15 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                     Откроет каталог с этим же байком — сможете оформить новую аренду
                   </p>
 
-                  <details className="group rounded-xl border" style={{ borderColor: borderSoft }}>
-                    <summary
-                      className="flex cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium list-none"
-                      style={{ color: textPrimary }}
-                    >
-                      <PackageCheck className="h-4 w-4 shrink-0" />
-                      Что вернуть
-                      <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
-                    </summary>
-                    <div className="border-t px-4 py-3 text-xs space-y-2" style={{ borderColor: borderSoft, color: textPrimary }}>
-                      <ul className="space-y-1.5">
-                        {[
-                          "ТС в том же состоянии",
-                          "Ключи от байка",
-                          "Шлем (если брали)",
-                          "Допы: перчатки, куртка, зарядка",
-                          "Паспорт/СТС, если в залог",
-                          "Полный бак / заряд",
-                        ].map((item) => (
-                          <li key={item} className="flex gap-2">
-                            <span style={{ color: accent }}>✓</span> {item}
-                          </li>
-                        ))}
-                      </ul>
-                      <p className="mt-3" style={{ color: textSecondary }}>
-                        При возврате оператор проверит комплектацию и состояние. Депозит вернём после акта.
-                      </p>
-                    </div>
-                  </details>
+                  <RentalReturnChecklist
+                    rentalId={rental.rentalId}
+                    crewId={crew.id}
+                    accentColor={accent}
+                    borderColor={borderSoft}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                    isAuto={isAuto}
+                  />
                 </>
               )}
 
@@ -467,6 +448,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             status={status}
             metadata={rental.metadata}
             palette={p}
+            isAuto={isAuto}
           />
 
           <FranchizeRentalLifecycleActions
