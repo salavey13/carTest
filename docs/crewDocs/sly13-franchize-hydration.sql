@@ -57,7 +57,7 @@ set
           'name', 'SLY13 CYBERVIBE',
           'shortName', 'SLY13',
           'tagline', 'Создаю экипажи. Учу админов. Цифровизирую бизнес.',
-          'logoUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif',
+          'logoUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg',
           'heroImageUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/46f34997-2589-4ae7-9082-a374f19419a6-c899f118-1692-45b9-b6ef-d1066a607426.jpg',
           'centerLogoInHeader', true,
           'fonts', jsonb_build_object(
