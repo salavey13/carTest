@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Lock, X, Bike } from "lucide-react";
+import { useAppContext } from "@/contexts/AppContext";
 import { validateAnalyticsPassword } from "@/app/franchize/server-actions/rentals-dashboard";
 import type { LeadRow, LeadTodoRow, LeadRentalRow, LeadSaleRow } from "@/app/franchize/server-actions/leads";
 
@@ -77,6 +78,7 @@ export function LeadsClient({
   const [segment, setSegment] = useState<Segment>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
+  const { dbUser } = useAppContext();
   const T = useTheme({ isAuto, isLightTheme, textColor, bgColor, accentColor });
 
   // Debounce search query

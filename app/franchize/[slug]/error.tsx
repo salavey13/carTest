@@ -49,11 +49,15 @@ export default function FranchizeSlugError({
               <div className="mt-2 h-3 w-1/2 rounded-full opacity-70" style={{ backgroundColor: surface.accentPill.backgroundColor }} />
             </div>
             <div className="grid gap-3">
-              {["Каталог", "Контакты", "Поддержка"].map((label) => (
-                <div key={label} className="rounded-3xl border p-4" style={surface.card}>
+              {[
+                { label: "Каталог", href: catalogHref },
+                { label: "Контакты", href: `${catalogHref}/contacts` },
+                { label: "Поддержка", href: "https://t.me/SALAVEY13" },
+              ].map((link) => (
+                <Link key={link.label} href={link.href} className="rounded-3xl border p-4 block" style={surface.card}>
                   <div className="h-2 w-12 rounded-full" style={{ backgroundColor: surface.accentPill.backgroundColor }} />
-                  <p className="mt-3 text-sm font-semibold">{label}</p>
-                </div>
+                  <p className="mt-3 text-sm font-semibold">{link.label}</p>
+                </Link>
               ))}
             </div>
           </div>
