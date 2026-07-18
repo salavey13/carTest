@@ -20,6 +20,7 @@ export function useVirtualList<T>(
     count: items.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => itemHeight,
+    measureElement: (el) => el.getBoundingClientRect().height,
     overscan,
     scrollMargin: 0,
   });
@@ -29,6 +30,7 @@ export function useVirtualList<T>(
     virtualItems: virtualizer.getVirtualItems(),
     totalHeight: virtualizer.getTotalSize(),
     scrollToIndex: virtualizer.scrollToIndex,
+    measureElement: virtualizer.measureElement,
   };
 }
 

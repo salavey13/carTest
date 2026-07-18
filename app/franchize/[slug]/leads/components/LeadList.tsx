@@ -1,12 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useCallback } from "react";
 import { useVirtualList } from "../hooks/useVirtualList";
 import { LeadCard } from "./LeadCard";
-import { LeadDetailContent } from "./LeadDetailContent";
-import { X } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
-import { metaFor, getInitials } from "../leads-utils";
 
 interface LeadListProps {
   leads: LeadRow[];
@@ -17,9 +14,15 @@ interface LeadListProps {
   T: any;
   crewId: string;
   slug: string;
+  /**
+   * Optional callback fired when a lead is selected (desktop: detail panel,
+   * mobile: bottom sheet). Lets parent own the detail entirely.
+   */
+  onSelectLead?: (lead: LeadRow | null) => void;
 }
 
-const ITEM_HEIGHT = 180; // Approximate height of a lead card
+/** Approximate starting height — real height is measured via measureElement */
+const ITEM_HEIGHT = 128;
 
 export function LeadList({
   leads,
@@ -30,30 +33,52 @@ export function LeadList({
   T,
   crewId,
   slug,
+  onSelectLead,
 }: LeadListProps) {
-  const { parentRef, virtualItems, totalHeight } = useVirtualList(leads, {
+  const { parentRef, virtualItems, totalHeight, measureElement } = useVirtualList(leads, {
     itemHeight: ITEM_HEIGHT,
-    containerHeight: 600, // Will be constrained by parent max-height
+    containerHeight: 600,
     overscan: 5,
   });
 
   const isSelected = useMemo(
-    () => selectedId ? new Set([selectedId]) : new Set<string>(),
+    () => (selectedId ? new Set([selectedId]) : new Set<string>()),
     [selectedId]
   );
 
-  const handleSelect = (lead: LeadRow) => {
-    setSelectedId(selectedId === lead.user_id ? null : lead.user_id);
-  };
+  const handleSelect = useCallback(
+    (lead: LeadRow) => {
+      const nextId = selectedId === lead.user_id ? null : lead.user_id;
+      setSelectedId(nextId);
+      onSelectLead?.(nextId ? lead : null);
+    },
+    [selectedId, setSelectedId, onSelectLead]
+  );
 
   return (
-    <div ref={parentRef} className="h-full max-h-[calc(100vh-280px)] overflow-y-auto" style={{ width: "100%" }}>
+    <div
+      ref={parentRef}
+      className="h-full max-h-[calc(100vh-280px)] overflow-y-auto"
+      style={{ width: "100%" }}
+    >
       <div style={{ position: "relative", height: totalHeight, width: "100%" }}>
         {virtualItems.map((virtualRow) => {
           const lead = leads[virtualRow.index];
           const isThisSelected = isSelected.has(lead.user_id);
           return (
-            <div key={lead.user_id} data-lead-id={lead.user_id} style={{ position: "absolute", top: virtualRow.start, left: 0, right: 0, height: virtualRow.size }}>
+            <div
+              key={lead.user_id}
+              data-index={virtualRow.index}
+              ref={measureElement}
+              className="virtual-item"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
               <LeadCard
                 lead={lead}
                 T={T}
@@ -62,26 +87,6 @@ export function LeadList({
                 onDismiss={onDismiss}
                 todos={getTodosForLead(lead)}
               />
-              {isThisSelected && (
-                <div className="lg:hidden rounded-2xl border p-4 mt-3" style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: T.shadow }}>
-                  <div className="mb-3 flex items-start gap-3">
-                    <div className="flex shrink-0 items-center justify-center rounded-full font-bold" style={{ width: 48, height: 48, backgroundColor: metaFor(lead.source).bg, color: metaFor(lead.source).color, fontSize: "14px" }}>
-                      {getInitials(lead.full_name)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-base font-bold" style={{ color: T.text }}>{lead.full_name || "Без имени"}</h3>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]" style={{ color: T.textMuted }}>
-                        {lead.phone && <span>{lead.phone}</span>}
-                        {lead.username && <span>@{lead.username}</span>}
-                      </div>
-                    </div>
-                    <button onClick={() => setSelectedId(null)} aria-label="Свернуть карточку" className="rounded p-1 transition hover:bg-black/5" style={{ color: T.textFaint }}>
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <LeadDetailContent lead={lead} todos={getTodosForLead(lead)} crewId={crewId} slug={slug} T={T} />
-                </div>
-              )}
             </div>
           );
         })}
