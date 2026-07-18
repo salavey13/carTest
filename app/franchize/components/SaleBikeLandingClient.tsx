@@ -53,6 +53,7 @@ import { localImageSrc, localVideoSrc, handleVideoError, supabaseUrlFromLocal } 
 import { getTelegramWebAppFallbackHref } from "@/app/franchize/lib/telegram-links";
 import { useFranchizeCart } from "@/app/franchize/hooks/useFranchizeCart";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
+import { useResolvedPalette } from "@/app/franchize/lib/useResolvedPalette";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   CATALOG_VS_SPECS,
@@ -124,19 +125,18 @@ export function SaleBikeLandingClient({
   useFranchizeTheme(crew.theme);
 
   // Theme-aware inline style helpers — resolve to CSS vars in auto mode, direct hex otherwise
+  const palette = useResolvedPalette(crew.theme);
   const isAuto = crew.theme.isAuto;
-  const cssAccent = isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain;
-  const cssBorder = isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft;
-  const cssBgBase = isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase;
-  const cssTextPrimary = isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary;
-  const cssTextSecondary = isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary;
-  const accentContrastText = isAuto
-    ? readablePaletteTextOnColor(crew.theme.palettes?.dark?.accentMain || crew.theme.palette.accentMain, crew.theme.palettes?.dark || crew.theme.palette)
-    : readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
+  const cssAccent = isAuto ? "var(--franchize-accent-main)" : palette.accentMain;
+  const cssBorder = isAuto ? "var(--franchize-border-soft)" : palette.borderSoft;
+  const cssBgBase = isAuto ? "var(--franchize-bg-base)" : palette.bgBase;
+  const cssTextPrimary = isAuto ? "var(--franchize-text-primary)" : palette.textPrimary;
+  const cssTextSecondary = isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary;
+  const accentContrastText = readablePaletteTextOnColor(palette.accentMain, palette);
   const inputFieldClass = "rounded-xl border px-3 py-2 text-sm outline-none transition focus:ring-2";
   const inputFieldStyle = {
-    borderColor: isAuto ? "color-mix(in srgb, var(--franchize-border-soft) 60%, transparent)" : `${crew.theme.palette.borderSoft}60`,
-    backgroundColor: isAuto ? "var(--franchize-bg-base)" : `${crew.theme.palette.bgBase}cc`,
+    borderColor: isAuto ? "color-mix(in srgb, var(--franchize-border-soft) 60%, transparent)" : `${palette.borderSoft}60`,
+    backgroundColor: isAuto ? "var(--franchize-bg-base)" : `${palette.bgBase}cc`,
     color: cssTextPrimary,
   };
 

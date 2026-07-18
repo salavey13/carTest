@@ -8,6 +8,7 @@ import type { FranchizeCrewVM } from "../actions";
 import { toInternalHref } from "../lib/navigation";
 import { crewPaletteForSurface } from "../lib/theme";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
+import { useResolvedPalette } from "../lib/useResolvedPalette";
 
 interface HeaderMenuProps {
   crew: FranchizeCrewVM;
@@ -29,6 +30,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
   const [mounted, setMounted] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const palette = useResolvedPalette(crew.theme);
   const surface = crewPaletteForSurface(crew.theme);
 
   // Apply franchize theme CSS variables
@@ -96,10 +98,10 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
         aria-labelledby="franchize-header-menu-title"
         className="pointer-events-auto mt-[calc(max(env(safe-area-inset-top),0.5rem)+1.2rem)] max-h-[calc(100dvh-max(env(safe-area-inset-top),0.5rem)-1rem)] w-full max-w-sm overflow-y-auto rounded-2xl border border-[var(--header-menu-border)] bg-[var(--header-menu-bg)] p-4 text-[var(--header-menu-text)] shadow-2xl"
         style={{
-          ["--header-menu-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard,
-          ["--header-menu-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
-          ["--header-menu-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
-          ["--header-menu-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
+          ["--header-menu-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
+          ["--header-menu-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
+          ["--header-menu-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
+          ["--header-menu-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
         }}
         onClick={(e) => e.stopPropagation()}
       >

@@ -3,14 +3,15 @@
 import { motion } from "framer-motion";
 import { Shield } from "lucide-react";
 import type { FranchizeCrewVM } from "../../actions";
-import { crewPaletteForSurface, readablePaletteTextOnColor, withAlpha } from "../../lib/theme";
+import { readablePaletteTextOnColor, withAlpha } from "../../lib/theme";
+import { useResolvedPalette } from "../../lib/useResolvedPalette";
 
 interface ProtectionPlanProps {
   crew: FranchizeCrewVM;
 }
 
 export function ProtectionPlan({ crew }: ProtectionPlanProps) {
-  const surface = crewPaletteForSurface(crew.theme);
+  const palette = useResolvedPalette(crew.theme);
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -18,18 +19,20 @@ export function ProtectionPlan({ crew }: ProtectionPlanProps) {
       transition={{ delay: 0.4 }}
       className="flex items-center justify-between rounded-2xl border p-4"
       style={{
-        ...surface.card,
-        boxShadow: `0 0 12px ${withAlpha(crew.theme.palette.accentMain, 0.08)}`,
+        backgroundColor: palette.bgCard,
+        borderColor: palette.borderSoft,
+        color: palette.textPrimary,
+        boxShadow: `0 0 12px ${withAlpha(palette.accentMain, 0.08)}`,
       }}
     >
       <div className="flex items-center gap-3">
         <Shield
           className="h-6 w-6"
-          style={{ color: crew.theme.palette.accentMain }}
+          style={{ color: palette.accentMain }}
         />
         <div>
           <p className="text-sm font-semibold">Полная защита включена</p>
-          <p className="text-xs" style={surface.mutedText}>
+          <p className="text-xs" style={{ color: palette.textSecondary }}>
             Кража, повреждения и техподдержка 24/7
           </p>
         </div>
@@ -37,11 +40,8 @@ export function ProtectionPlan({ crew }: ProtectionPlanProps) {
       <span
         className="rounded px-3 py-1 text-xs font-bold"
         style={{
-          backgroundColor: crew.theme.palette.accentMain,
-          color: readablePaletteTextOnColor(
-            crew.theme.palette.accentMain,
-            crew.theme.palette,
-          ),
+          backgroundColor: palette.accentMain,
+          color: readablePaletteTextOnColor(palette.accentMain, palette),
         }}
       >
         Включено

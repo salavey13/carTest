@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Users, Zap, MapPin, ChevronRight, TrendingUp, Award, Filter, Calendar } from "lucide-react";
 import type { FranchizeCrewVM } from "../actions";
 import { crewPaletteForSurface, withAlpha } from "../lib/theme";
+import { useResolvedPalette } from "../lib/useResolvedPalette";
 
 // ── Data layer (would be fetched from API in production) ──
 const FAKE_TOP_RIDERS = [
@@ -77,6 +78,7 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
   const [sortBy, setSortBy] = useState("rides");
   const [isLoading, setIsLoading] = useState(false);
 
+  const palette = useResolvedPalette(crew.theme);
   const surface = useMemo(() => crewPaletteForSurface(crew.theme), [crew.theme]);
   const brandName = crew.header.brandName || crew.name || "VIP BIKE";
 
@@ -118,12 +120,12 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
     <section
       className="mx-auto w-full max-w-5xl px-4 pb-24 pt-6"
       style={{
-        ["--lb-accent" as string]: crew.theme.palette.accentMain,
-        ["--lb-border" as string]: crew.theme.palette.borderSoft,
-        ["--lb-text" as string]: crew.theme.palette.textPrimary,
-        ["--lb-muted" as string]: crew.theme.palette.textSecondary,
-        ["--lb-card" as string]: crew.theme.palette.bgCard,
-        ["--lb-base" as string]: crew.theme.palette.bgBase,
+        ["--lb-accent" as string]: palette.accentMain,
+        ["--lb-border" as string]: palette.borderSoft,
+        ["--lb-text" as string]: palette.textPrimary,
+        ["--lb-muted" as string]: palette.textSecondary,
+        ["--lb-card" as string]: palette.bgCard,
+        ["--lb-base" as string]: palette.bgBase,
       }}
     >
       {/* ── Header ── */}
@@ -135,15 +137,15 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
         <div
           className="mb-3 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-medium backdrop-blur"
           style={{
-            borderColor: withAlpha(crew.theme.palette.accentMain, 0.27),
-            backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.09),
-            color: crew.theme.palette.accentMain,
+            borderColor: withAlpha(palette.accentMain, 0.27),
+            backgroundColor: withAlpha(palette.accentMain, 0.09),
+            color: palette.accentMain,
           }}
         >
           <Trophy className="h-3.5 w-3.5" />
           {brandName.toUpperCase()} · LEADERBOARD
         </div>
-        <h1 className="font-orbitron text-3xl sm:text-4xl" style={{ color: crew.theme.palette.textPrimary }}>
+        <h1 className="font-orbitron text-3xl sm:text-4xl" style={{ color: palette.textPrimary }}>
           Зал славы экипажа
         </h1>
         <p className="mx-auto mt-2 max-w-lg text-sm" style={surface.mutedText}>
@@ -170,11 +172,11 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
               )}
               style={{
                 backgroundColor: selectedSeason === s.id
-                  ? crew.theme.palette.accentMain
-                  : withAlpha(crew.theme.palette.accentMain, 0.12),
+                  ? palette.accentMain
+                  : withAlpha(palette.accentMain, 0.12),
                 color: selectedSeason === s.id
-                  ? crew.theme.palette.bgBase
-                  : crew.theme.palette.accentMain,
+                  ? palette.bgBase
+                  : palette.accentMain,
               }}
             >
               <Calendar className="mr-1 inline h-3 w-3" />
@@ -196,13 +198,13 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
               )}
               style={{
                 backgroundColor: sortBy === opt.id
-                  ? withAlpha(crew.theme.palette.accentMain, 0.15)
+                  ? withAlpha(palette.accentMain, 0.15)
                   : "transparent",
                 color: sortBy === opt.id
-                  ? crew.theme.palette.accentMain
-                  : crew.theme.palette.textSecondary,
+                  ? palette.accentMain
+                  : palette.textSecondary,
                 border: sortBy === opt.id
-                  ? `1px solid ${withAlpha(crew.theme.palette.accentMain, 0.3)}`
+                  ? `1px solid ${withAlpha(palette.accentMain, 0.3)}`
                   : undefined,
               }}
               title={`Сортировать: ${opt.name}`}
@@ -221,14 +223,14 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
         className="mb-6 overflow-hidden rounded-3xl border p-4 backdrop-blur-xl sm:p-5"
         style={{
           ...surface.card,
-          background: `linear-gradient(135deg, ${withAlpha(crew.theme.palette.bgCard, 0.88)}, ${withAlpha(crew.theme.palette.accentMain, 0.08)})`,
+          background: `linear-gradient(135deg, ${withAlpha(palette.bgCard, 0.88)}, ${withAlpha(palette.accentMain, 0.08)})`,
         }}
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4" style={{ color: crew.theme.palette.accentMain }} />
-              <span className="text-sm font-semibold" style={{ color: crew.theme.palette.textPrimary }}>
+              <Zap className="h-4 w-4" style={{ color: palette.accentMain }} />
+              <span className="text-sm font-semibold" style={{ color: palette.textPrimary }}>
                 {season.name}
               </span>
             </div>
@@ -240,23 +242,23 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
             {season.daysLeft !== null && (
               <>
                 <div>
-                  <p className="font-orbitron text-xl font-bold" style={{ color: crew.theme.palette.accentMain }}>
+                  <p className="font-orbitron text-xl font-bold" style={{ color: palette.accentMain }}>
                     {season.daysLeft}
                   </p>
                   <p className="text-[10px] uppercase tracking-wider" style={surface.mutedText}>Дней</p>
                 </div>
-                <div className="w-px" style={{ backgroundColor: crew.theme.palette.borderSoft }} />
+                <div className="w-px" style={{ backgroundColor: palette.borderSoft }} />
               </>
             )}
             <div>
-              <p className="font-orbitron text-xl font-bold" style={{ color: crew.theme.palette.textPrimary }}>
+              <p className="font-orbitron text-xl font-bold" style={{ color: palette.textPrimary }}>
                 {season.totalRiders}
               </p>
               <p className="text-[10px] uppercase tracking-wider" style={surface.mutedText}>Райдеров</p>
             </div>
-            <div className="w-px" style={{ backgroundColor: crew.theme.palette.borderSoft }} />
+            <div className="w-px" style={{ backgroundColor: palette.borderSoft }} />
             <div>
-              <p className="font-orbitron text-xl font-bold" style={{ color: crew.theme.palette.textPrimary }}>
+              <p className="font-orbitron text-xl font-bold" style={{ color: palette.textPrimary }}>
                 {(season.totalKm / 1000).toFixed(0)}k
               </p>
               <p className="text-[10px] uppercase tracking-wider" style={surface.mutedText}>Км</p>
@@ -273,25 +275,25 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
         className="mb-6 grid grid-cols-3 gap-3"
       >
         <StatCard
-          icon={<Trophy className="h-4 w-4" style={{ color: crew.theme.palette.accentMain }} />}
+          icon={<Trophy className="h-4 w-4" style={{ color: palette.accentMain }} />}
           label="В заезде"
           value={season.totalRiders}
           surface={surface}
-          accentColor={crew.theme.palette.accentMain}
+          accentColor={palette.accentMain}
         />
         <StatCard
-          icon={<MapPin className="h-4 w-4" style={{ color: crew.theme.palette.accentMain }} />}
+          icon={<MapPin className="h-4 w-4" style={{ color: palette.accentMain }} />}
           label="Общий пробег"
           value={`${season.totalKm.toLocaleString("ru-RU")} км`}
           surface={surface}
-          accentColor={crew.theme.palette.accentMain}
+          accentColor={palette.accentMain}
         />
         <StatCard
-          icon={<Users className="h-4 w-4" style={{ color: crew.theme.palette.accentMain }} />}
+          icon={<Users className="h-4 w-4" style={{ color: palette.accentMain }} />}
           label="Активны сегодня"
           value={47}
           surface={surface}
-          accentColor={crew.theme.palette.accentMain}
+          accentColor={palette.accentMain}
         />
       </motion.div>
 
@@ -307,7 +309,7 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
           const place = podiumOrder[index] + 1;
           const isGold = place === 1;
           const medals = ["🥇", "🥈", "🥉"];
-          const medalColors = [crew.theme.palette.accentMain, "#C0C0C0", "#CD7F32"];
+          const medalColors = [palette.accentMain, "#C0C0C0", "#CD7F32"];
 
           return (
             <motion.div
@@ -320,13 +322,13 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
               style={{
                 ...surface.card,
                 borderColor: isGold
-                  ? withAlpha(crew.theme.palette.accentMain, 0.4)
-                  : withAlpha(crew.theme.palette.borderSoft, 0.5),
+                  ? withAlpha(palette.accentMain, 0.4)
+                  : withAlpha(palette.borderSoft, 0.5),
                 boxShadow: isGold
-                  ? `0 0 40px ${withAlpha(crew.theme.palette.accentMain, 0.2)}`
+                  ? `0 0 40px ${withAlpha(palette.accentMain, 0.2)}`
                   : undefined,
                 background: isGold
-                  ? `linear-gradient(135deg, ${withAlpha(crew.theme.palette.accentMain, 0.15)}, ${withAlpha(crew.theme.palette.bgCard, 0.8)})`
+                  ? `linear-gradient(135deg, ${withAlpha(palette.accentMain, 0.15)}, ${withAlpha(palette.bgCard, 0.8)})`
                   : undefined,
               }}
             >
@@ -335,7 +337,7 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
                 <span className="text-3xl drop-shadow-lg">{medals[place - 1]}</span>
                 {isGold && (
                   <div className="absolute -inset-2 animate-ping rounded-full opacity-20"
-                    style={{ backgroundColor: crew.theme.palette.accentMain }}
+                    style={{ backgroundColor: palette.accentMain }}
                   />
                 )}
               </div>
@@ -344,11 +346,11 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
               <div
                 className="my-3 flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-md sm:h-16 sm:w-16 sm:text-3xl"
                 style={{
-                  borderColor: isGold ? crew.theme.palette.accentMain : crew.theme.palette.borderSoft,
+                  borderColor: isGold ? palette.accentMain : palette.borderSoft,
                   backgroundColor: isGold
-                    ? withAlpha(crew.theme.palette.accentMain, 0.2)
-                    : crew.theme.palette.bgBase,
-                  color: crew.theme.palette.textPrimary,
+                    ? withAlpha(palette.accentMain, 0.2)
+                    : palette.bgBase,
+                  color: palette.textPrimary,
                   borderWidth: "2px",
                 }}
               >
@@ -361,7 +363,7 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
               </p>
 
               {/* Score based on sort */}
-              <p className="mt-1 font-orbitron text-lg font-bold" style={{ color: crew.theme.palette.accentMain }}>
+              <p className="mt-1 font-orbitron text-lg font-bold" style={{ color: palette.accentMain }}>
                 {sortBy === "rides" ? rider.rides :
                  sortBy === "km" ? `${(rider.kmTotal / 1000).toFixed(1)}k` :
                  sortBy === "speed" ? `${rider.avgSpeed} км/ч` :
@@ -377,7 +379,7 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
               {/* Trend indicator */}
               {place <= 3 && (
                 <div className="mt-2 flex items-center gap-1 text-[10px]"
-                  style={{ color: withAlpha(crew.theme.palette.accentMain, 0.8) }}
+                  style={{ color: withAlpha(palette.accentMain, 0.8) }}
                 >
                   <TrendingUp className="h-3 w-3" />
                   <span>Top 3</span>
@@ -396,16 +398,16 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
         style={surface.card}
       >
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="flex items-center gap-2 font-orbitron text-lg" style={{ color: crew.theme.palette.textPrimary }}>
-            <Trophy className="h-4 w-4" style={{ color: crew.theme.palette.accentMain }} />
+          <h2 className="flex items-center gap-2 font-orbitron text-lg" style={{ color: palette.textPrimary }}>
+            <Trophy className="h-4 w-4" style={{ color: palette.accentMain }} />
             Полный рейтинг
           </h2>
           <div className="flex items-center gap-2">
             <span className="rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider"
               style={{
-                backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.09),
-                color: crew.theme.palette.accentMain,
-                border: `1px solid ${withAlpha(crew.theme.palette.accentMain, 0.2)}`,
+                backgroundColor: withAlpha(palette.accentMain, 0.09),
+                color: palette.accentMain,
+                border: `1px solid ${withAlpha(palette.accentMain, 0.2)}`,
               }}
             >
               {selectedSeason === "current" ? "Сезон активен" : "Вечный рейтинг"}
@@ -427,10 +429,10 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
                 style={{
                   ...surface.subtleCard,
                   borderColor: index < 3
-                    ? withAlpha(crew.theme.palette.accentMain, 0.2)
+                    ? withAlpha(palette.accentMain, 0.2)
                     : undefined,
                   backgroundColor: index < 3
-                    ? withAlpha(crew.theme.palette.accentMain, 0.03)
+                    ? withAlpha(palette.accentMain, 0.03)
                     : undefined,
                 }}
               >
@@ -440,18 +442,18 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold"
                     style={{
                       backgroundColor: index < 3
-                        ? withAlpha(crew.theme.palette.accentMain, 0.2)
-                        : crew.theme.palette.bgBase,
+                        ? withAlpha(palette.accentMain, 0.2)
+                        : palette.bgBase,
                       color: index < 3
-                        ? crew.theme.palette.accentMain
-                        : crew.theme.palette.textSecondary,
+                        ? palette.accentMain
+                        : palette.textSecondary,
                     }}
                   >
                     {index + 1}
                   </span>
                   {index < 3 && (
                     <div className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full text-[8px]"
-                      style={{ backgroundColor: crew.theme.palette.accentMain }}
+                      style={{ backgroundColor: palette.accentMain }}
                     >
                       {["🥇", "🥈", "🥉"][index]}
                     </div>
@@ -462,9 +464,9 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
                 <div
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-lg shadow-sm"
                   style={{
-                    borderColor: crew.theme.palette.borderSoft,
-                    backgroundColor: crew.theme.palette.bgBase,
-                    color: crew.theme.palette.textPrimary,
+                    borderColor: palette.borderSoft,
+                    backgroundColor: palette.bgBase,
+                    color: palette.textPrimary,
                   }}
                 >
                   {rider.avatar}
@@ -472,7 +474,7 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
 
                 {/* Info */}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold" style={{ color: crew.theme.palette.textPrimary }}>
+                  <p className="truncate text-sm font-semibold" style={{ color: palette.textPrimary }}>
                     {rider.name}
                   </p>
                   <div className="flex items-center gap-3 text-[11px]" style={surface.mutedText}>
@@ -488,20 +490,20 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
                 {/* Stats (desktop) */}
                 <div className="hidden items-center gap-4 sm:flex">
                   <div className="text-right">
-                    <p className="font-mono text-sm font-bold" style={{ color: crew.theme.palette.accentMain }}>
+                    <p className="font-mono text-sm font-bold" style={{ color: palette.accentMain }}>
                       {rider.avgSpeed} км/ч
                     </p>
                     <p className="text-[10px]" style={surface.mutedText}>Ср. скорость</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-mono text-sm font-bold" style={{ color: crew.theme.palette.textPrimary }}>
+                    <p className="font-mono text-sm font-bold" style={{ color: palette.textPrimary }}>
                       {rider.streak} дн.
                     </p>
                     <p className="text-[10px]" style={surface.mutedText}>Серия</p>
                   </div>
                 </div>
 
-                <ChevronRight className="h-4 w-4 shrink-0 opacity-30" style={{ color: crew.theme.palette.textSecondary }} />
+                <ChevronRight className="h-4 w-4 shrink-0 opacity-30" style={{ color: palette.textSecondary }} />
               </motion.div>
             ))}
           </AnimatePresence>
@@ -514,13 +516,13 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
           transition={{ delay: 0.5 }}
           className="mt-4 overflow-hidden rounded-2xl border border-dashed p-4 text-center"
           style={{
-            borderColor: withAlpha(crew.theme.palette.accentMain, 0.27),
-            backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.04),
+            borderColor: withAlpha(palette.accentMain, 0.27),
+            backgroundColor: withAlpha(palette.accentMain, 0.04),
           }}
         >
           <div className="flex items-center justify-center gap-2 mb-1">
-            <Award className="h-4 w-4" style={{ color: crew.theme.palette.accentMain }} />
-            <p className="text-sm font-medium" style={{ color: crew.theme.palette.textPrimary }}>
+            <Award className="h-4 w-4" style={{ color: palette.accentMain }} />
+            <p className="text-sm font-medium" style={{ color: palette.textPrimary }}>
               Хочешь попасть в рейтинг?
             </p>
           </div>
@@ -531,9 +533,9 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
             href={`/franchize/${slug}/map-riders`}
             className="mt-3 inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition hover:scale-105 active:scale-95"
             style={{
-              backgroundColor: crew.theme.palette.accentMain,
-              color: crew.theme.palette.bgBase,
-              boxShadow: `0 4px 14px ${withAlpha(crew.theme.palette.accentMain, 0.4)}`,
+              backgroundColor: palette.accentMain,
+              color: palette.bgBase,
+              boxShadow: `0 4px 14px ${withAlpha(palette.accentMain, 0.4)}`,
             }}
           >
             <MapPin className="h-4 w-4" />
@@ -554,14 +556,14 @@ export function FranchizeLeaderboardClient({ crew, slug }: FranchizeLeaderboardC
           description="Каждую неделю — новая миссия: пробег 100 км, ночной заезд, маршрут по новым точкам. Выполняй и получай бонусные баллы."
           icon="🎯"
           surface={surface}
-          accentColor={crew.theme.palette.accentMain}
+          accentColor={palette.accentMain}
         />
         <FadedTeaser
           title="Достижения и бейджи"
           description="Разблокируй достижения за мастерство: «Ночной волк», «Марафонец», «Первый в экипаже». Собери коллекцию."
           icon="🏅"
           surface={surface}
-          accentColor={crew.theme.palette.accentMain}
+          accentColor={palette.accentMain}
         />
       </motion.div>
     </section>

@@ -19,6 +19,7 @@ import { SHOW_CART } from "@/lib/feature-flags";
 import { ItemModal, type FlowType } from "../modals/Item";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
+import { useResolvedPalette } from "../lib/useResolvedPalette";
 import { todayISO } from "../lib/date-utils";
 import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 import { getCatalogPropulsionSegment } from "../lib/catalog-propulsion";
@@ -362,11 +363,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   // Apply franchize theme CSS variables
   useFranchizeTheme(crew.theme);
 
+  const palette = useResolvedPalette(crew.theme);
   const surface = crewPaletteForSurface(crew.theme);
   // Get accent color for price glow computation
-  const accentColor = crew.theme.isAuto
-    ? (crew.theme.palettes?.light?.accentMain || crew.theme.palettes?.dark?.accentMain || crew.theme.palette.accentMain)
-    : crew.theme.palette.accentMain;
+  const accentColor = palette.accentMain;
   const priceGlowStyle = getContrastingGlowStyle(accentColor);
   const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
   const { addItem } = useFranchizeCart(crew.slug || slug);
@@ -492,9 +492,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
 
   const promoGradientByIndex = (index: number) => {
     const isLight = crew.theme.mode.toLowerCase().includes("light");
-    const accentMain = crew.theme.isAuto
-      ? (crew.theme.palettes?.light?.accentMain || crew.theme.palettes?.dark?.accentMain || crew.theme.palette.accentMain)
-      : crew.theme.palette.accentMain;
+    const accentMain = palette.accentMain;
     const gradients = isLight
       ? [
           `linear-gradient(130deg, ${accentMain}E0, #FF7F50D0)`,
@@ -896,22 +894,18 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         className="relative mx-auto w-full max-w-7xl px-4 pb-6 pt-8 xl:max-w-[1440px] 2xl:max-w-[1800px]"
         id="catalog-sections"
         style={{
-          ["--catalog-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
-          ["--catalog-accent-hover" as string]: crew.theme.isAuto ? "var(--franchize-accent-hover)" : crew.theme.palette.accentMainHover,
-          ["--catalog-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
-          ["--catalog-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
-          ["--catalog-muted" as string]: crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary,
-          ["--catalog-card-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard,
-          ["--catalog-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase,
-          ["--catalog-accent-contrast" as string]: crew.theme.isAuto
-            ? readableTextOnColor(crew.theme.palettes?.dark?.accentMain || crew.theme.palettes?.light?.accentMain || crew.theme.palette.accentMain)
-            : readableTextOnColor(crew.theme.palette.accentMain),
-          ["--catalog-accent-muted-contrast" as string]: crew.theme.isAuto
-            ? withAlpha(readableTextOnColor(crew.theme.palettes?.dark?.accentMain || crew.theme.palettes?.light?.accentMain || crew.theme.palette.accentMain), 0.7)
-            : withAlpha(readableTextOnColor(crew.theme.palette.accentMain), 0.7),
+          ["--catalog-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
+          ["--catalog-accent-hover" as string]: crew.theme.isAuto ? "var(--franchize-accent-hover)" : palette.accentMainHover,
+          ["--catalog-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
+          ["--catalog-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
+          ["--catalog-muted" as string]: crew.theme.isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary,
+          ["--catalog-card-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
+          ["--catalog-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-base)" : palette.bgBase,
+          ["--catalog-accent-contrast" as string]: readableTextOnColor(palette.accentMain),
+          ["--catalog-accent-muted-contrast" as string]: withAlpha(readableTextOnColor(palette.accentMain), 0.7),
           ["--catalog-accent-subtle" as string]: crew.theme.isAuto
             ? "var(--franchize-accent-main)"
-            : withAlpha(crew.theme.palette.accentMain, 0.12),
+            : withAlpha(palette.accentMain, 0.12),
         }}
       >
         {!crew.isFound && (
@@ -936,10 +930,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
             style={{
-              boxShadow: `0 0 0 1px ${crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}`,
-              borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
-              backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-card)" : `${crew.theme.palette.bgCard}99`,
-              color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
+              boxShadow: `0 0 0 1px ${crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}`,
+              borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
+              backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-card)" : `${palette.bgCard}99`,
+              color: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
               ...(searchFocused ? interactionRingStyle(crew.theme) : {}),
             }}
           />
@@ -952,9 +946,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
               onFocus={() => setClearFocused(true)}
               onBlur={() => setClearFocused(false)}
               style={{
-                backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-base)" : `${crew.theme.palette.bgBase}F0`,
-                color: crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary,
-                border: `1px solid ${crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}`,
+                backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-base)" : `${palette.bgBase}F0`,
+                color: crew.theme.isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary,
+                border: `1px solid ${crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}`,
                 ...(clearFocused ? interactionRingStyle(crew.theme) : {}),
               }}
             >
@@ -973,10 +967,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
             onFocus={() => setSearchCtaFocused(true)}
             onBlur={() => setSearchCtaFocused(false)}
             style={{
-              backgroundColor: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
-              color: readableTextOnColor(crew.theme.isAuto
-                ? (crew.theme.palettes?.dark?.accentMain || crew.theme.palettes?.light?.accentMain || crew.theme.palette.accentMain)
-                : crew.theme.palette.accentMain),
+              backgroundColor: crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
+              color: readableTextOnColor(palette.accentMain),
               ...(searchCtaFocused ? interactionRingStyle(crew.theme) : {}),
             }}
           >
@@ -996,7 +988,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                   aria-label={`${module.ctaLabel}: ${module.title}`}
                   className="w-[85vw] shrink-0 rounded-2xl border p-3 transition hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)] sm:w-auto"
                   style={{
-                    borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
+                    borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
                     background: promoGradientByIndex(index),
                   }}
                   prefetch={!isExternal}
@@ -1035,13 +1027,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                 className="shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
                 style={{
                   ["--quick-pill-bg" as string]: active
-                    ? (filter.tierColor || (crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain))
-                    : (crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard),
+                    ? (filter.tierColor || (crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain))
+                    : (crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard),
                   ["--quick-pill-text" as string]: active
-                    ? readableTextOnColor(filter.tierColor || (crew.theme.isAuto
-                        ? (crew.theme.palettes?.dark?.accentMain || crew.theme.palettes?.light?.accentMain || crew.theme.palette.accentMain)
-                        : crew.theme.palette.accentMain))
-                    : (crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary),
+                    ? readableTextOnColor(filter.tierColor || palette.accentMain)
+                    : (crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary),
                   ...(active && filter.tierColor ? { boxShadow: `0 0 8px ${filter.tierColor}60` } : {}),
                 }}
               >
@@ -1060,8 +1050,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
               aria-label="Сбросить поиск и все быстрые фильтры"
               className="shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
               style={{
-                ["--quick-pill-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard,
-                ["--quick-pill-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary
+                ["--quick-pill-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
+                ["--quick-pill-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary
               }}
             >
               Сбросить всё
@@ -1288,8 +1278,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                                 width: isActive ? "24px" : "10px",
                                 height: "10px",
                                 backgroundColor: isActive
-                                  ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain)
-                                  : (crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary),
+                                  ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain)
+                                  : (crew.theme.isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary),
                                 opacity: isActive ? 1 : 0.4,
                               }}
                               onClick={() => {
@@ -1427,9 +1417,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           slug={resolvedSlug}
           href={`/franchize/${resolvedSlug}/cart`}
           items={items}
-          accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain}
-          textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
-          borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}
+          accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain}
+          textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary}
+          borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}
           theme={crew.theme}
           className={ctaPolicy?.floatingCartClassName}
         />

@@ -17,6 +17,7 @@ import { focusRingOutlineStyle, readablePaletteTextOnColor, withAlpha } from "..
 import { getTelegramHandleHref, getTelegramWebAppFallbackHref, getTelegramWebAppPageHref, getTelegramWebAppAdaptiveHref } from "../lib/telegram-links";
 import { getFranchizeFormPrefillAction, getFranchizeUserRentalSecretsAction, getRentalDocsPrefillAction, getLatestRentalDataWithSource } from "../profile-actions";
 import { useCrewTokens } from "../lib/use-crew-tokens";
+import { useResolvedPalette } from "../lib/useResolvedPalette";
 import {
   parseISODate,
   formatRuDateFromISO,
@@ -234,6 +235,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const licenseCategories = watch("licenseCategories") ?? "";
   const licenseExpiryDate = watch("licenseExpiryDate") ?? "";
   const T = useCrewTokens(crew.theme);
+  const palette = useResolvedPalette(crew.theme);
   const surface = T.styles;
   const isAuto = T.isAuto;
   const accentMain = T.accent;
@@ -976,8 +978,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         ["--order-accent-on" as string]: accentTextOn,
         ["--order-text-primary" as string]: textPrimary,
         ["--order-text-muted" as string]: textMuted,
-        ["--order-accent-soft" as string]: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 12%, transparent)" : `${crew.theme.palette.accentMain}1f`,
-        ["--order-progress-track" as string]: isAuto ? "color-mix(in srgb, var(--franchize-border-soft) 50%, transparent)" : `${crew.theme.palette.borderSoft}80`,
+        ["--order-accent-soft" as string]: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 12%, transparent)" : `${palette.accentMain}1f`,
+        ["--order-progress-track" as string]: isAuto ? "color-mix(in srgb, var(--franchize-border-soft) 50%, transparent)" : `${palette.borderSoft}80`,
         ["--order-progress-gradient-end" as string]: accentHover,
       }}
     >
@@ -990,11 +992,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         <div
           className="mt-4 rounded-2xl border p-4"
           style={{
-            borderColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 30%, transparent)" : `${crew.theme.palette.accentMain}40`,
-            backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 10%, transparent)" : `${crew.theme.palette.accentMain}1a`,
+            borderColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 30%, transparent)" : `${palette.accentMain}40`,
+            backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 10%, transparent)" : `${palette.accentMain}1a`,
           }}
         >
-          <p className="text-sm font-semibold" style={{ color: accentTextOn === "#16130A" ? crew.theme.palette.accentMain : textPrimary }}>
+          <p className="text-sm font-semibold" style={{ color: accentTextOn === "#16130A" ? palette.accentMain : textPrimary }}>
             С возвращением! {returningUserLastRental ? `Последняя аренда: ${returningUserLastRental}` : ""}
           </p>
           <p className="mt-1 text-xs" style={surface.mutedText}>
@@ -1009,7 +1011,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           className="mt-4 rounded-2xl border-2 p-4"
           style={{
             borderColor: accentMain,
-            backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 8%, transparent)" : `${crew.theme.palette.accentMain}14`,
+            backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 8%, transparent)" : `${palette.accentMain}14`,
           }}
         >
           <div className="flex items-start gap-3">
@@ -1555,8 +1557,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               <div
                 className="mt-2 rounded-2xl border p-3"
                 style={{
-                  borderColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 30%, transparent)" : `${crew.theme.palette.accentMain}40`,
-                  backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 10%, transparent)" : `${crew.theme.palette.accentMain}1a`,
+                  borderColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 30%, transparent)" : `${palette.accentMain}40`,
+                  backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 10%, transparent)" : `${palette.accentMain}1a`,
                 }}
               >
                 <p className="text-xs" style={{ color: textPrimary }}>{paymentRetryHint}</p>
@@ -1565,7 +1567,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                   onClick={handleSwitchToFallbackPayment}
                   className="mt-2 inline-flex items-center rounded-xl border px-3 py-1 text-xs font-semibold transition hover:opacity-90"
                   style={{
-                    borderColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 40%, transparent)" : `${crew.theme.palette.accentMain}55`,
+                    borderColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 40%, transparent)" : `${palette.accentMain}55`,
                     color: accentMain,
                   }}
                 >
@@ -1598,7 +1600,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                   promoMessage.tone === "error"
                     ? { color: isAuto ? "var(--franchize-text-primary)" : "#b91c1c" }
                     : promoMessage.tone === "success"
-                      ? { color: isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain }
+                      ? { color: isAuto ? "var(--franchize-accent-main)" : palette.accentMain }
                       : surface.mutedText
                 }
               >

@@ -3,6 +3,7 @@
 import { useAppContext } from '@/contexts/AppContext';
 import { useFranchizeTheme } from '../../../hooks/useFranchizeTheme';
 import { crewPaletteForSurface } from '../../../lib/theme';
+import { useResolvedPalette } from '../../../lib/useResolvedPalette';
 import { redirect } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -44,6 +45,7 @@ export function AnalyticsClient({
   const { dbUser } = useAppContext();
   const [isMember, setIsMember] = useState(false);
   const [checkingMember, setCheckingMember] = useState(true);
+  const palette = useResolvedPalette(crew.theme);
   const theme = useFranchizeTheme(crew.theme);
   const surface = crewPaletteForSurface(crew.theme);
 
@@ -128,19 +130,19 @@ export function AnalyticsClient({
       style={{
         ['--analytics-bg' as string]: theme.isAuto
           ? 'var(--franchize-bg-base)'
-          : crew.theme.palette.bgBase,
+          : palette.bgBase,
         ['--analytics-card' as string]: theme.isAuto
           ? 'var(--franchize-bg-card)'
-          : crew.theme.palette.bgCard,
+          : palette.bgCard,
         ['--analytics-text' as string]: theme.isAuto
           ? 'var(--franchize-text-primary)'
-          : crew.theme.palette.textPrimary,
+          : palette.textPrimary,
         ['--analytics-muted' as string]: theme.isAuto
           ? 'var(--franchize-text-secondary)'
-          : crew.theme.palette.textSecondary,
+          : palette.textSecondary,
         ['--analytics-accent' as string]: theme.isAuto
           ? 'var(--franchize-accent-main)'
-          : crew.theme.palette.accentMain,
+          : palette.accentMain,
       }}
     >
       {/* Header */}
@@ -165,7 +167,7 @@ export function AnalyticsClient({
               backgroundColor: 'var(--analytics-card)',
               borderColor: theme.isAuto
                 ? 'var(--franchize-border-soft)'
-                : crew.theme.palette.borderSoft,
+                : palette.borderSoft,
             }}
           >
             <p className="text-sm mb-2" style={{ color: 'var(--analytics-muted)' }}>
@@ -185,7 +187,7 @@ export function AnalyticsClient({
               backgroundColor: 'var(--analytics-card)',
               borderColor: theme.isAuto
                 ? 'var(--franchize-border-soft)'
-                : crew.theme.palette.borderSoft,
+                : palette.borderSoft,
             }}
           >
             <p className="text-sm mb-2" style={{ color: 'var(--analytics-muted)' }}>
@@ -219,7 +221,7 @@ export function AnalyticsClient({
                 backgroundColor: 'var(--analytics-card)',
                 borderColor: theme.isAuto
                   ? 'var(--franchize-border-soft)'
-                  : crew.theme.palette.borderSoft,
+                  : palette.borderSoft,
               }}
             >
               <div className="flex items-start justify-between gap-4">
