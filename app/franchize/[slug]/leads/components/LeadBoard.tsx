@@ -9,7 +9,7 @@ import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads"
 interface LeadBoardProps {
   leads: LeadRow[];
   selectedId: string | null;
-  onSelect: (id: string) => void;
+  onSelect: (id: string | null) => void;
   onDismiss: (id: string) => void;
   getTodosForLead: (lead: LeadRow) => LeadTodoRow[];
   T: any;
@@ -46,7 +46,7 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
                 return (
                   <div
                     key={lead.user_id}
-                    onClick={() => onSelect(selectedId === lead.user_id ? "" : lead.user_id)}
+                    onClick={() => onSelect(selectedId === lead.user_id ? null : lead.user_id)}
                     className="cursor-pointer rounded-xl border p-2.5 transition hover:shadow-sm"
                     style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: selectedId === lead.user_id ? `0 0 0 2px ${T.borderActive}33` : undefined }}
                   >

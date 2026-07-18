@@ -12,6 +12,7 @@ import { LeadsToolbar } from "./components/LeadsToolbar";
 import { LeadCard } from "./components/LeadCard";
 import { LeadList } from "./components/LeadList";
 import { LeadBoard } from "./components/LeadBoard";
+import { MobileLeadSheet } from "./components/MobileLeadSheet";
 import { EmptyState } from "./components/EmptyState";
 import { LeadDetailContent } from "./components/LeadDetailContent";
 import { Avatar } from "./components/Avatar";
@@ -199,7 +200,7 @@ export function LeadsClient({
         <LeadBoard
           leads={sortedLeads}
           selectedId={selectedId}
-          onSelect={(id) => setSelectedId(selectedId === id ? null : id)}
+          onSelect={(id) => setSelectedId(id)}
           onDismiss={handleDismissLead}
           getTodosForLead={getTodosForLead}
           T={T}
@@ -208,8 +209,8 @@ export function LeadsClient({
         <EmptyState hasFilters={hasFilters} T={T} />
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          {/* List */}
-          <div className={`space-y-3 ${selectedId ? "lg:col-span-5" : "lg:col-span-12"}`}>
+          {/* List column — shrinks on desktop when lead selected */}
+          <div className={`space-y-3 transition-all duration-200 ${selectedId ? "lg:col-span-5" : "lg:col-span-12"}`}>
             <LeadList
               leads={sortedLeads}
               selectedId={selectedId}
@@ -222,50 +223,59 @@ export function LeadsClient({
             />
           </div>
 
-          {/* Desktop detail panel */}
-          {selectedId && (
-            <div className="hidden lg:block lg:col-span-7">
-              <div className="sticky top-24 max-h-[calc(100vh-140px)] overflow-y-auto rounded-2xl border p-4" style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: T.shadow }}>
-                <div className="mb-4 flex items-start gap-3">
-                  {(() => {
-                    const selectedLead = sortedLeads.find(l => l.user_id === selectedId);
-                    if (!selectedLead) return null;
-                    return (
-                      <>
-                        <Avatar name={selectedLead.full_name} source={selectedLead.source} size={56} />
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate text-lg font-bold" style={{ color: T.text }}>{selectedLead.full_name || "Без имени"}</h3>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: T.textMuted }}>
-                            {selectedLead.phone && <span>{selectedLead.phone}</span>}
-                            {selectedLead.username && <span>@{selectedLead.username}</span>}
-                            <span>{relativeTime(selectedLead.lastSeenAt || selectedLead.createdAt)}</span>
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            <SourceBadge source={selectedLead.source} size="md" />
-                            {selectedLead.bikeTitle && (
-                              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ backgroundColor: T.borderSoft, color: T.text }}>
-                                <Bike className="h-3 w-3" /> {selectedLead.bikeTitle}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <button onClick={() => setSelectedId(null)} className="rounded p-1 transition hover:bg-black/5" style={{ color: T.textFaint }}>
-                          <X className="h-5 w-5" />
-                        </button>
-                      </>
-                    );
-                  })()}
+          {/* Desktop detail panel — always rendered; shows empty state or details */}
+          <div className="hidden lg:block lg:col-span-7">
+            {(() => {
+              const selectedLead = selectedId ? sortedLeads.find(l => l.user_id === selectedId) : null;
+              if (!selectedLead) {
+                return (
+                  <div className="sticky top-24 flex h-[calc(100vh-200px)] items-center justify-center rounded-2xl border border-dashed" style={{ borderColor: T.border }}>
+                    <p className="text-sm" style={{ color: T.textFaint }}>Выберите лида для просмотра деталей</p>
+                  </div>
+                );
+              }
+              return (
+                <div className="sticky top-24 max-h-[calc(100vh-140px)] overflow-y-auto rounded-2xl border p-4" style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: T.shadow }}>
+                  <div className="mb-4 flex items-start gap-3">
+                    <Avatar name={selectedLead.full_name} source={selectedLead.source} size={56} />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-lg font-bold" style={{ color: T.text }}>{selectedLead.full_name || "Без имени"}</h3>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: T.textMuted }}>
+                        {selectedLead.phone && <span>{selectedLead.phone}</span>}
+                        {selectedLead.username && <span>@{selectedLead.username}</span>}
+                        <span>{relativeTime(selectedLead.lastSeenAt || selectedLead.createdAt)}</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <SourceBadge source={selectedLead.source} size="md" />
+                        {selectedLead.bikeTitle && (
+                          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ backgroundColor: T.borderSoft, color: T.text }}>
+                            <Bike className="h-3 w-3" /> {selectedLead.bikeTitle}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button onClick={() => setSelectedId(null)} className="rounded p-1 transition hover:bg-black/5" style={{ color: T.textFaint }}>
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} />
                 </div>
-                {(() => {
-                  const selectedLead = sortedLeads.find(l => l.user_id === selectedId);
-                  if (!selectedLead) return null;
-                  return <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} />;
-                })()}
-              </div>
-            </div>
-          )}
+              );
+            })()}
+          </div>
         </div>
       )}
+
+      {/* Mobile bottom sheet — slides up on lead selection */}
+      {selectedId && (() => {
+        const selectedLead = sortedLeads.find(l => l.user_id === selectedId);
+        if (!selectedLead) return null;
+        return (
+          <MobileLeadSheet open={true} onClose={() => setSelectedId(null)} T={T}>
+            <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} />
+          </MobileLeadSheet>
+        );
+      })()}
     </div>
   );
 }
