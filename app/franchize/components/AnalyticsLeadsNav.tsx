@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { BarChart3, Calendar, Tag, FileText } from "lucide-react";
 
 interface AnalyticsLeadsNavProps {
@@ -22,7 +23,7 @@ export function AnalyticsLeadsNav({ slug }: AnalyticsLeadsNavProps) {
       {ANALYTICS_LINKS.map((link) => {
         const Icon = link.icon;
         return (
-          <a
+          <Link
             key={link.label}
             href={link.href(slug)}
             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all hover:scale-105 hover:shadow-sm"
@@ -42,7 +43,7 @@ export function AnalyticsLeadsNav({ slug }: AnalyticsLeadsNavProps) {
           >
             <Icon className="w-3 h-3" />
             {link.label}
-          </a>
+          </Link>
         );
       })}
     </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Calendar, Tag, FileText, BarChart3, Users } from "lucide-react";
 import { withAlpha } from "@/app/franchize/lib/theme";
 
@@ -48,14 +49,14 @@ export function AnalyticsCrossNav({
             <Icon className="w-3 h-3" /> {item.label}
           </span>
         ) : (
-          <a
+          <Link
             key={item.key}
             href={`${basePath}${item.suffix}`}
             className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold transition-all hover:opacity-80"
             style={{ color: textSecondary, border: `1px solid ${borderSoft}` }}
           >
             <Icon className="w-3 h-3" /> {item.label}
-          </a>
+          </Link>
         );
       })}
     </div>

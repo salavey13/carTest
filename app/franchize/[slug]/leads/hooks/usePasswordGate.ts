@@ -3,16 +3,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { validateAnalyticsPassword } from "@/app/franchize/server-actions/rentals-dashboard";
 
-export function usePasswordGate(slug: string, isInTelegram: boolean) {
+export function usePasswordGate(slug: string, isInTelegram: boolean, dbUserId?: string | null) {
   const [showPasswordEntry, setShowPasswordEntry] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [isPasswordValidating, setIsPasswordValidating] = useState(false);
   const [passwordAuthed, setPasswordAuthed] = useState(false);
 
+  // Skip password gate entirely if user is already authenticated via Telegram
+  const isAlreadyAuthed = !!dbUserId;
+
   useEffect(() => {
-    if (!isInTelegram && !passwordAuthed) setShowPasswordEntry(true);
-  }, [isInTelegram, passwordAuthed]);
+    if (!isAlreadyAuthed && !isInTelegram && !passwordAuthed) setShowPasswordEntry(true);
+  }, [isInTelegram, passwordAuthed, isAlreadyAuthed]);
 
   const handlePasswordSubmit = useCallback(async () => {
     if (!passwordInput.trim()) return;
