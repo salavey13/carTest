@@ -48,7 +48,7 @@ export function LeadList({
 
   return (
     <div ref={parentRef} className="h-full max-h-[calc(100vh-280px)] overflow-y-auto" style={{ width: "100%" }}>
-      <div className="space-y-3" style={{ height: totalHeight, width: "100%" }}>
+      <div style={{ position: "relative", height: totalHeight, width: "100%" }}>
         {virtualItems.map((virtualRow) => {
           const lead = leads[virtualRow.index];
           const isThisSelected = isSelected.has(lead.user_id);

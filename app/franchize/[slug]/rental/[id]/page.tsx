@@ -5,12 +5,12 @@ import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
 import { CrewFooter } from "../../../components/CrewFooter";
 import { FranchizeRentalLifecycleActions } from "../../../components/FranchizeRentalLifecycleActions";
-import { FranchizeHero } from "../../../components/FranchizeHero";
 import { FranchizePageShell } from "../../../components/FranchizePageShell";
 import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRentalDocumentsPanel";
 import { RentalChecklistPanel } from "../../../components/RentalChecklistPanel";
+import { RentalMessageInput } from "../../../components/RentalMessageInput";
 import { RentalTelegramGuard } from "../../../components/RentalTelegramGuard";
-import { getTelegramHandleHref, getTelegramWebAppPageHref } from "../../../lib/telegram-links";
+import { getTelegramWebAppPageHref } from "../../../lib/telegram-links";
 import { crewPaletteForSurface, readablePaletteTextOnColor } from "../../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../../metadata";
 
@@ -66,8 +66,6 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
   const dealStarted = rental.found || rental.paymentStatus === "interest_paid";
   const catalogHref = `/franchize/${resolvedSlug}`;
   const profileHref = getTelegramWebAppPageHref(`franchize/${resolvedSlug}/profile`, crew.contacts.telegramBotUsername) || `/franchize/${resolvedSlug}/profile`;
-  const contactsHref = `/franchize/${resolvedSlug}/contacts`;
-  const telegramSupportHref = getTelegramHandleHref(crew.contacts.telegram);
   const status = rental.status || "pending_confirmation";
   const statusStyle = statusPalette[status] || statusPalette.pending_confirmation;
 
@@ -88,42 +86,15 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
     ? `/franchize/${resolvedSlug}?vehicle=${encodeURIComponent(rental.vehicleTitle)}`
     : catalogHref;
 
-  // Status-aware hero subcopy & CTAs
-  const heroCopy: Record<string, { subcopy: string; primaryCta: { label: string; href: string }; secondaryCta: { label: string; href: string } }> = {
-    pending_confirmation: {
-      subcopy: "Заявка ждёт подтверждения.",
-      primaryCta: { label: "Продолжить", href: `/franchize/${resolvedSlug}/cart` },
-      secondaryCta: { label: "Каталог", href: catalogHref },
-    },
-    confirmed: {
-      subcopy: "Аренда подтверждена. Готовим выдачу.",
-      primaryCta: { label: "Открыть в Telegram", href: rental.telegramDeepLink },
-      secondaryCta: { label: "Каталог", href: catalogHref },
-    },
-    active: {
-      subcopy: "ТС у арендатора. Следим за сроками.",
-      primaryCta: { label: "Продлить", href: bikeSearchHref },
-      secondaryCta: { label: "Каталог", href: catalogHref },
-    },
-    completed: {
-      subcopy: "Аренда завершена.",
-      primaryCta: { label: "Арендовать снова", href: bikeSearchHref },
-      secondaryCta: { label: "Отзыв", href: contactsHref },
-    },
-    cancelled: {
-      subcopy: "Аренда отменена.",
-      primaryCta: { label: "Заказать ещё", href: catalogHref },
-      secondaryCta: { label: "Оператору", href: telegramSupportHref },
-    },
+  // Status-aware explanatory text
+  const statusHint: Record<string, string> = {
+    pending_confirmation: "Заявка ждёт подтверждения владельцем.",
+    confirmed: "Аренда подтверждена. Можно открыть в Telegram для деталей.",
+    active: "ТС у арендатора. Следим за сроками возврата.",
+    completed: "Аренда завершена. Спасибо!",
+    cancelled: "Аренда отменена.",
   };
-  const heroDefault = {
-    subcopy: rental.found
-      ? "Сделка активирована. Управляйте из Telegram."
-      : "Сделка не найдена. Проверьте ссылку или напишите оператору.",
-    primaryCta: { label: "Открыть в Telegram", href: rental.telegramDeepLink },
-    secondaryCta: { label: "Каталог", href: catalogHref },
-  };
-  const hero = rental.found ? (heroCopy[status] || heroDefault) : heroDefault;
+  const hintText = rental.found ? (statusHint[status] || "") : "Сделка не найдена. Проверьте ссылку или вернитесь в каталог.";
 
   return (
     <main className="min-h-screen" style={surface.page}>
@@ -134,13 +105,24 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
       />
 
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6">
-        <FranchizeHero
-          eyebrow={`/franchize/${resolvedSlug}/rental/${id} · сделка`}
-          title="Карточка аренды"
-          subcopy={hero.subcopy}
-          primaryCta={hero.primaryCta}
-          secondaryCta={hero.secondaryCta}
-        />
+        {/* Compact page header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold" style={{ color: textPrimary }}>
+              Карточка аренды
+            </h1>
+            {hintText && (
+              <p className="mt-1 text-sm" style={{ color: textSecondary }}>{hintText}</p>
+            )}
+          </div>
+          <span
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+            style={{ backgroundColor: statusStyle.badgeBg, color: statusStyle.badgeText }}
+          >
+            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: statusStyle.badgeText }} />
+            {statusLabel[status] || status}
+          </span>
+        </div>
 
         {/* Status + next steps */}
         <section className="rounded-3xl border p-4 md:p-6" style={surface.subtleCard}>
@@ -192,7 +174,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                     )
                   : [
                       "Подождём синхронизацию — бот присылает карточку с задержкой.",
-                      "Откройте в Telegram или напишите оператору.",
+                      "Откройте в Telegram или вернитесь в профиль.",
                       "Если не найдётся — вернитесь в каталог.",
                     ]
                 ).map((step, index) => (
@@ -248,6 +230,9 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                   >
                     <Timer className="h-4 w-4 shrink-0" /> Продлить
                   </Link>
+                  <p className="text-[11px] leading-tight text-center" style={{ color: textSecondary }}>
+                    Откроет каталог с этим же байком — сможете оформить новую аренду
+                  </p>
 
                   <details className="group rounded-xl border" style={{ borderColor: borderSoft }}>
                     <summary
@@ -281,25 +266,16 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                 </>
               )}
 
-              <a
-                href={telegramSupportHref}
-                target="_blank"
-                rel="noreferrer"
-                className="flex justify-center rounded-xl border px-4 py-3 transition hover:opacity-85"
-                style={{ borderColor: borderSoft, color: textPrimary }}
-              >
-                Оператору
-              </a>
+              {/* Message input — sends notification to crew owner via TG bot */}
+              <RentalMessageInput
+                rentalId={rental.rentalId}
+                accentColor={accent}
+                borderColor={borderSoft}
+                textPrimary={textPrimary}
+                textSecondary={textSecondary}
+              />
 
-              <Link
-                href={contactsHref}
-                className="flex justify-center rounded-xl border px-4 py-3 transition hover:opacity-85"
-                style={{ borderColor: borderSoft, color: textPrimary }}
-              >
-                Контакты
-              </Link>
-
-              <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="grid grid-cols-2 gap-2">
                 <Link
                   href={catalogHref}
                   className="rounded-xl border px-3 py-2 text-center text-xs transition hover:opacity-85"
@@ -327,16 +303,20 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               Проверьте ID в ссылке или вернитесь в профиль — там останутся последние активные заявки.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {[catalogHref, profileHref, contactsHref].map((href, i) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="rounded-xl border px-3 py-2 text-xs transition hover:opacity-85"
-                  style={{ borderColor: borderSoft }}
-                >
-                  {["Каталог", "Профиль", "Поддержка"][i]}
-                </Link>
-              ))}
+              <Link
+                href={catalogHref}
+                className="rounded-xl border px-3 py-2 text-xs transition hover:opacity-85"
+                style={{ borderColor: borderSoft }}
+              >
+                Каталог
+              </Link>
+              <Link
+                href={profileHref}
+                className="rounded-xl border px-3 py-2 text-xs transition hover:opacity-85"
+                style={{ borderColor: borderSoft }}
+              >
+                Профиль
+              </Link>
             </div>
           </section>
         ) : null}
