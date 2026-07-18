@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 
 interface MobileLeadSheetProps {
@@ -10,25 +11,27 @@ interface MobileLeadSheetProps {
   T: any;
 }
 
+const SHEET_HEIGHT = 0.88; // 88% of viewport
+
+const sheetVariants = {
+  hidden: { y: "100%" },
+  visible: {
+    y: 0,
+    transition: { type: "spring", damping: 28, stiffness: 300, mass: 0.8 },
+  },
+  exit: {
+    y: "100%",
+    transition: { type: "spring", damping: 28, stiffness: 400, mass: 0.8 },
+  },
+};
+
+const backdropVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.2 } },
+  exit: { opacity: 0, transition: { duration: 0.15 } },
+};
+
 export function MobileLeadSheet({ open, onClose, children, T }: MobileLeadSheetProps) {
-  const [visible, setVisible] = useState(false);
-  const [animating, setAnimating] = useState(false);
-  const sheetRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (open) {
-      setVisible(true);
-      // Trigger animation on next frame
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setAnimating(true));
-      });
-    } else {
-      setAnimating(false);
-      const timer = setTimeout(() => setVisible(false), 250);
-      return () => clearTimeout(timer);
-    }
-  }, [open]);
-
   // Close on Escape
   useEffect(() => {
     if (!open) return;
@@ -39,47 +42,64 @@ export function MobileLeadSheet({ open, onClose, children, T }: MobileLeadSheetP
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  if (!visible) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end lg:hidden">
-      {/* Backdrop */}
-      <div
-        className={`absolute inset-0 transition-opacity duration-250 ${
-          animating ? "opacity-100" : "opacity-0"
-        }`}
-        style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Sheet */}
-      <div
-        ref={sheetRef}
-        className={`relative w-full max-h-[85vh] rounded-t-3xl border-t shadow-2xl overflow-y-auto transition-transform duration-250 ease-out ${
-          animating ? "translate-y-0" : "translate-y-full"
-        }`}
-        style={{
-          backgroundColor: T.bgCard,
-          borderColor: T.border,
-        }}
-      >
-        {/* Drag handle */}
-        <div className="sticky top-0 z-10 flex items-center justify-center pt-3 pb-2" style={{ backgroundColor: T.bgCard }}>
-          <div className="h-1.5 w-10 rounded-full" style={{ backgroundColor: T.borderSoft }} />
-          <button
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-end lg:hidden">
+          {/* Backdrop */}
+          <motion.div
+            key="sheet-backdrop"
+            className="absolute inset-0"
+            style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+            variants={backdropVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             onClick={onClose}
-            className="absolute right-4 top-2 rounded-xl p-2 transition hover:bg-black/10"
-            style={{ color: T.textFaint }}
-            aria-label="Закрыть"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+          />
 
-        {/* Content */}
-        <div className="px-4 pb-8">{children}</div>
-      </div>
-    </div>
+          {/* Sheet */}
+          <motion.div
+            key="lead-sheet"
+            className="relative w-full rounded-t-3xl border-t shadow-2xl overflow-y-auto"
+            style={{
+              maxHeight: `${SHEET_HEIGHT * 100}vh`,
+              backgroundColor: T.bgCard,
+              borderColor: T.border,
+            }}
+            variants={sheetVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 120 }}
+            dragElastic={{ top: 0, bottom: 0.3 }}
+            onDragEnd={(_event, info) => {
+              if (info.offset.y > 80) onClose();
+            }}
+          >
+            {/* Drag handle */}
+            <div className="sticky top-0 z-10 flex items-center justify-center pt-3 pb-2" style={{ backgroundColor: T.bgCard }}>
+              <motion.div
+                className="h-1.5 w-10 rounded-full"
+                style={{ backgroundColor: T.borderSoft }}
+                whileTap={{ scale: 0.85 }}
+              />
+              <button
+                onClick={onClose}
+                className="absolute right-4 top-2 rounded-xl p-2 transition hover:bg-black/10"
+                style={{ color: T.textFaint }}
+                aria-label="Закрыть"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="px-4 pb-8">{children}</div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }

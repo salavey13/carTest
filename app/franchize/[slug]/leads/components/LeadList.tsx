@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useCallback } from "react";
+import { motion } from "framer-motion";
 import { useVirtualList } from "../hooks/useVirtualList";
 import { LeadCard } from "./LeadCard";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
@@ -23,6 +24,22 @@ interface LeadListProps {
 
 /** Approximate starting height — real height is measured via measureElement */
 const ITEM_HEIGHT = 128;
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 12, scale: 0.97 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: "spring",
+      damping: 24,
+      stiffness: 260,
+      mass: 0.6,
+      delay: Math.min(i * 0.025, 0.12),
+    },
+  }),
+};
 
 export function LeadList({
   leads,
@@ -66,11 +83,15 @@ export function LeadList({
           const lead = leads[virtualRow.index];
           const isThisSelected = isSelected.has(lead.user_id);
           return (
-            <div
+            <motion.div
               key={lead.user_id}
               data-index={virtualRow.index}
               ref={measureElement}
               className="virtual-item"
+              custom={virtualRow.index}
+              variants={cardVariants}
+              initial="hidden"
+              animate="visible"
               style={{
                 position: "absolute",
                 top: 0,
@@ -87,7 +108,7 @@ export function LeadList({
                 onDismiss={onDismiss}
                 todos={getTodosForLead(lead)}
               />
-            </div>
+            </motion.div>
           );
         })}
       </div>
