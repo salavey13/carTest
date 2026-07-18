@@ -217,7 +217,7 @@ export async function fetchRepoContents_pro(repoUrl: string, customToken?: strin
       return false;
     });
 
-    const MAX_FILES_TO_FETCH = 1013;
+    const MAX_FILES_TO_FETCH = 513;
     if (filesToFetch.length > MAX_FILES_TO_FETCH) {
       console.warn(`⚠️ High file count (${filesToFetch.length}). Truncating.`);
       filesToFetch = filesToFetch.slice(0, MAX_FILES_TO_FETCH);
@@ -330,7 +330,7 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
     try { const res = await octokit.git.getTree({ owner, repo, tree_sha: treeSha, recursive: '1' }); treeData = res.data as GitTreeResponseData; if (treeData?.truncated) { console.warn("[Action] Tree truncated."); await notifyAdmin(`⚠️ Tree truncated ${owner}/${repo} ${targetBranch}.`); } if (!treeData || !Array.isArray(treeData.tree)) { console.error("[Action] Invalid tree structure:", treeData); throw new Error(`Invalid tree structure.`); } console.log(`[Action] Tree items: ${treeData.tree.length}. Filtering...`); } catch (treeError: any) { console.error(`[Action] getTree failed`, treeError); throw new Error(`Failed getTree: ${treeError.message || treeError}`); }
     let filesToFetch = treeData.tree.filter((item): item is GitTreeFile => { if(item.type!=='blob'||!item.path||!item.sha) return false; const pL=item.path.toLowerCase(); if(excludedExactPaths.has(item.path)) return false; if(excludedPrefixes.some(p=>pL.startsWith(p))) return false; if(excludedExtensions.some(e=>pL.endsWith(e))) return item.path==='README.md'||allowedRootFiles.has(item.path); if(allowedRootFiles.has(item.path)) return true; if(allowedPrefixes.some(p=>pL.startsWith(p))) return true; return false; });
     console.log(`[Action] Filtered to ${filesToFetch.length} files.`);
-    const MAX_FILES_TO_FETCH = 1013; if (filesToFetch.length > MAX_FILES_TO_FETCH) { console.warn(`[Action] Count (${filesToFetch.length}) > limit (${MAX_FILES_TO_FETCH}). Truncating.`); await notifyAdmin(`⚠️ High file count (${filesToFetch.length}) ${owner}/${repo} ${targetBranch}. Truncated.`); filesToFetch = filesToFetch.slice(0, MAX_FILES_TO_FETCH); }
+    const MAX_FILES_TO_FETCH = 513; if (filesToFetch.length > MAX_FILES_TO_FETCH) { console.warn(`[Action] Count (${filesToFetch.length}) > limit (${MAX_FILES_TO_FETCH}). Truncating.`); await notifyAdmin(`⚠️ High file count (${filesToFetch.length}) ${owner}/${repo} ${targetBranch}. Truncated.`); filesToFetch = filesToFetch.slice(0, MAX_FILES_TO_FETCH); }
     const allFiles: FileNode[] = []; const totalFiles = filesToFetch.length; if (totalFiles === 0) { console.warn("[Action] No relevant files found."); return { success: true, files: [] }; }
     console.log(`[Action] Fetching content for ${totalFiles} files...`);
     const FETCH_CONCURRENCY = 69;
