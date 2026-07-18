@@ -24,6 +24,7 @@ export function LeadsToolbar({
   setSegment,
   viewMode,
   setViewMode,
+  segmentCounts,
   T,
   isAuto,
 }: {
@@ -38,6 +39,7 @@ export function LeadsToolbar({
   setSegment: (v: Segment) => void;
   viewMode: "list" | "board";
   setViewMode: (v: "list" | "board") => void;
+  segmentCounts?: Partial<Record<Segment, number>>;
   T: any;
   isAuto: boolean;
 }) {
@@ -114,12 +116,19 @@ export function LeadsToolbar({
           const meta = SEGMENT_META[key];
           const Icon = meta.icon;
           const active = segment === key;
+          const count = segmentCounts?.[key];
           return (
             <button key={key} onClick={() => setSegment(key)}
-              className={`flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${active ? "" : "hover:bg-black/5"}`}
+              className={`flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${active ? "" : "hover:opacity-80"}`}
               style={active ? { backgroundColor: meta.color + "15", color: meta.color, borderColor: meta.color + "40" } : { color: T.textMuted, borderColor: "transparent" }}>
               <Icon className="h-3.5 w-3.5" />
               {meta.label}
+              {count !== undefined && (
+                <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold"
+                  style={active ? { backgroundColor: meta.color + "30", color: meta.color } : { backgroundColor: T.borderSoft, color: T.textFaint }}>
+                  {count}
+                </span>
+              )}
             </button>
           );
         })}
