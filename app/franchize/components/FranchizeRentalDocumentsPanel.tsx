@@ -19,6 +19,7 @@ interface FranchizeRentalDocumentsPanelProps {
     textSecondary: string;
     bgCard: string;
   };
+  isAuto?: boolean;
 }
 
 const freezeChecklistOptions = [
@@ -29,8 +30,13 @@ const freezeChecklistOptions = [
   "Клиент подписал условия",
 ];
 
-export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metadata, palette }: FranchizeRentalDocumentsPanelProps) {
+export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metadata, palette, isAuto = false }: FranchizeRentalDocumentsPanelProps) {
   const { dbUser } = useAppContext();
+
+  // Resolve themed values — CSS vars for auto, palette for manual themes
+  const inputBg = isAuto ? "var(--franchize-bg-card)" : palette.bgCard;
+  const inputText = isAuto ? "var(--franchize-text-primary)" : palette.textPrimary;
+  const inputBorder = isAuto ? "var(--franchize-border-soft)" : palette.borderSoft;
   const [isPending, startTransition] = useTransition();
   const [odometerKm, setOdometerKm] = useState("45000");
   const [fuelLevel, setFuelLevel] = useState("4/5");
@@ -114,8 +120,8 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
         {canFreeze && (
           <div className="mt-3 space-y-2 text-sm">
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className="rounded-lg border px-2 py-1.5" style={{ borderColor: palette.borderSoft }} value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} placeholder="Пробег, км" />
-              <input className="rounded-lg border px-2 py-1.5" style={{ borderColor: palette.borderSoft }} value={fuelLevel} onChange={(e) => setFuelLevel(e.target.value)} placeholder="Топливо (например 4/5)" />
+              <input className="rounded-lg border px-2 py-1.5" style={{ borderColor: inputBorder, backgroundColor: inputBg, color: inputText }} value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} placeholder="Пробег, км" />
+              <input className="rounded-lg border px-2 py-1.5" style={{ borderColor: inputBorder, backgroundColor: inputBg, color: inputText }} value={fuelLevel} onChange={(e) => setFuelLevel(e.target.value)} placeholder="Топливо (например 4/5)" />
             </div>
             <div className="flex flex-wrap gap-2">
               {freezeChecklistOptions.map((item) => (
@@ -131,7 +137,7 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
                 </button>
               ))}
             </div>
-            <textarea className="min-h-16 w-full rounded-lg border px-2 py-1.5" style={{ borderColor: palette.borderSoft }} value={freezeNotes} onChange={(e) => setFreezeNotes(e.target.value)} placeholder="Комментарий к выдаче (опционально)" />
+            <textarea className="min-h-16 w-full rounded-lg border px-2 py-1.5" style={{ borderColor: inputBorder, backgroundColor: inputBg, color: inputText }} value={freezeNotes} onChange={(e) => setFreezeNotes(e.target.value)} placeholder="Комментарий к выдаче (опционально)" />
             <button
               type="button"
               disabled={isPending}
@@ -148,16 +154,16 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
       <div className="mt-3 rounded-xl border p-3" style={{ borderColor: palette.borderSoft }}>
         <p className="text-sm font-medium">Отчёты о повреждениях ({damageReports.length})</p>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          <select className="rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: palette.borderSoft }} value={damagePhase} onChange={(e) => setDamagePhase(e.target.value as "pickup" | "return")}>
+          <select className="rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: inputBorder, backgroundColor: inputBg, color: inputText }} value={damagePhase} onChange={(e) => setDamagePhase(e.target.value as "pickup" | "return")}>
             <option value="pickup">На выдаче</option>
             <option value="return">На возврате</option>
           </select>
-          <select className="rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: palette.borderSoft }} value={damageSeverity} onChange={(e) => setDamageSeverity(e.target.value as "minor" | "major")}>
+          <select className="rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: inputBorder, backgroundColor: inputBg, color: inputText }} value={damageSeverity} onChange={(e) => setDamageSeverity(e.target.value as "minor" | "major")}>
             <option value="minor">Лёгкое</option>
             <option value="major">Серьёзное</option>
           </select>
         </div>
-        <textarea className="mt-2 min-h-16 w-full rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: palette.borderSoft }} value={damageNotes} onChange={(e) => setDamageNotes(e.target.value)} placeholder="Описание повреждения / замечания" />
+        <textarea className="mt-2 min-h-16 w-full rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: inputBorder, backgroundColor: inputBg, color: inputText }} value={damageNotes} onChange={(e) => setDamageNotes(e.target.value)} placeholder="Описание повреждения / замечания" />
         <button
           type="button"
           disabled={isPending}

@@ -630,6 +630,74 @@ export async function sendRentalMessage(
 }
 
 // ============================================================================
+// getRentalReturnTodos — fetch return-related todos for a rental
+// ============================================================================
+
+export interface ReturnTodo {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  category: string;
+}
+
+export async function getRentalReturnTodos(
+  rentalId: string,
+  crewId: string
+): Promise<{ success: boolean; data?: ReturnTodo[]; error?: string }> {
+  try {
+    const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Fetch ALL crew_todos for this crew (both lead_followup and rental_verification)
+    const { data: allTodos, error } = await supabaseAdmin
+      .from("crew_todos")
+      .select("id, title, status, priority, category, description")
+      .eq("crew_id", crewId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("[getRentalReturnTodos] Error:", error);
+      return { success: false, error: error.message };
+    }
+
+    // Filter by rental_id in description JSON
+    const rentalTodos = (allTodos || []).filter((t) => {
+      if (t.category === "rental_verification") {
+        // Verification todos store rental_id directly in description
+        try {
+          const desc = JSON.parse(t.description || "{}");
+          return desc.rental_id === rentalId;
+        } catch { return false; }
+      }
+      // lead_followup todos may have rental_id or be generally return-related
+      if (t.category === "lead_followup") {
+        try {
+          const desc = JSON.parse(t.description || "{}");
+          return desc.rental_id === rentalId;
+        } catch { return false; }
+      }
+      return false;
+    });
+
+    return {
+      success: true,
+      data: rentalTodos.map((t) => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        priority: t.priority,
+        category: t.category,
+      })),
+    };
+  } catch (error) {
+    console.error("[getRentalReturnTodos] Error:", error);
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+// ============================================================================
 // Legacy runtime exports
 // ============================================================================
 

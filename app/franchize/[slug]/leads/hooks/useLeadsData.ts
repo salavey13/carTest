@@ -26,13 +26,22 @@ export function useTodosMapping(todos: LeadTodoRow[]) {
 
   const getTodosForLead = useCallback((lead: LeadRow): LeadTodoRow[] => {
     const leadUserIds = new Set([lead.user_id, lead.phone].filter(Boolean));
+    const seen = new Set<string>();
     return todos.filter((t) => {
+      let matched = false;
       const leadId = getTodoLeadIdMemo(t);
-      if (leadId && leadUserIds.has(leadId)) return true;
-      const leadPhone = getTodoLeadPhoneMemo(t);
-      if (leadPhone && lead.phone && leadPhone === lead.phone) return true;
-      if (leadId && lead.phone && leadId === lead.phone) return true;
-      return false;
+      if (leadId && leadUserIds.has(leadId)) matched = true;
+      if (!matched) {
+        const leadPhone = getTodoLeadPhoneMemo(t);
+        if (leadPhone && lead.phone && leadPhone === lead.phone) matched = true;
+        if (leadId && lead.phone && leadId === lead.phone) matched = true;
+      }
+      if (!matched) return false;
+      // Dedup by title — server already deduplicates, but guard here too
+      const key = `${t.title}|${t.description || ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
   }, [todos, getTodoLeadIdMemo, getTodoLeadPhoneMemo]);
 
