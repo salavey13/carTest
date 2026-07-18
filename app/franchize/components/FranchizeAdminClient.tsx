@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Loading } from "@/components/Loading";
 import { useAppContext } from "@/contexts/AppContext";
+import { useTheme } from "next-themes";
 import { getEditableVehiclesForUser } from "@/app/rentals/actions";
 import {
   getFranchizeOrderNotificationFailures,
@@ -379,11 +380,18 @@ export function FranchizeAdminClient({
     }
   }, [vinAudit.missing, loadFleet]);
 
+  const { theme: globalTheme } = useTheme();
+  const isLightMode = globalTheme === "light";
+  // Resolve palette: use light palette when global theme is light AND crew has a light palette
+  const resolvedPalette = (isLightMode && crew.theme.palettes?.light)
+    ? crew.theme.palettes.light
+    : crew.theme.palette;
+
   const surface = crewPaletteForSurface(crew.theme);
   const buttonFocus = focusRingOutlineStyle(crew.theme);
   const accentOn = readablePaletteTextOnColor(
-    crew.theme.palette.accentMain,
-    crew.theme.palette,
+    resolvedPalette.accentMain,
+    resolvedPalette,
   );
 
   if (isLoading) return <Loading text="Загружаем гараж экипажа..." />;
@@ -392,12 +400,12 @@ export function FranchizeAdminClient({
     <div
       className="space-y-4"
       style={{
-        ["--fr-admin-accent" as string]: crew.theme.palette.accentMain,
+        ["--fr-admin-accent" as string]: resolvedPalette.accentMain,
         ["--fr-admin-accent-hover" as string]:
-          crew.theme.palette.accentMainHover,
-        ["--fr-admin-border" as string]: crew.theme.palette.borderSoft,
-        ["--fr-admin-text" as string]: crew.theme.palette.textPrimary,
-        ["--fr-admin-muted" as string]: crew.theme.palette.textSecondary,
+          resolvedPalette.accentMainHover || resolvedPalette.accentMain,
+        ["--fr-admin-border" as string]: resolvedPalette.borderSoft,
+        ["--fr-admin-text" as string]: resolvedPalette.textPrimary,
+        ["--fr-admin-muted" as string]: resolvedPalette.textSecondary,
       }}
     >
       <p className="text-xs font-medium tracking-wide text-[var(--fr-admin-accent)]">
