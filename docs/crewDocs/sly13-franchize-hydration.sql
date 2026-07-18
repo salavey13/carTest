@@ -24,7 +24,7 @@ values (
   '6be3846b-f350-4558-a6c3-44b43b6760de',
   'SLY13 CYBERVIBE',
   'Создаю экипажи с нуля. Цифровые витрины, AI-операторы, обучение локальных админов. Превращаю бумажный бизнес в онлайн-систему.',
-  'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/a7f27e4d-81ba-464a-a8e5-7a75cd0f6c00-ac3bac18-2adc-4c94-bada-2c2f0805fde4.jpg',
+  'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg',
   '356282674',
   'sly13',
   '56.3269,44.0059',
