@@ -3,12 +3,14 @@
 import { motion } from "framer-motion";
 import { Zap, Shield, Headphones } from "lucide-react";
 import type { FranchizeCrewVM } from "../../actions";
+import { useResolvedPalette } from "../../lib/useResolvedPalette";
 
 interface TrustBadgesProps {
   crew: FranchizeCrewVM;
 }
 
 export function TrustBadges({ crew }: TrustBadgesProps) {
+  const palette = useResolvedPalette(crew.theme);
   const badges = [
     { Icon: Zap, label: "Быстрое оформление" },
     { Icon: Shield, label: "Без скрытых платежей" },
@@ -27,11 +29,11 @@ export function TrustBadges({ crew }: TrustBadgesProps) {
         >
           <badge.Icon
             className="h-4 w-4"
-            style={{ color: crew.theme.palette.accentMain }}
+            style={{ color: palette.accentMain }}
           />
           <span
             className="text-[11px] text-center"
-            style={{ color: crew.theme.palette.textSecondary }}
+            style={{ color: palette.textSecondary }}
           >
             {badge.label}
           </span>

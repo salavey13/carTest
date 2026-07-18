@@ -1,7 +1,7 @@
 "use client";
 
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useRef, useMemo } from "react";
+import { useRef } from "react";
 
 export interface VirtualListOptions {
   itemHeight: number;
@@ -24,11 +24,9 @@ export function useVirtualList<T>(
     scrollMargin: 0,
   });
 
-  const virtualItems = useMemo(() => virtualizer.getVirtualItems(), [virtualizer]);
-
   return {
     parentRef,
-    virtualItems,
+    virtualItems: virtualizer.getVirtualItems(),
     totalHeight: virtualizer.getTotalSize(),
     scrollToIndex: virtualizer.scrollToIndex,
   };
@@ -52,11 +50,9 @@ export function useVirtualGrid<T>(
     horizontal: false,
   });
 
-  const virtualRows = useMemo(() => virtualizer.getVirtualItems(), [virtualizer]);
-
   return {
     parentRef,
-    virtualRows,
+    virtualRows: virtualizer.getVirtualItems(),
     totalHeight: virtualizer.getTotalSize(),
     scrollToIndex: virtualizer.scrollToIndex,
   };

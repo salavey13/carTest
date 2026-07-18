@@ -16,6 +16,7 @@
 "use client";
 
 import { useMemo, type CSSProperties } from "react";
+import { useTheme } from "next-themes";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import {
@@ -81,27 +82,24 @@ export type CrewTokens = {
   };
 };
 
-function resolvePalette(theme: FranchizeTheme) {
+function resolvePalette(theme: FranchizeTheme, globalTheme: string | undefined) {
   if (theme.isAuto) {
+    // Auto mode uses CSS vars that respond to live device/global theme
     return theme.palettes?.light || theme.palettes?.dark || theme.palette;
   }
-  if (theme.mode === "light" && theme.palettes?.light) {
+  // Respect global theme toggle even for non-auto crews:
+  // if user switched to "light" and crew has a light palette, use it.
+  if ((globalTheme === "light" || theme.mode === "light") && theme.palettes?.light) {
     return theme.palettes.light;
   }
   return theme.palettes?.dark || theme.palette;
 }
 
-function detectIsLight(theme: FranchizeTheme, palette: ReturnType<typeof resolvePalette>): boolean {
+function detectIsLight(theme: FranchizeTheme, globalTheme: string | undefined): boolean {
   if (theme.isAuto) {
-    // We can't know the live device preference at hook time without
-    // reading the DOM, so callers that need this should prefer
-    // CSS variables for layout. For token resolution we assume the
-    // palette is the "neutral" one and let CSS-var usage drive the
-    // actual rendering. In practice, components that care about light
-    // vs dark use `isAuto` and feed CSS variables through styles.
-    return false;
+    return globalTheme === "light";
   }
-  return theme.mode === "light";
+  return (globalTheme === "light") || theme.mode === "light";
 }
 
 /**
@@ -115,12 +113,13 @@ function detectIsLight(theme: FranchizeTheme, palette: ReturnType<typeof resolve
  */
 export function useCrewTokens(theme: FranchizeTheme): CrewTokens {
   useFranchizeTheme(theme);
-  const palette = resolvePalette(theme);
+  const { theme: globalTheme } = useTheme();
+  const palette = resolvePalette(theme, globalTheme);
   // Normalize undefined → false for downstream consumers. The `useFranchizeTheme`
   // hook sometimes returns `isAuto: undefined` during SSR before the
   // ThemeProvider hydrates.
   const isAuto = Boolean(theme.isAuto);
-  const isLight = detectIsLight(theme, palette);
+  const isLight = detectIsLight(theme, globalTheme);
 
   return useMemo<CrewTokens>(() => {
     const accent = isAuto

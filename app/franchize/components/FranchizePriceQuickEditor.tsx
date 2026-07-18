@@ -9,11 +9,12 @@ import { Input } from "@/components/ui/input";
 import { useAppContext } from "@/contexts/AppContext";
 import { type FranchizeCrewVM } from "@/app/franchize/actions";
 import {
-  crewPaletteForSurface,
   focusRingOutlineStyle,
   readablePaletteTextOnColor,
   withAlpha,
 } from "@/app/franchize/lib/theme";
+import { useResolvedPalette } from "@/app/franchize/lib/useResolvedPalette";
+import { fallbackCrew } from "@/app/franchize/lib/fallback-crew";
 import { getEditableVehiclesForUser } from "@/app/rentals/actions";
 import type { Database } from "@/types/database.types";
 import { FranchizeOperatorLinkButton, FranchizeOperatorPanel } from "./FranchizeOperatorSurface";
@@ -78,6 +79,7 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
 
   const slug = initialSlug?.trim() || "vip-bike";
   const crew = initialCrew;
+  const palette = useResolvedPalette(crew?.theme ?? fallbackCrew.theme);
 
   const loadFleet = useCallback(async () => {
     if (!dbUser?.user_id) return;
@@ -267,9 +269,8 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
     });
   }, []);
 
-  const surface = crewPaletteForSurface(crew.theme);
   const buttonFocus = focusRingOutlineStyle(crew.theme);
-  const accentOn = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
+  const accentOn = readablePaletteTextOnColor(palette.accentMain, palette);
 
   if (isLoading) return <Loading text="Загружаем быстрый прайс-редактор..." />;
 
@@ -277,10 +278,10 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
     <div
       className="space-y-4"
       style={{
-        ["--fr-admin-accent" as string]: crew.theme.palette.accentMain,
-        ["--fr-admin-text" as string]: crew.theme.palette.textPrimary,
-        ["--fr-admin-muted" as string]: crew.theme.palette.textSecondary,
-        ["--fr-admin-border" as string]: crew.theme.palette.borderSoft,
+        ["--fr-admin-accent" as string]: palette.accentMain,
+        ["--fr-admin-text" as string]: palette.textPrimary,
+        ["--fr-admin-muted" as string]: palette.textSecondary,
+        ["--fr-admin-border" as string]: palette.borderSoft,
       }}
     >
       <p className="text-xs font-medium tracking-wide text-[var(--fr-admin-accent)]">Операторская подстраница</p>
@@ -360,7 +361,7 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
               className="rounded-xl border overflow-hidden"
               style={{
                 borderColor: "var(--fr-admin-border)",
-                backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.04),
+                backgroundColor: withAlpha(palette.accentMain, 0.04),
               }}
             >
               {/* Header - always visible */}
@@ -389,7 +390,7 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
                       className="h-8 px-3"
                       onClick={() => void handleSave(vehicle)}
                       disabled={savingId === vehicle.id}
-                      style={{ ...buttonFocus, backgroundColor: crew.theme.palette.accentMain, color: accentOn }}
+                      style={{ ...buttonFocus, backgroundColor: palette.accentMain, color: accentOn }}
                     >
                       {savingId === vehicle.id ? "..." : "Сохранить"}
                     </Button>
@@ -580,7 +581,7 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
         <FranchizeOperatorLinkButton href={`/franchize/${slug}/admin`} variant="secondary">
           ← Назад в админку
         </FranchizeOperatorLinkButton>
-        <Button asChild variant="outline" className="h-9" style={{ borderColor: "var(--fr-admin-border)", backgroundColor: surface.page.backgroundColor }}>
+        <Button asChild variant="outline" className="h-9" style={{ borderColor: "var(--fr-admin-border)", backgroundColor: palette.bgBase }}>
           <Link href={`/franchize/${slug}`}>Открыть витрину</Link>
         </Button>
       </div>

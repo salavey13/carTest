@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useTheme } from "next-themes";
 
 import {
   getFranchizeCloserIntents,
@@ -13,6 +14,7 @@ import {
   readablePaletteTextOnColor,
   withAlpha,
 } from "@/app/franchize/lib/theme";
+import { fallbackCrew } from "@/app/franchize/lib/fallback-crew";
 import { Loading } from "@/components/Loading";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
@@ -34,59 +36,6 @@ const closerActionLabels = {
 } as const;
 
 type CloserAction = keyof typeof closerActionLabels;
-
-const fallbackCrew: FranchizeCrewVM = {
-  id: "",
-  slug: "vip-bike",
-  name: "VIP BIKE",
-  description: "Панель обработки заявок экипажа",
-  logoUrl: "",
-  hqLocation: "",
-  isFound: false,
-  theme: {
-    mode: "pepperolli_dark",
-    palette: {
-      bgBase: "#0B0C10",
-      bgCard: "#111217",
-      accentMain: "#D99A00",
-      accentMainHover: "#E2A812",
-      textPrimary: "#F2F2F3",
-      textSecondary: "#A7ABB4",
-      borderSoft: "#24262E",
-    },
-  },
-  header: {
-    brandName: "VIP BIKE",
-    tagline: "Ride the vibe",
-    logoUrl: "",
-    logoHref: "",
-    menuLinks: [],
-  },
-  contacts: {
-    phone: "",
-    email: "",
-    address: "",
-    telegram: "",
-    workingHours: "",
-    map: {
-      gps: "",
-      publicTransport: "",
-      carDirections: "",
-      imageUrl: "",
-      bounds: { top: 0, bottom: 0, left: 0, right: 0 },
-    },
-  },
-  catalog: {
-    categories: [],
-    quickLinks: [],
-    tickerItems: [],
-    promoBanners: [],
-    adCards: [],
-    showcaseGroups: [],
-  },
-  ratingSummary: { average: 0, count: 0 },
-  footer: { socialLinks: [], columns: [], textColor: "#16130A" },
-};
 
 interface FranchizeCloserDashboardClientProps {
   initialSlug: string;
@@ -179,10 +128,16 @@ export function FranchizeCloserDashboardClient({
     [dbUser?.user_id, loadCloserIntents, slug],
   );
 
+  const { theme: globalTheme } = useTheme();
+  const isLightMode = globalTheme === "light";
+  const resolvedPalette = (isLightMode && crew.theme.palettes?.light)
+    ? crew.theme.palettes.light
+    : crew.theme.palette;
+
   const buttonFocus = focusRingOutlineStyle(crew.theme);
   const accentOn = readablePaletteTextOnColor(
-    crew.theme.palette.accentMain,
-    crew.theme.palette,
+    resolvedPalette.accentMain,
+    resolvedPalette,
   );
   const brandName = crew.header.brandName || crew.name || slug;
 
@@ -192,7 +147,7 @@ export function FranchizeCloserDashboardClient({
       style={{
         borderColor: "var(--fr-dashboard-border)",
         backgroundColor: withAlpha(
-          crew.theme.palette.bgBase,
+          resolvedPalette.bgBase,
           0.22,
         ),
       }}
@@ -255,16 +210,34 @@ export function FranchizeCloserDashboardClient({
     [closerIntents, filterIntentType],
   );
 
+  // Memoize counts to avoid 6× re-filter on every render
+  const intentCounts = useMemo(() => {
+    let rent = 0, sale = 0, service = 0;
+    for (const i of closerIntents) {
+      if (i.intentType === "rent") rent++;
+      else if (i.intentType === "sale") sale++;
+      else if (i.intentType === "service") service++;
+    }
+    return { rent, sale, service, all: closerIntents.length };
+  }, [closerIntents]);
+
+  const filterTabs = useMemo(() => [
+    { id: null, label: `Все (${intentCounts.all})` },
+    { id: "rent", label: `Аренда (${intentCounts.rent})` },
+    { id: "sale", label: `Продажа (${intentCounts.sale})` },
+    { id: "service", label: `Сервис (${intentCounts.service})` },
+  ], [intentCounts]);
+
   if (isLoading) return <Loading text="Загружаем заявки экипажа..." />;
 
   return (
     <div
       className="space-y-4"
       style={{
-        ["--fr-dashboard-accent" as string]: crew.theme.palette.accentMain,
-        ["--fr-dashboard-border" as string]: crew.theme.palette.borderSoft,
-        ["--fr-dashboard-text" as string]: crew.theme.palette.textPrimary,
-        ["--fr-dashboard-muted" as string]: crew.theme.palette.textSecondary,
+        ["--fr-dashboard-accent" as string]: resolvedPalette.accentMain,
+        ["--fr-dashboard-border" as string]: resolvedPalette.borderSoft,
+        ["--fr-dashboard-text" as string]: resolvedPalette.textPrimary,
+        ["--fr-dashboard-muted" as string]: resolvedPalette.textSecondary,
       }}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -294,21 +267,9 @@ export function FranchizeCloserDashboardClient({
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <FranchizeOperatorStatCard
-          label="Аренда"
-          value={closerIntents.filter((i) => i.intentType === "rent").length}
-          detail="активных"
-        />
-        <FranchizeOperatorStatCard
-          label="Продажа"
-          value={closerIntents.filter((i) => i.intentType === "sale").length}
-          detail="активных"
-        />
-        <FranchizeOperatorStatCard
-          label="Сервис"
-          value={closerIntents.filter((i) => i.intentType === "service").length}
-          detail="активных"
-        />
+        <FranchizeOperatorStatCard label="Аренда" value={intentCounts.rent} detail="активных" />
+        <FranchizeOperatorStatCard label="Продажа" value={intentCounts.sale} detail="активных" />
+        <FranchizeOperatorStatCard label="Сервис" value={intentCounts.service} detail="активных" />
       </div>
       <FranchizeOperatorPanel className="mt-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -329,12 +290,7 @@ export function FranchizeCloserDashboardClient({
 
         {/* Filter tabs */}
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {[
-            { id: null, label: `Все (${closerIntents.length})` },
-            { id: "rent", label: `Аренда (${closerIntents.filter((i) => i.intentType === "rent").length})` },
-            { id: "sale", label: `Продажа (${closerIntents.filter((i) => i.intentType === "sale").length})` },
-            { id: "service", label: `Сервис (${closerIntents.filter((i) => i.intentType === "service").length})` },
-          ].map((tab) => (
+          {filterTabs.map((tab) => (
             <button
               key={String(tab.id)}
               type="button"
@@ -344,7 +300,7 @@ export function FranchizeCloserDashboardClient({
                 backgroundColor:
                   filterIntentType === tab.id
                     ? "var(--fr-dashboard-accent)"
-                    : withAlpha(crew.theme.palette.bgCard, 0.72),
+                    : withAlpha(resolvedPalette.bgCard, 0.72),
                 color:
                   filterIntentType === tab.id
                     ? accentOn
@@ -380,8 +336,8 @@ export function FranchizeCloserDashboardClient({
                       : "var(--fr-dashboard-accent)",
                   backgroundColor:
                     intent.stage === "closed"
-                      ? withAlpha(crew.theme.palette.bgCard, 0.72)
-                      : withAlpha(crew.theme.palette.accentMain, 0.07),
+                    ? withAlpha(resolvedPalette.bgCard, 0.72)
+                    : withAlpha(resolvedPalette.accentMain, 0.07),
                 }}
               >
                 <div className="grid gap-2 md:gap-3 lg:grid-cols-[minmax(0,1.15fr),minmax(0,1fr)]">

@@ -13,6 +13,7 @@ import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { useDisplayMode } from "./DisplayModeContext";
 import { useAppContext } from "@/contexts/AppContext";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
+import { useResolvedPalette } from "../lib/useResolvedPalette";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
@@ -51,7 +52,8 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   // Apply franchize theme CSS variables
   useFranchizeTheme(crew.theme);
 
-  const activePillText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
+  const palette = useResolvedPalette(crew.theme);
+  const activePillText = readablePaletteTextOnColor(palette.accentMain, palette);
   const { itemCount } = useFranchizeCart(crew.slug);
 
   // ── Logo loading state machine ──
@@ -60,7 +62,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   const [logoDissolved, setLogoDissolved] = useState(false);
 
   const logoUrl = crew.header.logoUrl;
-  const accentMain = crew.theme.palette.accentMain;
+  const accentMain = palette.accentMain;
 
   // Reset loading/dissolve state when logo URL changes
   useEffect(() => {
@@ -125,26 +127,26 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
           : "calc(max(env(safe-area-inset-top), 0px) + 1.45rem)",
         // FIX 6: isolation creates a proper stacking context for the entire header.
         isolation: "isolate",
-        borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
+        borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
         backgroundColor: crew.theme.isAuto
           ? "var(--franchize-bg-card)"
-          : withAlpha(crew.theme.palette.bgCard, 0.94),
-        color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
+          : withAlpha(palette.bgCard, 0.94),
+        color: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
         ["--crew-header-text" as string]: crew.theme.isAuto
           ? "var(--franchize-text-primary)"
-          : crew.theme.palette.textPrimary,
+          : palette.textPrimary,
         ["--crew-header-card" as string]: crew.theme.isAuto
           ? "var(--franchize-bg-card)"
-          : crew.theme.palette.bgCard,
+          : palette.bgCard,
         ["--crew-header-base" as string]: crew.theme.isAuto
           ? "var(--franchize-bg-base)"
-          : crew.theme.palette.bgBase,
+          : palette.bgBase,
         ["--crew-header-border" as string]: crew.theme.isAuto
           ? "var(--franchize-border-soft)"
-          : crew.theme.palette.borderSoft,
+          : palette.borderSoft,
         ["--crew-header-accent" as string]: crew.theme.isAuto
           ? "var(--franchize-accent-main)"
-          : crew.theme.palette.accentMain,
+          : palette.accentMain,
         ["--crew-header-accent-text" as string]: activePillText,
       }}
     >
@@ -183,8 +185,8 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             style={{
               backgroundColor: crew.theme.isAuto
                 ? "var(--franchize-bg-base)"
-                : withAlpha(crew.theme.palette.bgBase, 0.8),
-              color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
+                : withAlpha(palette.bgBase, 0.8),
+              color: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
             }}
           >
             <Menu className="h-5 w-5" />
@@ -204,7 +206,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
               className="relative h-12 w-12 min-h-12 min-w-12 overflow-hidden rounded-full border shadow-lg"
               style={{
                 borderColor: accentMain,
-                backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase,
+                backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-base)" : palette.bgBase,
               }}
             >
               {logoUrl ? (
@@ -271,15 +273,15 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
           */}
           <div className="flex items-center gap-2 justify-self-end relative z-[2] pointer-events-auto" style={{ pointerEvents: isCompact ? "none" : "auto" }}>
             <CrewButtonErrorBoundary
-              bgColor={crew.theme.isAuto ? "var(--franchize-bg-base)" : withAlpha(crew.theme.palette.bgBase, 0.8)}
-              textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
-              borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}
+              bgColor={crew.theme.isAuto ? "var(--franchize-bg-base)" : withAlpha(palette.bgBase, 0.8)}
+              textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary}
+              borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}
               resetKey={pathname}
             >
               <FranchizeProfileButton
-                bgColor={crew.theme.isAuto ? "var(--franchize-bg-base)" : withAlpha(crew.theme.palette.bgBase, 0.8)}
-                textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
-                borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}
+                bgColor={crew.theme.isAuto ? "var(--franchize-bg-base)" : withAlpha(palette.bgBase, 0.8)}
+                textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary}
+                borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}
                 currentSlug={crew.slug}
                 telegramBotUsername={crew.contacts.telegramBotUsername}
               />
@@ -289,9 +291,9 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                 slug={crew.slug}
                 href={`/franchize/${crew.slug}/cart`}
                 items={items}
-                accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain}
-                textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
-                borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}
+                accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain}
+                textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary}
+                borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}
                 theme={crew.theme}
                 mode="inline-icon"
                 className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl no-underline"
@@ -304,7 +306,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
       {showRail && (
         <div
           className="-mx-4 mt-1 border-t px-4 pt-2"
-          style={{ borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft }}
+          style={{ borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft }}
         >
           <div className="mx-auto flex w-full max-w-7xl gap-2 pb-1" role="tablist" aria-label="Режим отображения каталога">
             {([
@@ -334,11 +336,11 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                   className="shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 select-none disabled:opacity-50 active:scale-95"
                   style={{
                     backgroundColor: isActive
-                      ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain)
-                      : (crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard),
+                      ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain)
+                      : (crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard),
                     color: isActive
                       ? activePillText
-                      : (crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary),
+                      : (crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary),
                     transform: isActive ? "scale(1.05)" : "scale(1)",
                   }}
                 >

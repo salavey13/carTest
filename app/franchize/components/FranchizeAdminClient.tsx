@@ -19,11 +19,11 @@ import {
   type RentalReviewVM,
 } from "@/app/franchize/actions";
 import {
-  crewPaletteForSurface,
   focusRingOutlineStyle,
   readablePaletteTextOnColor,
   withAlpha,
 } from "@/app/franchize/lib/theme";
+import { fallbackCrew } from "@/app/franchize/lib/fallback-crew";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
 import {
   Select,
@@ -114,60 +114,6 @@ const buildSyntheticVin = (vehicle: Vehicle) => {
     .join("");
   return (normalized + "CARTESTVIN00000000").slice(0, 17);
 };
-
-const fallbackCrew = {
-  id: "",
-  slug: "vip-bike",
-  name: "VIP BIKE",
-  description: "Crew admin panel",
-  logoUrl: "",
-  hqLocation: "",
-  isFound: false,
-  theme: {
-    mode: "pepperolli_dark",
-    palette: {
-      bgBase: "#0B0C10",
-      bgCard: "#111217",
-      accentMain: "#D99A00",
-      accentMainHover: "#E2A812",
-      textPrimary: "#F2F2F3",
-      textSecondary: "#A7ABB4",
-      borderSoft: "#24262E",
-    },
-  },
-  header: {
-    brandName: "VIP BIKE",
-    tagline: "Ride the vibe",
-    logoUrl: "",
-    logoHref: "",
-    menuLinks: [],
-  },
-  contacts: {
-    phone: "",
-    email: "",
-    address: "",
-    telegram: "",
-    telegramBotUsername: "",
-    workingHours: "",
-    map: {
-      gps: "",
-      publicTransport: "",
-      carDirections: "",
-      imageUrl: "",
-      bounds: { top: 0, bottom: 0, left: 0, right: 0 },
-    },
-  },
-  catalog: {
-    categories: [],
-    quickLinks: [],
-    tickerItems: [],
-    promoBanners: [],
-    adCards: [],
-    showcaseGroups: [],
-  },
-  ratingSummary: { average: 0, count: 0 },
-  footer: { socialLinks: [], columns: [], textColor: "#16130A" },
-} as unknown as FranchizeCrewVM;
 
 interface FranchizeAdminClientProps {
   initialSlug: string;
@@ -387,7 +333,6 @@ export function FranchizeAdminClient({
     ? crew.theme.palettes.light
     : crew.theme.palette;
 
-  const surface = crewPaletteForSurface(crew.theme);
   const buttonFocus = focusRingOutlineStyle(crew.theme);
   const accentOn = readablePaletteTextOnColor(
     resolvedPalette.accentMain,
@@ -484,7 +429,7 @@ export function FranchizeAdminClient({
           className="mt-2 rounded-xl border px-3 py-2"
           style={{
             borderColor: "var(--fr-admin-border)",
-            backgroundColor: withAlpha(crew.theme.palette.accentMain, 0.08),
+            backgroundColor: withAlpha(resolvedPalette.accentMain, 0.08),
           }}
         >
           <p className="text-xs text-[var(--fr-admin-text)]">
@@ -566,7 +511,7 @@ export function FranchizeAdminClient({
                     className="w-fit rounded-full border px-2 py-1 text-xs font-semibold text-[var(--fr-admin-text)]"
                     style={{
                       borderColor: "var(--fr-admin-border)",
-                      backgroundColor: withAlpha(crew.theme.palette.accentMain, rental.contractStatus === "verified" ? 0.16 : 0.06),
+                      backgroundColor: withAlpha(resolvedPalette.accentMain, rental.contractStatus === "verified" ? 0.16 : 0.06),
                     }}
                   >
                     {contractStatusLabel(rental.contractStatus)}
@@ -628,7 +573,7 @@ export function FranchizeAdminClient({
               style={{
                 borderColor: "var(--fr-admin-border)",
                 color: "var(--fr-admin-text)",
-                backgroundColor: surface.page.backgroundColor,
+                backgroundColor: resolvedPalette.bgBase,
               }}
             >
               <SelectValue placeholder="Выбери запись для редактирования" />
