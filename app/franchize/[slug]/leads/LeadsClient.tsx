@@ -101,7 +101,7 @@ export function LeadsClient({
     isPasswordValidating,
     passwordAuthed,
     handlePasswordSubmit,
-  } = usePasswordGate(slug, isInTelegram);
+  } = usePasswordGate(slug, isInTelegram, dbUser?.user_id);
 
   // Todo mapping
   const { getTodosForLead } = useTodosMapping(todos);

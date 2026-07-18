@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { localImageSrc } from "@/lib/image-fallback";
 import { HeaderMenu } from "../modals/HeaderMenu";
@@ -42,7 +42,9 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   const pathname = usePathname();
   const { displayMode, setDisplayMode, isTransitioning } = useDisplayMode();
   const { isInTelegramContext } = useAppContext();
+  const router = useRouter();
   const mainCatalogPath = `/franchize/${crew.slug}`;
+  const isOnCatalogPage = pathname === mainCatalogPath || pathname === `${mainCatalogPath}/`;
   const headerLogoHref = crew.header.logoHref || mainCatalogPath;
   const prevPathnameRef = useRef<string | null>(null);
 
@@ -309,9 +311,17 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
               { key: "rent" as const, label: "Аренда", count: items?.filter(hasRentPrice).length ?? 0 },
               { key: "sale" as const, label: "Продажа", count: items?.filter(hasSalePrice).length ?? 0 },
               { key: "service" as const, label: "Сервис", count: items?.filter(hasServicePrice).length ?? 0 },
-            ].filter((pill) => pill.count > 0 || pill.key === "rent" || pill.key === "sale")
-            ).map((pill) => {
+            ]).map((pill) => {
               const isActive = displayMode === pill.key;
+              const handlePillClick = () => {
+                if (isOnCatalogPage) {
+                  setDisplayMode(pill.key);
+                } else {
+                  // On non-catalog pages — navigate to main catalog with mode
+                  setDisplayMode(pill.key);
+                  router.push(mainCatalogPath);
+                }
+              };
               return (
                 <button
                   key={pill.key}
@@ -319,7 +329,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                   role="tab"
                   aria-selected={isActive}
                   aria-controls="catalog-sections"
-                  onClick={() => setDisplayMode(pill.key)}
+                  onClick={handlePillClick}
                   disabled={isTransitioning}
                   className="shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 select-none disabled:opacity-50 active:scale-95"
                   style={{
