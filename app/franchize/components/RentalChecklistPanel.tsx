@@ -41,7 +41,11 @@ export function RentalChecklistPanel({
   const odometerBefore = metadata?.pickup_freeze?.odometer_km || metadata?.odometer_before;
   const paymentCash = metadata?.payment_cash || metadata?.cashAmount;
   const paymentBank = metadata?.payment_bank || metadata?.bankAmount;
-  const totalCost = metadata?.total_cost || metadata?.daily_price;
+  // Sanity-safe price extraction: daily_price must be a reasonable number (100-1_000_000),
+  // not a garbage value that breaks the display or causes hydration errors.
+  // Reasonable daily upper bound: nothing in the fleet costs >200k/day.
+  const rawTotal = Number(metadata?.total_cost) || Number(metadata?.daily_price) || 0;
+  const totalCost = rawTotal > 0 && rawTotal < 200_000 ? rawTotal : null;
   const equipment = metadata?.equipment || {};
   const contractSha = metadata?.doc_sha256 || metadata?.contract_sha;
 

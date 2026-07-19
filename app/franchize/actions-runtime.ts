@@ -4744,6 +4744,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   vehicleTitle: string;
   renterId: string;
   ownerId: string;
+  agreedEndDate: string | null;
+  requestedEndDate: string | null;
   metadata: Record<string, unknown> | null;
   contractVerificationStatus: "verified" | "not_verified" | "expired";
   contractVerifierScope: string;
@@ -4766,6 +4768,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       vehicleTitle: "—",
       renterId: "",
       ownerId: "",
+      agreedEndDate: null,
+      requestedEndDate: null,
       metadata: null,
       contractVerificationStatus: "not_verified",
       contractVerifierScope: "",
@@ -4780,7 +4784,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
 
   const { data, error } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, metadata, vehicle:cars(make, model)")
+    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, agreed_end_date, requested_end_date, metadata, vehicle:cars(make, model)")
     .eq("rental_id", safeRentalId)
     .maybeSingle();
 
@@ -4795,6 +4799,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       vehicleTitle: "—",
       renterId: "",
       ownerId: "",
+      agreedEndDate: null,
+      requestedEndDate: null,
       metadata: null,
       contractVerificationStatus: "not_verified",
       contractVerifierScope: "",
@@ -4832,6 +4838,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     vehicleTitle: `${vehicle?.make ?? "Vehicle"} ${vehicle?.model ?? ""}`.trim(),
     renterId: data.user_id ?? "",
     ownerId: data.owner_id ?? "",
+    agreedEndDate: data.agreed_end_date || null,
+    requestedEndDate: data.requested_end_date || null,
     metadata,
     contractVerificationStatus,
     contractVerifierScope: typeof verifier?.scope === "string" ? verifier.scope : "",

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
 import { CrewFooter } from "../../../components/CrewFooter";
+import { FranchizeErrorBoundary } from "../../../components/ErrorBoundary";
 import { FranchizeRentalLifecycleActions } from "../../../components/FranchizeRentalLifecycleActions";
 import { FranchizePageShell } from "../../../components/FranchizePageShell";
 import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRentalDocumentsPanel";
@@ -14,6 +15,7 @@ import { RentalTelegramGuard } from "../../../components/RentalTelegramGuard";
 import { getTelegramWebAppPageHref } from "../../../lib/telegram-links";
 import { crewPaletteForSurface, readablePaletteTextOnColor } from "../../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../../metadata";
+import { formatRuDate } from "../../../lib/date-utils";
 
 interface FranchizeRentalPageProps {
   params: Promise<{ slug: string; id: string }>;
@@ -97,6 +99,13 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
   };
   const hintText = rental.found ? (statusHint[status] || "") : "Сделка не найдена. Проверьте ссылку или вернитесь в каталог.";
 
+  // ── Stale rental detection ──
+  // If the rental is "active" but the agreed/requested end date has passed,
+  // show a warning banner prompting the operator to mark it as completed.
+  const endDateStr = rental.agreedEndDate || rental.requestedEndDate;
+  const endDate = endDateStr ? Date.parse(endDateStr) : Number.NaN;
+  const isStale = status === "active" && !Number.isNaN(endDate) && endDate < Date.now();
+
   return (
     <main className="min-h-screen" style={surface.page}>
       <CrewHeader
@@ -106,6 +115,37 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
       />
 
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6">
+        {/* Top-level error boundary: if any client component crashes during hydration,
+            the CrewHeader + navigation stays interactive while this section degrades gracefully. */}
+        <FranchizeErrorBoundary
+          fallbackTitle="Блок аренды временно недоступен"
+          fallbackMessage="Что-то пошло не так при загрузке карточки. Попробуйте перезагрузить страницу или вернуться в профиль."
+          fallbackHref={catalogHref}
+          fallbackLinkLabel="В каталог"
+        >
+        {/* Stale rental warning */}
+        {isStale && (
+          <div
+            className="rounded-3xl border-2 p-4 text-sm"
+            style={{
+              borderColor: "#ef4444",
+              backgroundColor: "#ef444410",
+              color: textPrimary,
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <span className="text-lg shrink-0 mt-0.5">⚠️</span>
+              <div>
+                <p className="font-semibold" style={{ color: "#ef4444" }}>Аренда просрочена</p>
+                <p className="mt-1 opacity-80">
+                  Дата возврата ({formatRuDate(new Date(endDate))}) уже прошла, но статус всё ещё «Активна».
+                  Закройте аренду вручную — переведите в «Завершена» или «Просрочена».
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Compact page header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -442,6 +482,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             )}
           </div>
 
+          <FranchizeErrorBoundary fallbackTitle="Документы временно недоступны" fallbackMessage="Попробуйте перезагрузить.">
           <FranchizeRentalDocumentsPanel
             rentalId={rental.rentalId}
             ownerId={rental.ownerId}
@@ -451,7 +492,9 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             palette={p}
             isAuto={isAuto}
           />
+          </FranchizeErrorBoundary>
 
+          <FranchizeErrorBoundary fallbackTitle="Действия временно недоступны" fallbackMessage="Попробуйте перезагрузить.">
           <FranchizeRentalLifecycleActions
             rentalId={rental.rentalId}
             ownerId={rental.ownerId}
@@ -463,6 +506,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             palette={p}
             isAuto={isAuto}
           />
+          </FranchizeErrorBoundary>
 
           {/* Telegram fallback link */}
           <RentalTelegramGuard>
@@ -487,6 +531,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             </div>
           </RentalTelegramGuard>
         </section>
+        </FranchizeErrorBoundary>
       </FranchizePageShell>
 
       <CrewFooter crew={crew} />
