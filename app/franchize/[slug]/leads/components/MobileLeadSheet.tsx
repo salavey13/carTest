@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 
@@ -58,10 +58,10 @@ export function MobileLeadSheet({ open, onClose, children, T }: MobileLeadSheetP
             onClick={onClose}
           />
 
-          {/* Sheet */}
+          {/* Sheet — drag="y" on the outer shell, content scrolls independently */}
           <motion.div
             key="lead-sheet"
-            className="relative w-full rounded-t-3xl border-t shadow-2xl overflow-y-auto"
+            className="relative w-full rounded-t-3xl border-t shadow-2xl flex flex-col"
             style={{
               maxHeight: `${SHEET_HEIGHT * 100}vh`,
               backgroundColor: T.bgCard,
@@ -72,14 +72,17 @@ export function MobileLeadSheet({ open, onClose, children, T }: MobileLeadSheetP
             animate="visible"
             exit="exit"
             drag="y"
-            dragConstraints={{ top: 0, bottom: 120 }}
+            dragConstraints={{ top: 0, bottom: 80 }}
             dragElastic={{ top: 0, bottom: 0.3 }}
             onDragEnd={(_event, info) => {
               if (info.offset.y > 80) onClose();
             }}
           >
-            {/* Drag handle */}
-            <div className="sticky top-0 z-10 flex items-center justify-center pt-3 pb-2" style={{ backgroundColor: T.bgCard }}>
+            {/* Drag handle header — sticky, clickable X */}
+            <div
+              className="sticky top-0 z-10 shrink-0 flex items-center justify-center pt-3 pb-2"
+              style={{ backgroundColor: T.bgCard }}
+            >
               <motion.div
                 className="h-1.5 w-10 rounded-full"
                 style={{ backgroundColor: T.borderSoft }}
@@ -95,8 +98,19 @@ export function MobileLeadSheet({ open, onClose, children, T }: MobileLeadSheetP
               </button>
             </div>
 
-            {/* Content */}
-            <div className="px-4 pb-8">{children}</div>
+            {/* Scrollable content area — separate from drag */}
+            <div
+              className="overflow-y-auto px-4"
+              style={{
+                maxHeight: `calc(${SHEET_HEIGHT * 100}vh - 48px)`,
+                WebkitOverflowScrolling: "touch",
+                overscrollBehavior: "contain",
+              }}
+            >
+              <div className="pb-[calc(env(safe-area-inset-bottom,_16px)+16px)]">
+                {children}
+              </div>
+            </div>
           </motion.div>
         </div>
       )}

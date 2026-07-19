@@ -33,10 +33,32 @@ const freezeChecklistOptions = [
 export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metadata, palette, isAuto = false }: FranchizeRentalDocumentsPanelProps) {
   const { dbUser } = useAppContext();
 
-  // Resolve themed values — CSS vars for auto, palette for manual themes
-  const inputBg = isAuto ? "var(--franchize-bg-card)" : palette.bgCard;
-  const inputText = isAuto ? "var(--franchize-text-primary)" : palette.textPrimary;
-  const inputBorder = isAuto ? "var(--franchize-border-soft)" : palette.borderSoft;
+  // All themed values — CSS vars for auto, palette values for manual themes
+  const theme = useMemo(() => {
+    if (isAuto) {
+      return {
+        bgCard: "color-mix(in srgb, var(--franchize-bg-card) 80%, transparent)",
+        textPrimary: "var(--franchize-text-primary)",
+        textSecondary: "var(--franchize-text-secondary)",
+        borderSoft: "var(--franchize-border-soft)",
+        accentMain: "var(--franchize-accent-main)",
+        inputBg: "var(--franchize-bg-card)",
+        inputText: "var(--franchize-text-primary)",
+        inputBorder: "var(--franchize-border-soft)",
+      };
+    }
+    return {
+      bgCard: `${palette.bgCard}CC`,
+      textPrimary: palette.textPrimary,
+      textSecondary: palette.textSecondary,
+      borderSoft: palette.borderSoft,
+      accentMain: palette.accentMain,
+      inputBg: palette.bgCard,
+      inputText: palette.textPrimary,
+      inputBorder: palette.borderSoft,
+    };
+  }, [isAuto, palette]);
+
   const [isPending, startTransition] = useTransition();
   const [odometerKm, setOdometerKm] = useState("45000");
   const [fuelLevel, setFuelLevel] = useState("4/5");
@@ -96,32 +118,32 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
   return (
     <section
       className="mt-4 rounded-2xl border p-4"
-      style={{ borderColor: palette.borderSoft, backgroundColor: `${palette.bgCard}CC` }}
+      style={{ borderColor: theme.borderSoft, backgroundColor: theme.bgCard }}
     >
-      <p className="text-xs uppercase tracking-[0.16em]" style={{ color: palette.textSecondary }}>
+      <p className="text-xs uppercase tracking-[0.16em]" style={{ color: theme.textSecondary }}>
         Документы аренды
       </p>
-      <h3 className="mt-1 text-base font-semibold" style={{ color: palette.textPrimary }}>
+      <h3 className="mt-1 text-base font-semibold" style={{ color: theme.textPrimary }}>
         Фиксация выдачи и повреждений
       </h3>
 
-      <div className="mt-3 rounded-xl border p-3" style={{ borderColor: palette.borderSoft }}>
-        <p className="text-sm font-medium">Фиксация выдачи</p>
+      <div className="mt-3 rounded-xl border p-3" style={{ borderColor: theme.borderSoft }}>
+        <p className="text-sm font-medium" style={{ color: theme.textPrimary }}>Фиксация выдачи</p>
         {pickupFreeze?.frozen_at ? (
-          <div className="mt-2 space-y-1 text-xs" style={{ color: palette.textSecondary }}>
+          <div className="mt-2 space-y-1 text-xs" style={{ color: theme.textSecondary }}>
             <p>Статус: зафиксировано {new Date(pickupFreeze.frozen_at).toLocaleString("ru-RU")}</p>
             <p>Пробег: {pickupFreeze.odometer_km ?? "—"} км · Топливо: {pickupFreeze.fuel_level ?? "—"}</p>
             <p>Чеклист: {(pickupFreeze.checklist || []).join(", ") || "—"}</p>
           </div>
         ) : (
-          <p className="mt-2 text-xs" style={{ color: palette.textSecondary }}>Выдача пока не зафиксирована.</p>
+          <p className="mt-2 text-xs" style={{ color: theme.textSecondary }}>Выдача пока не зафиксирована.</p>
         )}
 
         {canFreeze && (
           <div className="mt-3 space-y-2 text-sm">
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className="rounded-lg border px-2 py-1.5" style={{ borderColor: inputBorder, backgroundColor: inputBg, color: inputText }} value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} placeholder="Пробег, км" />
-              <input className="rounded-lg border px-2 py-1.5" style={{ borderColor: inputBorder, backgroundColor: inputBg, color: inputText }} value={fuelLevel} onChange={(e) => setFuelLevel(e.target.value)} placeholder="Топливо (например 4/5)" />
+              <input className="rounded-lg border px-2 py-1.5" style={{ borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.inputText }} value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} placeholder="Пробег, км" />
+              <input className="rounded-lg border px-2 py-1.5" style={{ borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.inputText }} value={fuelLevel} onChange={(e) => setFuelLevel(e.target.value)} placeholder="Топливо (например 4/5)" />
             </div>
             <div className="flex flex-wrap gap-2">
               {freezeChecklistOptions.map((item) => (
@@ -130,20 +152,20 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
                   type="button"
                   onClick={() => toggleChecklist(item)}
                   className="rounded-full border px-2 py-1 text-xs"
-                  style={{ borderColor: checklist.includes(item) ? palette.accentMain : palette.borderSoft, color: checklist.includes(item) ? palette.accentMain : palette.textSecondary }}
+                  style={{ borderColor: checklist.includes(item) ? theme.accentMain : theme.borderSoft, color: checklist.includes(item) ? theme.accentMain : theme.textSecondary }}
                 >
                   {checklist.includes(item) ? "✓ " : ""}
                   {item}
                 </button>
               ))}
             </div>
-            <textarea className="min-h-16 w-full rounded-lg border px-2 py-1.5" style={{ borderColor: inputBorder, backgroundColor: inputBg, color: inputText }} value={freezeNotes} onChange={(e) => setFreezeNotes(e.target.value)} placeholder="Комментарий к выдаче (опционально)" />
+            <textarea className="min-h-16 w-full rounded-lg border px-2 py-1.5" style={{ borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.inputText }} value={freezeNotes} onChange={(e) => setFreezeNotes(e.target.value)} placeholder="Комментарий к выдаче (опционально)" />
             <button
               type="button"
               disabled={isPending}
               onClick={onSaveFreeze}
               className="rounded-lg px-3 py-2 text-sm font-semibold"
-              style={{ backgroundColor: palette.accentMain, color: "#16130A" }}
+              style={{ backgroundColor: theme.accentMain, color: "#16130A" }}
             >
               {isPending ? "Сохраняем..." : "Сохранить выдачу"}
             </button>
@@ -151,40 +173,40 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
         )}
       </div>
 
-      <div className="mt-3 rounded-xl border p-3" style={{ borderColor: palette.borderSoft }}>
-        <p className="text-sm font-medium">Отчёты о повреждениях ({damageReports.length})</p>
+      <div className="mt-3 rounded-xl border p-3" style={{ borderColor: theme.borderSoft }}>
+        <p className="text-sm font-medium" style={{ color: theme.textPrimary }}>Отчёты о повреждениях ({damageReports.length})</p>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          <select className="rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: inputBorder, backgroundColor: inputBg, color: inputText }} value={damagePhase} onChange={(e) => setDamagePhase(e.target.value as "pickup" | "return")}>
+          <select className="rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.inputText }} value={damagePhase} onChange={(e) => setDamagePhase(e.target.value as "pickup" | "return")}>
             <option value="pickup">На выдаче</option>
             <option value="return">На возврате</option>
           </select>
-          <select className="rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: inputBorder, backgroundColor: inputBg, color: inputText }} value={damageSeverity} onChange={(e) => setDamageSeverity(e.target.value as "minor" | "major")}>
+          <select className="rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.inputText }} value={damageSeverity} onChange={(e) => setDamageSeverity(e.target.value as "minor" | "major")}>
             <option value="minor">Лёгкое</option>
             <option value="major">Серьёзное</option>
           </select>
         </div>
-        <textarea className="mt-2 min-h-16 w-full rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: inputBorder, backgroundColor: inputBg, color: inputText }} value={damageNotes} onChange={(e) => setDamageNotes(e.target.value)} placeholder="Описание повреждения / замечания" />
+        <textarea className="mt-2 min-h-16 w-full rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.inputText }} value={damageNotes} onChange={(e) => setDamageNotes(e.target.value)} placeholder="Описание повреждения / замечания" />
         <button
           type="button"
           disabled={isPending}
           onClick={onAddDamageReport}
           className="mt-2 rounded-lg border px-3 py-2 text-sm"
-          style={{ borderColor: palette.borderSoft, color: palette.textPrimary }}
+          style={{ borderColor: theme.borderSoft, color: theme.textPrimary }}
         >
           Добавить отчёт
         </button>
 
-        <ul className="mt-3 space-y-2 text-xs" style={{ color: palette.textSecondary }}>
+        <ul className="mt-3 space-y-2 text-xs" style={{ color: theme.textSecondary }}>
           {damageReports.slice(0, 5).map((report: any) => (
-            <li key={report.report_id || `${report.reported_at}-${report.notes}`} className="rounded-lg border p-2" style={{ borderColor: palette.borderSoft }}>
-              <p className="font-medium" style={{ color: palette.textPrimary }}>
+            <li key={report.report_id || `${report.reported_at}-${report.notes}`} className="rounded-lg border p-2" style={{ borderColor: theme.borderSoft }}>
+              <p className="font-medium" style={{ color: theme.textPrimary }}>
                 {report.phase === "pickup" ? "Выдача" : "Возврат"} · {report.severity}
               </p>
               <p>{report.notes}</p>
               <p>{report.reporter_role || "пользователь"} · {report.reported_at ? new Date(report.reported_at).toLocaleString("ru-RU") : "—"}</p>
             </li>
           ))}
-          {damageReports.length === 0 && <li>Отчётов о повреждениях пока нет.</li>}
+          {damageReports.length === 0 && <li style={{ color: theme.textSecondary }}>Отчётов о повреждениях пока нет.</li>}
         </ul>
       </div>
     </section>
