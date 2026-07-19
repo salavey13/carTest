@@ -207,7 +207,7 @@ export function FranchizeRentalLifecycleActions({
         )}
       </div>
 
-      {role === "guest" && <p className="mt-3 text-xs text-[var(--lifecycle-muted)]">Действия доступны владельцу или арендатору этой сделки.</p>}
+      {role === "guest" && <p className="mt-3 text-xs text-[var(--lifecycle-muted)]">Действия доступны владельцу, арендатору или участнику экипажа.</p>}
       {pickupActionBlockedByFreeze && (
         <p className="mt-3 text-xs text-[var(--lifecycle-muted)]">
           Подтверждение выдачи будет доступно после сохранения выдачи в документах аренды.

@@ -26,16 +26,11 @@ interface LeadListProps {
 const ITEM_HEIGHT = 128;
 
 const cardVariants = {
-  hidden: { opacity: 0, y: 12, scale: 0.97 },
+  hidden: { opacity: 0 },
   visible: (i: number) => ({
     opacity: 1,
-    y: 0,
-    scale: 1,
     transition: {
-      type: "spring",
-      damping: 24,
-      stiffness: 260,
-      mass: 0.6,
+      duration: 0.2,
       delay: Math.min(i * 0.025, 0.12),
     },
   }),
