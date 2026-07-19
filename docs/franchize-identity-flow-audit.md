@@ -1,0 +1,258 @@
+# Franchize identity-flow audit
+
+Date: 2026-07-19
+
+## 1. Executive summary
+
+The current system does not have one stable lead/renter key. It reuses several fields as identity keys at different lifecycle stages:
+
+- `rentals.user_id` starts as the crew owner/operator placeholder, then should become the real renter after QR claim.
+- `private.rental_contract_artifacts.telegram_chat_id` is written as the operator chat id by `/doc-manual`, then should become the renter chat id after QR claim.
+- `private.user_rental_secrets.chat_id` is intentionally `NULL` for operator-created contracts, then becomes the renter chat id when claimed.
+- `franchize_intents.telegram_user_id` may be the renter chat id, a phone-derived synthetic user id, or the operator id depending on whether `clientPhone` exists and which flow wrote it.
+- `crew_todos.lead_id`, `crew_todos.user_id`, `crew_todos.phone`, and `crew_todos.description` all store overlapping identity hints, but not all readers use the same priority order.
+
+This explains the reported symptoms:
+
+1. Leads are undercounted because `getFranchizeLeads()` collapses multiple operator-created contracts under the same operator id when artifact `telegram_chat_id` is still the operator id, and because it filters todos to only those whose extracted todo lead key is already in the lead map.
+2. Operator-created rentals can appear under the operator because `/doc-manual` inserts `rentals.user_id = crewOwnerChatId` as the initial placeholder, and QR claim is the only intended promotion to the real renter.
+3. Todos are present in rental analytics because analytics/rental pages match todos by `rental_id` embedded in `crew_todos.description` JSON; the leads page matches todos by `user_id → phone → lead_id → description`, and filters out anything whose extracted identity is not a loaded lead key.
+4. QR replacement is split across two implementations. `app/lib/qr-linking-handler.ts` updates `rentals`, artifacts, and secrets, but its secrets update appears to use `.eq('rental_id', ...)` even the secrets table/code uses `source_rental_id`. `app/franchize/server-actions/rental-secrets-claim.ts` updates rentals, artifacts, secrets, todos, and intents, but todo re-link only sets `user_id` when `lead_id` equals the old operator id and `user_id IS NULL`; it does not update `lead_id`, phone, description JSON, or rental-verification todos.
+5. Analytics is closer to correct because it treats `rental_id` as the primary key and joins secrets by `source_rental_id`, avoiding renter/operator ambiguity in `telegram_chat_id`.
+
+Known operator chat IDs that should never be treated as real renters without explicit confirmation:
+
+- `7813830016`
+- `413553377`
+- `356282674`
+
+## 2. Current identity lifecycle diagram
+
+```mermaid
+sequenceDiagram
+  participant O as Operator Telegram user
+  participant Doc as /doc-manual handler
+  participant R as public.rentals
+  participant A as private.rental_contract_artifacts
+  participant S as private.user_rental_secrets
+  participant I as public.franchize_intents
+  participant T as public.crew_todos
+  participant QR as startapp / QR claim
+  participant U as Real renter Telegram user
+
+  O->>Doc: Creates rental contract before real renter opens app
+  Doc->>R: INSERT user_id=crewOwnerChatId, owner_id=crewOwnerChatId
+  Doc->>S: INSERT chat_id=NULL if creator is crew member
+  Doc->>A: INSERT telegram_chat_id=operator userId, rental_id=<rental uuid>
+  Doc->>I: UPSERT lead using clientPhone or operator userId
+  Doc->>T: INSERT lead_followup todos with leadId=clientPhone or operator userId, metadata.rental_id
+  Doc-->>O: Sends DOCX and QR startapp=rent_<bikeId>_<docSha256>
+
+  U->>QR: Opens QR deep link
+  QR->>S: Claim secret by doc_sha256; set chat_id=U
+  QR->>R: UPDATE user_id=U if still placeholder
+  QR->>A: UPDATE telegram_chat_id=U
+  QR->>T: Best-effort partial re-link in some flow
+  QR->>I: Best-effort partial re-link in some flow
+```
+
+Important caveat: there are at least two QR claim paths. The legacy `handleStartappParam()` calls `claimRentalByQRCode()`. A separate `rental-secrets-claim` server action calls `claimRentalSecretsByDocSha()` and then performs broader propagation. These paths are not equivalent.
+
+## 3. Data-flow diagram
+
+```mermaid
+flowchart TD
+  DocManual[/app/webhook-handlers/commands/doc-manual.ts/] -->|createRentalFromDocContract| Rentals[(public.rentals)]
+  DocManual -->|insert secret| Secrets[(private.user_rental_secrets)]
+  DocManual -->|insert artifact| Artifacts[(private.rental_contract_artifacts)]
+  DocManual -->|upsertFranchizeLead| Intents[(public.franchize_intents)]
+  DocManual -->|createLeadFollowupTodos| Todos[(public.crew_todos)]
+
+  Startapp[app/lib/startapp-handler.ts] --> QRLegacy[app/lib/qr-linking-handler.ts]
+  QRLegacy --> Rentals
+  QRLegacy --> Artifacts
+  QRLegacy -. possibly broken rental_id filter .-> Secrets
+
+  SecretClaim[app/franchize/server-actions/rental-secrets-claim.ts] --> Secrets
+  SecretClaim --> Rentals
+  SecretClaim --> Artifacts
+  SecretClaim -. partial .-> Todos
+  SecretClaim -. partial .-> Intents
+
+  Leads[app/franchize/server-actions/leads.ts] --> Intents
+  Leads --> Artifacts
+  Leads --> Secrets
+  Leads --> Rentals
+  Leads --> Todos
+
+  RentalAnalytics[app/franchize/server-actions/rentals-dashboard.ts] --> Rentals
+  RentalAnalytics --> Secrets
+  RentalPageTodos[app/franchize/server-actions/rentals.ts] --> Todos
+```
+
+## 4. Relevant fields table
+
+| Field | Table | Current meaning | Who writes it | Who reads it | When it changes meaning | Risks / bugs |
+|---|---|---|---|---|---|---|
+| `user_id` | `public.rentals` | Placeholder crew owner/operator before QR; real renter after claim | `/doc-manual` creates as `crewOwnerChatId`; QR claim updates to renter | rental dashboard, rental export, rental detail/profile, leads aggregation | On QR claim | Same column mixes placeholder and renter. Dedupe by `user_id::vehicle_id` can collapse operator-placeholder rentals. |
+| `owner_id` | `public.rentals` | Crew owner/operator account | `/doc-manual` | QR claim uses `user_id === owner_id` as unclaimed check | Does not change in claim | Used as sentinel for placeholder; fails if real renter is also owner/operator. |
+| `telegram_chat_id` | `private.rental_contract_artifacts` | Operator at creation; intended renter after QR claim | `/doc-manual`, `/doc`, testdrive/subrent variants; QR claim updates | leads aggregation, profile fallback, artifact lookup code | On QR claim | Leads page treats it as lead id; pre-claim artifacts collapse under operator. |
+| `renter_phone` | `private.rental_contract_artifacts` | Real renter phone if operator entered it | `/doc-manual` | leads aggregation | Stable | Leads aggregation prefers `telegram_chat_id` over phone, so operator id wins even when phone exists. |
+| `rental_id` | `private.rental_contract_artifacts` | FK to `public.rentals` | `/doc-manual` when rental row created | QR claim, leads, dashboards | Stable | Missing on old rows; legacy claim refuses artifacts without rental_id. |
+| `chat_id` | `private.user_rental_secrets` | `NULL` while unclaimed operator-created doc; real renter after claim; non-crew direct user for self-created data | `/doc-manual`; `claimRentalSecretsByDocSha`; QR code claim | profile, leads, rentals dashboard | On QR claim | Null secrets are invisible as leads; if set to operator by older flows it must be overwritten safely. |
+| `source_rental_id` | `private.user_rental_secrets` | Link to `public.rentals.rental_id` | `/doc-manual`, profile flows | rental analytics/dashboard, verification reads | Stable | Legacy `qr-linking-handler` appears to update secrets by `rental_id`, not `source_rental_id`. |
+| `doc_sha256` / `original_sha256` | secrets/artifacts | Document hash used for QR claim lookup | `/doc-manual` | QR claim | Stable | Correct correlation key; should drive propagation. |
+| `telegram_user_id` | `public.franchize_intents` | Intended Telegram lead id, but can be omitted for phone leads or be operator id when no phone | `upsertFranchizeLead`, web/callback flows | leads page, closer actions | Should become renter id after QR if placeholder was used | Mixed with phone-based synthetic `userId`; migration/claim needs exact rules. |
+| `phone` | `public.franchize_intents` | Lead phone | `upsertFranchizeLead` | leads page | Stable | If phone exists but artifact id is operator, separate lead rows can appear. |
+| `lead_id` | `public.crew_todos` | Legacy overloaded lead key: phone, Telegram id, or UUID | `createLeadFollowupTodos`, `createCrewTodo`, verification todo creation | leads page, lead note/todo APIs, partial QR re-link | Should not change conceptually, but some QR code tries to bridge via user_id only | Does not guarantee renter; may be operator or phone. |
+| `user_id` | `public.crew_todos` | Canonical Telegram user id if known | `createLeadFollowupTodos`, rental verification todos, partial QR claim | leads page | May be filled after claim | Some inserted todos have only description/lead_id. Partial claim only updates rows where `lead_id` equals old operator and `user_id IS NULL`. |
+| `phone` | `public.crew_todos` | Lead/renter phone | `createLeadFollowupTodos` | leads page | Stable | Not updated on QR; useful fallback only if leadMap contains phone key. |
+| `description` | `public.crew_todos` | JSON metadata containing `lead_id`, `user_id`, `phone`, `rental_id`, `todo_type` | todo creation flows | rental page/analytics parse `rental_id`; leads parse identity fallback | Should remain metadata | JSON is used as hidden index; no DB-level schema, fragile parse failures. |
+| `lead_id` | `public.lead_notes` | UI lead id string, not FK-enforced to a canonical lead table | lead notes actions | lead notes actions/UI | Changes if lead identity key changes | Notes can become orphaned when lead key moves from operator/phone to renter chat id. |
+
+## 5. Places where operator identity leaks into renter identity
+
+1. `/doc-manual` explicitly stores `telegram_chat_id: String(userId)` in rental contract artifacts and documents that this is the operator until QR claim.
+2. `/doc-manual` creates the rental row with `user_id: crewOwnerChatId` and `owner_id: crewOwnerChatId`; until claim, rental dashboards that display `user` show the owner/operator as renter.
+3. `/doc-manual` uses `leadUserId = context.clientPhone || String(userId)`. If no client phone is entered, `franchize_intents` and public `users` receive the operator id as the lead id.
+4. `/doc-manual` uses `leadId = context.clientPhone || String(userId)` for todos. If no phone is present, todos are keyed to the operator.
+5. `getFranchizeLeads()` gives artifact `telegram_chat_id` priority over `renter_phone`, so unclaimed artifacts are grouped under operator ids even if the renter phone exists.
+6. `getFranchizeLeads()` treats any numeric `user_id` in leadMap as a Telegram user and enriches it from `public.users`; operator profiles can overwrite/label what is actually renter-contract data.
+7. `sale_contract_artifacts.telegram_chat_id` is also written as operator id and is read by leads aggregation with the same priority problem.
+
+## 6. QR replacement propagation gaps
+
+Likely intended propagation after QR claim:
+
+- `rentals.user_id`: placeholder → renter chat id.
+- `rental_contract_artifacts.telegram_chat_id`: operator → renter chat id.
+- `user_rental_secrets.chat_id`: `NULL`/operator → renter chat id.
+- `franchize_intents.telegram_user_id`: operator placeholder → renter chat id when the intent was created as placeholder.
+- `crew_todos.user_id`: placeholder/empty → renter chat id.
+- `crew_todos.lead_id` and `description` JSON: should become canonical or at least include both old and new identities.
+- `lead_notes.lead_id`: if notes were attached to placeholder lead id, they need a migration/relink strategy.
+
+Observed gaps:
+
+1. `app/lib/qr-linking-handler.ts` does not update `franchize_intents`, `crew_todos`, or `lead_notes`.
+2. `app/lib/qr-linking-handler.ts` attempts to update `user_rental_secrets` with `.eq('rental_id', artifact.rental_id)`, but the surrounding code and migrations use `source_rental_id`; this can silently leave secrets unclaimed if no `rental_id` column exists/works there.
+3. `app/franchize/server-actions/rental-secrets-claim.ts` does broader propagation, but only updates `crew_todos.user_id` for rows where `lead_id` equals the old rental `user_id` and `user_id` is null. It does not update rows already having operator `user_id`, rows keyed by phone, rows keyed only by `description.rental_id`, or `lead_id`/description JSON.
+4. `rental-secrets-claim` updates all `franchize_intents` for the old operator id and crew slug, not only the specific contract/rental. That can accidentally move unrelated operator-created leads.
+5. No observed propagation to `lead_notes.lead_id`, so notes can remain attached to old operator/phone lead ids after the UI identity key changes.
+
+## 7. Leads page vs analytics page matching logic
+
+### Leads page
+
+`getFranchizeLeads()` builds `leadMap` by identity string. Its source priority is effectively:
+
+1. `franchize_intents`: `telegram_user_id || phone`.
+2. `rental_contract_artifacts`: `telegram_chat_id || renter_phone`.
+3. `user_rental_secrets`: `chat_id` only; null unclaimed secrets are skipped.
+4. `rentals`: `user_id`.
+5. `sale_contract_artifacts`: `telegram_chat_id || buyer_phone`.
+
+Then it fetches `crew_todos` only in category `lead_followup`, extracts a todo lead key by `user_id → phone → lead_id → description JSON`, and returns only todos whose extracted key exists in `leadMap`.
+
+Implication: if a todo has a valid `rental_id` in description but no matching identity key in `leadMap`, the leads page drops it.
+
+### Rental analytics / rental pages
+
+Rental dashboard code starts from `public.rentals` scoped by crew/date and dedupes by `rental_id` first, then by `user_id::vehicle_id`. It enriches document state from `user_rental_secrets.source_rental_id`.
+
+Rental return todo lookup fetches all `crew_todos` for the crew and filters by `description.rental_id`, for both `rental_verification` and `lead_followup` categories.
+
+Implication: todos that are invisible on leads can still appear in rental analytics because `rental_id` is a better key than `lead_id`/`user_id` during the placeholder phase.
+
+## 8. Canonical identity model proposal (conceptual only)
+
+Do not overload one column across lifecycle states. Introduce explicit roles:
+
+- Operator/creator identity: who generated the document (`created_by_operator_chat_id`).
+- Placeholder/claim state: whether a rental/secret/artifact is unclaimed, claimed, revoked, or conflict.
+- Renter Telegram identity: actual Telegram user who claimed the QR (`renter_telegram_chat_id`).
+- Renter contact identity: phone/email/name from documents (`renter_phone`, `renter_full_name`).
+- Lead identity: stable `lead_id`/UUID owned by the CRM layer, with separate links to phone, telegram id, rental ids, artifact ids.
+- Rental identity: `rental_id` as immutable primary key for rental operations and return todos.
+- Artifact identity: immutable `contract_key`/hash with FK to rental and lead.
+
+Recommended conceptual rules:
+
+1. Never store an operator id in a field named like renter/user unless it is explicitly a placeholder with a state flag.
+2. Lead page should aggregate by stable lead UUID or by deterministic contact key, not by whichever of `telegram_chat_id`, `phone`, or `user_id` appears first.
+3. Todos should have real nullable columns for `rental_id` and `lead_id` rather than relying on JSON in `description`.
+4. QR claim should be a single database transaction/RPC that updates all correlated records or records a failed propagation event.
+5. Operator ids should be filtered/flagged in lead aggregation using the known operator set plus crew membership lookup.
+
+## 9. Suggested fix plan in phases
+
+### Phase 0 — diagnostics only
+
+- Run read-only SQL counts for each known operator id across `rentals.user_id`, `rental_contract_artifacts.telegram_chat_id`, `franchize_intents.telegram_user_id`, and `crew_todos.lead_id/user_id`.
+- Count artifacts where `telegram_chat_id` is an operator and `renter_phone` is present.
+- Count secrets where `chat_id IS NULL` and `source_rental_id IS NOT NULL`.
+- Count todos where `description.rental_id` exists but `lead_id/user_id/phone` do not match the lead shown by `getFranchizeLeads()`.
+
+### Phase 1 — safe read-path fixes
+
+- In leads aggregation, prefer `renter_phone` or a rental-linked identity over artifact `telegram_chat_id` when `telegram_chat_id` is a known operator/crew member.
+- Include todos by `description.rental_id` when they can be attached to a lead's rental rows, not only by identity key.
+- Surface a badge/state like `unclaimed_operator_placeholder` rather than pretending the operator is a lead.
+
+### Phase 2 — claim propagation hardening
+
+- Consolidate QR claim into one path.
+- Use `doc_sha256/original_sha256` and `source_rental_id` consistently.
+- Propagate to rentals, artifacts, secrets, intents, todos, and notes in a transaction.
+- Add idempotency and conflict logs for already-claimed records.
+
+### Phase 3 — schema cleanup migrations
+
+- Add explicit `created_by_operator_chat_id`, `renter_telegram_chat_id`, and `claim_status` where needed.
+- Add `rental_id` column to `crew_todos` and backfill from `description.rental_id`.
+- Add a stable CRM `lead_id` model/table or make `franchize_intents.id` the canonical lead row with link tables.
+- Backfill historical rows and keep compatibility reads during migration.
+
+### Phase 4 — remove overloaded fallbacks
+
+- Stop using `telegram_chat_id` as both creator and renter.
+- Stop parsing `crew_todos.description` as the primary linkage mechanism.
+- Restrict old fallback code to legacy rows only.
+
+## 10. Questions to answer before code changes
+
+1. Should a lead be primarily keyed by Telegram chat id, phone number, or a new CRM lead UUID?
+2. Are the known operator IDs complete, or should operator detection use `crew_members` dynamically?
+3. For old unclaimed documents, should leads show as phone/name-only renters or be hidden until QR claim?
+4. If a renter never scans QR, should `rentals.user_id` remain the crew owner forever, or should a synthetic renter key be created from phone/passport hash?
+5. Should sale contracts follow the same QR claim model as rental contracts, or remain operator-owned artifacts with phone-only leads?
+6. Should existing lead notes follow the lead across identity merges, and if yes, what is the authoritative merge key?
+7. Should todo assignment (`assigned_to`) remain the operator while todo subject (`renter/lead`) moves to renter? This likely needs separate fields.
+8. What should happen if multiple documents for the same renter/bike/date have different phones or different QR claimers?
+9. Do analytics exports need to exclude placeholder-owner rentals from renter metrics until claimed?
+10. Is it acceptable to add a database RPC for atomic QR claim propagation?
+
+## What I would do next
+
+1. Produce a read-only SQL diagnostic report for the known operator IDs and the last 30/90 days of contracts.
+2. Patch only the leads read path to stop grouping operator-placeholder artifacts under operators and to attach todos by `rental_id` from description JSON.
+3. Fix/consolidate QR claim propagation after confirming which startapp path is used in production.
+4. Add `crew_todos.rental_id` and explicit operator/renter fields in a migration once the read-path behavior is agreed.
+
+## Source inventory inspected
+
+- `app/franchize/lib/leads.ts`
+- `app/franchize/server-actions/leads.ts`
+- `app/franchize/server-actions/lead-notes.ts`
+- `app/franchize/server-actions/intents.ts`
+- `app/franchize/server-actions/crew-todos.ts`
+- `app/franchize/server-actions/rentals.ts`
+- `app/franchize/server-actions/rental-verification-todos.ts`
+- `app/franchize/server-actions/rentals-dashboard.ts`
+- `app/franchize/server-actions/rental-secrets-claim.ts`
+- `app/webhook-handlers/commands/doc-manual.ts`
+- `app/webhook-handlers/commands/doc.ts`
+- `app/lib/startapp-handler.ts`
+- `app/lib/qr-linking-handler.ts`
+- `app/lib/user-rental-secrets.ts`
+- Related migrations for intents, artifacts, secrets, todos, rentals, users, and lead notes.
