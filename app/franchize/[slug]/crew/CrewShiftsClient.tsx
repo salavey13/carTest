@@ -28,12 +28,14 @@ interface ActiveShift {
 }
 
 export function FranchizeCrewShiftsClient({ crewSlug }: { crewSlug: string }) {
-    const { dbUser, userCrewInfo } = useAppContext();
+    const { dbUser, userCrewMemberships } = useAppContext();
     const [shifts, setShifts] = useState<ActiveShift[]>([]);
     const [loading, setLoading] = useState(true);
     const [endingShift, setEndingShift] = useState<string | null>(null);
 
-    const isCrewOwner = userCrewInfo?.is_owner && userCrewInfo?.slug === crewSlug;
+    const isCrewAdmin = userCrewMemberships.some(
+      (m) => m.slug === crewSlug && ["owner", "admin", "co_owner"].includes(m.role)
+    );
 
     useEffect(() => {
         loadShifts();
@@ -64,8 +66,8 @@ export function FranchizeCrewShiftsClient({ crewSlug }: { crewSlug: string }) {
     };
 
     const handleEndShift = async (shiftId: string) => {
-        if (!isCrewOwner) {
-            toast.error("Only crew owners can end shifts");
+        if (!isCrewAdmin) {
+            toast.error("Только администратор экипажа может завершить смену");
             return;
         }
 
@@ -78,14 +80,14 @@ export function FranchizeCrewShiftsClient({ crewSlug }: { crewSlug: string }) {
             });
 
             if (response.ok) {
-                toast.success("Shift ended successfully");
+                toast.success("Смена завершена");
                 loadShifts();
             } else {
                 const error = await response.json();
-                toast.error(error.error || "Failed to end shift");
+                toast.error(error.error || "Ошибка завершения смены");
             }
         } catch (error) {
-            toast.error("Failed to end shift");
+            toast.error("Ошибка завершения смены");
         } finally {
             setEndingShift(null);
         }
@@ -97,10 +99,10 @@ export function FranchizeCrewShiftsClient({ crewSlug }: { crewSlug: string }) {
         const diff = now.getTime() - start.getTime();
         const hours = Math.floor(diff / 3600000);
         const minutes = Math.floor((diff % 3600000) / 60000);
-        return `${hours}h ${minutes}m`;
+        return `${hours}ч ${minutes}м`;
     };
 
-    if (loading) return <Loading variant="bike" text="LOADING SHIFTS..." />;
+    if (loading) return <Loading variant="bike" text="Загрузка смен..." />;
 
     return (
         <div className="space-y-6">
@@ -110,13 +112,13 @@ export function FranchizeCrewShiftsClient({ crewSlug }: { crewSlug: string }) {
                     <ArrowLeft className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
                 </Link>
                 <div className="flex-1">
-                    <h1 className="text-2xl font-bold uppercase tracking-tight">Shift Management</h1>
-                    <p className="text-muted-foreground text-sm">Active shifts and crew status</p>
+                    <h1 className="text-2xl font-bold uppercase tracking-tight">Смены</h1>
+                    <p className="text-muted-foreground text-sm">Активные смены и статус экипажа</p>
                 </div>
                 <Badge variant="outline" className={cn(
                     shifts.length > 0 ? "" : "text-muted-foreground"
                 )}>
-                    {shifts.length} Active
+                    {shifts.length} Активных
                 </Badge>
             </div>
 
@@ -130,14 +132,14 @@ export function FranchizeCrewShiftsClient({ crewSlug }: { crewSlug: string }) {
                                     {/* Status Indicator */}
                                     <div className="flex flex-col items-center gap-1">
                                         <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-                                        <div className="text-[9px] text-muted-foreground uppercase">Active</div>
+                                        <div className="text-[9px] text-muted-foreground uppercase">Активна</div>
                                     </div>
 
                                     {/* Member Info */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
                                             <span className="font-bold uppercase">
-                                                @{shift.member?.username || 'Unknown'}
+                                                @{shift.member?.username || 'Неизвестно'}
                                             </span>
                                             <Badge variant="outline" className="text-[9px]">
                                                 {shift.shift_type}
@@ -156,7 +158,7 @@ export function FranchizeCrewShiftsClient({ crewSlug }: { crewSlug: string }) {
                                     </div>
 
                                     {/* Actions */}
-                                    {isCrewOwner && (
+                                    {isCrewAdmin && (
                                         <Button
                                             size="sm"
                                             variant="destructive"
@@ -169,7 +171,7 @@ export function FranchizeCrewShiftsClient({ crewSlug }: { crewSlug: string }) {
                                             ) : (
                                                 <>
                                                     <Square className="h-3 w-3 mr-1" />
-                                                    End
+                                                    Завершить
                                                 </>
                                             )}
                                         </Button>
@@ -183,8 +185,8 @@ export function FranchizeCrewShiftsClient({ crewSlug }: { crewSlug: string }) {
                 <Card>
                     <CardContent className="p-8 text-center">
                         <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                        <p className="text-muted-foreground">No active shifts right now.</p>
-                        <p className="text-muted-foreground/70 text-sm mt-2">Crew members can start shifts from their controls.</p>
+                        <p className="text-muted-foreground">Нет активных смен.</p>
+                        <p className="text-muted-foreground/70 text-sm mt-2">Участники могут начать смену из своих элементов управления.</p>
                     </CardContent>
                 </Card>
             )}

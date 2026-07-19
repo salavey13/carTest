@@ -87,8 +87,8 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
         }
     };
 
-    if (loading) return <Loading variant="bike" text="LOADING ROSTER..." />;
-    if (!crew) return <div className="text-center text-destructive font-bold text-4xl py-20">CREW NOT FOUND</div>;
+    if (loading) return <Loading variant="bike" text="Загрузка состава..." />;
+    if (!crew) return <div className="text-center text-destructive font-bold text-4xl py-20">ЭКИПАЖ НЕ НАЙДЕН</div>;
 
     const members = crew.members || [];
     const onlineCount = members.filter((m: CrewMember) => m.live_status === 'online' || m.live_status === 'riding').length;
@@ -114,21 +114,21 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
         }
     };
 
+    const getStatusLabel = (status: LiveStatus) => {
+        switch (status) {
+            case 'online': return 'НА СМЕНЕ';
+            case 'riding': return 'В ПОЕЗДКЕ';
+            case 'offline': return 'НЕ В СЕТИ';
+            default: return 'НЕИЗВЕСТНО';
+        }
+    };
+
     const getStatusColor = (status: LiveStatus) => {
         switch (status) {
             case 'online': return 'bg-green-500';
             case 'riding': return 'bg-primary';
             case 'offline': return 'bg-muted';
             default: return 'bg-muted-foreground';
-        }
-    };
-
-    const getStatusLabel = (status: LiveStatus) => {
-        switch (status) {
-            case 'online': return 'ON_SHIFT';
-            case 'riding': return 'RIDING';
-            case 'offline': return 'OFFLINE';
-            default: return 'UNKNOWN';
         }
     };
 
@@ -140,11 +140,11 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
                     <ArrowLeft className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
                 </Link>
                 <div className="flex-1">
-                    <h1 className="text-2xl font-bold uppercase tracking-tight">Unit Roster</h1>
+                    <h1 className="text-2xl font-bold uppercase tracking-tight">Состав экипажа</h1>
                     <p className="text-muted-foreground text-sm">{crew.name}</p>
                 </div>
                 <Badge variant="outline">
-                    {onlineCount} / {totalCount} Active
+                    {onlineCount} / {totalCount} На смене
                 </Badge>
             </div>
 
@@ -248,7 +248,7 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
                 <Card>
                     <CardContent className="p-8 text-center">
                         <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                        <p className="text-muted-foreground">No crew members found.</p>
+                        <p className="text-muted-foreground">Участники не найдены.</p>
                     </CardContent>
                 </Card>
             )}

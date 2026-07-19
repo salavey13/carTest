@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, ChevronDown, LayoutDashboard, List, Palette, Settings, Shield, IdCard, MessageCircle, Send, UserPlus, Users, Moon, Sun, BarChart3, PhoneCall } from "lucide-react";
+import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, IdCard, MessageCircle, Send, UserPlus, Users, Moon, Sun, BarChart3, PhoneCall } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
@@ -75,17 +75,6 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   const { dbUser, user, userCrewInfo, isInTelegramContext, tg } = useAppContext();
   const { theme, setTheme } = useTheme();
 
-  const handleInvite = () => {
-    if (!userCrewInfo) return;
-    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_${userCrewInfo.slug}_join_crew`;
-    const text = `Присоединяйся к нашему экипажу '${userCrewInfo.name}' в VibeRider!`;
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
-    if (isInTelegramContext && tg) {
-      tg.openLink(shareUrl);
-    } else {
-      window.open(shareUrl, "_blank");
-    }
-  };
   const hasUser = Boolean(dbUser || user);
   const displayName = dbUser?.username || dbUser?.full_name || user?.username || user?.first_name || "Operator";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
@@ -139,6 +128,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   const [tempCartId, setTempCartId] = useState<string | null>(null);
   const [notificationPreferences, setNotificationPreferences] = useState<FranchizeNotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
   const [isNotificationSaving, setIsNotificationSaving] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const canShowTelegramCartCta = !dbUser?.user_id && !isInTelegramContext && !isMockUserModeEnabled();
 
   useEffect(() => {
@@ -378,18 +368,24 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           {dbUser?.user_id ? (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                <Bell className="h-3.5 w-3.5" />
-                Уведомления
-              </DropdownMenuLabel>
-              {NOTIFICATION_OPTIONS.map((option) => (
+              <DropdownMenuItem
+                onSelect={() => setShowNotifications((v) => !v)}
+                className="cursor-pointer flex min-w-0 items-center gap-2 w-full"
+              >
+                <Bell className="mr-2 h-4 w-4 shrink-0" />
+                <span className="truncate">Уведомления</span>
+                <span className="ml-auto text-[10px] text-muted-foreground">
+                  {showNotifications ? "▲" : "▼"}
+                </span>
+              </DropdownMenuItem>
+              {showNotifications && NOTIFICATION_OPTIONS.map((option) => (
                 <DropdownMenuCheckboxItem
                   key={option.key}
                   checked={notificationPreferences[option.key]}
                   disabled={isNotificationSaving}
                   onCheckedChange={(checked) => handleNotificationPreferenceChange(option.key, Boolean(checked))}
                   onSelect={(event) => event.preventDefault()}
-                  className="cursor-pointer items-start gap-2 py-2"
+                  className="cursor-pointer items-start gap-2 py-2 pl-9"
                 >
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate text-sm">{option.label}</span>
@@ -399,16 +395,6 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
               ))}
             </>
           ) : null}
-
-          {/* Мои аренды — для всех (личные аренды на странице профиля) */}
-          {effectiveSlug && (
-            <DropdownMenuItem asChild>
-              <Link href={`/franchize/${effectiveSlug}/profile`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-                <List className="mr-2 h-4 w-4" />
-                <span className="truncate">Мои аренды</span>
-              </Link>
-            </DropdownMenuItem>
-          )}
 
           {/* Аналитика — только crew members/owner/admin */}
           {canViewCrewLinks && effectiveSlug && (
@@ -420,37 +406,25 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             </DropdownMenuItem>
           )}
 
-          {/* FIX: Crew-management links require userCrewInfo to be loaded.
-              Previous code conditionally wrapped on `effectiveSlug` but the
-              body accessed `userCrewInfo.slug` directly — when userCrewInfo
-              was null (user not in any crew, or snapshot still loading),
-              this threw TypeError and triggered CrewButtonErrorBoundary →
-              the "?" fallback button was rendered instead of the profile. */}
-          {userCrewInfo?.slug && (
+          {/* Crew management — always uses current page slug */}
+          {effectiveSlug && (
             <>
               <DropdownMenuItem asChild>
-                <Link href={`/franchize/${userCrewInfo.slug}/crew`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                <Link href={`/franchize/${effectiveSlug}/crew`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
                   <Users className="mr-2 h-4 w-4" />
                   <span className="truncate">Управление экипажем</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <button onClick={handleInvite} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                <button type="button" onClick={() => {
+                  const url = `https://t.me/oneBikePlsBot/app?startapp=crew_${effectiveSlug}_join_crew`;
+                  const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent("Присоединяйся к нашему экипажу в VibeRider!")}`;
+                  if (isInTelegramContext && tg) tg.openLink(shareUrl);
+                  else window.open(shareUrl, "_blank");
+                }} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
                   <UserPlus className="mr-2 h-4 w-4" />
                   <span className="truncate">Пригласить в экипаж</span>
                 </button>
-              </DropdownMenuItem>
-            </>
-          )}
-
-          {userIsAdmin && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/admin" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-                  <Shield className="mr-2 h-4 w-4" />
-                  <span className="truncate">Админка</span>
-                </Link>
               </DropdownMenuItem>
             </>
           )}
