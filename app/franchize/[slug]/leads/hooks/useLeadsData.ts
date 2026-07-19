@@ -3,8 +3,6 @@
 import { useMemo, useCallback } from "react";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
 import { 
-  getTodoLeadId, 
-  getTodoLeadPhone, 
   filterLeads, 
   sortLeads, 
   categorizeLeads, 
@@ -12,40 +10,37 @@ import {
   groupLeadsForBoard 
 } from "../leads-utils";
 
+/**
+ * Extract lead_id (user_id UUID) from a todo — checks column first, then description JSON.
+ * Returns null if the value looks like a phone number (no '-') rather than a UUID.
+ */
+function extractTodoLeadId(todo: LeadTodoRow): string | null {
+  if (todo.lead_id && todo.lead_id.includes('-')) return todo.lead_id;
+  if (!todo.description) return null;
+  try {
+    const desc = JSON.parse(todo.description);
+    if (desc.lead_id && typeof desc.lead_id === 'string' && desc.lead_id.includes('-')) return desc.lead_id;
+  } catch { /* ignore */ }
+  return null;
+}
+
 export function useTodosMapping(todos: LeadTodoRow[]) {
-  const getTodoLeadIdMemo = useCallback((todo: LeadTodoRow): string | null => {
-    if (todo.lead_id) return todo.lead_id;
-    if (!todo.description) return null;
-    try { return JSON.parse(todo.description).lead_id || null; } catch { return null; }
-  }, []);
-
-  const getTodoLeadPhoneMemo = useCallback((todo: LeadTodoRow): string | null => {
-    if (!todo.description) return null;
-    try { return JSON.parse(todo.description).lead_phone || null; } catch { return null; }
-  }, []);
-
   const getTodosForLead = useCallback((lead: LeadRow): LeadTodoRow[] => {
-    const leadUserIds = new Set([lead.user_id, lead.phone].filter(Boolean));
     const seen = new Set<string>();
     return todos.filter((t) => {
-      let matched = false;
-      const leadId = getTodoLeadIdMemo(t);
-      if (leadId && leadUserIds.has(leadId)) matched = true;
-      if (!matched) {
-        const leadPhone = getTodoLeadPhoneMemo(t);
-        if (leadPhone && lead.phone && leadPhone === lead.phone) matched = true;
-        if (leadId && lead.phone && leadId === lead.phone) matched = true;
-      }
-      if (!matched) return false;
-      // Dedup by title — server already deduplicates, but guard here too
-      const key = `${t.title}|${t.description || ""}`;
+      // Match ONLY by lead_id (user_id UUID) — never by phone, which causes
+      // cross-lead pollution when multiple leads share a contact number.
+      const todoLeadId = extractTodoLeadId(t);
+      if (!todoLeadId || todoLeadId !== lead.user_id) return false;
+      // Dedup by todo id, fallback to title
+      const key = t.id || `${todoLeadId}|${t.title}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
-  }, [todos, getTodoLeadIdMemo, getTodoLeadPhoneMemo]);
+  }, [todos]);
 
-  return { getTodosForLead, getTodoLeadId: getTodoLeadIdMemo, getTodoLeadPhone: getTodoLeadPhoneMemo };
+  return { getTodosForLead };
 }
 
 export function useFilteredSortedLeads(

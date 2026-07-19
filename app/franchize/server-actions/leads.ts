@@ -430,32 +430,39 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
 
     // ── Server-side filtering: only return todos matching loaded leads ──
     const leadUserIds = new Set(Array.from(leadMap.keys()));
-    const leadPhonesSet = new Set(
-      Array.from(leadMap.values()).map((l) => l.phone).filter(Boolean) as string[]
-    );
 
-    const filteredTodos = (todos || []).filter((t) => {
-      // Check lead_id column
-      if (t.lead_id && leadUserIds.has(t.lead_id)) return true;
-      if (t.lead_id && leadPhonesSet.has(t.lead_id)) return true;
-      // Fallback: check description JSON
+    /**
+     * Get the lead_id (user_id) from a todo, checking both the column and description.
+     * Only returns a real-looking UUID (contains '-'), NOT a phone number.
+     */
+    const getTodoLeadId = (t: typeof todos[number]): string | null => {
+      if (t.lead_id && t.lead_id.includes('-')) return t.lead_id;
       if (t.description) {
         try {
           const desc = JSON.parse(t.description);
-          if (desc.lead_id && (leadUserIds.has(desc.lead_id) || leadPhonesSet.has(desc.lead_id))) return true;
-          if (desc.lead_phone && leadPhonesSet.has(desc.lead_phone)) return true;
+          if (desc.lead_id && typeof desc.lead_id === 'string' && desc.lead_id.includes('-')) return desc.lead_id;
         } catch { /* ignore */ }
       }
+      return null;
+    };
+
+    const filteredTodos = (todos || []).filter((t) => {
+      // Match by lead_id (user_id UUID) — this is the only reliable association
+      const todoLeadId = getTodoLeadId(t);
+      if (todoLeadId && leadUserIds.has(todoLeadId)) return true;
       return false;
     });
 
-    // Deduplicate by title + lead_id — same todo was created multiple times
-    const seenTodoKey = new Set<string>();
+    // Deduplicate by todo id — each todo row should appear only once
+    const seenTodoId = new Set<string>();
     const dedupedTodos: typeof filteredTodos = [];
     for (const t of filteredTodos) {
-      const key = `${t.lead_id}|${t.title}`;
-      if (seenTodoKey.has(key)) continue;
-      seenTodoKey.add(key);
+      if (t.id && seenTodoId.has(t.id)) continue;
+      if (t.id) seenTodoId.add(t.id);
+      // Fallback dedup by lead_id|title for todos without id
+      const key = `${t.lead_id || '?'}|${t.title}`;
+      if (seenTodoId.has(key)) continue;
+      seenTodoId.add(key);
       dedupedTodos.push(t);
     }
 
