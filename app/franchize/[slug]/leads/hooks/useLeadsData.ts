@@ -15,12 +15,22 @@ import {
  * Returns null if the value looks like a phone number (no '-') rather than a UUID.
  */
 function extractTodoLeadId(todo: LeadTodoRow): string | null {
-  if (todo.lead_id && todo.lead_id.includes('-')) return todo.lead_id;
-  if (!todo.description) return null;
-  try {
-    const desc = JSON.parse(todo.description);
-    if (desc.lead_id && typeof desc.lead_id === 'string' && desc.lead_id.includes('-')) return desc.lead_id;
-  } catch { /* ignore */ }
+  if (todo.lead_id) {
+    // Numeric → Telegram user ID (primary match)
+    if (/^\d{1,9}$/.test(todo.lead_id)) return todo.lead_id;
+    // UUID → accept
+    if (todo.lead_id.includes('-')) return todo.lead_id;
+    // Phone or other → reject
+  }
+  if (todo.description) {
+    try {
+      const desc = JSON.parse(todo.description);
+      if (desc.lead_id && typeof desc.lead_id === 'string') {
+        if (/^\d{1,9}$/.test(desc.lead_id)) return desc.lead_id;
+        if (desc.lead_id.includes('-')) return desc.lead_id;
+      }
+    } catch { /* ignore */ }
+  }
   return null;
 }
 
