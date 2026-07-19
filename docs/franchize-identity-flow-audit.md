@@ -41,19 +41,22 @@ sequenceDiagram
   participant U as Real renter Telegram user
 
   O->>Doc: Creates rental contract before real renter opens app
-  Doc->>R: INSERT user_id=crewOwnerChatId, owner_id=crewOwnerChatId
-  Doc->>S: INSERT chat_id=NULL if creator is crew member
-  Doc->>A: INSERT telegram_chat_id=operator userId, rental_id=<rental uuid>
-  Doc->>I: UPSERT lead using clientPhone or operator userId
-  Doc->>T: INSERT lead_followup todos with leadId=clientPhone or operator userId, metadata.rental_id
-  Doc-->>O: Sends DOCX and QR startapp=rent_<bikeId>_<docSha256>
+  Doc->>R: Insert rental with operator placeholder IDs
+  Note right of R: user_id and owner_id both start as crewOwnerChatId
+  Doc->>S: Insert unclaimed secret for crew-created contract
+  Note right of S: chat_id is NULL until the renter claims the QR
+  Doc->>A: Insert artifact linked to rental
+  Note right of A: telegram_chat_id starts as the operator userId
+  Doc->>I: Upsert lead from clientPhone or operator userId
+  Doc->>T: Insert lead_followup todos with rental metadata
+  Doc-->>O: Send DOCX plus QR startapp link
 
-  U->>QR: Opens QR deep link
-  QR->>S: Claim secret by doc_sha256; set chat_id=U
-  QR->>R: UPDATE user_id=U if still placeholder
-  QR->>A: UPDATE telegram_chat_id=U
-  QR->>T: Best-effort partial re-link in some flow
-  QR->>I: Best-effort partial re-link in some flow
+  U->>QR: Open QR deep link
+  QR->>S: Claim by doc_sha256 and store renter chat_id
+  QR->>R: Replace placeholder user_id with renter userId
+  QR->>A: Replace artifact telegram_chat_id with renter userId
+  QR->>T: Best-effort partial todo relink in some flows
+  QR->>I: Best-effort partial intent relink in some flows
 ```
 
 Important caveat: there are at least two QR claim paths. The legacy `handleStartappParam()` calls `claimRentalByQRCode()`. A separate `rental-secrets-claim` server action calls `claimRentalSecretsByDocSha()` and then performs broader propagation. These paths are not equivalent.
@@ -231,6 +234,49 @@ Recommended conceptual rules:
 8. What should happen if multiple documents for the same renter/bike/date have different phones or different QR claimers?
 9. Do analytics exports need to exclude placeholder-owner rentals from renter metrics until claimed?
 10. Is it acceptable to add a database RPC for atomic QR claim propagation?
+
+## 11. Practical recommendations for `app/franchize/[slug]/leads`
+
+The leads page is already split into a server aggregator, a thin route wrapper, and focused client components. The next improvements should make it behave like an operator CRM, not just a list of merged technical records.
+
+### 11.1 Data quality and identity UX
+
+- Show an explicit identity state per lead: `claimed Telegram user`, `phone-only lead`, `operator placeholder`, `conflict`, or `merged`. This prevents operators from treating crew-owned placeholders as real renters.
+- Prefer renter contact data over operator Telegram IDs in the visible lead title. If a contract has `renter_full_name` or `renter_phone`, the card should lead with that and display the operator placeholder only as a warning badge.
+- Add a “why is this lead here?” explainer in the detail panel that lists source rows: intent, rental artifact, secret, rental, sale artifact, todo count, and latest rental id. This is invaluable when support/debugging asks why counts differ from analytics.
+- Normalize phone display and matching once on the server. Store both the raw value and a normalized E.164-ish/search key so `+7`, `8`, spaces, and punctuation do not split the same person into several leads.
+- Preserve old and new identities after QR claim as aliases. The UI should be able to say “merged from phone X / operator placeholder Y” instead of making notes and todos disappear.
+
+### 11.2 CRM workflow best practices
+
+- Replace generic segments with a sales pipeline model: `new`, `needs_contact`, `contract_sent`, `awaiting_qr_claim`, `documents_missing`, `active_rental`, `return_due`, `closed_won`, `closed_lost`. Keep source badges as secondary context.
+- Add SLA indicators: time since first contact, time since last operator action, overdue todo count, rental start date proximity, and unclaimed QR age. Hot leads should be derived from these signals, not only urgency scores.
+- Make the primary action obvious per state: call/write Telegram, request documents, resend QR, open contract, verify photos, create rental, schedule return, dismiss with reason.
+- Require a dismissal/lost reason and keep it reportable. This keeps the leads board useful for conversion analysis instead of silently hiding data.
+- Add owner/assignee and next-action metadata to lead todos. A lead page is most useful when each card answers “who owns this and what must happen next?”
+
+### 11.3 Page architecture and performance
+
+- Keep `page.tsx` as a server entry that resolves crew/theme and delegates UI to `LeadsClient`; continue putting data loading in `getFranchizeLeads()` so access checks and identity heuristics stay server-side.
+- Move heavy identity merging into named pure helpers with unit tests: `chooseLeadKey`, `mergeLeadSources`, `extractTodoRentalId`, `extractTodoLeadAliases`, and `isOperatorPlaceholder`. This will make future schema migrations safer.
+- Return pagination cursors or time windows from the server instead of hard-coded `limit(800/500/300)`. CRM pages need predictable “recent leads” behavior and a way to load history.
+- Attach todos by both canonical lead key and `rental_id`. The rental-id path should win for operator-created contracts because it is the stable key before QR claim.
+- Avoid full `window.location.reload()` after dismissing a lead. Use optimistic local state or `router.refresh()` so operators do not lose filters, selected lead, and scroll position.
+
+### 11.4 Operator-grade UI details
+
+- Add saved filters for daily workflows: `Unclaimed QR`, `Docs missing`, `Starts today/tomorrow`, `Overdue follow-up`, `No phone`, `Operator placeholders`, and `Troubled`.
+- Make the detail panel a chronological timeline: intent created, contract generated, QR claimed, documents uploaded, verification status changes, notes, todos, rental status changes.
+- Use compact card density on desktop and thumb-friendly actions on Telegram mobile. Operators likely use this page during handoff, pickup, and return, so the first screen should prioritize contact, bike, date, document state, and next action.
+- Add empty/error states with recovery actions: clear filters, open analytics, resend QR for selected contract, or create a follow-up todo.
+- Expose copyable identifiers in a debug drawer, not the primary card: `leadKey`, `telegramChatId`, `phone`, `rentalId`, artifact hash, and source route.
+
+### 11.5 Measurement and reliability
+
+- Track page-level metrics: total loaded leads, hidden/dropped todos, operator-placeholder leads, unclaimed contracts, merge conflicts, and leads with no actionable contact method.
+- Log identity merge decisions on the server with enough context to reproduce a bad card without exposing passport data.
+- Add regression fixtures for known operator IDs and mixed phone/Telegram scenarios before changing the read path.
+- Make the page degrade gracefully when private schema reads fail: show intent/rental leads with a warning banner instead of returning an empty CRM.
 
 ## What I would do next
 
