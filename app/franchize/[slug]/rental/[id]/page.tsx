@@ -445,6 +445,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           <FranchizeRentalDocumentsPanel
             rentalId={rental.rentalId}
             ownerId={rental.ownerId}
+            crewId={crew.id}
             status={status}
             metadata={rental.metadata}
             palette={p}
@@ -455,10 +456,12 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             rentalId={rental.rentalId}
             ownerId={rental.ownerId}
             renterId={rental.renterId}
+            crewId={crew.id}
             status={status}
             paymentStatus={rental.paymentStatus}
             hasPickupFreeze={Boolean((rental.metadata as { pickup_freeze?: { frozen_at?: unknown } } | null)?.pickup_freeze?.frozen_at)}
             palette={p}
+            isAuto={isAuto}
           />
 
           {/* Telegram fallback link */}

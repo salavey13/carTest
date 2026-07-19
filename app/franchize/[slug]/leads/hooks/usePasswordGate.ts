@@ -9,6 +9,7 @@ export function usePasswordGate(slug: string, isInTelegram: boolean, dbUserId?: 
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [isPasswordValidating, setIsPasswordValidating] = useState(false);
   const [passwordAuthed, setPasswordAuthed] = useState(false);
+  const [storedPassword, setStoredPassword] = useState<string | null>(null);
 
   // Skip password gate entirely if user is already authenticated via Telegram
   const isAlreadyAuthed = !!dbUserId;
@@ -25,6 +26,7 @@ export function usePasswordGate(slug: string, isInTelegram: boolean, dbUserId?: 
       const result = await validateAnalyticsPassword({ password: passwordInput });
       if (!result.success) { setPasswordError(result.error || "Неверный пароль"); return; }
       if (result.slug && result.slug !== slug.trim()) { setPasswordError("Пароль для другого экипажа"); return; }
+      setStoredPassword(passwordInput.trim());
       setPasswordAuthed(true);
       setShowPasswordEntry(false);
       setPasswordInput("");
@@ -40,6 +42,7 @@ export function usePasswordGate(slug: string, isInTelegram: boolean, dbUserId?: 
     setPasswordError,
     isPasswordValidating,
     passwordAuthed,
+    storedPassword,
     handlePasswordSubmit,
   };
 }

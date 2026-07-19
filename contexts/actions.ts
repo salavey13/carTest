@@ -53,6 +53,7 @@ export async function fetchUserCrewInfoAction(userId: string): Promise<UserCrewI
   if (!userId) return null;
 
   try {
+    // Primary crew = owned crew if exists
     const { data: ownedCrew } = await supabaseAdmin
       .from('crews')
       .select('id, slug, name, logo_url')
@@ -60,12 +61,13 @@ export async function fetchUserCrewInfoAction(userId: string): Promise<UserCrewI
       .maybeSingle();
 
     if (ownedCrew) {
-      return { ...ownedCrew, is_owner: true };
+      return { ...ownedCrew, is_owner: true, role: 'owner' };
     }
 
+    // Fallback to first active membership
     const { data: memberData } = await supabaseAdmin
       .from('crew_members')
-      .select('crews(id, slug, name, logo_url)')
+      .select('role, crews!inner(id, slug, name, logo_url)')
       .eq('user_id', userId)
       .eq('membership_status', 'active')
       .maybeSingle();
@@ -73,13 +75,64 @@ export async function fetchUserCrewInfoAction(userId: string): Promise<UserCrewI
     if (memberData && memberData.crews) {
       const crewData = Array.isArray(memberData.crews) ? memberData.crews[0] : memberData.crews;
       if (crewData) {
-          return { ...crewData, is_owner: false };
+          return { ...crewData, is_owner: false, role: memberData.role || 'member' };
       }
     }
     return null;
   } catch (error) {
     logger.error(`[fetchUserCrewInfoAction] Failed for user ${userId}:`, error);
     return null;
+  }
+}
+
+/** Fetch all crew memberships for a user (including role). */
+export async function fetchUserCrewMembershipsAction(userId: string): Promise<Array<{
+  crewId: string;
+  slug: string;
+  name: string;
+  role: string;
+}>> {
+  if (!userId) return [];
+
+  try {
+    const { data: ownedCrews } = await supabaseAdmin
+      .from('crews')
+      .select('id, slug, name')
+      .eq('owner_id', userId);
+
+    const owned = (ownedCrews || []).map((c) => ({
+      crewId: c.id,
+      slug: c.slug,
+      name: c.name,
+      role: 'owner' as const,
+    }));
+
+    const { data: memberships } = await supabaseAdmin
+      .from('crew_members')
+      .select('crew_id, role, crews!inner(slug, name)')
+      .eq('user_id', userId)
+      .eq('membership_status', 'active');
+
+    const member = (memberships || []).map((m) => {
+      const crewData = Array.isArray(m.crews) ? m.crews[0] : m.crews;
+      return {
+        crewId: m.crew_id,
+        slug: crewData?.slug || '',
+        name: crewData?.name || '',
+        role: m.role || 'member',
+      };
+    });
+
+    // Merge: owned crews override membership entries
+    const seen = new Set<string>();
+    return [...owned, ...member].filter((m) => {
+      if (seen.has(m.crewId)) return false;
+      seen.add(m.crewId);
+      return true;
+    });
+  } catch (error) {
+    logger.error(`[fetchUserCrewMembershipsAction] Failed for user ${userId}:`, error);
+    return [];
   }
 }
 
