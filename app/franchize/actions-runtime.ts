@@ -3,6 +3,7 @@
 import { createInvoice, supabaseAdmin } from "@/lib/supabase-server";
 import { notifyAdmin, sendTelegramDocument, sendTelegramInvoice } from "@/app/actions";
 import { logger } from "@/lib/logger";
+import { noStore } from "next/cache";
 import nodemailer from "nodemailer";
 import { z } from "zod";
 import { randomUUID } from "crypto";
@@ -667,6 +668,7 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
 });
 
 export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugResult> {
+  noStore();
   const safeSlug = normalizeCrewSlug(slug ?? "");
   if (!safeSlug) {
     return { crew: emptyCrew("unknown"), items: [] };

@@ -3,6 +3,7 @@
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { privateSchema } from "@/lib/private-secrets";
 import { logger } from "@/lib/logger";
+import { noStore } from "next/cache";
 
 export interface LeadRentalRow {
   rentalId: string;
@@ -73,6 +74,7 @@ export interface GetFranchizeLeadsResult {
 }
 
 export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeadsResult> {
+  noStore();
   const safeSlug = slug.trim();
   try {
     const { data: crew, error: crewError } = await supabaseAdmin
@@ -432,22 +434,38 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     const leadUserIds = new Set(Array.from(leadMap.keys()));
 
     /**
-     * Get the lead_id (user_id) from a todo, checking both the column and description.
-     * Only returns a real-looking UUID (contains '-'), NOT a phone number.
+     * Get the lead_id from a todo, checking both the column and description.
+     * Accepts:
+     *  - Numeric Telegram user ID (e.g. "7813830016") — the primary identifier
+     *  - UUID (contains '-') — for future use
+     *  Rejects phone numbers (lead_id starting with '+' or purely digits with 10+ chars
+     *  that don't match any known user) to prevent cross-lead pollution.
+     *
+     *  We rely on the fact that Telegram user IDs are numeric but short (≤9 digits),
+     *  while phone numbers are longer or start with '+'.
      */
     const getTodoLeadId = (t: typeof todos[number]): string | null => {
-      if (t.lead_id && t.lead_id.includes('-')) return t.lead_id;
+      if (t.lead_id) {
+        // Pure numeric → Telegram user ID (match lead user_id)
+        if (/^\d{1,9}$/.test(t.lead_id)) return t.lead_id;
+        // UUID → accept
+        if (t.lead_id.includes('-')) return t.lead_id;
+        // Phone number or other → reject (cross-lead pollution)
+      }
       if (t.description) {
         try {
           const desc = JSON.parse(t.description);
-          if (desc.lead_id && typeof desc.lead_id === 'string' && desc.lead_id.includes('-')) return desc.lead_id;
+          if (desc.lead_id && typeof desc.lead_id === 'string') {
+            if (/^\d{1,9}$/.test(desc.lead_id)) return desc.lead_id;
+            if (desc.lead_id.includes('-')) return desc.lead_id;
+          }
         } catch { /* ignore */ }
       }
       return null;
     };
 
     const filteredTodos = (todos || []).filter((t) => {
-      // Match by lead_id (user_id UUID) — this is the only reliable association
+      // Match by lead_id (Telegram user ID or UUID)
       const todoLeadId = getTodoLeadId(t);
       if (todoLeadId && leadUserIds.has(todoLeadId)) return true;
       return false;
