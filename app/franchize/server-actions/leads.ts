@@ -3,7 +3,7 @@
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { privateSchema } from "@/lib/private-secrets";
 import { logger } from "@/lib/logger";
-import { noStore } from "next/cache";
+import { unstable_noStore as noStore } from "next/cache";
 
 export interface LeadRentalRow {
   rentalId: string;
