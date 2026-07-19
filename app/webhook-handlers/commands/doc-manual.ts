@@ -1606,7 +1606,8 @@ ${qrDeepLink}`);
         original_sha256: docSha256,
         requested_bike_id: context.bikeId,
         resolved_bike_id: bike.id,
-        telegram_chat_id: context.clientPhone || String(userId),
+        telegram_chat_id: String(userId),          // Always operator's Telegram ID (will be re-linked on QR claim)
+        renter_phone: context.clientPhone || null,  // Phone in dedicated column (was wrongly stored in telegram_chat_id)
         telegram_message_id: null,
         renter_full_name: context.mpFullName || null,
         renter_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
@@ -1700,7 +1701,8 @@ ${qrDeepLink}`);
           original_sha256: docSha256,
           requested_bike_id: context.bikeId,
           resolved_bike_id: bike.id,
-          telegram_chat_id: context.clientPhone || String(userId),
+          telegram_chat_id: String(userId),            // Always operator's Telegram ID
+          buyer_phone: context.clientPhone || null,     // Phone in dedicated column
           telegram_message_id: null,
           buyer_full_name: context.mpFullName || null,
           buyer_passport_number: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,

@@ -31,14 +31,25 @@ export async function POST(request: NextRequest) {
 
     const todoId = `todo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
+    // Determine user_id (Telegram chat_id) and phone from leadId
+    const todoUserId = /^\d{1,9}$/.test(leadId) ? leadId : null;
+    const todoPhone = /^(\+?7|8)\d{10}$/.test(leadId) ? leadId : null;
+
     const { data, error } = await supabaseAdmin
       .from("crew_todos")
       .insert({
         id: todoId,
         crew_id: crewId,
         lead_id: leadId,
+        user_id: todoUserId,
+        phone: todoPhone,
         title,
-        description: JSON.stringify({ lead_id: leadId, lead_name: leadName || "" }),
+        description: JSON.stringify({
+          lead_id: leadId,
+          user_id: todoUserId,
+          phone: todoPhone,
+          lead_name: leadName || "",
+        }),
         category: "lead_followup",
         status: "pending",
         priority: priority || "medium",
