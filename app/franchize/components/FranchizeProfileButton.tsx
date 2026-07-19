@@ -91,15 +91,14 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = useIsAdmin();
   const { userCrewMemberships } = useAppContext();
+  const scopeSlug = normalizeSlug(currentSlug || userCrewInfo?.slug);
+  // If currentSlug was explicitly provided (from CrewHeader), prefer it.
+  const effectiveSlug = currentSlug?.trim() ? currentSlug.trim().toLowerCase() : scopeSlug;
   // Check if user has admin-level role for the current crew
   const isCurrentCrewAdmin = useMemo(() => {
     if (!effectiveSlug) return false;
     return userCrewMemberships.some((m) => m.slug === effectiveSlug && ["owner", "admin", "co_owner"].includes(m.role));
   }, [userCrewMemberships, effectiveSlug]);
-  const scopeSlug = normalizeSlug(currentSlug || userCrewInfo?.slug);
-  // FIX: If currentSlug was explicitly provided (from CrewHeader), prefer it.
-  // No longer falls back to "vip-bike" — empty slug is handled gracefully.
-  const effectiveSlug = currentSlug?.trim() ? currentSlug.trim().toLowerCase() : scopeSlug;
   // Only show crew operator links (leads, rentals, analytics) if user is admin
   // OR belongs to the crew whose page they're currently viewing.
   const isCurrentCrewMember = !!(userCrewInfo?.slug && effectiveSlug && userCrewInfo.slug === effectiveSlug);
@@ -306,12 +305,10 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          {/* Theme Toggle — persists to both next-themes and localStorage */}
+          {/* Theme Toggle */}
           <DropdownMenuItem
             onSelect={() => {
-              const next = theme === "dark" ? "light" : "dark";
-              setTheme(next);
-              localStorage.setItem("theme", next);
+              setTheme(theme === "dark" ? "light" : "dark");
             }}
             className="cursor-pointer flex min-w-0 items-center gap-2 w-full"
           >
