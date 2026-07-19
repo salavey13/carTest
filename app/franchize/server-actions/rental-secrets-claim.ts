@@ -137,6 +137,27 @@ async function createRentalFromClaimedSecret(
         }
       }
 
+      // Step 5: Re-link franchize_intents from operator ID → renter's chat_id
+      // Without this, the leads page shows TWO entries: one keyed by operator ID
+      // (from franchize_intents, with no rentals/todos) and one keyed by renter ID
+      // (from rentals, with no intents/todos). After this update, they merge into
+      // ONE lead with everything linked correctly.
+      const crewSlug = secret.crew_slug;
+      if (crewSlug && oldUserId && oldUserId !== renterChatId) {
+        const { error: intentsUpdateError } = await supabaseAdmin
+          .from('franchize_intents')
+          .update({ telegram_user_id: renterChatId })
+          .eq('slug', crewSlug)
+          .eq('telegram_user_id', String(oldUserId));
+
+        if (intentsUpdateError) {
+          console.warn('[rental-secrets-claim] Failed to update franchize_intents telegram_user_id:', intentsUpdateError);
+          // Non-fatal
+        } else {
+          console.log('[rental-secrets-claim] franchize_intents telegram_user_id updated from', oldUserId, 'to', renterChatId);
+        }
+      }
+
       return artifact.rental_id;
     }
 
