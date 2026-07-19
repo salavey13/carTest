@@ -8,6 +8,7 @@ import { Loading } from "@/components/Loading";
 import { useAppContext } from "@/contexts/AppContext";
 import { useTheme } from "next-themes";
 import { getEditableVehiclesForUser } from "@/app/rentals/actions";
+import { getCrewVehicles } from "@/app/franchize/server-actions/get-crew-vehicles";
 import {
   getFranchizeOrderNotificationFailures,
   getFranchizeRentalReviewsForModeration,
@@ -126,7 +127,7 @@ export function FranchizeAdminClient({
   editId,
   initialCrew,
 }: FranchizeAdminClientProps) {
-  const { dbUser, isLoading } = useAppContext();
+  const { dbUser, isLoading, userCrewMemberships } = useAppContext();
   const crew = initialCrew || fallbackCrew;
   const [fleet, setFleet] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -150,10 +151,24 @@ export function FranchizeAdminClient({
 
   const slug = initialSlug?.trim() || "vip-bike";
 
+  // Is current user a crew admin (can edit fleet)?
+  const isCrewFleetAdmin = useMemo(() => {
+    if (!crew?.slug) return false;
+    return userCrewMemberships.some(
+      (m) => m.slug === crew.slug && ["owner", "admin", "co_owner"].includes(m.role)
+    );
+  }, [userCrewMemberships, crew?.slug]);
+
   const loadFleet = useCallback(async () => {
-    if (!dbUser?.user_id) return;
+    if (!dbUser?.user_id || !crew?.slug) return;
     setLoadingFleet(true);
-    const res = await getEditableVehiclesForUser(dbUser.user_id);
+
+    // Crew admins see ALL vehicles belonging to the crew
+    // Others fall back to personal editable vehicles
+    const res = isCrewFleetAdmin
+      ? await getCrewVehicles(crew.slug)
+      : await getEditableVehiclesForUser(dbUser.user_id);
+
     setLoadingFleet(false);
 
     if (!res.success) {
@@ -162,11 +177,7 @@ export function FranchizeAdminClient({
     }
 
     const scoped = (res.data || []).filter(
-      (item) =>
-        (item.type === "bike" || item.type === "car") &&
-        (!crew.id ||
-          item.crew_id === crew.id ||
-          item.owner_id === dbUser.user_id),
+      (item) => item.type === "bike" || item.type === "car",
     );
 
     setFleet(scoped);
@@ -180,7 +191,7 @@ export function FranchizeAdminClient({
         );
       }
     }
-  }, [crew.id, dbUser?.user_id, editId]);
+  }, [crew?.id, crew?.slug, dbUser?.user_id, editId, isCrewFleetAdmin]);
 
   useEffect(() => {
     loadFleet();
@@ -557,79 +568,87 @@ export function FranchizeAdminClient({
       </FranchizeOperatorPanel>
 
       <FranchizeOperatorPanel className="mt-4">
-        <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr),auto]">
-          <Select
-            value={selectedVehicle?.id ?? "new"}
-            onValueChange={(value) =>
-              setSelectedVehicle(
-                value === "new"
-                  ? null
-                  : (visible.find((vehicle) => vehicle.id === value) ?? null),
-              )
-            }
-          >
-            <SelectTrigger
-              className="w-full border text-left"
-              style={{
-                borderColor: "var(--fr-admin-border)",
-                color: "var(--fr-admin-text)",
-                backgroundColor: resolvedPalette.bgBase,
-              }}
-            >
-              <SelectValue placeholder="Выбери запись для редактирования" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="new">Создать новую запись</SelectItem>
-              {visible.map((vehicle) => (
-                <SelectItem key={vehicle.id} value={vehicle.id}>
-                  {vehicle.type === "car" ? "🚗" : "🏍️"} {vehicle.make}{" "}
-                  {vehicle.model}
-                </SelectItem>
+        {isCrewFleetAdmin ? (
+          <>
+            <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr),auto]">
+              <Select
+                value={selectedVehicle?.id ?? "new"}
+                onValueChange={(value) =>
+                  setSelectedVehicle(
+                    value === "new"
+                      ? null
+                      : (visible.find((vehicle) => vehicle.id === value) ?? null),
+                  )
+                }
+              >
+                <SelectTrigger
+                  className="w-full border text-left"
+                  style={{
+                    borderColor: "var(--fr-admin-border)",
+                    color: "var(--fr-admin-text)",
+                    backgroundColor: resolvedPalette.bgBase,
+                  }}
+                >
+                  <SelectValue placeholder="Выбери запись для редактирования" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">Создать новую запись</SelectItem>
+                  {visible.map((vehicle) => (
+                    <SelectItem key={vehicle.id} value={vehicle.id}>
+                      {vehicle.type === "car" ? "🚗" : "🏍️"} {vehicle.make}{" "}
+                      {vehicle.model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSelectedVehicle(null)}
+                className="w-full sm:w-auto"
+              >
+                Новая запись
+              </Button>
+            </div>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {visible.slice(0, 8).map((vehicle) => (
+                <button
+                  key={vehicle.id}
+                  type="button"
+                  onClick={() => setSelectedVehicle(vehicle)}
+                  className="max-w-full rounded-full border px-3 py-1 text-xs font-medium transition hover:opacity-90"
+                  style={{
+                    borderColor:
+                      selectedVehicle?.id === vehicle.id
+                        ? "var(--fr-admin-accent)"
+                        : "var(--fr-admin-border)",
+                    color:
+                      selectedVehicle?.id === vehicle.id
+                        ? accentOn
+                        : "var(--fr-admin-text)",
+                    backgroundColor:
+                      selectedVehicle?.id === vehicle.id
+                        ? "var(--fr-admin-accent)"
+                        : "transparent",
+                  }}
+                >
+                  <span className="block max-w-[220px] truncate">
+                    {vehicle.make} {vehicle.model}
+                  </span>
+                </button>
               ))}
-            </SelectContent>
-          </Select>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setSelectedVehicle(null)}
-            className="w-full sm:w-auto"
-          >
-            Новая запись
-          </Button>
-        </div>
-        <div className="mb-3 flex flex-wrap gap-2">
-          {visible.slice(0, 8).map((vehicle) => (
-            <button
-              key={vehicle.id}
-              type="button"
-              onClick={() => setSelectedVehicle(vehicle)}
-              className="max-w-full rounded-full border px-3 py-1 text-xs font-medium transition hover:opacity-90"
-              style={{
-                borderColor:
-                  selectedVehicle?.id === vehicle.id
-                    ? "var(--fr-admin-accent)"
-                    : "var(--fr-admin-border)",
-                color:
-                  selectedVehicle?.id === vehicle.id
-                    ? accentOn
-                    : "var(--fr-admin-text)",
-                backgroundColor:
-                  selectedVehicle?.id === vehicle.id
-                    ? "var(--fr-admin-accent)"
-                    : "transparent",
-              }}
-            >
-              <span className="block max-w-[220px] truncate">
-                {vehicle.make} {vehicle.model}
-              </span>
-            </button>
-          ))}
-        </div>
-        <CarSubmissionForm
-          ownerId={dbUser?.user_id}
-          vehicleToEdit={selectedVehicle}
-          onSuccess={() => loadFleet()}
-        />
+            </div>
+            <CarSubmissionForm
+              ownerId={dbUser?.user_id}
+              vehicleToEdit={selectedVehicle}
+              onSuccess={() => loadFleet()}
+            />
+          </>
+        ) : (
+          <div className="py-3 text-sm text-muted-foreground text-center">
+            Только администратор экипажа может редактировать технику.
+          </div>
+        )}
       </FranchizeOperatorPanel>
 
       <FranchizeOperatorPanel className="mt-4">

@@ -369,7 +369,10 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onSelect={() => setShowNotifications((v) => !v)}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setShowNotifications((v) => !v);
+                }}
                 className="cursor-pointer flex min-w-0 items-center gap-2 w-full"
               >
                 <Bell className="mr-2 h-4 w-4 shrink-0" />
