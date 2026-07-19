@@ -285,7 +285,7 @@ export function LeadsClient({
         const selectedLead = sortedLeads.find(l => l.user_id === selectedId);
         if (!selectedLead) return null;
         return (
-          <MobileLeadSheet open={true} onClose={() => setSelectedId(null)} T={T}>
+          <MobileLeadSheet open={true} onClose={() => setSelectedId(null)} title={selectedLead.full_name || selectedLead.phone || undefined} T={T}>
             <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} />
           </MobileLeadSheet>
         );

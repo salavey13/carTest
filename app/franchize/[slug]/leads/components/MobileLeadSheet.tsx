@@ -8,6 +8,7 @@ interface MobileLeadSheetProps {
   open: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  title?: string;
   T: any;
 }
 
@@ -31,7 +32,7 @@ const backdropVariants = {
   exit: { opacity: 0, transition: { duration: 0.15 } },
 };
 
-export function MobileLeadSheet({ open, onClose, children, T }: MobileLeadSheetProps) {
+export function MobileLeadSheet({ open, onClose, children, title, T }: MobileLeadSheetProps) {
   // Close on Escape
   useEffect(() => {
     if (!open) return;
@@ -80,17 +81,24 @@ export function MobileLeadSheet({ open, onClose, children, T }: MobileLeadSheetP
           >
             {/* Drag handle header — sticky, clickable X */}
             <div
-              className="sticky top-0 z-10 shrink-0 flex items-center justify-center pt-3 pb-2"
+              className="sticky top-0 z-10 shrink-0 flex items-center justify-between pt-3 pb-2 px-4"
               style={{ backgroundColor: T.bgCard }}
             >
-              <motion.div
-                className="h-1.5 w-10 rounded-full"
-                style={{ backgroundColor: T.borderSoft }}
-                whileTap={{ scale: 0.85 }}
-              />
+              <div className="flex items-center gap-3 min-w-0">
+                <motion.div
+                  className="h-1.5 w-10 rounded-full shrink-0"
+                  style={{ backgroundColor: T.borderSoft }}
+                  whileTap={{ scale: 0.85 }}
+                />
+                {title && (
+                  <p className="truncate text-xs font-semibold leading-tight" style={{ color: T.textMuted }}>
+                    {title}
+                  </p>
+                )}
+              </div>
               <button
                 onClick={onClose}
-                className="absolute right-4 top-2 rounded-xl p-2 transition hover:bg-black/10"
+                className="rounded-xl p-2 transition hover:bg-black/10 shrink-0"
                 style={{ color: T.textFaint }}
                 aria-label="Закрыть"
               >
