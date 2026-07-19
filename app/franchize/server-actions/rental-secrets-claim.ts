@@ -117,6 +117,26 @@ async function createRentalFromClaimedSecret(
         // Non-fatal
       }
 
+      // Step 4: Re-link crew_todos from operator ID → renter's chat_id
+      // When the /doc operator creates todos with their own chat_id as lead_id,
+      // the todos are linked to the operator, not the client. After QR claim
+      // we know the real client chat_id, so we update user_id on those todos.
+      const oldUserId = rental.user_id; // operator's chat_id before update
+      if (oldUserId && oldUserId !== renterChatId) {
+        const { error: todosUpdateError } = await supabaseAdmin
+          .from('crew_todos')
+          .update({ user_id: renterChatId })
+          .eq('lead_id', String(oldUserId))
+          .is('user_id', null);
+
+        if (todosUpdateError) {
+          console.warn('[rental-secrets-claim] Failed to update crew_todos user_id:', todosUpdateError);
+          // Non-fatal
+        } else {
+          console.log('[rental-secrets-claim] crew_todos user_id updated from', oldUserId, 'to', renterChatId);
+        }
+      }
+
       return artifact.rental_id;
     }
 

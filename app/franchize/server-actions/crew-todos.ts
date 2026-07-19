@@ -778,12 +778,18 @@ export async function createLeadFollowupTodos(input: {
       return { success: true, created: 0, skipped: todos.length };
     }
 
+    // Determine user_id (Telegram chat_id) from leadId if it's numeric
+    const todoUserId = /^\d{1,9}$/.test(leadId) ? leadId : null;
+    const todoPhone = leadPhone && leadPhone.length > 0 ? leadPhone : null;
+
     const todoPromises = newTodos.map((todo) => {
       const todoId = `todo-${randomUUID()}`;
       return supabaseAdmin.from("crew_todos").insert({
         id: todoId,
         crew_id: crewId,
-        lead_id: leadId,
+        lead_id: leadId,           // keep for backward compat
+        user_id: todoUserId,       // Telegram chat_id (canonical)
+        phone: todoPhone,          // phone number (nullable)
         title: todo.title,
         status: "pending",
         priority: todo.priority,
@@ -791,6 +797,8 @@ export async function createLeadFollowupTodos(input: {
         category: "lead_followup",
         description: JSON.stringify({
           lead_id: leadId,
+          user_id: todoUserId,
+          phone: todoPhone,
           lead_phone: leadPhone || "",
           lead_name: leadName || "",
           bike_id: bikeId || null,

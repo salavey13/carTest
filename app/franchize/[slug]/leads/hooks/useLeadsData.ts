@@ -11,20 +11,28 @@ import {
 } from "../leads-utils";
 
 /**
- * Extract lead_id (user_id UUID) from a todo — checks column first, then description JSON.
- * Returns null if the value looks like a phone number (no '-') rather than a UUID.
+ * Extract the lead identifier from a todo, checking columns in priority order:
+ *  1. user_id column (Telegram chat_id, canonical)
+ *  2. phone column (phone-only leads)
+ *  3. lead_id column (legacy: Telegram ID, phone, or UUID)
+ *  4. description JSON (legacy fallback)
  */
 function extractTodoLeadId(todo: LeadTodoRow): string | null {
+  // 1. user_id column — canonical Telegram chat_id
+  if (todo.user_id && /^\d{1,9}$/.test(todo.user_id)) return todo.user_id;
+  // 2. phone column — phone-only leads
+  if (todo.phone) return todo.phone;
+  // 3. lead_id column — legacy fallback
   if (todo.lead_id) {
-    // Numeric → Telegram user ID (primary match)
     if (/^\d{1,9}$/.test(todo.lead_id)) return todo.lead_id;
-    // UUID → accept
     if (todo.lead_id.includes('-')) return todo.lead_id;
-    // Phone or other → reject
   }
+  // 4. description JSON — legacy fallback
   if (todo.description) {
     try {
       const desc = JSON.parse(todo.description);
+      if (desc.user_id && typeof desc.user_id === 'string' && /^\d{1,9}$/.test(desc.user_id)) return desc.user_id;
+      if (desc.phone && typeof desc.phone === 'string') return desc.phone;
       if (desc.lead_id && typeof desc.lead_id === 'string') {
         if (/^\d{1,9}$/.test(desc.lead_id)) return desc.lead_id;
         if (desc.lead_id.includes('-')) return desc.lead_id;

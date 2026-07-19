@@ -55,15 +55,17 @@ export interface LeadRow {
 
 export interface LeadTodoRow {
   id: string;
-  lead_id?: string | null;
+  lead_id: string | null;
+  user_id: string | null;
+  phone: string | null;
   title: string;
-  description?: string | null;
+  description: string | null;
   status: string;
   priority: string;
-  category?: string | null;
+  category: string;
   created_at: string;
-  completed_at?: string | null;
-  assigned_to?: string | null;
+  completed_at: string | null;
+  assigned_to: string | null;
 }
 
 export interface GetFranchizeLeadsResult {
@@ -154,7 +156,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       // 5. Sale contract artifacts (crew-filtered) (crew-filtered by crew_slug)
       privateSchema()
         .from("sale_contract_artifacts")
-        .select("buyer_phone, sale_id, bike_make, bike_model, sale_price, created_at")
+        .select("telegram_chat_id, buyer_phone, sale_id, bike_make, bike_model, sale_price, created_at")
         .eq("crew_slug", safeSlug)
         .order("created_at", { ascending: false })
         .limit(200),
@@ -314,7 +316,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     // 5. Sale contract artifacts (crew-filtered)
     if (saleArtifacts) {
       for (const s of saleArtifacts) {
-        const id = s.buyer_phone || "";
+        const id = s.telegram_chat_id || s.buyer_phone || "";
         if (!id) continue;
         const existing = leadMap.get(id);
         const bikeTitle = `${s.bike_make || ""} ${s.bike_model || ""}`.trim() || null;
@@ -329,19 +331,20 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
             user_id: id,
             full_name: null,
             username: null,
-            phone: s.buyer_phone,
+            phone: s.buyer_phone || null,
             source: "sale_contract",
             bikeTitle,
             createdAt: s.created_at,
             lastSeenAt: s.created_at,
             verified: true,
-            telegramChatId: null,
+            telegramChatId: s.telegram_chat_id || null,
             rentals: [],
             sales: [saleRow],
           });
         } else {
           existing.verified = true;
-          if (!existing.phone) existing.phone = s.buyer_phone;
+          if (!existing.phone) existing.phone = s.buyer_phone || null;
+          if (!existing.telegramChatId) existing.telegramChatId = s.telegram_chat_id || null;
           existing.sales.push(saleRow);
         }
       }
@@ -365,7 +368,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       // 11. Lead-linked todos (filtered by crew_id + category on DB side)
       supabaseAdmin
         .from("crew_todos")
-        .select("id, lead_id, title, description, status, priority, category, created_at, completed_at, assigned_to")
+        .select("id, lead_id, user_id, phone, title, description, status, priority, category, created_at, completed_at, assigned_to")
         .eq("crew_id", crewId)
         .eq("category", "lead_followup")
         .order("created_at", { ascending: false }),
@@ -434,27 +437,33 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     const leadUserIds = new Set(Array.from(leadMap.keys()));
 
     /**
-     * Get the lead_id from a todo, checking both the column and description.
-     * Accepts:
-     *  - Numeric Telegram user ID (e.g. "7813830016") — the primary identifier
-     *  - UUID (contains '-') — for future use
-     *  Rejects phone numbers (lead_id starting with '+' or purely digits with 10+ chars
-     *  that don't match any known user) to prevent cross-lead pollution.
+     * Get the lead identifier from a todo, checking user_id → phone → lead_id → description.
      *
-     *  We rely on the fact that Telegram user IDs are numeric but short (≤9 digits),
-     *  while phone numbers are longer or start with '+'.
+     * Priority order:
+     *  1. user_id column (Telegram chat_id, always numeric) — the canonical identifier
+     *  2. phone column (phone number) — for phone-only leads
+     *  3. lead_id column (legacy: Telegram ID, phone, or UUID)
+     *  4. description JSON (legacy fallback)
+     *
+     * This ensures correct matching after the 2026-07-19 data model fix where
+     * user_id and phone were split from the monolithic lead_id column.
      */
     const getTodoLeadId = (t: typeof todos[number]): string | null => {
+      // 1. user_id column — canonical Telegram chat_id
+      if (t.user_id && /^\d{1,9}$/.test(t.user_id)) return t.user_id;
+      // 2. phone column — phone-only leads
+      if (t.phone) return t.phone;
+      // 3. lead_id column — legacy fallback
       if (t.lead_id) {
-        // Pure numeric → Telegram user ID (match lead user_id)
         if (/^\d{1,9}$/.test(t.lead_id)) return t.lead_id;
-        // UUID → accept
         if (t.lead_id.includes('-')) return t.lead_id;
-        // Phone number or other → reject (cross-lead pollution)
       }
+      // 4. description JSON — legacy fallback
       if (t.description) {
         try {
           const desc = JSON.parse(t.description);
+          if (desc.user_id && typeof desc.user_id === 'string' && /^\d{1,9}$/.test(desc.user_id)) return desc.user_id;
+          if (desc.phone && typeof desc.phone === 'string') return desc.phone;
           if (desc.lead_id && typeof desc.lead_id === 'string') {
             if (/^\d{1,9}$/.test(desc.lead_id)) return desc.lead_id;
             if (desc.lead_id.includes('-')) return desc.lead_id;
