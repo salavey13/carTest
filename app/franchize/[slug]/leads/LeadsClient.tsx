@@ -89,6 +89,7 @@ export function LeadsClient({
     setPasswordError,
     isPasswordValidating,
     passwordAuthed,
+    storedPassword,
     handlePasswordSubmit,
   } = usePasswordGate(slug, isInTelegram, dbUser?.user_id);
 
@@ -125,13 +126,19 @@ export function LeadsClient({
     return () => clearTimeout(timer);
   }, [selectedId]);
 
-  // Dismiss lead
+  // Dismiss lead — pass auth headers so the server can verify crew membership
   const handleDismissLead = async (leadId: string) => {
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (dbUser?.user_id) {
+        headers["x-telegram-user-id"] = dbUser.user_id;
+      } else if (storedPassword) {
+        headers["x-auth-password"] = storedPassword;
+      }
       const resp = await fetch("/api/franchize/lead-todo", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadId, dismissLead: true, slug }),
+        headers,
+        body: JSON.stringify({ leadId, dismissLead: true, slug, crewId }),
       });
       if (!resp.ok) { alert("Не удалось убрать лид. Попробуйте позже."); return; }
       window.location.reload();

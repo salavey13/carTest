@@ -8,7 +8,7 @@ import { debugLogger } from "@/lib/debugLogger";
 import { useAppToast } from "@/hooks/useAppToast";
 import { supabaseAnon } from "@/hooks/supabase";
 import type { Database } from "@/types/database.types";
-import { refreshDbUserAction, fetchActiveGameAction, fetchUserRuntimeSnapshotAction } from "./actions";
+import { refreshDbUserAction, fetchActiveGameAction, fetchUserRuntimeSnapshotAction, fetchUserCrewMembershipsAction } from "./actions";
 import { IS_VPS_DEPLOYMENT } from "@/lib/feature-flags";
 
 export type UserCrewInfo = {
@@ -17,6 +17,14 @@ export type UserCrewInfo = {
   name: string;
   logo_url: string;
   is_owner: boolean;
+  role?: string;           // 'owner', 'admin', 'member', 'co_owner', 'mechanic'
+};
+
+export type CrewMembership = {
+  crewId: string;
+  slug: string;
+  name: string;
+  role: string;
 };
 
 export type ActiveLobbyInfo = {
@@ -42,6 +50,7 @@ interface AppRuntimeContextData {
   startParamPayload: string | null;
   clearStartParam: () => void;
   userCrewInfo: UserCrewInfo | null;
+  userCrewMemberships: CrewMembership[];
   userMetadataSlices: {
     cyberFitness: Record<string, unknown> | null;
     strikeball: Record<string, unknown> | null;
@@ -101,6 +110,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- Runtime boundary ---
   const [startParamPayload, setStartParamPayload] = useState<string | null>(null);
   const [userCrewInfo, setUserCrewInfo] = useState<UserCrewInfo | null>(null);
+  const [userCrewMemberships, setUserCrewMemberships] = useState<CrewMembership[]>([]);
   const [userMetadataSlices, setUserMetadataSlices] = useState<AppRuntimeContextData["userMetadataSlices"]>({
     cyberFitness: null,
     strikeball: null,
@@ -112,11 +122,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const fetchRuntimeSnapshot = async () => {
       if (!dbUser?.user_id) {
         setUserCrewInfo(null);
+        setUserCrewMemberships([]);
         setUserMetadataSlices({ cyberFitness: null, strikeball: null, franchizeProfiles: null });
         return;
       }
-      const snapshot = await fetchUserRuntimeSnapshotAction(dbUser.user_id);
+      const [snapshot, memberships] = await Promise.all([
+        fetchUserRuntimeSnapshotAction(dbUser.user_id),
+        fetchUserCrewMembershipsAction(dbUser.user_id),
+      ]);
       setUserCrewInfo(snapshot.crewInfo);
+      setUserCrewMemberships(memberships);
       setUserMetadataSlices(snapshot.metadataSlices);
     };
     fetchRuntimeSnapshot();
@@ -251,8 +266,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     startParamPayload,
     clearStartParam,
     userCrewInfo,
+    userCrewMemberships,
     userMetadataSlices,
-  }), [startParamPayload, clearStartParam, userCrewInfo, userMetadataSlices]);
+  }), [startParamPayload, clearStartParam, userCrewInfo, userCrewMemberships, userMetadataSlices]);
 
   const cartValue = useMemo<AppCartContextData>(() => ({
     cartScopeVersion: 1,
@@ -317,6 +333,7 @@ export const useAppContext = (): AppContextData => {
       refreshDbUser: defaultRefreshDbUser,
       clearStartParam: defaultClearStartParam,
       userCrewInfo: null,
+      userCrewMemberships: [],
       userMetadataSlices: { cyberFitness: null, strikeball: null, franchizeProfiles: null },
       activeLobby: null,
       cartScopeVersion: 1,
@@ -335,6 +352,7 @@ export const useAppContext = (): AppContextData => {
       startParamPayload: null,
       clearStartParam: defaultClearStartParam,
       userCrewInfo: null,
+      userCrewMemberships: [],
       userMetadataSlices: { cyberFitness: null, strikeball: null, franchizeProfiles: null },
     }),
     ...(strikeball ?? { activeLobby: null }),

@@ -10,6 +10,7 @@ type RentalMetadata = Record<string, any> | null;
 interface FranchizeRentalDocumentsPanelProps {
   rentalId: string;
   ownerId: string;
+  crewId: string;
   status: string;
   metadata: RentalMetadata;
   palette: {
@@ -30,8 +31,8 @@ const freezeChecklistOptions = [
   "Клиент подписал условия",
 ];
 
-export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metadata, palette, isAuto = false }: FranchizeRentalDocumentsPanelProps) {
-  const { dbUser } = useAppContext();
+export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, status, metadata, palette, isAuto = false }: FranchizeRentalDocumentsPanelProps) {
+  const { dbUser, userCrewMemberships } = useAppContext();
 
   // All themed values — CSS vars for auto, palette values for manual themes
   const theme = useMemo(() => {
@@ -69,9 +70,15 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, status, metad
   const [damageNotes, setDamageNotes] = useState("");
 
   const isOwner = dbUser?.user_id === ownerId;
+  const isCrewAdmin = useMemo(() => {
+    if (isOwner) return true;
+    return userCrewMemberships.some(
+      (m) => m.crewId === crewId && ["owner", "admin", "co_owner"].includes(m.role)
+    );
+  }, [isOwner, userCrewMemberships, crewId]);
   const pickupFreeze = (metadata?.pickup_freeze ?? null) as Record<string, any> | null;
   const damageReports = useMemo(() => (Array.isArray(metadata?.damage_reports) ? metadata?.damage_reports : []), [metadata]);
-  const canFreeze = isOwner && ["pending_confirmation", "confirmed"].includes(status);
+  const canFreeze = isCrewAdmin && ["pending_confirmation", "confirmed"].includes(status);
 
   const toggleChecklist = (item: string) => {
     setChecklist((prev) => (prev.includes(item) ? prev.filter((it) => it !== item) : [...prev, item]));

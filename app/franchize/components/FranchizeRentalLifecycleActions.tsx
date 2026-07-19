@@ -14,6 +14,7 @@ interface FranchizeRentalLifecycleActionsProps {
   rentalId: string;
   ownerId: string;
   renterId: string;
+  crewId: string;
   status: string;
   paymentStatus: string;
   hasPickupFreeze: boolean;
@@ -25,18 +26,21 @@ interface FranchizeRentalLifecycleActionsProps {
     textPrimary: string;
     textSecondary: string;
   };
+  isAuto?: boolean;
 }
 
 export function FranchizeRentalLifecycleActions({
   rentalId,
   ownerId,
   renterId,
+  crewId,
   status,
   paymentStatus,
   hasPickupFreeze,
   palette,
+  isAuto = false,
 }: FranchizeRentalLifecycleActionsProps) {
-  const { dbUser } = useAppContext();
+  const { dbUser, userCrewMemberships } = useAppContext();
   const router = useRouter();
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -45,8 +49,12 @@ export function FranchizeRentalLifecycleActions({
     if (!dbUser?.user_id) return "guest" as const;
     if (dbUser.user_id === ownerId) return "owner" as const;
     if (dbUser.user_id === renterId) return "renter" as const;
+    // Check if user is a crew member with admin/co_owner/owner role
+    const membership = userCrewMemberships.find((m) => m.crewId === crewId);
+    if (membership && ["owner", "admin", "co_owner"].includes(membership.role)) return "owner" as const;
+    if (membership) return "member" as const;
     return "guest" as const;
-  }, [dbUser?.user_id, ownerId, renterId]);
+  }, [dbUser?.user_id, ownerId, renterId, userCrewMemberships, crewId]);
 
   const withAction = (name: string, callback: () => Promise<void>) => {
     setPendingAction(name);
@@ -87,16 +95,34 @@ export function FranchizeRentalLifecycleActions({
   const canUploadStartPhoto = role === "renter" && ["pending_confirmation", "confirmed"].includes(status);
   const canUploadEndPhoto = role === "renter" && status === "active";
 
+  // Themed CSS vars
+  const lifecycleVars = useMemo(() => {
+    if (isAuto) {
+      return {
+        "--lifecycle-bg": "color-mix(in srgb, var(--franchize-bg-card) 80%, transparent)",
+        "--lifecycle-border": "var(--franchize-border-soft)",
+        "--lifecycle-muted": "var(--franchize-text-secondary)",
+        "--lifecycle-text": "var(--franchize-text-primary)",
+        "--lifecycle-accent": "var(--franchize-accent-main)",
+        "--lifecycle-accent-hover": "color-mix(in srgb, var(--franchize-accent-main) 85%, white)",
+      } as React.CSSProperties;
+    }
+    return {
+      "--lifecycle-bg": `${palette.bgCard}CC`,
+      "--lifecycle-border": palette.borderSoft,
+      "--lifecycle-muted": palette.textSecondary,
+      "--lifecycle-text": palette.textPrimary,
+      "--lifecycle-accent": palette.accentMain,
+      "--lifecycle-accent-hover": palette.accentMainHover,
+    } as React.CSSProperties;
+  }, [isAuto, palette]);
+
   return (
     <div
-      className="mt-4 rounded-2xl border bg-[var(--lifecycle-bg)] p-3"
+      className="mt-4 rounded-2xl border p-3"
       style={{
-        ["--lifecycle-bg" as string]: `${palette.bgCard}CC`,
-        ["--lifecycle-border" as string]: palette.borderSoft,
-        ["--lifecycle-muted" as string]: palette.textSecondary,
-        ["--lifecycle-text" as string]: palette.textPrimary,
-        ["--lifecycle-accent" as string]: palette.accentMain,
-        ["--lifecycle-accent-hover" as string]: palette.accentMainHover,
+        ...lifecycleVars,
+        backgroundColor: "var(--lifecycle-bg)",
         borderColor: "var(--lifecycle-border)",
       }}
     >
@@ -169,7 +195,7 @@ export function FranchizeRentalLifecycleActions({
                   return;
                 }
                 const result = await initiateTelegramRentalPhotoUpload(rentalId, dbUser.user_id, "start");
-                if (!result.success) {
+                if (!result.success || !result.deepLink) {
                   toast.error(result.error || "Не удалось открыть сценарий фото ДО.");
                   return;
                 }
@@ -193,7 +219,7 @@ export function FranchizeRentalLifecycleActions({
                   return;
                 }
                 const result = await initiateTelegramRentalPhotoUpload(rentalId, dbUser.user_id, "end");
-                if (!result.success) {
+                if (!result.success || !result.deepLink) {
                   toast.error(result.error || "Не удалось открыть сценарий фото ПОСЛЕ.");
                   return;
                 }

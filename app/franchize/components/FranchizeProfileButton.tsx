@@ -90,6 +90,12 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   const displayName = dbUser?.username || dbUser?.full_name || user?.username || user?.first_name || "Operator";
   const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const userIsAdmin = useIsAdmin();
+  const { userCrewMemberships } = useAppContext();
+  // Check if user has admin-level role for the current crew
+  const isCurrentCrewAdmin = useMemo(() => {
+    if (!effectiveSlug) return false;
+    return userCrewMemberships.some((m) => m.slug === effectiveSlug && ["owner", "admin", "co_owner"].includes(m.role));
+  }, [userCrewMemberships, effectiveSlug]);
   const scopeSlug = normalizeSlug(currentSlug || userCrewInfo?.slug);
   // FIX: If currentSlug was explicitly provided (from CrewHeader), prefer it.
   // No longer falls back to "vip-bike" — empty slug is handled gracefully.
@@ -300,16 +306,13 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem asChild>
-            <Link href="/settings" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-              <Settings className="mr-2 h-4 w-4" />
-              <span className="truncate">Настройки</span>
-            </Link>
-          </DropdownMenuItem>
-
-          {/* Theme Toggle */}
+          {/* Theme Toggle — persists to both next-themes and localStorage */}
           <DropdownMenuItem
-            onSelect={() => setTheme(theme === "dark" ? "light" : "dark")}
+            onSelect={() => {
+              const next = theme === "dark" ? "light" : "dark";
+              setTheme(next);
+              localStorage.setItem("theme", next);
+            }}
             className="cursor-pointer flex min-w-0 items-center gap-2 w-full"
           >
             {theme === "dark" ? (
@@ -327,7 +330,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             </Link>
           </DropdownMenuItem>
 
-          {userIsAdmin ? (
+          {(userIsAdmin || isCurrentCrewAdmin) && effectiveSlug ? (
             <DropdownMenuItem asChild>
               <Link href={franchizeAdminHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
                 <Shield className="mr-2 h-4 w-4 shrink-0" />
@@ -429,9 +432,9 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           {userCrewInfo?.slug && (
             <>
               <DropdownMenuItem asChild>
-                <Link href={`/crews/${userCrewInfo.slug}`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-                  <Palette className="mr-2 h-4 w-4" />
-                  <span className="truncate">Мой экипаж</span>
+                <Link href={`/franchize/${userCrewInfo.slug}/crew`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                  <Users className="mr-2 h-4 w-4" />
+                  <span className="truncate">Управление экипажем</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
@@ -439,12 +442,6 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
                   <UserPlus className="mr-2 h-4 w-4" />
                   <span className="truncate">Пригласить в экипаж</span>
                 </button>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/franchize/${userCrewInfo.slug}/crew`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-                  <Users className="mr-2 h-4 w-4" />
-                  <span className="truncate">Управление экипажем</span>
-                </Link>
               </DropdownMenuItem>
             </>
           )}
