@@ -10,11 +10,13 @@ import Link from "next/link";
 import { Users, Clock, Settings, Calendar } from "lucide-react";
 
 export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlug: string; initialCrew: any }) {
-    const { dbUser, userCrewInfo } = useAppContext();
+    const { userCrewMemberships } = useAppContext();
     const [crew, setCrew] = useState<any>(initialCrew);
     const [loading, setLoading] = useState(false);
 
-    const isCrewOwner = userCrewInfo?.is_owner && userCrewInfo?.slug === crewSlug;
+    const isCrewAdmin = userCrewMemberships.some(
+      (m) => m.slug === crewSlug && ["owner", "admin", "co_owner"].includes(m.role)
+    );
 
     useEffect(() => {
         if (!crewSlug) return;
@@ -25,7 +27,7 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
         });
     }, [crewSlug]);
 
-    if (loading && !crew) return <Loading variant="bike" text="LOADING..." />;
+    if (loading && !crew) return <Loading variant="bike" text="Загрузка..." />;
 
     const meta = crew?.metadata || {};
     const isProvider = meta.is_provider;
@@ -40,7 +42,7 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
                     <h1 className="text-3xl font-bold uppercase tracking-tighter">Управление экипажем</h1>
                     <p className="text-muted-foreground text-sm mt-1">{crew?.name || crewSlug}</p>
                 </div>
-                {isProvider && <Badge className="bg-primary">PROVIDER</Badge>}
+                {isProvider && <Badge className="bg-primary">ПРОВАЙДЕР</Badge>}
             </div>
 
             {/* Quick Stats */}
@@ -51,7 +53,7 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
                             <Users className="h-5 w-5 text-primary" />
                             <div>
                                 <div className="text-2xl font-bold">{memberCount}</div>
-                                <div className="text-xs text-muted-foreground">Members</div>
+                                <div className="text-xs text-muted-foreground">Участников</div>
                             </div>
                         </div>
                     </CardContent>
@@ -62,7 +64,7 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
                             <Calendar className="h-5 w-5 text-primary" />
                             <div>
                                 <div className="text-2xl font-bold">{vehicleCount}</div>
-                                <div className="text-xs text-muted-foreground">Vehicles</div>
+                                <div className="text-xs text-muted-foreground">Техники</div>
                             </div>
                         </div>
                     </CardContent>
@@ -72,8 +74,8 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
                         <div className="flex items-center gap-3">
                             <Clock className="h-5 w-5 text-primary" />
                             <div>
-                                <div className="text-2xl font-bold">Active</div>
-                                <div className="text-xs text-muted-foreground">Status</div>
+                                <div className="text-2xl font-bold">{crew?.activeShifts ?? 0}</div>
+                                <div className="text-xs text-muted-foreground">На смене</div>
                             </div>
                         </div>
                     </CardContent>
@@ -84,7 +86,7 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
                             <Settings className="h-5 w-5 text-primary" />
                             <div>
                                 <div className="text-2xl font-bold">24/7</div>
-                                <div className="text-xs text-muted-foreground">Ops</div>
+                                <div className="text-xs text-muted-foreground">Поддержка</div>
                             </div>
                         </div>
                     </CardContent>
@@ -98,14 +100,14 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
                         <CardContent className="p-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <Users className="h-6 w-6 text-primary" />
-                                <h2 className="text-lg font-semibold">Member Roster</h2>
+                                <h2 className="text-lg font-semibold">Участники</h2>
                             </div>
                             <p className="text-muted-foreground text-sm mb-4">
-                                View all crew members, their roles, and live status.
+                                Список экипажа, роли и статусы участников.
                             </p>
                             <div className="flex items-center justify-between">
-                                <span className="text-xs text-muted-foreground">{memberCount} members</span>
-                                <Badge variant="outline">View →</Badge>
+                                <span className="text-xs text-muted-foreground">{memberCount} участников</span>
+                                <Badge variant="outline">Открыть →</Badge>
                             </div>
                         </CardContent>
                     </Link>
@@ -116,31 +118,31 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
                         <CardContent className="p-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <Clock className="h-6 w-6 text-primary" />
-                                <h2 className="text-lg font-semibold">Shift Management</h2>
+                                <h2 className="text-lg font-semibold">Смены</h2>
                             </div>
                             <p className="text-muted-foreground text-sm mb-4">
-                                View active shifts, manage work schedules, and generate reports.
+                                Активные смены, график работы и отчёты.
                             </p>
                             <div className="flex items-center justify-between">
-                                <span className="text-xs text-muted-foreground">Shift tracking</span>
-                                <Badge variant="outline">View →</Badge>
+                                <span className="text-xs text-muted-foreground">Учёт смен</span>
+                                <Badge variant="outline">Открыть →</Badge>
                             </div>
                         </CardContent>
                     </Link>
                 </Card>
 
-                {isCrewOwner && (
+                {isCrewAdmin && (
                     <Card className="md:col-span-2 hover:border-primary transition-colors">
-                        <Link href={`/crews/${crewSlug}`}>
+                        <Link href={`/franchize/${crewSlug}/admin`}>
                             <CardContent className="p-6">
                                 <div className="flex items-center gap-3 mb-4">
                                     <Settings className="h-6 w-6 text-primary" />
-                                    <h2 className="text-lg font-semibold">Crew Settings (Public View)</h2>
+                                    <h2 className="text-lg font-semibold">Настройки экипажа</h2>
                                 </div>
                                 <p className="text-muted-foreground text-sm mb-4">
-                                    Manage crew profile, services, amenities, and public appearance.
+                                    Управление каталогом, ценами, отзывами и оформлением.
                                 </p>
-                                <Badge variant="outline">Open Settings →</Badge>
+                                <Badge variant="outline">Открыть →</Badge>
                             </CardContent>
                         </Link>
                     </Card>
