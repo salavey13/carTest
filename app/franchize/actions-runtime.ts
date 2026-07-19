@@ -3,7 +3,7 @@
 import { createInvoice, supabaseAdmin } from "@/lib/supabase-server";
 import { notifyAdmin, sendTelegramDocument, sendTelegramInvoice } from "@/app/actions";
 import { logger } from "@/lib/logger";
-import { noStore } from "next/cache";
+import { unstable_noStore as noStore } from "next/cache";
 import nodemailer from "nodemailer";
 import { z } from "zod";
 import { randomUUID } from "crypto";
