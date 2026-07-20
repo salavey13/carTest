@@ -2,6 +2,7 @@
 
 import { Avatar } from "./Avatar";
 import { SourceBadge } from "./SourceBadge";
+import { IdentityBadge } from "./IdentityBadge";
 import { CheckCircle, Trash2, ChevronDown, ChevronRight, AlertCircle, FileText, TrendingUp, Phone, Send } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
 import { SOURCE_META, STAGE_LABELS } from "../leads-constants";
@@ -62,6 +63,7 @@ export function LeadCard({ lead, T, isSelected, onSelect, onDismiss, todos }: Le
             {/* Tags row */}
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <SourceBadge source={lead.source} />
+              <IdentityBadge state={lead.identityState} />
               <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `${tempColor}15`, color: tempColor }}>
                 {tempLabel}
               </span>

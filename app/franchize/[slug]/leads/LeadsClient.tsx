@@ -16,6 +16,7 @@ import { EmptyState } from "./components/EmptyState";
 import { LeadDetailContent } from "./components/LeadDetailContent";
 import { Avatar } from "./components/Avatar";
 import { SourceBadge } from "./components/SourceBadge";
+import { IdentityBadge } from "./components/IdentityBadge";
 
 // Import constants
 import {
@@ -64,6 +65,7 @@ export function LeadsClient({
   const [filterSource, setFilterSource] = useState<string>("all");
   const [segment, setSegment] = useState<Segment>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [hidePlaceholders, setHidePlaceholders] = useState(true); // Hide operator placeholders by default
 
   const { dbUser } = useAppContext();
   const T = useTheme({ isAuto, isLightTheme, textColor, bgColor, accentColor });
@@ -105,16 +107,24 @@ export function LeadsClient({
     availableSources,
     hasFilters,
     boardColumns,
-  } = useFilteredSortedLeads(leads, debouncedSearchQuery, filterSource, segment, getTodosForLead, sortMode);
+  } = useFilteredSortedLeads(leads, debouncedSearchQuery, filterSource, segment, getTodosForLead, sortMode, hidePlaceholders);
+
+  // Filter out operator placeholders from segment counts for cleaner metrics
+  const activeLeads = useMemo(() => 
+    hidePlaceholders 
+      ? leads.filter((l) => l.identityState !== 'operator_placeholder')
+      : leads,
+    [leads, hidePlaceholders]
+  );
 
   // Segment counts for toolbar tabs
   const segmentCounts = useMemo(() => ({
-    all: leads.length,
+    all: activeLeads.length,
     hot: hot.length,
     warm: warm.length,
     verified: verified.length,
-    troubled: leads.filter((l) => l.troubled).length,
-  }), [leads, hot, warm, verified]);
+    troubled: activeLeads.filter((l) => l.troubled).length,
+  }), [activeLeads, hot, warm, verified]);
 
   // Scroll to selected lead
   useEffect(() => {
@@ -186,7 +196,7 @@ export function LeadsClient({
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
-      <LeadsKPICards leads={leads} hot={hot} verified={verified} todos={todos} T={T} />
+      <LeadsKPICards leads={activeLeads} hot={hot} verified={verified} todos={todos} T={T} />
 
       <LeadsToolbar
         searchQuery={searchQuery} setSearchQuery={setSearchQuery}
@@ -196,6 +206,7 @@ export function LeadsClient({
         segment={segment} setSegment={setSegment}
         viewMode={viewMode} setViewMode={setViewMode}
         segmentCounts={segmentCounts}
+        hidePlaceholders={hidePlaceholders} setHidePlaceholders={setHidePlaceholders}
         T={T} isAuto={isAuto}
       />
 
@@ -267,6 +278,9 @@ export function LeadsClient({
                         </div>
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           <SourceBadge source={selectedLead.source} size="md" />
+                          {selectedLead.identityState && selectedLead.identityState !== 'claimed_user' && (
+                            <IdentityBadge state={selectedLead.identityState} />
+                          )}
                           {selectedLead.bikeTitle && (
                             <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ backgroundColor: T.borderSoft, color: T.text }}>
                               <Bike className="h-3 w-3" /> {selectedLead.bikeTitle}

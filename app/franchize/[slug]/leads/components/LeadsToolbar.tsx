@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, X, LayoutList, Columns3, Download, Filter } from "lucide-react";
+import { Search, X, LayoutList, Columns3, Download, Filter, ShieldAlert } from "lucide-react";
 import { Users, Flame, CheckCircle, Phone, AlertCircle } from "lucide-react";
 import { type Segment } from "../leads-constants";
 
@@ -25,6 +25,8 @@ export function LeadsToolbar({
   viewMode,
   setViewMode,
   segmentCounts,
+  hidePlaceholders,
+  setHidePlaceholders,
   T,
   isAuto,
 }: {
@@ -40,6 +42,8 @@ export function LeadsToolbar({
   viewMode: "list" | "board";
   setViewMode: (v: "list" | "board") => void;
   segmentCounts?: Partial<Record<Segment, number>>;
+  hidePlaceholders: boolean;
+  setHidePlaceholders: (v: boolean) => void;
   T: any;
   isAuto: boolean;
 }) {
@@ -84,6 +88,22 @@ export function LeadsToolbar({
               <Columns3 className="h-3.5 w-3.5" /> Воронка
             </button>
           </div>
+
+          <button
+            onClick={() => setHidePlaceholders(!hidePlaceholders)}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+              hidePlaceholders ? '' : 'opacity-50'
+            }`}
+            style={{
+              borderColor: hidePlaceholders ? '#f59e0b40' : T.border,
+              color: hidePlaceholders ? '#f59e0b' : T.textMuted,
+              backgroundColor: hidePlaceholders ? '#f59e0b10' : 'transparent',
+            }}
+            title={hidePlaceholders ? 'Показать заглушки операторов' : 'Скрыть заглушки операторов'}
+          >
+            <ShieldAlert className="h-3.5 w-3.5" />
+            {hidePlaceholders ? 'Без операторов' : 'С операторами'}
+          </button>
 
           <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)}
             className="rounded-xl border px-3 py-2 text-xs outline-none"

@@ -92,9 +92,20 @@ export function filterLeads(
   searchQuery: string,
   filterSource: string,
   segment: "all" | "hot" | "verified" | "warm" | "troubled",
-  getTodosForLead: (lead: LeadRow) => LeadTodoRow[]
+  getTodosForLead: (lead: LeadRow) => LeadTodoRow[],
+  hidePlaceholders: boolean = false,
 ): LeadRow[] {
   let result = leads;
+
+  // Hide operator-placeholder leads that have no real activity
+  if (hidePlaceholders) {
+    result = result.filter((l) => 
+      l.identityState !== 'operator_placeholder' || 
+      l.rentals.length > 0 || 
+      l.sales.length > 0 ||
+      getTodosForLead(l).length > 0
+    );
+  }
 
   if (searchQuery.trim()) {
     const q = searchQuery.toLowerCase();
