@@ -12,7 +12,6 @@ import { RentalChecklistPanel } from "../../../components/RentalChecklistPanel";
 import { RentalMessageInput } from "../../../components/RentalMessageInput";
 import { RentalReturnChecklist } from "../../../components/RentalReturnChecklist";
 import { RentalTelegramGuard } from "../../../components/RentalTelegramGuard";
-import { getTelegramWebAppPageHref } from "../../../lib/telegram-links";
 import { crewPaletteForSurface, readablePaletteTextOnColor } from "../../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../../metadata";
 import { formatRuDate } from "../../../lib/date-utils";
@@ -68,7 +67,9 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
 
   const dealStarted = rental.found || rental.paymentStatus === "interest_paid";
   const catalogHref = `/franchize/${resolvedSlug}`;
-  const profileHref = getTelegramWebAppPageHref(`franchize/${resolvedSlug}/profile`, crew.contacts.telegramBotUsername) || `/franchize/${resolvedSlug}/profile`;
+  // Use internal relative path for profile link — inside TG WebApp the mini app
+  // can navigate internally; the TG deep link (with startapp) is fragile here.
+  const profileHref = `/franchize/${resolvedSlug}/profile`;
   const status = rental.status || "pending_confirmation";
   const statusStyle = statusPalette[status] || statusPalette.pending_confirmation;
 

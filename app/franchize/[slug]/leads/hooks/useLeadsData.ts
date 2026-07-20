@@ -44,10 +44,24 @@ function extractTodoLeadId(todo: LeadTodoRow): string | null {
 
 export function useTodosMapping(todos: LeadTodoRow[]) {
   const getTodosForLead = useCallback((lead: LeadRow): LeadTodoRow[] => {
+    // Build rental_id set for this lead — enables rental_id-based todo matching
+    const leadRentalIds = new Set(lead.rentals.map((r) => r.rentalId).filter(Boolean));
     const seen = new Set<string>();
     return todos.filter((t) => {
-      // Match ONLY by lead_id (user_id UUID) — never by phone, which causes
-      // cross-lead pollution when multiple leads share a contact number.
+      // 1. Match by rental_id from description JSON (strongest — works before QR claim)
+      if (t.description) {
+        try {
+          const desc = JSON.parse(t.description);
+          if (desc.rental_id && leadRentalIds.has(desc.rental_id)) {
+            const key = t.id || `rental:${desc.rental_id}|${t.title}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          }
+        } catch { /* ignore */ }
+      }
+
+      // 2. Match by identity key (user_id/phone/lead_id)
       const todoLeadId = extractTodoLeadId(t);
       if (!todoLeadId || todoLeadId !== lead.user_id) return false;
       // Dedup by todo id, fallback to title
