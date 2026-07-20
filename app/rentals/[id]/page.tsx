@@ -321,8 +321,13 @@ export default function RentalJourneyPage({ params }: { params: { id: string } }
             </div>
             <div className="container relative z-10 mx-auto max-w-3xl">
                 <div className="mb-8 rounded-3xl border border-border/70 bg-card/55 p-6 backdrop-blur-xl">
-                    <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/30 px-4 py-2 text-xs text-white/90">
-                        <VibeContentRenderer content="::FaRoute::" className="text-primary" /> RENTAL EXECUTION FLOW
+                    <div className="mb-3 flex items-center gap-2">
+                        <Link href="/rentals" className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/30 px-3 py-1.5 text-xs text-white/80 hover:text-white transition-colors">
+                            ← Назад
+                        </Link>
+                        <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/30 px-4 py-2 text-xs text-white/90">
+                            <VibeContentRenderer content="::FaRoute::" className="text-primary" /> RENTAL EXECUTION FLOW
+                        </span>
                     </div>
                     <h1 className="mb-2 font-orbitron text-3xl">Путь аренды</h1>
                     <p className="mb-6 text-sm font-mono text-muted-foreground">ID: {rental.rental_id}</p>

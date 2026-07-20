@@ -65,9 +65,22 @@ export function fmtMoney(n: number | undefined): string {
 }
 
 export function getTodoLeadId(todo: LeadTodoRow): string | null {
+  // 1. user_id column — canonical Telegram chat_id
+  if (todo.user_id && /^\d{1,9}$/.test(todo.user_id)) return todo.user_id;
+  // 2. phone column — phone-only leads
+  if (todo.phone) return todo.phone;
+  // 3. lead_id column — legacy fallback
   if (todo.lead_id) return todo.lead_id;
-  if (!todo.description) return null;
-  try { return JSON.parse(todo.description).lead_id || null; } catch { return null; }
+  // 4. description JSON — legacy fallback
+  if (todo.description) {
+    try {
+      const desc = JSON.parse(todo.description);
+      if (desc.user_id && typeof desc.user_id === 'string' && /^\d{1,9}$/.test(desc.user_id)) return desc.user_id;
+      if (desc.phone && typeof desc.phone === 'string') return desc.phone;
+      if (desc.lead_id && typeof desc.lead_id === 'string') return desc.lead_id;
+    } catch { /* ignore */ }
+  }
+  return null;
 }
 
 export function getTodoLeadPhone(todo: LeadTodoRow): string | null {
@@ -77,12 +90,24 @@ export function getTodoLeadPhone(todo: LeadTodoRow): string | null {
 
 export function getTodosForLead(todos: LeadTodoRow[], lead: LeadRow): LeadTodoRow[] {
   const leadUserIds = new Set([lead.user_id, lead.phone].filter(Boolean));
+  // Build rental_id lookup from lead's rentals for rental_id-based matching
+  const leadRentalIds = new Set(lead.rentals.map((r) => r.rentalId).filter(Boolean));
   return todos.filter((t) => {
+    // 1. Match by rental_id (strongest link — works before QR claim)
+    if (t.rental_id && leadRentalIds.has(t.rental_id)) return true;
+    // 2. Match by identity fields
     const leadId = getTodoLeadId(t);
     if (leadId && leadUserIds.has(leadId)) return true;
     const leadPhone = getTodoLeadPhone(t);
     if (leadPhone && lead.phone && leadPhone === lead.phone) return true;
     if (leadId && lead.phone && leadId === lead.phone) return true;
+    // 3. Match by rental_id from description JSON (legacy)
+    if (t.description) {
+      try {
+        const desc = JSON.parse(t.description);
+        if (desc.rental_id && typeof desc.rental_id === 'string' && leadRentalIds.has(desc.rental_id)) return true;
+      } catch { /* ignore */ }
+    }
     return false;
   });
 }
