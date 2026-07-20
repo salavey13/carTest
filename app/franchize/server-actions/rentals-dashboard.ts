@@ -1976,9 +1976,10 @@ export async function updateRentalStatus(input: {
       },
     };
 
-    // Store odometer values if provided
-    if (odometerBefore != null) updatePayload.odometer_before = odometerBefore;
-    if (odometerAfter != null) updatePayload.odometer_after = odometerAfter;
+    // Store odometer values in metadata JSON (no dedicated columns on rentals table)
+    const meta = updatePayload.metadata as Record<string, unknown>;
+    if (odometerBefore != null) meta.odometer_before = odometerBefore;
+    if (odometerAfter != null) meta.odometer_after = odometerAfter;
 
     const { error: updateError } = await supabaseAdmin
       .from("rentals")
