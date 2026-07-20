@@ -3,7 +3,6 @@
 import { getRentalDetails, addRentalPhoto, confirmVehiclePickup, confirmVehicleReturn, initiateTelegramRentalPhotoUpload } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
 import Image from 'next/image';
-import Link from 'next/link';
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Button } from '@/components/ui/button';
@@ -196,16 +195,44 @@ export default function RentalJourneyPage({ params }: { params: { id: string } }
         
         const fetchData = async () => {
             setLoading(true);
-            const res = await getRentalDetails(params.id, dbUser.user_id);
-            if (res.success && res.data) {
-                setRental(res.data as Rental);
-            } else {
-                setError(res.error || "Аренда не найдена или у вас нет доступа.");
+            try {
+                const res = await getRentalDetails(params.id, dbUser.user_id);
+                if (res.success && res.data) {
+                    setRental(res.data as Rental);
+                } else {
+                    setError(res.error || "Аренда не найдена или у вас нет доступа.");
+                }
+            } catch (e) {
+                setError("Ошибка загрузки данных аренды.");
+                console.error("[RentalPage] fetch error", e);
             }
             setLoading(false);
         };
         fetchData();
     }, [params.id, dbUser, isAppLoading]);
+
+    // ── Safety net: Escape key → go home ──
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                window.location.href = "/vipbikerental";
+            }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, []);
+
+    // ── Safety net: Telegram BackButton setup ──
+    useEffect(() => {
+        const webApp = (window as any).Telegram?.WebApp;
+        const bb = webApp?.BackButton;
+        if (bb && webApp?.isVersionAtLeast?.("6.1")) {
+            bb.show();
+            const handler = () => { window.location.href = "/vipbikerental"; };
+            bb.onClick(handler);
+            return () => { bb.offClick(handler); bb.hide(); };
+        }
+    }, []);
     
     const [currentStep, stepStates] = useMemo(() => getRentalStepStates(rental), [rental]);
     const userRole: UserRole = useMemo(() => {
@@ -322,9 +349,12 @@ export default function RentalJourneyPage({ params }: { params: { id: string } }
             <div className="container relative z-10 mx-auto max-w-3xl">
                 <div className="mb-8 rounded-3xl border border-border/70 bg-card/55 p-6 backdrop-blur-xl">
                     <div className="mb-3 flex items-center gap-2">
-                        <Link href="/rentals" className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/30 px-3 py-1.5 text-xs text-white/80 hover:text-white transition-colors">
-                            ← Назад
-                        </Link>
+                        <button
+                            onClick={() => window.location.href = "/vipbikerental"}
+                            className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/30 px-3 py-1.5 text-xs text-white/80 hover:text-white transition-colors cursor-pointer"
+                        >
+                            ← На главную
+                        </button>
                         <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/30 px-4 py-2 text-xs text-white/90">
                             <VibeContentRenderer content="::FaRoute::" className="text-primary" /> RENTAL EXECUTION FLOW
                         </span>
@@ -332,13 +362,13 @@ export default function RentalJourneyPage({ params }: { params: { id: string } }
                     <h1 className="mb-2 font-orbitron text-3xl">Путь аренды</h1>
                     <p className="mb-6 text-sm font-mono text-muted-foreground">ID: {rental.rental_id}</p>
                     {rental.vehicle && (
-                        <Link href={`/rent/${rental.vehicle.id}`} className="flex items-center gap-4 rounded-xl border border-border/60 bg-card/60 p-3 transition-colors hover:bg-card/80">
+                        <a href={`/rent/${rental.vehicle.id}`} className="flex items-center gap-4 rounded-xl border border-border/60 bg-card/60 p-3 transition-colors hover:bg-card/80 no-underline">
                             <Image src={rental.vehicle.image_url || '/placeholder.svg'} alt={rental.vehicle.model || 'V'} width={80} height={80} className="aspect-square rounded-lg object-cover" />
                             <div>
                                 <p className="text-xl font-bold">{rental.vehicle.make} {rental.vehicle.model}</p>
                                 <p className="text-muted-foreground">{rental.vehicle.type === 'bike' ? 'Мотоцикл' : 'Автомобиль'}</p>
                             </div>
-                        </Link>
+                        </a>
                     )}
                 </div>
                 <div className="relative rounded-3xl border border-border/70 bg-card/45 p-5 backdrop-blur-sm">
