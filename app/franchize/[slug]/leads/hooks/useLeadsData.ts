@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useRef } from "react";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
 import { 
   filterLeads, 
@@ -48,7 +48,16 @@ export function useTodosMapping(todos: LeadTodoRow[]) {
     const leadRentalIds = new Set(lead.rentals.map((r) => r.rentalId).filter(Boolean));
     const seen = new Set<string>();
     return todos.filter((t) => {
-      // 1. Match by rental_id from description JSON (strongest — works before QR claim)
+      // 1. Match by rental_id from todo's direct column (Phase 3c FK — primary)
+      const todoRentalId = t.rental_id || null;
+      if (todoRentalId && leadRentalIds.has(todoRentalId)) {
+        const key = t.id || `rental:${todoRentalId}|${t.title}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }
+
+      // 2. Match by rental_id from description JSON (legacy fallback)
       if (t.description) {
         try {
           const desc = JSON.parse(t.description);
@@ -61,7 +70,7 @@ export function useTodosMapping(todos: LeadTodoRow[]) {
         } catch { /* ignore */ }
       }
 
-      // 2. Match by identity key (user_id/phone/lead_id)
+      // 3. Match by identity key (user_id/phone/lead_id)
       const todoLeadId = extractTodoLeadId(t);
       if (!todoLeadId || todoLeadId !== lead.user_id) return false;
       // Dedup by todo id, fallback to title
@@ -72,7 +81,21 @@ export function useTodosMapping(todos: LeadTodoRow[]) {
     });
   }, [todos]);
 
-  return { getTodosForLead };
+  /** Stable result cache: same lead + same todos → same array reference */
+  const cache = useRef(new Map<string, LeadTodoRow[]>()).current;
+  const getTodosForLeadStable = useCallback((lead: LeadRow): LeadTodoRow[] => {
+    const cacheKey = lead.user_id;
+    const prev = cache.get(cacheKey);
+    const result = getTodosForLead(lead);
+    // Compare by length + each element id — only update cache if actually changed
+    if (prev && prev.length === result.length && prev.every((t, i) => t.id === result[i]?.id && t.status === result[i]?.status)) {
+      return prev; // same reference = no effect trigger in downstream components
+    }
+    cache.set(cacheKey, result);
+    return result;
+  }, [getTodosForLead, cache]);
+
+  return { getTodosForLead: getTodosForLeadStable };
 }
 
 export function useFilteredSortedLeads(

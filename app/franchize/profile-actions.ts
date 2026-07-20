@@ -308,6 +308,33 @@ export async function saveFranchizeNotificationPreferencesAction(params: {
   return updateError ? { success: false, error: updateError.message } : { success: true };
 }
 
+/**
+ * Save user theme preference (dark/light) to user metadata in Supabase.
+ * This persists the theme across sessions and devices (unlike localStorage).
+ */
+export async function saveUserThemePreferenceAction(params: {
+  userId: string;
+  themeMode: "dark" | "light";
+}): Promise<{ success: boolean; error?: string }> {
+  if (!params.userId) return { success: false, error: "userId is required" };
+
+  const { data: user, error } = await supabaseAdmin.from("users").select("metadata").eq("user_id", params.userId).maybeSingle();
+  if (error) return { success: false, error: error.message };
+
+  const metadata = asRecord(user?.metadata);
+  const next = {
+    ...metadata,
+    theme_mode: params.themeMode,
+  };
+
+  const { error: updateError } = await supabaseAdmin
+    .from("users")
+    .update({ metadata: next, updated_at: new Date().toISOString() })
+    .eq("user_id", params.userId);
+
+  return updateError ? { success: false, error: updateError.message } : { success: true };
+}
+
 export async function getFranchizeActivityDigestAction(params: { userId: string; slug: string }): Promise<{ success: boolean; data?: FranchizeActivityDigest; error?: string }> {
   const { data: rentals, error: rentalsError } = await supabaseAdmin
     .from("rentals")
