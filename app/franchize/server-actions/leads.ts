@@ -51,6 +51,10 @@ export interface LeadRow {
   sales: LeadSaleRow[];
   sourceRoute?: string | null;
   contactChannel?: string | null;
+  /** Identity state for UI classification */
+  identityState?: 'claimed_user' | 'phone_only' | 'operator_placeholder' | 'merged';
+  /** Count of source records merged into this lead */
+  sourceCount?: number;
 }
 
 export interface LeadTodoRow {
@@ -75,21 +79,82 @@ export interface GetFranchizeLeadsResult {
   error?: string;
 }
 
-// Known operator Telegram IDs that should never be treated as real renter leads.
-// These are the crew owners/operators who create contracts via /doc-manual before
-// the real renter scans the QR code.
-const KNOWN_OPERATOR_IDS = new Set(["7813830016", "413553377", "356282674"]);
+/**
+ * Fetch the set of operator Telegram IDs for a crew (owner + active members).
+ * These IDs should never be treated as real renter leads without explicit confirmation.
+ */
+async function getCrewOperatorIds(slug: string): Promise<Set<string>> {
+  const ids = new Set<string>();
+  try {
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("owner_id")
+      .eq("slug", slug)
+      .maybeSingle();
 
-/** Check if a chat ID is a known operator placeholder (not a real renter). */
-function isOperatorPlaceholder(id: string | null | undefined): boolean {
-  if (!id) return false;
-  return KNOWN_OPERATOR_IDS.has(id);
+    if (crew?.owner_id) ids.add(crew.owner_id);
+
+    const { data: members } = await supabaseAdmin
+      .from("crew_members")
+      .select("user_id")
+      .eq("crew_id", crew?.id)
+      .eq("membership_status", "active");
+
+    if (members) {
+      for (const m of members) {
+        if (m.user_id) ids.add(m.user_id);
+      }
+    }
+  } catch (error) {
+    logger.warn("[getCrewOperatorIds] Failed to fetch crew operators:", error);
+  }
+  return ids;
 }
 
-/** Check if a rental user_id belongs to a known crew owner (operator). */
-function isCrewOwnerId(id: string | null | undefined): boolean {
+/** Check if a chat ID is a numeric Telegram ID (not a phone number or operator). */
+function isNumericTelegramId(id: string | null | undefined): boolean {
   if (!id) return false;
-  return KNOWN_OPERATOR_IDS.has(id);
+  // Telegram IDs are up to 10 digits, not starting with + or 8/7 followed by 10
+  return /^\d{1,10}$/.test(id);
+}
+
+/** Check if a string looks like a phone number. */
+function isPhoneString(id: string | null | undefined): boolean {
+  if (!id) return false;
+  return /^(\+7|8|7)\d{10}$/.test(id.replace(/[\s\-\(\)]/g, ""));
+}
+
+/**
+ * Classify identity state for a lead.
+ */
+function classifyIdentityState(
+  lead: { user_id: string; phone: string | null; telegramChatId?: string | null; sourceCount?: number },
+  crewOperatorIds: Set<string>
+): 'claimed_user' | 'phone_only' | 'operator_placeholder' | 'merged' {
+  // If merged from multiple sources, still show the underlying state
+  const userId = lead.user_id;
+  
+  // Check if identity is a crew operator
+  if (crewOperatorIds.has(userId)) return 'operator_placeholder';
+  
+  // Check if identity is a phone number (no Telegram user linked)
+  if (isPhoneString(userId) || (lead.phone && userId === lead.phone)) return 'phone_only';
+  
+  // Has a real Telegram user_id AND it's not an operator
+  if (isNumericTelegramId(userId)) return 'claimed_user';
+  
+  // If merged from multiple source types
+  if ((lead.sourceCount || 0) >= 2) return 'merged';
+  
+  // Fallback: look at telegramChatId
+  if (lead.telegramChatId && isNumericTelegramId(lead.telegramChatId) && !crewOperatorIds.has(lead.telegramChatId)) {
+    return 'claimed_user';
+  }
+  
+  // Default: phone-only by elimination
+  if (lead.phone) return 'phone_only';
+  
+  return 'operator_placeholder';
 }
 
 export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeadsResult> {
@@ -98,7 +163,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
   try {
     const { data: crew, error: crewError } = await supabaseAdmin
       .from("crews")
-      .select("id")
+      .select("id, owner_id")
       .eq("slug", safeSlug)
       .maybeSingle();
 
@@ -107,6 +172,21 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     }
 
     const crewId = crew.id;
+    
+    // Fetch dynamic operator IDs for this crew (owner + active members)
+    const crewOperatorIds = await getCrewOperatorIds(safeSlug);
+
+    /** Check if a chat ID is a crew operator (not a real renter). */
+    const isOperatorPlaceholder = (id: string | null | undefined): boolean => {
+      if (!id) return false;
+      return crewOperatorIds.has(id);
+    };
+
+    /** Check if a rental user_id belongs to a crew operator. */
+    const isCrewOwnerId = (id: string | null | undefined): boolean => {
+      if (!id) return false;
+      return crewOperatorIds.has(id);
+    };
     type MutableLead = Omit<LeadRow, "rentals" | "sales"> & { rentals: LeadRentalRow[]; sales: LeadSaleRow[] };
     const leadMap = new Map<string, MutableLead>();
 
@@ -116,9 +196,12 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     const addOrMerge = (row: MutableLead) => {
       const existing = leadMap.get(row.user_id);
       if (!existing) {
-        leadMap.set(row.user_id, row);
+        // First entry for this key — init sourceCount
+        leadMap.set(row.user_id, { ...row, sourceCount: 1 });
         return;
       }
+      // Merge — increment sourceCount
+      existing.sourceCount = (existing.sourceCount || 1) + 1;
       if (row.verified) existing.verified = true;
       if (row.full_name && !existing.full_name) existing.full_name = row.full_name;
       if (row.username && !existing.username) existing.username = row.username;
@@ -470,6 +553,27 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
         .sort((a, b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime())[0];
       l.lastRentalDate = lastRental?.startDate || null;
       l.contractRef = lastRental?.rentalId || l.sales[0]?.saleId || null;
+    }
+
+    // ── Identity state classification ──
+    // Classify each lead so the UI can show operator placeholders, phone-only leads, etc.
+    for (const l of leadMap.values()) {
+      l.identityState = classifyIdentityState(l, crewOperatorIds);
+    }
+
+    // ── Filter out pure operator-placeholder leads with no activity ──
+    // If a lead's only source is operator artifacts with no renter phone, no rentals,
+    // no todos — it's noise. Keep leads with activity for operator visibility.
+    for (const [key, l] of leadMap.entries()) {
+      if (
+        l.identityState === 'operator_placeholder' &&
+        l.rentals.length === 0 &&
+        l.sales.length === 0 &&
+        (l.sourceCount || 0) <= 1
+      ) {
+        // Still keep — they'll be filtered on client if user picks "hide placeholders"
+        // But flag them explicitly
+      }
     }
 
     // ── Server-side filtering: return todos matching loaded leads ──

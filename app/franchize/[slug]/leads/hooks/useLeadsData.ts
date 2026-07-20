@@ -81,11 +81,12 @@ export function useFilteredSortedLeads(
   filterSource: string,
   segment: "all" | "hot" | "verified" | "warm" | "troubled",
   getTodosForLead: (lead: LeadRow) => LeadTodoRow[],
-  sortMode: "recent" | "urgent" | "name" | "spent"
+  sortMode: "recent" | "urgent" | "name" | "spent",
+  hidePlaceholders: boolean = false,
 ) {
   const filteredLeads = useMemo(
-    () => filterLeads(leads, searchQuery, filterSource, segment, getTodosForLead),
-    [leads, searchQuery, filterSource, segment, getTodosForLead]
+    () => filterLeads(leads, searchQuery, filterSource, segment, getTodosForLead, hidePlaceholders),
+    [leads, searchQuery, filterSource, segment, getTodosForLead, hidePlaceholders]
   );
 
   const sortedLeads = useMemo(
@@ -98,6 +99,7 @@ export function useFilteredSortedLeads(
     [sortedLeads, getTodosForLead]
   );
 
+  // availableSources is based on the full leads set so filters don't disappear
   const availableSources = useMemo(
     () => getAvailableSources(leads),
     [leads]
