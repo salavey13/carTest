@@ -5,6 +5,7 @@ import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
 import { CrewFooter } from "../../../components/CrewFooter";
 import { FranchizeErrorBoundary } from "../../../components/ErrorBoundary";
+import { DisplayModeProvider } from "../../../components/DisplayModeContext";
 import { FranchizeRentalLifecycleActions } from "../../../components/FranchizeRentalLifecycleActions";
 import { FranchizePageShell } from "../../../components/FranchizePageShell";
 import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRentalDocumentsPanel";
@@ -109,11 +110,20 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
 
   return (
     <main className="min-h-screen" style={surface.page}>
+      <DisplayModeProvider>
+      <FranchizeErrorBoundary
+        resetKey={resolvedSlug}
+        fallbackTitle="Шапка недоступна"
+        fallbackHref={catalogHref}
+        fallbackLinkLabel="В каталог"
+      >
       <CrewHeader
         crew={crew}
         activePath={`/franchize/${resolvedSlug}/rental/${id}`}
         groupLinks={items.map((item) => item.category)}
       />
+      </FranchizeErrorBoundary>
+      </DisplayModeProvider>
 
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6">
         {/* Top-level error boundary: if any client component crashes during hydration,
