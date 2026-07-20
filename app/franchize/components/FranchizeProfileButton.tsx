@@ -21,9 +21,9 @@ import {
 import {
   getFranchizeNotificationPreferencesAction,
   saveFranchizeNotificationPreferencesAction,
-  saveUserThemePreferenceAction,
   type FranchizeNotificationPreferences,
 } from "@/app/franchize/profile-actions";
+import { updateUserSettings as updateGeneralUserSettings } from "@/app/actions";
 import { toast } from "sonner";
 import {
   ensureSpookyKeyframes,
@@ -296,14 +296,24 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          {/* Theme Toggle — persists to Supabase (not just localStorage) */}
+          {/* Theme Toggle — identical to /settings page implementation */}
           <DropdownMenuItem
             onSelect={async () => {
               const newTheme = theme === "dark" ? "light" : "dark";
+              // 1. Immediate effect (localStorage via next-themes)
               setTheme(newTheme);
-              // Persist to Supabase for cross-session consistency
+              // 2. Persist to users.metadata.settings_profile (same as settings page)
               if (dbUser?.user_id) {
-                await saveUserThemePreferenceAction({ userId: dbUser.user_id, themeMode: newTheme }).catch(() => {});
+                const currentMetadata = (dbUser.metadata as Record<string, unknown>) || {};
+                const currentSettingsProfile = (currentMetadata as any)?.settings_profile || ({} as Record<string, unknown>);
+                const updatedMetadata = {
+                  ...currentMetadata,
+                  settings_profile: {
+                    ...currentSettingsProfile,
+                    dark_mode_enabled: newTheme === "dark",
+                  },
+                } as any;
+                await updateGeneralUserSettings(dbUser.user_id, updatedMetadata).catch(() => {});
               }
             }}
             className="cursor-pointer flex min-w-0 items-center gap-2 w-full"
