@@ -16,6 +16,7 @@ import { RentalTelegramGuard } from "../../../components/RentalTelegramGuard";
 import { crewPaletteForSurface, readablePaletteTextOnColor } from "../../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../../metadata";
 import { formatRuDate } from "../../../lib/date-utils";
+import { RentalEscapeHatch } from "../../../components/RentalEscapeHatch";
 
 interface FranchizeRentalPageProps {
   params: Promise<{ slug: string; id: string }>;
@@ -126,6 +127,9 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
       </DisplayModeProvider>
 
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6">
+        {/* Escape hatch: Escape key + Telegram BackButton + direct button */}
+        <RentalEscapeHatch catalogHref={catalogHref} />
+
         {/* Top-level error boundary: if any client component crashes during hydration,
             the CrewHeader + navigation stays interactive while this section degrades gracefully. */}
         <FranchizeErrorBoundary
