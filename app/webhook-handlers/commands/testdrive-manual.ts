@@ -723,6 +723,7 @@ async function generateContract(chatId: number, userId: string, context: TestDri
             requested_bike_id: bike.id,
             resolved_bike_id: bike.id,
             telegram_chat_id: String(userId),
+            created_by_operator_chat_id: String(userId),
             telegram_message_id: null,
             renter_full_name: context.customerFullName || null,
             renter_passport: passportNumber,

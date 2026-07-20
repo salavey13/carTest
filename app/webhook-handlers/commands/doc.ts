@@ -857,6 +857,7 @@ async function generateAndSendContract(
         requested_bike_id: context.bikeId,
         resolved_bike_id: bike.id,
         telegram_chat_id: String(userId),
+        created_by_operator_chat_id: String(userId),
         telegram_message_id: null,
         renter_full_name: passport.fullName || null,
         renter_passport: `${passport.series || ""} ${passport.number || ""}`.trim() || null,

@@ -1186,6 +1186,7 @@ async function createRentalFromDocContract(
     const rentalInsert = {
       user_id: crewOwnerChatId,
       owner_id: crewOwnerChatId,
+      created_by_operator_chat_id: crewOwnerChatId,
       vehicle_id: bike.id,
       requested_start_date: startDateIso,
       requested_end_date: endDateIso,
@@ -1607,6 +1608,7 @@ ${qrDeepLink}`);
         requested_bike_id: context.bikeId,
         resolved_bike_id: bike.id,
         telegram_chat_id: String(userId),          // Always operator's Telegram ID (will be re-linked on QR claim)
+        created_by_operator_chat_id: String(userId), // Preserved forever — never overwritten
         renter_phone: context.clientPhone || null,  // Phone in dedicated column (was wrongly stored in telegram_chat_id)
         telegram_message_id: null,
         renter_full_name: context.mpFullName || null,
