@@ -19,6 +19,10 @@ export function TodoList({ leadId, leadName, todos: initialTodos, crewId, slug, 
   // This avoids the optimistic-update revert bug: local state is never overwritten
   // by stale prop references.
   const [localTodos, setLocalTodos] = useState<LeadTodoRow[]>(initialTodos);
+  const [newTitle, setNewTitle] = useState("");
+  const [newPriority, setNewPriority] = useState("medium");
+  const [saving, setSaving] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const handleAdd = async () => {
     if (!newTitle.trim()) return;
