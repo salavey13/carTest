@@ -53,7 +53,7 @@ export function LeadDetailContent({ lead, todos, crewId, slug, T }: LeadDetailCo
       </Section>
 
       <Section title={`Задачи (${todos.filter(t => t.status !== "done").length})`} icon={CheckCircle} T={T}>
-        <TodoList leadId={lead.user_id} leadName={lead.full_name || "Без имени"} todos={todos} crewId={crewId} slug={slug} T={T} />
+        <TodoList key={lead.user_id} leadId={lead.user_id} leadName={lead.full_name || "Без имени"} todos={todos} crewId={crewId} slug={slug} T={T} />
       </Section>
 
       <Section title="Заметки" icon={StickyNote} T={T}>

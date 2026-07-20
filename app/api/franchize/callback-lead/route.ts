@@ -70,27 +70,42 @@ export async function POST(request: NextRequest) {
       if (error) logger.warn("[callback-lead] intent insert failed", error);
     });
 
-    // 3. Notify owner via forward-telegram (best-effort)
-    const message =
-      `📞 *Новая заявка на звонок*\n\n` +
-      `🏍 ${bikeTitle || "Байк"}\n` +
-      `👤 ${name}\n` +
-      `📱 ${normalizedPhone}\n` +
-      `🌐 Источник: веб-сайт\n` +
-      `⏰ ${new Date().toLocaleString("ru-RU")}`;
+    // 3. Notify crew owner via forward-telegram (best-effort)
+    // Lookup owner from crew slug (dynamic, not hardcoded)
+    let ownerChatId: string | null = null;
+    if (slug) {
+      const { data: crew } = await supabaseAdmin
+        .from("crews")
+        .select("owner_id")
+        .eq("slug", slug)
+        .maybeSingle();
+      if (crew?.owner_id) {
+        ownerChatId = crew.owner_id;
+      }
+    }
+    // Only notify if we found a valid owner — no fallback to hardcoded IDs
+    if (ownerChatId) {
+      const message =
+        `📞 *Новая заявка на звонок*\n\n` +
+        `🏍 ${bikeTitle || "Байк"}\n` +
+        `👤 ${name}\n` +
+        `📱 ${normalizedPhone}\n` +
+        `🌐 Источник: веб-сайт\n` +
+        `⏰ ${new Date().toLocaleString("ru-RU")}`;
 
-    try {
-      await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/forward-telegram`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chatId: "356282674", // Илья (owner)
-          text: message,
-          parseMode: "Markdown",
-        }),
-      });
-    } catch {
-      // Forward-telegram failure is OK — user is already saved
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/forward-telegram`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chatId: ownerChatId,
+            text: message,
+            parseMode: "Markdown",
+          }),
+        });
+      } catch {
+        // Forward-telegram failure is OK — user is already saved
+      }
     }
 
     return NextResponse.json({ success: true, userId });

@@ -21,6 +21,7 @@ import {
 import {
   getFranchizeNotificationPreferencesAction,
   saveFranchizeNotificationPreferencesAction,
+  saveUserThemePreferenceAction,
   type FranchizeNotificationPreferences,
 } from "@/app/franchize/profile-actions";
 import { toast } from "sonner";
@@ -295,10 +296,15 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
           <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          {/* Theme Toggle */}
+          {/* Theme Toggle — persists to Supabase (not just localStorage) */}
           <DropdownMenuItem
-            onSelect={() => {
-              setTheme(theme === "dark" ? "light" : "dark");
+            onSelect={async () => {
+              const newTheme = theme === "dark" ? "light" : "dark";
+              setTheme(newTheme);
+              // Persist to Supabase for cross-session consistency
+              if (dbUser?.user_id) {
+                await saveUserThemePreferenceAction({ userId: dbUser.user_id, themeMode: newTheme }).catch(() => {});
+              }
             }}
             className="cursor-pointer flex min-w-0 items-center gap-2 w-full"
           >

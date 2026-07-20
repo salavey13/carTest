@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Plus, CheckCircle, CircleDot, Trash2, AlertCircle } from "lucide-react";
 import type { LeadTodoRow } from "@/app/franchize/server-actions/leads";
 
@@ -13,14 +13,12 @@ interface TodoListProps {
   T: any;
 }
 
-export function TodoList({ leadId, leadName, todos, crewId, slug, T }: TodoListProps) {
-  const [localTodos, setLocalTodos] = useState<LeadTodoRow[]>(todos);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newPriority, setNewPriority] = useState("medium");
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => { setLocalTodos(todos); }, [todos]);
+export function TodoList({ leadId, leadName, todos: initialTodos, crewId, slug, T }: TodoListProps) {
+  // Use initialTodos as initial state only (no useEffect syncing from props).
+  // Key={lead.user_id} on the parent ensures remount on lead switch.
+  // This avoids the optimistic-update revert bug: local state is never overwritten
+  // by stale prop references.
+  const [localTodos, setLocalTodos] = useState<LeadTodoRow[]>(initialTodos);
 
   const handleAdd = async () => {
     if (!newTitle.trim()) return;
