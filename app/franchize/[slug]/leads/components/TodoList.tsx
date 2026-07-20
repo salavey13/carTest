@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, CheckCircle, CircleDot, Trash2, AlertCircle } from "lucide-react";
 import type { LeadTodoRow } from "@/app/franchize/server-actions/leads";
+import { useAppContext } from "@/contexts/AppContext";
 
 interface TodoListProps {
   leadId: string;
@@ -14,6 +15,14 @@ interface TodoListProps {
 }
 
 export function TodoList({ leadId, leadName, todos: initialTodos, crewId, slug, T }: TodoListProps) {
+  const { dbUser } = useAppContext();
+  // Build auth headers so PATCH/POST/DELETE pass crew membership check
+  const authHeaders = (): Record<string, string> => {
+    const h: Record<string, string> = { "Content-Type": "application/json" };
+    if (dbUser?.user_id) h["x-telegram-user-id"] = dbUser.user_id;
+    return h;
+  };
+
   // Use initialTodos as initial state only (no useEffect syncing from props).
   // Key={lead.user_id} on the parent ensures remount on lead switch.
   // This avoids the optimistic-update revert bug: local state is never overwritten
@@ -30,7 +39,7 @@ export function TodoList({ leadId, leadName, todos: initialTodos, crewId, slug, 
     try {
       const resp = await fetch("/api/franchize/lead-todo", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify({ crewId, slug, leadId, leadName, title: newTitle.trim(), priority: newPriority }),
       });
       const data = await resp.json();
@@ -49,7 +58,7 @@ export function TodoList({ leadId, leadName, todos: initialTodos, crewId, slug, 
     setLocalTodos(localTodos.map((t) => (t.id === todoId ? { ...t, status: newStatus } : t)));
     try {
       const r = await fetch("/api/franchize/lead-todo", {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
+        method: "PATCH", headers: authHeaders(),
         body: JSON.stringify({ todoId, status: newStatus }),
       });
       if (!r.ok) throw new Error();
@@ -61,7 +70,7 @@ export function TodoList({ leadId, leadName, todos: initialTodos, crewId, slug, 
     setLocalTodos(localTodos.filter((t) => t.id !== todoId));
     try {
       const r = await fetch("/api/franchize/lead-todo", {
-        method: "DELETE", headers: { "Content-Type": "application/json" },
+        method: "DELETE", headers: authHeaders(),
         body: JSON.stringify({ todoId }),
       });
       if (!r.ok) throw new Error();
