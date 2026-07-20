@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Lock, X, Bike } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
@@ -95,8 +95,23 @@ export function LeadsClient({
     handlePasswordSubmit,
   } = usePasswordGate(slug, isInTelegram, dbUser?.user_id);
 
-  // Todo mapping
-  const { getTodosForLead } = useTodosMapping(todos);
+  // Todo mapping — use writable state so TodoList callbacks sync the parent array
+  const [todosState, setTodosState] = useState(todos);
+  const { getTodosForLead } = useTodosMapping(todosState);
+
+  /** Called by TodoList after toggle/add/delete — keeps todosState in sync */
+  const handleTodoUpdate = useCallback((action: 'toggle' | 'delete' | 'add', todoId: string, todo?: LeadTodoRow) => {
+    setTodosState((prev) => {
+      if (action === 'toggle') {
+        return prev.map((t) =>
+          t.id === todoId ? { ...t, status: t.status === 'done' ? 'pending' : 'done' } : t
+        );
+      }
+      if (action === 'delete') return prev.filter((t) => t.id !== todoId);
+      if (action === 'add' && todo) return [todo, ...prev];
+      return prev;
+    });
+  }, []);
 
   // Filtered, sorted, categorized leads
   const {
@@ -292,7 +307,7 @@ export function LeadsClient({
                         <X className="h-5 w-5" />
                       </button>
                     </div>
-                    <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} />
+                    <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} onTodoUpdate={handleTodoUpdate} />
                   </motion.div>
                 );
               })()}
@@ -307,7 +322,7 @@ export function LeadsClient({
         if (!selectedLead) return null;
         return (
           <MobileLeadSheet open={true} onClose={() => setSelectedId(null)} title={selectedLead.full_name || selectedLead.phone || undefined} T={T}>
-            <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} />
+            <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} onTodoUpdate={handleTodoUpdate} />
           </MobileLeadSheet>
         );
       })()}

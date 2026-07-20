@@ -12,9 +12,11 @@ interface TodoListProps {
   crewId: string;
   slug: string;
   T: any;
+  /** Called after successful toggle/add/delete so parent can sync its todos state */
+  onTodoUpdate?: (action: 'toggle' | 'delete' | 'add', todoId: string, todo?: LeadTodoRow) => void;
 }
 
-export function TodoList({ leadId, leadName, todos: initialTodos, crewId, slug, T }: TodoListProps) {
+export function TodoList({ leadId, leadName, todos: initialTodos, crewId, slug, T, onTodoUpdate }: TodoListProps) {
   const { dbUser } = useAppContext();
   // Build auth headers so PATCH/POST/DELETE pass crew membership check
   const authHeaders = (): Record<string, string> => {
@@ -47,6 +49,7 @@ export function TodoList({ leadId, leadName, todos: initialTodos, crewId, slug, 
         setLocalTodos([data.todo, ...localTodos]);
         setNewTitle("");
         setShowAddForm(false);
+        onTodoUpdate?.('add', data.todo.id, data.todo);
       }
     } catch { /* ignore */ }
     setSaving(false);
@@ -62,6 +65,7 @@ export function TodoList({ leadId, leadName, todos: initialTodos, crewId, slug, 
         body: JSON.stringify({ todoId, status: newStatus }),
       });
       if (!r.ok) throw new Error();
+      onTodoUpdate?.('toggle', todoId);
     } catch { setLocalTodos(prev); }
   };
 
@@ -74,6 +78,7 @@ export function TodoList({ leadId, leadName, todos: initialTodos, crewId, slug, 
         body: JSON.stringify({ todoId }),
       });
       if (!r.ok) throw new Error();
+      onTodoUpdate?.('delete', todoId);
     } catch { setLocalTodos(prev); }
   };
 

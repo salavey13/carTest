@@ -3118,7 +3118,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             const { data: rentalRow, error: rentalInsertError } = await supabaseAdmin
               .from("rentals")
               .insert({
-                user_id: payload.telegramUserId,
+                user_id: payload.phone || payload.telegramUserId,
                 owner_id: crewOwnerChatId || payload.telegramUserId,
                 vehicle_id: doc.bikeId, // FIX: was bikeName (a label), now uses actual bike ID
                 crew_id: crewId,

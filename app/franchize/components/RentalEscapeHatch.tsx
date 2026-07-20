@@ -9,10 +9,10 @@ import { useEffect } from "react";
  * Provides:
  *  1. Escape key → navigate to catalog
  *  2. Telegram BackButton → navigate to catalog
- *  3. A visible fallback button that uses window.location.href directly
- *     (bypasses any broken Next.js router state)
+ *  3. Visible buttons for ALL critical links using window.location.href
+ *     (bypasses any broken Next.js router state on this deep page)
  */
-export function RentalEscapeHatch({ catalogHref }: { catalogHref: string }) {
+export function RentalEscapeHatch({ catalogHref, profileHref }: { catalogHref: string; profileHref?: string }) {
   // ── Escape key → go to catalog ──
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -41,7 +41,7 @@ export function RentalEscapeHatch({ catalogHref }: { catalogHref: string }) {
   }, [catalogHref]);
 
   return (
-    <div className="mb-4 flex items-center gap-2">
+    <div className="mb-4 flex items-center gap-2 flex-wrap">
       <button
         onClick={() => window.location.href = catalogHref}
         className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs transition-colors hover:opacity-80 cursor-pointer"
@@ -53,6 +53,19 @@ export function RentalEscapeHatch({ catalogHref }: { catalogHref: string }) {
       >
         ← В каталог
       </button>
+      {profileHref && (
+        <button
+          onClick={() => window.location.href = profileHref}
+          className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs transition-colors hover:opacity-80 cursor-pointer"
+          style={{
+            borderColor: "var(--franchize-border-soft, #333)",
+            color: "var(--franchize-text-secondary, #999)",
+            backgroundColor: "var(--franchize-bg-card, transparent)",
+          }}
+        >
+          👤 Профиль
+        </button>
+      )}
     </div>
   );
 }
