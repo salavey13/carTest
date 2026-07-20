@@ -4,13 +4,8 @@
 -- Shows the exact identity key used in each table for the last 20 rentals.
 -- ============================================================================
 
--- Step 1: Find the crew IDs for our known operator slugs
-WITH crew_ids AS (
-  SELECT id, slug FROM public.crews WHERE slug IN ('vip-bike', 'svarprofi', 'nnvolt')
-),
-
--- Step 2: Last 20 rentals with all identity-relevant fields
-latest_rentals AS (
+-- Step 1: Last 20 rentals for the target crews with all identity-relevant fields
+WITH latest_rentals AS (
   SELECT
     r.rental_id,
     r.user_id              AS rentals_user_id,
@@ -22,12 +17,12 @@ latest_rentals AS (
     r.created_at           AS rentals_created,
     (r.metadata->>'daily_price')::text AS rentals_daily_price
   FROM public.rentals r
-  WHERE r.crew_id IN (SELECT id FROM crew_ids)
+  WHERE r.crew_id IN (SELECT id FROM public.crews WHERE slug IN ('vip-bike', 'svarprofi', 'nnvolt'))
   ORDER BY r.created_at DESC
   LIMIT 20
 )
 
--- Step 3: Join with artifacts, secrets, intents, todos
+-- Step 2: Join with artifacts, secrets, intents, todos
 SELECT
   -- Rental fields
   lr.rental_id,
@@ -50,11 +45,6 @@ SELECT
   fi.phone                 AS intent_phone,
   fi.slug                  AS intent_slug,
   fi.stage                 AS intent_stage,
-
-  -- Todo count for this rental
-  (SELECT count(*) FROM public.crew_todos ct
-   WHERE (ct.description IS NOT NULL AND ct.description LIKE '%' || lr.rental_id || '%')
-  )                        AS rental_todo_count,
 
   -- Identity state classification
   CASE
@@ -80,7 +70,7 @@ LEFT JOIN private.rental_contract_artifacts rca
   ON rca.rental_id = lr.rental_id
 
 -- LEFT JOIN secrets (may be NULL if unclaimed)
--- Note: source_rental_id is TEXT, rental_id is UUID → cast UUID to text
+-- source_rental_id is TEXT, rental_id is UUID → cast UUID to text
 LEFT JOIN private.user_rental_secrets urs
   ON urs.source_rental_id = lr.rental_id::text
 
@@ -89,7 +79,7 @@ LEFT JOIN public.franchize_intents fi
   ON (fi.telegram_user_id = lr.rentals_user_id
       OR (rca.renter_phone IS NOT NULL AND fi.phone = rca.renter_phone)
       OR (urs.chat_id IS NOT NULL AND fi.telegram_user_id = urs.chat_id))
-  AND fi.slug IN (SELECT slug FROM crew_ids)
+  AND fi.slug IN (SELECT slug FROM public.crews WHERE slug IN ('vip-bike', 'svarprofi', 'nnvolt'))
 
 ORDER BY lr.rentals_created DESC;
 
@@ -97,11 +87,17 @@ ORDER BY lr.rentals_created DESC;
 -- Bonus: Operator count check
 -- How many active rentals are still under operator placeholders?
 -- ============================================================================
+WITH target_crew_ids AS (
+  SELECT id FROM public.crews WHERE slug IN ('vip-bike', 'svarprofi', 'nnvolt')
+),
+target_slugs AS (
+  SELECT slug FROM public.crews WHERE slug IN ('vip-bike', 'svarprofi', 'nnvolt')
+)
 SELECT
   'operator_placeholder_rentals' AS check_name,
   count(*) AS count
 FROM public.rentals r
-WHERE r.crew_id IN (SELECT id FROM crew_ids)
+WHERE r.crew_id IN (SELECT id FROM target_crew_ids)
   AND r.user_id IN ('7813830016', '413553377', '356282674')
   AND r.status NOT IN ('completed', 'cancelled')
 
@@ -111,7 +107,7 @@ SELECT
   'artifacts_with_operator_id_and_phone' AS check_name,
   count(*) AS count
 FROM private.rental_contract_artifacts a
-WHERE a.crew_slug IN (SELECT slug FROM crew_ids)
+WHERE a.crew_slug IN (SELECT slug FROM target_slugs)
   AND a.telegram_chat_id IN ('7813830016', '413553377', '356282674')
   AND a.renter_phone IS NOT NULL
 
@@ -121,6 +117,6 @@ SELECT
   'secrets_null_chat_id_after_claim' AS check_name,
   count(*) AS count
 FROM private.user_rental_secrets s
-WHERE s.crew_slug IN (SELECT slug FROM crew_ids)
+WHERE s.crew_slug IN (SELECT slug FROM target_slugs)
   AND s.chat_id IS NULL
   AND s.source_rental_id IS NOT NULL;
