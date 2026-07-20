@@ -75,6 +75,23 @@ export interface GetFranchizeLeadsResult {
   error?: string;
 }
 
+// Known operator Telegram IDs that should never be treated as real renter leads.
+// These are the crew owners/operators who create contracts via /doc-manual before
+// the real renter scans the QR code.
+const KNOWN_OPERATOR_IDS = new Set(["7813830016", "413553377", "356282674"]);
+
+/** Check if a chat ID is a known operator placeholder (not a real renter). */
+function isOperatorPlaceholder(id: string | null | undefined): boolean {
+  if (!id) return false;
+  return KNOWN_OPERATOR_IDS.has(id);
+}
+
+/** Check if a rental user_id belongs to a known crew owner (operator). */
+function isCrewOwnerId(id: string | null | undefined): boolean {
+  if (!id) return false;
+  return KNOWN_OPERATOR_IDS.has(id);
+}
+
 export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeadsResult> {
   noStore();
   const safeSlug = slug.trim();
@@ -92,6 +109,9 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     const crewId = crew.id;
     type MutableLead = Omit<LeadRow, "rentals" | "sales"> & { rentals: LeadRentalRow[]; sales: LeadSaleRow[] };
     const leadMap = new Map<string, MutableLead>();
+
+    // Cache: rental_id → artifact renter_phone (built from step 2 for step 4 lookups)
+    const artifactPhoneByRentalId = new Map<string, string | null>();
 
     const addOrMerge = (row: MutableLead) => {
       const existing = leadMap.get(row.user_id);
@@ -197,10 +217,19 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     }
 
     // 2. Rental contract artifacts (crew-filtered)
+    // IMPORTANT: artifact telegram_chat_id is often the OPERATOR's ID (set by /doc-manual).
+    // When it matches a known operator, prefer renter_phone as the lead identity key
+    // so the lead groups under the real renter's phone, not the operator placeholder.
     if (artifactUsers) {
       for (const a of artifactUsers) {
         if (!a.telegram_chat_id && !a.renter_phone) continue;
-        const id = a.telegram_chat_id || a.renter_phone || "";
+        // Cache phone by rental_id for rental-step lookups
+        if (a.rental_id) {
+          artifactPhoneByRentalId.set(a.rental_id, a.renter_phone || null);
+        }
+        // If telegram_chat_id is an operator placeholder, prefer renter_phone
+        const preferPhone = isOperatorPlaceholder(a.telegram_chat_id) && a.renter_phone;
+        const id = preferPhone ? a.renter_phone! : (a.telegram_chat_id || a.renter_phone || "");
         const existing = leadMap.get(id);
         const bikeTitle = `${a.bike_make || ""} ${a.bike_model || ""}`.trim() || null;
         if (!existing) {
@@ -214,7 +243,8 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
             createdAt: a.created_at,
             lastSeenAt: a.created_at,
             verified: true,
-            telegramChatId: a.telegram_chat_id || null,
+            // Store the operator's telegram_chat_id separately (not as lead key)
+            telegramChatId: preferPhone ? null : (a.telegram_chat_id || null),
             rentals: [{
               rentalId: a.rental_id || "",
               status: "confirmed",
@@ -275,7 +305,13 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     if (rentals) {
       for (const r of rentals) {
         if (!r.user_id) continue;
-        const existing = leadMap.get(r.user_id);
+        // If rental user_id is a known operator placeholder, try to use the
+        // renter's phone from the artifact (cached by rental_id) as identity key.
+        const prefersPhone = isCrewOwnerId(r.user_id);
+        const artifactPhone = artifactPhoneByRentalId.get(r.rental_id);
+        const effectiveId = (prefersPhone && artifactPhone) ? artifactPhone : r.user_id;
+
+        const existing = leadMap.get(effectiveId);
         const vehicle = r.vehicle as { make?: string; model?: string } | null;
         const bikeTitle = `${vehicle?.make || ""} ${vehicle?.model || ""}`.trim() || null;
         const rentalRow: LeadRentalRow = {
@@ -292,11 +328,11 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
           driversLicenceFrontalPhoto: (r as any).drivers_licence_frontal_photo || null,
         };
         if (!existing) {
-          leadMap.set(r.user_id, {
-            user_id: r.user_id,
+          leadMap.set(effectiveId, {
+            user_id: effectiveId,
             full_name: null,
             username: null,
-            phone: null,
+            phone: artifactPhone || null,
             source: "rental",
             bikeTitle,
             createdAt: r.requested_start_date,
@@ -308,15 +344,18 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
           });
         } else {
           existing.rentals.push(rentalRow);
+          if (!existing.phone && artifactPhone) existing.phone = artifactPhone;
           if (["active", "completed", "confirmed"].includes(r.status || "")) existing.verified = true;
         }
       }
     }
 
     // 5. Sale contract artifacts (crew-filtered)
+    // Same operator-phone preference: if telegram_chat_id is an operator, use buyer_phone
     if (saleArtifacts) {
       for (const s of saleArtifacts) {
-        const id = s.telegram_chat_id || s.buyer_phone || "";
+        const preferPhone = isOperatorPlaceholder(s.telegram_chat_id) && s.buyer_phone;
+        const id = preferPhone ? s.buyer_phone! : (s.telegram_chat_id || s.buyer_phone || "");
         if (!id) continue;
         const existing = leadMap.get(id);
         const bikeTitle = `${s.bike_make || ""} ${s.bike_model || ""}`.trim() || null;
@@ -433,20 +472,41 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       l.contractRef = lastRental?.rentalId || l.sales[0]?.saleId || null;
     }
 
-    // ── Server-side filtering: only return todos matching loaded leads ──
+    // ── Server-side filtering: return todos matching loaded leads ──
+    //
+    // Matching strategy (Phase 1 identity fix):
+    //  1. rental_id from description JSON → if leadMap has a lead whose rental includes this rental_id
+    //  2. user_id column (canonical Telegram chat_id)
+    //  3. phone column (phone-only leads)
+    //  4. lead_id column (legacy)
+    //  5. description JSON identity fields (legacy)
+    //
+    // This ensures operator-created todos (which have user_id=operator in description)
+    // can still be matched by rental_id BEFORE the QR claim propagates the real renter ID.
     const leadUserIds = new Set(Array.from(leadMap.keys()));
 
+    // Build rental_id → lead user_id lookup for rental_id-based todo matching
+    const rentalIdToLeadId = new Map<string, string>();
+    for (const [leadId, lead] of leadMap.entries()) {
+      for (const r of lead.rentals) {
+        if (r.rentalId) rentalIdToLeadId.set(r.rentalId, leadId);
+      }
+    }
+
     /**
-     * Get the lead identifier from a todo, checking user_id → phone → lead_id → description.
-     *
-     * Priority order:
-     *  1. user_id column (Telegram chat_id, always numeric) — the canonical identifier
-     *  2. phone column (phone number) — for phone-only leads
-     *  3. lead_id column (legacy: Telegram ID, phone, or UUID)
-     *  4. description JSON (legacy fallback)
-     *
-     * This ensures correct matching after the 2026-07-19 data model fix where
-     * user_id and phone were split from the monolithic lead_id column.
+     * Extract rental_id from todo description JSON.
+     */
+    const getTodoRentalId = (t: typeof todos[number]): string | null => {
+      if (!t.description) return null;
+      try {
+        const desc = JSON.parse(t.description);
+        if (desc.rental_id && typeof desc.rental_id === 'string') return desc.rental_id;
+      } catch { /* ignore */ }
+      return null;
+    };
+
+    /**
+     * Get the lead identifier from a todo.
      */
     const getTodoLeadId = (t: typeof todos[number]): string | null => {
       // 1. user_id column — canonical Telegram chat_id
@@ -474,9 +534,14 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     };
 
     const filteredTodos = (todos || []).filter((t) => {
-      // Match by lead_id (Telegram user ID or UUID)
+      // 1. Match by rental_id from description (strongest link — works before QR claim)
+      const todoRentalId = getTodoRentalId(t);
+      if (todoRentalId && rentalIdToLeadId.has(todoRentalId)) return true;
+
+      // 2-5. Match by identity fallback chain
       const todoLeadId = getTodoLeadId(t);
       if (todoLeadId && leadUserIds.has(todoLeadId)) return true;
+
       return false;
     });
 
