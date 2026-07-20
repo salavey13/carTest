@@ -758,9 +758,12 @@ export async function createLeadFollowupTodos(input: {
   todos: Array<{ title: string; priority: "low" | "medium" | "high" }>;
   assignedTo?: string;
   metadata?: Record<string, unknown>;
+  rentalId?: string;  // UUID — set to link this todo directly to a rental
 }): Promise<{ success: boolean; created: number; skipped: number; error?: string }> {
   try {
-    const { crewId, leadId, leadPhone, leadName, bikeId, todos, assignedTo, metadata } = input;
+    const { crewId, leadId, leadPhone, leadName, bikeId, todos, assignedTo, metadata, rentalId } = input;
+    // Accept rental_id from either explicit param or metadata (backward compat)
+    const effectiveRentalId = rentalId || (metadata?.rental_id as string | undefined) || null;
 
     // Idempotency: check if todos already exist for this lead
     const { data: existingTodos } = await supabaseAdmin
@@ -790,6 +793,7 @@ export async function createLeadFollowupTodos(input: {
         lead_id: leadId,           // keep for backward compat
         user_id: todoUserId,       // Telegram chat_id (canonical)
         phone: todoPhone,          // phone number (nullable)
+        rental_id: effectiveRentalId,  // FK to rentals (null for sales)
         title: todo.title,
         status: "pending",
         priority: todo.priority,
