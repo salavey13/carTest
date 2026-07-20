@@ -18,9 +18,10 @@ interface LeadDetailContentProps {
   crewId: string;
   slug: string;
   T: any;
+  onTodoUpdate?: (action: 'toggle' | 'delete' | 'add', todoId: string, todo?: LeadTodoRow) => void;
 }
 
-export function LeadDetailContent({ lead, todos, crewId, slug, T }: LeadDetailContentProps) {
+export function LeadDetailContent({ lead, todos, crewId, slug, T, onTodoUpdate }: LeadDetailContentProps) {
   const rentalsWithDocs = lead.rentals.filter(
     (r) => r.passportMainpagePhoto || r.passportRegistrationPhoto || r.driversLicenceFrontalPhoto || r.status === "pending_confirmation"
   );
@@ -53,7 +54,7 @@ export function LeadDetailContent({ lead, todos, crewId, slug, T }: LeadDetailCo
       </Section>
 
       <Section title={`Задачи (${todos.filter(t => t.status !== "done").length})`} icon={CheckCircle} T={T}>
-        <TodoList key={lead.user_id} leadId={lead.user_id} leadName={lead.full_name || "Без имени"} todos={todos} crewId={crewId} slug={slug} T={T} />
+        <TodoList key={lead.user_id} leadId={lead.user_id} leadName={lead.full_name || "Без имени"} todos={todos} crewId={crewId} slug={slug} T={T} onTodoUpdate={onTodoUpdate} />
       </Section>
 
       <Section title="Заметки" icon={StickyNote} T={T}>

@@ -395,7 +395,12 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
         const artifactPhone = artifactPhoneByRentalId.get(r.rental_id);
         const effectiveId = (prefersPhone && artifactPhone) ? artifactPhone : r.user_id;
 
-        const existing = leadMap.get(effectiveId);
+        const existing = leadMap.get(effectiveId) ||
+          // Fallback: try matching by renter_phone from metadata (handles existing rentals
+          // whose user_id is telegramUserId while the lead key is phone)
+          (r.metadata && typeof r.metadata === 'object' && 'renter_phone' in r.metadata
+            ? leadMap.get((r.metadata as Record<string, unknown>).renter_phone as string) || null
+            : null);
         const vehicle = r.vehicle as { make?: string; model?: string } | null;
         const bikeTitle = `${vehicle?.make || ""} ${vehicle?.model || ""}`.trim() || null;
         const rentalRow: LeadRentalRow = {

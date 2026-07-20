@@ -128,7 +128,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
 
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6">
         {/* Escape hatch: Escape key + Telegram BackButton + direct button */}
-        <RentalEscapeHatch catalogHref={catalogHref} />
+        <RentalEscapeHatch catalogHref={catalogHref} profileHref={profileHref} />
 
         {/* Top-level error boundary: if any client component crashes during hydration,
             the CrewHeader + navigation stays interactive while this section degrades gracefully. */}
