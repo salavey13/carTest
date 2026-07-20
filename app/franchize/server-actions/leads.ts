@@ -490,7 +490,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       // 11. Lead-linked todos (filtered by crew_id + category on DB side)
       supabaseAdmin
         .from("crew_todos")
-        .select("id, lead_id, user_id, phone, title, description, status, priority, category, created_at, completed_at, assigned_to")
+        .select("id, lead_id, user_id, phone, rental_id, title, description, status, priority, category, created_at, completed_at, assigned_to")
         .eq("crew_id", crewId)
         .eq("category", "lead_followup")
         .order("created_at", { ascending: false }),
@@ -598,9 +598,12 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     }
 
     /**
-     * Extract rental_id from todo description JSON.
+     * Extract rental_id from todo (direct column preferred, fall back to description JSON).
      */
     const getTodoRentalId = (t: typeof todos[number]): string | null => {
+      // 1. Direct rental_id column (Phase 3c — real FK, no parsing needed)
+      if (t.rental_id) return t.rental_id;
+      // 2. Legacy: parse from description JSON
       if (!t.description) return null;
       try {
         const desc = JSON.parse(t.description);

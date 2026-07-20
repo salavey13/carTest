@@ -89,6 +89,7 @@ export async function createRentalVerificationTodos(
       crew_id: crewId,
       lead_id: leadId || null,
       user_id: todoUserId,
+      rental_id: rentalId,  // Phase 3c: FK to rentals
       title: template.title,
       description: JSON.stringify({
         rental_id: rentalId,

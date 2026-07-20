@@ -1797,6 +1797,7 @@ ${qrDeepLink}`);
         bikeId: bike.id,
         todos,
         assignedTo: String(userId),
+        rentalId: rentalId || null,  // Phase 3c: set FK directly
         metadata: {
           rental_id: rentalId || null,
           rent_end_date: context.rentEndDate || null,
