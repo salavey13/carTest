@@ -53,110 +53,46 @@ async function createRentalFromClaimedSecret(
     }
 
     // ── Scenario A: Rental already exists (created by /doc-manual) ──
+    // Use consolidated RPC for atomic 6-table propagation (rentals, artifacts,
+    // secrets, intents, todos, lead_notes). Handles race conditions and
+    // idempotent re-propagation for already-claimed-by-this-user cases.
     if (artifact.rental_id) {
-      console.log('[rental-secrets-claim] Rental exists, updating user_id from operator to renter:', artifact.rental_id);
+      console.log('[rental-secrets-claim] Rental exists, calling claim_rental_by_qr RPC:', artifact.rental_id);
 
-      // Step 1: Read the rental to get current user_id and owner_id
-      const { data: rental, error: rentalSelectError } = await supabaseAdmin
-        .from('rentals')
-        .select('user_id, owner_id')
-        .eq('rental_id', artifact.rental_id)
-        .maybeSingle();
+      const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc(
+        'claim_rental_by_qr',
+        {
+          p_doc_sha256: secret.doc_sha256,
+          p_renter_chat_id: renterChatId,
+        }
+      );
 
-      if (rentalSelectError) {
-        console.error('[rental-secrets-claim] Failed to fetch rental:', rentalSelectError);
+      if (rpcError) {
+        console.error('[rental-secrets-claim] RPC failed:', rpcError);
         return null;
       }
 
-      if (!rental) {
-        console.error('[rental-secrets-claim] Rental not found in public.rentals');
+      const result = rpcResult as {
+        success: boolean;
+        rental_id: string | null;
+        error: string | null;
+        claimed_now: boolean;
+      };
+
+      if (!result.success) {
+        console.error('[rental-secrets-claim] RPC returned error:', result.error);
+        // ALREADY_CLAIMED_BY_OTHER is non-fatal — the rental exists, just not ours
+        if (result.error === 'ALREADY_CLAIMED_BY_OTHER') {
+          console.log('[rental-secrets-claim] Rental already claimed by another user');
+          return artifact.rental_id;
+        }
         return null;
       }
 
-      // Only update if still unclaimed (user_id === owner_id)
-      if (rental.user_id === rental.owner_id) {
-        const { error: updateError } = await supabaseAdmin
-          .from('rentals')
-          .update({ user_id: renterChatId })
-          .eq('rental_id', artifact.rental_id)
-          .eq('user_id', rental.owner_id); // Atomic: only if still owned by owner
-
-        if (updateError) {
-          console.error('[rental-secrets-claim] Failed to update rental user_id:', updateError);
-          return null;
-        }
-        console.log('[rental-secrets-claim] Rental user_id updated to renter:', renterChatId);
-      } else {
-        console.log('[rental-secrets-claim] Rental already claimed by another user (user_id !== owner_id)');
-      }
-
-      // Step 2: Update artifact telegram_chat_id from phone → renter's TG chat ID
-      const { error: artifactUpdateError } = await (supabaseAdmin as any)
-        .schema('private')
-        .from('rental_contract_artifacts')
-        .update({ telegram_chat_id: renterChatId })
-        .eq('original_sha256', secret.doc_sha256);
-
-      if (artifactUpdateError) {
-        console.error('[rental-secrets-claim] Failed to update artifact telegram_chat_id:', artifactUpdateError);
-        // Non-fatal — rental user_id was already updated
-      } else {
-        console.log('[rental-secrets-claim] Artifact telegram_chat_id updated to renter:', renterChatId);
-      }
-
-      // Step 3: Update user_rental_secrets chat_id if still null (defense-in-depth)
-      const { error: secretsUpdateError } = await (supabaseAdmin as any)
-        .schema('private')
-        .from('user_rental_secrets')
-        .update({ chat_id: renterChatId })
-        .eq('doc_sha256', secret.doc_sha256)
-        .is('chat_id', null);
-
-      if (secretsUpdateError) {
-        console.error('[rental-secrets-claim] Failed to update user_rental_secrets chat_id:', secretsUpdateError);
-        // Non-fatal
-      }
-
-      // Step 4: Re-link crew_todos from operator ID → renter's chat_id
-      // When the /doc operator creates todos with their own chat_id as lead_id,
-      // the todos are linked to the operator, not the client. After QR claim
-      // we know the real client chat_id, so we update user_id on those todos.
-      const oldUserId = rental.user_id; // operator's chat_id before update
-      if (oldUserId && oldUserId !== renterChatId) {
-        const { error: todosUpdateError } = await supabaseAdmin
-          .from('crew_todos')
-          .update({ user_id: renterChatId })
-          .eq('lead_id', String(oldUserId))
-          .is('user_id', null);
-
-        if (todosUpdateError) {
-          console.warn('[rental-secrets-claim] Failed to update crew_todos user_id:', todosUpdateError);
-          // Non-fatal
-        } else {
-          console.log('[rental-secrets-claim] crew_todos user_id updated from', oldUserId, 'to', renterChatId);
-        }
-      }
-
-      // Step 5: Re-link franchize_intents from operator ID → renter's chat_id
-      // Without this, the leads page shows TWO entries: one keyed by operator ID
-      // (from franchize_intents, with no rentals/todos) and one keyed by renter ID
-      // (from rentals, with no intents/todos). After this update, they merge into
-      // ONE lead with everything linked correctly.
-      const crewSlug = secret.crew_slug;
-      if (crewSlug && oldUserId && oldUserId !== renterChatId) {
-        const { error: intentsUpdateError } = await supabaseAdmin
-          .from('franchize_intents')
-          .update({ telegram_user_id: renterChatId })
-          .eq('slug', crewSlug)
-          .eq('telegram_user_id', String(oldUserId));
-
-        if (intentsUpdateError) {
-          console.warn('[rental-secrets-claim] Failed to update franchize_intents telegram_user_id:', intentsUpdateError);
-          // Non-fatal
-        } else {
-          console.log('[rental-secrets-claim] franchize_intents telegram_user_id updated from', oldUserId, 'to', renterChatId);
-        }
-      }
+      console.log('[rental-secrets-claim] RPC succeeded:', {
+        rentalId: result.rental_id,
+        claimedNow: result.claimed_now,
+      });
 
       return artifact.rental_id;
     }
