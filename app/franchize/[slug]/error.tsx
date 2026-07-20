@@ -38,10 +38,7 @@ export default function FranchizeSlugError({
           <p className="text-xs font-semibold uppercase tracking-[0.24em]" style={surface.mutedText}>
             crew recovery
           </p>
-          <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Экипаж временно недоступен</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6" style={surface.mutedText}>
-            Клиент видит спокойный fallback без секретов, stack trace и сырых ответов базы.
-          </p>
+          <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Oops...</h1>
           <div className="mt-6 grid gap-3 sm:grid-cols-[1.2fr_0.8fr]">
             <div className="rounded-3xl border p-4" style={surface.card}>
               <div className="h-28 rounded-2xl" style={{ backgroundColor: surface.accentPill.backgroundColor }} />
@@ -62,9 +59,6 @@ export default function FranchizeSlugError({
             </div>
           </div>
           {error.digest ? <p className="mt-4 text-[11px] opacity-50" style={surface.mutedText}>debug digest: {error.digest}</p> : null}
-          <Link href={catalogHref} className="mt-6 inline-flex text-sm font-semibold" style={{ color: DEFAULT_FRANCHIZE_THEME.palette.accentMain }}>
-            Вернуться в каталог
-          </Link>
         </div>
       </section>
     </main>

@@ -62,6 +62,7 @@ export interface LeadTodoRow {
   lead_id: string | null;
   user_id: string | null;
   phone: string | null;
+  rental_id: string | null;
   title: string;
   description: string | null;
   status: string;

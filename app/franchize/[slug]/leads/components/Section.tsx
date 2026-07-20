@@ -26,7 +26,7 @@ export function Section({ title, icon: Icon, children, T, defaultOpen = false }:
         </div>
         {open ? <ChevronDown className="h-3.5 w-3.5" style={{ color: T.textFaint }} /> : <ChevronRight className="h-3.5 w-3.5" style={{ color: T.textFaint }} />}
       </button>
-      {open && <div className="border-t px-3 py-3" style={{ borderColor: T.border }}>{children}</div>}
+      <div className="border-t px-3 py-3" style={{ borderColor: T.border, display: open ? '' : 'none' }}>{children}</div>
     </div>
   );
 }

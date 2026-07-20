@@ -319,9 +319,9 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                 if (isOnCatalogPage) {
                   setDisplayMode(pill.key);
                 } else {
-                  // On non-catalog pages — navigate to main catalog with mode
-                  setDisplayMode(pill.key);
-                  router.push(mainCatalogPath);
+                  // On non-catalog pages — navigate to main catalog with mode param
+                  const modeParam = pill.key === 'rent' ? '' : `?mode=${pill.key}`;
+                  router.push(`${mainCatalogPath}${modeParam}`);
                 }
               };
               return (
