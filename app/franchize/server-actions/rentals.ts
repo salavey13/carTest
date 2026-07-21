@@ -650,11 +650,16 @@ export async function getRentalReturnTodos(
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Fetch ALL crew_todos for this crew (both lead_followup and rental_verification)
+    // Fetch crew_todos matching this rental — uses indexed rental_id column
+    // with a description JSON fallback for legacy rows (pre-migration 20260720120200).
+    // The rental_id column is indexed (idx_crew_todos_rental_id) and backfilled
+    // from description JSON during migration, so this is a fast indexed query for
+    // most rows with a safe fallback for any missed legacy rows.
     const { data: allTodos, error } = await supabaseAdmin
       .from("crew_todos")
-      .select("id, title, status, priority, category, description")
+      .select("id, title, status, priority, category, description, rental_id")
       .eq("crew_id", crewId)
+      .or(`rental_id.eq.${rentalId},description.ilike.%${rentalId}%`)
       .order("created_at", { ascending: true });
 
     if (error) {
@@ -662,23 +667,18 @@ export async function getRentalReturnTodos(
       return { success: false, error: error.message };
     }
 
-    // Filter by rental_id in description JSON
+    // Client-side safety filter: also parse description JSON for any legacy rows
+    // where rental_id column might be null but description has it.
+    // This is redundant for rows caught by the SQL filter above, but ensures
+    // no todos are missed for pre-migration data.
     const rentalTodos = (allTodos || []).filter((t) => {
-      if (t.category === "rental_verification") {
-        // Verification todos store rental_id directly in description
-        try {
-          const desc = JSON.parse(t.description || "{}");
-          return desc.rental_id === rentalId;
-        } catch { return false; }
-      }
-      // lead_followup todos may have rental_id or be generally return-related
-      if (t.category === "lead_followup") {
-        try {
-          const desc = JSON.parse(t.description || "{}");
-          return desc.rental_id === rentalId;
-        } catch { return false; }
-      }
-      return false;
+      // Fast path: rental_id column matches (indexed)
+      if (t.rental_id === rentalId) return true;
+      // Fallback: parse description JSON for legacy rows
+      try {
+        const desc = JSON.parse(t.description || "{}");
+        return desc.rental_id === rentalId;
+      } catch { return false; }
     });
 
     return {
