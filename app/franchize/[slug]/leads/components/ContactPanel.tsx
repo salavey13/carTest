@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Phone, Send, AlertCircle, StickyNote, X, CheckCircle, TrendingUp, Bike, Users,
   Wallet, FileText, ExternalLink, Banknote, Briefcase, ShieldAlert, Hash,
@@ -18,6 +19,7 @@ interface ContactPanelProps {
 }
 
 export function ContactPanel({ lead, T, todos }: ContactPanelProps) {
+  const router = useRouter();
   const [showTgInput, setShowTgInput] = useState(false);
   const [tgMessage, setTgMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -68,7 +70,7 @@ export function ContactPanel({ lead, T, todos }: ContactPanelProps) {
         if (!data.troubled) lead.troubledReason = null;
         setShowTroubledInput(false);
         setTroubledReasonInput("");
-        window.location.reload();
+        router.refresh();
       }
     } catch { /* ignore */ }
     setTroubledUpdating(false);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Calendar, Banknote, ExternalLink, Activity, CheckCircle, XCircle,
   Gauge, Loader2, RotateCcw, ShieldCheck, AlertCircle, Check, X,
@@ -51,6 +52,7 @@ interface RentalRowProps {
 }
 
 function RentalRow({ rental, slug, T }: RentalRowProps) {
+  const router = useRouter();
   const statusMeta: Record<string, { label: string; color: string }> = {
     active: { label: "Активна", color: "#10b981" },
     completed: { label: "Завершена", color: "#3b82f6" },
@@ -99,7 +101,7 @@ function RentalRow({ rental, slug, T }: RentalRowProps) {
       });
       if (result.success) {
         setActivationMsg({ ok: true, text: result.message || "✅ Аренда активирована! Обновляю..." });
-        setTimeout(() => window.location.reload(), 2000);
+        router.refresh();
       } else {
         setActivationMsg({ ok: false, text: result.error || "Ошибка активации" });
       }
@@ -128,7 +130,7 @@ function RentalRow({ rental, slug, T }: RentalRowProps) {
       });
       if (result.success) {
         setDeclineMsg({ ok: true, text: result.message || "✅ Аренда отклонена. Обновляю..." });
-        setTimeout(() => window.location.reload(), 2000);
+        router.refresh();
       } else {
         setDeclineMsg({ ok: false, text: result.error || "Ошибка" });
       }
@@ -158,7 +160,7 @@ function RentalRow({ rental, slug, T }: RentalRowProps) {
       });
       if (result.success) {
         setCompleteMsg({ ok: true, text: result.message || "✅ Аренда завершена. Обновляю..." });
-        setTimeout(() => window.location.reload(), 2000);
+        router.refresh();
       } else {
         setCompleteMsg({ ok: false, text: result.error || "Ошибка" });
       }

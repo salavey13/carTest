@@ -618,13 +618,141 @@ FROM private.rental_contract_artifacts
 WHERE rental_id IS NULL;
 ```
 
-### 13.5 Files modified this session
+### 13.4c Updated priority (post-backfill, 2026-07-21)
+
+После применения `20260721160000_backfill_todos_artifacts.sql` (todo user_id + artifact rental_id):
+
+| # | Item | Status | Priority |
+|---|---|---|---|
+| 1 | **Todo user_id backfill** (`20260721160000` Step 1) | ✅ Applied | Critical |
+| 2 | **Orphaned artifact rental_id** (`20260721160000` Step 2) | ✅ Applied | Critical |
+| 3 | **`window.location.reload()` → `router.refresh()`** | ✅ Fixed (7 occurrences in leads, 1 in rentals) | High |
+| 4 | **`secret.chat_id` backfill** (not in Step 3, see §13.7 #1) | ✅ Fixed in `20260721170000` | High |
+| 5 | **`propagate_claim` LIKE→JSONB** (see §13.7 #3) | ✅ Fixed in `20260721170000` | Medium |
+| 6 | **`lead_notes.lead_id` migration** (§6 #5) | ⏳ Parked | Low |
+| 7 | **Analytics page parity** (§9 phase 4) | ⏳ Parked | Low |
+| 8 | **Stable CRM lead UUID** (§8) | ⏳ Parked | Low |
+| 9 | **Regression fixtures** (§11.5) | ⏳ Parked | Low |
+
+### 13.5 UX polish — `window.location.reload()` → `router.refresh()`
+
+**Problem:** После операций (dismiss lead, activate/decline/complete rental, toggle troubled) оператору показывали сообщение об успехе, затем через 2 секунды — полную перезагрузку страницы. Это:
+- Сбрасывало состояние UI (скролл, открытые модалки, ввод)
+- Мигало белым экраном (full page reload)
+- Теряло кеш компонентов
+
+**Fix:** Во всех случаях заменили `setTimeout(() => window.location.reload(), 2000)` на `router.refresh()` + optimistic state update. `router.refresh()` делает мягкий RSC refresh, не сбрасывая клиентское состояние.
+
+**Затронутые файлы:**
+
+| File | Occurrences | Pattern |
+|---|---|---|
+| `LeadsClient.tsx` | handleDismissLead | optimistic remove + `router.refresh()` |
+| `DealsPanel.tsx` | 3 (activate/decline/complete) | `setTimeout(reload, 2000)` → `router.refresh()` |
+| `useRentalActions.ts` | 3 (activate/decline/complete) | `setTimeout(reload, 2000)` → `router.refresh()` |
+| `ContactPanel.tsx` | handleToggleTroubled | `window.location.reload()` → `router.refresh()` |
+| `RentalsListClient.tsx` | error retry button | `window.location.reload()` → `router.refresh()` |
+
+Всего **8 occurrences** заменены в **5 файлах**. LeadsClient.tsx уже был починен ранее; остальные 4 файла исправлены коллегой в параллельной ветке и смержены.
+
+### 13.6 Post-fix verification (2026-07-21)
+
+После всех миграций:
+
+```sql
+-- Artifacts: claimed должны быть > 0, orphaned = 0
+SELECT COUNT(*) AS total,
+  COUNT(*) FILTER (WHERE telegram_chat_id != created_by_operator_chat_id AND created_by_operator_chat_id IS NOT NULL) AS claimed,
+  COUNT(*) FILTER (WHERE rental_id IS NULL) AS orphaned
+FROM private.rental_contract_artifacts;
+
+-- Secrets: fully_claimed должно покрывать все заклеймленные rentals
+SELECT COUNT(*) AS total,
+  COUNT(*) FILTER (WHERE chat_id IS NULL) AS null_chat_id,
+  COUNT(*) FILTER (WHERE chat_id IS NOT NULL AND qr_claimed_at IS NOT NULL) AS fully_claimed
+FROM private.user_rental_secrets;
+
+-- Todos: has_user_id должно быть > 0
+SELECT COUNT(*) AS total,
+  COUNT(*) FILTER (WHERE user_id IS NOT NULL) AS has_user_id,
+  COUNT(*) FILTER (WHERE rental_id IS NOT NULL) AS has_rental_id
+FROM public.crew_todos;
+```
+
+### 13.7 Flagged issues (colleague code-review, 2026-07-21)
+
+**#1 — `secret.chat_id` не бэкфиллится для 5 уже заклеймленных rental'ов**
+
+Миграция `20260721160000` Step 3 (re-propagate) обновляет `source_rental_id` и `qr_claimed_at`, но НЕ проставляет `chat_id = renter`. В результате:
+- У 5 rental'ов уже есть `user_id != owner_id` (заклеймлены)
+- Их secrets имеют `chat_id = NULL`
+- При повторном сканировании QR `claimRentalSecretsByDocSha` видит `chat_id IS NULL` и пытается заклеймить снова
+- Логически OK (идемпотентность), но диагностика сбивается
+
+**Fix:** `20260721170000` Step 2 — DO block с `SET chat_id = v_rec.renter_id`.
+
+---
+
+**#2 — `claimRentalSecretsByDocSha` обновляет secret ДО RPC (риск частичного отказа)**
+
+Функция `claimRentalSecretsByDocSha` (TS, user-rental-secrets.ts) напрямую апдейтит `chat_id` в private.user_rental_secrets. Затем caller может вызвать RPC `claim_rental_by_qr`, который тоже апдейтит rentals + artifacts + todos.
+
+Риск: если TS-функция успела обновить secret, но RPC упала (сеть, таймаут, ошибка), то secret находится в полу-заклеймленном состоянии: `chat_id` проставлен, но `rentals.user_id` и `artifact.telegram_chat_id` не обновлены.
+
+**Рекомендация:** В будущем сделать RPC единственным canonical путем claim'а. `claimRentalSecretsByDocSha` должна либо:
+a) Только валидировать и возвращать secret, не апдейтя его (caller вызывает RPC)
+b) Вызывать RPC внутри себя и возвращать результат RPC
+
+Текущий риск mitigated тем, что:
+- При повторном вызове RPC видит `chat_id = renter` и корректно пропускает шаг 5 (т.к. `v_secret_chat_id = p_renter_chat_id`)
+- Шаг 6 (UPDATE rentals) идемпотентен
+
+---
+
+**#3 — `propagate_claim` Step 4 ищет rental_id через `LIKE '%...%'` substring match**
+
+```sql
+-- Было (риск ложных совпадений):
+AND description LIKE '%' || p_rental_id::text || '%'
+
+-- Стало (JSONB, точно):
+AND (description::jsonb ->> 'rental_id') = p_rental_id::text
+```
+
+`LIKE '%...%'` может совпасть с подстрокой другого rental_id (например, `'abc'` совпадает с `'abc-123'`). JSONB-извлечение гарантирует точное совпадение поля.
+
+**Fix:** `20260721170000` Step 1 — `CREATE OR REPLACE FUNCTION private.propagate_claim` с исправленным Step 4.
+
+---
+
+**#4 — Bug #10 (lead_notes lead_id) не фиксился**
+
+Баг #10 из оригинального аудита: `lead_notes.lead_id` не обновляется при смене identity (QR claim). Причина: propagate_claim уже апдейтит `lead_notes.lead_id` (Step 6), но только для будущих claim'ов. Для существующих записей нужен отдельный бэкфилл.
+
+**Статус:** Паркуем. В проде 0 проблемных строк (данные свежие).
+
+---
+
+**#5 — 62 legacy crew_todos без user_id и rental_id**
+
+Диагностика показала 62 todos с `user_id IS NULL`. После `20260721160000` Step 1, часть из них получила `user_id`. Оставшиеся — legacy строки без привязки к rental'у (созданные до введения `rental_id` колонки). Они не мешают leads page — `getTodoLeadId()` падает через `lead_id` → phone match.
+
+**Статус:** Acceptable. Если операторы не видят эти todos в leads page, они всё ещё доступны через прямой запрос.
+
+### 13.8 Files modified this session (post-merge)
 
 | File | Change |
 |---|---|
 | `app/franchize/components/RentalLink.tsx` | New — `router.push()` component, bypasses broken `<Link>` |
 | `app/franchize/[slug]/rental/[id]/page.tsx` | 24 `<Link>` → `<RentalLink>` |
 | `supabase/migrations/20260721150000_fix_claim_rental_rpc.sql` | New — RPC rewrite, propagage_claim update, backfill |
+| `supabase/migrations/20260721160000_backfill_todos_artifacts.sql` | New — backfill todos user_id + artifact rental_id |
+| `supabase/migrations/20260721170000_fix_backfill_chatid_and_jsonb.sql` | New — fix secret.chat_id backfill + LIKE→JSONB in propagate_claim |
+| `app/franchize/[slug]/leads/components/DealsPanel.tsx` | Fixed — 3× `window.location.reload()` → `router.refresh()` |
+| `app/franchize/[slug]/leads/hooks/useRentalActions.ts` | Fixed — 3× `window.location.reload()` → `router.refresh()` |
+| `app/franchize/[slug]/leads/components/ContactPanel.tsx` | Fixed — `window.location.reload()` → `router.refresh()` |
+| `app/franchize/[slug]/rentals/RentalsListClient.tsx` | Fixed — `window.location.reload()` → `router.refresh()` |
+| `app/franchize/[slug]/leads/LeadsClient.tsx` | Fixed (previously) — `router.refresh()` + optimistic state |
 | `docs/franchize-identity-flow-audit.md` | This update |
 
 ---
