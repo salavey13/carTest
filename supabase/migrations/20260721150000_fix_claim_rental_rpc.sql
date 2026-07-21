@@ -260,7 +260,7 @@ BEGIN
   FOR v_rec IN
     SELECT r.rental_id, r.user_id AS renter_id, a.original_sha256
     FROM public.rentals r
-    JOIN private.rental_contract_artifacts a ON a.rental_id = r.rental_id::text
+    JOIN private.rental_contract_artifacts a ON a.rental_id::uuid = r.rental_id
     WHERE r.user_id != r.owner_id
       AND a.telegram_chat_id IS DISTINCT FROM r.user_id
   LOOP
