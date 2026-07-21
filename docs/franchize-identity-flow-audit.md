@@ -1,7 +1,7 @@
 # Franchize identity-flow audit
 
 Date: 2026-07-19
-Last updated: 2026-07-21 (post-fix status — see §12, §13, §14)
+Last updated: 2026-07-21 (post-fix status — see §12, §13, §14, §15 re-audit with corrected diagrams)
 
 ## 1. Executive summary
 
@@ -29,6 +29,8 @@ Known operator chat IDs that should never be treated as real renters without exp
 
 ## 2. Current identity lifecycle diagram
 
+> **Updated 2026-07-21** to reflect the post-§13 state: single canonical RPC, validate-only `claimRentalSecretsByDocSha`, `created_by_operator_chat_id` preserved on rentals + artifacts, `metadata.operatorId` on intents.
+
 ```mermaid
 sequenceDiagram
   participant O as Operator Telegram user
@@ -38,111 +40,165 @@ sequenceDiagram
   participant S as private.user_rental_secrets
   participant I as public.franchize_intents
   participant T as public.crew_todos
-  participant QR as startapp / QR claim
+  participant N as public.lead_notes
+  participant QR as claim_rental_by_qr RPC
+  participant Val as claimRentalSecretsByDocSha (validate-only)
   participant U as Real renter Telegram user
 
   O->>Doc: Creates rental contract before real renter opens app
-  Doc->>R: Insert rental with operator placeholder IDs
-  Note right of R: user_id and owner_id both start as crewOwnerChatId
-  Doc->>S: Insert unclaimed secret for crew-created contract
-  Note right of S: chat_id is NULL until the renter claims the QR
+  Doc->>R: Insert rental with operator placeholder
+  Note right of R: user_id = owner_id = created_by_operator_chat_id = crewOwnerChatId
+  Doc->>S: Insert unclaimed secret
+  Note right of S: chat_id is NULL, source_rental_id is NULL until QR claim
   Doc->>A: Insert artifact linked to rental
-  Note right of A: telegram_chat_id starts as the operator userId
-  Doc->>I: Upsert lead from clientPhone or operator userId
-  Doc->>T: Insert lead_followup todos with rental metadata
+  Note right of A: telegram_chat_id = created_by_operator_chat_id = operator userId
+  Doc->>I: Upsert lead via upsertFranchizeLead
+  Note right of I: metadata.operatorId = operator userId (preserved forever)
+  Doc->>T: Insert lead_followup todos via createLeadFollowupTodos
+  Note right of T: lead_id, user_id, phone, rental_id, description JSON all set
   Doc-->>O: Send DOCX plus QR startapp link
 
-  U->>QR: Open QR deep link
-  QR->>S: Claim by doc_sha256 and store renter chat_id
-  QR->>R: Replace placeholder user_id with renter userId
-  QR->>A: Replace artifact telegram_chat_id with renter userId
-  QR->>T: Best-effort partial todo relink in some flows
-  QR->>I: Best-effort partial intent relink in some flows
+  U->>Val: Open QR deep link (rent_{bikeId}_{sha256})
+  Val->>Val: Validate eligibility (no DB writes)
+  Val-->>U: Return secret + claimedNow flag
+
+  U->>QR: Caller invokes claim_rental_by_qr RPC
+  Note right of QR: Single canonical writer for all 6 tables
+  QR->>S: UPDATE chat_id = renter, source_rental_id = rental, qr_claimed_at = now()
+  QR->>R: UPDATE user_id = renter (preserves created_by_operator_chat_id)
+  QR->>A: UPDATE telegram_chat_id = renter (preserves created_by_operator_chat_id)
+  QR->>I: UPDATE telegram_user_id = renter WHERE slug+old_user_id
+  QR->>T: UPDATE user_id = renter WHERE rental_id matches (JSONB or column)
+  QR->>N: UPDATE lead_id = renter WHERE crew+old_user_id
+  QR-->>U: Return rental_id + claimed_now flag
 ```
 
-Important caveat: there are at least two QR claim paths. The legacy `handleStartappParam()` calls `claimRentalByQRCode()`. A separate `rental-secrets-claim` server action calls `claimRentalSecretsByDocSha()` and then performs broader propagation. These paths are not equivalent.
+**Three entry paths all converge to the same RPC:**
+
+| Path | Entry point | Pre-RPC work | RPC call |
+|---|---|---|---|
+| A — Deep link | `startapp-handler.ts:85` → `claimRentalByQRCode()` | None | `supabaseAdmin.rpc('claim_rental_by_qr', ...)` |
+| A' — Server action | `qr-claiming.ts` → `claimRentalByQRCode()` | None | Same RPC |
+| B — Secret claim | `rental-secrets-claim.ts:265` → `createRentalFromClaimedSecret()` | Calls `claimRentalSecretsByDocSha()` (validate-only — no DB writes) | Same RPC, called unconditionally |
+
+**Key invariants (post-§13.9 refactor):**
+- `claimRentalSecretsByDocSha` does NOT write to any table. It only validates eligibility (revoked? already claimed by another renter? operator overwrite allowed?) and returns the secret. The caller then invokes the RPC which atomically updates all 6 tables.
+- `updateRentalSecretWithQrTracking` has been removed from `user-rental-secrets.ts`.
+- `claim_rental_by_qr` is the **sole canonical writer** for claim-side updates. There are no parallel manual SQL updates in any TS file.
 
 ## 3. Data-flow diagram
+
+> **Updated 2026-07-21** to reflect the post-§13 state.
 
 ```mermaid
 flowchart TD
   DocManual[/app/webhook-handlers/commands/doc-manual.ts/] -->|createRentalFromDocContract| Rentals[(public.rentals)]
-  DocManual -->|insert secret| Secrets[(private.user_rental_secrets)]
+  DocManual -->|saveUserRentalSecrets| Secrets[(private.user_rental_secrets)]
   DocManual -->|insert artifact| Artifacts[(private.rental_contract_artifacts)]
   DocManual -->|upsertFranchizeLead| Intents[(public.franchize_intents)]
   DocManual -->|createLeadFollowupTodos| Todos[(public.crew_todos)]
+  DocManual -->|createRentalVerificationTodos| Todos
+
+  WebFlow[/app/franchize/actions-runtime.ts/] -->|insert rental| Rentals
+  WebFlow -->|saveUserRentalSecrets| Secrets
+  WebFlow -->|insert artifact| Artifacts
+  WebFlow -->|upsertFranchizeLead| Intents
+  WebFlow -->|createLeadFollowupTodos| Todos
+  WebFlow -->|createRentalVerificationTodos| Todos
 
   Startapp[app/lib/startapp-handler.ts] --> QRLegacy[app/lib/qr-linking-handler.ts]
-  QRLegacy --> Rentals
-  QRLegacy --> Artifacts
-  QRLegacy -. possibly broken rental_id filter .-> Secrets
+  QRLegacy -->|rpc only| RPC[(claim_rental_by_qr RPC)]
 
-  SecretClaim[app/franchize/server-actions/rental-secrets-claim.ts] --> Secrets
-  SecretClaim --> Rentals
-  SecretClaim --> Artifacts
-  SecretClaim -. partial .-> Todos
-  SecretClaim -. partial .-> Intents
+  SecretClaim[app/franchize/server-actions/rental-secrets-claim.ts] -->|validate-only| Validate[claimRentalSecretsByDocSha]
+  SecretClaim -->|always| RPC
 
-  Leads[app/franchize/server-actions/leads.ts] --> Intents
-  Leads --> Artifacts
-  Leads --> Secrets
-  Leads --> Rentals
-  Leads --> Todos
+  RPC --> Rentals
+  RPC --> Artifacts
+  RPC --> Secrets
+  RPC --> Intents
+  RPC --> Todos
+  RPC --> Notes[(public.lead_notes)]
 
-  RentalAnalytics[app/franchize/server-actions/rentals-dashboard.ts] --> Rentals
-  RentalAnalytics --> Secrets
-  RentalPageTodos[app/franchize/server-actions/rentals.ts] --> Todos
+  Leads[app/franchize/server-actions/leads.ts<br/>getFranchizeLeads] -->|read| Intents
+  Leads -->|read| Artifacts
+  Leads -->|read| Secrets
+  Leads -->|read| Rentals
+  Leads -->|read| Todos
+  Leads -->|read| Users[(public.users)]
+  Leads -->|read| Cars[(public.cars)]
+
+  RentalAnalytics[app/franchize/server-actions/rentals-dashboard.ts<br/>getRentalsDashboard] -->|read| Rentals
+  RentalAnalytics -->|read| Secrets
+  RentalAnalytics -->|read| Users
+  RentalPageTodos[app/franchize/server-actions/rentals.ts<br/>getRentalReturnTodos] -->|read| Todos
 ```
+
+**Key changes vs. the original §3 diagram:**
+- `qr-linking-handler.ts` no longer has its own SQL — it's a thin wrapper that just calls the RPC.
+- `rental-secrets-claim.ts` no longer has "partial" updates — it validates then defers all writes to the RPC.
+- `claim_rental_by_qr` RPC is the single arrow into all 6 write-targets (rentals, artifacts, secrets, intents, todos, lead_notes).
+- `leads.ts` now also reads `public.cars` (for bike titles) and joins `users` by `user_id` only (no phone column).
+- Web-flow path (`actions-runtime.ts`) added explicitly — it's the second rental-creation path that doesn't go through `/doc-manual`.
 
 ## 4. Relevant fields table
 
-| Field | Table | Current meaning | Who writes it | Who reads it | When it changes meaning | Risks / bugs |
+> **Updated 2026-07-21** to reflect post-§13 state. Strikethrough marks the original "Risks / bugs" entries that have been fixed; current risks are listed below each.
+
+| Field | Table | Current meaning | Who writes it | Who reads it | When it changes meaning | Current risks / bugs |
 |---|---|---|---|---|---|---|
-| `user_id` | `public.rentals` | Placeholder crew owner/operator before QR; real renter after claim | `/doc-manual` creates as `crewOwnerChatId`; QR claim updates to renter | rental dashboard, rental export, rental detail/profile, leads aggregation | On QR claim | Same column mixes placeholder and renter. Dedupe by `user_id::vehicle_id` can collapse operator-placeholder rentals. |
-| `owner_id` | `public.rentals` | Crew owner/operator account | `/doc-manual` | QR claim uses `user_id === owner_id` as unclaimed check | Does not change in claim | Used as sentinel for placeholder; fails if real renter is also owner/operator. |
-| `telegram_chat_id` | `private.rental_contract_artifacts` | Operator at creation; intended renter after QR claim | `/doc-manual`, `/doc`, testdrive/subrent variants; QR claim updates | leads aggregation, profile fallback, artifact lookup code | On QR claim | Leads page treats it as lead id; pre-claim artifacts collapse under operator. |
-| `renter_phone` | `private.rental_contract_artifacts` | Real renter phone if operator entered it | `/doc-manual` | leads aggregation | Stable | Leads aggregation prefers `telegram_chat_id` over phone, so operator id wins even when phone exists. |
-| `rental_id` | `private.rental_contract_artifacts` | FK to `public.rentals` | `/doc-manual` when rental row created | QR claim, leads, dashboards | Stable | Missing on old rows; legacy claim refuses artifacts without rental_id. |
-| `chat_id` | `private.user_rental_secrets` | `NULL` while unclaimed operator-created doc; real renter after claim; non-crew direct user for self-created data | `/doc-manual`; `claimRentalSecretsByDocSha`; QR code claim | profile, leads, rentals dashboard | On QR claim | Null secrets are invisible as leads; if set to operator by older flows it must be overwritten safely. |
-| `source_rental_id` | `private.user_rental_secrets` | Link to `public.rentals.rental_id` | `/doc-manual`, profile flows | rental analytics/dashboard, verification reads | Stable | Legacy `qr-linking-handler` appears to update secrets by `rental_id`, not `source_rental_id`. |
-| `doc_sha256` / `original_sha256` | secrets/artifacts | Document hash used for QR claim lookup | `/doc-manual` | QR claim | Stable | Correct correlation key; should drive propagation. |
-| `telegram_user_id` | `public.franchize_intents` | Intended Telegram lead id, but can be omitted for phone leads or be operator id when no phone | `upsertFranchizeLead`, web/callback flows | leads page, closer actions | Should become renter id after QR if placeholder was used | Mixed with phone-based synthetic `userId`; migration/claim needs exact rules. |
-| `phone` | `public.franchize_intents` | Lead phone | `upsertFranchizeLead` | leads page | Stable | If phone exists but artifact id is operator, separate lead rows can appear. |
-| `lead_id` | `public.crew_todos` | Legacy overloaded lead key: phone, Telegram id, or UUID | `createLeadFollowupTodos`, `createCrewTodo`, verification todo creation | leads page, lead note/todo APIs, partial QR re-link | Should not change conceptually, but some QR code tries to bridge via user_id only | Does not guarantee renter; may be operator or phone. |
-| `user_id` | `public.crew_todos` | Canonical Telegram user id if known | `createLeadFollowupTodos`, rental verification todos, partial QR claim | leads page | May be filled after claim | Some inserted todos have only description/lead_id. Partial claim only updates rows where `lead_id` equals old operator and `user_id IS NULL`. |
-| `phone` | `public.crew_todos` | Lead/renter phone | `createLeadFollowupTodos` | leads page | Stable | Not updated on QR; useful fallback only if leadMap contains phone key. |
-| `description` | `public.crew_todos` | JSON metadata containing `lead_id`, `user_id`, `phone`, `rental_id`, `todo_type` | todo creation flows | rental page/analytics parse `rental_id`; leads parse identity fallback | Should remain metadata | JSON is used as hidden index; no DB-level schema, fragile parse failures. |
-| `lead_id` | `public.lead_notes` | UI lead id string, not FK-enforced to a canonical lead table | lead notes actions | lead notes actions/UI | Changes if lead identity key changes | Notes can become orphaned when lead key moves from operator/phone to renter chat id. |
+| `user_id` | `public.rentals` | Placeholder crew owner/operator before QR; real renter after claim | `/doc-manual` creates as `crewOwnerChatId`; `actions-runtime.ts` creates as `payload.phone \|\| payload.telegramUserId`; RPC `claim_rental_by_qr` updates to renter on claim | rental dashboard, rental export, rental detail/profile, leads aggregation | On QR claim | ~~Same column mixes placeholder and renter.~~ Now disambiguated by `created_by_operator_chat_id` (see next row). Dashboard still shows operator name in renter column for placeholder rentals (cosmetic — see §13.4c #7). |
+| `owner_id` | `public.rentals` | Crew owner/operator account | `/doc-manual`, `actions-runtime.ts` | RPC uses `user_id === owner_id` as a secondary check | Does not change in claim | No longer the primary signal — RPC uses secret-based check (§13.2). |
+| `created_by_operator_chat_id` | `public.rentals` | Operator who originally created the rental (preserved forever) | `/doc-manual` L1190 (`crewOwnerChatId`); `actions-runtime.ts` does NOT set this (web flow is renter-initiated) | `leads.ts` rentals step (L580-584) — used to detect pre-claim state via `user_id === created_by_operator_chat_id`; `classifyIdentityState` uses it for `merged` detection | Stable (never overwritten by RPC) | **NEW #4 (§15.2)**: web-flow rentals don't set this. Acceptable — web flow is renter-initiated, so no operator origin to preserve. |
+| `telegram_chat_id` | `private.rental_contract_artifacts` | Operator at creation; renter after QR claim | `/doc-manual`, `/doc`, testdrive/subrent variants; RPC updates on claim | leads aggregation, profile fallback, artifact lookup code | On QR claim | ~~Leads page treats it as lead id; pre-claim artifacts collapse under operator.~~ Now `leads.ts` checks `telegram_chat_id === created_by_operator_chat_id` and prefers `renter_phone` when pre-claim. |
+| `created_by_operator_chat_id` | `private.rental_contract_artifacts` | Operator who created the artifact (preserved forever) | `/doc-manual` L1612; web flow also sets it | `leads.ts` artifacts step (L480-482) — used to detect pre-claim state | Stable | None — works as designed. |
+| `renter_phone` | `private.rental_contract_artifacts` | Real renter phone if operator entered it | `/doc-manual` L1613 | leads aggregation (preferred over operator `telegram_chat_id` when pre-claim) | Stable | None — phone is normalized to E.164 in `leads.ts`. |
+| `rental_id` | `private.rental_contract_artifacts` | FK to `public.rentals` | `/doc-manual` when rental row created; backfilled by migration `20260721160000` for orphans (§13.4b #6) | QR claim, leads, dashboards | Stable | ~~Missing on old rows; legacy claim refuses artifacts without rental_id.~~ All 30 orphans linked via migration. |
+| `chat_id` | `private.user_rental_secrets` | `NULL` while unclaimed; real renter after claim | `/doc-manual` (NULL on insert); RPC updates on claim | profile, leads, rentals dashboard | On QR claim | ~~Null secrets are invisible as leads; if set to operator by older flows it must be overwritten safely.~~ Backfilled by `20260721170000` for 5 already-claimed rentals (§13.7 #1). |
+| `source_rental_id` | `private.user_rental_secrets` | Link to `public.rentals.rental_id` (as text) | `/doc-manual` (NULL on insert); RPC sets on claim; backfilled by migration | rental analytics/dashboard, verification reads | Stable | ~~Legacy `qr-linking-handler` appears to update secrets by `rental_id`, not `source_rental_id`.~~ `qr-linking-handler` no longer has its own SQL — only the RPC writes, and it uses both `doc_sha256` and `source_rental_id`. |
+| `doc_sha256` / `original_sha256` | secrets/artifacts | Document hash used for QR claim lookup | `/doc-manual` | QR claim, validate-only `claimRentalSecretsByDocSha` | Stable | None — correct correlation key. |
+| `telegram_user_id` | `public.franchize_intents` | Telegram lead id, OR phone-derived id when no TG user, OR operator id when `/doc-manual` had no `clientPhone` | `upsertFranchizeLead` (called from `/doc-manual`, `actions-runtime.ts`, web callback flows) | leads page, closer actions | Should become renter id after QR if placeholder was used (RPC updates by slug + old_user_id) | None — RPC scopes the update to crew slug + old user id (§6 #4 fix). |
+| `metadata.operatorId` | `public.franchize_intents` (JSONB) | Operator who created the intent (preserved forever, even after QR claim overwrites `telegram_user_id`) | `/doc-manual` L1762 (`metadata: { operatorId: String(userId), ... }`) | `leads.ts` intents step (L416-417) — used as fallback for `originalOperatorChatId` when no rental/artifact is attached | Stable | **Note**: `actions-runtime.ts` (web flow) does NOT set this — correct, because web flow is renter-initiated. |
+| `phone` | `public.franchize_intents` | Lead phone (E.164 normalized) | `upsertFranchizeLead` (uses `phone-utils.normalizePhone`) | leads page | Stable | **NEW #6 (§15.2)**: `phone-utils.normalizePhone` diverges from the inline copies in `leads.ts`/`crew-todos.ts`/etc. for 10-digit numbers without country code. Same person could be keyed differently depending on which path normalized the phone. |
+| `lead_id` | `public.crew_todos` | Legacy overloaded lead key: phone, Telegram id, or UUID | `createLeadFollowupTodos`, `createCrewTodo`, `createRentalVerificationTodos` | leads page, lead note/todo APIs, RPC `propagate_claim` (Step 5) | Stable (RPC does NOT update `lead_id` — only `user_id`) | Does not guarantee renter; may be operator or phone. Acceptable — `user_id` is the canonical column now. |
+| `user_id` | `public.crew_todos` | Canonical Telegram user id if known | `createLeadFollowupTodos` (sets if `leadId` matches `\d{1,12}`); `createRentalVerificationTodos` (**BUG: still uses `\d{1,9}` — see NEW #1 §15.2**); RPC `propagate_claim` (updates on claim) | leads page (primary match key) | Filled at creation if known, updated on QR claim | **NEW #1 (§15.2)**: `rental-verification-todos.ts:86` still uses `/^\d{1,9}$/` regex — silently drops 10-digit Telegram IDs. |
+| `rental_id` | `public.crew_todos` | FK to `public.rentals` (Phase 3c — added by migration) | `createLeadFollowupTodos` (L797); `createRentalVerificationTodos` (L93) | leads page (strongest match key — works before QR claim); rental page `getRentalReturnTodos` (parses description JSON instead — see NEW #5 §15.2) | Stable | **NEW #5 (§15.2)**: `getRentalReturnTodos` fetches ALL crew todos and filters client-side by description JSON, ignoring the indexed `rental_id` column. Perf issue, not correctness. |
+| `phone` | `public.crew_todos` | Lead/renter phone (E.164 normalized) | `createLeadFollowupTodos` (uses inline `normalizePhone`) | leads page (fallback when `user_id` is null) | Stable (RPC does NOT update `phone`) | **NEW #6 (§15.2)**: same divergence as `franchize_intents.phone` — inline vs `phone-utils.ts`. |
+| `description` | `public.crew_todos` | JSON metadata: `lead_id`, `user_id`, `phone`, `rental_id`, `todo_type`, etc. | `createLeadFollowupTodos`, `createRentalVerificationTodos` | rental page (`getRentalReturnTodos` parses `rental_id`); leads page (fallback identity parse); RPC `propagate_claim` (JSONB match for `rental_id`) | Stable | RPC now uses JSONB extraction (§13.7 #3 fix) instead of `LIKE '%...%'` substring match. |
+| `lead_id` | `public.lead_notes` | UI lead id string, not FK-enforced to a canonical lead table | lead notes actions | lead notes actions/UI | Changes if lead identity key changes | Notes can become orphaned when lead key moves from operator/phone to renter chat id. RPC `propagate_claim` Step 6 updates `lead_notes.lead_id` for future claims. **Existing 1 row in production is acceptable (parked, §13.4c #6).** |
 
 ## 5. Places where operator identity leaks into renter identity
 
-1. `/doc-manual` explicitly stores `telegram_chat_id: String(userId)` in rental contract artifacts and documents that this is the operator until QR claim.
-2. `/doc-manual` creates the rental row with `user_id: crewOwnerChatId` and `owner_id: crewOwnerChatId`; until claim, rental dashboards that display `user` show the owner/operator as renter.
-3. `/doc-manual` uses `leadUserId = context.clientPhone || String(userId)`. If no client phone is entered, `franchize_intents` and public `users` receive the operator id as the lead id.
-4. `/doc-manual` uses `leadId = context.clientPhone || String(userId)` for todos. If no phone is present, todos are keyed to the operator.
-5. `getFranchizeLeads()` gives artifact `telegram_chat_id` priority over `renter_phone`, so unclaimed artifacts are grouped under operator ids even if the renter phone exists.
-6. `getFranchizeLeads()` treats any numeric `user_id` in leadMap as a Telegram user and enriches it from `public.users`; operator profiles can overwrite/label what is actually renter-contract data.
-7. `sale_contract_artifacts.telegram_chat_id` is also written as operator id and is read by leads aggregation with the same priority problem.
+> **Updated 2026-07-21** — items below reflect the post-§13 state. Original 7 items from the audit's first version; current status marked inline.
+
+1. `/doc-manual` explicitly stores `telegram_chat_id: String(userId)` in rental contract artifacts and documents that this is the operator until QR claim. **Status:** still true at the write side, but `leads.ts` now disambiguates via `created_by_operator_chat_id` and prefers `renter_phone` when pre-claim. ✅ Read-side fixed.
+2. `/doc-manual` creates the rental row with `user_id: crewOwnerChatId` and `owner_id: crewOwnerChatId`; until claim, rental dashboards that display `user` show the owner/operator as renter. **Status:** still true. Rentals dashboard (analytics) still shows operator name in renter column for placeholder rentals. **Parked — §13.4c #7.**
+3. `/doc-manual` uses `leadUserId = context.clientPhone || String(userId)`. If no client phone is entered, `franchize_intents` and public `users` receive the operator id as the lead id. **Status:** still true at write side. Read side: `classifyIdentityState` detects this via `originalOperatorChatId` (from `metadata.operatorId`) and classifies as `operator_placeholder`. ✅ Read-side fixed.
+4. `/doc-manual` uses `leadId = context.clientPhone || String(userId)` for todos. If no phone is present, todos are keyed to the operator. **Status:** still true at write side. RPC `propagate_claim` updates `user_id` to renter on claim (matched by `rental_id` JSONB or `lead_id = old_user_id`). ✅ Fixed for new claims; existing 62 legacy todos with null `user_id` and no `rental_id` are acceptable (§13.7 #5).
+5. ~~`getFranchizeLeads()` gives artifact `telegram_chat_id` priority over `renter_phone`.~~ **Status:** ✅ Fixed — see §12.1, §12.2 Follow-up row.
+6. ~~`getFranchizeLeads()` treats any numeric `user_id` in leadMap as a Telegram user and enriches it from `public.users`; operator profiles can overwrite/label what is actually renter-contract data.~~ **Status:** ✅ Fixed — `classifyIdentityState` consults `originalOperatorChatId` and refuses to misclassify.
+7. `sale_contract_artifacts.telegram_chat_id` is also written as operator id and is read by leads aggregation with the same priority problem. **Status:** ✅ Fixed — sales step now always prefers `buyer_phone` (sales have no QR claim flow, so `telegram_chat_id` is always the operator).
 
 ## 6. QR replacement propagation gaps
 
+> **Updated 2026-07-21** — all 5 original gaps now closed via the `claim_rental_by_qr` RPC (§13.2-§13.3, §13.7, §13.9). Original "Observed gaps" preserved below for historical context, with current status marked.
+
 Likely intended propagation after QR claim:
 
-- `rentals.user_id`: placeholder → renter chat id.
-- `rental_contract_artifacts.telegram_chat_id`: operator → renter chat id.
-- `user_rental_secrets.chat_id`: `NULL`/operator → renter chat id.
-- `franchize_intents.telegram_user_id`: operator placeholder → renter chat id when the intent was created as placeholder.
-- `crew_todos.user_id`: placeholder/empty → renter chat id.
-- `crew_todos.lead_id` and `description` JSON: should become canonical or at least include both old and new identities.
-- `lead_notes.lead_id`: if notes were attached to placeholder lead id, they need a migration/relink strategy.
+- `rentals.user_id`: placeholder → renter chat id. **✅ Done by RPC Step 6**
+- `rental_contract_artifacts.telegram_chat_id`: operator → renter chat id. **✅ Done by RPC propagate_claim Step 1a + 1b** (updates by both `original_sha256` and `rental_id`)
+- `user_rental_secrets.chat_id`: `NULL`/operator → renter chat id. **✅ Done by RPC propagate_claim Step 2 + 2b** (updates by both `doc_sha256` and `source_rental_id`)
+- `franchize_intents.telegram_user_id`: operator placeholder → renter chat id when the intent was created as placeholder. **✅ Done by RPC propagate_claim Step 3** (scoped to crew slug + old_user_id — not over-broad)
+- `crew_todos.user_id`: placeholder/empty → renter chat id. **✅ Done by RPC propagate_claim Step 4 + Step 5** (Step 4: by `rental_id` JSONB match; Step 5: by `lead_id = old_user_id`)
+- ~~`crew_todos.lead_id` and `description` JSON: should become canonical or at least include both old and new identities.~~ **Acceptable**: `user_id` is now the canonical column; `lead_id` is legacy and not updated. Todos match via `rental_id` (strongest) or `user_id` (canonical) — `lead_id` is fallback only.
+- `lead_notes.lead_id`: if notes were attached to placeholder lead id, they need a migration/relink strategy. **✅ Done by RPC propagate_claim Step 6** for future claims. Existing 1 row in production is acceptable (parked).
 
-Observed gaps:
+Observed gaps (original audit, with current status):
 
-1. `app/lib/qr-linking-handler.ts` does not update `franchize_intents`, `crew_todos`, or `lead_notes`.
-2. `app/lib/qr-linking-handler.ts` attempts to update `user_rental_secrets` with `.eq('rental_id', artifact.rental_id)`, but the surrounding code and migrations use `source_rental_id`; this can silently leave secrets unclaimed if no `rental_id` column exists/works there.
-3. `app/franchize/server-actions/rental-secrets-claim.ts` does broader propagation, but only updates `crew_todos.user_id` for rows where `lead_id` equals the old rental `user_id` and `user_id` is null. It does not update rows already having operator `user_id`, rows keyed by phone, rows keyed only by `description.rental_id`, or `lead_id`/description JSON.
-4. `rental-secrets-claim` updates all `franchize_intents` for the old operator id and crew slug, not only the specific contract/rental. That can accidentally move unrelated operator-created leads.
-5. No observed propagation to `lead_notes.lead_id`, so notes can remain attached to old operator/phone lead ids after the UI identity key changes.
+1. ~~`app/lib/qr-linking-handler.ts` does not update `franchize_intents`, `crew_todos`, or `lead_notes`.~~ **✅ Fixed** — `qr-linking-handler.ts` no longer has its own SQL; it just calls the RPC, which updates all 6 tables.
+2. ~~`app/lib/qr-linking-handler.ts` attempts to update `user_rental_secrets` with `.eq('rental_id', artifact.rental_id)`, but the surrounding code and migrations use `source_rental_id`.~~ **✅ Fixed** — see above; RPC uses both `doc_sha256` and `source_rental_id`.
+3. ~~`app/franchize/server-actions/rental-secrets-claim.ts` does broader propagation, but only updates `crew_todos.user_id` for rows where `lead_id` equals the old rental `user_id` and `user_id` is null.~~ **✅ Fixed** — `rental-secrets-claim.ts` is now validate-only (§13.9); RPC does the full propagation via both `rental_id` (JSONB) and `lead_id`.
+4. ~~`rental-secrets-claim` updates all `franchize_intents` for the old operator id and crew slug, not only the specific contract/rental.~~ **✅ Fixed** — RPC Step 3 is scoped to `slug = p_crew_slug AND telegram_user_id = p_old_user_id`. This still updates all intents with that operator id for that crew, which is intentional (an operator creating multiple leads for the same renter should have all of them re-keyed). If finer scoping is needed, would require a `rental_id` FK on `franchize_intents` (not currently present).
+5. ~~No observed propagation to `lead_notes.lead_id`.~~ **✅ Fixed** — RPC Step 6 updates `lead_notes.lead_id` where `crew_id = v_crew_id AND lead_id = p_old_user_id`.
 
 ## 7. Leads page vs analytics page matching logic
 
@@ -823,3 +879,333 @@ FROM public.rentals
 WHERE user_id != owner_id;
 -- 5 rows with different renter IDs (e.g. 425868767, 5022137788, 679256270, etc.)
 ```
+
+---
+
+## 15. Re-audit (2026-07-21, evening) — independent verification against current `main`
+
+This section is the result of a fresh read-through of all 56 source files extracted from the repo (post-merge) plus the audit through §14. Goal: verify every "FIXED / DONE" claim in §12-§13 against the actual code, and flag anything that was missed or regressed.
+
+### 15.1 ✅ Claims that hold up under verification
+
+| Claim | Source | Verification |
+|---|---|---|
+| Bug #1a (artifacts query uses real columns) | §12.2 | `leads.ts:325` — confirmed: `requested_bike_id, resolved_bike_id, total_sum, created_by_operator_chat_id`. No `bike_make`/`bike_model`/`total_amount`. |
+| Bug #1b (sales query uses real columns) | §12.2 | `leads.ts:350` — confirmed: `id, requested_bike_id, resolved_bike_id, sale_price, total_sum`. No `sale_id`/`bike_make`/`bike_model`. |
+| Bug #1c (users query drops `phone`) | §12.2 | `leads.ts:711` — confirmed: `select("user_id, username, full_name, metadata")`. No `phone`. Phone read from `metadata->>phone` at L765. |
+| Bug #3 (load both categories) | §12.2 | `leads.ts:727` — confirmed: `.in("category", ["lead_followup", "rental_verification"])`. |
+| Bug #4 (regex `/^\d{1,12}$/`) | §12.2 | Confirmed in `leads.ts` (6 occurrences), `useLeadsData.ts` (5 occurrences), `leads-utils.tsx` (5 occurrences), `crew-todos.ts:803`. |
+| Bug #5 (`normalizePhone` everywhere) | §12.2 | Confirmed helper duplicated in `leads.ts`, `crew-todos.ts`, `useLeadsData.ts`, `leads-utils.tsx`. |
+| Bug #7 (`addOrMerge` used by all 5 steps) | §12.2 | Confirmed in `leads.ts:251-280` — appends `rentals`/`sales` arrays and propagates `originalOperatorChatId`. |
+| Bug #8 (`getCrewOperatorIds` queries members) | §12.2 | `leads.ts:101-131` — confirmed: selects `id, owner_id` from crews, then queries `crew_members` with the real crew id. |
+| Bug #12 (error logging on all queries) | §12.2 | `leads.ts:358-362` (main queries) + `732-735` (enrichment) — confirmed. |
+| Codex P2 #1 (bike title pre-fetch BEFORE artifact loop) | §12.2 | `leads.ts:370-401` — confirmed: bikes fetched before ingestion loops at L450+. |
+| Codex P2 #2 (client-side phone normalization) | §12.2 | `useLeadsData.ts:25-34` + `leads-utils.tsx:76-85` — confirmed. `useTodosMapping` uses normalized identity set. |
+| Follow-up (artifact phone-priority via `created_by_operator_chat_id`) | §12.2 | `leads.ts:480-488` (artifacts) + `581-584` (rentals) — confirmed. Sales simplified to always prefer `buyer_phone` (L665). |
+| §13.9 (`claimRentalSecretsByDocSha` is validate-only) | §13.9 | `user-rental-secrets.ts:304-372` — confirmed: NO `UPDATE` calls. Only `SELECT` + `isCrewMember` lookups. `updateRentalSecretWithQrTracking` is gone (no matches in repo). |
+| §13.5 (all `window.location.reload()` replaced) | §13.5 | `grep -rn 'location.reload' app/ lib/` returns 0 matches. All 4 files (`LeadsClient`, `DealsPanel`, `useRentalActions`, `ContactPanel`) + `RentalsListClient` use `router.refresh()`. |
+| §13 RentalLink usage | §13.8 | `rental/[id]/page.tsx` — confirmed: 13 `<RentalLink>` usages, no remaining `<Link>` for rental navigation. |
+| `qr-linking-handler.ts` calls RPC, no own SQL | §13.3 | `qr-linking-handler.ts:42-50` — confirmed: only `supabaseAdmin.rpc('claim_rental_by_qr', ...)`. No manual table updates. |
+| `startapp-handler.ts` routes through `claimRentalByQRCode` | §13.1 | `startapp-handler.ts:85` — confirmed: `await claimRentalByQRCode(startParam, chatId)` for `rent_*` deep links. |
+| `/doc-manual` writes `created_by_operator_chat_id` | §12.1 | `doc-manual.ts:1190` (rentals) + `1612` (artifacts) — confirmed. `metadata.operatorId: String(userId)` at L1762. |
+| `propagate_claim` uses JSONB match (§13.7 #3) | §13.7 #3 | Not directly verifiable from this bundle (migration SQL not included), but the calling code is consistent with the claim. |
+
+### 15.2 🔴 New bugs / regressions found in this re-audit
+
+These were NOT previously documented in §12-§13 and need attention:
+
+#### NEW #1 — `rental-verification-todos.ts:86` still uses broken `/^\d{1,9}$/` regex
+
+```ts
+// /app/franchize/server-actions/rental-verification-todos.ts L86
+const todoUserId = leadId && /^\d{1,9}$/.test(leadId) ? leadId : null;
+```
+
+This is the **only** remaining `\d{1,9}` regex in the entire codebase. It silently drops 10-digit Telegram IDs when creating `rental_verification` todos via `createRentalVerificationTodos()`.
+
+**Impact:** `actions-runtime.ts:3156` calls this with `leadId = payload.phone || payload.telegramUserId`. When `payload.telegramUserId` is a 10-digit ID (most modern users), `todoUserId` becomes null, and the 5 verification todos (passport, license, odometer, dates, etc.) are created with `user_id = NULL`. They still match via `rental_id` (which is set correctly at L93), but the identity-based matching path is broken for these todos.
+
+**Fix:** change `/^\d{1,9}$/` → `/^\d{1,12}$/` at line 86. One-character change.
+
+#### NEW #2 — ~~`app/franchize/lib/phone-utils.ts` is imported but does not exist~~ (FALSE ALARM — file exists)
+
+> **Correction 2026-07-21 (evening):** After receiving the `ctx_part5_phone_analytics.txt` bundle, I confirmed `app/franchize/lib/phone-utils.ts` exists in the repo. It was simply not included in the previous 4-part bundle. **No action needed.**
+
+The file is at `/app/franchize/lib/phone-utils.ts` (19 lines):
+
+```ts
+export function normalizePhone(phone?: string | null): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 10) return null;
+  if (digits.length === 11 && digits.startsWith("8")) {
+    return `+7${digits.slice(1)}`;
+  }
+  if (digits.startsWith("7") && digits.length === 11) {
+    return `+${digits}`;
+  }
+  return `+${digits}`;
+}
+```
+
+However, comparing this to the inline `normalizePhone` copies in `leads.ts` / `crew-todos.ts` / `useLeadsData.ts` / `leads-utils.tsx` revealed a real divergence — see **NEW #6** below.
+
+#### NEW #3 — `lib/leads.ts:82-93` writes `phone` to `public.users` (column doesn't exist)
+
+```ts
+// /app/franchize/lib/leads.ts L82-93
+await supabaseAdmin.from("users").upsert(
+  {
+    user_id: userId,
+    phone: phone,        // ← public.users has NO phone column
+    full_name: fullName,
+    username: username,
+    metadata: userMeta,
+    ...
+  },
+  { onConflict: "user_id" }
+);
+```
+
+`public.users` schema (verified in `supabase.txt`) has no `phone` column — phone lives in `metadata->>phone`. The `userMeta.phone` is set correctly at L78, but the top-level `phone: phone` field at L85 will cause PostgREST to 400.
+
+**Impact:** The entire `users` upsert silently fails whenever `ensureUser: true` is passed. Both `/doc-manual` (L1766) and `actions-runtime.ts` (L3211) pass `ensureUser: true`. This means:
+- Synthetic `users` rows for phone-based web leads are NOT being created
+- `users.full_name` and `users.username` updates from `/doc-manual` are NOT happening
+- The phone IS being written to `metadata.phone` (correctly), but the top-level field causes the whole upsert to fail
+
+**Fix:** Remove `phone: phone,` from line 85 of `lib/leads.ts`. The phone is already stored in `metadata.phone` via `userMeta.phone = phone` at L78, which is the correct location per the schema.
+
+```diff
+   await supabaseAdmin.from("users").upsert(
+     {
+       user_id: userId,
+-    phone: phone,
+       full_name: fullName,
+       username: username,
+       metadata: userMeta,
+       updated_at: now,
+       created_at: now,
+     },
+     { onConflict: "user_id" }
+   );
+```
+
+#### NEW #4 — `actions-runtime.ts:3122` does NOT set `created_by_operator_chat_id` on web-flow rentals
+
+```ts
+// /app/franchize/actions-runtime.ts L3119-3143
+const { data: rentalRow, error: rentalInsertError } = await supabaseAdmin
+  .from("rentals")
+  .insert({
+    user_id: payload.phone || payload.telegramUserId,
+    owner_id: crewOwnerChatId || payload.telegramUserId,
+    vehicle_id: doc.bikeId,
+    // ... NO created_by_operator_chat_id here
+  })
+```
+
+`/doc-manual` correctly sets `created_by_operator_chat_id: crewOwnerChatId` (L1190). But `actions-runtime.ts` (the web-flow rental insert) does NOT. This is the path that creates phone-based rentals (`user_id = phone`).
+
+**Impact:**
+1. The "follow-up" fix in `leads.ts:581-582` (`isPreClaimByOperatorColumn = user_id === created_by_operator_chat_id`) won't fire for web-flow rentals because `rentalCreatedByOp` is null. So web-flow rentals where `user_id = phone` won't trigger the phone-preference logic in the rentals step.
+2. However, this is **mostly OK** because the rentals step at L622 still sets `phone: effectivePhone` (from `artifactPhoneByRentalId` or `metaRenterPhone`), and the lead gets keyed by the phone via the artifacts step (which has `preferPhone = isPreClaimByOperatorColumn || isOperatorFromCrew`). The artifacts step works because artifacts always have `created_by_operator_chat_id` set by `/doc-manual` and the web flow.
+3. After QR claim, `classifyIdentityState` won't see `originalOperatorChatId` for these rentals, so they'll be classified as `claimed_user` rather than `merged`. This is **correct** behavior — web-flow rentals are renter-initiated, not operator-initiated, so `claimed_user` is right.
+
+**Verdict:** Not a bug per se. The web flow is renter-initiated, so it's correct that there's no operator origin to preserve. But worth documenting so future readers don't think it's an oversight. **No fix needed** unless we want to track "this rental was created via web flow vs. /doc-manual" for analytics — in which case a different column (`source_flow`) would be more appropriate.
+
+#### NEW #5 — `getRentalReturnTodos` in `rentals.ts:655-683` doesn't use the `rental_id` column
+
+```ts
+// /app/franchize/server-actions/rentals.ts L655-683
+const { data: allTodos, error } = await supabaseAdmin
+  .from("crew_todos")
+  .select("id, title, status, priority, category, description")  // ← no rental_id column
+  .eq("crew_id", crewId)
+  .order("created_at", { ascending: true });
+
+// ... then filters client-side by parsing description JSON
+const rentalTodos = (allTodos || []).filter((t) => {
+  if (t.category === "rental_verification") {
+    try {
+      const desc = JSON.parse(t.description || "{}");
+      return desc.rental_id === rentalId;
+    } catch { return false; }
+  }
+  ...
+});
+```
+
+This fetches **ALL** crew todos and filters client-side, instead of using the indexed `rental_id` column (which the audit §11.3 recommended as Phase 3c — and the column exists with an index `idx_crew_todos_rental_id`).
+
+**Impact:** Performance issue on crews with many todos. For a crew with 1000+ todos, this fetches all of them and parses JSON for each. Not a correctness bug — the result is the same — but it's a missed optimization.
+
+**Fix:**
+
+```diff
+ const { data: allTodos, error } = await supabaseAdmin
+   .from("crew_todos")
+-  .select("id, title, status, priority, category, description")
++  .select("id, title, status, priority, category, description, rental_id")
+   .eq("crew_id", crewId)
++  .or(`rental_id.eq.${rentalId},description.ilike.%${rentalId}%`)
+   .order("created_at", { ascending: true });
+```
+
+Or better, use two separate queries (one for the indexed column, one for the JSON fallback) and merge. Lower priority — park for now.
+
+#### NEW #6 — `normalizePhone` divergence between `phone-utils.ts` and the 4 inline copies
+
+The shared helper at `app/franchize/lib/phone-utils.ts` is **only used by `lib/leads.ts`** (which calls `upsertFranchizeLead`, the write path for `franchize_intents` and `public.users`). The four other call sites have their own inline copies with slightly different logic:
+
+| Call site | File | Used by |
+|---|---|---|
+| `phone-utils.normalizePhone` | `app/franchize/lib/phone-utils.ts` | `lib/leads.ts` → `upsertFranchizeLead` (writes intents + users) |
+| Inline copy #1 | `app/franchize/server-actions/leads.ts:157-166` | `getFranchizeLeads` (reads + matches) |
+| Inline copy #2 | `app/franchize/server-actions/crew-todos.ts:23-32` | `createLeadFollowupTodos` (writes todos) |
+| Inline copy #3 | `app/franchize/[slug]/leads/hooks/useLeadsData.ts:25-34` | Client-side todo matching |
+| Inline copy #4 | `app/franchize/[slug]/leads/leads-utils.tsx:76-85` | Client-side `getTodoLeadId` util |
+
+**The two implementations diverge:**
+
+```ts
+// phone-utils.ts (used by writers — upsertFranchizeLead)
+export function normalizePhone(phone?: string | null): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");          // strips ALL non-digits (aggressive)
+  if (digits.length < 10) return null;              // rejects short input
+  if (digits.length === 11 && digits.startsWith("8")) return `+7${digits.slice(1)}`;
+  if (digits.startsWith("7") && digits.length === 11) return `+${digits}`;
+  return `+${digits}`;                              // no RU-prefix inference for 10-digit
+}
+
+// Inline copy (used by readers/matchers — leads.ts, etc.)
+function normalizePhone(input: string | null | undefined): string | null {
+  if (!input) return null;
+  let s = input.trim().replace(/[\s\-\(\)]/g, "");  // strips only spaces, dashes, parens
+  if (!s) return null;
+  if (/^8\d{10}$/.test(s)) s = "+7" + s.slice(1);
+  else if (/^7\d{10}$/.test(s)) s = "+" + s;
+  else if (/^\d{10}$/.test(s)) s = "+7" + s;        // infers +7 for 10-digit RU numbers
+  else if (!s.startsWith("+")) s = "+" + s;
+  return s;                                          // never returns null for non-empty input
+}
+```
+
+**Divergence table (test cases):**
+
+| Input | `phone-utils.ts` (writer) | Inline copy (reader) | Same? |
+|---|---|---|---|
+| `"+79991234567"` | `+79991234567` | `+79991234567` | ✅ |
+| `"89991234567"` | `+79991234567` | `+79991234567` | ✅ |
+| `"79991234567"` | `+79991234567` | `+79991234567` | ✅ |
+| `"+7 999 123-45-67"` | `+79991234567` | `+79991234567` | ✅ |
+| `"8 999 123-45-67"` | `+79991234567` | `+79991234567` | ✅ |
+| `"9991234567"` (10 digits, no prefix) | `+9991234567` (treats as international) | `+79991234567` (assumes RU) | ❌ |
+| `"12345"` (garbage) | `null` (rejected, length < 10) | `+12345` (passes through) | ❌ |
+| `"8 999 123"` (incomplete) | `null` (digits.length < 10) | `+7999123` (passes through) | ❌ |
+
+**Impact:**
+
+When `/doc-manual` or `actions-runtime.ts` calls `upsertFranchizeLead` with a phone like `"9991234567"` (10 digits without country code — uncommon but possible if the operator types it that way), the writer (`phone-utils.ts`) keys the intent as `+9991234567`. But when `leads.ts` reads the same phone from `franchize_intents.phone` and normalizes it with the inline copy, it produces `+79991234567`. The lead won't match its own intent row → split identity.
+
+Same risk for `crew_todos.phone` — `createLeadFollowupTodos` uses the inline copy to normalize, while `lib/leads.ts` (which calls `upsertFranchizeLead`) uses `phone-utils.ts`. So a todo created with phone `"9991234567"` is keyed as `+79991234567`, but if `upsertFranchizeLead` is called with the same phone, the intent is keyed as `+9991234567` → mismatch.
+
+**Practical severity:** LOW for production (operators almost always type `+7...` or `8...` prefixes), but HIGH for correctness invariants. The whole point of normalizing is to have one canonical form.
+
+**Fix (recommended):**
+
+1. Pick one canonical implementation. The `phone-utils.ts` version is stricter (rejects garbage) but loses RU-prefix inference. The inline version is more permissive but doesn't reject garbage.
+2. Recommended: use the **inline copy's logic** (with RU-prefix inference) but add the length check from `phone-utils.ts`. Result:
+
+   ```ts
+   // /app/franchize/lib/phone-utils.ts (canonical, single source of truth)
+   export function normalizePhone(input: string | null | undefined): string | null {
+     if (!input) return null;
+     let s = input.trim().replace(/[\s\-\(\)]/g, "");
+     if (!s) return null;
+     if (/^8\d{10}$/.test(s)) s = "+7" + s.slice(1);
+     else if (/^7\d{10}$/.test(s)) s = "+" + s;
+     else if (/^\d{10}$/.test(s)) s = "+7" + s;       // RU-prefix inference (was missing in phone-utils.ts)
+     else if (!s.startsWith("+")) s = "+" + s;
+     // Reject garbage (was missing in inline copies)
+     const digits = s.replace(/\D/g, "");
+     if (digits.length < 10) return null;
+     return s;
+   }
+   ```
+
+3. Replace all 4 inline copies with `import { normalizePhone } from "@/app/franchize/lib/phone-utils"` (or relative path). The file is safe for both client and server (no `"use server"` directive, no server-only imports).
+4. Remove the 4 inline copies.
+
+This is a **refactor**, not a hotfix — the divergence only manifests for edge-case inputs. But it's the right time to consolidate since the audit is fresh.
+
+### 15.3 🟡 Parked items still parked (no regressions, no new progress)
+
+These were marked as "parked" in §13.4c and remain parked. Listed here for completeness — no action needed unless priorities change:
+
+| Item | Parked at | Reason |
+|---|---|---|
+| `lead_notes.lead_id` migration (§6 #5) | §13.4c #6 | Only 1 row in production |
+| Analytics page parity (§9 phase 4) | §13.4c #7 | `rentals-dashboard.ts` still has no operator-placeholder detection — confirmed by reading L245-270 (main query doesn't select `created_by_operator_chat_id`). Acceptable because analytics treats `rental_id` as primary key, so operator-placeholder rentals show up under their `rental_id` (correct) but the renter column shows the operator's name (cosmetic). |
+| Stable CRM lead UUID (§8) | §13.4c #8 | Long-term architectural fix |
+| Regression fixtures (§11.5) | §13.4c #9 | Should be done before any more refactors |
+
+### 15.4 Recommended next actions (priority order)
+
+Based on the new findings in §15.2 (after the §15.2 NEW #2 correction):
+
+1. **NEW #3 (HIGH)** — remove `phone: phone,` from `lib/leads.ts:85`. This is silently breaking the `users` upsert for every lead creation. One-line fix. **The phone is already correctly stored in `metadata.phone` via `userMeta.phone = phone` at L78** — the top-level `phone` field is just dead code that causes the whole upsert to 400.
+
+2. **NEW #1 (MEDIUM)** — change `/^\d{1,9}$/` → `/^\d{1,12}$/` in `rental-verification-todos.ts:86`. One-character fix. Same Bug #4 pattern that was fixed everywhere else but missed here. Affects identity matching for verification todos created from web-flow rentals with 10-digit Telegram IDs.
+
+3. **NEW #6 (MEDIUM — refactor)** — consolidate the 5 `normalizePhone` implementations into one. Pick the inline copy's logic (with RU-prefix inference) + add the length check from `phone-utils.ts`. Replace the 4 inline copies with imports from `phone-utils.ts`. This eliminates the divergence that could split identities for edge-case phone inputs.
+
+4. **NEW #5 (LOW — perf)** — optimize `getRentalReturnTodos` in `rentals.ts:655` to use the indexed `rental_id` column instead of fetching all crew todos and filtering client-side. Park unless performance becomes an issue on high-volume crews.
+
+5. **(Parked)** — analytics page parity (§13.4c #7), regression fixtures (§13.4c #9), stable CRM UUID (§13.4c #8), `lead_notes` migration (§13.4c #6). No urgency — see §15.3.
+
+6. **NEW #4 (no action)** — documented as not-a-bug. Web-flow rentals correctly don't set `created_by_operator_chat_id` because they're renter-initiated.
+
+7. **NEW #2 (no action)** — false alarm. `phone-utils.ts` exists in the repo; was just missing from the previous bundle.
+
+### 15.5 Files inspected in this re-audit
+
+All 95 files from the 5-part bundle were extracted and inspected. Key files verified line-by-line:
+
+- `app/franchize/server-actions/leads.ts` (1075 lines) — all §12 claims verified
+- `app/franchize/server-actions/crew-todos.ts` (857 lines) — verified
+- `app/franchize/server-actions/rental-verification-todos.ts` (343 lines) — **NEW #1 found**
+- `app/franchize/server-actions/rental-secrets-claim.ts` (280 lines) — §13.9 verified
+- `app/franchize/server-actions/rentals.ts` (723 lines) — **NEW #5 found**
+- `app/franchize/server-actions/rentals-dashboard.ts` (2804 lines) — §13.4c #7 parked status confirmed
+- `app/franchize/lib/leads.ts` (160 lines) — **NEW #3 found**
+- `app/franchize/lib/phone-utils.ts` (19 lines) — **NEW #2 false alarm corrected; NEW #6 found**
+- `app/lib/user-rental-secrets.ts` (398 lines) — §13.9 verified
+- `app/lib/qr-linking-handler.ts` (103 lines) — verified
+- `app/lib/startapp-handler.ts` (105 lines) — verified
+- `app/webhook-handlers/commands/doc-manual.ts` (3387 lines, key sections) — verified
+- `app/franchize/actions-runtime.ts` (5004 lines, key sections) — **NEW #4 found**
+- `app/franchize/[slug]/rentals-analytics/page.tsx` (62 lines) — verified
+- `app/franchize/[slug]/rentals-analytics/RentalsAnalyticsClient.tsx` (1482 lines) — confirmed no operator detection
+- `app/franchize/[slug]/rentals-analytics/analytics-utils.ts` (35 lines) — pure formatting, no identity logic
+- `app/franchize/[slug]/rentals-analytics/analytics-components/TodosSection.tsx` (132 lines) — crew-wide todo board, no per-rental matching
+- `app/franchize/[slug]/rentals-analytics/analytics-components/SalesListSection.tsx` (67 lines) — uses `buyer_full_name` from artifacts, no operator issue
+- All leads page UI components — verified
+- `app/franchize/[slug]/rental/[id]/page.tsx` — RentalLink verified (13 usages)
+
+### 15.6 Summary
+
+The audit through §14 is **largely accurate** — every "FIXED/DONE" claim I verified held up under line-by-line inspection. The RPC refactor (§13.9) is particularly clean: `claimRentalSecretsByDocSha` is genuinely validate-only, `updateRentalSecretWithQrTracking` is gone, and the RPC is the sole canonical writer.
+
+The 6 new findings in §15.2 (after correcting NEW #2):
+- ~~1 build-breaking (NEW #2 — missing `phone-utils.ts`)~~ → **false alarm**, file exists
+- 1 silent-failure (NEW #3 — `users` upsert 400s on missing `phone` column) — **highest priority fix**
+- 1 missed regex (NEW #1 — same Bug #4 pattern, one file missed) — one-character fix
+- 1 refactor opportunity (NEW #6 — `normalizePhone` divergence between `phone-utils.ts` and 4 inline copies) — medium priority
+- 1 perf (NEW #5 — `getRentalReturnTodos` ignores indexed column) — park
+- 1 documented non-bug (NEW #4 — web flow doesn't set `created_by_operator_chat_id`) — no action
+
+**Net assessment:** the leads page matching work is solid and the claims are honest. The audit's §2-§3 diagrams and §4 fields table have been updated to reflect the post-§13 state (single canonical RPC, validate-only `claimRentalSecretsByDocSha`, `created_by_operator_chat_id` preserved, `metadata.operatorId` on intents). The remaining findings are small follow-up fixes that don't undermine the patch — they're either pre-existing issues that the audit didn't catch (NEW #3 has been there since the original `lib/leads.ts` was written) or trivial oversights (NEW #1). NEW #6 is the most interesting finding because it's a silent correctness issue that only manifests for edge-case phone inputs, but the fix is a straightforward consolidation.
+
+**For the colleague executing the fixes:** the priority order in §15.4 is your work list. NEW #3 first (one-line, high-impact), then NEW #1 (one-character), then NEW #6 (refactor — replace 4 inline copies with imports from `phone-utils.ts` and merge the logic). NEW #5 and the parked items can wait.
