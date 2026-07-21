@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     const todoId = `todo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
     // Determine user_id (Telegram chat_id) and phone from leadId
-    const todoUserId = /^\d{1,9}$/.test(leadId) ? leadId : null;
+    const todoUserId = /^\d{1,12}$/.test(leadId) ? leadId : null;
     const todoPhone = /^(\+?7|8)\d{10}$/.test(leadId) ? leadId : null;
 
     const { data, error } = await supabaseAdmin
