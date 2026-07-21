@@ -1,92 +1,89 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Users, Star, Flame, CheckCircle, Clock, Banknote } from "lucide-react";
-import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
-import { fmtMoney } from "../leads-utils";
+import { Users, Flame, TrendingUp, Wallet } from "lucide-react";
+import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
 
-interface LeadsKPICardsProps {
-  leads: LeadRow[];
-  hot: LeadRow[];
-  verified: LeadRow[];
-  todos: LeadTodoRow[];
-  T: any;
+export interface LeadsKpis {
+  totalLeads: number;
+  hotLeads: number;
+  conversionRate: number;
+  monthlyRevenue: number;
 }
 
-function isToday(dateStr: string | null): boolean {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+interface Props {
+  kpis: LeadsKpis;
+  T: ThemeTokens;
 }
 
-const cardVariants = {
-  hidden: { opacity: 0, y: 16 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { type: "spring", damping: 22, stiffness: 240, delay: i * 0.04 },
-  }),
-};
-
-export function LeadsKPICards({ leads, hot, verified, todos, T }: LeadsKPICardsProps) {
-  const today = leads.filter((l) => isToday(l.createdAt) || isToday(l.lastSeenAt)).length;
-  const pending = todos.filter((t) => t.status !== "done").length;
-  const totalSpent = leads.reduce((s, l) => s + (l.totalSpent || 0), 0);
-
-  const cards = [
-    { label: "Всего лидов", value: leads.length, icon: Users, color: T.textMuted },
-    { label: "Активность сегодня", value: today, icon: Star, color: T.accent },
-    { label: "Горячие", value: hot.length, icon: Flame, color: "#ef4444" },
-    { label: "Клиенты", value: verified.length, icon: CheckCircle, color: "#10b981" },
-    { label: "Задач в работе", value: pending, icon: Clock, color: "#f59e0b" },
-    { label: "Выручка", value: fmtMoney(totalSpent), icon: Banknote, color: "#10b981" },
+/**
+ * 4-card KPI row (Всего лиды, Горячие, Конверсия, Выручка).
+ * Glass-panel style with large numbers and small deltas.
+ * Responsive: 1col mobile / 2col tablet / 4col desktop.
+ */
+export function LeadsKPICards({ kpis, T }: Props) {
+  const cards: Array<{
+    label: string;
+    value: string;
+    icon: typeof Users;
+    color: string;
+    delta: string | null;
+  }> = [
+    { label: "Всего лидов", value: String(kpis.totalLeads), icon: Users, color: "#facc15", delta: "за 7 дней" },
+    { label: "Горячие", value: String(kpis.hotLeads), icon: Flame, color: "#ef4444", delta: "требуют внимания" },
+    { label: "Конверсия", value: `${kpis.conversionRate}%`, icon: TrendingUp, color: "#22c55e", delta: "по пайплайну" },
+    { label: "Выручка (мес.)", value: fmtMoney(kpis.monthlyRevenue), icon: Wallet, color: "#facc15", delta: "активные аренды" },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map((c, i) => {
         const Icon = c.icon;
         return (
-          <motion.div
+          <motion.article
             key={c.label}
-            custom={i}
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            whileHover={{ scale: 1.02, y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            className="relative overflow-hidden rounded-2xl border p-3 transition-shadow hover:shadow-lg"
-            style={{ borderColor: T.border, backgroundColor: T.bgCard }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: "spring", damping: 22, stiffness: 240, delay: i * 0.04 }}
+            whileHover={{ y: -3 }}
+            className="glass-panel rounded-[24px] p-5"
           >
-            {/* Subtle glow on accent */}
-            <div
-              className="absolute -right-4 -top-4 h-16 w-16 rounded-full opacity-[0.04]"
-              style={{ backgroundColor: c.color }}
-            />
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: T.textFaint }}>
-                  {c.label}
-                </p>
-                <motion.p
-                  className="mt-1 text-xl font-black tracking-tight"
-                  style={{ color: T.text }}
-                  key={typeof c.value === "string" ? c.value : `val-${c.value}`}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: i * 0.04 + 0.1 }}
-                >
-                  {c.value}
-                </motion.p>
+            <div className="mb-4 flex items-center gap-3">
+              <div
+                className="grid h-11 w-11 place-items-center rounded-2xl"
+                style={{ background: `${c.color}1a` }}
+              >
+                <Icon className="h-5 w-5" style={{ color: c.color }} />
               </div>
-              <div className="rounded-lg p-1.5" style={{ backgroundColor: T.borderSoft }}>
-                <Icon className="h-4 w-4" style={{ color: c.color }} />
-              </div>
+              <p className="text-sm" style={{ color: T.textMuted }}>
+                {c.label}
+              </p>
             </div>
-          </motion.div>
+
+            <motion.div
+              key={c.value}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: i * 0.04 + 0.1 }}
+              className="truncate text-4xl font-bold tracking-tight"
+              style={{ color: T.text }}
+            >
+              {c.value}
+            </motion.div>
+
+            {c.delta && (
+              <div className="mt-2 text-xs" style={{ color: T.textFaint }}>
+                {c.delta}
+              </div>
+            )}
+          </motion.article>
         );
       })}
-    </div>
+    </section>
   );
+}
+
+function fmtMoney(n: number): string {
+  if (!Number.isFinite(n)) return "0 ₽";
+  return new Intl.NumberFormat("ru-RU").format(Math.round(n)) + " ₽";
 }
