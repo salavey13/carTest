@@ -23,6 +23,7 @@ interface FileListProps {
     docXAppFiles: string[];
     docXMigrationsFiles: string[];
     docXDocsFiles: string[];
+    docXAuditFiles: string[];
     isLoading: boolean;
     isActionDisabled: boolean;
     toggleFileSelection: (path: string) => void;
@@ -37,6 +38,7 @@ interface FileListProps {
     onAddDocXApp: () => void;
     onAddDocXMigrations: () => void;
     onAddDocXDocs: () => void;
+    onAddDocXAudit: () => void;
     onAddTree: () => void;
     onSelectHighlighted: () => void;
     // --- NEW PROPS for bulk actions ---
@@ -55,10 +57,10 @@ const groupFilesByFolder = (files: FileNode[]) => { const g: { folder: string; f
 const FileList: React.FC<FileListProps> = React.memo(({ // Memoize the component
     id, files, selectedFiles, primaryHighlightedPath, secondaryHighlightedPaths, importantFiles, docXagentFiles,
     docXRentalFiles, docXSaleFiles, docXSubrentFiles, docXCommercialFiles, docXCoreFiles, docXAppFiles,
-    docXMigrationsFiles, docXDocsFiles,
+    docXMigrationsFiles, docXDocsFiles, docXAuditFiles,
     isLoading, isActionDisabled, toggleFileSelection, onAddSelected, onAddImportant, onAddDocXagent,
     onAddDocXRental, onAddDocXSale, onAddDocXSubrent, onAddDocXCommercial, onAddDocXCore, onAddDocXApp,
-    onAddDocXMigrations, onAddDocXDocs,
+    onAddDocXMigrations, onAddDocXDocs, onAddDocXAudit,
     onAddTree, onSelectHighlighted, onSelectAll, onDeselectAll, // Destructure new props
 }) => {
 
@@ -100,6 +102,7 @@ const FileList: React.FC<FileListProps> = React.memo(({ // Memoize the component
                      <motion.button onClick={onAddDocXApp} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-cyan-600 to-sky-500 transition-all shadow-md shadow-sky-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-cyan-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="App integration (dashboard, API)"> App </motion.button>
                      <motion.button onClick={onAddDocXMigrations} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-red-600 to-rose-500 transition-all shadow-md shadow-rose-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-red-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="Database migrations"> Migrations </motion.button>
                      <motion.button onClick={onAddDocXDocs} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-yellow-600 to-lime-500 transition-all shadow-md shadow-lime-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-yellow-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="Documentation & seed data"> Docs </motion.button>
+                     <motion.button onClick={onAddDocXAudit} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-rose-800 to-pink-700 transition-all shadow-md shadow-pink-700/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-rose-700/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="Identity-flow audit files (§13.4c parked items)"> Audit </motion.button>
                      <motion.button onClick={onAddDocXagent} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-violet-600 to-fuchsia-500 transition-all shadow-md shadow-fuchsia-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-fuchsia-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }} title="All DocX files combined"> <FaRobot /> All </motion.button>
                  </div>
 

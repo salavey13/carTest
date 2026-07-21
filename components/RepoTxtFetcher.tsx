@@ -185,6 +185,76 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "docs/sql/cars_rows_12bikes_june5.csv",
     ].filter(Boolean), []);
 
+    // Audit File Set: Files relevant to remaining franchise-identity-flow-audit items
+    // (§12.3 #3 lead_notes migration, #5 analytics parity, #6 stable CRM UUID, #7 regression fixtures,
+    //  §13.7 #4 bug #10 lead_notes, §13.7 #5 legacy crew_todos).
+    // Full file list for colleague re-audit — covers core identity flow, QR claim, leads, analytics, todos.
+    // See docs/franchize-identity-flow-audit.md §13.4c parked items.
+    const docXAuditFiles = useMemo(() => [
+        // Core identity-flow files (source inventory from audit §289-304)
+        "app/franchize/lib/leads.ts",
+        "app/franchize/server-actions/leads.ts",
+        "app/franchize/server-actions/lead-notes.ts",
+        "app/franchize/server-actions/intents.ts",
+        "app/franchize/server-actions/crew-todos.ts",
+        "app/franchize/server-actions/rentals.ts",
+        "app/franchize/server-actions/rental-verification-todos.ts",
+        "app/franchize/server-actions/rentals-dashboard.ts",
+        "app/franchize/server-actions/rental-secrets-claim.ts",
+        "app/webhook-handlers/commands/doc-manual.ts",
+        "app/webhook-handlers/commands/doc.ts",
+        "app/lib/startapp-handler.ts",
+        "app/lib/qr-linking-handler.ts",
+        "app/lib/user-rental-secrets.ts",
+        // Remaining item #3 — lead_notes.lead_id migration (§6 #5)
+        "app/franchize/server-actions/lead-notes.ts",
+        // Remaining item #5 — analytics page parity (§9 phase 4)
+        "app/franchize/[slug]/rentals-analytics/RentalsAnalyticsClient.tsx",
+        "app/franchize/[slug]/rentals-analytics/page.tsx",
+        // Remaining item #6 — stable CRM lead UUID (§8, §9 phase 3)
+        "app/franchize/actions.ts",
+        // Remaining item #7 — regression fixtures (§11.5)
+        "app/franchize/[slug]/leads/hooks/useLeadsData.ts",
+        "app/franchize/[slug]/leads/leads-utils.tsx",
+        // §13.7 #5 — 62 legacy crew_todos
+        "supabase/migrations/20260721160000_backfill_todos_artifacts.sql",
+        // Recent fixes
+        "app/franchize/[slug]/leads/components/DealsPanel.tsx",
+        "app/franchize/[slug]/leads/hooks/useRentalActions.ts",
+        "app/franchize/[slug]/leads/components/ContactPanel.tsx",
+        "app/franchize/[slug]/rentals/RentalsListClient.tsx",
+        "app/franchize/[slug]/leads/LeadsClient.tsx",
+        "app/franchize/components/RentalLink.tsx",
+        // Franchize core
+        "app/franchize/lib/theme.ts",
+        "app/franchize/lib/theme-resolver.ts",
+        "app/franchize/lib/docx-capability.ts",
+        "app/franchize/lib/rental-contract-types.ts",
+        "app/lib/rental-contract-vars.ts",
+        "lib/rental-date-utils.ts",
+        "lib/rental-pricing-calculator.ts",
+        // Supabase schema (key migrations)
+        "supabase/migrations/20240101000000_init.sql",
+        "supabase/migrations/20260304_private_scheme.sql",
+        "supabase/migrations/20260601000000_user_rental_secrets.sql",
+        "supabase/migrations/20260612000000_fix_rental_contract_artifacts.sql",
+        "supabase/migrations/20260617000000_rental_sts_pledge.sql",
+        "supabase/migrations/20260625000000_add_qr_status_tracking.sql",
+        "supabase/migrations/20260721150000_fix_claim_rental_rpc.sql",
+        "supabase/migrations/20260721160000_backfill_todos_artifacts.sql",
+        "supabase/migrations/20260721170000_fix_backfill_chatid_and_jsonb.sql",
+        // Telegram bot handlers
+        "app/webhook-handlers/commands/ctx.ts",
+        "app/webhook-handlers/commands/file.ts",
+        "app/webhook-handlers/commands/subrent-manual.ts",
+        "app/webhook-handlers/commands/analytics-pass.ts",
+        // Rental UI
+        "app/franchize/[slug]/rental/[id]/page.tsx",
+        "app/franchize/[slug]/rentals/page.tsx",
+        // The audit doc itself
+        "docs/franchize-identity-flow-audit.md",
+    ].filter(Boolean), []);
+
     // Combined DocX files (for legacy support)
     const docXagentFiles = useMemo(() => [
         ...docXRentalFiles,
@@ -232,6 +302,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         handleAddDocXAppFiles,
         handleAddDocXMigrationsFiles,
         handleAddDocXDocsFiles,
+        handleAddDocXAuditFiles,
         handleSelectAll,
         handleDeselectAll,
     } = useFileSelection({
@@ -248,6 +319,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         docXAppFiles,
         docXMigrationsFiles,
         docXDocsFiles,
+        docXAuditFiles,
         imageReplaceTaskActive: !!imageReplaceTask || !!iconReplaceTask,
     });
 
@@ -542,6 +614,10 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              logger.debug(`[Imperative] handleAddDocXDocsFiles called.`);
              handleAddDocXDocsFiles();
         },
+        handleAddDocXAuditFiles: () => {
+             logger.debug(`[Imperative] handleAddDocXAuditFiles called.`);
+             handleAddDocXAuditFiles();
+        },
         handleAddFullTree: () => {
              logger.debug(`[Imperative] handleAddFullTree called.`);
              handleAddFullTree();
@@ -741,23 +817,25 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                              docXSubrentFiles={docXSubrentFiles}
                              docXCommercialFiles={docXCommercialFiles}
                              docXCoreFiles={docXCoreFiles}
-                             docXAppFiles={docXAppFiles}
-                             docXMigrationsFiles={docXMigrationsFiles}
-                             docXDocsFiles={docXDocsFiles}
-                             isLoading={isFetchLoading}
-                             isActionDisabled={isActionDisabled}
-                             toggleFileSelection={toggleFileSelection}
-                             onAddImportant={handleAddImportantFiles}
-                             onAddDocXagent={handleAddDocXagentFiles}
-                             onAddDocXRental={handleAddDocXRentalFiles}
-                             onAddDocXSale={handleAddDocXSaleFiles}
-                             onAddDocXSubrent={handleAddDocXSubrentFiles}
-                             onAddDocXCommercial={handleAddDocXCommercialFiles}
-                             onAddDocXCore={handleAddDocXCoreFiles}
-                             onAddDocXApp={handleAddDocXAppFiles}
-                             onAddDocXMigrations={handleAddDocXMigrationsFiles}
-                             onAddDocXDocs={handleAddDocXDocsFiles}
-                             onSelectHighlighted={selectHighlightedFiles}
+                              docXAppFiles={docXAppFiles}
+                              docXMigrationsFiles={docXMigrationsFiles}
+                              docXDocsFiles={docXDocsFiles}
+                              docXAuditFiles={docXAuditFiles}
+                              isLoading={isFetchLoading}
+                              isActionDisabled={isActionDisabled}
+                              toggleFileSelection={toggleFileSelection}
+                              onAddImportant={handleAddImportantFiles}
+                              onAddDocXagent={handleAddDocXagentFiles}
+                              onAddDocXRental={handleAddDocXRentalFiles}
+                              onAddDocXSale={handleAddDocXSaleFiles}
+                              onAddDocXSubrent={handleAddDocXSubrentFiles}
+                              onAddDocXCommercial={handleAddDocXCommercialFiles}
+                              onAddDocXCore={handleAddDocXCoreFiles}
+                              onAddDocXApp={handleAddDocXAppFiles}
+                              onAddDocXMigrations={handleAddDocXMigrationsFiles}
+                              onAddDocXDocs={handleAddDocXDocsFiles}
+                              onAddDocXAudit={handleAddDocXAuditFiles}
+                              onSelectHighlighted={selectHighlightedFiles}
                              onSelectAll={handleSelectAll}
                              onDeselectAll={handleDeselectAll}
                              onAddSelected={handleAddSelected}
