@@ -11,30 +11,71 @@ import {
 } from "../leads-utils";
 
 /**
+ * Normalize a phone number to canonical E.164-ish form (+7XXXXXXXXXX for RU).
+ * Accepts +7/7/8 prefix, spaces, dashes, parentheses.
+ * Returns null if input is empty or unparseable.
+ *
+ * MUST mirror the server-side normalizePhone() in server-actions/leads.ts and
+ * crew-todos.ts. Without this, a todo keyed by "89991234567" would never match
+ * a lead keyed by "+79991234567" on the client side, even after the server
+ * correctly returns both — the todo would appear in the API response but
+ * disappear from the lead card because todoLeadId !== lead.user_id.
+ */
+function normalizePhone(input: string | null | undefined): string | null {
+  if (!input) return null;
+  let s = input.trim().replace(/[\s\-\(\)]/g, "");
+  if (!s) return null;
+  if (/^8\d{10}$/.test(s)) s = "+7" + s.slice(1);
+  else if (/^7\d{10}$/.test(s)) s = "+" + s;
+  else if (/^\d{10}$/.test(s)) s = "+7" + s;
+  else if (!s.startsWith("+")) s = "+" + s;
+  return s;
+}
+
+/**
  * Extract the lead identifier from a todo, checking columns in priority order:
  *  1. user_id column (Telegram chat_id, canonical)
  *  2. phone column (phone-only leads)
  *  3. lead_id column (legacy: Telegram ID, phone, or UUID)
  *  4. description JSON (legacy fallback)
+ *
+ * Note: Telegram user IDs can be up to 10 digits today (e.g. 7813830016).
+ * The previous /^\d{1,9}$/ regex silently rejected 10-digit IDs and broke
+ * matching for most modern users. Allow up to 12 digits for future-proofing.
+ *
+ * Phones are normalized to E.164 so a todo with phone "89991234567" matches
+ * a lead keyed by "+79991234567". Mirrors server-side behavior in
+ * getTodoLeadId() in server-actions/leads.ts.
  */
 function extractTodoLeadId(todo: LeadTodoRow): string | null {
   // 1. user_id column — canonical Telegram chat_id
-  if (todo.user_id && /^\d{1,9}$/.test(todo.user_id)) return todo.user_id;
-  // 2. phone column — phone-only leads
-  if (todo.phone) return todo.phone;
+  if (todo.user_id && /^\d{1,12}$/.test(todo.user_id)) return todo.user_id;
+  // 2. phone column — phone-only leads (normalize for cross-source matching)
+  if (todo.phone) {
+    const normalized = normalizePhone(todo.phone);
+    if (normalized) return normalized;
+  }
   // 3. lead_id column — legacy fallback
   if (todo.lead_id) {
-    if (/^\d{1,9}$/.test(todo.lead_id)) return todo.lead_id;
+    if (/^\d{1,12}$/.test(todo.lead_id)) return todo.lead_id;
+    // Phone-shaped lead_id (legacy) — normalize.
+    const normalizedLead = normalizePhone(todo.lead_id);
+    if (normalizedLead) return normalizedLead;
     if (todo.lead_id.includes('-')) return todo.lead_id;
   }
   // 4. description JSON — legacy fallback
   if (todo.description) {
     try {
       const desc = JSON.parse(todo.description);
-      if (desc.user_id && typeof desc.user_id === 'string' && /^\d{1,9}$/.test(desc.user_id)) return desc.user_id;
-      if (desc.phone && typeof desc.phone === 'string') return desc.phone;
+      if (desc.user_id && typeof desc.user_id === 'string' && /^\d{1,12}$/.test(desc.user_id)) return desc.user_id;
+      if (desc.phone && typeof desc.phone === 'string') {
+        const normalized = normalizePhone(desc.phone);
+        if (normalized) return normalized;
+      }
       if (desc.lead_id && typeof desc.lead_id === 'string') {
-        if (/^\d{1,9}$/.test(desc.lead_id)) return desc.lead_id;
+        if (/^\d{1,12}$/.test(desc.lead_id)) return desc.lead_id;
+        const normalizedLead = normalizePhone(desc.lead_id);
+        if (normalizedLead) return normalizedLead;
         if (desc.lead_id.includes('-')) return desc.lead_id;
       }
     } catch { /* ignore */ }
@@ -46,6 +87,11 @@ export function useTodosMapping(todos: LeadTodoRow[]) {
   const getTodosForLead = useCallback((lead: LeadRow): LeadTodoRow[] => {
     // Build rental_id set for this lead — enables rental_id-based todo matching
     const leadRentalIds = new Set(lead.rentals.map((r) => r.rentalId).filter(Boolean));
+    // Build identity set with normalized phone so phone-only leads (keyed by "+7999...")
+    // match todos whose phone column or description.lead_phone is "8999...".
+    const leadIdentitySet = new Set(
+      [lead.user_id, lead.phone, normalizePhone(lead.phone)].filter(Boolean) as string[]
+    );
     const seen = new Set<string>();
     return todos.filter((t) => {
       // 1. Match by rental_id from todo's direct column (Phase 3c FK — primary)
@@ -70,9 +116,12 @@ export function useTodosMapping(todos: LeadTodoRow[]) {
         } catch { /* ignore */ }
       }
 
-      // 3. Match by identity key (user_id/phone/lead_id)
+      // 3. Match by identity key (user_id/phone/lead_id) — must include normalized
+      // phone variants so a todo keyed by "89991234567" matches a lead keyed by
+      // "+79991234567". extractTodoLeadId() already normalizes phones, so we just
+      // need to check membership against the full identity set.
       const todoLeadId = extractTodoLeadId(t);
-      if (!todoLeadId || todoLeadId !== lead.user_id) return false;
+      if (!todoLeadId || !leadIdentitySet.has(todoLeadId)) return false;
       // Dedup by todo id, fallback to title
       const key = t.id || `${todoLeadId}|${t.title}`;
       if (seen.has(key)) return false;
