@@ -20,6 +20,7 @@ interface UseFileSelectionProps {
     docXAppFiles: string[];
     docXMigrationsFiles: string[];
     docXDocsFiles: string[];
+    docXAuditFiles: string[];
     imageReplaceTaskActive: boolean;
 }
 
@@ -36,6 +37,7 @@ interface UseFileSelectionReturn {
     handleAddDocXAppFiles: () => void;
     handleAddDocXMigrationsFiles: () => void;
     handleAddDocXDocsFiles: () => void;
+    handleAddDocXAuditFiles: () => void;
     handleSelectAll: () => void;
     handleDeselectAll: () => void;
 }
@@ -54,6 +56,7 @@ export const useFileSelection = ({
     docXAppFiles,
     docXMigrationsFiles,
     docXDocsFiles,
+    docXAuditFiles,
     imageReplaceTaskActive,
 }: UseFileSelectionProps): UseFileSelectionReturn => {
     logger.debug("[useFileSelection] Hook initialized");
@@ -246,6 +249,7 @@ export const useFileSelection = ({
     const handleAddDocXAppFiles = createDocXPresetHandler(docXAppFiles, "DocX App", "usedAddDocXAppFiles");
     const handleAddDocXMigrationsFiles = createDocXPresetHandler(docXMigrationsFiles, "DocX Migrations", "usedAddDocXMigrationsFiles");
     const handleAddDocXDocsFiles = createDocXPresetHandler(docXDocsFiles, "DocX Docs", "usedAddDocXDocsFiles");
+    const handleAddDocXAuditFiles = createDocXPresetHandler(docXAuditFiles, "Audit", "usedAddDocXAuditFiles");
 
     const handleSelectAll = useCallback(async () => { 
         if (imageReplaceTaskActive) {
@@ -311,6 +315,7 @@ export const useFileSelection = ({
         handleAddDocXAppFiles,
         handleAddDocXMigrationsFiles,
         handleAddDocXDocsFiles,
+        handleAddDocXAuditFiles,
         handleSelectAll,
         handleDeselectAll,
     };
