@@ -223,7 +223,8 @@ BEGIN
 
   -- -- Step 5b: Preserve operator identity BEFORE overwriting user_id --─
   UPDATE public.rentals
-  SET created_by_operator_chat_id = COALESCE(created_by_operator_chat_id, v_rental.user_id)
+  -- NOTE: use owner_id (always the operator) not user_id (may be phone-derived for web-callback rentals)
+  SET created_by_operator_chat_id = COALESCE(created_by_operator_chat_id, v_rental.owner_id)
   WHERE rental_id = v_rental_id_uuid
     AND created_by_operator_chat_id IS NULL;
 
