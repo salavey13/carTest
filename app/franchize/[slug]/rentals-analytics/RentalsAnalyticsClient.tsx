@@ -1072,6 +1072,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                   { label: "Выручка", value: formatRubles(summary?.totalRevenue ?? 0), icon: <TrendingUp className="w-3 h-3" />, color: "#10b981" },
                   { label: "Средний", value: summary?.totalRentals ? formatRubles((summary?.totalRevenue ?? 0) / summary.totalRentals) : "—", icon: <BarChart3 className="w-3 h-3" />, color: "#8b5cf6" },
                   { label: "Активны", value: String(summary?.activeRentals ?? 0), icon: <Clock className="w-3 h-3" />, color: "#f59e0b" },
+                  ...((summary?.operatorPlaceholderCount ?? 0) > 0 ? [{ label: "Ожидают QR", value: String(summary!.operatorPlaceholderCount), icon: <Clock className="w-3 h-3" />, color: "#ef4444" }] : []),
                   { label: "Завершены", value: String(summary?.completedRentals ?? 0), icon: <CheckCircle2 className="w-3 h-3" />, color: "#34d399" },
                   { label: "Продажи", value: String(sales.length), icon: <Tag className="w-3 h-3" />, color: "#10b981" },
                   { label: "КП", value: String(proposals.length), icon: <FileText className="w-3 h-3" />, color: "#8b5cf6" },

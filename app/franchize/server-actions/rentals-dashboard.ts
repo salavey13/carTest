@@ -18,6 +18,10 @@ export interface RentalDashboardItem {
   requested_end_date: string | null;
   created_at: string;
   metadata: Record<string, unknown>;
+  /** Preserved from rental creation — set by /doc-manual, null for web-flow rentals */
+  created_by_operator_chat_id: string | null;
+  /** True when this rental is still in operator-placeholder state (unclaimed QR) */
+  isOperatorPlaceholder: boolean;
   vehicle: {
     id: string;
     make: string;
@@ -57,9 +61,13 @@ export interface RentalDashboardItem {
 
 export interface RentalDashboardSummary {
   totalCount: number;
+  /** Alias for totalCount, used by client (RentalsAnalyticsClient.tsx) */
+  totalRentals: number;
   totalRevenue: number;
   byStatus: Record<string, number>;
   byPaymentStatus: Record<string, number>;
+  /** Count of operator-placeholder rentals (unclaimed, user_id === operator) */
+  operatorPlaceholderCount: number;
 }
 
 export interface RentalDashboardResult {
@@ -244,6 +252,7 @@ export async function getRentalsDashboard(input: {
       requested_end_date,
       created_at,
       metadata,
+      created_by_operator_chat_id,
       vehicle:cars!inner(id, make, model, crew_id, type, specs),
       user:users!rentals_user_id_fkey(user_id, full_name, username, metadata)
     `;
@@ -300,6 +309,36 @@ export async function getRentalsDashboard(input: {
         items.push({ ...rental, documentSecret: null });
       }
       // Skip duplicate (user, vehicle) pairs - older rental generations
+    }
+
+    // ── Operator-placeholder detection (§13.4c #7) ──────────────────────────
+    // Fetch crew members to identify operator chat IDs. Rentals where
+    // user_id === created_by_operator_chat_id (or user_id is a crew member)
+    // are still in pre-claim state — the renter hasn't scanned the QR yet.
+    const crewOperatorIds = new Set<string>();
+    try {
+      const { data: crewMembers } = await supabaseAdmin
+        .from("crew_members")
+        .select("user_id")
+        .eq("crew_id", crew.id);
+      if (crewMembers) {
+        for (const m of crewMembers) crewOperatorIds.add(m.user_id);
+      }
+    } catch (e) {
+      console.warn("[rentals-dashboard] Failed to fetch crew members for operator detection:", e);
+    }
+    // Also treat the crew owner as an operator
+    if (crew.owner_id) crewOperatorIds.add(crew.owner_id);
+
+    // Classify each item; only mark as operator-placeholder if user_id is an
+    // operator AND the rental was created by that operator (has matching
+    // created_by_operator_chat_id). Web-flow rentals (no created_by_operator_chat_id)
+    // with operator user_id are NOT placeholders — they're operator-as-renter.
+    for (const item of items) {
+      const createdByOp = (item as any).created_by_operator_chat_id as string | null;
+      const isOperatorId = crewOperatorIds.has(item.user_id);
+      const isSameAsCreator = createdByOp != null && item.user_id === createdByOp;
+      item.isOperatorPlaceholder = isOperatorId && isSameAsCreator;
     }
 
     // Filter by verification status if specified - DEDUPLICATED per rental
@@ -435,9 +474,11 @@ export async function getRentalsDashboard(input: {
     // Calculate summary statistics
     const summary: RentalDashboardSummary = {
       totalCount: items.length,
+      totalRentals: items.length,
       totalRevenue: items.reduce((sum, r) => sum + (r.total_cost || 0), 0),
       byStatus: {},
       byPaymentStatus: {},
+      operatorPlaceholderCount: 0,
     };
 
     // Count by status
@@ -447,6 +488,8 @@ export async function getRentalsDashboard(input: {
 
       const paymentStatus = item.payment_status || "unknown";
       summary.byPaymentStatus[paymentStatus] = (summary.byPaymentStatus[paymentStatus] || 0) + 1;
+
+      if (item.isOperatorPlaceholder) summary.operatorPlaceholderCount++;
     }
 
     console.log("[rentals-dashboard] Returning result:", {
