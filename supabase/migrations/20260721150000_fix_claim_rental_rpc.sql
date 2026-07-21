@@ -56,7 +56,7 @@ BEGIN
   -- 1b. Also update by rental_id for robustness (catches any sha256 mismatch)
   UPDATE private.rental_contract_artifacts
   SET telegram_chat_id = p_renter_chat_id
-  WHERE rental_id = p_rental_id::text
+  WHERE rental_id = p_rental_id
     AND telegram_chat_id IS DISTINCT FROM p_renter_chat_id;
 
   -- 2. Update secret: set chat_id → renter, link source_rental_id
@@ -267,7 +267,7 @@ BEGIN
     -- Update artifact telegram_chat_id → renter
     UPDATE private.rental_contract_artifacts
     SET telegram_chat_id = v_rec.renter_id
-    WHERE rental_id = v_rec.rental_id::text
+    WHERE rental_id = v_rec.rental_id
       AND telegram_chat_id IS DISTINCT FROM v_rec.renter_id;
 
     -- Update secret source_rental_id if missing
