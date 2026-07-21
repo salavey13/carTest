@@ -2,18 +2,18 @@
 -- /supabase/migrations/20260721160000_backfill_todos_artifacts.sql
 -- Phase 3c.5: Backfill existing data after RPC fix
 --
-── Diagnostika pokazala:
-──  - 60/60 crew_todos have user_id = NULL
-──  - 30/54 rental_contract_artifacts have no rental_id
-──
-── RPC propagate_claim only fixes FUTURE QR claims.
-── This backfill recovers EXISTING rows so the leads page works correctly TODAY.
-──
-── Порядок выполнения:
-──   1. Сначала выполни RPC migration (20260721150000), если ещё нет
-──   2. Потом эту миграцию
-──
-── Все UPDATE идемпотентны — можно запускать несколько раз.
+-- Diagnostika pokazala:
+--  - 60/60 crew_todos have user_id = NULL
+--  - 30/54 rental_contract_artifacts have no rental_id
+--
+-- RPC propagate_claim only fixes FUTURE QR claims.
+-- This backfill recovers EXISTING rows so the leads page works correctly TODAY.
+--
+-- Порядок выполнения:
+--   1. Сначала выполни RPC migration (20260721150000), если ещё нет
+--   2. Потом эту миграцию
+--
+-- Все UPDATE идемпотентны — можно запускать несколько раз.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- ─── Step 1: Backfill crew_todos.user_id ─────────────────────────────────
