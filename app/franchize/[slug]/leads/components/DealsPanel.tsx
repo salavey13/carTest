@@ -101,7 +101,10 @@ function RentalRow({ rental, slug, T }: RentalRowProps) {
       });
       if (result.success) {
         setActivationMsg({ ok: true, text: result.message || "✅ Аренда активирована! Обновляю..." });
-        router.refresh();
+        // Refresh server data without losing client state (filters, scroll, selected lead).
+        // The 2s delay lets the operator see the success message before the row re-renders
+        // with the new status.
+        setTimeout(() => router.refresh(), 2000);
       } else {
         setActivationMsg({ ok: false, text: result.error || "Ошибка активации" });
       }
@@ -130,7 +133,8 @@ function RentalRow({ rental, slug, T }: RentalRowProps) {
       });
       if (result.success) {
         setDeclineMsg({ ok: true, text: result.message || "✅ Аренда отклонена. Обновляю..." });
-        router.refresh();
+        // Refresh server data without losing client state.
+        setTimeout(() => router.refresh(), 2000);
       } else {
         setDeclineMsg({ ok: false, text: result.error || "Ошибка" });
       }
@@ -160,7 +164,8 @@ function RentalRow({ rental, slug, T }: RentalRowProps) {
       });
       if (result.success) {
         setCompleteMsg({ ok: true, text: result.message || "✅ Аренда завершена. Обновляю..." });
-        router.refresh();
+        // Refresh server data without losing client state.
+        setTimeout(() => router.refresh(), 2000);
       } else {
         setCompleteMsg({ ok: false, text: result.error || "Ошибка" });
       }

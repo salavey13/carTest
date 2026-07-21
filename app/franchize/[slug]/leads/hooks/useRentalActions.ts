@@ -42,7 +42,10 @@ export function useActivateRental(rental: { rentalId: string; bikeTitle?: string
       });
       if (result.success) {
         setActivationMsg({ ok: true, text: result.message || "✅ Аренда активирована! Обновляю..." });
-        router.refresh();
+        // Refresh server data without losing client state (filters, scroll, selected lead).
+        // The 2s delay lets the operator see the success message before the row re-renders
+        // with the new status.
+        setTimeout(() => router.refresh(), 2000);
       } else {
         setActivationMsg({ ok: false, text: result.error || "Ошибка активации" });
       }
@@ -51,7 +54,7 @@ export function useActivateRental(rental: { rentalId: string; bikeTitle?: string
     } finally {
       setActivating(false);
     }
-  }, [odometerInput, slug, rental.rentalId]);
+  }, [odometerInput, slug, rental.rentalId, router]);
 
   return {
     showModal,
@@ -100,7 +103,8 @@ export function useDeclineRental(rental: { rentalId: string; bikeTitle?: string;
       });
       if (result.success) {
         setDeclineMsg({ ok: true, text: result.message || "✅ Аренда отклонена. Обновляю..." });
-        router.refresh();
+        // Refresh server data without losing client state.
+        setTimeout(() => router.refresh(), 2000);
       } else {
         setDeclineMsg({ ok: false, text: result.error || "Ошибка" });
       }
@@ -109,7 +113,7 @@ export function useDeclineRental(rental: { rentalId: string; bikeTitle?: string;
     } finally {
       setDeclining(false);
     }
-  }, [declineMessage, slug, rental.rentalId]);
+  }, [declineMessage, slug, rental.rentalId, router]);
 
   return {
     showModal,
@@ -161,7 +165,8 @@ export function useCompleteRental(rental: { rentalId: string; bikeTitle?: string
       });
       if (result.success) {
         setCompleteMsg({ ok: true, text: result.message || "✅ Аренда завершена. Обновляю..." });
-        router.refresh();
+        // Refresh server data without losing client state.
+        setTimeout(() => router.refresh(), 2000);
       } else {
         setCompleteMsg({ ok: false, text: result.error || "Ошибка" });
       }
@@ -170,7 +175,7 @@ export function useCompleteRental(rental: { rentalId: string; bikeTitle?: string
     } finally {
       setCompleting(false);
     }
-  }, [completeOdometer, slug, rental.rentalId]);
+  }, [completeOdometer, slug, rental.rentalId, router]);
 
   return {
     showModal,
