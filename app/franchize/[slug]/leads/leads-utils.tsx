@@ -64,20 +64,56 @@ export function fmtMoney(n: number | undefined): string {
   return new Intl.NumberFormat("ru-RU").format(Math.round(n)) + " ₽";
 }
 
+/**
+ * Normalize a phone number to canonical E.164-ish form (+7XXXXXXXXXX for RU).
+ * Accepts +7/7/8 prefix, spaces, dashes, parentheses.
+ * Returns null if input is empty or unparseable.
+ *
+ * MUST mirror the server-side normalizePhone() in server-actions/leads.ts and
+ * crew-todos.ts so client-side matching stays consistent with server-side filtering.
+ */
+function normalizePhone(input: string | null | undefined): string | null {
+  if (!input) return null;
+  let s = input.trim().replace(/[\s\-\(\)]/g, "");
+  if (!s) return null;
+  if (/^8\d{10}$/.test(s)) s = "+7" + s.slice(1);
+  else if (/^7\d{10}$/.test(s)) s = "+" + s;
+  else if (/^\d{10}$/.test(s)) s = "+7" + s;
+  else if (!s.startsWith("+")) s = "+" + s;
+  return s;
+}
+
 export function getTodoLeadId(todo: LeadTodoRow): string | null {
   // 1. user_id column — canonical Telegram chat_id
-  if (todo.user_id && /^\d{1,9}$/.test(todo.user_id)) return todo.user_id;
-  // 2. phone column — phone-only leads
-  if (todo.phone) return todo.phone;
+  // Note: Telegram IDs can be up to 10 digits today; allow up to 12 for future-proofing.
+  if (todo.user_id && /^\d{1,12}$/.test(todo.user_id)) return todo.user_id;
+  // 2. phone column — phone-only leads (normalize for cross-source matching)
+  if (todo.phone) {
+    const normalized = normalizePhone(todo.phone);
+    if (normalized) return normalized;
+  }
   // 3. lead_id column — legacy fallback
-  if (todo.lead_id) return todo.lead_id;
+  if (todo.lead_id) {
+    if (/^\d{1,12}$/.test(todo.lead_id)) return todo.lead_id;
+    const normalizedLead = normalizePhone(todo.lead_id);
+    if (normalizedLead) return normalizedLead;
+    return todo.lead_id;
+  }
   // 4. description JSON — legacy fallback
   if (todo.description) {
     try {
       const desc = JSON.parse(todo.description);
-      if (desc.user_id && typeof desc.user_id === 'string' && /^\d{1,9}$/.test(desc.user_id)) return desc.user_id;
-      if (desc.phone && typeof desc.phone === 'string') return desc.phone;
-      if (desc.lead_id && typeof desc.lead_id === 'string') return desc.lead_id;
+      if (desc.user_id && typeof desc.user_id === 'string' && /^\d{1,12}$/.test(desc.user_id)) return desc.user_id;
+      if (desc.phone && typeof desc.phone === 'string') {
+        const normalized = normalizePhone(desc.phone);
+        if (normalized) return normalized;
+      }
+      if (desc.lead_id && typeof desc.lead_id === 'string') {
+        if (/^\d{1,12}$/.test(desc.lead_id)) return desc.lead_id;
+        const normalizedLead = normalizePhone(desc.lead_id);
+        if (normalizedLead) return normalizedLead;
+        return desc.lead_id;
+      }
     } catch { /* ignore */ }
   }
   return null;
@@ -89,7 +125,11 @@ export function getTodoLeadPhone(todo: LeadTodoRow): string | null {
 }
 
 export function getTodosForLead(todos: LeadTodoRow[], lead: LeadRow): LeadTodoRow[] {
-  const leadUserIds = new Set([lead.user_id, lead.phone].filter(Boolean));
+  // Build identity set with normalized phone so a lead keyed by "+7999..." matches
+  // todos whose description.lead_phone is "8999..." (legacy formatting).
+  const leadUserIds = new Set(
+    [lead.user_id, lead.phone, normalizePhone(lead.phone)].filter(Boolean) as string[]
+  );
   // Build rental_id lookup from lead's rentals for rental_id-based matching
   const leadRentalIds = new Set(lead.rentals.map((r) => r.rentalId).filter(Boolean));
   return todos.filter((t) => {
@@ -99,7 +139,12 @@ export function getTodosForLead(todos: LeadTodoRow[], lead: LeadRow): LeadTodoRo
     const leadId = getTodoLeadId(t);
     if (leadId && leadUserIds.has(leadId)) return true;
     const leadPhone = getTodoLeadPhone(t);
-    if (leadPhone && lead.phone && leadPhone === lead.phone) return true;
+    if (leadPhone) {
+      const normalizedTodoPhone = normalizePhone(leadPhone);
+      if (normalizedTodoPhone && leadUserIds.has(normalizedTodoPhone)) return true;
+      // Raw comparison as last-resort fallback for non-RU phones or weird formats.
+      if (lead.phone && leadPhone === lead.phone) return true;
+    }
     if (leadId && lead.phone && leadId === lead.phone) return true;
     // 3. Match by rental_id from description JSON (legacy)
     if (t.description) {
