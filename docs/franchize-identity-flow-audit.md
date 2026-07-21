@@ -540,6 +540,84 @@ END IF;
 6. **Orphaned artifact cleanup** — 30 artifacts without `rental_id`: link to correct rental or archive.
 7. **Todo user_id backfill** — 60 todos with null `user_id`: set from linked rental's user_id.
 
+### 13.4b Re-prioritized recommendation (from colleague code-review, 2026-07-21)
+
+После фикса RPC **#6 и #7 — самые срочные**. Без них leads page будет выглядеть сломанной для операторов: todos не привяжутся к лидам (у всех 60 `user_id = NULL`). RPC `propagate_claim` не поможет существующим строкам — он только для будущих QR claim'ов.
+
+**Порядок:**
+
+1. **#7: Todo `user_id` backfill** — самый высокий рычаг. 60/60 todos имеют `user_id = NULL`. Без этого `getTodoLeadId()` падает через phone/lead_id fallback — а это именно то, что мы чинили. SQL ниже идемпотентен, безопасен.
+2. **#6: Orphaned artifacts** — 30/54 без `rental_id`, никогда не будут QR-claimable. Привязать через secrets.source_rental_id или по оператору+байку+дате.
+3. **#2: `window.location.reload()` → `router.refresh()`** — 15 минут, high operator-visible value.
+4. **#1: `lead_notes.lead_id`** — 1 строка в проде. Паркуем.
+5. **#3, #4, #5** — долгосрочные, сегодня не болят.
+
+**SQL для #7 — todo `user_id` backfill (идемпотентно):**
+
+```sql
+-- Step 7a: todos c rental_id column (если есть)
+UPDATE public.crew_todos t
+SET user_id = r.user_id
+FROM public.rentals r
+WHERE t.rental_id = r.rental_id
+  AND t.user_id IS NULL
+  AND r.user_id IS NOT NULL
+  AND r.user_id != r.owner_id;
+
+-- Step 7b: todos с rental_id только в description JSON
+UPDATE public.crew_todos t
+SET user_id = r.user_id,
+    rental_id = (t.description::jsonb ->> 'rental_id')::uuid
+FROM public.rentals r
+WHERE t.rental_id IS NULL
+  AND t.user_id IS NULL
+  AND (t.description::jsonb ->> 'rental_id') IS NOT NULL
+  AND (t.description::jsonb ->> 'rental_id') = r.rental_id::text
+  AND r.user_id != r.owner_id;
+
+-- Step 7c: todos только с lead_id = phone → через artifact.renter_phone
+UPDATE public.crew_todos t
+SET user_id = r.user_id
+FROM private.rental_contract_artifacts a
+JOIN public.rentals r ON r.rental_id = a.rental_id::uuid
+WHERE t.user_id IS NULL
+  AND t.lead_id IS NOT NULL
+  AND a.renter_phone = t.lead_id
+  AND r.user_id != r.owner_id;
+
+-- Verify
+SELECT COUNT(*) FILTER (WHERE user_id IS NOT NULL) AS has_user_id,
+       COUNT(*) FILTER (WHERE user_id IS NULL) AS still_null
+FROM public.crew_todos;
+```
+
+**SQL для #6 — orphaned artifacts (после #7):**
+
+```sql
+-- 6a: через secrets.source_rental_id
+UPDATE private.rental_contract_artifacts a
+SET rental_id = s.source_rental_id::uuid
+FROM private.user_rental_secrets s
+WHERE a.rental_id IS NULL
+  AND a.original_sha256 = s.doc_sha256
+  AND s.source_rental_id IS NOT NULL
+  AND s.source_rental_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+
+-- 6b: по оператору + байку + дате
+UPDATE private.rental_contract_artifacts a
+SET rental_id = r.rental_id
+FROM public.rentals r
+WHERE a.rental_id IS NULL
+  AND r.created_by_operator_chat_id = a.created_by_operator_chat_id
+  AND r.requested_start_date::text = a.rent_start_date
+  AND r.vehicle_id = COALESCE(a.resolved_bike_id, a.requested_bike_id);
+
+-- 6c: проверка остатка
+SELECT COUNT(*) AS still_orphaned
+FROM private.rental_contract_artifacts
+WHERE rental_id IS NULL;
+```
+
 ### 13.5 Files modified this session
 
 | File | Change |
