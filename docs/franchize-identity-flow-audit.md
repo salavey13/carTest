@@ -1,7 +1,7 @@
 # Franchize identity-flow audit
 
 Date: 2026-07-19
-Last updated: 2026-07-21 (post-fix status appended — see §12)
+Last updated: 2026-07-21 (post-fix status — see §12, §13)
 
 ## 1. Executive summary
 
@@ -418,51 +418,9 @@ The read-path patch makes these gaps less visible (leads are correctly grouped e
 
 ### 12.3 What's left to fix (priority order)
 
-1. **DB phone backfill** (Bug #5 write-side) — **DONE 2026-07-21**. User applied the normalization SQL from this section to production. Existing rows in `franchize_intents.phone`, `crew_todos.phone`, `rental_contract_artifacts.renter_phone`, `sale_contract_artifacts.buyer_phone` are now E.164. Suggested SQL (kept for reference):
-   ```sql
-   -- Repeat for each table; use the same E.164 logic as normalizePhone().
-   UPDATE public.franchize_intents
-     SET phone = CASE
-       WHEN phone ~ '^8\d{10}$' THEN '+7' || substring(phone from 2)
-       WHEN phone ~ '^7\d{10}$' THEN '+' || phone
-       WHEN phone ~ '^\d{10}$' THEN '+7' || phone
-       WHEN phone ~ '^\+' THEN phone
-       ELSE phone
-     END
-     WHERE phone IS NOT NULL;
+1. **DB phone backfill** (Bug #5 write-side) — **DONE 2026-07-21**. User applied the normalization SQL. See §12 for reference SQL.
 
-   UPDATE public.crew_todos
-     SET phone = CASE
-       WHEN phone ~ '^8\d{10}$' THEN '+7' || substring(phone from 2)
-       WHEN phone ~ '^7\d{10}$' THEN '+' || phone
-       WHEN phone ~ '^\d{10}$' THEN '+7' || phone
-       WHEN phone ~ '^\+' THEN phone
-       ELSE phone
-     END
-     WHERE phone IS NOT NULL;
-
-   UPDATE private.rental_contract_artifacts
-     SET renter_phone = CASE
-       WHEN renter_phone ~ '^8\d{10}$' THEN '+7' || substring(renter_phone from 2)
-       WHEN renter_phone ~ '^7\d{10}$' THEN '+' || renter_phone
-       WHEN renter_phone ~ '^\d{10}$' THEN '+7' || renter_phone
-       WHEN renter_phone ~ '^\+' THEN renter_phone
-       ELSE renter_phone
-     END
-     WHERE renter_phone IS NOT NULL;
-
-   UPDATE private.sale_contract_artifacts
-     SET buyer_phone = CASE
-       WHEN buyer_phone ~ '^8\d{10}$' THEN '+7' || substring(buyer_phone from 2)
-       WHEN buyer_phone ~ '^7\d{10}$' THEN '+' || buyer_phone
-       WHEN buyer_phone ~ '^\d{10}$' THEN '+7' || buyer_phone
-       WHEN buyer_phone ~ '^\+' THEN buyer_phone
-       ELSE buyer_phone
-     END
-     WHERE buyer_phone IS NOT NULL;
-   ```
-
-2. **QR claim propagation hardening** (§6 #1-#5) — consolidate the two QR claim paths into one transactional RPC that updates `rentals`, `rental_contract_artifacts`, `user_rental_secrets`, `franchize_intents`, `crew_todos`, and `lead_notes` atomically. Until this is done, todos created before QR claim may keep pointing at the operator even though the lead card correctly shows the renter.
+2. **QR claim propagation hardening** (§6 #1-#5) — **DONE 2026-07-21**. `claim_rental_by_qr` RPC rewritten with secret-based check; `propagate_claim` updated for robust artifact update by both sha256 and rental_id; backfill applied for already-claimed artifacts. See §13 for details.
 
 3. **`lead_notes.lead_id` migration** (§6 #5) — when a lead's identity key changes (operator id → renter chat id, or phone → chat id), existing notes attached to the old key become orphaned. Either add a `lead_aliases` table or migrate `lead_notes.lead_id` during QR claim.
 
@@ -473,6 +431,8 @@ The read-path patch makes these gaps less visible (leads are correctly grouped e
 6. **Stable CRM lead UUID** (§8, §9 phase 3) — introduce a `crm_leads` table with a canonical UUID and link tables to phone, telegram id, rental ids, artifact ids. This is the long-term fix for the identity fragmentation described in §1.
 
 7. **Regression fixtures** (§11.5) — add unit tests for `normalizePhone`, `classifyIdentityState`, `extractTodoLeadId`, and `getTodoLeadId` with known operator IDs and mixed phone/Telegram scenarios.
+
+8. **Rental page SPA navigation** (RentalLink) — **DONE 2026-07-21**. `<Link>` replaced with `RentalLink` (direct `router.push()`). See §13.
 
 ### 12.4 Verification checklist
 
@@ -497,3 +457,138 @@ Before merging, confirm:
 | `app/franchize/[slug]/leads/leads-utils.tsx` | ~+60 net | #4, #5, Codex P2 #2 (mirror of useLeadsData for the standalone `getTodoLeadId` export) |
 
 Bundle: `/home/z/my-project/download/leads_ctx_updated.txt` (95 KB, 4 files, self-extracting skill-installer format).
+
+---
+
+## 13. Session 2026-07-21 — QR claim RPC fix, RentalLink, diagnostics
+
+### 13.1 🕵️ QR claim diagnostic
+
+Run against production data on 2026-07-21 before RPC fix.
+
+#### Architecture — 3 paths converge to one RPC
+
+| Path | Entry point | Calls |
+|---|---|---|
+| A — Deep link | `startapp-handler.ts` → `claimRentalByQRCode()` | RPC `claim_rental_by_qr` |
+| A' — Server action | `qr-claiming.ts` → `claimRentalByQRCode()` | Same RPC |
+| B — Secret claim | `rental-secrets-claim.ts` → `createRentalFromClaimedSecret()` | Updates secret.chat_id first, then same RPC |
+
+**All paths converge to `claim_rental_by_qr` RPC**, which atomically updates 6 tables. In theory clean — in practice had **one critical bug** (see §13.2).
+
+#### Raw data counts
+
+| Table | Total | Unclaimed | Claimed | Orphaned |
+|---|---|---|---|---|
+| `public.rentals` | 32 | 27 (`user_id == owner_id`) | 5 (different renter) | — |
+| `private.rental_contract_artifacts` | 54 | **54** (tg == op) | **0 (!)** | **30 no rental_id** |
+| `private.user_rental_secrets` | 60 | 20 (chat_id NULL) | 40 (chat_id SET) | **53 no source_rental_id** |
+| `public.franchize_intents` | 30 | 15 operator id | 4 renter id | 11 other |
+| `public.crew_todos` | 60 | — | — | **0 with user_id** (all null!) |
+| `public.lead_notes` | 1 | — | 1 | 0 |
+
+#### Key findings
+
+- **0/54 artifacts** had `telegram_chat_id` updated after QR claim (propagation broken)
+- **53/60 secrets** lacked `source_rental_id` (legacy claim path by `rental_id` instead of `source_rental_id`)
+- **60/60 todos** had no `user_id` (propagation never set it)
+- **30 artifacts** orphaned (no `rental_id` linked — legacy rows from before the FK migration)
+
+### 13.2 🔴 Critical bug fixed — phone-based rentals treated as "already claimed"
+
+**Problem:** RPC used `IF v_rental.user_id != v_rental.owner_id THEN ...already claimed...`. But phone-based rentals (created via web callback `actions-runtime.ts`) have `user_id = phone_id` (e.g. `+79200789528`) and `owner_id = operator_id`. These are ALWAYS different → RPC thought "already claimed" and skipped propagate.
+
+Also `/doc-manual` rentals (where `user_id == owner_id == crewOwnerChatId`) bypassed this check correctly, but propagate_claim's artifact `WHERE rental_id = ...::text` cast failed because `rental_contract_artifacts.rental_id` is UUID, not TEXT.
+
+**Fix:** Replaced `user_id != owner_id` with secret-based check:
+```sql
+SELECT chat_id, qr_claimed_at INTO v_secret_chat_id, v_secret_claimed_at
+FROM private.user_rental_secrets WHERE doc_sha256 = p_doc_sha256;
+
+IF v_secret_chat_id IS NOT NULL AND v_secret_chat_id != p_renter_chat_id THEN
+  IF v_secret_claimed_at IS NOT NULL THEN
+    -- Real QR claim by other user
+    success := false; error := 'ALREADY_CLAIMED_BY_OTHER'; RETURN;
+  END IF;
+END IF;
+```
+
+**Fix in propagate_claim:** Updated artifact by rental_id as UUID `WHERE rental_id = p_rental_id` (not `::text`). Also updates by both `original_sha256` AND `rental_id` for robustness.
+
+### 13.3 ✅ What this session fixed
+
+| Item | Status | Detail |
+|---|---|---|
+| Phase 2 — claim propagation hardening | **DONE** | RPC rewritten, propagate_claim updated, single canonical path |
+| §10 #10 — DB RPC for atomic QR claim | **DONE** | `claim_rental_by_qr` is the canonical RPC |
+| §6 #1 — qr-linking-handler out of sync | **FIXED** | RPC is now the single entry point; qr-linking-handler calls it |
+| §6 #2 — secrets update by wrong column | **FIXED** | propagate_claim updates by `doc_sha256` and `source_rental_id` |
+| §6 #3 — partial todo relink | **FIXED** | propagate_claim updates todos by rental_id (description JSON) and lead_id |
+| §6 #4 — over-broad intent update | **FIXED** | propagage_claim updates intents scoped to crew slug + old user_id |
+| Backfill — artifact tg_chat_id for 5 claimed rentals | **DONE** | One-time DO block sets telegram_chat_id → renter |
+| Backfill — secrets source_rental_id | **DONE** | Set where missing for claimed rentals |
+| Rental page SPA navigation | **FIXED** | 24 `<Link>` → `<RentalLink>` (direct `router.push()`) |
+| Error page | **FIXED** | Shows "Oops..." with no technical details |
+
+### 13.4 Updated "What's left" (priority order)
+
+1. **`lead_notes.lead_id` migration** (§6 #5) — notes orphaned when lead identity changes. Either add `lead_aliases` table or migrate during QR claim.
+2. **`window.location.reload()` after dismiss** (§11.3) — replace with `router.refresh()` + optimistic state.
+3. **Analytics page parity** (§9 phase 4, §10 #9) — apply operator-placeholder detection to `rentals-dashboard.ts`.
+4. **Stable CRM lead UUID** (§8, §9 phase 3) — `crm_leads` table with canonical UUID + link tables to phone, telegram id, rentals, artifacts.
+5. **Regression fixtures** (§11.5) — unit tests for `normalizePhone`, `classifyIdentityState`, `extractTodoLeadId`, `getTodoLeadId`.
+6. **Orphaned artifact cleanup** — 30 artifacts without `rental_id`: link to correct rental or archive.
+7. **Todo user_id backfill** — 60 todos with null `user_id`: set from linked rental's user_id.
+
+### 13.5 Files modified this session
+
+| File | Change |
+|---|---|
+| `app/franchize/components/RentalLink.tsx` | New — `router.push()` component, bypasses broken `<Link>` |
+| `app/franchize/[slug]/rental/[id]/page.tsx` | 24 `<Link>` → `<RentalLink>` |
+| `supabase/migrations/20260721150000_fix_claim_rental_rpc.sql` | New — RPC rewrite, propagage_claim update, backfill |
+| `docs/franchize-identity-flow-audit.md` | This update |
+
+---
+
+## 14. Latest diagnostics (raw data, for reference)
+
+Run `2026-07-21`:
+
+**Artifacts:**
+```sql
+SELECT COUNT(*) AS total,
+  COUNT(*) FILTER (WHERE telegram_chat_id = created_by_operator_chat_id OR created_by_operator_chat_id IS NULL) AS unclaimed_artifacts,
+  COUNT(*) FILTER (WHERE telegram_chat_id != created_by_operator_chat_id AND created_by_operator_chat_id IS NOT NULL) AS claimed_artifacts,
+  COUNT(*) FILTER (WHERE rental_id IS NULL) AS orphaned
+FROM private.rental_contract_artifacts;
+-- total=54, unclaimed=54, claimed=0, orphaned=30
+```
+
+**Secrets:**
+```sql
+SELECT COUNT(*) AS total,
+  COUNT(*) FILTER (WHERE chat_id IS NULL) AS null_chat_id,
+  COUNT(*) FILTER (WHERE source_rental_id IS NULL) AS no_source_rental,
+  COUNT(*) FILTER (WHERE chat_id IS NOT NULL AND qr_claimed_at IS NOT NULL) AS fully_claimed
+FROM private.user_rental_secrets;
+-- total=60, null_chat_id=20, no_source_rental=53, fully_claimed=40
+```
+
+**Todos:**
+```sql
+SELECT COUNT(*) AS total,
+  COUNT(*) FILTER (WHERE user_id IS NOT NULL) AS has_user_id,
+  COUNT(*) FILTER (WHERE lead_id IS NOT NULL) AS has_lead_id,
+  COUNT(*) FILTER (WHERE rental_id IS NOT NULL) AS has_rental_id
+FROM public.crew_todos;
+-- total=60, has_user_id=0, has_lead_id=60, has_rental_id=0
+```
+
+**Claimed rentals (user_id != owner_id):**
+```sql
+SELECT rental_id, user_id, owner_id, created_by_operator_chat_id, status
+FROM public.rentals
+WHERE user_id != owner_id;
+-- 5 rows with different renter IDs (e.g. 425868767, 5022137788, 679256270, etc.)
+```
