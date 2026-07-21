@@ -1,7 +1,7 @@
 # Franchize identity-flow audit
 
 Date: 2026-07-19
-Last updated: 2026-07-21 (post-fix status — see §12, §13, §14, §15 re-audit with corrected diagrams)
+Last updated: 2026-07-21 (post-fix status — see §12, §13, §14, §15 re-audit with corrected diagrams; all 3 §15.2 open findings fixed in §15.7)
 
 ## 1. Executive summary
 
@@ -1153,21 +1153,15 @@ These were marked as "parked" in §13.4c and remain parked. Listed here for comp
 
 ### 15.4 Recommended next actions (priority order)
 
-Based on the new findings in §15.2 (after the §15.2 NEW #2 correction):
+**All 3 open findings from this section have been fixed in §15.7.** Remaining:
 
-1. **NEW #3 (HIGH)** — remove `phone: phone,` from `lib/leads.ts:85`. This is silently breaking the `users` upsert for every lead creation. One-line fix. **The phone is already correctly stored in `metadata.phone` via `userMeta.phone = phone` at L78** — the top-level `phone` field is just dead code that causes the whole upsert to 400.
+1. **NEW #5 (LOW — perf)** — optimize `getRentalReturnTodos` in `rentals.ts:655` to use the indexed `rental_id` column instead of fetching all crew todos and filtering client-side. Park unless performance becomes an issue on high-volume crews.
 
-2. **NEW #1 (MEDIUM)** — change `/^\d{1,9}$/` → `/^\d{1,12}$/` in `rental-verification-todos.ts:86`. One-character fix. Same Bug #4 pattern that was fixed everywhere else but missed here. Affects identity matching for verification todos created from web-flow rentals with 10-digit Telegram IDs.
+2. **(Parked)** — analytics page parity (§13.4c #7), regression fixtures (§13.4c #9), stable CRM UUID (§13.4c #8), `lead_notes` migration (§13.4c #6). No urgency — see §15.3.
 
-3. **NEW #6 (MEDIUM — refactor)** — consolidate the 5 `normalizePhone` implementations into one. Pick the inline copy's logic (with RU-prefix inference) + add the length check from `phone-utils.ts`. Replace the 4 inline copies with imports from `phone-utils.ts`. This eliminates the divergence that could split identities for edge-case phone inputs.
+3. **NEW #4 (no action)** — documented as not-a-bug. Web-flow rentals correctly don't set `created_by_operator_chat_id` because they're renter-initiated.
 
-4. **NEW #5 (LOW — perf)** — optimize `getRentalReturnTodos` in `rentals.ts:655` to use the indexed `rental_id` column instead of fetching all crew todos and filtering client-side. Park unless performance becomes an issue on high-volume crews.
-
-5. **(Parked)** — analytics page parity (§13.4c #7), regression fixtures (§13.4c #9), stable CRM UUID (§13.4c #8), `lead_notes` migration (§13.4c #6). No urgency — see §15.3.
-
-6. **NEW #4 (no action)** — documented as not-a-bug. Web-flow rentals correctly don't set `created_by_operator_chat_id` because they're renter-initiated.
-
-7. **NEW #2 (no action)** — false alarm. `phone-utils.ts` exists in the repo; was just missing from the previous bundle.
+4. **NEW #2 (no action)** — false alarm. `phone-utils.ts` exists in the repo; was just missing from the previous bundle.
 
 ### 15.5 Files inspected in this re-audit
 
@@ -1200,12 +1194,28 @@ The audit through §14 is **largely accurate** — every "FIXED/DONE" claim I ve
 
 The 6 new findings in §15.2 (after correcting NEW #2):
 - ~~1 build-breaking (NEW #2 — missing `phone-utils.ts`)~~ → **false alarm**, file exists
-- 1 silent-failure (NEW #3 — `users` upsert 400s on missing `phone` column) — **highest priority fix**
-- 1 missed regex (NEW #1 — same Bug #4 pattern, one file missed) — one-character fix
-- 1 refactor opportunity (NEW #6 — `normalizePhone` divergence between `phone-utils.ts` and 4 inline copies) — medium priority
+- 1 silent-failure (NEW #3 — `users` upsert 400s on missing `phone` column) — **✅ Fixed**
+- 1 missed regex (NEW #1 — same Bug #4 pattern, one file missed) — **✅ Fixed**
+- 1 refactor opportunity (NEW #6 — `normalizePhone` divergence between `phone-utils.ts` and 4 inline copies) — **✅ Fixed**
 - 1 perf (NEW #5 — `getRentalReturnTodos` ignores indexed column) — park
 - 1 documented non-bug (NEW #4 — web flow doesn't set `created_by_operator_chat_id`) — no action
 
-**Net assessment:** the leads page matching work is solid and the claims are honest. The audit's §2-§3 diagrams and §4 fields table have been updated to reflect the post-§13 state (single canonical RPC, validate-only `claimRentalSecretsByDocSha`, `created_by_operator_chat_id` preserved, `metadata.operatorId` on intents). The remaining findings are small follow-up fixes that don't undermine the patch — they're either pre-existing issues that the audit didn't catch (NEW #3 has been there since the original `lib/leads.ts` was written) or trivial oversights (NEW #1). NEW #6 is the most interesting finding because it's a silent correctness issue that only manifests for edge-case phone inputs, but the fix is a straightforward consolidation.
+**Net assessment:** the leads page matching work is solid and the claims are honest. The audit's §2-§3 diagrams and §4 fields table have been updated to reflect the post-§13 state (single canonical RPC, validate-only `claimRentalSecretsByDocSha`, `created_by_operator_chat_id` preserved, `metadata.operatorId` on intents). All 3 open findings from the re-audit have been fixed in a single session (§15.7). NEW #5 (perf) and the parked items can wait.
 
-**For the colleague executing the fixes:** the priority order in §15.4 is your work list. NEW #3 first (one-line, high-impact), then NEW #1 (one-character), then NEW #6 (refactor — replace 4 inline copies with imports from `phone-utils.ts` and merge the logic). NEW #5 and the parked items can wait.
+### 15.7 Fixes applied (2026-07-21, §15.2 findings executed)
+
+All 3 open findings from the re-audit were fixed in one session:
+
+| Finding | File | Change | Priority |
+|---|---|---|---|
+| NEW #3 | `app/franchize/lib/leads.ts:85` | Removed `phone: phone,` from `users` upsert (column doesn't exist; phone already in `metadata.phone`) | HIGH |
+| NEW #1 | `app/franchize/server-actions/rental-verification-todos.ts:86` | `/^\d{1,9}$/` → `/^\d{1,12}$/` (same Bug #4 pattern, one file missed) | MEDIUM |
+| NEW #6 | `app/franchize/lib/phone-utils.ts` | Consolidated canonical `normalizePhone` with RU-prefix inference + garbage rejection | MEDIUM |
+| NEW #6 | `app/franchize/server-actions/leads.ts` | Replaced inline `normalizePhone` with import from `phone-utils` | MEDIUM |
+| NEW #6 | `app/franchize/server-actions/crew-todos.ts` | Replaced inline `normalizePhone` with import from `phone-utils` | MEDIUM |
+| NEW #6 | `app/franchize/[slug]/leads/hooks/useLeadsData.ts` | Replaced inline `normalizePhone` with import from `phone-utils` | MEDIUM |
+| NEW #6 | `app/franchize/[slug]/leads/leads-utils.tsx` | Replaced inline `normalizePhone` with import from `phone-utils` | MEDIUM |
+
+`phone-utils.ts` is now the single canonical source: accepts `+7/7/8` prefixes, spaces/dashes/parens, infers `+7` for 10-digit RU numbers, rejects `< 10` digit garbage. All 4 inline copies removed, replaced with `import { normalizePhone } from "@/app/franchize/lib/phone-utils"`. `lib/leads.ts` already used `phone-utils.ts` — no change needed there.
+
+**Still parked:** NEW #5 (`getRentalReturnTodos` ignores `rental_id` index), §13.4c #6-9 (lead_notes migration, analytics parity, CRM UUID, regression fixtures).

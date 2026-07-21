@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { privateSchema } from "@/lib/private-secrets";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from "next/cache";
+import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 
 export interface LeadRentalRow {
   rentalId: string;
@@ -153,17 +154,6 @@ function isPhoneString(id: string | null | undefined): boolean {
  * Same person → two different lead cards. Normalizing at every read & write
  * path collapses them into one canonical identity.
  */
-function normalizePhone(input: string | null | undefined): string | null {
-  if (!input) return null;
-  let s = input.trim().replace(/[\s\-\(\)]/g, "");
-  if (!s) return null;
-  if (/^8\d{10}$/.test(s)) s = "+7" + s.slice(1);
-  else if (/^7\d{10}$/.test(s)) s = "+" + s;
-  else if (/^\d{10}$/.test(s)) s = "+7" + s;
-  else if (!s.startsWith("+")) s = "+" + s;
-  return s;
-}
-
 /**
  * Classify identity state for a lead.
  *

@@ -2,6 +2,7 @@
 
 import { useMemo, useCallback, useRef } from "react";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
+import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 import { 
   filterLeads, 
   sortLeads, 
@@ -9,28 +10,6 @@ import {
   getAvailableSources,
   groupLeadsForBoard 
 } from "../leads-utils";
-
-/**
- * Normalize a phone number to canonical E.164-ish form (+7XXXXXXXXXX for RU).
- * Accepts +7/7/8 prefix, spaces, dashes, parentheses.
- * Returns null if input is empty or unparseable.
- *
- * MUST mirror the server-side normalizePhone() in server-actions/leads.ts and
- * crew-todos.ts. Without this, a todo keyed by "89991234567" would never match
- * a lead keyed by "+79991234567" on the client side, even after the server
- * correctly returns both — the todo would appear in the API response but
- * disappear from the lead card because todoLeadId !== lead.user_id.
- */
-function normalizePhone(input: string | null | undefined): string | null {
-  if (!input) return null;
-  let s = input.trim().replace(/[\s\-\(\)]/g, "");
-  if (!s) return null;
-  if (/^8\d{10}$/.test(s)) s = "+7" + s.slice(1);
-  else if (/^7\d{10}$/.test(s)) s = "+" + s;
-  else if (/^\d{10}$/.test(s)) s = "+7" + s;
-  else if (!s.startsWith("+")) s = "+" + s;
-  return s;
-}
 
 /**
  * Extract the lead identifier from a todo, checking columns in priority order:

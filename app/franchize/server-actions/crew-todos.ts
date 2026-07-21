@@ -11,24 +11,9 @@ import {
   type UpdateTodoInput,
   DEFAULT_TODO_CATEGORIES,
 } from "./crew-todos-constants";
+import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-/**
- * Normalize a phone number to canonical E.164-ish form (+7XXXXXXXXXX for RU).
- * Accepts +7/7/8 prefix, spaces, dashes, parentheses.
- * Returns null if input is empty or unparseable.
- */
-function normalizePhone(input: string | null | undefined): string | null {
-  if (!input) return null;
-  let s = input.trim().replace(/[\s\-\(\)]/g, "");
-  if (!s) return null;
-  if (/^8\d{10}$/.test(s)) s = "+7" + s.slice(1);
-  else if (/^7\d{10}$/.test(s)) s = "+" + s;
-  else if (/^\d{10}$/.test(s)) s = "+7" + s;
-  else if (!s.startsWith("+")) s = "+" + s;
-  return s;
-}
 
 // Raw database type with joined fields as arrays (Supabase response format)
 interface CrewTodoDBRow {

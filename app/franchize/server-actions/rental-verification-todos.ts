@@ -82,7 +82,7 @@ export async function createRentalVerificationTodos(
     console.log(`[rental-verification-todos] Creating todos for rental ${rentalId}${leadId ? `, lead ${leadId}` : ""}`);
 
     // Determine user_id from leadId if it's a Telegram ID
-    const todoUserId = leadId && /^\d{1,9}$/.test(leadId) ? leadId : null;
+    const todoUserId = leadId && /^\d{1,12}$/.test(leadId) ? leadId : null;
 
     const todosToInsert = VERIFICATION_TODO_TEMPLATES.map((template) => ({
       id: randomUUID(),
