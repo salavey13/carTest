@@ -461,9 +461,30 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
             rentalIdsByNormalizedPhone.set(normalizedArtifactPhone, set);
           }
         }
-        // If telegram_chat_id is an operator placeholder, prefer renter_phone.
-        const preferPhone = isOperatorPlaceholder(a.telegram_chat_id) && normalizedArtifactPhone;
-        const id = preferPhone ? normalizedArtifactPhone! : (a.telegram_chat_id || normalizedArtifactPhone || "");
+        // Determine whether this artifact is still in the pre-claim state (operator
+        // owns it, renter hasn't scanned QR yet).
+        //
+        // /doc-manual L1614-1615 sets:
+        //   telegram_chat_id = String(userId)              // operator's TG id
+        //   created_by_operator_chat_id = String(userId)   // same, preserved forever
+        // After QR claim, telegram_chat_id is overwritten with the renter's TG id,
+        // but created_by_operator_chat_id is never touched.
+        //
+        // So: telegram_chat_id === created_by_operator_chat_id ⟺ pre-claim.
+        // This is more robust than isOperatorPlaceholder() because it catches
+        // operators who are no longer in crew_members, were never added, or were
+        // added with membership_status != 'active'. It also catches the case where
+        // crewOperatorIds is stale (e.g. owner just changed but old owner still
+        // appears on historical artifacts).
+        const isPreClaimByOperatorColumn =
+          !!a.created_by_operator_chat_id &&
+          a.telegram_chat_id === a.created_by_operator_chat_id;
+        const isOperatorFromCrew = isOperatorPlaceholder(a.telegram_chat_id);
+        const preferPhone =
+          (isPreClaimByOperatorColumn || isOperatorFromCrew) && !!normalizedArtifactPhone;
+        const id = preferPhone
+          ? normalizedArtifactPhone!
+          : (a.telegram_chat_id || normalizedArtifactPhone || "");
         if (!id) continue;
         // Resolve bike title from the pre-fetched cars map.
         const bikeId = a.resolved_bike_id || a.requested_bike_id;
@@ -542,9 +563,24 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     if (rentals) {
       for (const r of rentals) {
         if (!r.user_id) continue;
-        // If rental user_id is a known operator placeholder, try to use the
-        // renter's phone from the artifact (cached by rental_id) as identity key.
-        const prefersPhone = isCrewOwnerId(r.user_id);
+        // Determine whether this rental is still in the pre-claim state (operator
+        // owns it, renter hasn't scanned QR yet).
+        //
+        // /doc-manual L1191-1193 sets:
+        //   user_id = crewOwnerChatId                       // operator's TG id
+        //   owner_id = crewOwnerChatId                      // same
+        //   created_by_operator_chat_id = crewOwnerChatId   // preserved forever
+        // After QR claim, user_id is overwritten with the renter's TG id, but
+        // created_by_operator_chat_id is never touched.
+        //
+        // So: user_id === created_by_operator_chat_id ⟺ pre-claim.
+        // More robust than isCrewOwnerId() because it catches former operators,
+        // never-added operators, and stale crewOperatorIds caches.
+        const rentalCreatedByOp = (r as any).created_by_operator_chat_id || null;
+        const isPreClaimByOperatorColumn =
+          !!rentalCreatedByOp && r.user_id === rentalCreatedByOp;
+        const isOperatorFromCrew = isCrewOwnerId(r.user_id);
+        const prefersPhone = isPreClaimByOperatorColumn || isOperatorFromCrew;
         const artifactPhone = artifactPhoneByRentalId.get(r.rental_id) || null;
         // Secondary fallback: pull renter_phone out of rental.metadata (some older
         // rentals were created with it stored there).
@@ -563,7 +599,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
         // rentals.created_by_operator_chat_id preserves who originally created the rental
         // (the operator). Use it to detect operator-origin even after QR claim replaces
         // rentals.user_id with the renter's id.
-        const originalOp = (r as any).created_by_operator_chat_id || null;
+        const originalOp = rentalCreatedByOp;
         const rentalRow: LeadRentalRow = {
           rentalId: r.rental_id,
           status: r.status || "pending_confirmation",
@@ -614,8 +650,21 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     if (saleArtifacts) {
       for (const s of saleArtifacts) {
         const normalizedBuyerPhone = normalizePhone(s.buyer_phone);
-        const preferPhone = isOperatorPlaceholder(s.telegram_chat_id) && normalizedBuyerPhone;
-        const id = preferPhone ? normalizedBuyerPhone! : (s.telegram_chat_id || normalizedBuyerPhone || "");
+        // Sale artifacts have NO created_by_operator_chat_id column and NO QR claim
+        // flow (audit §10 #5 — open question, currently sales are always operator-
+        // created). So telegram_chat_id is always the operator's id, never the
+        // buyer's. Always prefer buyer_phone when present — this is safe because:
+        //   - If telegram_chat_id is the operator → lead groups under buyer's phone (correct)
+        //   - If telegram_chat_id is somehow the buyer (rare edge case) → lead still
+        //     groups under buyer's phone (still correct, just keyed differently)
+        //   - buyer_phone is a stable identifier that doesn't change post-creation
+        // This also catches the case where the operator isn't in crewOperatorIds
+        // (former member, never-added, stale cache) — isOperatorPlaceholder would
+        // miss those, but we don't need it here.
+        const preferPhone = !!normalizedBuyerPhone;
+        const id = preferPhone
+          ? normalizedBuyerPhone!
+          : (s.telegram_chat_id || "");
         if (!id) continue;
         // Resolve bike title from the pre-fetched cars map.
         const bikeId = s.resolved_bike_id || s.requested_bike_id;
