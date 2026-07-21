@@ -387,7 +387,7 @@ DECLARE
   v_todo_type TEXT;
 BEGIN
   FOR v_rental IN
-    SELECT rental_id, user_id, crew_id, metadata, status
+    SELECT rental_id, user_id, crew_id, metadata, status, agreed_end_date
     FROM public.rentals
     WHERE status IN ('active', 'confirmed', 'pending_confirmation', 'completed')
   LOOP
