@@ -2,29 +2,29 @@
 -- /supabase/migrations/20260721150000_fix_claim_rental_rpc.sql
 -- Phase 3c: Fix QR claim RPC for phone-based rentals
 --
-── Диагностика показала:
-── 1. RPC `claim_rental_by_qr` использует `user_id != owner_id` как сигнал
-──    "уже занято". Но phone-based rental (созданный через веб-форму или
-──    /doc-manual с телефоном) имеет user_id = phone_id, owner_id = operator_id,
-──    что всегда разные → RPC ошибочно думает "уже занято" и не апдейтит.
-── 2. propagate_claim не обновила artifact.telegram_chat_id для 5 уже
-──    заклеймленных rental'ов (все 54 артефакта показывают tg == op).
-──
-── Фикс RPC:
-──   - Вместо `user_id != owner_id` используем проверку по секрету:
-──     если secret.chat_id установлен на ДРУГОГО реального пользователя
-──     (не оператора) И qr_claimed_at проставлен → rental занят.
-──   - Guard Step 6 меняем с `user_id = owner_id` на `rental_id = uuid`
-──     (idempotent, race condition ловится через секрет).
-──
-── Фикс propagate_claim:
-──   - Добавляем обновление artifact.telegram_chat_id через rental_id
-──     (дополнительно к original_sha256 — для надёжности).
-──
-── Бэкфилл: обновляем artifact.telegram_chat_id для 5 уже заклеймленных rental'ов.
+-- Диагностика показала:
+-- 1. RPC `claim_rental_by_qr` использует `user_id != owner_id` как сигнал
+--    "уже занято". Но phone-based rental (созданный через веб-форму или
+--    /doc-manual с телефоном) имеет user_id = phone_id, owner_id = operator_id,
+--    что всегда разные → RPC ошибочно думает "уже занято" и не апдейтит.
+-- 2. propagate_claim не обновила artifact.telegram_chat_id для 5 уже
+--    заклеймленных rental'ов (все 54 артефакта показывают tg == op).
+--
+-- Фикс RPC:
+--   - Вместо `user_id != owner_id` используем проверку по секрету:
+--     если secret.chat_id установлен на ДРУГОГО реального пользователя
+--     (не оператора) И qr_claimed_at проставлен → rental занят.
+--   - Guard Step 6 меняем с `user_id = owner_id` на `rental_id = uuid`
+--     (idempotent, race condition ловится через секрет).
+--
+-- Фикс propagate_claim:
+--   - Добавляем обновление artifact.telegram_chat_id через rental_id
+--     (дополнительно к original_sha256 — для надёжности).
+--
+-- Бэкфилл: обновляем artifact.telegram_chat_id для 5 уже заклеймленных rental'ов.
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- ─── Step 1: Update propagate_claim helper ───────────────────────────────
+-- --─ Step 1: Update propagate_claim helper ------------------------------─
 -- Улучшаем: обновляем artifact по rental_id (не только по sha256),
 --            добавляем обновление secret.source_rental_id
 
@@ -122,7 +122,7 @@ END;
 $$;
 
 
--- ─── Step 2: Rewrite claim_rental_by_qr RPC ──────────────────────────────
+-- --─ Step 2: Rewrite claim_rental_by_qr RPC ------------------------------
 -- Главный фикс: вместо user_id != owner_id используем проверку secret'а.
 
 CREATE OR REPLACE FUNCTION public.claim_rental_by_qr(
@@ -147,7 +147,7 @@ DECLARE
   v_secret_chat_id    TEXT;
   v_secret_claimed_at TIMESTAMPTZ;
 BEGIN
-  -- ── Step 1: Find artifact by doc_sha256 ─────────────────────────────
+  -- -- Step 1: Find artifact by doc_sha256 ----------------------------─
   BEGIN
     SELECT * INTO STRICT v_artifact
     FROM private.rental_contract_artifacts
@@ -161,13 +161,13 @@ BEGIN
       RETURN;
   END;
 
-  -- ── Step 2: Validate artifact has rental_id ─────────────────────────
+  -- -- Step 2: Validate artifact has rental_id ------------------------─
   IF v_artifact.rental_id IS NULL THEN
     success := false; error := 'NO_RENTAL_LINKED'; claimed_now := false;
     RETURN;
   END IF;
 
-  -- ── Step 3: Cast rental_id to UUID ──────────────────────────────────
+  -- -- Step 3: Cast rental_id to UUID ----------------------------------
   BEGIN
     v_rental_id_uuid := v_artifact.rental_id::uuid;
   EXCEPTION
@@ -178,7 +178,7 @@ BEGIN
 
   v_crew_slug := v_artifact.crew_slug;
 
-  -- ── Step 4: Get the rental ──────────────────────────────────────────
+  -- -- Step 4: Get the rental ------------------------------------------
   BEGIN
     SELECT * INTO STRICT v_rental
     FROM public.rentals
@@ -191,7 +191,7 @@ BEGIN
 
   v_old_user_id := v_rental.user_id;
 
-  -- ── Step 5: Check claim state via the secret (MOST RELIABLE SIGNAL) ─
+  -- -- Step 5: Check claim state via the secret (MOST RELIABLE SIGNAL) ─
   -- Используем secret как источник правды: если secret.chat_id
   -- установлен на ДРУГОГО Telegram-юзера (не p_renter_chat_id)
   -- И qr_claimed_at проставлен → rental занят другим.
@@ -221,13 +221,13 @@ BEGIN
     -- или артефакт бэкфилла — разрешаем claim (secret обновится в propagate)
   END IF;
 
-  -- ── Step 5b: Preserve operator identity BEFORE overwriting user_id ───
+  -- -- Step 5b: Preserve operator identity BEFORE overwriting user_id --─
   UPDATE public.rentals
   SET created_by_operator_chat_id = COALESCE(created_by_operator_chat_id, v_rental.user_id)
   WHERE rental_id = v_rental_id_uuid
     AND created_by_operator_chat_id IS NULL;
 
-  -- ── Step 6: Update rentals.user_id → renter ──────────────────────────
+  -- -- Step 6: Update rentals.user_id → renter --------------------------
   -- Guard: просто апдейтим по rental_id (idempotent).
   -- Race condition защищена через секрет (шаг 2 в propagate_claim).
   UPDATE public.rentals
@@ -237,18 +237,18 @@ BEGIN
 
   GET DIAGNOSTICS v_updated = ROW_COUNT;
 
-  -- ── Step 7: Propagate to all linked tables ──────────────────────────
+  -- -- Step 7: Propagate to all linked tables --------------------------
   PERFORM private.propagate_claim(
     v_rental_id_uuid, p_doc_sha256, v_old_user_id, p_renter_chat_id, v_crew_slug
   );
 
-  -- ── Success ──────────────────────────────────────────────────────────
+  -- -- Success ----------------------------------------------------------
   success := true; rental_id := v_artifact.rental_id; claimed_now := (v_updated > 0);
 END;
 $$;
 
 
--- ─── Step 3: Backfill artifact telegram_chat_id for already-claimed rentals ──
+-- --─ Step 3: Backfill artifact telegram_chat_id for already-claimed rentals --
 -- 5 rentals имеют user_id != owner_id (уже заклеймлены), но их артефакты
 -- всё ещё показывают telegram_chat_id = created_by_operator_chat_id.
 -- Пробегаемся и фиксим.
@@ -284,6 +284,6 @@ END;
 $$;
 
 
--- ─── Step 4: Grant permissions ─────────────────────────────────────────────
+-- --─ Step 4: Grant permissions --------------------------------------------─
 GRANT EXECUTE ON FUNCTION public.claim_rental_by_qr TO service_role;
 GRANT EXECUTE ON FUNCTION private.propagate_claim TO service_role;
