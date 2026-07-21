@@ -1,7 +1,7 @@
 # Franchize identity-flow audit
 
 Date: 2026-07-19
-Last updated: 2026-07-21 (post-fix status — see §12, §13)
+Last updated: 2026-07-21 (post-fix status — see §12, §13, §14)
 
 ## 1. Executive summary
 
@@ -384,7 +384,7 @@ The read-path patch makes these gaps less visible (leads are correctly grouped e
 | §11.3 Pure helpers with tests (`chooseLeadKey`, `mergeLeadSources`, etc.) | **NOT DONE** | Logic is inline in `getFranchizeLeads()`. |
 | §11.3 Pagination cursors | **NOT DONE** | Still hard-coded `limit(800/500/300)`. |
 | §11.3 Attach todos by both canonical lead key and `rental_id` | **DONE** | Both paths implemented server-side and client-side. |
-| §11.3 Avoid `window.location.reload()` after dismissing | **NOT DONE** | `handleDismissLead` still calls `window.location.reload()`. |
+| §11.3 Avoid `window.location.reload()` after dismissing | **DONE** | `handleDismissLead` now uses `router.refresh()` + optimistically removes from `leadsState`. Filters, scroll, selection preserved. |
 | §11.4 Saved filters | **NOT DONE** | |
 | §11.4 Chronological timeline in detail panel | **NOT DONE** | |
 | §11.4 Compact card density / thumb-friendly actions | **NOT DONE** | |
