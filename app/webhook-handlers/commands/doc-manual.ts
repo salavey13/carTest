@@ -59,6 +59,7 @@ import nodemailer from "nodemailer";
 import { calculatePriceForDuration, getHelmetPrice } from "@/app/franchize/lib/pricing-calculator";
 import { isCrewMember } from "@/app/lib/user-rental-secrets";
 import { createLeadFollowupTodos } from "@/app/franchize/server-actions/crew-todos";
+import { createRentalVerificationTodos } from "@/app/franchize/server-actions/rental-verification-todos";
 import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrew } from "../lib/crew-access";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -1797,7 +1798,7 @@ ${qrDeepLink}`);
         bikeId: bike.id,
         todos,
         assignedTo: String(userId),
-        rentalId: rentalId || null,  // Phase 3c: set FK directly
+        rentalId: rentalId || undefined,  // Phase 3c: set FK directly
         metadata: {
           rental_id: rentalId || null,
           rent_end_date: context.rentEndDate || null,
@@ -1808,6 +1809,16 @@ ${qrDeepLink}`);
         logger.info(`[/doc] Created ${result.created} crew_todos for equipment return + checks (${result.skipped} skipped)`);
       } else {
         logger.warn("[/doc] Failed to create crew_todos:", result.error);
+      }
+
+      // ── Also create standard verification todos (passport, odometer, dates) ──
+      if (rentalId) {
+        try {
+          const vResult = await createRentalVerificationTodos(rentalId, crewId, leadId);
+          logger.info(`[/doc] Created ${vResult.created} verification todos for rental ${rentalId}`);
+        } catch (vErr) {
+          logger.warn("[/doc] Failed to create verification todos (non-fatal):", vErr);
+        }
       }
       } // close else (bike has crew_id for rent)
     }

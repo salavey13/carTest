@@ -498,7 +498,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
         .from("crew_todos")
         .select("id, lead_id, user_id, phone, rental_id, title, description, status, priority, category, created_at, completed_at, assigned_to")
         .eq("crew_id", crewId)
-        .eq("category", "lead_followup")
+        .in("category", ["lead_followup", "rental_verification"])
         .order("created_at", { ascending: false }),
     ]);
 
