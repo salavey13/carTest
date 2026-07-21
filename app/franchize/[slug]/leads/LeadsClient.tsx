@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Lock, X, Bike } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
@@ -67,8 +68,12 @@ export function LeadsClient({
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [hidePlaceholders, setHidePlaceholders] = useState(true); // Hide operator placeholders by default
 
+  const router = useRouter();
   const { dbUser } = useAppContext();
   const T = useTheme({ isAuto, isLightTheme, textColor, bgColor, accentColor });
+
+  // Writable leads state — dismiss removes optimistically, router.refresh() re-syncs
+  const [leadsState, setLeadsState] = useState(leads);
 
   // Debounce search query
   useEffect(() => {
@@ -122,14 +127,14 @@ export function LeadsClient({
     availableSources,
     hasFilters,
     boardColumns,
-  } = useFilteredSortedLeads(leads, debouncedSearchQuery, filterSource, segment, getTodosForLead, sortMode, hidePlaceholders);
+  } = useFilteredSortedLeads(leadsState, debouncedSearchQuery, filterSource, segment, getTodosForLead, sortMode, hidePlaceholders);
 
   // Filter out operator placeholders from segment counts for cleaner metrics
   const activeLeads = useMemo(() => 
     hidePlaceholders 
-      ? leads.filter((l) => l.identityState !== 'operator_placeholder')
-      : leads,
-    [leads, hidePlaceholders]
+      ? leadsState.filter((l) => l.identityState !== 'operator_placeholder')
+      : leadsState,
+    [leadsState, hidePlaceholders]
   );
 
   // Segment counts for toolbar tabs
@@ -166,7 +171,10 @@ export function LeadsClient({
         body: JSON.stringify({ leadId, dismissLead: true, slug, crewId }),
       });
       if (!resp.ok) { alert("Не удалось убрать лид. Попробуйте позже."); return; }
-      window.location.reload();
+      // Optimistic remove from local state, then re-sync with server
+      setLeadsState((prev) => prev.filter((l) => l.user_id !== leadId));
+      setSelectedId((prev) => prev === leadId ? null : prev);
+      router.refresh();
     } catch { alert("Ошибка сети."); }
   };
 
