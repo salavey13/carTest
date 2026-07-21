@@ -101,3 +101,45 @@ export const LEAD_CARD_TRANSITION_MS = 200;
 export const BOARD_MAX_HEIGHT = "calc(100vh - 280px)";
 export const DETAIL_PANEL_MAX_HEIGHT = "calc(100vh - 140px)";
 export const SEARCH_DEBOUNCE_MS = 300;
+// ── Leads UI v2 types ──
+export type Mode = "rent" | "sale" | "service";
+
+export type StageKey =
+  | "new" | "needs_contact" | "contract_sent" | "awaiting_qr_claim"
+  | "documents_missing" | "active_rental" | "return_due"
+  | "closed_won" | "closed_lost";
+
+export type SortModeV2 = "recent" | "urgent" | "name" | "spent" | "sla" | "return_due" | "overdue_todos";
+
+export type FilterFlags = {
+  overdueOnly: boolean;
+  unclaimedQrOnly: boolean;
+  documentsMissingOnly: boolean;
+  activeRentalOnly: boolean;
+  returnDueOnly: boolean;
+  dismissedOnly: boolean;
+  hideOperatorPlaceholders: boolean;
+};
+
+export type LeadQuickAction =
+  | { type: "call" } | { type: "telegram" } | { type: "notify" }
+  | { type: "request_docs" } | { type: "resend_qr" } | { type: "open_contract" }
+  | { type: "verify_photos" } | { type: "create_rental" } | { type: "schedule_return" }
+  | { type: "dismiss" } | { type: "assign_owner" } | { type: "pin" } | { type: "more" };
+
+export type LeadSignal = {
+  key: string;
+  label: string;
+  value: string;
+  tone: "neutral" | "good" | "warning" | "danger";
+  priority: number;
+  detail?: string;
+};
+
+export type LeadHistoryEvent = {
+  type: string;
+  timestamp: string;
+  label: string;
+  icon?: string;
+  detail?: string;
+};
