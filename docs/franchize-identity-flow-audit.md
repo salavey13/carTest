@@ -414,10 +414,11 @@ The read-path patch makes these gaps less visible (leads are correctly grouped e
 | #12 — No error logging on Supabase query failures | LOW | **FIXED** | All 9 query results checked; errors logged via `logger.error("[getFranchizeLeads] ...")`. |
 | Codex P2 #1 — Bike titles populated after artifact rows built | MEDIUM | **FIXED** | `bikeTitleMap` pre-fetch moved BEFORE the artifact/sale ingestion loops (`leads.ts` L388-401). |
 | Codex P2 #2 — Client-side `extractTodoLeadId` doesn't normalize phones | MEDIUM | **FIXED** | `normalizePhone()` mirrored in `useLeadsData.ts` and `leads-utils.tsx`. `useTodosMapping` and `getTodosForLead` now compare against a normalized identity set. |
+| Follow-up — Artifact phone-priority depends on `crewOperatorIds` being complete | HIGH | **FIXED** | Now uses `telegram_chat_id === created_by_operator_chat_id` as the pre-claim signal (more robust — catches former operators, never-added operators, stale caches). Applied to both artifacts step (`leads.ts` L465-488) and rentals step (`leads.ts` L567-584). Sale artifacts step simplified to always prefer `buyer_phone` (no QR claim flow for sales). |
 
 ### 12.3 What's left to fix (priority order)
 
-1. **DB phone backfill** (Bug #5 write-side) — run one-time SQL to normalize existing rows in `franchize_intents.phone`, `crew_todos.phone`, `rental_contract_artifacts.renter_phone`, `sale_contract_artifacts.buyer_phone`. Until this runs, old rows will still split identities (a lead keyed by `+7999...` won't match an old todo keyed by `8999...`). Suggested SQL:
+1. **DB phone backfill** (Bug #5 write-side) — **DONE 2026-07-21**. User applied the normalization SQL from this section to production. Existing rows in `franchize_intents.phone`, `crew_todos.phone`, `rental_contract_artifacts.renter_phone`, `sale_contract_artifacts.buyer_phone` are now E.164. Suggested SQL (kept for reference):
    ```sql
    -- Repeat for each table; use the same E.164 logic as normalizePhone().
    UPDATE public.franchize_intents
