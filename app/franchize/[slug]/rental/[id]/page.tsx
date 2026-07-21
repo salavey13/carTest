@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { ExternalLink, Info, RefreshCw, RotateCcw, ShoppingCart, Sparkles, Timer } from "lucide-react";
-import Link from "next/link";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
 import { CrewFooter } from "../../../components/CrewFooter";
@@ -17,6 +16,7 @@ import { crewPaletteForSurface, readablePaletteTextOnColor } from "../../../lib/
 import { buildFranchizeSectionMetadata } from "../../metadata";
 import { formatRuDate } from "../../../lib/date-utils";
 import { RentalEscapeHatch } from "../../../components/RentalEscapeHatch";
+import { RentalLink } from "../../../components/RentalLink";
 
 interface FranchizeRentalPageProps {
   params: Promise<{ slug: string; id: string }>;
@@ -279,13 +279,13 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
 
               {status === "active" && (
                 <>
-                  <Link
+                  <RentalLink
                     href={bikeSearchHref}
                     className="flex items-center justify-center gap-2 rounded-xl border px-4 py-3 font-semibold transition hover:opacity-85"
                     style={{ borderColor: accent, color: accent }}
                   >
                     <Timer className="h-4 w-4 shrink-0" /> Продлить
-                  </Link>
+                  </RentalLink>
                   <p className="text-[11px] leading-tight text-center" style={{ color: textSecondary }}>
                     Откроет каталог с этим же байком — сможете оформить новую аренду
                   </p>
@@ -312,20 +312,20 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               />
 
               <div className="grid grid-cols-2 gap-2">
-                <Link
+                <RentalLink
                   href={catalogHref}
                   className="rounded-xl border px-3 py-2 text-center text-xs transition hover:opacity-85"
                   style={{ borderColor: borderSoft }}
                 >
                   Каталог
-                </Link>
-                <Link
+                </RentalLink>
+                <RentalLink
                   href={profileHref}
                   className="rounded-xl border px-3 py-2 text-center text-xs transition hover:opacity-85"
                   style={{ borderColor: borderSoft }}
                 >
                   Профиль
-                </Link>
+                </RentalLink>
               </div>
             </div>
           </div>
@@ -339,20 +339,20 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               Проверьте ID в ссылке или вернитесь в профиль — там останутся последние активные заявки.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Link
+              <RentalLink
                 href={catalogHref}
                 className="rounded-xl border px-3 py-2 text-xs transition hover:opacity-85"
                 style={{ borderColor: borderSoft }}
               >
                 Каталог
-              </Link>
-              <Link
+              </RentalLink>
+              <RentalLink
                 href={profileHref}
                 className="rounded-xl border px-3 py-2 text-xs transition hover:opacity-85"
                 style={{ borderColor: borderSoft }}
               >
                 Профиль
-              </Link>
+              </RentalLink>
             </div>
           </section>
         ) : null}
@@ -379,13 +379,13 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             >
               {verificationText}
             </span>
-            <Link
+            <RentalLink
               href={`/doc-verifier?integrationScope=${encodeURIComponent(rental.contractVerifierScope || `rental:${rental.rentalId}`)}&documentKey=${encodeURIComponent(rental.contractDocumentKey || `rental-${slug}-${rental.rentalId}`)}`}
               className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:opacity-85"
               style={{ borderColor: accent, color: accent }}
             >
               Verify
-            </Link>
+            </RentalLink>
             {rental.docVerifierRecordId && (
               <span className="text-[11px]" style={{ color: textSecondary }}>
                 #{rental.docVerifierRecordId.slice(0, 8)}
@@ -441,58 +441,58 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           <div className="grid gap-2 sm:grid-cols-2 max-sm:grid-cols-1 pt-2">
             {status === "completed" ? (
               <>
-                <Link
+                <RentalLink
                   href={`/franchize/${resolvedSlug}?vehicle=${encodeURIComponent(rental.vehicleTitle || "")}`}
                   className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition hover:opacity-90"
                   style={{ backgroundColor: accent, color: accentTextOn }}
                 >
                   <RotateCcw className="h-4 w-4 shrink-0" />
                   Арендовать снова
-                </Link>
-                <Link
+                </RentalLink>
+                <RentalLink
                   href={profileHref}
                   className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm transition hover:opacity-85"
                   style={{ borderColor: borderSoft, color: textPrimary }}
                 >
                   <ShoppingCart className="mr-2 h-4 w-4 shrink-0" />
                   История
-                </Link>
+                </RentalLink>
               </>
             ) : status === "active" ? (
               <>
-                <Link
+                <RentalLink
                   href={bikeSearchHref}
                   className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition hover:opacity-90"
                   style={{ backgroundColor: accent, color: accentTextOn }}
                 >
                   <RefreshCw className="h-4 w-4 shrink-0" />
                   Продлить
-                </Link>
-                <Link
+                </RentalLink>
+                <RentalLink
                   href={catalogHref}
                   className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm transition hover:opacity-85"
                   style={{ borderColor: borderSoft, color: textPrimary }}
                 >
                   Каталог
-                </Link>
+                </RentalLink>
               </>
             ) : (
               <>
-                <Link
+                <RentalLink
                   href={`/franchize/${resolvedSlug}/cart`}
                   className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition hover:opacity-90"
                   style={{ backgroundColor: accent, color: accentTextOn }}
                 >
                   <Sparkles className="h-4 w-4 shrink-0" />
                   Продолжить
-                </Link>
-                <Link
+                </RentalLink>
+                <RentalLink
                   href={catalogHref}
                   className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm transition hover:opacity-85"
                   style={{ borderColor: borderSoft, color: textPrimary }}
                 >
                   Каталог
-                </Link>
+                </RentalLink>
               </>
             )}
           </div>
