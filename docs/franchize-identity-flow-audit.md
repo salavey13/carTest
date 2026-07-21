@@ -633,6 +633,7 @@ WHERE rental_id IS NULL;
 | 7 | **Analytics page parity** (§9 phase 4) | ⏳ Parked | Low |
 | 8 | **Stable CRM lead UUID** (§8) | ⏳ Parked | Low |
 | 9 | **Regression fixtures** (§11.5) | ⏳ Parked | Low |
+| 10 | **`claimRentalSecretsByDocSha` pre-RPC write** (§13.7 #2) | ✅ FIXED — validate-only, RPC is sole writer | Critical |
 
 ### 13.5 UX polish — `window.location.reload()` → `router.refresh()`
 
@@ -693,19 +694,19 @@ FROM public.crew_todos;
 
 ---
 
-**#2 — `claimRentalSecretsByDocSha` обновляет secret ДО RPC (риск частичного отказа)**
+**#2 — `claimRentalSecretsByDocSha` обновлял secret ДО RPC (риск частичного отказа) — ✅ FIXED**
 
-Функция `claimRentalSecretsByDocSha` (TS, user-rental-secrets.ts) напрямую апдейтит `chat_id` в private.user_rental_secrets. Затем caller может вызвать RPC `claim_rental_by_qr`, который тоже апдейтит rentals + artifacts + todos.
+Функция `claimRentalSecretsByDocSha` (TS, user-rental-secrets.ts) напрямую апдейтила `chat_id` в private.user_rental_secrets. Затем caller вызывал RPC `claim_rental_by_qr`, который тоже апдейтит rentals + artifacts + todos.
 
 Риск: если TS-функция успела обновить secret, но RPC упала (сеть, таймаут, ошибка), то secret находится в полу-заклеймленном состоянии: `chat_id` проставлен, но `rentals.user_id` и `artifact.telegram_chat_id` не обновлены.
 
-**Рекомендация:** В будущем сделать RPC единственным canonical путем claim'а. `claimRentalSecretsByDocSha` должна либо:
-a) Только валидировать и возвращать secret, не апдейтя его (caller вызывает RPC)
-b) Вызывать RPC внутри себя и возвращать результат RPC
+**Fix (2026-07-21, §13.9):** Полностью убрал прямые UPDATE из `claimRentalSecretsByDocSha`. Теперь функция **только валидирует** eligibility (revoked? not found? already claimed by same user? operator overwrite allowed?) и возвращает secret. Все write-операции (chat_id, rentals, artifacts, todos, intents) теперь идут исключительно через `claim_rental_by_qr` RPC, который вызывается из `rental-secrets-claim.ts`.
 
-Текущий риск mitigated тем, что:
-- При повторном вызове RPC видит `chat_id = renter` и корректно пропускает шаг 5 (т.к. `v_secret_chat_id = p_renter_chat_id`)
-- Шаг 6 (UPDATE rentals) идемпотентен
+**Что изменилось:**
+- `claimRentalSecretsByDocSha`: удалены 2 вызова `updateRentalSecretWithQrTracking` (Step 4b overwrite + Step 5 atomic claim)
+- `updateRentalSecretWithQrTracking`: полностью удалена из user-rental-secrets.ts (больше не используется)
+- `rental-secrets-claim.ts`: убран gate `if (result.claimedNow)` — `createRentalFromClaimedSecret` (и RPC внутри) вызывается **всегда**, даже для уже заклеймленных rental'ов (RPC идемпотентен)
+- `claimedNow` теперь вычисляется валидатором: `true` когда `chat_id IS NULL` (pre-claim) или `chat_id = operator` (overwrite allowed)
 
 ---
 
@@ -753,6 +754,30 @@ AND (description::jsonb ->> 'rental_id') = p_rental_id::text
 | `app/franchize/[slug]/leads/components/ContactPanel.tsx` | Fixed — `window.location.reload()` → `router.refresh()` |
 | `app/franchize/[slug]/rentals/RentalsListClient.tsx` | Fixed — `window.location.reload()` → `router.refresh()` |
 | `app/franchize/[slug]/leads/LeadsClient.tsx` | Fixed (previously) — `router.refresh()` + optimistic state |
+| `docs/franchize-identity-flow-audit.md` | This update |
+
+### 13.9 §13.7 #2 fix — validate-only claimRentalSecretsByDocSha (2026-07-21)
+
+**Problem:** `claimRentalSecretsByDocSha` (TS) directly UPDATEd `secret.chat_id` before calling `claim_rental_by_qr` RPC. If the RPC failed, the secret was half-claimed (chat_id set but rentals/artifacts/todos not propagated).
+
+**Fix:**
+- `claimRentalSecretsByDocSha` now **validates only** — no UPDATEs. Returns secret + `claimedNow` flag (true if chat_id was null or operator-preclaimed).
+- Caller `rental-secrets-claim.ts` always calls `createRentalFromClaimedSecret` (→ RPC `claim_rental_by_qr`) regardless of `claimedNow`. RPC is idempotent.
+- `updateRentalSecretWithQrTracking` removed (no longer used anywhere).
+- RPC `claim_rental_by_qr` is now the **sole canonical writer** for claim-side updates (secret.chat_id + rentals.user_id + artifacts.telegram_chat_id + todos.user_id/rental_id + intents.user_id).
+
+**RPC invocation flow:**
+```
+validateOnly(chatId, docSha256) → { secret, claimedNow }  // no DB writes
+createRentalFromClaimedSecret(secret, chatId)               // always called
+  └→ rpc("claim_rental_by_qr", { ... })                     // sole writer
+```
+
+| File | Change |
+|---|---|
+| `app/lib/user-rental-secrets.ts` | `claimRentalSecretsByDocSha` — removed 2× `updateRentalSecretWithQrTracking` UPDATEs; function is now validate-only |
+| `app/lib/user-rental-secrets.ts` | Removed `updateRentalSecretWithQrTracking` function (~65 lines) |
+| `app/franchize/server-actions/rental-secrets-claim.ts` | `createRentalFromClaimedSecret` now called unconditionally (no `claimedNow` gate) |
 | `docs/franchize-identity-flow-audit.md` | This update |
 
 ---
