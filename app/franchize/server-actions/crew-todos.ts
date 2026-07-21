@@ -14,6 +14,22 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/**
+ * Normalize a phone number to canonical E.164-ish form (+7XXXXXXXXXX for RU).
+ * Accepts +7/7/8 prefix, spaces, dashes, parentheses.
+ * Returns null if input is empty or unparseable.
+ */
+function normalizePhone(input: string | null | undefined): string | null {
+  if (!input) return null;
+  let s = input.trim().replace(/[\s\-\(\)]/g, "");
+  if (!s) return null;
+  if (/^8\d{10}$/.test(s)) s = "+7" + s.slice(1);
+  else if (/^7\d{10}$/.test(s)) s = "+" + s;
+  else if (/^\d{10}$/.test(s)) s = "+7" + s;
+  else if (!s.startsWith("+")) s = "+" + s;
+  return s;
+}
+
 // Raw database type with joined fields as arrays (Supabase response format)
 interface CrewTodoDBRow {
   id: string;
@@ -781,9 +797,13 @@ export async function createLeadFollowupTodos(input: {
       return { success: true, created: 0, skipped: todos.length };
     }
 
-    // Determine user_id (Telegram chat_id) from leadId if it's numeric
-    const todoUserId = /^\d{1,9}$/.test(leadId) ? leadId : null;
-    const todoPhone = leadPhone && leadPhone.length > 0 ? leadPhone : null;
+    // Determine user_id (Telegram chat_id) from leadId if it's numeric.
+    // Telegram IDs can be up to 10 digits today (e.g. 7813830016); allow up to 12 for future-proofing.
+    const todoUserId = /^\d{1,12}$/.test(leadId) ? leadId : null;
+    // Normalize phone to canonical E.164 so leads keyed by "+7XXX" and todos keyed by "8XXX"
+    // stop splitting the same person into two identities.
+    const todoPhone = leadPhone && leadPhone.length > 0 ? normalizePhone(leadPhone) : null;
+    const normalizedLeadPhone = todoPhone || "";
 
     const todoPromises = newTodos.map((todo) => {
       const todoId = `todo-${randomUUID()}`;
@@ -792,7 +812,7 @@ export async function createLeadFollowupTodos(input: {
         crew_id: crewId,
         lead_id: leadId,           // keep for backward compat
         user_id: todoUserId,       // Telegram chat_id (canonical)
-        phone: todoPhone,          // phone number (nullable)
+        phone: todoPhone,          // normalized phone (E.164) or null
         rental_id: effectiveRentalId,  // FK to rentals (null for sales)
         title: todo.title,
         status: "pending",
@@ -803,7 +823,7 @@ export async function createLeadFollowupTodos(input: {
           lead_id: leadId,
           user_id: todoUserId,
           phone: todoPhone,
-          lead_phone: leadPhone || "",
+          lead_phone: normalizedLeadPhone,
           lead_name: leadName || "",
           bike_id: bikeId || null,
           ...(metadata || {}),
