@@ -252,15 +252,22 @@ export async function claimRentalSecretsAction(
     return { ok: false, reason: result.reason, error: result.error };
   }
 
-  // If this was a fresh claim, create rental in public.rentals
+  // Always try to create/link the rental via the RPC.
+  // The RPC (claim_rental_by_qr) is idempotent — safe to call for already-claimed
+  // rentals. It atomically updates the secret, rentals, artifacts, todos, intents,
+  // and lead_notes. This also re-propagates for any previously half-claimed rentals
+  // (see §13.7 #2 fix).
+  //
+  // createRentalFromClaimedSecret handles two scenarios:
+  //   A) Rental exists (artifact.rental_id set) → calls RPC for propagation
+  //   B) Rental doesn't exist → creates new rental + links artifact
   let rentalId: string | undefined;
-  if (result.claimedNow) {
-    const createdRentalId = await createRentalFromClaimedSecret(result.secret, chatId);
-    if (createdRentalId) {
-      rentalId = createdRentalId;
-    }
+  const createdRentalId = await createRentalFromClaimedSecret(result.secret, chatId);
+  if (createdRentalId) {
+    rentalId = createdRentalId;
   } else {
-    // Already claimed — try to get existing rental_id from secret
+    // Fallback: try source_rental_id from secret (pre-claim state, should not happen
+    // if RPC succeeded, but keeps backward compat for edge cases)
     rentalId = result.secret.source_rental_id || undefined;
   }
 

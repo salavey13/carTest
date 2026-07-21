@@ -73,72 +73,6 @@ export type ClaimResult =
   | { ok: true; secret: UserRentalSecret; claimedNow: boolean }
   | { ok: false; reason: "already_claimed_by_other" | "revoked" | "not_found" | "error"; error?: string };
 
-// ─── Helper: safe update with optional qr_claimed_at ────────────────────────
-
-/**
- * Attempt an update on user_rental_secrets, including qr_claimed_at column.
- * If the column does not exist in the schema cache (PGRST204), retry without it.
- * This handles the case where the migration 20260625000000_add_qr_status_tracking.sql
- * has not been applied on the production Supabase project.
- *
- * @param updateFields - Fields to update (will have updated_at + optionally qr_claimed_at added)
- * @param eqConditions - Array of { column, value } for .eq() filters
- * @param isNullCondition - Optional { column } for .is(column, null) filter
- */
-async function updateRentalSecretWithQrTracking(
-  updateFields: Record<string, unknown>,
-  eqConditions: { column: string; value: string | number | boolean | null }[],
-  isNullCondition?: { column: string },
-): Promise<{ data: unknown; error: unknown }> {
-  // Build update payload with qr_claimed_at
-  const payloadWithQr = {
-    ...updateFields,
-    qr_claimed_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-
-  let query = privateSchema()
-    .from("user_rental_secrets")
-    .update(payloadWithQr);
-
-  for (const eq of eqConditions) {
-    query = query.eq(eq.column, eq.value);
-  }
-
-  if (isNullCondition) {
-    query = query.is(isNullCondition.column, null);
-  }
-
-  let result = await query.select("*").maybeSingle();
-  const supabaseError = result.error as { code?: string } | null;
-
-  // If column doesn't exist (PGRST204), retry without qr_claimed_at
-  if (supabaseError?.code === "PGRST204") {
-    console.log("[user-rental-secrets] qr_claimed_at column not found, retrying without it. Run migration 20260625000000_add_qr_status_tracking.sql");
-
-    const fallbackPayload = {
-      ...updateFields,
-      updated_at: new Date().toISOString(),
-    };
-
-    let fallbackQuery = privateSchema()
-      .from("user_rental_secrets")
-      .update(fallbackPayload);
-
-    for (const eq of eqConditions) {
-      fallbackQuery = fallbackQuery.eq(eq.column, eq.value);
-    }
-
-    if (isNullCondition) {
-      fallbackQuery = fallbackQuery.is(isNullCondition.column, null);
-    }
-
-    result = await fallbackQuery.select("*").maybeSingle();
-  }
-
-  return { data: result.data, error: result.error };
-}
-
 // ─── Helper: check if chat_id is a crew member ──────────────────────────────
 
 /**
@@ -345,19 +279,27 @@ export async function saveUserRentalSecrets(
 }
 
 /**
- * Claim rental secrets by doc_sha256 — the core of the 1-click next rent flow.
+ * Validate & return a rental secret for the 1-click next rent flow.
  *
  * Called when a renter scans their QR code and opens the Telegram WebApp.
- * Atomically links this secret row to the claiming user's chat_id.
+ * This function DOES NOT update the secret — it only validates eligibility
+ * and returns the secret data. The actual claim (setting chat_id, propagating
+ * to rentals/artifacts/todos/intents) is done by the `claim_rental_by_qr` RPC,
+ * which is called by the caller (rental-secrets-claim.ts).
+ *
+ * This eliminates the partial-failure risk where the TS function updated the
+ * secret but the RPC failed, leaving the system in a half-claimed state.
+ * See §13.7 #2 in the audit.
  *
  * Flow:
- *   1. Look up by doc_sha256 + verification_status='verified'
- *   2. If chat_id IS NULL → claim it (SET chat_id = caller's chatId) → return secret
+ *   1. Look up by doc_sha256
+ *   2. If revoked or not found → return error
  *   3. If chat_id = caller's chatId → already claimed by same user → return secret
  *   4. If chat_id ≠ NULL AND ≠ caller:
  *      a. If current chat_id is a crew member (operator) → ALLOW overwrite (renter claiming)
+ *         → return secret, RPC will overwrite chat_id
  *      b. Otherwise → DENY (another renter already claimed)
- *   5. If not found or revoked → return appropriate error
+ *   5. If chat_id IS NULL → return secret (RPC will claim it atomically)
  */
 export async function claimRentalSecretsByDocSha(
   chatId: string,
@@ -402,7 +344,7 @@ export async function claimRentalSecretsByDocSha(
     // Step 4: chat_id is set to a different user
     if (secret.chat_id !== null) {
       // Step 4a: Check if current chat_id belongs to a crew member (operator)
-      // If yes, allow the renter to claim (overwrite operator's chat_id)
+      // If yes, allow the renter to claim (RPC will overwrite operator's chat_id)
       const currentChatIdIsCrewMember = await isCrewMember(secret.chat_id, secret.crew_slug);
       
       if (!currentChatIdIsCrewMember) {
@@ -412,84 +354,17 @@ export async function claimRentalSecretsByDocSha(
       }
 
       // Step 4b: Current chat_id IS a crew member (operator) — allow renter to claim
-      console.log(`[user-rental-secrets] claimRentalSecretsByDocSha: operator ${secret.chat_id} → renter ${normalizedChatId} (overwrite allowed)`);
-      
-      const { data: claimed, error: claimError } = await updateRentalSecretWithQrTracking(
-        { chat_id: normalizedChatId },
-        [
-          { column: "doc_sha256", value: normalizedDocSha256 },
-          { column: "chat_id", value: secret.chat_id },
-        ],
-      );
-
-      if (claimError) {
-        logUserRentalSecretsError("claimRentalSecretsByDocSha.overwrite", claimError);
-        return { ok: false, reason: "error", error: claimError.message || String(claimError) };
-      }
-
-      if (!claimed) {
-        // Race condition: someone else updated it between our find and update
-        const { data: rechecked } = await privateSchema()
-          .from("user_rental_secrets")
-          .select("chat_id")
-          .eq("doc_sha256", normalizedDocSha256)
-          .limit(1)
-          .maybeSingle();
-
-        if (rechecked?.chat_id === normalizedChatId) {
-          const { data: fullSecret } = await privateSchema()
-            .from("user_rental_secrets")
-            .select("*")
-            .eq("doc_sha256", normalizedDocSha256)
-            .limit(1)
-            .maybeSingle();
-          return { ok: true, secret: fullSecret as UserRentalSecret, claimedNow: false };
-        }
-
-        return { ok: false, reason: "already_claimed_by_other" };
-      }
-
-      return { ok: true, secret: claimed as UserRentalSecret, claimedNow: true };
+      // NOTE: we do NOT update the secret here. The caller (rental-secrets-claim.ts)
+      // will call the claim_rental_by_qr RPC which atomically updates the secret
+      // alongside rentals, artifacts, todos, and intents.
+      console.log(`[user-rental-secrets] claimRentalSecretsByDocSha: operator ${secret.chat_id} → renter ${normalizedChatId} (RPC will overwrite)`);
+      return { ok: true, secret, claimedNow: true };
     }
 
-    // Step 5: chat_id IS NULL — claim it atomically
-    // Use UPDATE ... WHERE chat_id IS NULL to prevent race conditions
-    const { data: claimed, error: claimError } = await updateRentalSecretWithQrTracking(
-      { chat_id: normalizedChatId },
-      [{ column: "doc_sha256", value: normalizedDocSha256 }],
-      { column: "chat_id" },  // IS NULL condition (atomic: only if still unclaimed)
-    );
-
-    if (claimError) {
-      logUserRentalSecretsError("claimRentalSecretsByDocSha.claim", claimError);
-      return { ok: false, reason: "error", error: claimError.message || String(claimError) };
-    }
-
-    // Race condition: another request claimed it between our find and update
-    if (!claimed) {
-      // Re-fetch to determine who claimed it
-      const { data: rechecked } = await privateSchema()
-        .from("user_rental_secrets")
-        .select("chat_id")
-        .eq("doc_sha256", normalizedDocSha256)
-        .limit(1)
-        .maybeSingle();
-
-      if (rechecked?.chat_id === normalizedChatId) {
-        // We actually got it (unlikely timing, but handle gracefully)
-        const { data: fullSecret } = await privateSchema()
-          .from("user_rental_secrets")
-          .select("*")
-          .eq("doc_sha256", normalizedDocSha256)
-          .limit(1)
-          .maybeSingle();
-        return { ok: true, secret: fullSecret as UserRentalSecret, claimedNow: false };
-      }
-
-      return { ok: false, reason: "already_claimed_by_other" };
-    }
-
-    return { ok: true, secret: claimed as UserRentalSecret, claimedNow: true };
+    // Step 5: chat_id IS NULL — return secret for the RPC to claim atomically.
+    // The RPC uses UPDATE ... WHERE chat_id IS NULL to prevent race conditions.
+    console.log(`[user-rental-secrets] claimRentalSecretsByDocSha: unclaimed secret ${normalizedDocSha256.slice(0, 12)} for renter ${normalizedChatId} (RPC will claim)`);
+    return { ok: true, secret, claimedNow: true };
   } catch (error) {
     logUserRentalSecretsError("claimRentalSecretsByDocSha", error);
     return { ok: false, reason: "error", error: error instanceof Error ? error.message : String(error) };
