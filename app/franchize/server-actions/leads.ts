@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { privateSchema } from "@/lib/private-secrets";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from "next/cache";
+import { computeLeadStage, computeQrStatus, computeAssignee, STAGE_NEXT_ACTION, matchTodosToLead } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 
 export interface LeadRentalRow {
@@ -64,6 +65,18 @@ export interface LeadRow {
    *  Lets classifyIdentityState detect an operator-placeholder lead even after the
    *  renter's chat id has replaced the operator in telegram_user_id / user_id. */
   originalOperatorChatId?: string | null;
+  /** Pipeline stage key — derived by computeLeadStage(). */
+  stageKey?: string;
+  /** Assignee — derived from most recent todo's assigned_to. */
+  assigneeId?: string | null;
+  /** Assignee display name. */
+  assigneeName?: string | null;
+  /** Owner display name. */
+  ownerName?: string | null;
+  /** Next action label, derived from stageKey. */
+  nextAction?: string | null;
+  /** QR claim status. */
+  qrStatus?: "unclaimed" | "sent" | "claimed" | "expired";
 }
 
 export interface LeadTodoRow {
@@ -807,6 +820,11 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     // Classify each lead so the UI can show operator placeholders, phone-only leads, etc.
     for (const l of leadMap.values()) {
       l.identityState = classifyIdentityState(l, crewOperatorIds);
+      // Compute pipeline stage, QR status, next action
+      l.stageKey = computeLeadStage(l);
+      l.qrStatus = computeQrStatus(l);
+      l.nextAction = (STAGE_NEXT_ACTION as Record<string, string>)[l.stageKey] || null;
+      l.ownerId = l.originalOperatorChatId || null;
     }
 
     // ── Filter out pure operator-placeholder leads with no activity ──
@@ -927,6 +945,34 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       if (seenTodoId.has(key)) continue;
       seenTodoId.add(key);
       dedupedTodos.push(t);
+    }
+
+    // Compute assignee for each lead from its todos
+    const assigneeIds = new Set<string>();
+    for (const t of dedupedTodos) {
+      if (t.assigned_to) assigneeIds.add(t.assigned_to);
+    }
+    const assigneeIdsList = Array.from(assigneeIds);
+    if (assigneeIdsList.length > 0) {
+      const { data: assigneeUsers } = await supabaseAdmin
+        .from("users")
+        .select("user_id, username, full_name")
+        .in("user_id", assigneeIdsList);
+      const assigneeMap = new Map<string, { username: string | null; full_name: string | null }>();
+      for (const u of assigneeUsers ?? []) {
+        assigneeMap.set(u.user_id, { username: u.username, full_name: u.full_name });
+      }
+      for (const l of leadMap.values()) {
+        l.assigneeId = computeAssignee(l, dedupedTodos);
+        if (l.assigneeId) {
+          const a = assigneeMap.get(l.assigneeId);
+          l.assigneeName = a?.full_name || a?.username || null;
+        }
+        if (l.ownerId) {
+          const o = assigneeMap.get(l.ownerId) || (tgUsers as any[])?.find((u: any) => u.user_id === l.ownerId);
+          l.ownerName = (o as any)?.full_name || (o as any)?.username || null;
+        }
+      }
     }
 
     return {
