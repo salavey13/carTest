@@ -81,7 +81,6 @@ export async function upsertFranchizeLead(input: UpsertFranchizeLeadInput): Prom
       await supabaseAdmin.from("users").upsert(
         {
           user_id: userId,
-          phone: phone,
           full_name: fullName,
           username: username,
           metadata: userMeta,
