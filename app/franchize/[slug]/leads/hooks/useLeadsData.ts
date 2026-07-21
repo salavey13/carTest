@@ -16,25 +16,29 @@ import {
  *  2. phone column (phone-only leads)
  *  3. lead_id column (legacy: Telegram ID, phone, or UUID)
  *  4. description JSON (legacy fallback)
+ *
+ * Note: Telegram user IDs can be up to 10 digits today (e.g. 7813830016).
+ * The previous /^\d{1,9}$/ regex silently rejected 10-digit IDs and broke
+ * matching for most modern users. Allow up to 12 digits for future-proofing.
  */
 function extractTodoLeadId(todo: LeadTodoRow): string | null {
   // 1. user_id column — canonical Telegram chat_id
-  if (todo.user_id && /^\d{1,9}$/.test(todo.user_id)) return todo.user_id;
+  if (todo.user_id && /^\d{1,12}$/.test(todo.user_id)) return todo.user_id;
   // 2. phone column — phone-only leads
   if (todo.phone) return todo.phone;
   // 3. lead_id column — legacy fallback
   if (todo.lead_id) {
-    if (/^\d{1,9}$/.test(todo.lead_id)) return todo.lead_id;
+    if (/^\d{1,12}$/.test(todo.lead_id)) return todo.lead_id;
     if (todo.lead_id.includes('-')) return todo.lead_id;
   }
   // 4. description JSON — legacy fallback
   if (todo.description) {
     try {
       const desc = JSON.parse(todo.description);
-      if (desc.user_id && typeof desc.user_id === 'string' && /^\d{1,9}$/.test(desc.user_id)) return desc.user_id;
+      if (desc.user_id && typeof desc.user_id === 'string' && /^\d{1,12}$/.test(desc.user_id)) return desc.user_id;
       if (desc.phone && typeof desc.phone === 'string') return desc.phone;
       if (desc.lead_id && typeof desc.lead_id === 'string') {
-        if (/^\d{1,9}$/.test(desc.lead_id)) return desc.lead_id;
+        if (/^\d{1,12}$/.test(desc.lead_id)) return desc.lead_id;
         if (desc.lead_id.includes('-')) return desc.lead_id;
       }
     } catch { /* ignore */ }
