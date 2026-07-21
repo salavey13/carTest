@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { activateRental, updateRentalStatus } from "@/app/franchize/server-actions/rentals-dashboard";
 
 interface RentalActionState {
@@ -21,6 +22,8 @@ export function useActivateRental(rental: { rentalId: string; bikeTitle?: string
   const [activating, setActivating] = useState(false);
   const [activationMsg, setActivationMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  const router = useRouter();
+
   const handleActivate = useCallback(async () => {
     const odometer = parseInt(odometerInput, 10);
     if (isNaN(odometer) || odometer < 0 || odometer > 999999) {
@@ -39,7 +42,7 @@ export function useActivateRental(rental: { rentalId: string; bikeTitle?: string
       });
       if (result.success) {
         setActivationMsg({ ok: true, text: result.message || "✅ Аренда активирована! Обновляю..." });
-        setTimeout(() => window.location.reload(), 2000);
+        router.refresh();
       } else {
         setActivationMsg({ ok: false, text: result.error || "Ошибка активации" });
       }
@@ -77,6 +80,8 @@ export function useDeclineRental(rental: { rentalId: string; bikeTitle?: string;
   const [declining, setDeclining] = useState(false);
   const [declineMsg, setDeclineMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  const router = useRouter();
+
   const handleDecline = useCallback(async () => {
     if (!declineMessage.trim()) {
       setDeclineMsg({ ok: false, text: "Укажите причину отклонения" });
@@ -95,7 +100,7 @@ export function useDeclineRental(rental: { rentalId: string; bikeTitle?: string;
       });
       if (result.success) {
         setDeclineMsg({ ok: true, text: result.message || "✅ Аренда отклонена. Обновляю..." });
-        setTimeout(() => window.location.reload(), 2000);
+        router.refresh();
       } else {
         setDeclineMsg({ ok: false, text: result.error || "Ошибка" });
       }
@@ -135,6 +140,8 @@ export function useCompleteRental(rental: { rentalId: string; bikeTitle?: string
   const [completing, setCompleting] = useState(false);
   const [completeMsg, setCompleteMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  const router = useRouter();
+
   const handleComplete = useCallback(async () => {
     const odometer = parseInt(completeOdometer, 10);
     if (isNaN(odometer) || odometer < 0 || odometer > 999999) {
@@ -154,7 +161,7 @@ export function useCompleteRental(rental: { rentalId: string; bikeTitle?: string
       });
       if (result.success) {
         setCompleteMsg({ ok: true, text: result.message || "✅ Аренда завершена. Обновляю..." });
-        setTimeout(() => window.location.reload(), 2000);
+        router.refresh();
       } else {
         setCompleteMsg({ ok: false, text: result.error || "Ошибка" });
       }

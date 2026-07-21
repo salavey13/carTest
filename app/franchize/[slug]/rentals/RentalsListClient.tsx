@@ -138,7 +138,7 @@ export function RentalsListClient({ initialSlug, crew }: RentalsListClientProps)
         <div className="max-w-md rounded-2xl border p-6 text-center" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
           <p className="text-sm" style={{ color: T.text }}>{error}</p>
           <button
-            onClick={() => { setIsLoading(true); setError(null); window.location.reload(); }}
+            onClick={() => { setIsLoading(true); setError(null); router.refresh(); }}
             className="mt-4 rounded-xl px-4 py-2 text-sm font-semibold transition hover:opacity-85"
             style={T.styles.ctaPrimary}
           >
