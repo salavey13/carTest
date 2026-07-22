@@ -14,17 +14,17 @@ export interface DismissLeadInput {
 export async function dismissLeadWithReason(input: DismissLeadInput): Promise<{ success: boolean; error?: string }> {
   const validReasons = DISMISS_REASONS.map((r) => r.value);
   if (!validReasons.includes(input.reason)) return { success: false, error: "Invalid dismiss reason" };
-  if (input.reason === "other" && !input.note?.trim()) return { success: false, error: "Note is required for 'other' reason" };
+  const reasonDef = DISMISS_REASONS.find((r) => r.value === input.reason);
+  if (reasonDef?.requiresNote && !input.note?.trim()) return { success: false, error: `Note is required for '${reasonDef.label}'` };
 
   try {
-    const { data: intent, error: fetchError } = await supabaseAdmin
-      .from("franchize_intents")
-      .select("id, metadata")
-      .eq("slug", input.slug)
-      .or(`telegram_user_id.eq.${input.leadId},phone.eq.${input.leadId}`)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Use two separate queries to avoid PostgREST filter injection
+    const [{ data: byTg, error: tgErr }, { data: byPhone, error: phoneErr }] = await Promise.all([
+      supabaseAdmin.from("franchize_intents").select("id, metadata").eq("slug", input.slug).eq("telegram_user_id", input.leadId).order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+      supabaseAdmin.from("franchize_intents").select("id, metadata").eq("slug", input.slug).eq("phone", input.leadId).order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    const fetchError = tgErr || phoneErr;
+    const intent = byTg || byPhone;
 
     if (fetchError || !intent) return { success: false, error: "Lead not found" };
 
@@ -44,7 +44,8 @@ export async function dismissLeadWithReason(input: DismissLeadInput): Promise<{ 
 
     if (updateError) {
       logger.error("[dismissLeadWithReason] update failed:", updateError);
-      return { success: false, error: updateError.message };
+      logger.error("[dismissLeadWithReason] update failed:", updateError);
+    return { success: false, error: "Failed to dismiss lead" };
     }
     return { success: true };
   } catch (err) {
