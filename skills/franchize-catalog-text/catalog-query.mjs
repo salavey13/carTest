@@ -39,7 +39,7 @@ const CREW_ID = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
 // `bike` → motorcycles / electric dirt bikes / mopeds that go in the bike list.
 // `scooter` → stand-up scooters / e-scooters.
 // Pass `all` to disable the type filter entirely.
-const KNOWN_TYPES = new Set(["bike", "scooter", "car", "all"]);
+const KNOWN_TYPES = new Set(["bike", "scooter", "car", "service", "wb_item", "all"]);
 
 // Rental statuses that block a bike on a given day.
 // `pending_confirmation` is intentionally excluded — the rental hasn't been
