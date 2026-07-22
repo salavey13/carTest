@@ -24,7 +24,12 @@ import {
   type Segment,
   type ViewMode,
   type SortMode,
+  type FilterFlags,
+  type SortModeV2,
+  type LeadSignal,
 } from "./leads-constants";
+import { computeLeadSignals } from "./lib/sla-signals";
+import { STAGE_LABELS } from "./lib/pipeline-stages";
 import { relativeTime } from "./leads-utils";
 
 // Import hooks
@@ -67,6 +72,18 @@ export function LeadsClient({
   const [segment, setSegment] = useState<Segment>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [hidePlaceholders, setHidePlaceholders] = useState(true); // Hide operator placeholders by default
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [ownerFilter, setOwnerFilter] = useState<string>("all");
+  const [stageFilter, setStageFilter] = useState<string>("all");
+  const [filterFlags, setFilterFlags] = useState<FilterFlags>({
+    overdueOnly: false,
+    unclaimedQrOnly: false,
+    documentsMissingOnly: false,
+    activeRentalOnly: false,
+    returnDueOnly: false,
+    dismissedOnly: false,
+    hideOperatorPlaceholders: true,
+  });
 
   const router = useRouter();
   const { dbUser } = useAppContext();
@@ -103,6 +120,15 @@ export function LeadsClient({
   // Todo mapping — use writable state so TodoList callbacks sync the parent array
   const [todosState, setTodosState] = useState(todos);
   const { getTodosForLead } = useTodosMapping(todosState);
+
+  /** Compute SLA signals for a lead — needed by v2 LeadCard/LeadList/LeadBoard */
+  const getLeadSignals = useCallback((lead: LeadRow): LeadSignal[] => {
+    try {
+      return computeLeadSignals(lead, todosState);
+    } catch {
+      return [];
+    }
+  }, [todosState]);
 
   /** Called by TodoList after toggle/add/delete — keeps todosState in sync */
   const handleTodoUpdate = useCallback((action: 'toggle' | 'delete' | 'add', todoId: string, todo?: LeadTodoRow) => {
@@ -259,24 +285,31 @@ export function LeadsClient({
       <LeadsKPICards kpis={kpis} T={T} />
 
       <LeadsToolbar
-        searchQuery={searchQuery} setSearchQuery={setSearchQuery}
-        sortMode={sortMode} setSortMode={setSortMode}
-        filterSource={filterSource} setFilterSource={setFilterSource}
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        sortValue={(sortMode as string) as SortModeV2}
+        onSortChange={(v: SortModeV2) => setSortMode(v as SortMode)}
+        sourceValue={sourceFilter}
+        onSourceChange={setSourceFilter}
         availableSources={availableSources}
-        segment={segment} setSegment={setSegment}
-        viewMode={viewMode} setViewMode={setViewMode}
-        segmentCounts={segmentCounts}
-        hidePlaceholders={hidePlaceholders} setHidePlaceholders={setHidePlaceholders}
-        T={T} isAuto={isAuto}
+        ownerValue={ownerFilter}
+        onOwnerChange={setOwnerFilter}
+        stageValue={stageFilter}
+        onStageChange={setStageFilter}
+        filterFlags={filterFlags}
+        onFilterFlagsChange={(f: Partial<FilterFlags>) => setFilterFlags((prev) => ({ ...prev, ...f }))}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onExport={() => {}}
+        T={T}
       />
 
       {viewMode === "board" ? (
         <LeadBoard
-          leads={sortedLeads}
-          selectedId={selectedId}
-          onSelect={(id) => setSelectedId(id)}
-          onDismiss={handleDismissLead}
-          getTodosForLead={getTodosForLead}
+          leadsByStage={boardColumns as Record<string, LeadRow[]>}
+          selectedLeadId={selectedId}
+          onSelectLead={(lead: LeadRow) => setSelectedId(lead.user_id)}
+          getLeadSignals={getLeadSignals}
           T={T}
         />
       ) : sortedLeads.length === 0 ? (
@@ -287,10 +320,11 @@ export function LeadsClient({
           <div className={`space-y-3 transition-all duration-200 ${selectedId ? "lg:col-span-5" : "lg:col-span-12"}`}>
             <LeadList
               leads={sortedLeads}
-              selectedId={selectedId}
-              setSelectedId={setSelectedId}
-              onDismiss={handleDismissLead}
+              selectedLeadId={selectedId}
+              onSelectLead={(lead: LeadRow) => setSelectedId(lead.user_id)}
+              onDismissLead={handleDismissLead}
               getTodosForLead={getTodosForLead}
+              getLeadSignals={getLeadSignals}
               T={T}
               crewId={crewId}
               slug={slug}
@@ -352,7 +386,18 @@ export function LeadsClient({
                         <X className="h-5 w-5" />
                       </button>
                     </div>
-                    <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} onTodoUpdate={handleTodoUpdate} />
+                    <LeadDetailContent
+                    lead={selectedLead}
+                    todos={getTodosForLead(selectedLead)}
+                    notes={[]}
+                    T={T}
+                    onClose={() => setSelectedId(null)}
+                    onAction={() => {}}
+                    onCreateTodo={() => {}}
+                    onToggleTodo={(id: string) => handleTodoUpdate('toggle', id)}
+                    onDeleteTodo={(id: string) => handleTodoUpdate('delete', id)}
+                    onAddNote={() => {}}
+                  />
                   </motion.div>
                 );
               })()}
@@ -367,7 +412,18 @@ export function LeadsClient({
         if (!selectedLead) return null;
         return (
           <MobileLeadSheet open={true} onClose={() => setSelectedId(null)} title={selectedLead.full_name || selectedLead.phone || undefined} T={T}>
-            <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} onTodoUpdate={handleTodoUpdate} />
+            <LeadDetailContent
+                    lead={selectedLead}
+                    todos={getTodosForLead(selectedLead)}
+                    notes={[]}
+                    T={T}
+                    onClose={() => setSelectedId(null)}
+                    onAction={() => {}}
+                    onCreateTodo={() => {}}
+                    onToggleTodo={(id: string) => handleTodoUpdate('toggle', id)}
+                    onDeleteTodo={(id: string) => handleTodoUpdate('delete', id)}
+                    onAddNote={() => {}}
+                  />
           </MobileLeadSheet>
         );
       })()}
