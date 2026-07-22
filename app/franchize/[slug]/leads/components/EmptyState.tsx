@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Users, Filter, Search, Inbox } from "lucide-react";
+import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
 
 interface EmptyStateProps {
   hasFilters: boolean;
@@ -9,11 +10,21 @@ interface EmptyStateProps {
   /** Called when the user clicks "Сбросить фильтры". Should clear ALL filters
    *  (search + source + owner + stage + segment + flags), not just search. */
   onReset?: () => void;
-  T: any;
+  T: ThemeTokens;
 }
 
+/**
+ * Friendly empty state — never looks like an error.
+ *
+ * - Animated icon circle (subtle scale pulse).
+ * - Friendly copy: different messages for "no results with filters" vs
+ *   "no leads yet at all".
+ * - "Сбросить фильтры" reset button (only when filters are active).
+ * - Source chips (Telegram / Avito / Сайт) when no leads exist — so the
+ *   operator sees where leads will come from.
+ */
 export function EmptyState({ hasFilters, searchQuery, onReset, T }: EmptyStateProps) {
-  const showSearchTip = hasFilters && searchQuery && searchQuery.length > 0;
+  const showSearchTip = hasFilters && !!searchQuery && searchQuery.length > 0;
   const showFilterTip = hasFilters && !showSearchTip;
 
   return (
@@ -21,12 +32,16 @@ export function EmptyState({ hasFilters, searchQuery, onReset, T }: EmptyStatePr
       initial={{ opacity: 0, y: 20, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", damping: 22, stiffness: 240 }}
-      className="flex flex-col items-center rounded-3xl border p-12 text-center"
-      style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: T.shadow }}
+      className="flex flex-col items-center rounded-3xl border p-8 text-center sm:p-12"
+      style={{
+        borderColor: T.border,
+        backgroundColor: T.bgCard,
+        boxShadow: T.shadow,
+      }}
     >
       {/* Animated icon circle */}
       <motion.div
-        className="relative mb-6 flex h-24 w-24 items-center justify-center rounded-full"
+        className="relative mb-6 flex h-20 w-20 items-center justify-center rounded-full sm:h-24 sm:w-24"
         style={{ backgroundColor: T.borderSoft }}
         animate={{
           scale: [1, 1.04, 1],
@@ -36,6 +51,7 @@ export function EmptyState({ hasFilters, searchQuery, onReset, T }: EmptyStatePr
           scale: { duration: 3, repeat: Infinity, ease: "easeInOut" },
           rotate: { duration: 0.5 },
         }}
+        aria-hidden
       >
         {/* Ring glow */}
         <motion.div
@@ -49,15 +65,15 @@ export function EmptyState({ hasFilters, searchQuery, onReset, T }: EmptyStatePr
         />
 
         {hasFilters ? (
-          <Search className="h-10 w-10" style={{ color: T.textFaint }} />
+          <Search className="h-9 w-9 sm:h-10 sm:w-10" style={{ color: T.textFaint }} />
         ) : (
-          <Users className="h-10 w-10" style={{ color: T.textFaint }} />
+          <Users className="h-9 w-9 sm:h-10 sm:w-10" style={{ color: T.textFaint }} />
         )}
       </motion.div>
 
       {/* Title */}
       <motion.p
-        className="text-lg font-bold"
+        className="text-base font-bold sm:text-lg"
         style={{ color: T.text }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -96,25 +112,44 @@ export function EmptyState({ hasFilters, searchQuery, onReset, T }: EmptyStatePr
           <button
             type="button"
             onClick={onReset}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition hover:opacity-80"
-            style={{ backgroundColor: T.borderSoft, color: T.textMuted }}
+            className="inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition"
+            style={{
+              borderColor: T.borderActive,
+              backgroundColor: `${T.accent}14`,
+              color: T.accent,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = `${T.accent}1f`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = `${T.accent}14`;
+            }}
           >
-            <Filter className="h-3 w-3" />
+            <Filter className="h-3 w-3" aria-hidden />
             Сбросить фильтры
           </button>
         )}
         {!hasFilters && (
           <>
-            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium" style={{ backgroundColor: T.borderSoft, color: T.textMuted }}>
-              <Inbox className="h-3 w-3" />
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium"
+              style={{ backgroundColor: T.borderSoft, color: T.textMuted }}
+            >
+              <Inbox className="h-3 w-3" aria-hidden />
               Telegram
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium" style={{ backgroundColor: T.borderSoft, color: T.textMuted }}>
-              <Users className="h-3 w-3" />
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium"
+              style={{ backgroundColor: T.borderSoft, color: T.textMuted }}
+            >
+              <Users className="h-3 w-3" aria-hidden />
               Avito
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium" style={{ backgroundColor: T.borderSoft, color: T.textMuted }}>
-              <Search className="h-3 w-3" />
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium"
+              style={{ backgroundColor: T.borderSoft, color: T.textMuted }}
+            >
+              <Search className="h-3 w-3" aria-hidden />
               Сайт
             </span>
           </>
