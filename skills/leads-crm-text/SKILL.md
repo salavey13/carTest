@@ -530,6 +530,24 @@ node leads-query.mjs list-leads --search "BMW F800R" --limit 10
 node leads-query.mjs list-todos --overdue --mine 413553377 --limit 30
 ```
 
+## Service Mode — Production Reality (2026-07-22)
+
+**Production status:** `franchize_intents` has 0 rows with `intent_type='service'` — verified via REST API. The schema constraint `franchize_intents_intent_type_allowed` does NOT include `'service'`.
+
+Service capability is currently expressed via **catalog items** in `cars` table (`type='service'`, IDs `vip-bike-svc-001`…`vip-bike-svc-010` — Нормо-час, Замена масла, etc.). Operators can create rental rows that reference these service items via `vehicle_id='vip-bike-svc-*'` to bill service work, but this does NOT go through `franchize_intents`.
+
+To enable service leads in the pipeline, apply this migration:
+```sql
+ALTER TABLE public.franchize_intents DROP CONSTRAINT IF EXISTS franchize_intents_intent_type_allowed;
+ALTER TABLE public.franchize_intents ADD CONSTRAINT franchize_intents_intent_type_allowed CHECK (
+  intent_type = ANY (ARRAY[
+    'checkout_start', 'payment_failure', 'payment_success', 'hold_created',
+    'map_click', 'contact_click', 'test_ride_click', 'test_ride',
+    'prebuy', 'trade_in', 'finance', 'rent', 'sale', 'service'
+  ])
+);
+```
+
 ## Error Handling
 
 | Stage                       | Reason                                          | Когда возникает                                                                | Exit | Что делать                                                                  |
