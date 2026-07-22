@@ -61,7 +61,7 @@ export function LeadBoard({
       </div>
 
       <div
-        className="flex gap-3 overflow-x-auto pb-2 lg:grid lg:grid-cols-9 lg:overflow-visible"
+        className="flex gap-3 overflow-x-auto pb-2 lg:grid lg:flex gap-3 overflow-x-auto pb-4 lg:overflow-visible"
         style={{ scrollbarWidth: "thin" }}
       >
         {PIPELINE_STAGES.map((stage) => (
@@ -228,7 +228,7 @@ function BoardCard({
         >
           {initials}
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[280px] flex-shrink-0 snap-start">
           <div className="flex items-center gap-1.5">
             <p
               className="truncate text-xs font-semibold"
