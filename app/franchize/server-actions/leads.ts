@@ -488,9 +488,14 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
         const isOperatorFromCrew = isOperatorPlaceholder(a.telegram_chat_id);
         const preferPhone =
           (isPreClaimByOperatorColumn || isOperatorFromCrew) && !!normalizedArtifactPhone;
+        // When operator placeholder + no phone, use renter_full_name as fallback
+        // identity key so the lead doesn't disappear under the operator's ID.
+        const fallbackName = (!preferPhone && !normalizedArtifactPhone && a.renter_full_name)
+          ? `name:${a.renter_full_name}`
+          : null;
         const id = preferPhone
           ? normalizedArtifactPhone!
-          : (a.telegram_chat_id || normalizedArtifactPhone || "");
+          : (fallbackName || a.telegram_chat_id || normalizedArtifactPhone || "");
         if (!id) continue;
         // Resolve bike title from the pre-fetched cars map.
         const bikeId = a.resolved_bike_id || a.requested_bike_id;
