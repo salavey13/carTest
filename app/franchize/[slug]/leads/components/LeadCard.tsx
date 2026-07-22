@@ -67,8 +67,8 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
       onClick={onSelect}
       className="relative cursor-pointer overflow-hidden rounded-[24px] p-5 pl-6"
       style={{
-        background: "linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.025))",
-        border: `1px solid ${selected ? stageColor : "rgba(255,255,255,0.08)"}`,
+        background: "T.bgCard",
+        border: `1px solid ${selected ? stageColor : "T.border"}`,
         boxShadow: selected
           ? `0 0 0 2px ${stageColor}40, 0 18px 50px rgba(0,0,0,0.35)`
           : "0 18px 50px rgba(0,0,0,0.35)",
@@ -154,8 +154,8 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
             <div
               className="rounded-2xl border p-3 text-sm"
               style={{
-                borderColor: "rgba(255,255,255,0.08)",
-                background: "rgba(0,0,0,0.2)",
+                borderColor: "T.border",
+                background: T.bgElevated,
                 color: T.textMuted,
               }}
             >
@@ -203,7 +203,7 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
             }}
             className="rounded-lg p-1.5 transition"
             style={{ color: T.textFaint }}
-            aria-label="Действия"
+            aria-label="Закрыть лид"
             onMouseEnter={(e) => {
               e.currentTarget.style.background = "rgba(239,68,68,0.1)";
               e.currentTarget.style.color = "#ef4444";
