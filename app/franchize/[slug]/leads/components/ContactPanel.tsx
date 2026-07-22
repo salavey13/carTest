@@ -11,10 +11,11 @@ import { ActionBtn } from "./ActionBtn";
 import { InfoTile } from "./InfoTile";
 import { metaFor, fmtMoney, formatDate } from "../leads-utils";
 import { STAGE_LABELS } from "../leads-constants";
+import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
 
 interface ContactPanelProps {
   lead: any;
-  T: any;
+  T: ThemeTokens;
   todos?: any[];
 }
 
@@ -83,16 +84,18 @@ export function ContactPanel({ lead, T, todos }: ContactPanelProps) {
         {lead.username && <ActionBtn href={`https://t.me/${lead.username}`} icon={Send} label="Telegram" T={T} external />}
         {lead.telegramChatId && (
           <button onClick={() => setShowTgInput(!showTgInput)}
-            className="group flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-[11px] font-medium transition hover:brightness-110"
+            aria-pressed={showTgInput}
+            className="group flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-[11px] font-medium transition hover:brightness-110"
             style={{ borderColor: T.border, backgroundColor: showTgInput ? `${T.accent}18` : T.bgElevated, color: showTgInput ? T.accent : T.text }}>
-            <Send className="h-3.5 w-3.5 transition group-hover:scale-110" style={{ color: T.accent }} />
+            <Send className="h-3.5 w-3.5 transition group-hover:scale-110" style={{ color: T.accent }} aria-hidden />
             {showTgInput ? "Закрыть" : "Уведомить"}
           </button>
         )}
         <button onClick={() => lead.troubled ? handleToggleTroubled(lead.user_id, "") : setShowTroubledInput(!showTroubledInput)}
-          className="group flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-[11px] font-medium transition hover:brightness-110"
+          aria-pressed={lead.troubled}
+          className="group flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-[11px] font-medium transition hover:brightness-110"
           style={{ borderColor: lead.troubled ? "#dc262640" : T.border, backgroundColor: lead.troubled ? "#dc262618" : T.bgElevated, color: lead.troubled ? "#dc2626" : T.text }}>
-          <AlertCircle className="h-3.5 w-3.5 transition group-hover:scale-110" style={{ color: lead.troubled ? "#dc2626" : T.accent }} />
+          <AlertCircle className="h-3.5 w-3.5 transition group-hover:scale-110" style={{ color: lead.troubled ? "#dc2626" : T.accent }} aria-hidden />
           {lead.troubled ? "Снять отметку" : "Отметить"}
         </button>
       </div>
@@ -100,16 +103,17 @@ export function ContactPanel({ lead, T, todos }: ContactPanelProps) {
       {showTroubledInput && !lead.troubled && (
         <div className="space-y-2 rounded-xl border p-3" style={{ borderColor: "#dc262640", backgroundColor: "#dc262608" }}>
           <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: "#dc2626" }}>
-            <AlertCircle className="h-3.5 w-3.5" /> Причина отметки
+            <AlertCircle className="h-3.5 w-3.5" aria-hidden /> Причина отметки
           </div>
           <div className="flex gap-2">
             <input value={troubledReasonInput} onChange={(e) => setTroubledReasonInput(e.target.value)}
               placeholder="Повредил байк / не оплатил …"
-              className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs outline-none"
+              aria-label="Причина отметки"
+              className="min-h-[44px] min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs outline-none"
               style={{ borderColor: "#dc262640", backgroundColor: T.inputBg, color: T.text }}
               onKeyDown={(e) => { if (e.key === "Enter") handleToggleTroubled(lead.user_id, troubledReasonInput.trim()); }} />
             <button onClick={() => handleToggleTroubled(lead.user_id, troubledReasonInput.trim())} disabled={troubledUpdating}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40" style={{ backgroundColor: "#dc2626" }}>
+              className="flex min-h-[44px] cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold disabled:cursor-not-allowed disabled:opacity-40" style={{ background: "#dc2626", color: "#ffffff" }}>
               {troubledUpdating ? "…" : "OK"}
             </button>
           </div>
@@ -119,23 +123,24 @@ export function ContactPanel({ lead, T, todos }: ContactPanelProps) {
       {showTgInput && lead.telegramChatId && (
         <div className="space-y-2 rounded-xl border p-3" style={{ borderColor: T.inputBorder, backgroundColor: T.bgElevated }}>
           <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: T.accent }}>
-            <Send className="h-3.5 w-3.5" /> Уведомление в Telegram
+            <Send className="h-3.5 w-3.5" aria-hidden /> Уведомление в Telegram
           </div>
           <div className="relative">
             <textarea value={tgMessage} onChange={(e) => setTgMessage(e.target.value)}
               placeholder="Текст уведомления..." rows={3}
+              aria-label="Текст уведомления"
               className="w-full resize-none rounded-lg border px-3 py-2 pr-8 text-xs outline-none"
               style={{ borderColor: T.inputBorder, backgroundColor: T.inputBg, color: T.text }} />
             {todos && todos.filter((t) => t.status !== "done").length > 0 && (
-              <button onClick={addTodosToMessage} title="Добавить задачи в текст"
-                className="absolute right-2 top-2 rounded p-1 transition hover:opacity-80" style={{ color: T.accent }}>
+              <button onClick={addTodosToMessage} title="Добавить задачи в текст" aria-label="Добавить задачи в текст"
+                className="absolute right-2 top-2 cursor-pointer rounded p-1 transition hover:opacity-80" style={{ color: T.accent }}>
                 <StickyNote className="h-4 w-4" />
               </button>
             )}
           </div>
           <button onClick={handleTgSend} disabled={sending || !tgMessage.trim()}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40" style={{ backgroundColor: T.accent }}>
-            {sending ? "…" : sent ? "✅" : <><Send className="h-3 w-3" /> Отправить</>}
+            className="flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold disabled:cursor-not-allowed disabled:opacity-40" style={{ background: T.accent, color: T.accentContrast }}>
+            {sending ? "…" : sent ? "✅" : <><Send className="h-3 w-3" aria-hidden /> Отправить</>}
           </button>
         </div>
       )}
@@ -153,8 +158,8 @@ export function ContactPanel({ lead, T, todos }: ContactPanelProps) {
         {(lead.totalSpent || 0) > 0 && <InfoTile label="Выручка" value={fmtMoney(lead.totalSpent)} T={T} />}
         {lead.lastRentalDate && <InfoTile label="Последняя аренда" value={formatDate(lead.lastRentalDate)} T={T} />}
         {lead.troubled && (
-          <div className="col-span-full flex items-center gap-2 rounded-lg border p-2.5" style={{ borderColor: "#dc262640", backgroundColor: "#dc262608" }}>
-            <AlertCircle className="h-4 w-4 shrink-0" style={{ color: "#dc2626" }} />
+          <div className="col-span-full flex min-h-[44px] items-center gap-2 rounded-lg border p-2.5" style={{ borderColor: "#dc262640", backgroundColor: "#dc262608" }}>
+            <AlertCircle className="h-4 w-4 shrink-0" style={{ color: "#dc2626" }} aria-hidden />
             <div className="min-w-0 text-xs">
               <span className="font-semibold" style={{ color: "#dc2626" }}>Проблемный клиент</span>
               {lead.troubledReason && <span className="ml-2" style={{ color: T.textMuted }}>— {lead.troubledReason}</span>}
