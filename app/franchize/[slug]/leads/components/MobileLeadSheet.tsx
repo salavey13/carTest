@@ -1,28 +1,30 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, type ReactNode } from "react";
+import { motion, AnimatePresence, type PanInfo } from "framer-motion";
 import { X } from "lucide-react";
+import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
 
-interface MobileLeadSheetProps {
+interface Props {
   open: boolean;
   onClose: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
   title?: string;
-  T: any;
+  T: ThemeTokens;
 }
 
-const SHEET_HEIGHT = 0.88; // 88% of viewport
+const SHEET_HEIGHT_VH = 0.92; // 92% of viewport — leaves room for status bar
+const DRAG_DISMISS_THRESHOLD = 120; // px — drag past this to dismiss
 
 const sheetVariants = {
   hidden: { y: "100%" },
   visible: {
     y: 0,
-    transition: { type: "spring", damping: 28, stiffness: 300, mass: 0.8 },
+    transition: { type: "spring" as const, damping: 30, stiffness: 320, mass: 0.8 },
   },
   exit: {
     y: "100%",
-    transition: { type: "spring", damping: 28, stiffness: 400, mass: 0.8 },
+    transition: { type: "spring" as const, damping: 32, stiffness: 380, mass: 0.8 },
   },
 };
 
@@ -32,7 +34,16 @@ const backdropVariants = {
   exit: { opacity: 0, transition: { duration: 0.15 } },
 };
 
-export function MobileLeadSheet({ open, onClose, children, title, T }: MobileLeadSheetProps) {
+/**
+ * Bottom sheet that slides up on mobile (hidden on lg+).
+ *
+ * - Drag handle at the top — drag down past 120px to dismiss
+ * - Backdrop click also dismisses
+ * - Escape key dismisses
+ * - Safe-area padding bottom (80px reserved for home indicator + nav bar)
+ * - Sheet body scrolls independently of the drag gesture
+ */
+export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
   // Close on Escape
   useEffect(() => {
     if (!open) return;
@@ -40,8 +51,18 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: MobileLea
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    // Lock body scroll while sheet is open
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handler);
+      document.body.style.overflow = prev;
+    };
   }, [open, onClose]);
+
+  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    if (info.offset.y > DRAG_DISMISS_THRESHOLD) onClose();
+  };
 
   return (
     <AnimatePresence>
@@ -49,9 +70,9 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: MobileLea
         <div className="fixed inset-0 z-50 flex items-end lg:hidden">
           {/* Backdrop */}
           <motion.div
-            key="sheet-backdrop"
+            key="mobile-sheet-backdrop"
             className="absolute inset-0"
-            style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+            style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)" }}
             variants={backdropVariants}
             initial="hidden"
             animate="visible"
@@ -59,46 +80,53 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: MobileLea
             onClick={onClose}
           />
 
-          {/* Sheet — drag="y" on the outer shell, content scrolls independently */}
+          {/* Sheet — drag handle on the outer shell; content scrolls independently */}
           <motion.div
-            key="lead-sheet"
-            className="relative w-full rounded-t-3xl border-t shadow-2xl flex flex-col"
+            key="mobile-lead-sheet"
+            className="relative flex w-full flex-col rounded-t-[28px] border-t shadow-2xl"
             style={{
-              maxHeight: `${SHEET_HEIGHT * 100}vh`,
-              backgroundColor: T.bgCard,
-              borderColor: T.border,
+              maxHeight: `${SHEET_HEIGHT_VH * 100}vh`,
+              background: "linear-gradient(180deg, #111113 0%, #09090b 100%)",
+              borderColor: "rgba(255,255,255,0.08)",
+              boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
             }}
             variants={sheetVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
             drag="y"
-            dragConstraints={{ top: 0, bottom: 80 }}
-            dragElastic={{ top: 0, bottom: 0.3 }}
-            onDragEnd={(_event, info) => {
-              if (info.offset.y > 80) onClose();
-            }}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.4 }}
+            dragMomentum={false}
+            onDragEnd={handleDragEnd}
           >
-            {/* Drag handle header — sticky, clickable X */}
+            {/* Drag handle header — sticky, with title + close button */}
             <div
-              className="sticky top-0 z-10 shrink-0 flex items-center justify-between pt-3 pb-2 px-4"
-              style={{ backgroundColor: T.bgCard }}
+              className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-3"
+              style={{
+                background: "linear-gradient(180deg, #111113 60%, transparent)",
+                cursor: "grab",
+              }}
             >
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex min-w-0 items-center gap-3">
                 <motion.div
-                  className="h-1.5 w-10 rounded-full shrink-0"
-                  style={{ backgroundColor: T.borderSoft }}
+                  className="h-1.5 w-10 shrink-0 rounded-full"
+                  style={{ background: "rgba(255,255,255,0.18)" }}
                   whileTap={{ scale: 0.85 }}
                 />
                 {title && (
-                  <p className="truncate text-xs font-semibold leading-tight" style={{ color: T.textMuted }}>
+                  <p
+                    className="truncate text-xs font-semibold leading-tight"
+                    style={{ color: T.textMuted }}
+                  >
                     {title}
                   </p>
                 )}
               </div>
               <button
+                type="button"
                 onClick={onClose}
-                className="rounded-xl p-2 transition hover:bg-black/10 shrink-0"
+                className="shrink-0 rounded-xl p-2 transition hover:bg-white/5"
                 style={{ color: T.textFaint }}
                 aria-label="Закрыть"
               >
@@ -110,14 +138,14 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: MobileLea
             <div
               className="overflow-y-auto px-4"
               style={{
-                maxHeight: `calc(${SHEET_HEIGHT * 100}vh - 48px)`,
+                maxHeight: `calc(${SHEET_HEIGHT_VH * 100}vh - 56px)`,
                 WebkitOverflowScrolling: "touch",
                 overscrollBehavior: "contain",
+                // Reserve 80px at bottom for safe-area + mobile nav
+                paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
               }}
             >
-              <div className="pb-[calc(env(safe-area-inset-bottom,_16px)+16px)]">
-                {children}
-              </div>
+              {children}
             </div>
           </motion.div>
         </div>
