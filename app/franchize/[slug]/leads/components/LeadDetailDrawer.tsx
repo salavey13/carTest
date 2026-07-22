@@ -202,10 +202,13 @@ export function LeadDetailDrawer(props: Props) {
           exit={{ x: "100%" }}
           transition={{ type: "spring", damping: 30, stiffness: 280 }}
           onClick={(e) => e.stopPropagation()}
-          className="flex h-full w-full max-w-[640px] flex-col"
+          // `relative` so the absolutely-positioned sticky footer (bottom-0)
+          // anchors to this aside (max-w-[640px]) and not the full-viewport
+          // backdrop. Previously the footer spanned the entire viewport width.
+          className="relative flex h-full w-full max-w-[640px] flex-col"
           style={{
             background: T.bg,
-            borderLeft: "1px solid T.border",
+            borderLeft: `1px solid ${T.border}`,
             boxShadow: "0 0 60px rgba(0,0,0,0.6)",
           }}
         >
@@ -326,7 +329,7 @@ export function LeadDetailDrawer(props: Props) {
                       key={r.rentalId}
                       className="flex items-center justify-between rounded-2xl border p-3"
                       style={{
-                        borderColor: "T.border",
+                        borderColor: T.border,
                         background: "rgba(255,255,255,0.03)",
                       }}
                     >
@@ -453,7 +456,7 @@ export function LeadDetailDrawer(props: Props) {
                           style={{
                             borderColor: isOverdue
                               ? "#ef444433"
-                              : "T.border",
+                              : T.border,
                             background: isOverdue
                               ? "#ef44440d"
                               : "rgba(255,255,255,0.03)",
@@ -566,7 +569,7 @@ export function LeadDetailDrawer(props: Props) {
                         key={n.id}
                         className="rounded-2xl border p-3"
                         style={{
-                          borderColor: "T.border",
+                          borderColor: T.border,
                           background: "rgba(255,255,255,0.03)",
                         }}
                       >
@@ -603,7 +606,7 @@ export function LeadDetailDrawer(props: Props) {
           <div
             className="absolute bottom-0 left-0 right-0 flex items-center gap-3 border-t p-4"
             style={{
-              borderColor: "T.border",
+              borderColor: T.border,
               background: T.bg,
               backdropFilter: "blur(12px)",
             }}
