@@ -16,6 +16,7 @@ interface Props {
   T: ThemeTokens;
 }
 
+// Semantic tone colors — fixed hexes for severity indicators.
 const TONE_COLORS: Record<NonNullable<InfoTile["tone"]>, string> = {
   accent: "#facc15",
   warning: "#f59e0b",
@@ -25,8 +26,16 @@ const TONE_COLORS: Record<NonNullable<InfoTile["tone"]>, string> = {
 };
 
 /**
- * 2-column grid of info tiles.
- * Each tile: uppercase label + large value. Copyable fields show a copy icon.
+ * Responsive grid of info tiles.
+ *
+ * Mobile: 1 column. Desktop (sm+): 2 columns.
+ *
+ * Each tile:
+ *   - Uppercase, tiny, muted label (text-[10px] tracking-wider).
+ *   - Medium-weight value (not bold) — bold would compete with section headers.
+ *   - Consistent height thanks to `h-full` + flex column layout.
+ *   - Copyable fields show a subtle Copy icon that becomes visible on hover
+ *     (or tap on mobile). Turns into a green Check for 1.5s after copy.
  */
 export function LeadInfoGrid({ items, T }: Props) {
   return (
@@ -55,8 +64,10 @@ function Tile({ item, T }: { item: InfoTile; T: ThemeTokens }) {
   };
 
   return (
-    <div className="glass-panel rounded-2xl p-4">
-      <div className="flex items-center justify-between">
+    <div
+      className="glass-panel flex h-full min-h-[64px] flex-col justify-between rounded-2xl p-3 sm:p-4"
+    >
+      <div className="flex items-center justify-between gap-2">
         <div
           className="text-[10px] font-semibold uppercase tracking-wider"
           style={{ color: T.textFaint }}
@@ -67,19 +78,26 @@ function Tile({ item, T }: { item: InfoTile; T: ThemeTokens }) {
           <button
             type="button"
             onClick={handleCopy}
-            className="rounded-md p-1 transition hover:bg-white/10"
+            className="cursor-pointer rounded-md p-1 transition"
+            style={{ color: copied ? "#22c55e" : T.textFaint }}
             aria-label={`Скопировать ${item.label}`}
+            onMouseEnter={(e) => {
+              if (!copied) e.currentTarget.style.color = T.text;
+            }}
+            onMouseLeave={(e) => {
+              if (!copied) e.currentTarget.style.color = T.textFaint;
+            }}
           >
             {copied ? (
-              <Check className="h-3.5 w-3.5" style={{ color: "#22c55e" }} />
+              <Check className="h-3.5 w-3.5" />
             ) : (
-              <Copy className="h-3.5 w-3.5" style={{ color: T.textFaint }} />
+              <Copy className="h-3.5 w-3.5" />
             )}
           </button>
         )}
       </div>
       <div
-        className="mt-2 truncate text-base font-medium"
+        className="mt-1.5 truncate text-sm font-medium sm:text-base"
         style={{ color: valueColor }}
         title={item.value}
       >
