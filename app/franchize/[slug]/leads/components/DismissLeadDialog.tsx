@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, AlertTriangle } from "lucide-react";
 import type { LeadRow } from "@/app/franchize/server-actions/leads";
 import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
+import { STAGE_LABELS } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
 
 export interface DismissReason {
   value: string;
@@ -46,7 +47,10 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
   const expectedRevenue =
     lead?.rentals?.reduce((s, r) => s + (Number(r.totalCost) || 0), 0) || 0;
   const source = lead?.source || "—";
-  const stage = (lead as { stageKey?: string }).stageKey || "new";
+  // Show the localized stage label (e.g. "Новые") instead of the raw stage key
+  // (e.g. "new") in the analytics preview. Falls back to the raw key if no label.
+  const stageKey = (lead as { stageKey?: string }).stageKey || "new";
+  const stage = STAGE_LABELS[stageKey] || stageKey;
 
   return (
     <AnimatePresence>
@@ -154,7 +158,7 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
               <div
                 className="space-y-3 rounded-2xl border p-4"
                 style={{
-                  borderColor: "T.border",
+                  borderColor: T.border,
                   background: T.bgElevated,
                 }}
               >
