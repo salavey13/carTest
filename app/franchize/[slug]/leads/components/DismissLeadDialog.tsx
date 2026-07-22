@@ -66,7 +66,7 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
             transition={{ type: "spring", damping: 26, stiffness: 280 }}
             className="w-full max-w-3xl rounded-[28px] border p-5"
             style={{
-              background: "#111113",
+              background: T.bg,
               borderColor: "rgba(255,255,255,0.1)",
               boxShadow: "0 18px 50px rgba(0,0,0,0.45)",
             }}
@@ -154,8 +154,8 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
               <div
                 className="space-y-3 rounded-2xl border p-4"
                 style={{
-                  borderColor: "rgba(255,255,255,0.08)",
-                  background: "rgba(0,0,0,0.2)",
+                  borderColor: "T.border",
+                  background: T.bgElevated,
                 }}
               >
                 <p
