@@ -87,6 +87,47 @@ async function getDocCrewSlug(userId: string): Promise<string> {
   }
 }
 
+/**
+ * Fetch recent callback leads (web "перезвоните" CTA) that carry a phone, for a
+ * crew. Used in the client_phone step to auto-suggest the client phone so the
+ * operator can link the contract to the web lead in ONE tap instead of skipping.
+ *
+ * Skipping was the root cause of 45/57 rental_contract_artifacts having
+ * renter_phone = NULL: the phone step is optional and operators routinely hit
+ * "Пропустить", which keys the lead by the operator's TG id (collapsing all of
+ * one operator's clients into a single franchize_intents row) and leaves the
+ * phone empty everywhere. Surfacing existing callback phones makes collection
+ * 1-tap when the client actually came from the site.
+ */
+async function getRecentCallbackPhones(slug: string): Promise<Array<{ phone: string; name: string | null }>> {
+  try {
+    const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabaseAdmin
+      .from("franchize_intents")
+      .select("phone, metadata, last_seen_at")
+      .eq("slug", slug)
+      .eq("intent_type", "contact_click")
+      .not("phone", "is", null)
+      .gte("last_seen_at", since)
+      .order("last_seen_at", { ascending: false })
+      .limit(8);
+    if (error || !data) return [];
+    const seen = new Set<string>();
+    const out: Array<{ phone: string; name: string | null }> = [];
+    for (const row of data) {
+      const phone = (row.phone || "").trim();
+      if (!phone || seen.has(phone)) continue;
+      seen.add(phone);
+      const meta = (row.metadata as Record<string, unknown> | null) || {};
+      out.push({ phone, name: (meta.name as string) || null });
+    }
+    return out;
+  } catch (e) {
+    logger.warn("[/doc] getRecentCallbackPhones failed:", e);
+    return [];
+  }
+}
+
 // ── Constants (minimal inline keyboards) ─────────────────────────────────────
 // Simplified: we only care about A, B (M included), or no license. C/C1 ignored.
 
@@ -3283,19 +3324,26 @@ export async function handleDocCallback(
   }
 
   if (callbackData === "ok") {
-    // Before generating: ask for optional client phone (for callback leads)
-    // This links the contract to the web lead (phone = user_id in users table)
+    // Before generating: ask for client phone (links contract to web callback lead).
+    // Auto-suggest recent "перезвоните" leads from the site so the operator can
+    // pick the client in one tap. This prevents the recurring NULL-phone case
+    // (operator used to skip the optional step → renter_phone NULL everywhere).
     if (!context.clientPhoneResolved) {
       await setState(userId, "client_phone", context);
-      await sendComplexMessage(
-        chatId,
-        "📞 *Телефон клиента*\n\nЕсли клиент пришёл с сайта (заявка на звонок), введите его номер — договор привяжется к заявке.\n\nИли нажмите «Пропустить».",
-        [
-          [{ text: "⏭ Пропустить", callback_data: "ph_skip" }],
-          [{ text: "❌ Отменить", callback_data: "cancel" }],
-        ],
-        { keyboardType: "inline", parseMode: "Markdown" },
-      );
+      const suggestSlug = await getDocCrewSlug(userId);
+      const suggestions = await getRecentCallbackPhones(suggestSlug);
+      const rows: KeyboardButton[][] = [];
+      if (suggestions.length) {
+        for (const s of suggestions.slice(0, 6)) {
+          rows.push([{ text: `👤 ${s.name || "Клиент с сайта"} · ${s.phone}`, callback_data: `ph_pick:${s.phone}` }]);
+        }
+      }
+      rows.push([{ text: "⏭ Пропустить (без телефона)", callback_data: "ph_skip" }]);
+      rows.push([{ text: "❌ Отменить", callback_data: "cancel" }]);
+      const header = suggestions.length
+        ? "📞 *Телефон клиента*\n\nЗаявки с сайта (перезвон) за 14 дней. Выберите клиента — договор привяжется к заявке:\n\nЛибо введите номер вручную, либо пропустите."
+        : "📞 *Телефон клиента*\n\nВведите номер клиента — договор привяжется к заявке с сайта (если была).\n\nИли нажмите «Пропустить».";
+      await sendComplexMessage(chatId, header, rows, { keyboardType: "inline", parseMode: "Markdown" });
       return true;
     }
     const docCrewSlug = await getDocCrewSlug(userId);
@@ -3313,6 +3361,25 @@ export async function handleDocCallback(
     const docCrewSlug = await getDocCrewSlug(userId);
     await sendComplexMessage(chatId, "⏳ Генерирую...", [], { removeKeyboard: true });
     const success = await generateContract(chatId, userId, context, docCrewSlug);
+    if (success) {
+      await clearState(userId);
+    }
+    return true;
+  }
+
+  // Operator picked a suggested callback-lead phone → link contract to that lead.
+  if (callbackData.startsWith("ph_pick:")) {
+    const phone = callbackData.slice("ph_pick:".length).trim();
+    if (!/^[\d+]{10,16}$/.test(phone)) {
+      await sendComplexMessage(chatId, "❌ Некорректный номер. Введите вручную или пропустите.", [], { removeKeyboard: true });
+      return true;
+    }
+    context.clientPhone = phone;
+    context.clientPhoneResolved = true;
+    await setState(userId, "confirm", context);
+    await sendComplexMessage(chatId, `✅ Телефон клиента: ${phone}\n\n⏳ Генерирую...`, [], { removeKeyboard: true });
+    const crewSlug = await getDocCrewSlug(userId);
+    const success = await generateContract(chatId, userId, context, crewSlug);
     if (success) {
       await clearState(userId);
     }

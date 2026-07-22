@@ -124,6 +124,23 @@ function isPhoneString(id) {
   return /^(\+7|8|7)\d{10}$/.test(id.replace(/[\s\-()]/g, ""));
 }
 
+/**
+ * Stable per-renter identity key from a full name ("Рудометов Михаил Сергеевич."
+ * → "name:рудометов михаил сергеевич"). Used so operator-created contracts with
+ * NO phone don't all collapse under the operator's chat id (which hid everyone
+ * except one renter on the leads list). MUST mirror leads.ts nameIdentityKey()
+ * exactly so the text skill and the web page surface the same identities.
+ */
+function nameIdentityKey(fullName) {
+  const n = String(fullName || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[.\s]+/g, " ")
+    .replace(/[.]/g, "")
+    .trim();
+  return n ? `name:${n}` : "";
+}
+
 // ─── Supabase REST client (uses fetch, no supabase-js dep) ────────────────────
 
 let _supaUrl = null;
@@ -290,6 +307,7 @@ function addOrMerge(leadMap, row) {
 
 async function buildLeadMap() {
   const artifactPhoneByRentalId = new Map();
+  const artifactNameByRentalId = new Map();
   const rentalIdsByNormalizedPhone = new Map();
   const bikeTitleMap = new Map();
   const leadMap = new Map();
@@ -404,6 +422,7 @@ async function buildLeadMap() {
     const normalizedArtifactPhone = normalizePhone(a.renter_phone);
     if (a.rental_id) {
       artifactPhoneByRentalId.set(a.rental_id, normalizedArtifactPhone);
+      artifactNameByRentalId.set(a.rental_id, a.renter_full_name || null);
       if (normalizedArtifactPhone) {
         const set = rentalIdsByNormalizedPhone.get(normalizedArtifactPhone) ?? new Set();
         set.add(a.rental_id);
@@ -416,7 +435,13 @@ async function buildLeadMap() {
       a.telegram_chat_id === a.created_by_operator_chat_id;
     const isOperatorFromCrew = a.telegram_chat_id && CREW_OPERATOR_IDS.has(a.telegram_chat_id);
     const preferPhone = (isPreClaimByOperatorColumn || isOperatorFromCrew) && !!normalizedArtifactPhone;
-    const id = preferPhone ? normalizedArtifactPhone : (a.telegram_chat_id || normalizedArtifactPhone || "");
+    // Operator-created + no phone → key by NORMALIZED renter name so each renter
+    // is a distinct lead (mirrors leads.ts nameIdentityKey). Without this, all of
+    // one operator's renters collapsed under the operator's chat id and only one
+    // was ever visible.
+    const isOperatorOrigin = isPreClaimByOperatorColumn || isOperatorFromCrew;
+    const nameKey = isOperatorOrigin ? nameIdentityKey(a.renter_full_name) : "";
+    const id = preferPhone ? normalizedArtifactPhone : (nameKey || a.telegram_chat_id || normalizedArtifactPhone || "");
     if (!id) continue;
     const bikeId = a.resolved_bike_id || a.requested_bike_id;
     const bikeTitle = (bikeId && bikeTitleMap.get(bikeId)) || null;
@@ -489,11 +514,22 @@ async function buildLeadMap() {
       ? normalizePhone(r.metadata.renter_phone)
       : null;
     const effectivePhone = artifactPhone || metaRenterPhone || null;
-    const effectiveId = (prefersPhone && effectivePhone) ? effectivePhone : r.user_id;
+    // Operator-placeholder (pre-claim) + no phone → key by NORMALIZED renter name
+    // (looked up via the artifact for this rental_id) so the rental merges with
+    // the matching artifact lead instead of collapsing under the crew-owner
+    // placeholder user_id. Mirrors leads.ts.
+    const rentalName = (r.rental_id && artifactNameByRentalId.get(r.rental_id)) || null;
+    const rentalNameKey = prefersPhone ? nameIdentityKey(rentalName) : "";
+    const effectiveId = (prefersPhone && effectivePhone)
+      ? effectivePhone
+      : (rentalNameKey || r.user_id);
 
     let existing = leadMap.get(effectiveId);
     if (!existing && metaRenterPhone) {
       existing = leadMap.get(metaRenterPhone) || null;
+    }
+    if (!existing && rentalNameKey) {
+      existing = leadMap.get(rentalNameKey) || null;
     }
     // Resolve bike title: try bike_id from metadata → bikeTitleMap; else fall back to null.
     const meta = (r.metadata && typeof r.metadata === "object") ? r.metadata : null;
@@ -516,7 +552,7 @@ async function buildLeadMap() {
     if (!existing) {
       leadMap.set(effectiveId, {
         user_id: effectiveId,
-        full_name: null,
+        full_name: rentalName || null,
         username: null,
         phone: effectivePhone,
         source: "rental",
@@ -1117,7 +1153,7 @@ async function cmdLeadDetail(leadId, opts) {
   console.log("=== Pipeline ===");
   console.log(`Стадия:          ${STAGE_LABELS[lead.stageKey] || lead.stageKey}`);
   console.log(`QR status:       ${lead.qrStatus}`);
-  console.log(`
+
   // Fetch lead notes
   const notesResp = await fetch(`${SUPABASE_URL}/rest/v1/lead_notes?select=id,text,created_by,created_at&lead_id=eq.${encodeURIComponent(leadId)}&order=created_at.desc&limit=20`, {
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
@@ -1130,7 +1166,7 @@ async function cmdLeadDetail(leadId, opts) {
     }
   }
 
-  // Следующее действие: ${STAGE_NEXT_ACTION[lead.stageKey] || "—"}`);
+  console.log(`Следующее действие: ${STAGE_NEXT_ACTION[lead.stageKey] || "—"}`);
   console.log(`Assignee:        ${formatAssignee(lead.assignee)}`);
   console.log("");
 

@@ -160,6 +160,31 @@ function isPhoneString(id: string | null | undefined): boolean {
 }
 
 /**
+ * Build a stable per-renter identity key from a full name, e.g.
+ * "Рудометов Михаил Сергеевич." → "name:рудометов михаил сергеевич".
+ *
+ * WHY: when an operator creates a contract via /doc-manual and SKIPS the optional
+ * client phone, the lead used to be keyed by the operator's telegram_chat_id.
+ * That collapsed ALL of one operator's renters into a single franchize_intents /
+ * lead row (last write wins on name), so only ONE renter was ever visible on the
+ * leads page and the other 44+ were invisible. Keying by normalized name instead
+ * gives every renter a distinct, stable lead identity even without a phone.
+ *
+ * Normalization is intentionally minimal (lowercase, strip trailing dots/punct,
+ * collapse whitespace) and MUST stay identical here and in leads-query.mjs so the
+ * web page and the text skill surface the same identities. Returns "" for empty.
+ */
+function nameIdentityKey(fullName: string | null | undefined): string {
+  const n = (fullName || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[.\s]+/g, " ")
+    .replace(/[.]/g, "")
+    .trim();
+  return n ? `name:${n}` : "";
+}
+
+/**
  * Normalize a phone number to canonical E.164-ish form (+7XXXXXXXXXX for RU).
  * Accepts +7/7/8 prefix, spaces, dashes, parentheses.
  * Returns null if input is empty or unparseable.
@@ -247,6 +272,11 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
     // Cache: rental_id → artifact renter_phone (built from step 2 for step 4 lookups).
     // Stores NORMALIZED phones so rentals step can match against operator-placeholder rentals.
     const artifactPhoneByRentalId = new Map<string, string | null>();
+    // renter_full_name by rental_id — lets the rentals step fall back to a NAME
+    // identity key (nameIdentityKey) for operator-placeholder rentals that have no
+    // phone, so they merge with the matching artifact lead instead of collapsing
+    // under the crew-owner placeholder user_id.
+    const artifactNameByRentalId = new Map<string, string | null>();
     // Cache: renter_phone (normalized) → set of rental_ids — helps with old artifacts
     // that don't have rental_id backfilled (audit §4).
     const rentalIdsByNormalizedPhone = new Map<string, Set<string>>();
@@ -460,6 +490,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
         // Cache phone by rental_id for rental-step lookups (use the normalized form).
         if (a.rental_id) {
           artifactPhoneByRentalId.set(a.rental_id, normalizedArtifactPhone);
+          artifactNameByRentalId.set(a.rental_id, a.renter_full_name || null);
           // Also index by normalized phone → rental_ids (helps old artifacts without rental_id).
           if (normalizedArtifactPhone) {
             const set = rentalIdsByNormalizedPhone.get(normalizedArtifactPhone) ?? new Set<string>();
@@ -488,10 +519,13 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
         const isOperatorFromCrew = isOperatorPlaceholder(a.telegram_chat_id);
         const preferPhone =
           (isPreClaimByOperatorColumn || isOperatorFromCrew) && !!normalizedArtifactPhone;
-        // When operator placeholder + no phone, use renter_full_name as fallback
-        // identity key so the lead doesn't disappear under the operator's ID.
+        // When operator placeholder + no phone, use the NORMALIZED renter name as
+        // the identity key so each renter is a distinct lead (not collapsed under
+        // the operator's chat id). Normalization matters: "…Кириллович." (trailing
+        // dot) and "…Кириллович" must resolve to the SAME key, otherwise the same
+        // person shows up twice. See nameIdentityKey().
         const fallbackName = (!preferPhone && !normalizedArtifactPhone && a.renter_full_name)
-          ? `name:${a.renter_full_name}`
+          ? nameIdentityKey(a.renter_full_name)
           : null;
         const id = preferPhone
           ? normalizedArtifactPhone!
@@ -599,12 +633,23 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
           ? normalizePhone((r.metadata as Record<string, unknown>).renter_phone as string | undefined)
           : null;
         const effectivePhone = artifactPhone || metaRenterPhone || null;
-        const effectiveId = (prefersPhone && effectivePhone) ? effectivePhone : r.user_id;
+        // Identity for this rental: phone if we have one; otherwise, for operator-
+        // placeholder (pre-claim) rentals, fall back to the renter NAME (looked up
+        // via the artifact for this rental_id) so the rental merges with the
+        // matching artifact lead instead of collapsing under the crew-owner
+        // placeholder user_id (which hid 22 operator-created rentals behind one id).
+        const rentalName = (r.rental_id && artifactNameByRentalId.get(r.rental_id)) || null;
+        const rentalNameKey = prefersPhone ? nameIdentityKey(rentalName) : "";
+        const effectiveId = (prefersPhone && effectivePhone)
+          ? effectivePhone
+          : (rentalNameKey || r.user_id);
 
         const existing = leadMap.get(effectiveId) ||
           // Fallback: try matching by renter_phone from metadata (handles existing rentals
           // whose user_id is telegramUserId while the lead key is phone)
-          (metaRenterPhone ? leadMap.get(metaRenterPhone) || null : null);
+          (metaRenterPhone ? leadMap.get(metaRenterPhone) || null : null) ||
+          // Fallback: try matching by name key (rental merged to artifact by name)
+          (rentalNameKey ? leadMap.get(rentalNameKey) || null : null);
         const vehicle = r.vehicle as { make?: string; model?: string } | null;
         const bikeTitle = `${vehicle?.make || ""} ${vehicle?.model || ""}`.trim() || null;
         // rentals.created_by_operator_chat_id preserves who originally created the rental
@@ -627,7 +672,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
         if (!existing) {
           leadMap.set(effectiveId, {
             user_id: effectiveId,
-            full_name: null,
+            full_name: rentalName || null,
             username: null,
             phone: effectivePhone,
             source: "rental",
