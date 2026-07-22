@@ -1,5 +1,4 @@
 "use server";
-import { supabaseAdmin } from "@/lib/supabase-server";
 import { getFranchizeLeads } from "./leads";
 import { isHotLead } from "@/app/franchize/[slug]/leads/lib/sla-signals";
 import type { Mode } from "@/app/franchize/[slug]/leads/leads-constants";
@@ -9,6 +8,10 @@ export interface LeadsKpis {
   hotLeads: number;
   conversionRate: number;
   monthlyRevenue: number;
+  totalLeadsDelta?: number;
+  hotLeadsDelta?: number;
+  conversionDelta?: number;
+  revenueDelta?: number;
 }
 
 export async function getLeadsKpis(slug: string, mode: Mode): Promise<LeadsKpis> {
@@ -34,11 +37,14 @@ export async function getLeadsKpis(slug: string, mode: Mode): Promise<LeadsKpis>
   const recentWon = recent.filter((l) => l.stageKey === "closed_won").length;
   const conversionRate = recent.length > 0 ? (recentWon / recent.length) * 100 : 0;
 
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthlyRevenue = leads.reduce((sum, l) => {
     return sum + l.rentals
-      .filter((r) => r.status === "active" || r.status === "completed")
+      .filter((r) => (r.status === "active" || r.status === "completed"))
       .reduce((s, r) => s + (Number(r.totalCost) || 0), 0);
   }, 0);
+  // Note: precise month filtering requires rentals.createdAt on LeadRentalRow —
+  // currently not exposed. Using total active+completed as approximation for v1.
 
   return { totalLeads, hotLeads, conversionRate: Math.round(conversionRate), monthlyRevenue };
 }
