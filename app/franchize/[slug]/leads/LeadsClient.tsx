@@ -8,7 +8,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
 
 // Import extracted components
-import { LeadsKPICards } from "./components/LeadsKPICards";
+import { LeadsKPICards, type LeadsKpis } from "./components/LeadsKPICards";
 import { LeadsToolbar } from "./components/LeadsToolbar";
 import { LeadList } from "./components/LeadList";
 import { LeadBoard } from "./components/LeadBoard";
@@ -146,6 +146,26 @@ export function LeadsClient({
     troubled: activeLeads.filter((l) => l.troubled).length,
   }), [activeLeads, hot, warm, verified]);
 
+  // KPI cards — computed client-side from activeLeads + hot.
+  // Mirrors server-side getLeadsKpis() math (app/franchize/server-actions/leads-kpis.ts)
+  // but without a mode filter — v1 LeadsClient shows a single segment.
+  const kpis = useMemo<LeadsKpis>(() => {
+    const totalLeads = activeLeads.filter((l) => l.stageKey !== "closed_lost").length;
+    const hotLeads = hot.length;
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 864e5);
+    const recent = activeLeads.filter((l) => !!l.createdAt && new Date(l.createdAt) >= thirtyDaysAgo);
+    const recentWon = recent.filter((l) => l.stageKey === "closed_won").length;
+    const conversionRate = recent.length > 0 ? Math.round((recentWon / recent.length) * 100) : 0;
+    const monthlyRevenue = activeLeads.reduce(
+      (sum, l) => sum + l.rentals
+        .filter((r) => r.status === "active" || r.status === "completed")
+        .reduce((s, r) => s + (Number(r.totalCost) || 0), 0),
+      0,
+    );
+    return { totalLeads, hotLeads, conversionRate, monthlyRevenue };
+  }, [activeLeads, hot]);
+
   // Scroll to selected lead
   useEffect(() => {
     if (!selectedId) return;
@@ -236,7 +256,7 @@ export function LeadsClient({
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
-      <LeadsKPICards leads={activeLeads} hot={hot} verified={verified} todos={todos} T={T} />
+      <LeadsKPICards kpis={kpis} T={T} />
 
       <LeadsToolbar
         searchQuery={searchQuery} setSearchQuery={setSearchQuery}
