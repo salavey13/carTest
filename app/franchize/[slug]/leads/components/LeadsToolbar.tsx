@@ -57,11 +57,16 @@ const SORT_OPTIONS: Array<{ value: SortModeV2; label: string }> = [
 
 /**
  * Search + filters toolbar.
- * - Large search input with magnifying glass icon (dominant control)
- * - 4 dropdown filters: Source, Stage, Owner, Sort
- * - Boolean filter pills: Overdue, QR Pending, Missing Docs, Active Rental
- * - View mode toggle (List / Board)
- * - Export button
+ *
+ * Layout:
+ *   Row 1 (mobile): full-width search input on its own line.
+ *   Row 1 (desktop): search (flex-1) + dropdown row inline.
+ *   Row 2 (mobile): dropdowns wrap to second row (flex-wrap), full-width each.
+ *   Row 2 (desktop): dropdowns in a row + view toggle + export on the right.
+ *
+ * All touch targets are ≥44px (min-h-[44px]) for accessibility.
+ * Filter pills are horizontally scrollable on mobile (overflow-x-auto with
+ * hidden scrollbar) so they don't push the layout wider than the viewport.
  */
 export function LeadsToolbar(props: Props) {
   const {
@@ -117,29 +122,33 @@ export function LeadsToolbar(props: Props) {
   ];
 
   return (
-    <section className="space-y-4">
-      {/* Row 1: search + dropdowns */}
+    <section className="space-y-3">
+      {/* Row 1: search (full width mobile) + dropdowns (wrap to next row on mobile) */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        {/* Search input — full width on mobile, flex-1 on desktop */}
         <div className="relative flex-1">
           <Search
-            className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2"
+            className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 md:left-5"
             style={{ color: T.textFaint }}
+            aria-hidden
           />
           <input
             type="text"
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Имя, телефон, байк, Telegram, договор..."
-            className="w-full rounded-2xl border py-4 pl-14 pr-4 text-base outline-none transition"
+            aria-label="Поиск лидов"
+            className="w-full min-h-[44px] rounded-2xl border py-3 pl-12 pr-4 text-base outline-none transition md:pl-14"
             style={{
-              background: "rgba(255,255,255,0.05)",
-              borderColor: searchValue ? `${T.accent}66` : "rgba(255,255,255,0.08)",
+              background: T.inputBg,
+              borderColor: searchValue ? T.borderActive : T.inputBorder,
               color: T.text,
             }}
           />
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        {/* Dropdowns row — wraps on mobile so each gets its own line if needed */}
+        <div className="flex flex-wrap gap-2 lg:flex-nowrap">
           <Dropdown
             label="Источник"
             value={sourceValue}
@@ -180,43 +189,54 @@ export function LeadsToolbar(props: Props) {
         </div>
       </div>
 
-      {/* Row 2: pill filters + view toggle + export */}
+      {/* Row 2: horizontally-scrollable filter pills + view toggle + export */}
       <div className="flex flex-wrap items-center gap-2">
-        {pills.map((p) => {
-          const Icon = p.icon;
-          return (
-            <motion.button
-              key={p.key}
-              whileTap={{ scale: 0.96 }}
-              type="button"
-              onClick={() =>
-                onFilterFlagsChange({ [p.key]: !p.active } as Partial<FilterFlags>)
-              }
-              className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-medium transition"
-              style={
-                p.active
-                  ? {
-                      borderColor: `${p.color}4d`,
-                      background: `${p.color}1a`,
-                      color: p.color,
-                    }
-                  : {
-                      borderColor: "rgba(255,255,255,0.1)",
-                      background: "rgba(255,255,255,0.03)",
-                      color: T.textMuted,
-                    }
-              }
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {p.label}
-            </motion.button>
-          );
-        })}
+        {/* Pills row — horizontally scrollable on mobile with hidden scrollbar */}
+        <div
+          className="-mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1 lg:mx-0 lg:px-0 lg:overflow-visible lg:pb-0"
+          style={{ scrollbarWidth: "none" }}
+          aria-label="Быстрые фильтры"
+        >
+          {pills.map((p) => {
+            const Icon = p.icon;
+            return (
+              <motion.button
+                key={p.key}
+                whileTap={{ scale: 0.96 }}
+                transition={{ type: "spring", damping: 22, stiffness: 320 }}
+                type="button"
+                onClick={() =>
+                  onFilterFlagsChange({ [p.key]: !p.active } as Partial<FilterFlags>)
+                }
+                aria-pressed={p.active}
+                className="inline-flex min-h-[44px] shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium transition"
+                style={
+                  p.active
+                    ? {
+                        borderColor: `${p.color}4d`,
+                        background: `${p.color}1a`,
+                        color: p.color,
+                      }
+                    : {
+                        borderColor: T.border,
+                        background: T.bgCard,
+                        color: T.textMuted,
+                      }
+                }
+              >
+                <Icon className="h-3.5 w-3.5" aria-hidden />
+                <span className="whitespace-nowrap">{p.label}</span>
+              </motion.button>
+            );
+          })}
+        </div>
 
-        {/* View mode toggle */}
+        {/* View mode toggle — 44px touch target */}
         <div
           className="ml-auto flex rounded-full border p-1"
-          style={{ borderColor: "rgba(255,255,255,0.1)" }}
+          style={{ borderColor: T.border }}
+          role="group"
+          aria-label="Режим отображения"
         >
           {(
             [
@@ -231,28 +251,37 @@ export function LeadsToolbar(props: Props) {
                 key={opt.v}
                 type="button"
                 onClick={() => onViewModeChange(opt.v)}
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition"
+                aria-pressed={active}
+                className="inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition"
                 style={
                   active
                     ? { background: T.accent, color: T.accentContrast }
                     : { color: T.textMuted }
                 }
               >
-                <Icon className="h-3.5 w-3.5" />
+                <Icon className="h-3.5 w-3.5" aria-hidden />
                 <span className="hidden sm:inline">{opt.label}</span>
               </button>
             );
           })}
         </div>
 
-        {/* Export */}
+        {/* Export — 44px target */}
         <button
           type="button"
           onClick={onExport}
-          className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-medium transition hover:bg-white/5"
-          style={{ borderColor: "rgba(255,255,255,0.1)", color: T.textMuted }}
+          className="inline-flex min-h-[44px] cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium transition"
+          style={{ borderColor: T.border, color: T.textMuted }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = T.bgCardHover;
+            e.currentTarget.style.color = T.text;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.color = T.textMuted;
+          }}
         >
-          <Download className="h-3.5 w-3.5" /> Экспорт
+          <Download className="h-3.5 w-3.5" aria-hidden /> Экспорт
         </button>
       </div>
     </section>
@@ -286,22 +315,29 @@ function Dropdown({
   const selected = options.find((o) => o.value === value);
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative min-w-0 flex-1 lg:min-w-[160px] lg:flex-none" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm transition"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="inline-flex min-h-[44px] w-full cursor-pointer items-center gap-2 rounded-2xl border px-4 text-sm transition lg:w-auto"
         style={{
-          borderColor: open ? T.accent : "rgba(255,255,255,0.1)",
-          background: "rgba(255,255,255,0.03)",
+          borderColor: open ? T.borderActive : T.border,
+          background: T.bgCard,
           color: T.text,
         }}
       >
-        <span style={{ color: T.textMuted }}>{label}:</span>
-        <span className="max-w-[120px] truncate font-medium">{selected?.label || "—"}</span>
+        <span className="shrink-0" style={{ color: T.textMuted }}>
+          {label}:
+        </span>
+        <span className="min-w-0 max-w-[120px] flex-1 truncate font-medium">
+          {selected?.label || "—"}
+        </span>
         <ChevronDown
-          className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`}
+          className={`h-3.5 w-3.5 shrink-0 transition ${open ? "rotate-180" : ""}`}
           style={{ color: T.textMuted }}
+          aria-hidden
         />
       </button>
 
@@ -311,13 +347,14 @@ function Dropdown({
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.15 }}
-            className="absolute right-0 z-20 mt-2 min-w-[200px] max-h-[320px] overflow-y-auto rounded-2xl border p-1.5"
+            transition={{ type: "spring", damping: 28, stiffness: 320 }}
+            className="absolute right-0 z-[60] mt-2 min-w-[200px] max-h-[320px] overflow-y-auto rounded-2xl border p-1.5"
             style={{
-              background: "#161618",
-              borderColor: "rgba(255,255,255,0.1)",
-              boxShadow: "0 18px 50px rgba(0,0,0,0.45)",
+              background: T.bgElevated,
+              borderColor: T.border,
+              boxShadow: T.shadow,
             }}
+            role="listbox"
           >
             {options.map((opt) => {
               const active = opt.value === value;
@@ -329,11 +366,22 @@ function Dropdown({
                     onChange(opt.value);
                     setOpen(false);
                   }}
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm transition hover:bg-white/5"
-                  style={{ color: active ? T.accent : T.text }}
+                  role="option"
+                  aria-selected={active}
+                  className="flex w-full cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-sm transition"
+                  style={{
+                    color: active ? T.accent : T.text,
+                    background: active ? T.bgCardHover : "transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!active) e.currentTarget.style.background = T.bgCardHover;
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!active) e.currentTarget.style.background = "transparent";
+                  }}
                 >
                   <span className="truncate">{opt.label}</span>
-                  {active && <Check className="h-3.5 w-3.5 shrink-0" />}
+                  {active && <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />}
                 </button>
               );
             })}
