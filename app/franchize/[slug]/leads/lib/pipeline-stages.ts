@@ -15,14 +15,14 @@ export const PIPELINE_STAGES = [
 
 export type StageKey = (typeof PIPELINE_STAGES)[number]["key"];
 
-export const STAGE_LABELS: Record<string, string> = Object.fromEntries(
+export const STAGE_LABELS: Record<StageKey, string> = Object.fromEntries(
   PIPELINE_STAGES.map((s) => [s.key, s.label]),
 );
-export const STAGE_COLORS: Record<string, string> = Object.fromEntries(
+export const STAGE_COLORS: Record<StageKey, string> = Object.fromEntries(
   PIPELINE_STAGES.map((s) => [s.key, s.color]),
 );
 
-export const STAGE_NEXT_ACTION: Record<string, string> = {
+export const STAGE_NEXT_ACTION: Record<StageKey, string> = {
   new: "Написать в Telegram",
   needs_contact: "Написать в Telegram",
   contract_sent: "Переслать QR",
@@ -82,7 +82,7 @@ export function getPrimaryActions(lead: LeadRow): Array<{ type: string; label: s
     active_rental: [{ type: "open_contract", label: "Открыть договор" }, { type: "call", label: "Позвонить" }, { type: "telegram", label: "Написать в TG" }, { type: "more", label: "Ещё" }],
     return_due: [{ type: "schedule_return", label: "Назначить возврат" }, { type: "open_contract", label: "Открыть договор" }, { type: "verify_photos", label: "Проверить фото" }, { type: "more", label: "Ещё" }],
     closed_won: [{ type: "create_rental", label: "Создать аренду" }, { type: "more", label: "Ещё" }],
-    closed_lost: [{ type: "more", label: "Ещё" }],
+    closed_lost: [{ type: "reopen", label: "Открыть повторно" }, { type: "more", label: "Ещё" }],
   };
   return map[stage] || map.new;
 }
@@ -124,9 +124,9 @@ function extractTodoLeadId(todo: LeadTodoRow): string | null {
   if (todo.description) {
     try {
       const d = JSON.parse(todo.description);
-      if (d.user_id && /^\d{1,12}$/.test(d.user_id)) return d.user_id;
-      if (d.phone) { const n = normalizePhone(d.phone); if (n) return n; }
-      if (d.lead_id) {
+      if (typeof d.user_id === 'string' && /^\d{1,12}$/.test(d.user_id)) return d.user_id;
+      if (typeof d.phone === 'string') { const n = normalizePhone(d.phone); if (n) return n; }
+      if (typeof d.lead_id === 'string' && d.lead_id) {
         if (/^\d{1,12}$/.test(d.lead_id)) return d.lead_id;
         const n = normalizePhone(d.lead_id); if (n) return n;
         if (d.lead_id.includes("-")) return d.lead_id;
