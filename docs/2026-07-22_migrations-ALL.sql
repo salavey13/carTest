@@ -117,6 +117,13 @@ WHERE s.renter_phone IS NULL
 --      Source of truth: user_rental_secrets → artifacts → todos
 -- ────────────────────────────────────────────────────────────────────────────
 
+-- Ensure created_by_operator_chat_id columns exist (self-sufficient, no deps)
+ALTER TABLE IF EXISTS private.rental_contract_artifacts
+  ADD COLUMN IF NOT EXISTS created_by_operator_chat_id TEXT;
+
+ALTER TABLE IF EXISTS private.sale_contract_artifacts
+  ADD COLUMN IF NOT EXISTS created_by_operator_chat_id TEXT;
+
 -- Step 1: rental_contract_artifacts ← user_rental_secrets
 UPDATE private.rental_contract_artifacts AS a
 SET renter_phone = s.renter_phone
