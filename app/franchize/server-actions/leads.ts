@@ -71,6 +71,8 @@ export interface LeadRow {
   assigneeId?: string | null;
   /** Assignee display name. */
   assigneeName?: string | null;
+  /** Owner — the operator who created the lead. */
+  ownerId?: string | null;
   /** Owner display name. */
   ownerName?: string | null;
   /** Next action label, derived from stageKey. */
