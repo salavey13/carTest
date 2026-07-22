@@ -65,7 +65,7 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
       whileHover={{ y: -2 }}
       whileTap={{ scale: 0.995 }}
       onClick={onSelect}
-      className="relative cursor-pointer overflow-hidden rounded-[24px] p-5 pl-6"
+      className="relative cursor-pointer overflow-hidden rounded-[24px] p-3 md:p-3 md:p-4 pl-6"
       style={{
         background: "T.bgCard",
         border: `1px solid ${selected ? stageColor : "T.border"}`,
@@ -78,10 +78,10 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
       {/* Left edge color stripe */}
       <div className="absolute left-0 top-0 h-full w-1" style={{ background: stageColor }} />
 
-      <div className="flex gap-4">
+      <div className="flex gap-3 md:p-4">
         {/* Avatar */}
         <div
-          className="grid h-14 w-14 shrink-0 place-items-center rounded-full text-lg font-bold"
+          className="grid h-10 w-10 md:h-12 md:w-12 shrink-0 place-items-center rounded-full text-sm md:text-base font-bold"
           style={{ background: `${stageColor}26`, color: stageColor }}
         >
           {initials}
@@ -182,7 +182,7 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
                 <div className="text-[10px] uppercase tracking-wide" style={{ color: slaColor }}>
                   SLA
                 </div>
-                <div className="mt-1 text-2xl font-bold" style={{ color: slaColor }}>
+                <div className="mt-1 text-lg md:text-xl font-bold" style={{ color: slaColor }}>
                   {topSignal.value}
                 </div>
                 <div className="text-[11px]" style={{ color: T.textMuted }}>
