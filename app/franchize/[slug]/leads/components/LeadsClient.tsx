@@ -97,7 +97,7 @@ const DEFAULT_FILTER_FLAGS: FilterFlags = {
   activeRentalOnly: false,
   returnDueOnly: false,
   dismissedOnly: false,
-  hideOperatorPlaceholders: true,
+  hideOperatorPlaceholders: false,
 };
 
 // ── Main Component ──────────────────────────────────────────────────────────
