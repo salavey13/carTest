@@ -19,6 +19,7 @@ const SIGNAL_ICONS: Record<string, typeof Clock> = {
   until_return: Bike,
 };
 
+// Semantic tone colors — fixed hexes for severity indicators.
 const TONE_COLORS: Record<LeadSignal["tone"], string> = {
   danger: "#ef4444",
   warning: "#f59e0b",
@@ -27,8 +28,15 @@ const TONE_COLORS: Record<LeadSignal["tone"], string> = {
 };
 
 /**
- * 4 circular SLA indicators in a horizontal row.
- * Each: icon + value + label, colored by severity.
+ * 4 circular SLA indicators in an evenly-spaced horizontal row.
+ *
+ * Each indicator:
+ *   - 48px circle (h-12 w-12) with a colored ring matching the signal tone.
+ *   - Icon + bold value below.
+ *   - Label + optional detail below the value.
+ *
+ * Layout: 2x2 grid on mobile, 4-col on desktop. Items use `place-items-center`
+ * and equal `gap-3` so the spacing stays even regardless of content length.
  */
 export function LeadSLAOverview({ signals, T }: Props) {
   const top4 = signals.slice(0, 4);
@@ -37,7 +45,7 @@ export function LeadSLAOverview({ signals, T }: Props) {
     return (
       <section className="glass-panel rounded-[24px] p-5">
         <div className="flex items-center gap-3">
-          <Activity className="h-5 w-5" style={{ color: "#22c55e" }} />
+          <Activity className="h-5 w-5" style={{ color: "#22c55e" }} aria-hidden />
           <p className="text-sm" style={{ color: T.textMuted }}>
             Нет активных SLA сигналов
           </p>
@@ -59,9 +67,11 @@ export function LeadSLAOverview({ signals, T }: Props) {
             transition={{ type: "spring", damping: 22, stiffness: 260, delay: i * 0.05 }}
             className="glass-panel flex flex-col items-center gap-2 rounded-2xl p-4 text-center"
           >
+            {/* Circular icon with colored ring */}
             <div
               className="relative grid h-12 w-12 place-items-center rounded-full"
               style={{ background: `${color}1a` }}
+              aria-hidden
             >
               <Icon className="h-5 w-5" style={{ color }} />
               <motion.div
@@ -69,10 +79,14 @@ export function LeadSLAOverview({ signals, T }: Props) {
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.4, delay: i * 0.05 + 0.1 }}
-                style={{ border: `2px solid ${color}40` }}
+                style={{ border: `2px solid ${color}66` }}
               />
             </div>
-            <div className="text-lg font-bold tabular-nums" style={{ color: T.text }}>
+            {/* Bold value — uses tabular-nums so values align across cards */}
+            <div
+              className="text-lg font-bold tabular-nums"
+              style={{ color: T.text }}
+            >
               {s.value}
             </div>
             <div className="text-[11px]" style={{ color: T.textMuted }}>
