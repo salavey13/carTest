@@ -95,6 +95,7 @@ export interface LeadTodoRow {
   created_at: string;
   completed_at: string | null;
   assigned_to: string | null;
+  due_date: string | null;
 }
 
 export interface GetFranchizeLeadsResult {
@@ -726,7 +727,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
       // rental_id and absolutely belong on the lead's card.
       supabaseAdmin
         .from("crew_todos")
-        .select("id, lead_id, user_id, phone, rental_id, title, description, status, priority, category, created_at, completed_at, assigned_to")
+        .select("id, lead_id, user_id, phone, rental_id, title, description, status, priority, category, created_at, completed_at, assigned_to, due_date")
         .eq("crew_id", crewId)
         .in("category", ["lead_followup", "rental_verification"])
         .order("created_at", { ascending: false }),
