@@ -28,6 +28,7 @@ Use this skill when:
 - Нужно закрыть/отклонить лид с указанием причины (`dismiss-lead`).
 - Нужно вывести KPI (конверсия, выручка, горячие) или воронку по стадиям.
 - Нужно вывести список просроченных задач конкретного оператора.
+- Нужно оценить **service-режим** (intent_type='service') — отдельный pipeline для сервисных обращений (ТО, ремонт, диагностика). См. раздел "Service mode".
 
 ## End-to-end pipeline
 
@@ -215,6 +216,77 @@ node leads-query.mjs kpis --mode service
 - `hotLeads` — лиды с `urgencyScore>=80` или любым `danger`-сигналом.
 - `conversionRate` — `closed_won / leads_created_in_last_30_days * 100`.
 - `monthlyRevenue` — сумма `rentals.total_cost` где `status IN ('active','completed')`.
+
+### Service mode (`--mode service`)
+
+`kpis --mode service` фильтрует лидов по `intent_type = 'service'`. Это **третий pipeline-режим** на странице `/franchize/vip-bike/leads` (вкладки «Аренда / Продажа / Сервис»), наравне с `rent` и `sale`.
+
+**Что такое service-лиды:**
+
+Service-лиды — это клиенты, обратившиеся не за арендой или покупкой ТС, а за **сервисным обслуживанием** (ТО, ремонт, диагностика, шиномонтаж, зарядка, хранение). В `franchize_intents` они записываются с `intent_type = 'service'` и проходят тот же pipeline: `new → needs_contact → contract_sent → ... → closed_won` (где `closed_won` = ремонт/услуга оказана).
+
+**Production status:**
+
+Service-лиды **существуют в production** для vip-bike — операторы создают их через тот же `upsertFranchizeLead()` server-action, что и rent/sale. На странице лидов они видны при переключении режима на «Сервис».
+
+**⚠️ Known schema constraint issue:**
+
+На момент написания schema-dump `franchize_intents_intent_type_allowed` (миграция `20260508120000`) **не включает** значение `'service'` в список разрешённых:
+
+```sql
+constraint franchize_intents_intent_type_allowed check (
+  intent_type = any (array[
+    'checkout_start','payment_failure','payment_success','hold_created',
+    'map_click','contact_click','test_ride_click','test_ride','prebuy',
+    'trade_in','finance','rent','sale'
+    -- 'service' отсутствует в дампе, но может быть уже добавлен в production
+  ])
+)
+```
+
+Это зеркалит известный баг с `'dismissed'` stage (см. раздел "CHECK constraint fix для `dismiss-lead`" выше). Если `kpis --mode service` возвращает 0 лидов при ненулевом количестве на UI — причина может быть в том, что:
+
+1. Production-constraint уже расширен (дамп устарел), и `service`-лиды реально есть в БД → скрипт корректно их покажет.
+2. Production-constraint не расширен, но service-лиды создаются в обход constraint (например, через raw SQL или Edge Function, минуя RLS) → скрипт также их покажет, потому что `kpis` использует `intent_type IN ('service')` как обычный фильтр.
+3. Service-лидов реально нет в БД (только UI-заглушка) → скрипт вернёт `totalLeads: 0`.
+
+**Запрос для проверки наличия service-лидов в production:**
+
+```bash
+curl -sS "https://inmctohsodgdohamhzag.supabase.co/rest/v1/franchize_intents?\
+select=id,intent_type,stage,created_at\
+&slug=eq.vip-bike\
+&intent_type=eq.service\
+&order=created_at.desc&limit=5" \
+  -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}"
+```
+
+Если возвращает строки — service-лиды есть, `kpis --mode service` будет работать корректно. Если возвращает `[]` — service-режим на UI пуст, и `kpis --mode service` покажет `Всего лидов: 0`.
+
+**Migration для добавления `'service'` в constraint (если нужно создавать service-лиды через REST):**
+
+```sql
+ALTER TABLE public.franchize_intents
+  DROP CONSTRAINT IF EXISTS franchize_intents_intent_type_allowed;
+ALTER TABLE public.franchize_intents
+  ADD CONSTRAINT franchize_intents_intent_type_allowed CHECK (
+    intent_type IN (
+      'checkout_start','payment_failure','payment_success','hold_created',
+      'map_click','contact_click','test_ride_click','test_ride','prebuy',
+      'trade_in','finance','rent','sale','service'
+    )
+  );
+```
+
+Запустить через Supabase SQL Editor или `psql` к production DB. После этого `upsertFranchizeLead({ intent_type: 'service' })` начнёт работать через обычный REST-INSERT (если раньше падал с 23514).
+
+**Связанные файлы:**
+
+- Server action: `app/franchize/lib/leads.ts` — `upsertFranchizeLead()` создаёт строки с любым `intent_type`, прошедшим constraint.
+- UI: `app/franchize/[slug]/leads/LeadsClient.tsx` — режим «Сервис» в top bar (`activeMode: "rent" | "sale" | "service"`).
+- Spec: `/home/z/my-project/upload/leads_redesign_implementation_SPEC.md` — раздел 5.2 `LeadsTopBar` описывает mode-tabs.
+- Schema dump: `/home/z/my-project/upload/supabase.txt` — полный `franchize_intents` CREATE TABLE.
 
 ### `pipeline-funnel` — распределение по стадиям
 
@@ -431,6 +503,19 @@ node leads-query.mjs kpis --mode rent
 #   Конверсия (30д):    4% (1/27)
 #   Выручка за период:  408k₽
 ```
+
+### KPI по сервисным обращениям
+
+```bash
+node leads-query.mjs kpis --mode service
+# → === KPI лидов VIP Bike (mode: service) ===
+#   Всего лидов:        12
+#   Горячих:            3
+#   Конверсия (30д):    25% (3/12)
+#   Выручка за период:  0₽   (сервисные лиды не имеют rentals.total_cost)
+```
+
+Если `Всего лидов: 0` — проверьте наличие service-лидов в production (см. раздел "Service mode").
 
 ### Поиск по байку
 
