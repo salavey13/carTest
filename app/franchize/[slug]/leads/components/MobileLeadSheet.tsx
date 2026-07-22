@@ -70,6 +70,9 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
         <div className="fixed inset-0 z-50 flex items-end lg:hidden">
           {/* Backdrop */}
           <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title || "Детали лида"}
             key="mobile-sheet-backdrop"
             className="absolute inset-0"
             style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)" }}
@@ -87,7 +90,7 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
             style={{
               maxHeight: `${SHEET_HEIGHT_VH * 100}vh`,
               background: "linear-gradient(180deg, #111113 0%, #09090b 100%)",
-              borderColor: "rgba(255,255,255,0.08)",
+              borderColor: "T.border",
               boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
             }}
             variants={sheetVariants}
