@@ -1,7 +1,7 @@
 # Franchize identity-flow audit
 
 Date: 2026-07-19
-Last updated: 2026-07-21 (post-fix status — see §12, §13, §14, §15 re-audit with corrected diagrams; all 3 §15.2 open findings fixed in §15.7)
+Last updated: 2026-07-22 (all §13.4c parked items closed — #6 lead_notes backfill, #7 analytics parity, #8 CRM UUID foundation; #9 skipped; NEW #5 optimized)
 
 ## 1. Executive summary
 
@@ -472,23 +472,25 @@ The read-path patch makes these gaps less visible (leads are correctly grouped e
 | Codex P2 #2 — Client-side `extractTodoLeadId` doesn't normalize phones | MEDIUM | **FIXED** | `normalizePhone()` mirrored in `useLeadsData.ts` and `leads-utils.tsx`. `useTodosMapping` and `getTodosForLead` now compare against a normalized identity set. |
 | Follow-up — Artifact phone-priority depends on `crewOperatorIds` being complete | HIGH | **FIXED** | Now uses `telegram_chat_id === created_by_operator_chat_id` as the pre-claim signal (more robust — catches former operators, never-added operators, stale caches). Applied to both artifacts step (`leads.ts` L465-488) and rentals step (`leads.ts` L567-584). Sale artifacts step simplified to always prefer `buyer_phone` (no QR claim flow for sales). |
 
-### 12.3 What's left to fix (priority order)
+### 12.3 What's left to fix (priority order) — ALL CLOSED
+
+All items from this list have been addressed. Final status:
 
 1. **DB phone backfill** (Bug #5 write-side) — **DONE 2026-07-21**. User applied the normalization SQL. See §12 for reference SQL.
 
-2. **QR claim propagation hardening** (§6 #1-#5) — **DONE 2026-07-21**. `claim_rental_by_qr` RPC rewritten with secret-based check; `propagate_claim` updated for robust artifact update by both sha256 and rental_id; backfill applied for already-claimed artifacts. See §13 for details.
+2. **QR claim propagation hardening** (§6 #1-#5) — **DONE 2026-07-21**. `claim_rental_by_qr` RPC rewritten with secret-based check; `propagate_claim` updated.
 
-3. **`lead_notes.lead_id` migration** (§6 #5) — when a lead's identity key changes (operator id → renter chat id, or phone → chat id), existing notes attached to the old key become orphaned. Either add a `lead_aliases` table or migrate `lead_notes.lead_id` during QR claim.
+3. **`lead_notes.lead_id` migration** (§6 #5) — **DONE 2026-07-22**. Backfill migration `20260721200000` closes 1-row gap; propagate_claim Step 6 handles future claims.
 
-4. **`window.location.reload()` after dismiss** (§11.3) — replace with `router.refresh()` and optimistic state update so operators don't lose filters/scroll.
+4. **`window.location.reload()` after dismiss** (§11.3) — **DONE 2026-07-21**. 8 occurrences replaced with `router.refresh()`.
 
-5. **Analytics page parity** (§9 phase 4, §10 #9) — apply the same operator-placeholder detection to `rentals-dashboard.ts` so renter metrics exclude placeholder-owner rentals until claimed.
+5. **Analytics page parity** (§9 phase 4, §10 #9) — **DONE 2026-07-22**. Operator-placeholder detection added to `rentals-dashboard.ts`.
 
-6. **Stable CRM lead UUID** (§8, §9 phase 3) — introduce a `crm_leads` table with a canonical UUID and link tables to phone, telegram id, rental ids, artifact ids. This is the long-term fix for the identity fragmentation described in §1.
+6. **Stable CRM lead UUID** (§8, §9 phase 3) — **DONE 2026-07-22**. Foundation migration `20260721210000`: `crm_leads` table + link tables + `resolve_crm_lead()` helper.
 
-7. **Regression fixtures** (§11.5) — add unit tests for `normalizePhone`, `classifyIdentityState`, `extractTodoLeadId`, and `getTodoLeadId` with known operator IDs and mixed phone/Telegram scenarios.
+7. **Regression fixtures** (§11.5) — ⏳ **Skipped**. Out of scope.
 
-8. **Rental page SPA navigation** (RentalLink) — **DONE 2026-07-21**. `<Link>` replaced with `RentalLink` (direct `router.push()`). See §13.
+8. **Rental page SPA navigation** (RentalLink) — **DONE 2026-07-21**. `<Link>` replaced with `RentalLink`.
 
 ### 12.4 Verification checklist
 
@@ -605,8 +607,8 @@ END IF;
 1. **#7: Todo `user_id` backfill** — самый высокий рычаг. 60/60 todos имеют `user_id = NULL`. Без этого `getTodoLeadId()` падает через phone/lead_id fallback — а это именно то, что мы чинили. SQL ниже идемпотентен, безопасен.
 2. **#6: Orphaned artifacts** — 30/54 без `rental_id`, никогда не будут QR-claimable. Привязать через secrets.source_rental_id или по оператору+байку+дате.
 3. **#2: `window.location.reload()` → `router.refresh()`** — 15 минут, high operator-visible value.
-4. **#1: `lead_notes.lead_id`** — 1 строка в проде. Паркуем.
-5. **#3, #4, #5** — долгосрочные, сегодня не болят.
+4. **#1: `lead_notes.lead_id`** — ✅ Закрыто. Бэкфилл применён, propagate_claim Step 6 чинит будущие claim'ы.
+5. **#3, #4, #5** — закрыты в ходе аудита (#3 готов, #4 готов, #5 готов).
 
 **SQL для #7 — todo `user_id` backfill (идемпотентно):**
 
@@ -685,10 +687,10 @@ WHERE rental_id IS NULL;
 | 3 | **`window.location.reload()` → `router.refresh()`** | ✅ Fixed (7 occurrences in leads, 1 in rentals) | High |
 | 4 | **`secret.chat_id` backfill** (not in Step 3, see §13.7 #1) | ✅ Fixed in `20260721170000` | High |
 | 5 | **`propagate_claim` LIKE→JSONB** (see §13.7 #3) | ✅ Fixed in `20260721170000` | Medium |
-| 6 | **`lead_notes.lead_id` migration** (§6 #5) | ⏳ Parked | Low |
-| 7 | **Analytics page parity** (§9 phase 4) | ⏳ Parked | Low |
-| 8 | **Stable CRM lead UUID** (§8) | ⏳ Parked | Low |
-| 9 | **Regression fixtures** (§11.5) | ⏳ Parked | Low |
+| 6 | **`lead_notes.lead_id` migration** (§6 #5) | ✅ Done (backfill + propagate_claim Step 6) | Low |
+| 7 | **Analytics page parity** (§9 phase 4) | ✅ Done (operator-placeholder detection in rentals-dashboard.ts) | Low |
+| 8 | **Stable CRM lead UUID** (§8) | ✅ Done (crm_leads table + resolve_crm_lead() helper) | Low |
+| 9 | **Regression fixtures** (§11.5) | ⏳ Skipped (out of scope) | Low |
 | 10 | **`claimRentalSecretsByDocSha` pre-RPC write** (§13.7 #2) | ✅ FIXED — validate-only, RPC is sole writer | Critical |
 
 ### 13.5 UX polish — `window.location.reload()` → `router.refresh()`
@@ -1140,28 +1142,30 @@ Same risk for `crew_todos.phone` — `createLeadFollowupTodos` uses the inline c
 
 This is a **refactor**, not a hotfix — the divergence only manifests for edge-case inputs. But it's the right time to consolidate since the audit is fresh.
 
-### 15.3 🟡 Parked items still parked (no regressions, no new progress)
+### 15.3 🟢 Previously parked items — now closed
 
-These were marked as "parked" in §13.4c and remain parked. Listed here for completeness — no action needed unless priorities change:
+All previously parked items from §13.4c have been addressed:
 
-| Item | Parked at | Reason |
-|---|---|---|
-| `lead_notes.lead_id` migration (§6 #5) | §13.4c #6 | Only 1 row in production |
-| Analytics page parity (§9 phase 4) | §13.4c #7 | `rentals-dashboard.ts` still has no operator-placeholder detection — confirmed by reading L245-270 (main query doesn't select `created_by_operator_chat_id`). Acceptable because analytics treats `rental_id` as primary key, so operator-placeholder rentals show up under their `rental_id` (correct) but the renter column shows the operator's name (cosmetic). |
-| Stable CRM lead UUID (§8) | §13.4c #8 | Long-term architectural fix |
-| Regression fixtures (§11.5) | §13.4c #9 | Should be done before any more refactors |
+| Item | Was parked at | Status | Resolution |
+|---|---|---|---|
+| `lead_notes.lead_id` migration (§6 #5) | §13.4c #6 | ✅ Closed | Backfill migration `20260721200000` applied; propagate_claim Step 6 already handles future claims |
+| Analytics page parity (§9 phase 4) | §13.4c #7 | ✅ Closed | Operator-placeholder detection added to `rentals-dashboard.ts` — `isOperatorPlaceholder` + `operatorPlaceholderCount`; shown as "Ожидают QR" stat in analytics UI |
+| Stable CRM lead UUID (§8) | §13.4c #8 | ✅ Closed | Foundation migration `20260721210000` creates `crm_leads` table + `crm_lead_rentals`/`crm_lead_artifacts` link tables + `resolve_crm_lead()` helper. Integration into existing flows is next phase. |
+| Regression fixtures (§11.5) | §13.4c #9 | ⏳ Skipped | Out of scope for this session |
 
 ### 15.4 Recommended next actions (priority order)
 
-**All 3 open findings from this section have been fixed in §15.7.** Remaining:
+**All open findings from this session have been fixed.** Remaining:
 
-1. **NEW #5 (LOW — perf)** — optimize `getRentalReturnTodos` in `rentals.ts:655` to use the indexed `rental_id` column instead of fetching all crew todos and filtering client-side. Park unless performance becomes an issue on high-volume crews.
+1. ~~**NEW #5 (LOW — perf)** — optimize `getRentalReturnTodos` in `rentals.ts:655` to use the indexed `rental_id` column instead of fetching all crew todos and filtering client-side.~~ ✅ **Fixed** — now uses indexed `rental_id.eq` with `description.ilike` fallback.
 
-2. **(Parked)** — analytics page parity (§13.4c #7), regression fixtures (§13.4c #9), stable CRM UUID (§13.4c #8), `lead_notes` migration (§13.4c #6). No urgency — see §15.3.
+2. ~~**(Parked)** — analytics page parity (§13.4c #7), regression fixtures (§13.4c #9), stable CRM UUID (§13.4c #8), `lead_notes` migration (§13.4c #6).~~ ✅ **All closed** — see §15.3.
 
 3. **NEW #4 (no action)** — documented as not-a-bug. Web-flow rentals correctly don't set `created_by_operator_chat_id` because they're renter-initiated.
 
 4. **NEW #2 (no action)** — false alarm. `phone-utils.ts` exists in the repo; was just missing from the previous bundle.
+
+5. **Future: CRM lead UUID integration** — integrate `crm_leads` into existing flows: set `crm_lead_id` on rental creation, QR claim, and web flow. Not urgent — current identity resolution works correctly via existing fields.
 
 ### 15.5 Files inspected in this re-audit
 
@@ -1218,4 +1222,4 @@ All 3 open findings from the re-audit were fixed in one session:
 
 `phone-utils.ts` is now the single canonical source: accepts `+7/7/8` prefixes, spaces/dashes/parens, infers `+7` for 10-digit RU numbers, rejects `< 10` digit garbage. All 4 inline copies removed, replaced with `import { normalizePhone } from "@/app/franchize/lib/phone-utils"`. `lib/leads.ts` already used `phone-utils.ts` — no change needed there.
 
-**Still parked:** NEW #5 (`getRentalReturnTodos` ignores `rental_id` index), §13.4c #6-9 (lead_notes migration, analytics parity, CRM UUID, regression fixtures).
+**All previously parked items now closed.** NEW #5 fixed (indexed rental_id), §13.4c #6 done (lead_notes backfill), #7 done (analytics parity), #8 done (CRM UUID foundation). #9 skipped (regression fixtures out of scope).
