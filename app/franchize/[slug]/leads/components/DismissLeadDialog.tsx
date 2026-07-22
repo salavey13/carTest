@@ -24,10 +24,21 @@ interface Props {
 
 /**
  * Close-lead confirmation dialog.
- * - Reason dropdown (from DISMISS_REASONS)
- * - Note textarea (required if reason.requiresNote)
- * - Analytics impact preview (conversion -1, revenue -X, source, stage)
- * - Cancel + destructive red "Закрыть лид" button
+ *
+ * Layout:
+ *   - Desktop (sm+): centered modal with backdrop scrim.
+ *   - Mobile: slides up as a bottom sheet, anchored to the bottom of the
+ *     viewport with safe-area padding at the bottom.
+ *
+ * Contents:
+ *   - Reason dropdown (from DISMISS_REASONS).
+ *   - Note textarea (required if reason.requiresNote).
+ *   - Analytics impact preview panel with a subtle red tint (T.bgElevated +
+ *     `#ef444408` overlay) so the operator notices the consequences.
+ *   - Cancel + destructive red "Закрыть лид" button.
+ *
+ * z-index: z-[60] — above the mobile sheet (z-50) and drawer (z-40), below
+ * toasts (z-[70]).
  */
 export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }: Props) {
   const [reason, setReason] = useState(reasons[0]?.value || "");
@@ -47,8 +58,6 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
   const expectedRevenue =
     lead?.rentals?.reduce((s, r) => s + (Number(r.totalCost) || 0), 0) || 0;
   const source = lead?.source || "—";
-  // Show the localized stage label (e.g. "Новые") instead of the raw stage key
-  // (e.g. "new") in the analytics preview. Falls back to the raw key if no label.
   const stageKey = (lead as { stageKey?: string }).stageKey || "new";
   const stage = STAGE_LABELS[stageKey] || stageKey;
 
@@ -59,28 +68,38 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.7)" }}
+          transition={{ duration: 0.18 }}
+          // z-[60]: above mobile sheet (z-50) + drawer (z-40), below toast (z-[70]).
+          // On mobile the dialog anchors to the bottom; on desktop it's centered.
+          className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4"
+          style={{ background: "color-mix(in srgb, #000000 70%, transparent)" }}
           onClick={onCancel}
         >
           <motion.div
-            initial={{ scale: 0.94, opacity: 0, y: 12 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.94, opacity: 0, y: 12 }}
-            transition={{ type: "spring", damping: 26, stiffness: 280 }}
-            className="w-full max-w-3xl rounded-[28px] border p-5"
+            initial={{ y: 40, opacity: 0, scale: 0.98 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 40, opacity: 0, scale: 0.98 }}
+            transition={{ type: "spring", damping: 28, stiffness: 300 }}
+            // Mobile: full-width, rounded top corners only (bottom-sheet feel).
+            // Desktop: max-w-3xl, all corners rounded.
+            className="w-full max-w-3xl rounded-t-[28px] border p-5 sm:rounded-[28px]"
             style={{
               background: T.bg,
-              borderColor: "rgba(255,255,255,0.1)",
-              boxShadow: "0 18px 50px rgba(0,0,0,0.45)",
+              borderColor: T.border,
+              boxShadow: T.shadow,
+              paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
             }}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Закрыть лид"
           >
             <div className="flex items-start justify-between gap-4">
               <div className="flex gap-3">
                 <div
                   className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
                   style={{ background: "#ef444420" }}
+                  aria-hidden
                 >
                   <AlertTriangle className="h-5 w-5" style={{ color: "#f87171" }} />
                 </div>
@@ -89,17 +108,25 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
                     Закрыть лид
                   </h3>
                   <p className="mt-1 text-sm" style={{ color: T.textMuted }}>
-                    {lead?.full_name || "Без имени"} — выберите причину закрытия и
-                    добавьте комментарий.
+                    {lead?.full_name || "Без имени"} — выберите причину закрытия
+                    и добавьте комментарий.
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={onCancel}
-                className="rounded-lg p-1.5 transition hover:bg-white/5"
+                className="cursor-pointer rounded-lg p-1.5 transition"
                 style={{ color: T.textFaint }}
                 aria-label="Закрыть окно"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = T.bgCardHover;
+                  e.currentTarget.style.color = T.text;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = T.textFaint;
+                }}
               >
                 <X className="h-5 w-5" />
               </button>
@@ -114,10 +141,10 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
                   <select
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    className="w-full rounded-2xl border px-4 py-3 outline-none"
+                    className="min-h-[44px] w-full cursor-pointer rounded-2xl border px-4 py-3 outline-none"
                     style={{
-                      background: "rgba(255,255,255,0.05)",
-                      borderColor: "rgba(255,255,255,0.1)",
+                      background: T.inputBg,
+                      borderColor: T.inputBorder,
                       color: T.text,
                     }}
                   >
@@ -139,11 +166,11 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
                     placeholder="Клиент выбрал другого поставщика..."
                     className="min-h-32 w-full resize-none rounded-2xl border px-4 py-3 outline-none"
                     style={{
-                      background: "rgba(255,255,255,0.05)",
+                      background: T.inputBg,
                       borderColor:
                         requiresNote && !note.trim()
                           ? "#ef444460"
-                          : "rgba(255,255,255,0.1)",
+                          : T.inputBorder,
                       color: T.text,
                     }}
                   />
@@ -155,11 +182,12 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
                 </label>
               </div>
 
+              {/* Analytics impact preview — subtle red tint */}
               <div
                 className="space-y-3 rounded-2xl border p-4"
                 style={{
-                  borderColor: T.border,
-                  background: T.bgElevated,
+                  borderColor: `${T.border}`,
+                  background: `color-mix(in srgb, #ef4444 5%, ${T.bgElevated})`,
                 }}
               >
                 <p
@@ -184,8 +212,14 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
               <button
                 type="button"
                 onClick={onCancel}
-                className="rounded-2xl border px-5 py-3 text-sm font-medium transition hover:bg-white/5"
-                style={{ borderColor: "rgba(255,255,255,0.1)", color: T.text }}
+                className="min-h-[44px] cursor-pointer rounded-2xl border px-5 py-3 text-sm font-medium transition"
+                style={{ borderColor: T.border, color: T.text }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = T.bgCardHover;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
               >
                 Отмена
               </button>
@@ -193,7 +227,7 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
                 type="button"
                 disabled={!canSubmit}
                 onClick={() => onSubmit(reason, note.trim())}
-                className="rounded-2xl px-5 py-3 text-sm font-semibold transition enabled:hover:brightness-110 disabled:opacity-40"
+                className="min-h-[44px] cursor-pointer rounded-2xl px-5 py-3 text-sm font-semibold transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
                 style={{ background: "#dc2626", color: "#ffffff" }}
               >
                 Закрыть лид
@@ -217,11 +251,12 @@ function Row({
   tone: "danger" | "accent";
   T: ThemeTokens;
 }) {
-  const color = tone === "danger" ? "#fca5a5" : "#fde68a";
+  // Semantic tone colors: danger uses red-300, accent uses yellow-200.
+  const color = tone === "danger" ? "#fca5a5" : T.accent;
   return (
-    <div className="flex items-center justify-between text-sm">
+    <div className="flex min-h-[28px] items-center justify-between text-sm">
       <span style={{ color: T.textMuted }}>{label}</span>
-      <span style={{ color }}>{value}</span>
+      <span className="font-medium" style={{ color }}>{value}</span>
     </div>
   );
 }
