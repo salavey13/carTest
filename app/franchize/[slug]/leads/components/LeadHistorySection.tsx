@@ -37,6 +37,8 @@ const EVENT_ICON: Record<string, LucideIcon> = {
   note_added: MessageSquare,
 };
 
+// Semantic per-event colors. Same palette as the rest of the dashboard so
+// qr_claimed (green) matches the verified check, etc.
 const EVENT_COLOR: Record<string, string> = {
   lead_created: "#a1a1aa",
   first_contact: "#facc15",
@@ -64,28 +66,40 @@ function formatTimestamp(ts: string): string {
 }
 
 /**
- * Vertical timeline with colored icons.
- * Each event: timestamp + label + optional detail, in a single row.
+ * Vertical timeline with colored dots.
+ *
+ * Layout:
+ *   - Vertical line on the left (1px, T.border color).
+ *   - Each event has a colored dot (28px circle) sitting on the line.
+ *   - Compact on mobile: timestamp + label on one line, detail hidden behind
+ *     a soft wrap if present. On desktop: timestamp on top, label below,
+ *     detail on a third line.
+ *
+ * AnimatePresence is used so events fade+slide in when the section expands.
  */
 export function LeadHistorySection({ events, expanded, onToggle, T }: Props) {
   return (
-    <section className="glass-panel rounded-[24px] p-5">
+    <section className="glass-panel rounded-[24px] p-4 sm:p-5">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between"
+        aria-expanded={expanded}
+        className="flex min-h-[44px] w-full cursor-pointer items-center justify-between"
       >
         <div className="flex items-center gap-3">
-          <History className="h-5 w-5" style={{ color: T.accent }} />
-          <h3 className="text-lg font-semibold" style={{ color: T.text }}>
+          <History className="h-5 w-5" style={{ color: T.accent }} aria-hidden />
+          <h3 className="text-base font-semibold md:text-lg" style={{ color: T.text }}>
             История
           </h3>
           <span className="text-sm" style={{ color: T.textMuted }}>
             {events.length}
           </span>
         </div>
-        <motion.div animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-          <ChevronDown className="h-5 w-5" style={{ color: T.textMuted }} />
+        <motion.div
+          animate={{ rotate: expanded ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <ChevronDown className="h-5 w-5" style={{ color: T.textMuted }} aria-hidden />
         </motion.div>
       </button>
 
@@ -100,7 +114,7 @@ export function LeadHistorySection({ events, expanded, onToggle, T }: Props) {
           >
             <div
               className="mt-5 space-y-4 border-l pl-5"
-              style={{ borderColor: "rgba(255,255,255,0.08)" }}
+              style={{ borderColor: T.border }}
             >
               {events.length === 0 ? (
                 <p className="text-sm" style={{ color: T.textMuted }}>
@@ -109,29 +123,45 @@ export function LeadHistorySection({ events, expanded, onToggle, T }: Props) {
               ) : (
                 events.map((ev, i) => {
                   const Icon = EVENT_ICON[ev.type] || History;
-                  const color = EVENT_COLOR[ev.type] || "#a1a1aa";
+                  const color = EVENT_COLOR[ev.type] || T.textFaint;
                   return (
                     <motion.div
                       key={`${ev.type}-${i}`}
                       initial={{ opacity: 0, x: -8 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: Math.min(i * 0.03, 0.3) }}
+                      transition={{
+                        delay: Math.min(i * 0.03, 0.3),
+                        type: "spring",
+                        damping: 24,
+                        stiffness: 280,
+                      }}
                       className="relative"
                     >
+                      {/* Colored dot on the vertical line */}
                       <div
                         className="absolute -left-[26px] top-0 grid h-7 w-7 place-items-center rounded-full"
                         style={{ background: `${color}1a` }}
+                        aria-hidden
                       >
                         <Icon className="h-3.5 w-3.5" style={{ color }} />
                       </div>
-                      <div className="text-xs" style={{ color: T.textMuted }}>
-                        {formatTimestamp(ev.timestamp)}
-                      </div>
-                      <div className="mt-0.5 text-sm" style={{ color: T.text }}>
-                        {ev.label}
+                      {/* Mobile: single-line compact layout. Desktop: 2-line. */}
+                      <div className="flex flex-wrap items-baseline gap-x-2 md:block">
+                        <span className="text-xs" style={{ color: T.textMuted }}>
+                          {formatTimestamp(ev.timestamp)}
+                        </span>
+                        <span
+                          className="text-sm md:mt-0.5 md:block"
+                          style={{ color: T.text }}
+                        >
+                          {ev.label}
+                        </span>
                       </div>
                       {ev.detail && (
-                        <div className="mt-0.5 text-xs" style={{ color: T.textFaint }}>
+                        <div
+                          className="mt-0.5 text-xs"
+                          style={{ color: T.textFaint }}
+                        >
                           {ev.detail}
                         </div>
                       )}
