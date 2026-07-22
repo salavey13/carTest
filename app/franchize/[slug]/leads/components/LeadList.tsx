@@ -1,107 +1,148 @@
 "use client";
 
-import { useMemo, useRef, useCallback } from "react";
+import { useMemo, useRef, useCallback, type ReactNode } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { motion } from "framer-motion";
-import { useVirtualList } from "../hooks/useVirtualList";
-import { LeadCard } from "./LeadCard";
+import { Inbox } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
+import type { LeadSignal } from "@/app/franchize/[slug]/leads/leads-constants";
+import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
+import { LeadCard } from "./LeadCard";
 
-interface LeadListProps {
+interface Props {
   leads: LeadRow[];
-  selectedId: string | null;
-  setSelectedId: (id: string | null) => void;
-  onDismiss: (id: string) => void;
+  selectedLeadId: string | null;
+  onSelectLead: (lead: LeadRow) => void;
+  onDismissLead: (leadId: string) => void;
   getTodosForLead: (lead: LeadRow) => LeadTodoRow[];
-  T: any;
+  getLeadSignals: (lead: LeadRow) => LeadSignal[];
+  T: ThemeTokens;
   crewId: string;
   slug: string;
-  /**
-   * Optional callback fired when a lead is selected (desktop: detail panel,
-   * mobile: bottom sheet). Lets parent own the detail entirely.
-   */
-  onSelectLead?: (lead: LeadRow | null) => void;
+  /** Optional empty-state renderer (defaults to a generic Inbox empty card). */
+  emptyState?: ReactNode;
 }
 
-/** Approximate starting height — real height is measured via measureElement */
-const ITEM_HEIGHT = 128;
+/** Approximate card height — the virtualizer measures actual height via measureElement. */
+const ESTIMATED_ITEM_HEIGHT = 192;
+const OVERSCAN = 6;
 
-const cardVariants = {
-  hidden: { opacity: 0 },
-  visible: (i: number) => ({
-    opacity: 1,
-    transition: {
-      duration: 0.2,
-      delay: Math.min(i * 0.025, 0.12),
-    },
-  }),
-};
-
+/**
+ * Virtualized lead list.
+ *
+ * Uses @tanstack/react-virtual for windowed rendering — only the visible
+ * LeadCards (+ OVERSCAN above/below) are mounted, so the list stays smooth
+ * with thousands of leads.
+ *
+ * Each row is absolutely positioned (transform: translateY) inside a tall
+ * container. measureElement keeps heights accurate when content reflows.
+ */
 export function LeadList({
   leads,
-  selectedId,
-  setSelectedId,
-  onDismiss,
-  getTodosForLead,
-  T,
-  crewId,
-  slug,
+  selectedLeadId,
   onSelectLead,
-}: LeadListProps) {
-  const { parentRef, virtualItems, totalHeight, measureElement } = useVirtualList(leads, {
-    itemHeight: ITEM_HEIGHT,
-    containerHeight: 600,
-    overscan: 5,
+  onDismissLead,
+  getTodosForLead: _getTodosForLead,
+  getLeadSignals,
+  T,
+  crewId: _crewId,
+  slug: _slug,
+  emptyState,
+}: Props) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: leads.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ESTIMATED_ITEM_HEIGHT,
+    overscan: OVERSCAN,
+    measureElement: (el) => el.getBoundingClientRect().height,
   });
 
-  const isSelected = useMemo(
-    () => (selectedId ? new Set([selectedId]) : new Set<string>()),
-    [selectedId]
-  );
+  const virtualItems = virtualizer.getVirtualItems();
+  const totalHeight = virtualizer.getTotalSize();
 
   const handleSelect = useCallback(
     (lead: LeadRow) => {
-      const nextId = selectedId === lead.user_id ? null : lead.user_id;
-      setSelectedId(nextId);
-      onSelectLead?.(nextId ? lead : null);
+      onSelectLead(lead);
     },
-    [selectedId, setSelectedId, onSelectLead]
+    [onSelectLead]
   );
+
+  const handleDismiss = useCallback(
+    (leadId: string) => {
+      onDismissLead(leadId);
+    },
+    [onDismissLead]
+  );
+
+  // Stable id set for fast selection lookup.
+  const selectedSet = useMemo(
+    () => (selectedLeadId ? new Set([selectedLeadId]) : new Set<string>()),
+    [selectedLeadId]
+  );
+
+  if (leads.length === 0) {
+    return (
+      <div className="grid place-items-center rounded-[24px] border border-dashed p-10 text-center" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+        {emptyState ?? (
+          <div className="space-y-2">
+            <Inbox className="mx-auto h-10 w-10" style={{ color: T.textFaint }} />
+            <p className="text-sm" style={{ color: T.textMuted }}>
+              Лиды не найдены
+            </p>
+            <p className="text-xs" style={{ color: T.textFaint }}>
+              Измените фильтры или поисковый запрос
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
       ref={parentRef}
-      className="h-full max-h-[calc(100vh-280px)] overflow-y-auto"
-      style={{ width: "100%" }}
+      className="max-h-[calc(100vh-280px)] overflow-y-auto overflow-x-hidden pr-1"
+      style={{
+        // Hide scrollbar for cleaner look on desktop, but keep it functional.
+        scrollbarWidth: "thin",
+        scrollbarColor: "rgba(255,255,255,0.15) transparent",
+        // Smooth scrolling for anchor jumps (selected lead scrollIntoView).
+        scrollBehavior: "smooth",
+      }}
     >
       <div style={{ position: "relative", height: totalHeight, width: "100%" }}>
         {virtualItems.map((virtualRow) => {
           const lead = leads[virtualRow.index];
-          const isThisSelected = isSelected.has(lead.user_id);
+          if (!lead) return null;
+          const isSelected = selectedSet.has(lead.user_id);
+          const signals = getLeadSignals(lead);
           return (
             <motion.div
               key={lead.user_id}
+              data-lead-id={lead.user_id}
               data-index={virtualRow.index}
-              ref={measureElement}
-              className="virtual-item"
-              custom={virtualRow.index}
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
+              ref={virtualizer.measureElement}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.18, delay: Math.min(virtualRow.index * 0.01, 0.06) }}
               style={{
                 position: "absolute",
                 top: 0,
                 left: 0,
                 right: 0,
                 transform: `translateY(${virtualRow.start}px)`,
+                paddingBottom: 12,
               }}
             >
               <LeadCard
                 lead={lead}
-                T={T}
-                isSelected={isThisSelected}
+                signals={signals}
+                selected={isSelected}
                 onSelect={() => handleSelect(lead)}
-                onDismiss={onDismiss}
-                todos={getTodosForLead(lead)}
+                onDismiss={handleDismiss}
+                T={T}
               />
             </motion.div>
           );
