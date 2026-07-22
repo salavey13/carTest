@@ -23,14 +23,15 @@ export function LeadsAppShell({ children, className = "", T, isMobile = false }:
     <div
       className={`relative min-h-[100dvh] w-full ${className}`}
       style={{
-        // Subtle radial-gradient + linear gradient on top of #09090b base.
+        // Subtle radial-gradient + linear gradient on top of T.bg base.
         // Two layered backgrounds: a faint accent glow (top-left) and a vertical
         // dim fade (bottom). Both via color-mix so they react to the dynamic
-        // crew theme accent color.
+        // crew theme accent color. Previously hardcoded #0c0c0f/#09090b which
+        // broke on light themes and on crew theme overrides.
         background: `
           radial-gradient(1200px 480px at 12% -8%, ${hexA(T.accent, 0.10)}, transparent 60%),
           radial-gradient(900px 420px at 92% 0%, ${hexA(T.accent, 0.06)}, transparent 55%),
-          linear-gradient(180deg, #0c0c0f 0%, #09090b 40%, #09090b 100%)
+          linear-gradient(180deg, ${T.bgElevated} 0%, ${T.bg} 40%, ${T.bg} 100%)
         `,
         color: T.text,
       }}
