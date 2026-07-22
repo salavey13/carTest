@@ -65,10 +65,13 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
       whileHover={{ y: -2 }}
       whileTap={{ scale: 0.995 }}
       onClick={onSelect}
-      className="relative cursor-pointer overflow-hidden rounded-[24px] p-3 md:p-3 md:p-4 pl-6"
+      // pl-6 reserves space for the 4px left color stripe + visual breathing room.
+      // (Previously had a duplicate `md:p-3 md:p-4` pair — the later won and the
+      // duplicate was just noise.)
+      className="relative cursor-pointer overflow-hidden rounded-[24px] p-3 pl-6 md:p-4"
       style={{
-        background: "T.bgCard",
-        border: `1px solid ${selected ? stageColor : "T.border"}`,
+        background: T.bgCard,
+        border: `1px solid ${selected ? stageColor : T.border}`,
         boxShadow: selected
           ? `0 0 0 2px ${stageColor}40, 0 18px 50px rgba(0,0,0,0.35)`
           : "0 18px 50px rgba(0,0,0,0.35)",
@@ -154,7 +157,7 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
             <div
               className="rounded-2xl border p-3 text-sm"
               style={{
-                borderColor: "T.border",
+                borderColor: T.border,
                 background: T.bgElevated,
                 color: T.textMuted,
               }}
