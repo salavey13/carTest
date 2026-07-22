@@ -29,12 +29,13 @@ interface Props {
 /**
  * Kanban board with one column per pipeline stage (9 total).
  *
- * - Mobile: horizontal scroll (one column visible at a time)
- * - Desktop (lg+): all 9 columns side-by-side with equal flex
+ * Mobile: horizontal scroll — one column visible at a time, each column is
+ * 260px wide. Hidden scrollbar for a cleaner mobile look.
+ * Desktop (lg+): all 9 columns side-by-side in a 9-col grid.
  *
  * Cards are NOT draggable in v1 — they are click targets that open the
  * detail drawer / mobile sheet. Each card is a compact variant of LeadCard
- * (just avatar, name, stage badge, SLA chip).
+ * (avatar 32px, name truncated, SLA chip).
  */
 export function LeadBoard({
   leadsByStage,
@@ -61,13 +62,10 @@ export function LeadBoard({
       </div>
 
       <div
-        // Mobile: horizontal scroll, one column visible at a time.
-        // Desktop (lg+): 9-column grid (PIPELINE_STAGES length), no overflow.
-        // Previously this className had duplicate `gap-3 overflow-x-auto` tokens
-        // AND a conflicting `lg:grid lg:flex` pair — the later `lg:flex` won and
-        // broke the desktop grid layout (columns stacked instead of gridded).
+        // Mobile: horizontal scroll with hidden scrollbar — one column visible at a time.
+        // Desktop (lg+): 9-column grid, no overflow.
         className="flex gap-3 overflow-x-auto pb-4 lg:grid lg:grid-cols-9 lg:gap-3 lg:overflow-visible lg:pb-0"
-        style={{ scrollbarWidth: "thin" }}
+        style={{ scrollbarWidth: "none" }}
       >
         {PIPELINE_STAGES.map((stage) => (
           <BoardColumn
@@ -99,7 +97,7 @@ interface ColumnProps {
 }
 
 function BoardColumn({
-  stageKey,
+  stageKey: _stageKey,
   label,
   color,
   leads,
@@ -110,7 +108,8 @@ function BoardColumn({
 }: ColumnProps) {
   return (
     <div
-      className="flex w-[280px] shrink-0 flex-col rounded-[20px] border lg:w-auto lg:min-w-0"
+      // Mobile: 260px-wide column. Desktop: full-width grid cell.
+      className="flex w-[260px] shrink-0 flex-col rounded-[20px] border lg:w-auto lg:min-w-0"
       style={{
         borderColor: `${color}33`,
         background: `${color}0a`,
@@ -126,6 +125,7 @@ function BoardColumn({
           <span
             className="h-2.5 w-2.5 shrink-0 rounded-full"
             style={{ background: color, boxShadow: `0 0 8px ${color}80` }}
+            aria-hidden
           />
           <span
             className="truncate text-xs font-semibold uppercase tracking-wide"
@@ -193,6 +193,7 @@ function BoardCard({
   const rel = relativeTime(lead.lastSeenAt || lead.createdAt);
   const topSignal = signals[0];
   const sigTone = topSignal?.tone || "neutral";
+  // Semantic tone colors — keep as fixed hexes (signal indicators).
   const sigColor =
     sigTone === "danger"
       ? "#ef4444"
@@ -200,7 +201,7 @@ function BoardCard({
         ? "#f59e0b"
         : sigTone === "good"
           ? "#22c55e"
-          : "#a1a1aa";
+          : T.textFaint;
 
   return (
     <motion.button
@@ -211,32 +212,34 @@ function BoardCard({
       transition={{ delay: Math.min(index * 0.02, 0.1), duration: 0.18 }}
       whileHover={{ y: -1 }}
       whileTap={{ scale: 0.99 }}
-      className="relative w-full overflow-hidden rounded-2xl border p-3 text-left transition"
+      className="relative w-full cursor-pointer overflow-hidden rounded-2xl border p-3 text-left transition"
       style={{
-        borderColor: selected ? stageColor : "rgba(255,255,255,0.08)",
+        borderColor: selected ? stageColor : T.border,
         background: selected
-          ? `linear-gradient(180deg, ${stageColor}1a, rgba(255,255,255,0.02))`
-          : "rgba(255,255,255,0.025)",
-        boxShadow: selected ? `0 0 0 1px ${stageColor}55, 0 8px 22px ${stageColor}22` : "none",
+          ? `linear-gradient(180deg, ${stageColor}1a, ${T.bgCard})`
+          : T.bgCard,
+        boxShadow: selected
+          ? `0 0 0 1px ${stageColor}55, 0 8px 22px ${stageColor}22`
+          : "none",
       }}
+      aria-label={`Лид: ${lead.full_name || "Без имени"}`}
     >
-      {/* Left edge color stripe */}
+      {/* Left edge color stripe — 2px wide for compact board cards */}
       <div
         className="absolute left-0 top-0 h-full w-0.5"
         style={{ background: stageColor }}
+        aria-hidden
       />
 
       <div className="flex items-center gap-2.5 pl-1">
+        {/* Compact avatar — 32px (h-8 w-8) */}
         <div
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-bold"
           style={{ background: `${stageColor}26`, color: stageColor }}
+          aria-hidden
         >
           {initials}
         </div>
-        {/* min-w-0 + flex-1 lets the name truncate properly inside the 280px
-            column. Previously this was min-w-[280px] flex-shrink-0 which forced
-            the inner block to 280px+ and made the chevron + avatar overflow /
-            overlap the next card. */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <p
@@ -246,7 +249,11 @@ function BoardCard({
               {lead.full_name || "Без имени"}
             </p>
             {lead.verified && (
-              <CheckCircle2 className="h-3 w-3 shrink-0" style={{ color: "#22c55e" }} />
+              <CheckCircle2
+                className="h-3 w-3 shrink-0"
+                style={{ color: "#22c55e" }}
+                aria-label="Подтверждён"
+              />
             )}
           </div>
           <p
@@ -256,17 +263,22 @@ function BoardCard({
             {lead.phone || (lead.username ? `@${lead.username}` : "") || rel || "—"}
           </p>
         </div>
-        <ChevronRight className="h-3.5 w-3.5 shrink-0" style={{ color: T.textFaint }} />
+        <ChevronRight
+          className="h-3.5 w-3.5 shrink-0"
+          style={{ color: T.textFaint }}
+          aria-hidden
+        />
       </div>
 
-      {/* SLA chip */}
+      {/* SLA chip — compact */}
       {topSignal && (
         <div className="mt-2 flex flex-wrap items-center gap-1 pl-1">
           <span
             className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-medium"
             style={{ background: `${sigColor}1f`, color: sigColor }}
           >
-            {topSignal.label}: <span className="font-bold tabular-nums">{topSignal.value}</span>
+            {topSignal.label}:{" "}
+            <span className="font-bold tabular-nums">{topSignal.value}</span>
           </span>
         </div>
       )}
@@ -284,7 +296,7 @@ function EmptyColumnPlaceholder({ color, T }: { color: string; T: ThemeTokens })
         className="grid h-8 w-8 place-items-center rounded-full"
         style={{ background: `${color}1a` }}
       >
-        <ChevronRight className="h-4 w-4" style={{ color: `${color}aa` }} />
+        <ChevronRight className="h-4 w-4" style={{ color: `${color}aa` }} aria-hidden />
       </div>
       <p className="mt-2 text-[10px]" style={{ color: T.textFaint }}>
         Нет лидов
