@@ -108,7 +108,7 @@ export function LeadDetailDrawer(props: Props) {
   const initials = getInitials(lead.full_name);
   const rel = relativeTime(lead.lastSeenAt || lead.createdAt);
   const isHot = signals.some((s) => s.tone === "danger");
-  const assignee = (lead as { assignee?: string }).assignee || "—";
+  const assignee = lead.assigneeName || lead.assigneeId || "—";
 
   const [todoFilter, setTodoFilter] = useState<TodoFilter>("all");
   const [newTodo, setNewTodo] = useState("");
@@ -204,8 +204,8 @@ export function LeadDetailDrawer(props: Props) {
           onClick={(e) => e.stopPropagation()}
           className="flex h-full w-full max-w-[640px] flex-col"
           style={{
-            background: "#0c0c0e",
-            borderLeft: "1px solid rgba(255,255,255,0.08)",
+            background: T.bg,
+            borderLeft: "1px solid T.border",
             boxShadow: "0 0 60px rgba(0,0,0,0.6)",
           }}
         >
@@ -326,7 +326,7 @@ export function LeadDetailDrawer(props: Props) {
                       key={r.rentalId}
                       className="flex items-center justify-between rounded-2xl border p-3"
                       style={{
-                        borderColor: "rgba(255,255,255,0.08)",
+                        borderColor: "T.border",
                         background: "rgba(255,255,255,0.03)",
                       }}
                     >
@@ -453,7 +453,7 @@ export function LeadDetailDrawer(props: Props) {
                           style={{
                             borderColor: isOverdue
                               ? "#ef444433"
-                              : "rgba(255,255,255,0.08)",
+                              : "T.border",
                             background: isOverdue
                               ? "#ef44440d"
                               : "rgba(255,255,255,0.03)",
@@ -566,7 +566,7 @@ export function LeadDetailDrawer(props: Props) {
                         key={n.id}
                         className="rounded-2xl border p-3"
                         style={{
-                          borderColor: "rgba(255,255,255,0.08)",
+                          borderColor: "T.border",
                           background: "rgba(255,255,255,0.03)",
                         }}
                       >
@@ -603,8 +603,8 @@ export function LeadDetailDrawer(props: Props) {
           <div
             className="absolute bottom-0 left-0 right-0 flex items-center gap-3 border-t p-4"
             style={{
-              borderColor: "rgba(255,255,255,0.08)",
-              background: "rgba(12,12,14,0.92)",
+              borderColor: "T.border",
+              background: T.bg,
               backdropFilter: "blur(12px)",
             }}
           >
