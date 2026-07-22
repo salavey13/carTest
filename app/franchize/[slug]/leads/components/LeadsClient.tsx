@@ -858,7 +858,7 @@ function ModeTabsRow({
       {/* Mode tabs */}
       <div
         className="inline-flex rounded-full border p-1"
-        style={{ borderColor: "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)" }}
+        style={{ borderColor: T.border, background: T.bgCard }}
         role="tablist"
         aria-label="Режим пайплайна"
       >
@@ -873,14 +873,19 @@ function ModeTabsRow({
               aria-selected={active}
               onClick={() => onModeChange(tab.value)}
               whileTap={{ scale: 0.96 }}
-              className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition"
+              transition={{ type: "spring", damping: 22, stiffness: 320 }}
+              className="inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition"
               style={
                 active
-                  ? { background: tab.color, color: "#0a0a0a", boxShadow: `0 6px 18px ${tab.color}40` }
+                  ? {
+                      background: tab.color,
+                      color: T.accentContrast,
+                      boxShadow: `0 6px 18px ${tab.color}40`,
+                    }
                   : { color: T.textMuted }
               }
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-4 w-4" aria-hidden />
               <span>{tab.label}</span>
             </motion.button>
           );
@@ -891,16 +896,20 @@ function ModeTabsRow({
       <button
         type="button"
         onClick={onToggleHideOperators}
-        className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-medium transition"
-        style={
-          hideOperatorPlaceholders
-            ? { borderColor: `${T.accent}40`, background: `${T.accent}14`, color: T.accent }
-            : { borderColor: "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: T.textMuted }
-        }
         aria-pressed={hideOperatorPlaceholders}
         title="Скрывать лиды, созданные операторами как заглушки (нет реальной активности)"
+        className="inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-medium transition"
+        style={
+          hideOperatorPlaceholders
+            ? {
+                borderColor: `${T.accent}40`,
+                background: `${T.accent}14`,
+                color: T.accent,
+              }
+            : { borderColor: T.border, background: T.bgCard, color: T.textMuted }
+        }
       >
-        <EyeOff className="h-3.5 w-3.5" />
+        <EyeOff className="h-3.5 w-3.5" aria-hidden />
         Без операторов
       </button>
     </div>
