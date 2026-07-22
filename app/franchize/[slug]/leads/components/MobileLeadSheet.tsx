@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { motion, AnimatePresence, type PanInfo } from "framer-motion";
+import { motion, AnimatePresence, useDragControls, type PanInfo } from "framer-motion";
 import { X } from "lucide-react";
 import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
 
@@ -13,7 +13,10 @@ interface Props {
   T: ThemeTokens;
 }
 
-const SHEET_HEIGHT_VH = 0.92; // 92% of viewport — leaves room for status bar
+// 68vh leaves room for the toolbar/funnel above the sheet and matches the
+// ~65-70vh target on mobile. Previously 0.92 which covered almost the entire
+// viewport and hid the pipeline funnel behind the sheet.
+const SHEET_HEIGHT_VH = 0.68;
 const DRAG_DISMISS_THRESHOLD = 120; // px — drag past this to dismiss
 
 const sheetVariants = {
@@ -37,21 +40,24 @@ const backdropVariants = {
 /**
  * Bottom sheet that slides up on mobile (hidden on lg+).
  *
- * - Drag handle at the top — drag down past 120px to dismiss
- * - Backdrop click also dismisses
- * - Escape key dismisses
- * - Safe-area padding bottom (80px reserved for home indicator + nav bar)
- * - Sheet body scrolls independently of the drag gesture
+ * - Drag handle at the top — drag down past 120px to dismiss.
+ *   Drag is started ONLY from the header handle (via useDragControls) so that
+ *   scrolling the inner content never triggers the close gesture.
+ * - Backdrop click also dismisses.
+ * - Escape key dismisses.
+ * - Safe-area padding bottom (80px reserved for home indicator + nav bar).
+ * - Sheet body scrolls independently of the drag gesture.
  */
 export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
-  // Close on Escape
+  const dragControls = useDragControls();
+
+  // Close on Escape + lock body scroll while sheet is open
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
-    // Lock body scroll while sheet is open
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -70,9 +76,6 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
         <div className="fixed inset-0 z-50 flex items-end lg:hidden">
           {/* Backdrop */}
           <motion.div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title || "Детали лида"}
             key="mobile-sheet-backdrop"
             className="absolute inset-0"
             style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)" }}
@@ -83,14 +86,17 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
             onClick={onClose}
           />
 
-          {/* Sheet — drag handle on the outer shell; content scrolls independently */}
+          {/* Sheet — drag is started ONLY from the header handle so inner scroll works */}
           <motion.div
             key="mobile-lead-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label={title || "Детали лида"}
             className="relative flex w-full flex-col rounded-t-[28px] border-t shadow-2xl"
             style={{
               maxHeight: `${SHEET_HEIGHT_VH * 100}vh`,
               background: "linear-gradient(180deg, #111113 0%, #09090b 100%)",
-              borderColor: "T.border",
+              borderColor: T.border,
               boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
             }}
             variants={sheetVariants}
@@ -98,18 +104,26 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
             animate="visible"
             exit="exit"
             drag="y"
+            // Disable the default drag listener — drag is started manually from
+            // the header via dragControls.start(e). This is what stops the inner
+            // content scroll from triggering the swipe-to-close gesture.
+            dragListener={false}
+            dragControls={dragControls}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.4 }}
             dragMomentum={false}
             onDragEnd={handleDragEnd}
           >
-            {/* Drag handle header — sticky, with title + close button */}
+            {/* Drag handle header — sticky, with title + close button.
+                pointerDown starts the drag so the gesture only fires here, not on
+                the scrollable body. */}
             <div
-              className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-3"
+              className="sticky top-0 z-10 flex shrink-0 cursor-grab items-center justify-between gap-3 px-4 pb-2 pt-3"
               style={{
                 background: "linear-gradient(180deg, #111113 60%, transparent)",
-                cursor: "grab",
+                touchAction: "none",
               }}
+              onPointerDown={(e) => dragControls.start(e)}
             >
               <div className="flex min-w-0 items-center gap-3">
                 <motion.div
@@ -137,14 +151,15 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
               </button>
             </div>
 
-            {/* Scrollable content area — separate from drag */}
+            {/* Scrollable content area — separate from drag.
+                overscrollBehavior:contain prevents scroll chaining so swiping up
+                at the top of the content never propagates to the sheet drag. */}
             <div
               className="overflow-y-auto px-4"
               style={{
                 maxHeight: `calc(${SHEET_HEIGHT_VH * 100}vh - 56px)`,
                 WebkitOverflowScrolling: "touch",
                 overscrollBehavior: "contain",
-                // Reserve 80px at bottom for safe-area + mobile nav
                 paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
               }}
             >
