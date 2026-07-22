@@ -95,7 +95,8 @@ export function LeadDetailContent({
   const docs: DocumentItem[] = useMemo(() => buildDocuments(enrichedLead), [enrichedLead]);
 
   // ── 5. Cast todos to DrawerTodo (adds optional due_date) ──
-  const drawerTodos = useMemo(() => todos as DrawerTodo[], [todos]);
+  // LeadTodoRow now includes due_date — no cast needed
+  const drawerTodos = useMemo(() => todos, [todos]);
 
   // ── 6. Cast notes to LeadDrawerNote ──
   const drawerNotes = useMemo(
