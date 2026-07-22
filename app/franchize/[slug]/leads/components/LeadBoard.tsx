@@ -61,7 +61,12 @@ export function LeadBoard({
       </div>
 
       <div
-        className="flex gap-3 overflow-x-auto pb-2 lg:grid lg:flex gap-3 overflow-x-auto pb-4 lg:overflow-visible"
+        // Mobile: horizontal scroll, one column visible at a time.
+        // Desktop (lg+): 9-column grid (PIPELINE_STAGES length), no overflow.
+        // Previously this className had duplicate `gap-3 overflow-x-auto` tokens
+        // AND a conflicting `lg:grid lg:flex` pair — the later `lg:flex` won and
+        // broke the desktop grid layout (columns stacked instead of gridded).
+        className="flex gap-3 overflow-x-auto pb-4 lg:grid lg:grid-cols-9 lg:gap-3 lg:overflow-visible lg:pb-0"
         style={{ scrollbarWidth: "thin" }}
       >
         {PIPELINE_STAGES.map((stage) => (
@@ -228,7 +233,11 @@ function BoardCard({
         >
           {initials}
         </div>
-        <div className="min-w-[280px] flex-shrink-0 snap-start">
+        {/* min-w-0 + flex-1 lets the name truncate properly inside the 280px
+            column. Previously this was min-w-[280px] flex-shrink-0 which forced
+            the inner block to 280px+ and made the chevron + avatar overflow /
+            overlap the next card. */}
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <p
               className="truncate text-xs font-semibold"
