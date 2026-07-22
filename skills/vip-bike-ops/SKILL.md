@@ -188,6 +188,30 @@ This skill does not query Supabase directly. For schema details, refer to the re
 - `rental_contract_artifacts` — PII. Rental contract metadata, STS pledge, storage_path.
 - `sale_contract_artifacts` — PII. Sale contract metadata, buyer info, warranty.
 
+### Lead identity resolution (important)
+
+When surfacing leads (web page `app/franchize/server-actions/leads.ts` and this
+skill's `leads-query.mjs`), the identity key is resolved in this priority:
+
+1. **Phone** (normalized `+7XXXXXXXXXX`) — when the artifact/rental has one.
+2. **Normalized renter name** — `name:<lowercased, dot-collapsed full name>` —
+   used as a fallback for operator-created contracts where the operator SKIPPED
+   the optional client phone step in `/doc-manual`. Without this fallback all of
+   one operator's renters collapsed into a single lead keyed by the operator's
+   `telegram_chat_id`, hiding everyone except one. The normalization MUST match
+   exactly between `leads.ts` (`nameIdentityKey`) and `leads-query.mjs`
+   (`nameIdentityKey`) or the web page and the text skill diverge.
+3. `telegram_chat_id` / `user_id` — last resort (operator placeholder).
+
+`rentals.user_id` for operator-created rentals is a placeholder = crew owner
+until the renter scans the QR. `created_by_operator_chat_id` on
+`rental_contract_artifacts` preserves the REAL operator; on `rentals` it is the
+crew-owner placeholder (known inconsistency, do not rely on it for "who issued").
+
+`/doc-manual` now auto-suggests recent web callback (`contact_click`) phones in
+the client_phone step so the operator links the contract in one tap instead of
+skipping — the main cause of `renter_phone = NULL`.
+
 ## Web Links
 
 | Command         | Web page                                                                              |
