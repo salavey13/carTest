@@ -3,7 +3,7 @@ import { CrewHeader } from "../../components/CrewHeader";
 import { getFranchizeBySlug } from "../../actions";
 import { crewPaletteWithCssVars } from "../../lib/theme";
 import { getFranchizeLeads, type LeadRow, type LeadTodoRow } from "../../server-actions/leads";
-import { LeadsClient } from "./LeadsClient";
+import { LeadsClient } from "./components/LeadsClient";
 import { AnalyticsLeadsNav } from "../../components/AnalyticsLeadsNav";
 
 interface LeadsPageProps {
