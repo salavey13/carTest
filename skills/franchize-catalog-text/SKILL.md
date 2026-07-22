@@ -1,25 +1,25 @@
 ---
 name: franchize-catalog-text
 description: >
-  Text-based catalog for VIP Bike franchise. Query bikes, pricing, availability via Supabase.
-  Trigger phrases: "каталог байков", "список байков", "сколько стоит аренда",
-  "доступность байка", "покажи байки", "bike catalog", "bike list",
-  "bike pricing", "bike availability", "какие байки есть"
+  Text-based catalog for VIP Bike franchise. Query bikes, pricing, availability via Supabase
+  REST API (curl). Outputs formatted text — no UI, no JSON blobs.
+  Trigger phrases (RU): "каталог байков", "список байков", "сколько стоит аренда",
+  "доступность байка", "покажи байки", "какие байки есть", "цена байка", "залог за байк",
+  "характеристики байка", "свободен ли байк", "бронь байка".
+  Trigger phrases (EN): "bike catalog", "bike list", "bike pricing", "bike availability",
+  "show bikes", "bike specs", "bike deposit", "is bike free", "bike tier prices".
 ---
 
 # Franchize Catalog (text) — VIP Bike
 
-Триггер-фразы: **`каталог байков`**, **`список байков`**, **`сколько стоит аренда`**, **`доступность байка`**, **`покажи байки`**, **`bike catalog`**, **`bike list`**, **`bike pricing`**, **`bike availability`**, **`какие байки есть`**.
+Триггер-фразы (RU): **`каталог байков`**, **`список байков`**, **`сколько стоит аренда`**, **`доступность байка`**, **`покажи байки`**, **`какие байки есть`**, **`цена байка`**, **`залог за байк`**, **`характеристики байка`**, **`свободен ли байк`**, **`бронь байка`**.
+Триггер-фразы (EN): `bike catalog`, `bike list`, `bike pricing`, `bike availability`, `show bikes`, `bike specs`, `bike deposit`, `is bike free`, `bike tier prices`.
 
 ## Overview
 
-Text-based эквивалент каталога ТС для экипажа `vip-bike`. Читает таблицу `public.cars` через Supabase REST API (PostgREST), фильтрует по `crew_id = 2d5fde70-1dd3-4f0d-8d72-66ccf6908746` и `type = bike`, выводит форматированную текстовую таблицу вместо React UI. Также читает `public.rentals` для проверки доступности конкретного байка на дату.
+Text-based эквивалент каталога ТС для экипажа `vip-bike`. Читает таблицу `public.cars` через Supabase REST API (PostgREST), фильтрует по `crew_id = 2d5fde70-1dd3-4f0d-8d72-66ccf6908746` и `type = bike`, выводит форматированную текстовую таблицу. Также читает `public.rentals` для проверки доступности конкретного байка на дату.
 
-Skill не запускает Node.js сервер и не требует сборки Next.js — только один файл `catalog-query.mjs` (pure ESM, без зависимостей, использует встроенный `fetch`).
-
-Сibling skill'ы:
-- `leads-crm-text` — та же архитектура (`leads-query.mjs`), для CRM-лидов.
-- `analytics-text` — inline-`curl` команды для analytics-дашбордов (rentals/sales/todos).
+Skill использует только `curl` к Supabase REST API и стандартные shell-утилиты. Не запускает Node.js сервер, не требует сборки Next.js.
 
 ## When to Use
 
@@ -31,58 +31,50 @@ Use this skill when:
 - Нужно проверить, свободен ли байк на конкретную дату (на основе активных/подтверждённых аренд).
 - Нужно ответить клиенту в Telegram «какие байки есть» без открытия браузера.
 
-## End-to-end pipeline
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│ 1. CREW:     hardcoded CREW_SLUG=vip-bike, CREW_ID=<uuid>             │
-│ 2. AUTH:     read SUPABASE_SERVICE_ROLE_KEY from                     │
-│              /home/z/my-project/upload/secrets.txt (or env/CLI)       │
-│ 3. QUERY:    GET /rest/v1/cars?crew_id=eq.<id>&type=eq.bike           │
-│              select=id,make,model,daily_price,image_url,specs,        │
-│                       availability_rules,quantity,type                │
-│ 4. RENDER:   text table (ID | Марка | Модель | Цена/день | Кол-во |   │
-│                       Ключевые спецификации)                          │
-│              + блок ссылок на image_url                               │
-│ 5. (opt) AVAILABILITY: GET /rest/v1/rentals?vehicle_id=eq.<bikeId>    │
-│                        &status=in.("active","confirmed")              │
-│                        &requested_start_date=lte.<END>                │
-│                        &requested_end_date=gte.<START>                │
-│                        → bike blocked if blocking.length >= quantity  │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-## CLI Usage
-
-Все команды выполняются из директории skill:
+## Supabase Access
 
 ```bash
-# Базовый запуск (читает SUPABASE_SERVICE_ROLE_KEY из /home/z/my-project/upload/secrets.txt)
-node catalog-query.mjs list-bikes
+SUPABASE_URL="https://inmctohsodgdohamhzag.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="$(grep SUPABASE_SERVICE_ROLE_KEY /home/z/my-project/upload/secrets.txt | cut -d= -f2-)"
+CREW_SLUG="vip-bike"
+CREW_ID="2d5fde70-1dd3-4f0d-8d72-66ccf6908746"
 
-# С явным указанием файла секретов
-node catalog-query.mjs --secrets /path/to/secrets.txt list-bikes
+OP_OWNER=356282674        # I_O_S_NN
+OP_CO_OWNER=244736261     # Roman_Vip_Bike_Electro
+OP_ADMIN=413553377        # salavey13
+OP_MEMBER=7813830016      # DJORUDJOV
 
-# Через env-переменные
-SUPABASE_URL=https://inmctohsodgdohamhzag.supabase.co \
-SUPABASE_SERVICE_ROLE_KEY=eyJ... \
-node catalog-query.mjs list-bikes
+HDR_PUBLIC=(-H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" -H "Accept: application/json")
 ```
 
-### `list-bikes [--type bike|scooter|all]` — список ТС экипажа
+## Commands
+
+### 1. `list-bikes [--type bike|scooter|all]` — список ТС экипажа
 
 ```bash
-# Все байки (по умолчанию)
-node catalog-query.mjs list-bikes
+# Все байки (type=bike)
+curl -sS "${SUPABASE_URL}/rest/v1/cars?\
+select=id,make,model,daily_price,image_url,specs,availability_rules,quantity,type,owner_id\
+&crew_id=eq.${CREW_ID}&type=eq.bike&is_test_result=eq.false\
+&order=make.asc,model.asc" \
+  "${HDR_PUBLIC[@]}"
 
-# Только самокаты
-node catalog-query.mjs list-bikes --type scooter
+# Самокаты
+curl -sS "${SUPABASE_URL}/rest/v1/cars?\
+select=id,make,model,daily_price,quantity,specs\
+&crew_id=eq.${CREW_ID}&type=eq.scooter&is_test_result=eq.false\
+&order=make.asc" \
+  "${HDR_PUBLIC[@]}"
 
 # Все ТС (без фильтра по типу)
-node catalog-query.mjs list-bikes --type all
+curl -sS "${SUPABASE_URL}/rest/v1/cars?\
+select=id,make,model,daily_price,quantity,type,specs\
+&crew_id=eq.${CREW_ID}&is_test_result=eq.false\
+&order=type.asc,make.asc" \
+  "${HDR_PUBLIC[@]}"
 ```
 
-**Логика:** Query `public.cars` where `crew_id = 2d5fde70-1dd3-4f0d-8d72-66ccf6908746` AND `type = bike` (или `scooter`, или без фильтра для `all`). Дополнительно `is_test_result = false` — отбрасывает ТС, сгенерированные embedding-пайплайном.
+**Логика:** Query `public.cars` where `crew_id = ${CREW_ID}` AND `type = bike` (или `scooter`, или без фильтра для `all`). Дополнительно `is_test_result = false` — отбрасывает ТС, сгенерированные embedding-пайплайном.
 
 **Пример вывода:**
 
@@ -102,14 +94,19 @@ rawrr-mantis-s         Rawrr             Mantis S                 6 000 ₽     
   rawrr-mantis-s:       https://.../rawrr-mantis-s.jpg
 ```
 
-Колонки: `ID` (22), `Марка` (16), `Модель` (24), `Цена/день` (12, right-align), `Кол-во` (7), `Ключевые спецификации` (60). Цена форматируется с пробелом как thousand separator (`8 500 ₽`).
+🌐 Web: `https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro`
 
-«Ключевые спецификации» — это композит из `specs` jsonb по полям: `color`, `year`, `engine`, `power_kw`, `battery_kwh`, `range_km`, `weight_kg`, `vin`. Пустые поля пропускаются.
+---
 
-### `bike-detail <bikeId>` — полные детали байка
+### 2. `bike-detail <bikeId>` — полные детали байка
 
 ```bash
-node catalog-query.mjs bike-detail falcon-lynx
+BIKE_ID="falcon-lynx"
+curl -sS "${SUPABASE_URL}/rest/v1/cars?\
+select=id,make,model,description,daily_price,image_url,rent_link,is_test_result,\
+specs,owner_id,type,crew_id,availability_rules,quantity\
+&id=eq.${BIKE_ID}&crew_id=eq.${CREW_ID}" \
+  "${HDR_PUBLIC[@]}" | jq '.[0]'
 ```
 
 **Пример вывода:**
@@ -163,10 +160,18 @@ Tier                   Цена         Единица
   notice_hours          2
 ```
 
-### `bike-pricing <bikeId>` — все pricing tiers
+🌐 Web: `https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro`
+
+---
+
+### 3. `bike-pricing <bikeId>` — все pricing tiers
 
 ```bash
-node catalog-query.mjs bike-pricing falcon-lynx
+BIKE_ID="falcon-lynx"
+curl -sS "${SUPABASE_URL}/rest/v1/cars?\
+select=id,make,model,daily_price,specs\
+&id=eq.${BIKE_ID}&crew_id=eq.${CREW_ID}" \
+  "${HDR_PUBLIC[@]}" | jq '.[0] | {daily_price, specs: (.specs // {})}'
 ```
 
 **Пример вывода:**
@@ -188,337 +193,175 @@ Tier                   Цена         Единица
 specs.dailyPrice: 8 500 ₽
 ```
 
-Если в `specs` нет каких-то tier-полей, в таблице будет `—` для цены. Это нормально — operator мог заполнить только базовую цену и залог.
+🌐 Web: `https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro`
 
-### `check-availability <bikeId> [--date YYYY-MM-DD]` — доступность на дату
+---
 
-```bash
-# На сегодня (UTC)
-node catalog-query.mjs check-availability falcon-lynx
-
-# На конкретную дату
-node catalog-query.mjs check-availability falcon-lynx --date 2026-07-25
-```
-
-**Логика:** Байк **недоступен** на дату `D` если существует хотя бы одна запись в `public.rentals` где:
-
-```
-vehicle_id = <bikeId>
-AND status IN ('active', 'confirmed')
-AND requested_start_date <= <D end-of-day>
-AND requested_end_date   >= <D start-of-day>
-```
-
-Если у байка `quantity > 1`, то он недоступен только когда **количество блокирующих аренд** `>= quantity`. Это позволяет иметь в парке 2 одинаковых байка (например, 2 × Sur-Ron Light Bee X) и сдавать их параллельно.
-
-`status = 'pending_confirmation'` **не блокирует** — заявка ещё не согласована, байк остаётся бронируемым. `status = 'cancelled'` и `status = 'completed'` не блокируют.
-
-`status = 'disputed'` не блокирует (оспариваемая аренда — решение оператора).
-
-**Пример вывода (байк доступен):**
-
-```
-=== Доступность байка 79BIKE Falcon Lynx (id: falcon-lynx) ===
-Дата:                       2026-07-25
-Количество в парке:         1
-Активных/подтверждённых аренд на эту дату: 0
-Доступен:                   ✅ ДА
-Правила доступности:        доступен, сезон: Apr-Oct, мин. аренда 1 дн., макс. аренда 30 дн.
-```
-
-**Пример вывода (байк занят):**
-
-```
-=== Доступность байка 79BIKE Falcon Lynx (id: falcon-lynx) ===
-Дата:                       2026-07-25
-Количество в парке:         1
-Активных/подтверждённых аренд на эту дату: 1
-Доступен:                   ❌ НЕТ
-Правила доступности:        доступен, сезон: Apr-Oct, мин. аренда 1 дн., макс. аренда 30 дн.
-
-— Блокирующие аренды —
-rental_id                              status      payment      период (requested)      период (agreed)         renter
-──────────────────────  ──────────  ──────────  ──────────  ──────────  ──────
-a1b2c3d4-...                           active      fully_paid   24.07.2026 → 27.07.2026  24.07.2026 → 27.07.2026  413553377
-```
-
-## Input/Output Contracts
-
-### Required Inputs
-
-- Supabase service role key — читается из (в порядке приоритета):
-  1. `--secrets <path>` аргумент CLI
-  2. `SUPABASE_SERVICE_ROLE_KEY` env-переменная
-  3. `/home/z/my-project/upload/secrets.txt` (ищет строку `SUPABASE_SERVICE_ROLE_KEY=...`)
-
-### Optional Inputs
-
-- `--secrets <path>` — путь к файлу с секретами (default: `/home/z/my-project/upload/secrets.txt`)
-- `SUPABASE_URL` env — URL проекта (default: `https://inmctohsodgdohamhzag.supabase.co`)
-- `--type <bike|scooter|all>` — фильтр типа ТС для `list-bikes` (default: `bike`)
-- `--date <YYYY-MM-DD>` — дата для `check-availability` (default: today UTC)
-- `DEBUG` env — печатать stack trace при ошибках
-
-### Anti-hallucination: флаги, которых НЕ существует
-
-- ~~`--json`~~ — не существует. Скрипт всегда выводит текстовую таблицу.
-- ~~`--outFile <path>`~~ — не существует. Вывод идёт в stdout; для записи в файл используйте `> catalog.txt` shell-redirect.
-- ~~`--crew <slug>`~~ — не существует. Crew захардкожен как `vip-bike` (меняется в исходниках: `CREW_SLUG`, `CREW_ID`).
-- ~~`--sort <field>`~~ — не существует. Сортировка всегда `make.asc, model.asc`. Для другой сортировки парсьте stdout.
-- ~~`--format csv|md|html`~~ — не существует. Только текстовая таблица.
-- ~~`--only-available`~~ — не существует для `list-bikes`. Доступность проверяется только в `check-availability` (она требует конкретную дату).
-- ~~`bike-detail --include-rentals`~~ — не существует. Аренды байка — это отдельная команда `check-availability`. Для истории всех аренд смотри skill `analytics-text`.
-- ~~`list-bikes --price-max <rub>`~~ / ~~`--price-min <rub>`~~ — не существуют. Фильтруйте вывод внешними утилитами (`grep`, `awk`, `jq`).
-- ~~`bike-pricing --days <n>`~~ — не существует. Скрипт выводит ВСЕ tiers из `specs`. Подбор конкретной цены по длительности — на стороне вызывающего.
-
-### Output
-
-- **stdout** — форматированная текстовая таблица / детали байка / pricing tiers / availability-чек.
-- **stderr** — ошибки в формате `ERROR: <message>`.
-- **exit code**:
-  - `0` — успех (включая empty state: «Нет ТС в каталоге»).
-  - `2` — ошибка (невалидные аргументы, байк не найден, Supabase 4xx/5xx).
-
-## Schema access
-
-Только `public` schema. Private schema (`rental_contract_artifacts`, `user_rental_secrets`, `sale_contract_artifacts`) НЕ используется этим skill'ом — это каталог ТС, а не PII-документы арендаторов. Если нужны PII, смотри `leads-crm-text` или `analytics-text`.
-
-### `public.cars` — основной источник
-
-```sql
-create table public.cars (
-  id text not null,                         -- PK, slug-like (e.g. "falcon-lynx")
-  make text not null,                       -- e.g. "79BIKE", "Sur-Ron"
-  model text not null,                      -- e.g. "Falcon Lynx", "Light Bee X"
-  description text not null,                -- long description
-  embedding public.vector null,             -- pgvector embedding (ignored here)
-  daily_price numeric null,                 -- base price (₽/day); can be null if specs.dailyPrice is set
-  image_url text not null,                  -- public CDN URL
-  rent_link text null,                      -- affiliate/booking URL (e.g. t.me link)
-  is_test_result boolean default false,     -- skip these in catalog listings
-  specs jsonb default '{}'::jsonb,          -- full specs (see below)
-  owner_id text null,                       -- operator telegram id (FK users.user_id)
-  type text not null default 'car',         -- 'bike' | 'scooter' | 'car' | custom
-  crew_id uuid null,                        -- FK crews.id (filter = vip-bike id)
-  availability_rules jsonb default '{}'::jsonb,
-  quantity numeric default 1,               -- number of identical units in fleet
-  constraint cars_pkey primary key (id)
-);
-```
-
-Indexes (relevant for queries):
-- `idx_cars_crew_id` on `crew_id` — primary filter for crew catalog.
-- `cars_embedding_idx` HNSW on `embedding` — for semantic search (not used here).
-
-### `specs` jsonb — known keys
-
-Это гибкий jsonb-объект, накапливающий все известные характеристики ТС. Skill интерпретирует конкретные ключи для pricing tiers и key specs. Остальные ключи выводятся как «name: value» в полном дампе.
-
-**Pricing tiers (читаются `bike-pricing` и `bike-detail`):**
-
-| Key             | Label                  | Unit     |
-|-----------------|------------------------|----------|
-| `rent_weekday`  | Будни (1 день)         | ₽/день   |
-| `rent_weekend`  | Выходной (1 день)      | ₽/день   |
-| `rent_2_4d`     | 2–4 дня                | ₽/день   |
-| `rent_5_10d`    | 5–10 дней              | ₽/день   |
-| `rent_11_30d`   | 11–30 дней             | ₽/день   |
-| `deposit_rub`   | Залог                  | ₽        |
-
-Дополнительно: `dailyPrice` — дублирующее поле базовой цены (может отличаться от `cars.daily_price`).
-
-**Key specs (читаются `list-bikes` в компактную колонку):**
-
-| Key            | Example       | Notes                                |
-|----------------|---------------|--------------------------------------|
-| `color`        | `black`       |                                      |
-| `year`         | `2025`        |                                      |
-| `engine`       | `1500W`       | free-form string                     |
-| `power_kw`     | `8`           | numeric, kW                          |
-| `battery_kwh`  | `2.1`         | numeric, kWh                         |
-| `range_km`     | `150`         | numeric, km                          |
-| `weight_kg`    | `65`          | numeric, kg                          |
-| `vin`          | `XYZ123456789`| string                               |
-
-Также могут встречаться: `motor_type`, `top_speed_kmh`, `charge_time_h`, `brakes`, `suspension`, `tyres`, `seat_height_mm`, `load_capacity_kg`, `lights`, `display`, `connectivity`, `warranty_months`. Все они выводятся в полном дампе `bike-detail`.
-
-### `availability_rules` jsonb — known keys
-
-Опциональный объект с правилами доступности ТС. Если пусто — используется «по умолчанию доступен».
-
-| Key                | Type            | Example              | Notes                                            |
-|--------------------|-----------------|----------------------|--------------------------------------------------|
-| `available`        | boolean         | `true`               | Master switch                                    |
-| `season`           | string          | `"Apr-Oct"`          | Human-readable season window                     |
-| `blackout_dates`   | array<string>   | `["2026-01-01"]`     | Specific dates when bike is unavailable           |
-| `notice_hours`     | number          | `2`                  | Minimum booking notice (hours before pickup)     |
-| `min_rental_days`  | number          | `1`                  | Minimum rental duration                          |
-| `max_rental_days`  | number          | `30`                 | Maximum rental duration                          |
-
-`check-availability` **не** автоматически применяет `blackout_dates` или `season` — эти правила информационные и выводятся в чек. Реальная блокировка идёт только через `rentals` table. Если нужно учитывать blackouts, оператор должен либо создать `rental` со статусом `active`, либо валидировать дату по `availability_rules` на стороне приложения.
-
-### `public.rentals` — для availability-чек
-
-| Column                  | Type        | Notes                                            |
-|-------------------------|-------------|--------------------------------------------------|
-| `rental_id`             | uuid (PK)   |                                                  |
-| `vehicle_id`            | text        | FK → `cars.id` (filter column)                   |
-| `status`                | text        | `pending_confirmation` / `confirmed` / `active` / `completed` / `cancelled` / `disputed` |
-| `payment_status`        | text        | `pending` / `interest_paid` / `fully_paid` / `refunded` / `failed` |
-| `requested_start_date`  | timestamptz | Original request start (used for overlap check)  |
-| `requested_end_date`    | timestamptz | Original request end (used for overlap check)    |
-| `agreed_start_date`     | timestamptz | Negotiated start (shown in output but not filter)|
-| `agreed_end_date`       | timestamptz | Negotiated end (shown in output but not filter)  |
-| `total_cost`            | numeric?    | Rubles                                           |
-| `user_id`               | text        | FK → `users.user_id`                             |
-
-**Overlap-фильтр** использует `requested_start_date` / `requested_end_date` (а не `agreed_*`) — это соответствует поведению server-action `getFranchizeRentals`. Если `requested_*` пустые, запись не попадёт в блокирующий набор (это редкий случай — обычно заявка создаётся с `requested_*` сразу).
-
-## Crew context (hardcoded defaults)
-
-| Field        | Value                                  |
-|--------------|----------------------------------------|
-| `crew_slug`  | `vip-bike`                             |
-| `crew_id`    | `2d5fde70-1dd3-4f0d-8d72-66ccf6908746` |
-
-Override через `--crewSlug` / `--crewId` **не существует** (anti-hallucination rule). Для другого crew — отредактировать `CREW_SLUG` / `CREW_ID` в начале `catalog-query.mjs`.
-
-Operator chat IDs (для справки, не используются этим skill'ом напрямую):
-- `356282674` — I_O_S_NN (owner)
-- `244736261` — Roman_Vip_Bike_Electro (co_owner)
-- `413553377` — salavey13 (admin)
-- `7813830016` — DJORUDJOV (member)
-
-## Examples
-
-### Утренний оператор: какие байки есть в парке
+### 4. `check-availability <bikeId> [--date YYYY-MM-DD]` — доступность на дату
 
 ```bash
-cd /home/z/my-project/download/skills/franchize-catalog-text
-node catalog-query.mjs list-bikes
+BIKE_ID="falcon-lynx"
+DATE="${1:-$(date -u '+%Y-%m-%d')}"
+START="${DATE}T00:00:00.000Z"
+END="${DATE}T23:59:59.999Z"
+
+# Активные/подтверждённые аренды этого байка, пересекающие выбранную дату
+curl -sS "${SUPABASE_URL}/rest/v1/rentals?\
+select=rental_id,user_id,status,requested_start_date,requested_end_date,agreed_start_date,agreed_end_date\
+&vehicle_id=eq.${BIKE_ID}\
+&status=in.(active,confirmed,pending_confirmation)\
+&requested_start_date=lte.${END}&requested_end_date=gte.${START}\
+&order=requested_start_date.asc" \
+  "${HDR_PUBLIC[@]}"
+
+# Количество ТС (для определения, свободен ли ещё байк, если quantity > 1)
+curl -sS "${SUPABASE_URL}/rest/v1/cars?\
+select=quantity\
+&id=eq.${BIKE_ID}&crew_id=eq.${CREW_ID}" \
+  "${HDR_PUBLIC[@]}" | jq '.[0].quantity'
 ```
 
-### Клиент спрашивает «сколько стоит аренда Falcon Lynx на 3 дня в будни»
+**Логика:** Если `blocking.length >= quantity` → байк занят. Иначе — свободен (но может быть частично занят, если `blocking.length > 0 && quantity > 1`).
+
+**Пример вывода:**
+
+```
+=== Доступность: falcon-lynx на 2026-07-25 ===
+Количество ТС:     1
+Активных броней:   1 (пересекают дату)
+
+— Брони —
+  rental_id:   a1b2c3d4-...
+  статус:      confirmed
+  renter_id:   78901234
+  даты:        25.07 10:00 — 27.07 20:00
+
+Результат: ❌ ЗАКРЫТ для аренды на эту дату
+```
+
+🌐 Web: `https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro`
+
+---
+
+### 5. `find-bike <query>` — поиск байка по марке/модели
 
 ```bash
-# 1. Показать все pricing tiers
-node catalog-query.mjs bike-pricing falcon-lynx
-
-# 2. Найти tier "2–4 дня" — это 7 500 ₽/день
-# 3. Итого: 7 500 × 3 = 22 500 ₽ + залог 30 000 ₽
+QUERY="BMW"
+# PostgREST `ilike` for case-insensitive substring match
+curl -sS "${SUPABASE_URL}/rest/v1/cars?\
+select=id,make,model,daily_price,type,quantity\
+&crew_id=eq.${CREW_ID}&is_test_result=eq.false\
+&or=(make.ilike.*${QUERY}*,model.ilike.*${QUERY}*,id.ilike.*${QUERY}*)\
+&order=make.asc" \
+  "${HDR_PUBLIC[@]}"
 ```
 
-### Клиент хочет забронировать байк на 25 июля
+**Пример вывода:**
 
-```bash
-# Проверить доступность
-node catalog-query.mjs check-availability falcon-lynx --date 2026-07-25
-# → ✅ ДА → можно принимать заявку
-# → ❌ НЕТ → показать клиенту другой байк:
-node catalog-query.mjs list-bikes --type all
+```
+=== Поиск: "BMW" — 2 совпадения ===
+ID                     Марка             Модель                   Цена/день     Кол-во
+──────────────────────  ────────────────  ────────────────────────  ──────────  ──────
+bmw-f800r-001          BMW               F800R                    7 000 ₽      1
+bmw-r1250rs            BMW               R1250RS                  12 000 ₽     1
 ```
 
-### Полные детали байка для онбординга оператора
+🌐 Web: `https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro`
 
-```bash
-node catalog-query.mjs bike-detail sur-ron-light-bee-x
-```
+---
 
-Вывод включает: ID, тип, owner_id, полную спецификацию (specs jsonb), все pricing tiers, правила доступности, ссылку на изображение и rent_link.
+## Schema Access
 
-### Telegram-бот: показать клиенту 3 самых дешёвых байка
+### Public schema
 
-```bash
-# Получить список, отсортировать по цене через awk
-node catalog-query.mjs list-bikes | tail -n +3 | sort -t '₽' -k1 -n | head -3
-```
+- `cars` — `id` (text PK), `make`, `model`, `description`, `embedding` (vector), `daily_price`, `image_url`, `rent_link`, `is_test_result`, `specs` (jsonb — `dailyPrice`, `rent_weekday`, `rent_weekend`, `rent_2_4d`, `rent_5_10d`, `rent_11_30d`, `deposit_rub`, `color`, `year`, `vin`, `power_kw`, `battery_kwh`, `range_km`, `weight_kg`), `owner_id`, `type` (`bike` / `scooter` / `car` / `service`), `crew_id`, `availability_rules` (jsonb — `available`, `season`, `min_rental_days`, `max_rental_days`, `notice_hours`), `quantity`.
+- `rentals` — `rental_id`, `user_id`, `vehicle_id`, `status`, `requested_start_date`, `requested_end_date`, `agreed_start_date`, `agreed_end_date`, `crew_id`. Используется только для проверки доступности.
+- `crews` — `id`, `slug`, `name`. Используется для резолва `crew_id` по `slug`.
 
-(Внутри skill нет флага `--sort` по цене — это анти-функция. Используйте unix-pipeline.)
+### Private schema
+
+Catalog skill не использует private schema.
+
+## Web Links
+
+| Command            | Web page                                                                              |
+|--------------------|---------------------------------------------------------------------------------------|
+| `list-bikes`       | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro  |
+| `bike-detail`      | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro  |
+| `bike-pricing`     | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro  |
+| `check-availability`| https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro |
+| `find-bike`        | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro  |
+
+## Anti-hallucination: флаги, которых НЕ существует
+
+- ~~`--json`~~ — не существует. Skill всегда выводит текстовую таблицу.
+- ~~`--currency USD|EUR`~~ — не существует. Только ₽.
+- ~~`--crew <slug>`~~ — не существует. Crew захардкожен как `vip-bike`.
+- ~~`--includeTestResults`~~ — не существует. `is_test_result=true` ТС всегда отбрасываются.
+- ~~`--vin <vin>`~~ — не существует. VIN хранится в `specs->>vin`; для поиска по VIN используйте `find-bike` с VIN строкой.
+- ~~`--embedding <vector>`~~ — не существует. Semantic search через embedding не поддерживается в text-skill.
+- ~~`--outFile <path>`~~ — не существует. Используйте `> file.txt`.
+- ~~`--format csv|md`~~ — не существует. Только текстовая таблица.
+- ~~`bike-detail --withRentals`~~ — не существует. Для аренд байка используйте `rental-card-text` skill.
+- ~~`check-availability --range <start> <end>`~~ — не существует. Только одна дата. Для диапазона вызовите команду несколько раз.
 
 ## Error Handling
 
-| Stage                       | Reason                                          | Когда возникает                                                                | Exit | Что делать                                                                  |
-|-----------------------------|-------------------------------------------------|--------------------------------------------------------------------------------|------|-----------------------------------------------------------------------------|
-| `secrets_load`              | `SUPABASE_SERVICE_ROLE_KEY not found`           | Нет env-переменной, `--secrets` путь не читается, дефолтный путь недоступен    | 2    | Передать `--secrets <path>` или export env var                              |
-| `type_invalid`              | `invalid type "<value>"`                        | `list-bikes --type bogus`                                                      | 2    | Использовать `bike` / `scooter` / `all`                                     |
-| `date_invalid`              | `invalid date "<value>"`                        | `check-availability --date 2026/07/25`                                         | 2    | Использовать формат `YYYY-MM-DD`                                            |
-| `bike_id_missing`           | `bikeId is required`                            | `bike-detail` / `bike-pricing` / `check-availability` без позиционного арг.   | 2    | Передать `<bikeId>` первым позиционным аргументом                            |
-| `bike_not_found`            | `bike not found: <bikeId>`                      | Нет строки в `cars` с таким `id`                                               | 2    | Проверить `list-bikes` — какой у байка реальный `id`                        |
-| `supabase_query_4xx`        | `Supabase public.<table> 4xx: <body>`           | Неверный select-список, RLS запретил, нет такой колонки                         | 2    | Проверить схему (см. раздел "Schema access")                                |
-| `supabase_query_5xx`        | `Supabase public.<table> 5xx: <body>`           | Supabase лежит, rate-limit, timeout                                            | 2    | Повторить через минуту                                                       |
-| `unknown_command`           | `unknown command "<value>"`                     | Опечатка в подкоманде                                                          | 2    | Запустить `--help` для списка команд                                         |
+| Stage             | Reason                                | Когда возникает                                              | Exit | Что делать                                       |
+|-------------------|---------------------------------------|--------------------------------------------------------------|------|--------------------------------------------------|
+| `secrets_load`    | `SUPABASE_SERVICE_ROLE_KEY not found` | Путь `/home/z/my-project/upload/secrets.txt` недоступен     | 2    | Проверить путь или export env                    |
+| `bike_not_found`  | `Bike not found: <bikeId>`            | `bike-detail`/`bike-pricing` — нет ТС с таким ID у экипажа   | 2    | Проверить `list-bikes` для валидных IDs          |
+| `bike_wrong_crew` | `Bike <id> belongs to another crew`   | `bike-detail` для ТС другого экипажа (crew_id не совпадает)  | 2    | Проверить `crew_id` в URL запроса                |
+| `supabase_4xx`    | `Supabase cars 4xx: <body>`           | Неверный select, RLS, нет такой колонки                      | 2    | Проверить схему (раздел "Schema Access")         |
+| `supabase_5xx`    | `Supabase cars 5xx: <body>`           | Supabase лежит, rate-limit                                   | 2    | Повторить через минуту                           |
+| `date_parse`      | `Invalid date format`                 | `--date` не парсится как YYYY-MM-DD                          | 2    | Использовать `YYYY-MM-DD`                        |
+| `empty_catalog`   | `[]`                                   | У экипажа нет ТС в `cars` с указанным `type`                | 0    | Вывод: `Каталог пуст.`                           |
 
-## Security / Compliance Rules
+## Security
 
-- **Service role key** (`SUPABASE_SERVICE_ROLE_KEY`) даёт полный read/write доступ ко всем таблицам, включая private-схему с ПДн клиентов. Никогда:
-  - не коммитить ключ в git
-  - не логировать ключ в stdout/stderr (скрипт не печатает его нигде)
-  - не передавать ключ как URL-параметр (только header `apikey` / `Authorization: Bearer`)
-  - не встраивать ключ в клиентский код (React/Next.js client bundle)
-- Этот skill **не читает PII**: только `public.cars` (каталог ТС) и `public.rentals` (rental_id, vehicle_id, status, dates, user_id). Поля `passport_*_photo`, `drivers_licence_frontal_photo` из `rentals` НЕ запрашиваются в select-списке.
-- Тем не менее `rentals.user_id` — это Telegram chat_id арендатора; в публичных логах / Telegram-чатах маскировать (например `4135XXXX77`).
-- Скрипт полностью read-only: не делает `INSERT` / `UPDATE` / `PATCH` / `DELETE`. Только `GET` к PostgREST.
-- Все HTTP-запросы идут через HTTPS. Не использовать plain HTTP proxy.
-- Скрипт не сохраняет результаты запросов на диск. Вывод в stdout принадлежит вызывающей стороне.
-
-## Integration with boss-mode / Telegram bot
-
-Скрипт можно вызывать из Telegram-бота для ответов на запросы клиентов/операторов:
-
-```
-Клиент: "какие байки есть?"
-Бот: exec `node catalog-query.mjs list-bikes`
-     → вывод таблицы в Telegram-чат
-
-Клиент: "сколько стоит Falcon Lynx на 3 дня?"
-Бот: exec `node catalog-query.mjs bike-pricing falcon-lynx`
-     → парсит tier "2–4 дня" → 7 500 ₽/день
-     → отправляет: "3 дня = 22 500 ₽ + залог 30 000 ₽"
-
-Оператор: "свободен ли Falcon Lynx 25 июля?"
-Бот: exec `node catalog-query.mjs check-availability falcon-lynx --date 2026-07-25`
-     → ✅ ДА / ❌ НЕТ с деталями блокирующей аренды
-```
-
-При интеграции с Telegram учитывать:
-- Длинные таблицы (>4096 символов) разбивать на несколько сообщений или отправлять как файл.
-- Image URLs из `list-bikes` отправлять как preview-фото в Telegram.
-- Если каталог большой (>50 байков), рекомендовать фильтрацию по `--type`.
-
-## Known limitations
-
-1. **Crew is hardcoded**: `CREW_SLUG`, `CREW_ID` захардкожены в `catalog-query.mjs` под `vip-bike`. Для другого crew — отредактировать константы в начале файла.
-
-2. **Resource embedding not used**: Supabase REST `?select=...,crew:crews!inner(name,slug)` JOIN syntax не используется. Crew уже захардкожен — JOIN не нужен.
-
-3. **`availability_rules` not auto-applied**: Правила `blackout_dates`, `season`, `notice_hours` выводятся как информация, но не блокируют automatically. Реальная блокировка — только через `rentals` таблицу со статусом `active`/`confirmed`. Это соответствует поведению production-CRM.
-
-4. **`requested_*` dates only for overlap**: Если у rental пустые `requested_start_date` / `requested_end_date` (только `agreed_*`), запись не попадёт в блокирующий набор. Это редкий кейс — обычно заявка создаётся с `requested_*` сразу. Если нужно учитывать `agreed_*`, расширить фильтр через PostgREST `or` syntax.
-
-5. **`is_test_result` filter is hardcoded**: `list-bikes` всегда добавляет `is_test_result=eq.false`. Если нужно показать test bikes — убрать фильтр в исходнике.
-
-6. **No timezone conversion**: Все даты выводятся в ISO / UTC. Локализация в MSK (UTC+3) — на стороне вызывающего.
-
-7. **Type filter exact match**: `--type bike` ищет `type = 'bike'` (case-sensitive). Если в БД есть `'Bike'` или `'BIKE'`, они не попадут в результат. Production-data для vip-bike использует lowercase.
-
-8. **`specs` keys are case-sensitive**: `specs.rent_weekday` ≠ `specs.Rent_Weekday`. Если operator заполнил specs с разными casing'ом, скрипт выведет `—` в pricing table.
+- **Service role key** — полный read/write ко всем схемам. Никогда не коммитить, не логировать, не передавать как URL-параметр. Только header `apikey` / `Authorization: Bearer`.
+- **PII handling**: catalog не содержит PII клиентов, но `specs` может включать VIN. Не выводить VIN в публичных каналах без необходимости.
+- **Private schema headers**: не нужны для catalog skill (только public.cars / public.rentals).
+- Skill полностью **read-only**.
+- Все HTTP-запросы — HTTPS.
 
 ## Related Files
 
-- **Script**: `catalog-query.mjs` (этот skill)
-- **Sibling skills**:
-  - `download/skills/leads-crm-text/SKILL.md` + `leads-query.mjs` — CRM-лиды (та же архитектура)
-  - `download/skills/analytics-text/SKILL.md` — analytics (rentals/sales/todos dashboards, inline-`curl`)
-  - `download/skills/vip-bike-ops/SKILL.md` — primary-agent super-skill, объединяющий все три
-- **Schema migrations**:
-  - `supabase/migrations/00000000000000_create_cars.sql` (или аналог) — `cars` table
-  - `supabase/migrations/00000000000000_create_rentals.sql` (или аналог) — `rentals` table
-  - Полный дамп схемы: `/home/z/my-project/upload/supabase.txt`
-- **UI reference** (для справки, не используется скриптом):
-  - `app/franchize/[slug]/catalog/CatalogClient.tsx` (если есть) — React UI каталога
-  - `app/franchize/server-actions/catalog.ts` (если есть) — server actions
-- **Crew constants**:
-  - Crew slug: `vip-bike`
-  - Crew ID: `2d5fde70-1dd3-4f0d-8d72-66ccf6908746`
-  - Секреты: `/home/z/my-project/upload/secrets.txt`
-- **Schema source**: `/home/z/my-project/upload/supabase.txt` (полный CREATE TABLE дамп для `cars`, `rentals`, `users`, `crews`, `crew_members`, `crew_todos`, `franchize_intents`, `rental_contract_artifacts`, `user_rental_secrets`, `sale_contract_artifacts`)
+**Sibling text skills:**
+
+- `/home/z/my-project/download/skills/leads-crm-text/SKILL.md` — leads CRM
+- `/home/z/my-project/download/skills/analytics-text/SKILL.md` — analytics dashboards
+- `/home/z/my-project/download/skills/rental-card-text/SKILL.md` — single rental card (uses bike info)
+- `/home/z/my-project/download/skills/crew-management-text/SKILL.md` — crew members
+- `/home/z/my-project/download/skills/rider-profile-text/SKILL.md` — rider profile
+- `/home/z/my-project/download/skills/reviews-text/SKILL.md` — reviews
+- `/home/z/my-project/download/skills/contract-draft-text/SKILL.md` — contract draft
+- `/home/z/my-project/download/skills/orders-checkout-text/SKILL.md` — orders/checkout (selects bike to rent)
+- `/home/z/my-project/download/skills/crew-admin-text/SKILL.md` — admin panel (edits catalog prices)
+- `/home/z/my-project/download/skills/leaderboard-text/SKILL.md` — leaderboard
+- `/home/z/my-project/download/skills/crew-info-text/SKILL.md` — crew info
+- `/home/z/my-project/download/skills/vip-bike-ops/SKILL.md` — umbrella meta-skill
+
+**Server actions (source of truth):**
+
+- `app/franchize/server-actions/catalog.ts` — `getCatalog()`, `getBike()`
+- `app/franchize/server-actions/get-crew-vehicles.ts` — `getCrewVehicles()`
+- `app/franchize/lib/catalog-utils.ts` — pricing tier resolver
+- `app/franchize/lib/catalog-tier-utils.ts` — tier constants
+- `app/api/franchize/catalog/route.ts` — public catalog endpoint
+
+**Schema migrations:**
+
+- `cars` table — original schema (no migration file; legacy)
+- `20260722000000_hotfix_schema_discrepancies.sql` — `cars.quantity`, `cars.availability_rules`
+
+**UI references:**
+
+- `app/franchize/[slug]/electro-enduro/page.tsx` — catalog page
+- `app/franchize/[slug]/configurator/page.tsx` — bike configurator
+- `app/franchize/[slug]/market/[bike_id]/buy/page.tsx` — buy page (uses bike specs)
+
+**Secrets:**
+
+- `/home/z/my-project/upload/secrets.txt`
+- `/home/z/my-project/upload/supabase.txt`
