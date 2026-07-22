@@ -214,7 +214,7 @@ export function LeadDetailDrawer(props: Props) {
             <div className="flex items-start justify-between gap-4">
               <div className="flex min-w-0 gap-4">
                 <div
-                  className="grid h-16 w-16 shrink-0 place-items-center rounded-full text-2xl font-bold"
+                  className="grid h-12 w-12 md:h-14 md:w-14 shrink-0 place-items-center rounded-full text-lg md:text-base md:text-lg font-bold"
                   style={{ background: `${stageColor}26`, color: stageColor }}
                 >
                   {initials}
@@ -222,7 +222,7 @@ export function LeadDetailDrawer(props: Props) {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2
-                      className="truncate text-2xl font-semibold tracking-tight"
+                      className="truncate text-lg md:text-base md:text-lg font-semibold tracking-tight"
                       style={{ color: T.text }}
                     >
                       {displayName}
@@ -649,7 +649,7 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="glass-panel rounded-[24px] p-5">
+    <section className="glass-panel rounded-[24px] p-3 md:p-4">
       <button
         type="button"
         onClick={onToggle}
