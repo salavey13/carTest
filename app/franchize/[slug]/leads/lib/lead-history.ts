@@ -21,8 +21,8 @@ export function computeLeadHistory(
 
   for (const r of lead.rentals) {
     events.push({ type: "rental_created", timestamp: (r as any).createdAt || lead.createdAt || new Date().toISOString(), label: "Аренда создана", icon: "🏍", detail: r.bikeTitle || undefined });
-    if (r.status === "active") events.push({ type: "rental_active", timestamp: new Date().toISOString(), label: "Аренда активирована", icon: "▶️" });
-    if (r.status === "completed") events.push({ type: "return_completed", timestamp: new Date().toISOString(), label: "Возврат завершён", icon: "✓" });
+    if (r.status === "active" && r.startDate) events.push({ type: "rental_active", timestamp: r.startDate, label: "Аренда активирована", icon: "▶️", detail: r.bikeTitle || undefined });
+    if (r.status === "completed" && r.endDate) events.push({ type: "return_completed", timestamp: r.endDate, label: "Возврат завершён", icon: "✓", detail: r.bikeTitle || undefined });
   }
 
   const todos = matchTodosToLead(lead, allTodos);
@@ -32,6 +32,9 @@ export function computeLeadHistory(
   }
 
   for (const n of notes) events.push({ type: "note_added", timestamp: n.created_at, label: "Заметка: " + (n.text.length > 50 ? n.text.slice(0, 50) + "…" : n.text), icon: "📝" });
+
+  if (lead.stageKey === "closed_won") events.push({ type: "closed_won", timestamp: lead.lastSeenAt || new Date().toISOString(), label: "Лид закрыт (выигран)", icon: "🎉" });
+  if (lead.stageKey === "closed_lost" && lead.lastSeenAt) events.push({ type: "closed_lost", timestamp: lead.lastSeenAt, label: "Лид закрыт (потерян)", icon: "✗" });
 
   return events.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 }
