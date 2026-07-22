@@ -1,13 +1,20 @@
--- Hotfix: callback-lead route sends intent_type='callback_request' and stage='lead_captured',
--- but neither value is present in the CHECK constraints (franchize_intents_intent_type_allowed
--- and franchize_intents_stage_allowed). The INSERT silently fails with a warn log.
+-- ═══════════════════════════════════════════════════════════════════════════
+-- COMPREHENSIVE FIX: franchize_intents CHECK constraints vs code reality
 --
--- Impact: web-site callback leads NEVER actually persisted in franchize_intents.
--- Telegram notification still fires (separate fetch), so operators saw the message
--- but the lead was invisible in /leads UI, analytics, and follow-up pipelines.
+-- Discovered: 2026-07-22
+-- Root cause: the DB CHECK constraints (intent_type_allowed / stage_allowed)
+-- were narrower than the values actually sent by application code.
+-- Silent INSERT failures across 6+ code paths — leads lost.
 --
--- Fix: add both missing values to the respective CHECK constraint lists.
+-- Fix: align both constraints with ALL values code may send.
+-- See also: app/franchize/server-actions/intents.ts (Zod schema) — kept in sync.
+-- ═══════════════════════════════════════════════════════════════════════════
 
+-- ── 1. Franchize intent_type_allowed ──────────────────────────────────────
+-- Code-sent values added:
+--   callback_request  (callback-lead route)
+--   test_drive        (testdrive-manual, Zod schema)
+--   service           (actions-runtime service flow)
 alter table public.franchize_intents
   drop constraint if exists franchize_intents_intent_type_allowed;
 
@@ -16,45 +23,52 @@ alter table public.franchize_intents
     intent_type in (
       'callback_request',
       'checkout_start',
-      'payment_failure',
-      'payment_success',
+      'contact_click',
+      'finance',
       'hold_created',
       'map_click',
-      'contact_click',
-      'test_ride_click',
-      'test_ride',
+      'payment_failure',
+      'payment_success',
       'prebuy',
-      'trade_in',
-      'finance',
       'rent',
-      'sale'
+      'sale',
+      'service',
+      'test_drive',
+      'test_ride',
+      'test_ride_click',
+      'trade_in'
     )
   );
 
+-- ── 2. Franchize stage_allowed ────────────────────────────────────────────
+-- Code-sent values added:
+--   lead_captured     (callback-lead route)
+--   dismissed         (leads-dismiss, lead-todo route)
 alter table public.franchize_intents
   drop constraint if exists franchize_intents_stage_allowed;
 
 alter table public.franchize_intents
   add constraint franchize_intents_stage_allowed check (
     stage in (
-      'lead_captured',
-      'discovered',
-      'clicked',
-      'prebuy_started',
+      'alternative_offered',
       'checkout_started',
-      'hold_created',
-      'payment_failed',
-      'payment_confirmed',
+      'clicked',
+      'closed',
+      'configured',
       'contacted',
+      'contract_generated',
+      'discovered',
+      'dismissed',
+      'finance_requested',
+      'hold_created',
+      'lead_captured',
+      'manual_reserved',
+      'offer_sent',
+      'payment_confirmed',
+      'payment_failed',
+      'prebuy_started',
       'test_ride_requested',
       'trade_in_requested',
-      'finance_requested',
-      'viewed',
-      'configured',
-      'offer_sent',
-      'manual_reserved',
-      'alternative_offered',
-      'closed',
-      'contract_generated'
+      'viewed'
     )
   );
