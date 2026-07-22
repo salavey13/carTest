@@ -84,10 +84,13 @@ export function LeadList({
 
   if (leads.length === 0) {
     return (
-      <div className="grid place-items-center rounded-[24px] border border-dashed p-10 text-center" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+      <div
+        className="grid place-items-center rounded-[24px] border border-dashed p-10 text-center"
+        style={{ borderColor: T.border }}
+      >
         {emptyState ?? (
           <div className="space-y-2">
-            <Inbox className="mx-auto h-10 w-10" style={{ color: T.textFaint }} />
+            <Inbox className="mx-auto h-10 w-10" style={{ color: T.textFaint }} aria-hidden />
             <p className="text-sm" style={{ color: T.textMuted }}>
               Лиды не найдены
             </p>
@@ -105,10 +108,11 @@ export function LeadList({
       ref={parentRef}
       className="max-h-[calc(100vh-280px)] overflow-y-auto overflow-x-hidden pr-1"
       style={{
-        // Hide scrollbar for cleaner look on desktop, but keep it functional.
+        // Thin scrollbar tinted with the theme border color so it adapts to
+        // light/dark. Smooth scrolling for anchor jumps (selected lead
+        // scrollIntoView).
         scrollbarWidth: "thin",
-        scrollbarColor: "rgba(255,255,255,0.15) transparent",
-        // Smooth scrolling for anchor jumps (selected lead scrollIntoView).
+        scrollbarColor: `${T.border} transparent`,
         scrollBehavior: "smooth",
       }}
     >
