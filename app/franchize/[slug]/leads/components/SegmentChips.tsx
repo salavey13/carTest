@@ -22,19 +22,26 @@ interface Props {
 /**
  * Horizontal scrollable pill chips for segment filtering.
  * Default segments: All / Hot / Overdue / Clients.
- * Each chip shows icon + label + count. Active chip highlighted with accent ring.
- * Mobile: scroll-x with hidden scrollbar. Desktop: wrap or single row.
+ *
+ * Active chip: solid accent background (T.accent) with accent-contrast text +
+ * a subtle accent ring. The active chip's count badge uses the segment's own
+ * color so the user can still tell hot vs overdue apart at a glance.
+ *
+ * Inactive chip: T.bgCard background with T.border, text in T.textMuted.
+ *
+ * Mobile: scroll-x with hidden scrollbar so the row never wraps and pushes
+ * the layout wider than the viewport. Desktop: single row, no overflow.
  */
 export function SegmentChips({ segments, activeSegment, onChange, T }: Props) {
   return (
-    <section
-      aria-label="Сегменты"
-      className="-mx-4 px-4 lg:mx-0 lg:px-0"
-    >
-      <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-wrap lg:overflow-visible lg:pb-0 scrollbar-none">
+    <section aria-label="Сегменты" className="-mx-4 px-4 lg:mx-0 lg:px-0">
+      <div
+        className="flex gap-2 overflow-x-auto pb-1 lg:flex-wrap lg:overflow-visible lg:pb-0"
+        style={{ scrollbarWidth: "none" }}
+      >
         {segments.map((seg, i) => {
           const Icon = seg.icon;
-          const color = seg.color || T.accent;
+          const segColor = seg.color || T.accent;
           const active = seg.key === activeSegment;
           return (
             <motion.button
@@ -46,31 +53,34 @@ export function SegmentChips({ segments, activeSegment, onChange, T }: Props) {
               initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.03, type: "spring", damping: 22, stiffness: 280 }}
-              className="inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition"
+              aria-pressed={active}
+              className="inline-flex min-h-[40px] shrink-0 cursor-pointer items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition"
               style={
                 active
                   ? {
-                      borderColor: color,
-                      background: `${color}1f`,
-                      color,
-                      boxShadow: `0 0 0 1px ${color}40, 0 6px 18px ${color}22`,
+                      borderColor: T.accent,
+                      background: T.accent,
+                      color: T.accentContrast,
+                      boxShadow: `0 6px 18px ${T.accent}40`,
                     }
                   : {
-                      borderColor: "rgba(255,255,255,0.08)",
-                      background: "rgba(255,255,255,0.03)",
+                      borderColor: T.border,
+                      background: T.bgCard,
                       color: T.textMuted,
                     }
               }
-              aria-pressed={active}
             >
-              {Icon && <Icon className="h-4 w-4 shrink-0" />}
+              {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden />}
               <span className="whitespace-nowrap">{seg.label}</span>
               <span
                 className="grid h-5 min-w-[20px] place-items-center rounded-full px-1.5 text-[11px] font-bold tabular-nums"
                 style={
                   active
-                    ? { background: color, color: "#0a0a0a" }
-                    : { background: "rgba(255,255,255,0.06)", color: T.textFaint }
+                    ? {
+                        background: T.accentContrast,
+                        color: segColor,
+                      }
+                    : { background: T.bgElevated, color: T.textFaint }
                 }
               >
                 {seg.count}
