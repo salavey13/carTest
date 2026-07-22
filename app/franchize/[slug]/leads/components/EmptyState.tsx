@@ -6,11 +6,13 @@ import { Users, Filter, Search, Inbox } from "lucide-react";
 interface EmptyStateProps {
   hasFilters: boolean;
   searchQuery?: string;
-  activeSources?: string[];
+  /** Called when the user clicks "Сбросить фильтры". Should clear ALL filters
+   *  (search + source + owner + stage + segment + flags), not just search. */
+  onReset?: () => void;
   T: any;
 }
 
-export function EmptyState({ hasFilters, searchQuery, activeSources, T }: EmptyStateProps) {
+export function EmptyState({ hasFilters, searchQuery, onReset, T }: EmptyStateProps) {
   const showSearchTip = hasFilters && searchQuery && searchQuery.length > 0;
   const showFilterTip = hasFilters && !showSearchTip;
 
@@ -91,13 +93,15 @@ export function EmptyState({ hasFilters, searchQuery, activeSources, T }: EmptyS
         transition={{ delay: 0.25 }}
       >
         {hasFilters && (
-          <span
+          <button
+            type="button"
+            onClick={onReset}
             className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition hover:opacity-80"
             style={{ backgroundColor: T.borderSoft, color: T.textMuted }}
           >
             <Filter className="h-3 w-3" />
             Сбросить фильтры
-          </span>
+          </button>
         )}
         {!hasFilters && (
           <>
