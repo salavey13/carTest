@@ -459,6 +459,17 @@ export function useStartParamRouter() {
           if (lobbyId) {
             targetPath = `/strikeball/lobbies/${lobbyId}`;
           }
+        } else if (paramToProcess.startsWith("lead_") || paramToProcess.startsWith("lead-")) {
+          // ── Lead deep-link: lead_<leadId> or lead-<leadId> ──
+          // Sent by lead-watcher in new-lead Telegram notifications.
+          // Opens /franchize/<slug>/leads with ?leadId=… so LeadsClient
+          // can auto-focus the row (scrollIntoView + open detail pane).
+          const separator = paramToProcess.includes("_") ? "_" : "-";
+          const leadId = paramToProcess.split(separator).slice(1).join(separator).trim();
+          const slug = searchParams.get("slug") || userCrewInfo?.slug || "vip-bike";
+          if (leadId) {
+            targetPath = `/franchize/${slug}/leads?leadId=${encodeURIComponent(leadId)}`;
+          }
         } else if (paramToProcess.startsWith("rental-") || paramToProcess.startsWith("rentals-") || paramToProcess.startsWith("sale-")) {
           const rentalId = paramToProcess.split("-").at(-1);
           const franchizeSlug = searchParams.get("slug") || "vip-bike";
