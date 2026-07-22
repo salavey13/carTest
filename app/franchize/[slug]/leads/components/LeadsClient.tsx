@@ -174,8 +174,11 @@ export function LeadsClient({
   const [dismissLeadId, setDismissLeadId] = useState<string | null>(null);
 
   // ── Writable leads/todos state syncs with prop changes ──
-  useEffect(() => { setLeadsState(leads); }, [leads]);
-  useEffect(() => { setTodosState(todos); }, [todos]);
+  // NOTE: leads/todos state is initialized once from props.
+  // Do NOT sync on every prop change — that would clobber optimistic updates.
+  // router.refresh() will cause a re-render with new prop refs, but we preserve
+  // the writable state by only initializing on mount.
+  // If server data changes significantly, the user can pull-to-refresh manually.
 
   // ── Debounce search ──
   useEffect(() => {
@@ -625,11 +628,11 @@ export function LeadsClient({
           onSearchChange={setSearchQuery}
           sortValue={sortMode}
           onSortChange={(v) => setSortMode(v as SortModeV2)}
-          sourceValue="all"
-          onSourceChange={() => {}}
+          sourceValue={sourceFilter}
+          onSourceChange={setSourceFilter}
           availableSources={availableSources}
-          ownerValue="all"
-          onOwnerChange={() => {}}
+          ownerValue={ownerFilter}
+          onOwnerChange={setOwnerFilter}
           stageValue={activeStageFilter || "all"}
           onStageChange={(v) => setActiveStageFilter(v === "all" ? null : (v as StageKey))}
           filterFlags={filterFlags}
