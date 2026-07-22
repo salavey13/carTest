@@ -958,6 +958,18 @@ async function cmdListLeads(opts) {
   // Apply filters.
   let filtered = leads;
   if (opts.hot)              filtered = filtered.filter((l) => l.hot);
+  
+  // Validate --stage
+  if (opts.stage) {
+    const validStages = ['new','needs_contact','contract_sent','awaiting_qr_claim','documents_missing','active_rental','return_due','closed_won','closed_lost'];
+    if (!validStages.includes(opts.stage)) {
+      console.error(`ERROR: invalid stage "${opts.stage}". Valid stages:`);
+      console.error('  new, needs_contact, contract_sent, awaiting_qr_claim,');
+      console.error('  documents_missing, active_rental, return_due, closed_won, closed_lost');
+      process.exit(2);
+    }
+  }
+
   if (opts.stage)            filtered = filtered.filter((l) => l.stageKey === opts.stage);
   if (opts.troubled)         filtered = filtered.filter((l) => l.troubled);
   if (opts.unclaimedQr)      filtered = filtered.filter((l) => l.qrStatus === "unclaimed");
@@ -993,7 +1005,19 @@ async function cmdListLeads(opts) {
   if (opts.search || opts.stage || opts.hot) {
     const segs = [];
     if (opts.search)       segs.push(`поиск: "${opts.search}"`);
-    if (opts.stage)        segs.push(`стадия: ${STAGE_LABELS[opts.stage] || opts.stage}`);
+    
+  // Validate --stage
+  if (opts.stage) {
+    const validStages = ['new','needs_contact','contract_sent','awaiting_qr_claim','documents_missing','active_rental','return_due','closed_won','closed_lost'];
+    if (!validStages.includes(opts.stage)) {
+      console.error(`ERROR: invalid stage "${opts.stage}". Valid stages:`);
+      console.error('  new, needs_contact, contract_sent, awaiting_qr_claim,');
+      console.error('  documents_missing, active_rental, return_due, closed_won, closed_lost');
+      process.exit(2);
+    }
+  }
+
+  if (opts.stage)        segs.push(`стадия: ${STAGE_LABELS[opts.stage] || opts.stage}`);
     if (opts.hot)          segs.push("только горячие");
     if (opts.troubled)     segs.push("только проблемные");
     if (opts.unclaimedQr)  segs.push("только QR не принят");
@@ -1093,7 +1117,20 @@ async function cmdLeadDetail(leadId, opts) {
   console.log("=== Pipeline ===");
   console.log(`Стадия:          ${STAGE_LABELS[lead.stageKey] || lead.stageKey}`);
   console.log(`QR status:       ${lead.qrStatus}`);
-  console.log(`Следующее действие: ${STAGE_NEXT_ACTION[lead.stageKey] || "—"}`);
+  console.log(`
+  // Fetch lead notes
+  const notesResp = await fetch(`${SUPABASE_URL}/rest/v1/lead_notes?select=id,text,created_by,created_at&lead_id=eq.${encodeURIComponent(leadId)}&order=created_at.desc&limit=20`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+  });
+  const notes = await notesResp.json();
+  if (Array.isArray(notes) && notes.length > 0) {
+    console.log('\n--- Заметки ---');
+    for (const n of notes) {
+      console.log(`  [${n.created_at?.slice(0,16)}] ${n.text}`);
+    }
+  }
+
+  // Следующее действие: ${STAGE_NEXT_ACTION[lead.stageKey] || "—"}`);
   console.log(`Assignee:        ${formatAssignee(lead.assignee)}`);
   console.log("");
 
