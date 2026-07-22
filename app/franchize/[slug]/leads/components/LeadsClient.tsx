@@ -56,6 +56,7 @@ import { LeadBoard } from "./LeadBoard";
 import { LeadDetailContent } from "./LeadDetailContent";
 import { MobileLeadSheet } from "./MobileLeadSheet";
 import { DismissLeadDialog } from "./DismissLeadDialog";
+import { EmptyState } from "./EmptyState";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -165,6 +166,11 @@ export function LeadsClient({
   const [filterFlags, setFilterFlags] = useState<FilterFlags>(DEFAULT_FILTER_FLAGS);
   const [viewMode, setViewMode] = useState<"list" | "board">("list");
   const [activeSegment, setActiveSegment] = useState<string>("all");
+  // Source / owner dropdown filters. Previously referenced but never declared,
+  // which broke the toolbar (TS2304: Cannot find name 'sourceFilter') AND meant
+  // changing the dropdowns had no effect on the list.
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [ownerFilter, setOwnerFilter] = useState<string>("all");
 
   const [kpis, setKpis] = useState<LeadsKpis | null>(null);
   const [leadsState, setLeadsState] = useState<LeadRow[]>(leads);
@@ -215,7 +221,7 @@ export function LeadsClient({
     [todosState]
   );
 
-  // ── Filter pipeline: mode → stage → search → filterFlags → sort ──
+  // ── Filter pipeline: mode → stage → search → source/owner → filterFlags → segment → sort ──
 
   // 1. Mode filter (by intent_type)
   const modeFilteredLeads = useMemo(() => {
@@ -251,10 +257,28 @@ export function LeadsClient({
     );
   }, [stageFilteredLeads, debouncedSearch]);
 
+  // 4b. Source + owner dropdown filters. Previously these state values were
+  // referenced by the toolbar but never declared and never applied here, so
+  // changing the dropdowns had no visible effect on the list.
+  const sourceOwnerFilteredLeads = useMemo(() => {
+    let result = searchFilteredLeads;
+    if (sourceFilter !== "all") {
+      result = result.filter((l) => l.source === sourceFilter);
+    }
+    if (ownerFilter !== "all") {
+      // Match either ownerId or ownerName so the dropdown keeps working even
+      // when the owner has a name but the lead only stores the id (or vice versa).
+      result = result.filter(
+        (l) => l.ownerId === ownerFilter || l.ownerName === ownerFilter
+      );
+    }
+    return result;
+  }, [searchFilteredLeads, sourceFilter, ownerFilter]);
+
   // 5. FilterFlags (overdue, qr, docs, active, returnDue, dismissed, hideOperatorPlaceholders)
   const flagFilteredLeads = useMemo(() => {
     const now = Date.now();
-    return searchFilteredLeads.filter((l) => {
+    return sourceOwnerFilteredLeads.filter((l) => {
       const leadTodos = getTodosForLead(l);
       const hasOverdueTodo = leadTodos.some(
         (t) => !!(t as { due_date?: string | null }).due_date &&
@@ -280,7 +304,7 @@ export function LeadsClient({
       if (filterFlags.hideOperatorPlaceholders && isOperatorPlaceholder) return false;
       return true;
     });
-  }, [searchFilteredLeads, filterFlags, getTodosForLead]);
+  }, [sourceOwnerFilteredLeads, filterFlags, getTodosForLead]);
 
   // 6. Segment filter (All / Hot / Overdue / Clients)
   const segmentFilteredLeads = useMemo(() => {
@@ -592,6 +616,40 @@ export function LeadsClient({
     return Array.from(set);
   }, [leadsState]);
 
+  // ── Available owners for the toolbar dropdown ──
+  // Uses ownerName when available, falls back to ownerId. Skips null/empty.
+  const availableOwners = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of leadsState) {
+      const name = l.ownerName || l.ownerId;
+      if (name) set.add(name);
+    }
+    return Array.from(set);
+  }, [leadsState]);
+
+  // ── Whether any filter is currently active (drives EmptyState copy + reset) ──
+  const hasActiveFilters = useMemo(() => {
+    return (
+      !!debouncedSearch.trim() ||
+      sourceFilter !== "all" ||
+      ownerFilter !== "all" ||
+      activeStageFilter !== null ||
+      activeSegment !== "all" ||
+      Object.values(filterFlags).some(Boolean)
+    );
+  }, [debouncedSearch, sourceFilter, ownerFilter, activeStageFilter, activeSegment, filterFlags]);
+
+  // ── Reset ALL filters (used by EmptyState "Сбросить фильтры" button) ──
+  const handleResetAllFilters = useCallback(() => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setSourceFilter("all");
+    setOwnerFilter("all");
+    setActiveStageFilter(null);
+    setActiveSegment("all");
+    setFilterFlags(DEFAULT_FILTER_FLAGS);
+  }, []);
+
   // ── Selected lead's todos (for the detail drawer) ──
   const selectedLeadTodos = useMemo(
     () => (selectedLead ? getTodosForLead(selectedLead) : []),
@@ -633,6 +691,7 @@ export function LeadsClient({
           availableSources={availableSources}
           ownerValue={ownerFilter}
           onOwnerChange={setOwnerFilter}
+          availableOwners={availableOwners}
           stageValue={activeStageFilter || "all"}
           onStageChange={(v) => setActiveStageFilter(v === "all" ? null : (v as StageKey))}
           filterFlags={filterFlags}
@@ -700,6 +759,14 @@ export function LeadsClient({
                 T={T}
                 crewId={crewId}
                 slug={slug}
+                emptyState={
+                  <EmptyState
+                    hasFilters={hasActiveFilters}
+                    searchQuery={searchQuery}
+                    onReset={handleResetAllFilters}
+                    T={T}
+                  />
+                }
               />
             </motion.div>
           )}
