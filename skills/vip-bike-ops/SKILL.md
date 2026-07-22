@@ -267,6 +267,12 @@ This skill does not query Supabase directly. For schema details, refer to the re
 - `app/franchize/lib/` — shared libraries
 - `app/franchize/[slug]/` — page components
 
+**Leads UI component contracts (frontend gotchas):**
+
+- `app/franchize/[slug]/leads/page.tsx` imports `LeadsClient` from `./LeadsClient` (v1, the **live** version). The Phase 3 `components/LeadsClient.tsx` (v2) is not yet wired into `page.tsx` — edits to v2 don't reach production.
+- `app/franchize/[slug]/leads/components/LeadsKPICards.tsx` expects a **single** `kpis: LeadsKpis` prop (`{ totalLeads, hotLeads, conversionRate, monthlyRevenue }`). Do **not** pass raw arrays (`leads` / `hot` / `verified` / `todos`) — `kpis` ends up `undefined` and the page dies on `kpis.totalLeads` inside the error boundary. Compute KPIs upstream (client `useMemo` from `activeLeads` + `hot`, or server action `getLeadsKpis(slug, mode)` in `app/franchize/server-actions/leads-kpis.ts`).
+- v1 `LeadsClient.tsx` carries several pre-existing TS prop mismatches with sibling components (`LeadsToolbar`, `LeadList`, `LeadBoard`, `LeadDetailContent`) — they predate the KPI bug, don't blank the page, and are tracked separately. Don't conflate with new fixes.
+
 **Schema migrations (consolidated):**
 
 - `20260304_private_scheme.sql` — private schema setup
