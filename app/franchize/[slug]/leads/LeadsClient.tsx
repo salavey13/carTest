@@ -156,6 +156,23 @@ export function LeadsClient({
     return () => clearTimeout(timer);
   }, [selectedId]);
 
+  // Auto-focus a lead from the URL (?leadId=…) — used by startapp deep-link
+  // `lead_<id>` from lead-watcher Telegram notifications.
+  // Читаем window.location.search напрямую, чтобы не тянуть useSearchParams
+  // (ему нужен Suspense boundary в Next.js 14 при статической генерации).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const leadId = params.get("leadId");
+    if (!leadId) return;
+    // Only set if the lead is actually in the loaded list — otherwise the
+    // detail pane shows an empty state. If list is still loading, the effect
+    // re-runs when `leads` prop updates.
+    if (leads.some((l) => l.user_id === leadId)) {
+      setSelectedId((prev) => (prev === leadId ? prev : leadId));
+    }
+  }, [leads]);
+
   // Dismiss lead — pass auth headers so the server can verify crew membership
   const handleDismissLead = async (leadId: string) => {
     try {
