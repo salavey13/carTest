@@ -1,7 +1,16 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, ChevronDown, QrCode } from "lucide-react";
+import {
+  FileText,
+  ChevronDown,
+  QrCode,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  Minus,
+  type LucideIcon,
+} from "lucide-react";
 import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
 
 export type DocStatus = "missing" | "pending" | "verified" | "sent";
@@ -28,24 +37,45 @@ interface Props {
   T: ThemeTokens;
 }
 
-const STATUS_META: Record<DocStatus, { color: string; label: string }> = {
-  missing: { color: "#ef4444", label: "Отсутствует" },
-  pending: { color: "#f59e0b", label: "На проверке" },
-  verified: { color: "#22c55e", label: "Проверен" },
-  sent: { color: "#3b82f6", label: "Отправлен" },
-};
-
-const QR_TONE_COLOR: Record<QrStatus["tone"], string> = {
-  danger: "#ef4444",
-  warning: "#f59e0b",
-  good: "#22c55e",
-  neutral: "#a1a1aa",
+const STATUS_META: Record<
+  DocStatus,
+  { color: string; label: string; icon: LucideIcon }
+> = {
+  missing: { color: "#ef4444", label: "Отсутствует", icon: XCircle },
+  pending: { color: "#f59e0b", label: "На проверке", icon: Clock },
+  verified: { color: "#22c55e", label: "Проверен", icon: CheckCircle2 },
+  sent: { color: "#3b82f6", label: "Отправлен", icon: Minus },
 };
 
 /**
+ * Resolve a QR tone to a hex color. Semantic tones (danger/warning/good) use
+ * fixed colors so the severity reads consistently across light/dark themes.
+ * `neutral` falls back to the theme's textFaint token so it adapts.
+ */
+function qrToneColor(tone: QrStatus["tone"], T: ThemeTokens): string {
+  switch (tone) {
+    case "danger":
+      return "#ef4444";
+    case "warning":
+      return "#f59e0b";
+    case "good":
+      return "#22c55e";
+    case "neutral":
+    default:
+      return T.textFaint;
+  }
+}
+
+/**
  * Document checklist section.
- * Each row: icon + name + status badge + action button.
- * QR status row at the bottom with a resend button.
+ *
+ * Each row:
+ *   - Status icon on the left (✓ green / ⏳ yellow / ✗ red / — gray).
+ *   - Document name + status label.
+ *   - Action link ("Запросить" / "Открыть" / "Verify") right-aligned, in
+ *     the accent color (T.accent) for clear affordance.
+ *
+ * QR status row at the bottom with a resend button (accent-styled).
  */
 export function LeadDocumentsSection({
   documents,
@@ -56,17 +86,19 @@ export function LeadDocumentsSection({
   T,
 }: Props) {
   const missingCount = documents.filter((d) => d.status === "missing").length;
+  const qrColor = qrToneColor(qrStatus.tone, T);
 
   return (
-    <section className="glass-panel rounded-[24px] p-5">
+    <section className="glass-panel rounded-[24px] p-4 sm:p-5">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between"
+        aria-expanded={expanded}
+        className="flex min-h-[44px] w-full cursor-pointer items-center justify-between"
       >
         <div className="flex items-center gap-3">
-          <FileText className="h-5 w-5" style={{ color: T.accent }} />
-          <h3 className="text-lg font-semibold" style={{ color: T.text }}>
+          <FileText className="h-5 w-5" style={{ color: T.accent }} aria-hidden />
+          <h3 className="text-base font-semibold md:text-lg" style={{ color: T.text }}>
             Документы
           </h3>
           {missingCount > 0 && (
@@ -78,8 +110,11 @@ export function LeadDocumentsSection({
             </span>
           )}
         </div>
-        <motion.div animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-          <ChevronDown className="h-5 w-5" style={{ color: T.textMuted }} />
+        <motion.div
+          animate={{ rotate: expanded ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <ChevronDown className="h-5 w-5" style={{ color: T.textMuted }} aria-hidden />
         </motion.div>
       </button>
 
@@ -95,27 +130,29 @@ export function LeadDocumentsSection({
             <div className="mt-4 space-y-3">
               {documents.map((doc) => {
                 const meta = STATUS_META[doc.status];
+                const StatusIcon = meta.icon;
                 return (
                   <div
                     key={doc.key}
-                    className="flex items-center justify-between rounded-2xl border p-4"
+                    className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3 sm:p-4"
                     style={{
-                      borderColor: "rgba(255,255,255,0.08)",
-                      background: "rgba(255,255,255,0.03)",
+                      borderColor: T.border,
+                      background: T.bgCard,
                     }}
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <div
                         className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
                         style={{ background: `${meta.color}1a` }}
+                        aria-hidden
                       >
-                        <FileText className="h-4 w-4" style={{ color: meta.color }} />
+                        <StatusIcon className="h-4 w-4" style={{ color: meta.color }} />
                       </div>
                       <div className="min-w-0">
-                        <div className="truncate font-medium" style={{ color: T.text }}>
+                        <div className="truncate text-sm font-medium" style={{ color: T.text }}>
                           {doc.name}
                         </div>
-                        <div className="mt-0.5 text-sm" style={{ color: meta.color }}>
+                        <div className="mt-0.5 text-xs" style={{ color: meta.color }}>
                           {meta.label}
                         </div>
                       </div>
@@ -124,8 +161,14 @@ export function LeadDocumentsSection({
                       <button
                         type="button"
                         onClick={doc.onAction}
-                        className="shrink-0 text-sm font-medium transition hover:brightness-125"
-                        style={{ color: "#93c5fd" }}
+                        className="shrink-0 cursor-pointer text-sm font-medium transition"
+                        style={{ color: T.accent }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.opacity = "0.75";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = "1";
+                        }}
                       >
                         {doc.actionLabel}
                       </button>
@@ -136,30 +179,25 @@ export function LeadDocumentsSection({
 
               {/* QR status row */}
               <div
-                className="flex items-center justify-between rounded-2xl border p-4"
+                className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3 sm:p-4"
                 style={{
-                  borderColor: `${QR_TONE_COLOR[qrStatus.tone]}33`,
-                  background: `${QR_TONE_COLOR[qrStatus.tone]}0d`,
+                  borderColor: `${qrColor}33`,
+                  background: `${qrColor}0d`,
                 }}
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <div
                     className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
-                    style={{ background: `${QR_TONE_COLOR[qrStatus.tone]}1a` }}
+                    style={{ background: `${qrColor}1a` }}
+                    aria-hidden
                   >
-                    <QrCode
-                      className="h-4 w-4"
-                      style={{ color: QR_TONE_COLOR[qrStatus.tone] }}
-                    />
+                    <QrCode className="h-4 w-4" style={{ color: qrColor }} />
                   </div>
-                  <div>
-                    <div className="font-medium" style={{ color: T.text }}>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium" style={{ color: T.text }}>
                       QR код аренды
                     </div>
-                    <div
-                      className="mt-0.5 text-sm"
-                      style={{ color: QR_TONE_COLOR[qrStatus.tone] }}
-                    >
+                    <div className="mt-0.5 text-xs" style={{ color: qrColor }}>
                       {qrStatus.label}
                     </div>
                   </div>
@@ -167,11 +205,11 @@ export function LeadDocumentsSection({
                 <button
                   type="button"
                   onClick={onRequestResendQr}
-                  className="shrink-0 rounded-lg border px-3 py-1.5 text-sm font-medium transition hover:brightness-125"
+                  className="shrink-0 cursor-pointer rounded-lg border px-3 py-1.5 text-sm font-medium transition"
                   style={{
-                    borderColor: "#3b82f64d",
-                    background: "#3b82f61a",
-                    color: "#93c5fd",
+                    borderColor: `${T.accent}4d`,
+                    background: `${T.accent}1a`,
+                    color: T.accent,
                   }}
                 >
                   Переслать QR
