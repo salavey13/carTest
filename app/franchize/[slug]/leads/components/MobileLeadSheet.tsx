@@ -19,15 +19,18 @@ interface Props {
 const SHEET_HEIGHT_VH = 0.68;
 const DRAG_DISMISS_THRESHOLD = 120; // px — drag past this to dismiss
 
+// Spring is tuned for a snappy-but-smooth open (270ms-feeling) and a slightly
+// firmer close. damping/stiffness/mass are chosen so the sheet decelerates
+// naturally without bouncing past y:0.
 const sheetVariants = {
   hidden: { y: "100%" },
   visible: {
     y: 0,
-    transition: { type: "spring" as const, damping: 30, stiffness: 320, mass: 0.8 },
+    transition: { type: "spring" as const, damping: 32, stiffness: 340, mass: 0.8 },
   },
   exit: {
     y: "100%",
-    transition: { type: "spring" as const, damping: 32, stiffness: 380, mass: 0.8 },
+    transition: { type: "spring" as const, damping: 36, stiffness: 420, mass: 0.8 },
   },
 };
 
@@ -73,17 +76,28 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
   return (
     <AnimatePresence>
       {open && (
+        // z-50 sits above page chrome (z-40 backdrop / drawer) but below the
+        // dismiss dialog (z-[60]) and toasts (z-[70]). lg:hidden so the sheet
+        // only renders on mobile — desktop uses the right-side drawer.
         <div className="fixed inset-0 z-50 flex items-end lg:hidden">
-          {/* Backdrop */}
+          {/* Backdrop — dim layer. pointer-events:auto so clicking the scrim
+              closes the sheet (the onClick is wired through). The scrim uses
+              a dark tint that works on both light + dark themes; backdrop-blur
+              softens the underlying content. */}
           <motion.div
             key="mobile-sheet-backdrop"
-            className="absolute inset-0"
-            style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)" }}
+            className="absolute inset-0 cursor-pointer"
+            style={{
+              background: "color-mix(in srgb, #000000 55%, transparent)",
+              backdropFilter: "blur(3px)",
+              WebkitBackdropFilter: "blur(3px)",
+            }}
             variants={backdropVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
             onClick={onClose}
+            aria-hidden
           />
 
           {/* Sheet — drag is started ONLY from the header handle so inner scroll works */}
@@ -95,9 +109,12 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
             className="relative flex w-full flex-col rounded-t-[28px] border-t shadow-2xl"
             style={{
               maxHeight: `${SHEET_HEIGHT_VH * 100}vh`,
-              background: "linear-gradient(180deg, #111113 0%, #09090b 100%)",
+              // Use theme bgElevated → bg gradient so the sheet visually relates
+              // to the rest of the surface. Previously this hardcoded #111113 →
+              // #09090b which broke on light themes and on crew theme overrides.
+              background: `linear-gradient(180deg, ${T.bgElevated} 0%, ${T.bg} 100%)`,
               borderColor: T.border,
-              boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
+              boxShadow: "0 -20px 60px rgba(0,0,0,0.55)",
             }}
             variants={sheetVariants}
             initial="hidden"
@@ -118,18 +135,21 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
                 pointerDown starts the drag so the gesture only fires here, not on
                 the scrollable body. */}
             <div
-              className="sticky top-0 z-10 flex shrink-0 cursor-grab items-center justify-between gap-3 px-4 pb-2 pt-3"
+              className="sticky top-0 z-10 flex shrink-0 cursor-grab items-center justify-between gap-3 px-4 pb-2.5 pt-3 active:cursor-grabbing"
               style={{
-                background: "linear-gradient(180deg, #111113 60%, transparent)",
+                background: `linear-gradient(180deg, ${T.bgElevated} 70%, transparent)`,
                 touchAction: "none",
               }}
               onPointerDown={(e) => dragControls.start(e)}
             >
               <div className="flex min-w-0 items-center gap-3">
+                {/* Visible drag handle pill — gray, top-aligned, 40px wide */}
                 <motion.div
                   className="h-1.5 w-10 shrink-0 rounded-full"
-                  style={{ background: "rgba(255,255,255,0.18)" }}
+                  style={{ background: T.border }}
                   whileTap={{ scale: 0.85 }}
+                  transition={{ type: "spring", damping: 22, stiffness: 320 }}
+                  aria-hidden
                 />
                 {title && (
                   <p
@@ -143,8 +163,16 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
               <button
                 type="button"
                 onClick={onClose}
-                className="shrink-0 rounded-xl p-2 transition hover:bg-white/5"
+                className="shrink-0 rounded-xl p-2 transition"
                 style={{ color: T.textFaint }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = T.bgCard;
+                  e.currentTarget.style.color = T.text;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = T.textFaint;
+                }}
                 aria-label="Закрыть"
               >
                 <X className="h-5 w-5" />
@@ -160,7 +188,10 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
                 maxHeight: `calc(${SHEET_HEIGHT_VH * 100}vh - 56px)`,
                 WebkitOverflowScrolling: "touch",
                 overscrollBehavior: "contain",
+                // Safe-area padding at bottom (iOS home indicator) + breathing
+                // room above the bottom of the sheet.
                 paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
+                scrollbarWidth: "thin",
               }}
             >
               {children}
