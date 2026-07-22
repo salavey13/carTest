@@ -124,8 +124,13 @@ export function LeadList({
               data-lead-id={lead.user_id}
               data-index={virtualRow.index}
               ref={virtualizer.measureElement}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
+              // IMPORTANT: we animate ONLY opacity (not `y`) here. Framer-motion's
+              // `y` motion value would override the inline `transform: translateY(...)`
+              // used by @tanstack/react-virtual for absolute positioning, which
+              // previously caused every virtualized row to collapse to top:0 and
+              // visually stack on top of each other.
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               transition={{ duration: 0.18, delay: Math.min(virtualRow.index * 0.01, 0.06) }}
               style={{
                 position: "absolute",
