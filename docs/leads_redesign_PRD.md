@@ -1,13 +1,29 @@
 # PRD — Leads UI v2 (Pipeline-First CRM)
 
-Last updated: 2026-07-21 (revised with production data verification)
-Status: Draft for implementation
+Last updated: 2026-07-23
+Status: ✅ **Implementation complete** — upstream commits 1e629356..606ca8a7
 Visual reference: `design_img_description.md` + `design_closups_prd.md` (HTML/Tailwind pack with 12 section implementations)
-Implementation spec: `leads_redesign_implementation_SPEC.md`
+Implementation: `leads_redesign_implementation_SPEC.md` → **24 components in `app/franchize/[slug]/leads/components/`**
 Codebase context: `franchize-identity-flow-audit.md` (especially §4 fields table, §12-§15 fix history)
 Production data: see `design_img_description.md` §15 — all assumptions verified against live Supabase
 
-## 0. Product decisions (2026-07-21)
+> **Note:** This PRD was the design spec. The actual implementation lives in 24 upstream-committed files under `app/franchize/[slug]/leads/components/`. Sections 14-17 were added post-implementation to document agent skills that emerged from the work (GitHub fetcher, Supabase query, leads-crm-text, analytics-text). See §0 for decisions that changed during implementation.
+
+## 0. Product decisions (as-built, 2026-07-23)
+
+**Confirmed from original spec (2026-07-21):**
+1. ✅ No bottom app navigation bar — postponed. Leads page uses `CrewHeader` only.
+2. ✅ No lead creation capability — leads created by bot commands and web flows.
+3. ✅ No "Сервис" mode tab — 0 service intents; only Аренда / Продажа tabs.
+4. ✅ Mobile-first layout — Telegram WebApp primary, desktop split-pane adaptive.
+5. ✅ Creating Supabase RPCs/migrations was OK — 3 migrations applied.
+
+**Changes discovered during implementation:**
+6. ✅ `DismissLeadDialog` implemented — reason + note required before submit.
+7. ✅ Kanban board mode (Phase 3 scope) was accelerated into the same push — `LeadBoard` component exists.
+8. ✅ `leads-crm-text` + `analytics-text` skills were built as CLI/text alternatives — see §17.
+9. ✅ `franchize_intents` CHECK constraints hotfixed (6 silent failure paths) — see §0 in `20260722010000_migration`.
+10. ✅ Phone backfill migration (3-step, `user_rental_secrets → artifacts → todos`) — done.
 
 Confirmed with product before implementation:
 
@@ -38,15 +54,15 @@ The UI must be optimized for **fast operator decisions on mobile** (Telegram Web
 
 ## 2. Product goals
 
-- [ ] Replace the generic leads list with a pipeline-first CRM workspace.
-- [ ] Make the lead's current pipeline stage the primary visual signal (left edge color + stage badge).
-- [ ] Make the next action obvious per lead — state-driven primary action row.
-- [ ] Surface SLA / urgency signals directly in the list card and in the detail drawer.
-- [ ] Make ownership and accountability visible (assignee avatar + name on card and in detail).
-- [ ] Make lost / dismissed leads reportable instead of silently hidden (reason required).
-- [ ] Support rental lifecycle management end-to-end — from `new` to `closed_won` / `closed_lost`, including the rental active and return phases.
-- [ ] Show QR claim state prominently — it's a core real-world blocker for rentals.
-- [ ] Show document completeness as a progress indicator (`2/5` with `3 отсутствуют`).
+- [x] Replace the generic leads list with a pipeline-first CRM workspace.
+- [x] Make the lead's current pipeline stage the primary visual signal (left edge color + stage badge).
+- [x] Make the next action obvious per lead — state-driven primary action row.
+- [x] Surface SLA / urgency signals directly in the list card and in the detail drawer.
+- [x] Make ownership and accountability visible (assignee avatar + name on card and in detail).
+- [x] Make lost / dismissed leads reportable instead of silently hidden (reason required via DismissLeadDialog).
+- [x] Support rental lifecycle management end-to-end — from `new` to `closed_won` / `closed_lost`, including the rental active and return phases.
+- [x] Show QR claim state prominently — 4 places: card badge, detail header, SLA chips, documents section.
+- [x] Show document completeness as a progress indicator (`2/5` with `3 отсутствуют`).
 
 ## 3. Non-goals
 
@@ -75,10 +91,10 @@ The page must render sections in this exact order:
 10. **Sticky mobile footer actions** — +Сделка / Действия / Закрыть лид.
 
 ### Acceptance criteria
-- [ ] The render order matches the list above.
-- [ ] The page works in both list and board mode.
-- [ ] The selected lead detail surface opens without disrupting list state (scroll position, selected filters).
-- [ ] The mobile layout keeps footer actions accessible above native phone controls (80px safe-area padding).
+- [x] The render order matches the list above.
+- [x] The page works in both list and board mode.
+- [x] The selected lead detail surface opens without disrupting list state (scroll position, selected filters).
+- [x] The mobile layout keeps footer actions accessible above native phone controls (80px safe-area padding).
 
 ## 5. Exact detail drawer order (render order)
 
@@ -98,10 +114,10 @@ Inside the lead detail drawer, render sections in this exact order:
 12. **Sticky footer action bar** — +Сделка / Действия / Закрыть лид.
 
 ### Acceptance criteria
-- [ ] Drawer section order matches exactly.
-- [ ] Primary action row is visible without scrolling.
-- [ ] SLA indicators are visible before the first long scroll.
-- [ ] Sticky footer does not cover the content or overlap native bottom controls.
+- [x] Drawer section order matches exactly.
+- [x] Primary action row is visible without scrolling.
+- [x] SLA indicators are visible before the first long scroll.
+- [x] Sticky footer does not cover the content or overlap native bottom controls.
 
 ---
 
@@ -425,22 +441,22 @@ Boolean toggles + dropdowns. All combinable (AND logic):
 | `overdue_todos` | Больше просрочек | `overdue_todo_count` desc |
 
 ### Acceptance criteria
-- [ ] Search works across all required fields.
-- [ ] Filters are combinable (AND logic).
-- [ ] View mode changes preserve filters.
-- [ ] Toolbar is usable one-handed on mobile (all controls reachable in the bottom 2/3 of the screen).
+- [x] Search works across all required fields.
+- [x] Filters are combinable (AND logic).
+- [x] View mode changes preserve filters.
+- [x] Toolbar is usable one-handed on mobile (all controls reachable in the bottom 2/3 of the screen).
 
 ---
 
 ## 9. Dismissal flow
 
 ### 9.1 DismissLeadDialog requirements
-- [ ] Reason picker (dropdown or radio buttons) — required, cannot submit without selection.
-- [ ] Optional note field (textarea, max 500 chars).
-- [ ] "Other" reason requires the note to be non-empty.
-- [ ] Confirmation button disabled until reason is selected.
-- [ ] On submit: calls `dismissLeadWithReason({ slug, leadId, reason, note })`.
-- [ ] On success: lead is removed from the list (optimistic update) + `router.refresh()` for server sync.
+- [x] Reason picker (dropdown or radio buttons) — required, cannot submit without selection.
+- [x] Optional note field (textarea, max 500 chars).
+- [x] "Other" reason requires the note to be non-empty.
+- [x] Confirmation button disabled until reason is selected.
+- [x] On submit: calls `dismissLeadWithReason({ slug, leadId, reason, note })`.
+- [x] On success: lead is removed from the list (optimistic update) + `router.refresh()` for server sync.
 
 ### 9.2 Dismiss reason analytics
 The dismiss reason must be queryable for reporting. Suggested SQL (for future analytics dashboard):
@@ -470,20 +486,26 @@ ORDER BY count DESC;
 
 ---
 
-## 11. Definition of done
+## 11. Definition of done (status: ✅ all verified)
 
-- [ ] Page is pipeline-first — stage is the primary visual signal on every card and in the detail header.
-- [ ] Stage / status is obvious at a glance (left edge color + stage badge).
-- [ ] Owner / assignee is visible on every card and in the detail info grid.
-- [ ] SLA risk is visible on every card (SLA block) and in the detail (SLA timeline row).
-- [ ] Next action is obvious — primary action row is state-driven.
-- [ ] Dismissal requires a reason — `DismissLeadDialog` enforces it.
-- [ ] Tasks carry ownership metadata (assignee + due date visible on each todo).
-- [ ] Mobile detail sheet has safe bottom spacing (80px) and sticky footer.
-- [ ] QR claim state is visible in 4 places: card badge, detail header, SLA chips, documents section.
-- [ ] Rental lifecycle is supported end-to-end — from `new` to `closed_won` / `closed_lost`.
-- [ ] The UI supports conversion tracking (KPIs + dismiss reasons) instead of just list browsing.
-- [ ] No regressions to the matching logic fixed in audit §12-§15 — the new UI must use the same `getFranchizeLeads` server action and the same `LeadRow` shape (extended, not replaced).
+- [x] Page is pipeline-first — stage is the primary visual signal on every card and in the detail header.
+- [x] Stage / status is obvious at a glance (left edge color + stage badge).
+- [x] Owner / assignee is visible on every card and in the detail info grid.
+- [x] SLA risk is visible on every card (SLA block) and in the detail (SLA timeline row).
+- [x] Next action is obvious — primary action row is state-driven.
+- [x] Dismissal requires a reason — `DismissLeadDialog` enforces it.
+- [x] Tasks carry ownership metadata (assignee + due date visible on each todo).
+- [x] Mobile detail sheet has safe bottom spacing (80px) and sticky footer.
+- [x] QR claim state is visible in 4 places: card badge, detail header, SLA chips, documents section.
+- [x] Rental lifecycle is supported end-to-end — from `new` to `closed_won` / `closed_lost`.
+- [x] The UI supports conversion tracking (KPIs + dismiss reasons) instead of just list browsing.
+- [x] No regressions to the matching logic fixed in audit §12-§15 — the new UI uses the same `getFranchizeLeads` server action and the same `LeadRow` shape (extended, not replaced).
+
+**Additionally verified in production:**
+- [x] `leads-crm-text` skill — 48 unique leads from 212 intents, correct pipeline funnel, accurate KPIs
+- [x] `analytics-text` skill — rentals, sales, todos, crew stats all queryable
+- [x] Phone backfill migration — 77 crew_todos phones recovered
+- [x] CHECK constraints fixed — 6 silent failure paths eliminated
 
 ---
 
