@@ -4,14 +4,14 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { ChevronRight, CheckCircle2 } from "lucide-react";
 import type { LeadRow } from "@/app/franchize/server-actions/leads";
-import type { LeadSignal } from "@/app/franchize/[slug]/leads/leads-constants";
-import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
+import type { LeadSignal } from "../leads-constants";
+import type { ThemeTokens } from "../hooks/useTheme";
 import {
   PIPELINE_STAGES,
   STAGE_LABELS,
   STAGE_COLORS,
-} from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
-import { getInitials, relativeTime } from "@/app/franchize/[slug]/leads/leads-utils";
+} from "../lib/pipeline-stages";
+import { getInitials, relativeTime } from "../leads-utils";
 
 interface Props {
   /**
