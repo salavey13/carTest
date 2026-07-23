@@ -5,14 +5,14 @@ import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads"
 import type {
   LeadSignal,
   LeadHistoryEvent,
-} from "@/app/franchize/[slug]/leads/leads-constants";
-import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
+} from "../leads-constants";
+import type { ThemeTokens } from "../hooks/useTheme";
 import {
   computeLeadStage,
   computeQrStatus,
-} from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
-import { computeLeadSignals } from "@/app/franchize/[slug]/leads/lib/sla-signals";
-import { computeLeadHistory } from "@/app/franchize/[slug]/leads/lib/lead-history";
+} from "../lib/pipeline-stages";
+import { computeLeadSignals } from "../lib/sla-signals";
+import { computeLeadHistory } from "../lib/lead-history";
 import {
   LeadDetailDrawer,
   type LeadDrawerNote,
