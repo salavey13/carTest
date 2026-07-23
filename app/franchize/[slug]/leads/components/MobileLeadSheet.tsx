@@ -3,7 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import { motion, AnimatePresence, useDragControls, type PanInfo } from "framer-motion";
 import { X } from "lucide-react";
-import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
+import type { ThemeTokens } from "../hooks/useTheme";
 
 interface Props {
   open: boolean;
