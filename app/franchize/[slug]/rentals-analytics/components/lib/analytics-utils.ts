@@ -93,15 +93,16 @@ export function formatDateLong(iso: string): string {
   }
 }
 
-/** Returns the local-calendar YYYY-MM-DD for "today".
+/** Returns the local-calendar YYYY-MM-DD for "today" in Europe/Moscow timezone.
  *  Crucial for users in UTC+ timezones (Moscow UTC+3) — `new Date().toISOString()`
- *  would return yesterday's date between 00:00 and 03:00 local.
+ *  would return yesterday's date between 00:00 and 03:00 local. We force
+ *  Europe/Moscow via `toLocaleDateString("en-CA", { timeZone: "Europe/Moscow" })`
+ *  which emits YYYY-MM-DD — this MUST match the server-side computation in
+ *  `page.tsx` (which also uses `timeZone: "Europe/Moscow"`).
  */
 export function todayLocalIso(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate(),
-  ).padStart(2, "0")}`;
+  // `en-CA` locale formats dates as YYYY-MM-DD (ISO-like).
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Moscow" });
 }
 
 /** Shift a YYYY-MM-DD date by `deltaDays` in UTC (deterministic across timezones).
@@ -123,17 +124,19 @@ export function getInitials(name: string | null | undefined): string {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
-/** Extract the local YYYY-MM-DD from an ISO datetime string.
+/** Extract the Europe/Moscow YYYY-MM-DD from an ISO datetime string.
  *  Used for date comparisons (e.g. "is agreed_end_date today?") where the
- *  stored datetime is UTC but we want the user's local calendar date.
+ *  stored datetime is UTC but we want the Moscow-local calendar date —
+ *  matches the server-side `todayLocalIso()` rule.
  */
 export function localDateOnly(iso: string | null | undefined): string | null {
   if (!iso) return null;
   try {
-    const d = new Date(iso);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-      d.getDate(),
-    ).padStart(2, "0")}`;
+    // Force Europe/Moscow TZ so "today" matches what the operator sees on
+    // their wall clock. `en-CA` locale emits YYYY-MM-DD.
+    return new Date(iso).toLocaleDateString("en-CA", {
+      timeZone: "Europe/Moscow",
+    });
   } catch {
     return null;
   }
