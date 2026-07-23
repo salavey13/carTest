@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
-import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
+import type { ThemeTokens } from "../hooks/useTheme";
 
 interface Props {
   children: ReactNode;
