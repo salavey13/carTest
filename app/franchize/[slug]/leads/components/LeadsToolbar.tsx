@@ -14,15 +14,15 @@ import {
   FileText,
   Bike,
 } from "lucide-react";
-import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
+import type { ThemeTokens } from "../hooks/useTheme";
 import type {
   FilterFlags,
   SortModeV2,
   ViewMode,
-} from "@/app/franchize/[slug]/leads/leads-constants";
+} from "../leads-constants";
 import {
   STAGE_LABELS,
-} from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
+} from "../lib/pipeline-stages";
 
 interface Props {
   searchValue: string;
