@@ -46,6 +46,11 @@ interface AnalyticsClientProps {
   loading?: boolean;
   todos?: RentalTodo[];
   mechanicMap?: Record<string, string | null>;
+  /** Controlled date — when provided, AnalyticsClient becomes controlled and
+   *  emits onDateChange instead of managing its own date state. Required for
+   *  the v2 wrapper to refetch on date navigation. */
+  date?: string;
+  onDateChange?: (next: string) => void;
 }
 
 export function AnalyticsClient({
@@ -58,9 +63,19 @@ export function AnalyticsClient({
   loading = false,
   todos = [],
   mechanicMap = {},
+  date: controlledDate,
+  onDateChange,
 }: AnalyticsClientProps) {
   const router = useRouter();
-  const [date, setDate] = useState(initialDate);
+  // Date state: controlled (when parent passes `date` + `onDateChange`) or
+  // uncontrolled (fallback to internal state initialized from initialDate).
+  // The v2 wrapper uses controlled mode so it can refetch on date change.
+  const [internalDate, setInternalDate] = useState(initialDate);
+  const date = controlledDate ?? internalDate;
+  const setDate = (next: string) => {
+    if (onDateChange) onDateChange(next);
+    else setInternalDate(next);
+  };
   const [activeTab, setActiveTab] = useState<AnalyticsTab>("rentals");
   const [selectedRentalId, setSelectedRentalId] = useState<string | null>(null);
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
@@ -111,8 +126,15 @@ export function AnalyticsClient({
     if (!selectedRentalId) return null;
     const rental = rentals.find((r) => r.rental_id === selectedRentalId);
     if (!rental) return null;
+    // v1 CrewTodo doesn't carry rental_id, so we match todos by operator
+    // chat id (same heuristic as buildMechanicMap). If the rental has no
+    // operator chat id, fall back to the rental_id (for forward-compat when
+    // crew_todos.rental_id is backfilled).
     const rentalTodos = todos.filter(
-      (t) => t.rental_id === rental.rental_id,
+      (t) =>
+        (rental.created_by_operator_chat_id &&
+          t.assigned_to === rental.created_by_operator_chat_id) ||
+        t.rental_id === rental.rental_id,
     );
     const md = (rental.metadata || {}) as Record<string, unknown>;
     return {
