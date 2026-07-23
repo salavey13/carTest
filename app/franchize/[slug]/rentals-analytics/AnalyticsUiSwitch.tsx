@@ -1,23 +1,23 @@
 "use client";
 
-// /app/franchize/[slug]/rentals-analytics/AnalyticsUiSwitch.tsx
-//
-// Client-side feature-flag resolver for the analytics v2 rollout.
-// v2 IS NOW THE DEFAULT.
+// AnalyticsUiSwitch — feature-flag resolver with T.* theme tokens.
+// v2 is the default. v1 accessible via ?ui=v1 or localStorage.analytics_ui_v2=false.
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import type { ThemeTokens } from "./hooks/useTheme";
 
 interface AnalyticsUiSwitchProps {
   forceV2: boolean;
   forceV1: boolean;
   v1: ReactNode;
   v2: ReactNode;
+  T: ThemeTokens;
 }
 
 const LS_KEY = "analytics_ui_v2";
 
-export function AnalyticsUiSwitch({ forceV2, forceV1, v1, v2 }: AnalyticsUiSwitchProps) {
+export function AnalyticsUiSwitch({ forceV2, forceV1, v1, v2, T }: AnalyticsUiSwitchProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const storedPrefState = useState<string | null>(null);
@@ -57,20 +57,23 @@ export function AnalyticsUiSwitch({ forceV2, forceV1, v1, v2 }: AnalyticsUiSwitc
 
       {isHydrated && (
         <div
-          className="fixed bottom-4 right-4 z-30 flex items-center gap-1 rounded-full border bg-black/60 px-1 py-1 text-xs backdrop-blur"
+          className="fixed bottom-4 right-4 z-30 flex items-center gap-1 rounded-full border px-1 py-1 text-xs backdrop-blur"
           role="group"
           aria-label="Переключатель версии интерфейса"
-          style={{ borderColor: "rgba(255,255,255,0.15)" }}
+          style={{
+            borderColor: T.border,
+            backgroundColor: T.bgCard,
+          }}
         >
-          <span className="px-2 text-white/60">UI</span>
+          <span className="px-2" style={{ color: T.textMuted }}>UI</span>
           <button
             type="button"
             onClick={() => toggleUi(false)}
             aria-pressed={!useV2}
             className="rounded-full px-3 py-1 transition focus:outline-none focus-visible:ring-2"
             style={{
-              backgroundColor: !useV2 ? "rgba(255,255,255,0.18)" : "transparent",
-              color: !useV2 ? "#ffffff" : "rgba(255,255,255,0.55)",
+              backgroundColor: !useV2 ? T.bgCardHover : "transparent",
+              color: !useV2 ? T.text : T.textMuted,
               minHeight: "32px",
             }}
           >
@@ -82,8 +85,8 @@ export function AnalyticsUiSwitch({ forceV2, forceV1, v1, v2 }: AnalyticsUiSwitc
             aria-pressed={useV2}
             className="rounded-full px-3 py-1 transition focus:outline-none focus-visible:ring-2"
             style={{
-              backgroundColor: useV2 ? "rgba(34,197,94,0.25)" : "transparent",
-              color: useV2 ? "#22c55e" : "rgba(255,255,255,0.55)",
+              backgroundColor: useV2 ? "#22c55e20" : "transparent",
+              color: useV2 ? "#22c55e" : T.textMuted,
               minHeight: "32px",
             }}
           >
