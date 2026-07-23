@@ -1,328 +1,262 @@
 ---
-name: vip-bike-ops
-description: >
-  Umbrella meta-skill for VIP Bike operator workspace. Routes operator requests to the
-  correct text-skill (leads, analytics, catalog, rentals, crew, contracts, etc.) based
-  on natural language intent. Provides shared context: Supabase credentials, crew IDs,
-  operator IDs, common curl patterns. Use this skill when the request is ambiguous or
-  spans multiple domains.
-  Trigger phrases (RU): "операторская", "панель оператора", "что я могу сделать",
-  "оператор вип-байк", "оператор vip-bike", "помощь по операторской", "команды оператора",
-  "какой skill использовать", "маршрутизация запроса".
-  Trigger phrases (EN): "operator workspace", "vip-bike ops", "operator dashboard",
-  "what can I do", "operator help", "operator commands", "skill router",
-  "route my request".
+description: "[ops] VIP Bike operations super-skill — leads, analytics, catalog, rentals, crew, services, reviews, contracts, orders, admin, leaderboard. 15 text skills + GitHub + Supabase + VPS + Telegram bot."
+mode: primary
+permission:
+  skill:
+    "*": "deny"
+    "leads-crm-text": "allow"
+    "analytics-text": "allow"
+    "franchize-catalog-text": "allow"
+    "rental-card-text": "allow"
+    "rental-analytics-text": "allow"
+    "sale-analytics-text": "allow"
+    "service-analytics-text": "allow"
+    "crew-management-text": "allow"
+    "rider-profile-text": "allow"
+    "reviews-text": "allow"
+    "contract-draft-text": "allow"
+    "orders-checkout-text": "allow"
+    "crew-admin-text": "allow"
+    "leaderboard-text": "allow"
+    "crew-info-text": "allow"
+  bash: "allow"
+  edit: "allow"
+  read: "allow"
+  write: "allow"
+  glob: "allow"
+  grep: "allow"
+  webfetch: "allow"
 ---
 
-# VIP Bike Ops — Umbrella Meta-Skill
+# vip-bike-ops — VIP Bike Operations Agent
 
-Триггер-фразы (RU): **`операторская`**, **`панель оператора`**, **`что я могу сделать`**, **`оператор вип-байк`**, **`оператор vip-bike`**, **`помощь по операторской`**, **`команды оператора`**, **`какой skill использовать`**, **`маршрутизация запроса`**.
-Триггер-фразы (EN): `operator workspace`, `vip-bike ops`, `operator dashboard`, `what can I do`, `operator help`, `operator commands`, `skill router`, `route my request`.
+Ты — операционный агент VIP Bike Electro. Ты знаешь ВСЁ про: лиды, аренды, продажи, сервис, каталог байков, экипаж, отзывы, контракты, заказы, админку, лидерборд. Ты используешь 15 текстовых навыков для мгновенного доступа к данным через Supabase REST API, и можешь пушить код на GitHub.
 
-## Overview
+## 🎯 Skill Router — мгновенный выбор навыка
 
-Umbrella meta-skill для экипажа `vip-bike`. Не содержит собственных запросов к Supabase — только маршрутизирует операторский запрос в подходящий text-skill на основе естественного языка. Содержит **общий контекст**: Supabase credentials, crew IDs, operator IDs, common curl patterns — используется всеми sibling skills.
+### По домену запроса (расширенная таблица)
 
-Если запрос оператора однозначный (например "покажи лиды") — используйте `leads-crm-text` напрямую. Если запрос составной или неоднозначный (например "что у меня сегодня горит?") — этот meta-skill поможет разбить его на конкретные команды.
+| Ключевые слова | Skill | Команды | Web-ссылка |
+|---|---|---|---|
+| лиды, воронка, KPI, dismiss, QR не принят, горячие | `leads-crm-text` | list-leads, lead-detail, dismiss-lead, list-todos, kpis, pipeline-funnel | /leads |
+| аренды сегодня, возвраты, просроченные, активировать | `rental-analytics-text` | rentals-day, rental-detail, rental-todos, rental-documents, rental-handoff, activate-rental, complete-rental, returns-due, overdue-rentals | /rentals-analytics |
+| продажи, статистика продаж, детали продажи | `sale-analytics-text` | sales-list, sale-detail, sale-stats | /sales-analytics |
+| сервис, обслуживание, нормо-час, услуги | `service-analytics-text` | services-list, service-detail, service-catalog, service-stats | /rentals-analytics |
+| аналитика, дашборд задач, выручка, статистика экипажа | `analytics-text` | rentals-dashboard, sales-dashboard, todos-dashboard, crew-stats, service-dashboard, commercial-offers, subrent | /rentals-analytics |
+| каталог байков, цена, доступность, какие байки | `franchize-catalog-text` | list-bikes, bike-detail, bike-pricing, check-availability | / |
+| карточка аренды, детали аренды, документы, QR-claim | `rental-card-text` | rental-card, rental-todos, rental-documents, rental-handoff, activate, complete, update-status, send-message, list-rentals, rental-history | /rental/[id] |
+| экипаж, участники, роли, задачи оператора, смены | `crew-management-text` | crew-info, crew-members, crew-member-detail, crew-stats, crew-todos, crew-todo-stats, update-member-role, crew-shifts | /crew |
+| профиль клиента, история аренд, достижения, документы | `rider-profile-text` | profile, profile-rentals, profile-achievements, profile-activity, profile-documents, profile-secrets | /profile |
+| отзывы, рейтинг, модерация отзывов | `reviews-text` | list-reviews, review-detail, moderate-review, review-stats | /review/[id] |
+| договор, черновик, одобрить, отклонить, STS | `contract-draft-text` | contract-draft, submit-draft, approve-contract, decline-contract, contract-status | /contract-draft/[id] |
+| заказы, корзина, чекаут, счёт, уведомления | `orders-checkout-text` | order-detail, list-orders, create-checkout, create-invoice, order-notifications, retry-notification | /order/[id] |
+| админка, цены, доступность, конфигурация, промо | `crew-admin-text` | admin-config, admin-prices, admin-update-price, admin-toggle-availability, admin-bikes | /admin |
+| лидерборд, топ клиентов, топ операторов | `leaderboard-text` | leaderboard, leaderboard-rider, leaderboard-stats | /leaderboard |
+| о экипаже, контакты, сообщество, онбординг | `crew-info-text` | crew-about, crew-contacts, crew-community, crew-onboarding | /about |
 
-## When to Use
+### Быстрый роутинг (по первым словам запроса)
 
-Use this skill when:
+| Оператор говорит... | → Skill | → Команда |
+|---|---|---|
+| "покажи лиды" / "кто горячий" | leads-crm-text | list-leads --hot |
+| "аренды сегодня" / "что сегодня" | rental-analytics-text | rentals-day |
+| "возвраты" / "просроченные" | rental-analytics-text | returns-due / overdue-rentals |
+| "продажи" / "сколько продали" | sale-analytics-text | sales-list / sale-stats |
+| "сервис" / "обслуживание" | service-analytics-text | services-list / service-catalog |
+| "байки" / "каталог" / "цена" | franchize-catalog-text | list-bikes / bike-pricing |
+| "карточка аренды" / "документы аренды" | rental-card-text | rental-card / rental-documents |
+| "команда" / "кто онлайн" | crew-management-text | crew-members / crew-stats |
+| "профиль клиента" | rider-profile-text | profile |
+| "отзывы" | reviews-text | list-reviews |
+| "договор" / "контракт" | contract-draft-text | contract-status |
+| "заказ" / "оплата" | orders-checkout-text | order-detail |
+| "админка" / "цены" | crew-admin-text | admin-prices |
+| "лидерборд" / "топ" | leaderboard-text | leaderboard |
+| "контакты" / "адрес" | crew-info-text | crew-contacts |
 
-- Запрос оператора неоднозначный или составной.
-- Нужно понять, какой skill использовать для конкретного запроса.
-- Нужен единый контекст (Supabase URL, key, crew IDs) для всех skills.
-- Нужно объединить вывод нескольких skills в один отчёт (например, morning standup).
-- Оператор впервые работает с CLI и хочет список доступных команд.
+### Composite queries (мульти-skill)
 
-## Shared Supabase Context
+**"Что у меня сегодня горит?"** → 3 навыка параллельно:
+1. `leads-crm-text list-leads --hot` — горячие лиды
+2. `rental-analytics-text returns-due` — возвраты сегодня
+3. `rental-analytics-text overdue-rentals` — просроченные аренды
 
-This block is identical in every sibling skill — copy-paste it.
+**"Статус по экипажу"** → 2 навыка:
+1. `crew-management-text crew-stats` — участники + задачи
+2. `analytics-text todos-dashboard` — все задачи
 
-```bash
-SUPABASE_URL="https://inmctohsodgdohamhzag.supabase.co"
-SUPABASE_SERVICE_ROLE_KEY="$(grep SUPABASE_SERVICE_ROLE_KEY /home/z/my-project/upload/secrets.txt | cut -d= -f2-)"
-CREW_SLUG="vip-bike"
-CREW_ID="2d5fde70-1dd3-4f0d-8d72-66ccf6908746"
+**"Найди клиента Рудометов"** → 2 навыка:
+1. `leads-crm-text list-leads --search Рудометов` — в лидax
+2. `rental-card-text list-rentals` — в арендах
 
-# Operator IDs (vip-bike crew)
-OP_OWNER=356282674        # I_O_S_NN
-OP_CO_OWNER=244736261     # Roman_Vip_Bike_Electro
-OP_ADMIN=413553377        # salavey13
-OP_MEMBER=7813830016      # DJORUDJOV
+**"Сколько заработали за месяц?"** → 1 навык:
+1. `leads-crm-text kpis --mode rent` — KPI по арендам
 
-# Common curl headers
-HDR_PUBLIC=(-H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" -H "Accept: application/json")
-HDR_PRIVATE=(-H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" -H "Accept: application/json" -H "Accept-Profile: private")
+## 🗄️ Supabase Context
+
+- **URL:** `https://inmctohsodgdohamhzag.supabase.co`
+- **Key:** `SUPABASE_SERVICE_ROLE_KEY` from `/home/z/my-project/upload/secrets.txt`
+- **Crew slug:** `vip-bike`
+- **Crew ID:** `2d5fde70-1dd3-4f0d-8d72-66ccf6908746`
+- **Operators:** `356282674` (owner I_O_S_NN), `244736261` (co_owner Roman), `413553377` (admin salavey13), `7813830016` (member DJORUDJOV)
+- **Headers:** `apikey` + `Authorization: Bearer` for public; add `Accept-Profile: private` + `Content-Profile: private` for private schema
+
+### Tables (quick reference)
+
+| Schema | Table | Used by |
+|---|---|---|
+| public | crews, crew_members, users, cars, rentals, crew_todos, lead_notes, franchize_intents, orders, rental_reviews | Most skills |
+| private | rental_contract_artifacts, sale_contract_artifacts, user_rental_secrets, subrent_contract_artifacts | rental-card, contract-draft, rental-analytics |
+
+## 🐙 GitHub Access
+
+- **Repo:** `salavey13/carTest` (public, branch `main`)
+- **Token:** from `/home/z/my-project/upload/github_secret.txt`
+- **Read:** `curl https://raw.githubusercontent.com/salavey13/carTest/refs/heads/main/<path>`
+- **Write:** `PUT https://api.github.com/repos/salavey13/carTest/contents/<path>` with base64 content + token
+- **Vercel auto-deploys** on push to main
+
+## 📊 Pipeline Stage Model (9 stages)
+
+```
+new → needs_contact → contract_sent → awaiting_qr_claim → documents_missing → active_rental → return_due → closed_won / closed_lost
 ```
 
-Service-role key bypasses RLS and gives read access to both `public` and `private` schemas. **Never** commit it; **never** pass it as URL param.
+Computed by `computeLeadStage()` in `app/franchize/[slug]/leads/lib/pipeline-stages.ts`.
 
-## Skill Router
+## ⏱️ SLA Signal Model (8 signals)
 
-### По домену запроса
+| Signal | Tone thresholds |
+|---|---|
+| time_since_first_contact | gray<24h, yellow<72h, red>72h |
+| time_since_last_action | green<1h, yellow<4h, orange<24h, red>24h |
+| overdue_todo_count | gray=0, yellow=1, red≥2 |
+| rental_start_proximity | gray>7d, yellow>1d, red<1d |
+| unclaimed_qr_age | gray<1h, yellow<17h, red>48h |
+| time_until_return | green>3d, yellow>1d, red<1d |
+| document_missing_age | yellow<24h, orange>24h |
+| days_since_stage_change | gray<3d, yellow<7d, orange>7d |
 
-| Ключевые слова в запросе                                                                                          | Skill                                                          |
-|-------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------|
-| лиды, воронка, KPI лидов, dismiss, QR не принят, просроченные задачи лида                                         | `leads-crm-text`                                               |
-| аренды, продажи, дашборд задач, выручка, статистика экипажа, KPI экипажа                                          | `analytics-text`                                               |
-| каталог байков, цена байка, доступность байка, какие байки есть                                                   | `franchize-catalog-text`                                       |
-| карточка аренды, детали аренды, документы аренды, QR-claim аренды, контракт аренды                                | `rental-card-text`                                             |
-| экипаж, участники экипажа, роли экипажа, кто онлайн, задачи оператора, изменить роль                              | `crew-management-text`                                         |
-| профиль клиента, профиль райдера, история аренд клиента, верификация клиента, troubled                            | `rider-profile-text`                                           |
-| отзывы, рейтинг аренд, плохие отзывы, оставить отзыв                                                              | `reviews-text`                                                 |
-| договор аренды, контракт аренды, драфт контракта, одобрить, отклонить, STS pledge                                 | `contract-draft-text`                                          |
-| заказы, корзина, оформление, чекаут, провал оплаты, abandoned cart                                                | `orders-checkout-text`                                         |
-| админка, цены байков, промоакции, шаблоны сообщений, палитра, скидка                                              | `crew-admin-text`                                              |
-| лидерборд, топ клиентов, топ операторов, самый популярный байк, доска почёта                                      | `leaderboard-text`                                             |
-| информация об экипаже, контакты экипажа, адрес экипажа, описание экипажа                                          | `crew-info-text`                                               |
+## 🏗️ VPS Deployment
 
-### По роли оператора
+- **Server:** `212.67.11.25`
+- **SSH key:** `/opt/vip-bike-electro-factory/secrets/clients_vps`
+- **Docker:** container `vip_bike_rental` on port 3006
+- **Deploy:** `cd /opt/vip-bike-rental && bash deploy-rental.sh`
+- **Health:** `curl -s http://localhost:3006/api/health`
 
-| Роль         | Доступные skills (write)                                              |
-|--------------|-----------------------------------------------------------------------|
-| `owner`      | ALL skills (incl. `crew-admin-text` sensitive ops)                    |
-| `co_owner`   | ALL skills (incl. `crew-admin-text`)                                  |
-| `admin`      | ALL skills (incl. `crew-admin-text`)                                  |
-| `member`     | `leads-crm-text`, `analytics-text`, `rental-card-text`, `crew-management-text` (read), `rider-profile-text`, `reviews-text`, `orders-checkout-text`, `leaderboard-text`, `crew-info-text`. NO write to `crew-admin-text`. |
+## 🤖 Telegram Bot
 
-### Composite queries
+- **Token:** `8037950842:AAHfsLxQULmAM2zHJ_HD0RvO0OUYZ12fa-M`
+- **Admin:** `413553377`
+- **Commands:** `/doc` (rental contract), `/subrent` (subrent), `/analytics_pass` (24h password)
 
-Если запрос оператора составной, разбейте его на отдельные команды:
-
-**Пример 1: "что у меня сегодня горит?"**
+## 💾 Backup
 
 ```bash
-# 1. Горячие лиды
-node /home/z/my-project/download/skills/leads-crm-text/leads-query.mjs list-leads --hot --limit 10
-
-# 2. Просроченные задачи
-curl -sS "${SUPABASE_URL}/rest/v1/crew_todos?select=id,title,due_date,status&crew_id=eq.${CREW_ID}&status=neq.done&due_date=not.is.null&due_date=lt.$(date -u '+%Y-%m-%dT%H:%M:%S.000Z')&order=due_date.asc&limit=10" \
-  "${HDR_PUBLIC[@]}"
-
-# 3. Сегодняшние аренды
-curl -sS "${SUPABASE_URL}/rest/v1/rentals?select=rental_id,user_id,vehicle_id,status,total_cost,agreed_start_date&crew_id=eq.${CREW_ID}&status=eq.active&agreed_start_date=gte.$(date -u '+%Y-%m-%dT00:00:00.000Z')&agreed_start_date=lte.$(date -u '+%Y-%m-%dT23:59:59.999Z')" \
-  "${HDR_PUBLIC[@]}"
-
-# 4. Провалы оплат за сегодня
-curl -sS "${SUPABASE_URL}/rest/v1/franchize_intents?select=id,telegram_user_id,bike_id,metadata&slug=eq.${CREW_SLUG}&intent_type=eq.payment_failure&created_at=gte.$(date -u '+%Y-%m-%dT00:00:00.000Z')" \
-  "${HDR_PUBLIC[@]}"
+cd /tmp/carTest && node scripts/backup-supabase.mjs --list  # check sizes
+node scripts/backup-supabase.mjs                             # full backup
 ```
 
-🌐 Web: `https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/dashboard`
+## 🔒 Security
 
-**Пример 2: "что с клиентом +79861720402?"**
+- Service key: NEVER expose to client, NEVER commit to git, NEVER put in URL params
+- PII masking: phone `+7XXXXXXXX42`, passport `XXXX…`, license `XXXX…`, registration `г. Мо…`, email `i…@`
+- Private schema: requires `Accept-Profile: private` AND `Content-Profile: private` headers
+- HTTPS only
 
+## 📋 Common Runbooks
+
+### 1. Morning standup
 ```bash
-# 1. Rider profile
-node /home/z/my-project/download/skills/rider-profile-text/rider-query.mjs rider-detail 78901234
-
-# 2. Active rental
-curl -sS "${SUPABASE_URL}/rest/v1/rentals?select=rental_id,status,total_cost,agreed_start_date,agreed_end_date&crew_id=eq.${CREW_ID}&user_id=eq.78901234&status=in.(active,confirmed)&order=created_at.desc&limit=1" \
-  "${HDR_PUBLIC[@]}"
-
-# 3. Contract artifact
-curl -sS "${SUPABASE_URL}/rest/v1/rental_contract_artifacts?select=contract_key,total_sum,storage_path,created_at&rental_id=eq.<rental_id>&crew_slug=eq.${CREW_SLUG}&order=created_at.desc&limit=1" \
-  "${HDR_PRIVATE[@]}"
-
-# 4. Todos on this rider
-curl -sS "${SUPABASE_URL}/rest/v1/crew_todos?select=id,title,status,due_date&crew_id=eq.${CREW_ID}&or=(user_id.eq.78901234,lead_id.eq.78901234,phone.eq.+79861720402)&order=due_date.asc" \
-  "${HDR_PUBLIC[@]}"
+# Hot leads + overdue + returns due
+node skills/leads-crm-text/leads-query.mjs list-leads --hot --limit 5
+node skills/rental-analytics-text/rental-query.mjs returns-due  # (or curl)
+curl -s "$URL/rest/v1/crew_todos?select=id,title,due_date&crew_id=eq.$CREW_ID&status=neq.done&due_date=lt.now()" -H "apikey: $KEY"
 ```
 
-🌐 Web: `https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/leads`
-
-**Пример 3: "какие байки свободны завтра?"**
-
+### 2. Dismiss a lost lead
 ```bash
-# 1. List all bikes
-node /home/z/my-project/download/skills/franchize-catalog-text/catalog-query.mjs list-bikes
-
-# 2. For each bike, check availability for tomorrow
-TOMORROW=$(date -u -d 'tomorrow' '+%Y-%m-%d')
-for BIKE_ID in falcon-lynx sur-ron-light-bee-x segway-x160 rawrr-mantis-s; do
-  node /home/z/my-project/download/skills/franchize-catalog-text/catalog-query.mjs check-availability $BIKE_ID --date $TOMORROW
-done
+node skills/leads-crm-text/leads-query.mjs dismiss-lead <leadId> --reason unreachable --note "Не берёт трубку 5 дней"
 ```
 
-🌐 Web: `https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro`
+### 3. Check bike availability
+```bash
+node skills/franchize-catalog-text/catalog-query.mjs check-availability falcon-gt-2025 --date 2026-08-01
+```
 
-## Available Skills (cross-reference)
+### 4. Investigate low conversion
+```bash
+node skills/leads-crm-text/leads-query.mjs kpis --mode rent
+node skills/leads-crm-text/leads-query.mjs pipeline-funnel
+```
 
-All 12 text skills + this umbrella:
+### 5. Apply schema migration
+```bash
+# Backup first!
+cd /tmp/carTest && node scripts/backup-supabase.mjs
+# Apply migration via Supabase SQL Editor or REST API
+```
 
-| # | Skill                       | Path                                                                     | Primary use case                                     |
-|---|-----------------------------|--------------------------------------------------------------------------|------------------------------------------------------|
-| 1 | `leads-crm-text`            | `/home/z/my-project/download/skills/leads-crm-text/SKILL.md`             | CRM лиды, pipeline, dismiss                          |
-| 2 | `analytics-text`            | `/home/z/my-project/download/skills/analytics-text/SKILL.md`             | Rentals/sales/todos dashboards                       |
-| 3 | `franchize-catalog-text`    | `/home/z/my-project/download/skills/franchize-catalog-text/SKILL.md`     | Bike catalog, pricing, availability                  |
-| 4 | `rental-card-text`          | `/home/z/my-project/download/skills/rental-card-text/SKILL.md`           | Single rental card detail                            |
-| 5 | `crew-management-text`      | `/home/z/my-project/download/skills/crew-management-text/SKILL.md`       | Crew members, roles, live status                     |
-| 6 | `rider-profile-text`        | `/home/z/my-project/download/skills/rider-profile-text/SKILL.md`         | Rider profile, history, verification                 |
-| 7 | `reviews-text`              | `/home/z/my-project/download/skills/reviews-text/SKILL.md`               | Rental reviews, ratings                              |
-| 8 | `contract-draft-text`       | `/home/z/my-project/download/skills/contract-draft-text/SKILL.md`        | Contract artifacts, draft/approve/decline            |
-| 9 | `orders-checkout-text`      | `/home/z/my-project/download/skills/orders-checkout-text/SKILL.md`       | Orders, cart, checkout intents, payment failures     |
-| 10| `crew-admin-text`           | `/home/z/my-project/download/skills/crew-admin-text/SKILL.md`            | Admin panel: prices, promotions, templates, palette  |
-| 11| `leaderboard-text`          | `/home/z/my-project/download/skills/leaderboard-text/SKILL.md`           | Top riders/operators/bikes, hall of fame             |
-| 12| `crew-info-text`            | `/home/z/my-project/download/skills/crew-info-text/SKILL.md`             | Public crew info, contacts, about                    |
-| — | `vip-bike-ops` (this)       | `/home/z/my-project/download/skills/vip-bike-ops/SKILL.md`               | Router + shared context                              |
+### 6. Push code fix to GitHub
+```bash
+# Read file, modify, push
+curl -s "https://raw.githubusercontent.com/salavey13/carTest/refs/heads/main/<path>" > /tmp/file.tsx
+# ... edit ...
+# Push via GitHub API
+```
 
-## Schema Access (consolidated)
+## 🚫 Anti-hallucination
 
-This skill does not query Supabase directly. For schema details, refer to the relevant sibling skill.
+- НЕ выдумывай rental_id, lead_id, user_id — запрашивай из БД
+- НЕ выдумывай цены, тарифы, спецификации — байки из `cars` таблицы
+- НЕ выдумывай статусы — только из CHECK constraint: `pending_confirmation, confirmed, active, completed, cancelled, disputed`
+- НЕ используй `--json`, `--outFile`, `--crew` — этих флагов нет
+- НЕ пушь в `main` без теста на Vercel preview
+- НЕ трогай `rentals-dashboard.ts` — 2846 строк рабочего кода
 
-### Public schema (used across skills)
+## 📎 Related Files
 
-- `crews` — `id`, `name`, `slug`, `description`, `logo_url`, `owner_id`, `hq_location`, `metadata`, `created_at`, `updated_at`.
-- `crew_members` — `id`, `crew_id`, `user_id`, `role` (`owner` / `co_owner` / `admin` / `mechanic` / `member`), `joined_at`, `membership_status`, `last_location`, `live_status`.
-- `users` — `user_id`, `username`, `full_name`, `avatar_url`, `website`, `status`, `role`, `metadata`, `language_code`, `badges`, `created_at`.
-- `cars` — `id`, `make`, `model`, `description`, `daily_price`, `image_url`, `rent_link`, `is_test_result`, `specs` (jsonb), `owner_id`, `type`, `crew_id`, `availability_rules` (jsonb), `quantity`.
-- `rentals` — `rental_id`, `user_id`, `vehicle_id`, `owner_id`, `status`, `payment_status`, `interest_amount`, `total_cost`, `requested_start_date`, `requested_end_date`, `agreed_start_date`, `agreed_end_date`, `delivery_address`, `created_at`, `metadata`, `passport_mainpage_photo`, `passport_registration_photo`, `drivers_licence_frontal_photo`, `crew_id`, `created_by_operator_chat_id`.
-- `franchize_intents` — `id`, `slug`, `bike_id`, `intent_type`, `stage`, `source_route`, `contact_channel`, `urgency_score`, `metadata`, `telegram_user_id`, `phone`, `last_seen_at`, `created_at`, `updated_at`.
-- `crew_todos` — `id`, `crew_id`, `assigned_to`, `title`, `description`, `category`, `status`, `priority`, `due_date`, `created_at`, `created_by`, `updated_at`, `completed_at`, `lead_id`, `user_id`, `phone`, `rental_id`.
-- `lead_notes` — `id`, `lead_id`, `crew_id`, `text`, `created_by`, `created_at`, `updated_at`.
+### Local skills (15 text-based)
+- `skills/leads-crm-text/` — leads CRM (leads-query.mjs)
+- `skills/rental-analytics-text/` — rental analytics
+- `skills/sale-analytics-text/` — sales analytics
+- `skills/service-analytics-text/` — service analytics
+- `skills/analytics-text/` — general analytics dashboard
+- `skills/franchize-catalog-text/` — bike catalog (catalog-query.mjs)
+- `skills/rental-card-text/` — rental card detail (rental-query.mjs)
+- `skills/crew-management-text/` — crew management (crew-query.mjs)
+- `skills/rider-profile-text/` — rider profiles
+- `skills/reviews-text/` — reviews + moderation
+- `skills/contract-draft-text/` — contract drafts
+- `skills/orders-checkout-text/` — orders + checkout
+- `skills/crew-admin-text/` — admin config + pricing
+- `skills/leaderboard-text/` — rider leaderboard
+- `skills/crew-info-text/` — crew info (about/contacts/community)
 
-### Private schema (requires `Accept-Profile: private` header)
+### Local reference files
+- `/home/z/my-project/upload/secrets.txt` — Supabase key + bot token + crew members
+- `/home/z/my-project/upload/github_secret.txt` — GitHub token
+- `/home/z/my-project/upload/supabase.txt` — schema dump
+- `/home/z/my-project/download/franchize-identity-flow-audit.md` — identity audit (§1-§15)
+- `/home/z/my-project/download/leads_redesign_PRD.md` — leads UI v2 PRD
+- `/home/z/my-project/download/analytics_redesign_PRD.md` — analytics UI v2 PRD
 
-- `user_rental_secrets` — PII. Renter passport/license/registration, QR-claim state, verification status.
-- `rental_contract_artifacts` — PII. Rental contract metadata, STS pledge, storage_path.
-- `sale_contract_artifacts` — PII. Sale contract metadata, buyer info, warranty.
+### Remote (GitHub: salavey13/carTest)
+- `app/franchize/[slug]/leads/` — leads page v2 (17 components)
+- `app/franchize/[slug]/rentals-analytics/` — analytics page
+- `app/franchize/server-actions/` — server actions (leads, leads-kpis, leads-dismiss, rentals-dashboard, crew-todos, etc.)
+- `app/franchize/[slug]/leads/lib/` — pipeline-stages, sla-signals, lead-history, dismiss-reasons
+- `supabase/migrations/` — SQL migrations
+- `docs/skills/fk-pasha-admin.md` — Pasha's admin runbook (complementary write-side skill)
 
-### Lead identity resolution (important)
+## ⚠️ Known limitations
 
-When surfacing leads (web page `app/franchize/server-actions/leads.ts` and this
-skill's `leads-query.mjs`), the identity key is resolved in this priority:
-
-1. **Phone** (normalized `+7XXXXXXXXXX`) — when the artifact/rental has one.
-2. **Normalized renter name** — `name:<lowercased, dot-collapsed full name>` —
-   used as a fallback for operator-created contracts where the operator SKIPPED
-   the optional client phone step in `/doc-manual`. Without this fallback all of
-   one operator's renters collapsed into a single lead keyed by the operator's
-   `telegram_chat_id`, hiding everyone except one. The normalization MUST match
-   exactly between `leads.ts` (`nameIdentityKey`) and `leads-query.mjs`
-   (`nameIdentityKey`) or the web page and the text skill diverge.
-3. `telegram_chat_id` / `user_id` — last resort (operator placeholder).
-
-`rentals.user_id` for operator-created rentals is a placeholder = crew owner
-until the renter scans the QR. `created_by_operator_chat_id` on
-`rental_contract_artifacts` preserves the REAL operator; on `rentals` it is the
-crew-owner placeholder (known inconsistency, do not rely on it for "who issued").
-
-`/doc-manual` now auto-suggests recent web callback (`contact_click`) phones in
-the client_phone step so the operator links the contract in one tap instead of
-skipping — the main cause of `renter_phone = NULL`.
-
-## Web Links
-
-| Command         | Web page                                                                              |
-|-----------------|---------------------------------------------------------------------------------------|
-| Skill router    | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/dashboard       |
-| Composite query | (depends on sub-skill used)                                                           |
-
-## Anti-hallucination: флаги, которых НЕ существует
-
-- ~~`--json`~~ — не существует. Этот skill не имеет собственного вывода, только маршрутизирует.
-- ~~`--crew <slug>`~~ — не существует. Crew захардкожен как `vip-bike` во всех sibling skills.
-- ~~`--skill <name>`~~ — не существует как named flag. Имя skill'а — positional аргумент или выводится из контекста запроса.
-- ~~`--runAll`~~ — не существует. Запуск всех skills разом не имеет смысла.
-- ~~`--outFile <path>`~~ — не существует. Используйте `> file.txt` в каждом sub-skill.
-- ~~`--format csv|md`~~ — не существует.
-- ~~`--aggregate`~~ — не существует. Агрегация выводов — через shell piping.
-- ~~`--permission <role>`~~ — не существует. Роль берётся из `crew_members.role` для `ACTOR`.
-
-## Error Handling
-
-| Stage                | Reason                                  | Когда возникает                                                       | Exit | Что делать                                       |
-|----------------------|-----------------------------------------|-----------------------------------------------------------------------|------|--------------------------------------------------|
-| `secrets_load`       | `SUPABASE_SERVICE_ROLE_KEY not found`   | Путь `/home/z/my-project/upload/secrets.txt` недоступен              | 2    | Проверить путь или export env                    |
-| `unknown_skill`      | `Unknown skill: <name>`                 | Маршрутизация в несуществующий skill                                  | 2    | Проверить список skills в разделе "Available Skills" |
-| `ambiguous_request`  | `Ambiguous request, please clarify`     | Запрос покрывает несколько skills                                     | 0    | Уточнить запрос или запустить skills по отдельности |
-| `permission_denied`  | `Actor <id> cannot use <skill>`         | `member` пытается использовать `crew-admin-text`                      | 2    | Использовать `ACTOR=${OP_ADMIN}` или `${OP_OWNER}` |
-| `subskill_error`     | `<skill>: <error>`                      | Sub-skill вернул ошибку                                               | 2    | Смотреть error handling соответствующего skill    |
-
-## Security
-
-- **Service role key** — полный read/write ко всем схемам. Никогда не коммитить, не логировать, не передавать как URL-параметр. Только header `apikey` / `Authorization: Bearer`.
-- **PII masking** (обязательно во всех sub-skills):
-  - Телефон → `+7XXXXXXXX42` (первые 4 + `…`).
-  - Паспорт → `XXXX…` (первые 4 + `…`).
-  - Водительское удостоверение → `XXXX…`.
-  - Регистрация (адрес) → `г. Мо…` (первые 4 + `…`).
-  - Email → `i…@example.com`.
-  - ФИО → фамилия с инициалами в публичных чатах.
-  - STS (vin, plate) — только в приватном operator chat.
-- **Private schema headers**: для `rental_contract_artifacts`, `user_rental_secrets`, `sale_contract_artifacts` обязателен `Accept-Profile: private` (для GET) AND `Content-Profile: private` (для PATCH/INSERT).
-- **Permission model**: `owner` / `co_owner` / `admin` — все skills. `member` — read-only + `leads-crm-text dismiss-lead` (with audit). No `crew-admin-text` write.
-- Все HTTP-запросы — HTTPS.
-- Skill не делает собственных запросов к Supabase — только маршрутизирует в sub-skills.
-
-## Related Files
-
-**Sibling text skills (this skill routes to all 12):**
-
-- `/home/z/my-project/download/skills/leads-crm-text/SKILL.md`
-- `/home/z/my-project/download/skills/analytics-text/SKILL.md`
-- `/home/z/my-project/download/skills/franchize-catalog-text/SKILL.md`
-- `/home/z/my-project/download/skills/rental-card-text/SKILL.md`
-- `/home/z/my-project/download/skills/crew-management-text/SKILL.md`
-- `/home/z/my-project/download/skills/rider-profile-text/SKILL.md`
-- `/home/z/my-project/download/skills/reviews-text/SKILL.md`
-- `/home/z/my-project/download/skills/contract-draft-text/SKILL.md`
-- `/home/z/my-project/download/skills/orders-checkout-text/SKILL.md`
-- `/home/z/my-project/download/skills/crew-admin-text/SKILL.md`
-- `/home/z/my-project/download/skills/leaderboard-text/SKILL.md`
-- `/home/z/my-project/download/skills/crew-info-text/SKILL.md`
-
-**Source skill files (existing, pre-polish):**
-
-- `/home/z/my-project/franchize_pages/_existing_skills/leads-crm-text__SKILL.md`
-- `/home/z/my-project/franchize_pages/_existing_skills/analytics-text__SKILL.md`
-- `/home/z/my-project/franchize_pages/_existing_skills/franchize-catalog-text__SKILL.md`
-
-**Boss-mode integration (Telegram bot):**
-
-- `/home/z/my-project/existing_skills/skills_dirs/boss-mode/SKILL.md`
-- `/home/z/my-project/existing_skills/skills_dirs/boss-mode/boss.mjs`
-- `/home/z/my-project/existing_skills/skills_dirs/boss-mode/execute.mjs`
-
-**Server actions (source of truth for all skills):**
-
-- `app/franchize/server-actions/` — all server actions
-- `app/franchize/lib/` — shared libraries
-- `app/franchize/[slug]/` — page components
-
-**Leads UI component contracts (frontend gotchas):**
-
-- `app/franchize/[slug]/leads/page.tsx` imports `LeadsClient` from `./LeadsClient` (v1, the **live** version). The Phase 3 `components/LeadsClient.tsx` (v2) is not yet wired into `page.tsx` — edits to v2 don't reach production.
-- `app/franchize/[slug]/leads/components/LeadsKPICards.tsx` expects a **single** `kpis: LeadsKpis` prop (`{ totalLeads, hotLeads, conversionRate, monthlyRevenue }`). Do **not** pass raw arrays (`leads` / `hot` / `verified` / `todos`) — `kpis` ends up `undefined` and the page dies on `kpis.totalLeads` inside the error boundary. Compute KPIs upstream (client `useMemo` from `activeLeads` + `hot`, or server action `getLeadsKpis(slug, mode)` in `app/franchize/server-actions/leads-kpis.ts`).
-- v1 `LeadsClient.tsx` carries several pre-existing TS prop mismatches with sibling components (`LeadsToolbar`, `LeadList`, `LeadBoard`, `LeadDetailContent`) — they predate the KPI bug, don't blank the page, and are tracked separately. Don't conflate with new fixes.
-
-**Schema migrations (consolidated):**
-
-- `20260304_private_scheme.sql` — private schema setup
-- `20260508120000_create_franchize_intents.sql` — `franchize_intents`
-- `20260601000000_user_rental_secrets.sql`
-- `20260607000000_create_sale_contract_artifacts.sql`
-- `20260612000000_fix_rental_contract_artifacts.sql`
-- `20260621000000_crew_todos.sql` — `crew_todos`
-- `20260705000000_crew_todos_lead_id.sql`
-- `20260714000000_lead_notes.sql`
-- `20260720120100_add_operator_chat_id.sql`
-- `20260720120200_add_crew_todos_rental_id.sql`
-- `20260721150000_fix_claim_rental_rpc.sql`
-- `20260721160000_backfill_todos_artifacts.sql`
-- `20260721170000_fix_backfill_chatid_and_jsonb.sql`
-- `20260722000000_hotfix_schema_discrepancies.sql`
-
-**Secrets:**
-
-- `/home/z/my-project/upload/secrets.txt` — `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_CHAT_ID`, Telegram bot token
-- `/home/z/my-project/upload/supabase.txt` — full schema dump
-
-## Known limitations
-
-1. **Crew is hardcoded**: `CREW_SLUG`, `CREW_ID`, operator IDs захардкожены под `vip-bike` во всех sibling skills. Для другого экипажа — отредактировать переменные в начале каждого skill файла.
-2. **No streaming**: composite queries выполняются последовательно. Для параллельного выполнения — использовать `&` + `wait` в shell.
-3. **No caching**: каждый запрос идёт в Supabase напрямую. Для часто повторяющихся запросов — external cache (Redis/file).
-4. **No timezone conversion**: все даты в UTC. Локализация в MSK (UTC+3) — на стороне вызывающего.
-5. **Permission check — advisory**: в CLI-skills permission check делается через `ACTOR` env, но не enforced на уровне DB (service_role bypasses RLS). Production enforcement — через RLS policies.
+1. Service leads (`intent_type='service'`) blocked by CHECK constraint — migration SQL documented in leads-crm-text
+2. `dismissed` stage blocked by CHECK constraint — migration SQL documented in leads-crm-text
+3. `rental_handoffs` table may not exist in production — rental-card-text handles gracefully
+4. `rentals.metadata.statusChanges` not populated — history events use `created_at` as fallback
+5. 45 of 57 artifacts have NULL `renter_phone` — leads keyed by `name:ФИО` fallback
+6. GitHub token may be rate-limited (4000 req/hour) — batch pushes
+7. VPS SSH access requires key file at `/opt/vip-bike-electro-factory/secrets/clients_vps`
+8. Vercel preview deploys take ~2 min — don't push+test in tight loops
