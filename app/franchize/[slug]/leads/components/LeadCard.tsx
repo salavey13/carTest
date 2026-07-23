@@ -29,7 +29,7 @@ interface Props {
 const TONE_COLOR: Record<LeadSignal["tone"], string> = {
   danger: "#ef4444",
   warning: "#f59e0b",
-  neutral: "#a1a1aa",
+  neutral: "#64748b",
   good: "#22c55e",
 };
 
@@ -168,7 +168,7 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
           <div className="flex flex-wrap gap-2">
             <span
               className="rounded-full px-2.5 py-1 text-[10px] font-medium"
-              style={{ background: "#3b82f620", color: "#93c5fd" }}
+              style={{ background: "#3b82f620", color: "#3b82f6" }}
             >
               {SOURCE_META[lead.source]?.label || lead.source}
             </span>
