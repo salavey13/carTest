@@ -2,8 +2,8 @@
 
 import { motion } from "framer-motion";
 import { Clock, QrCode, Bike, AlertCircle, Activity } from "lucide-react";
-import type { LeadSignal } from "@/app/franchize/[slug]/leads/leads-constants";
-import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
+import type { LeadSignal } from "../leads-constants";
+import type { ThemeTokens } from "../hooks/useTheme";
 
 interface Props {
   signals: LeadSignal[];
