@@ -150,7 +150,7 @@ function BoardColumn({
         {leads.length === 0 ? (
           <EmptyColumnPlaceholder color={color} T={T} />
         ) : (
-          leads.map((lead, idx) => (
+          leads.filter(Boolean).map((lead, idx) => (
             <BoardCard
               key={lead.user_id}
               lead={lead}
