@@ -19,8 +19,8 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
   const surface = crewPaletteWithCssVars(crew.theme);
 
   const result = await getFranchizeLeads(slug);
-  const leads: LeadRow[] = result.leads || [];
-  const todos: LeadTodoRow[] = result.todos || [];
+  const leads: LeadRow[] = (result.leads || []).filter(Boolean) as LeadRow[];
+  const todos: LeadTodoRow[] = (result.todos || []).filter(Boolean) as LeadTodoRow[];
 
   return (
     <main className="min-h-screen" style={surface.page}>
