@@ -3,19 +3,19 @@
 import { motion } from "framer-motion";
 import { CheckCircle2, ChevronRight, Phone, Clock, MoreVertical } from "lucide-react";
 import type { LeadRow } from "@/app/franchize/server-actions/leads";
-import type { LeadSignal } from "@/app/franchize/[slug]/leads/leads-constants";
-import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
+import type { LeadSignal } from "../leads-constants";
+import type { ThemeTokens } from "../hooks/useTheme";
 import {
   STAGE_LABELS,
   STAGE_COLORS,
-} from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
-import { SOURCE_META } from "@/app/franchize/[slug]/leads/leads-constants";
+} from "../lib/pipeline-stages";
+import { SOURCE_META } from "../leads-constants";
 import {
   getInitials,
   relativeTime,
   fmtMoney,
   formatDate,
-} from "@/app/franchize/[slug]/leads/leads-utils";
+} from "../leads-utils";
 
 interface Props {
   lead: LeadRow;
