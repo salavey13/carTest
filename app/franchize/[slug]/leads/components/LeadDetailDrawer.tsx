@@ -101,6 +101,13 @@ export function LeadDetailDrawer(props: Props) {
     onDismissLead,
   } = props;
 
+  // Defensive null-guard: if `lead` is null/undefined (shouldn't happen —
+  // LeadDetailContent null-checks before rendering us — but be safe against
+  // any unexpected crash), bail with null.
+  if (!lead || typeof lead !== "object") {
+    return null;
+  }
+
   const stageKey = (lead as { stageKey?: string }).stageKey || "new";
   const stageColor = STAGE_COLORS[stageKey] || "#64748b";
   const stageLabel = STAGE_LABELS[stageKey] || stageKey;
