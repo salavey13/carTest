@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
-import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
+import type { ThemeTokens } from "../hooks/useTheme";
 
 export interface InfoTile {
   label: string;
