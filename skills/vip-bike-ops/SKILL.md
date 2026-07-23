@@ -39,9 +39,9 @@ permission:
 | Ключевые слова | Skill | Команды | Web-ссылка |
 |---|---|---|---|
 | лиды, воронка, KPI, dismiss, QR не принят, горячие | `leads-crm-text` | list-leads, lead-detail, dismiss-lead, list-todos, kpis, pipeline-funnel | /leads |
-| аренды сегодня, возвраты, просроченные, активировать | `rental-analytics-text` | rentals-day, rental-detail, rental-todos, rental-documents, rental-handoff, activate-rental, complete-rental, returns-due, overdue-rentals | /rentals-analytics |
-| продажи, статистика продаж, детали продажи | `sale-analytics-text` | sales-list, sale-detail, sale-stats | /sales-analytics |
-| сервис, обслуживание, нормо-час, услуги | `service-analytics-text` | services-list, service-detail, service-catalog, service-stats | /rentals-analytics |
+| аренды сегодня, возвраты, просроченные, активировать, kpi аренд, документы аренды, передача байка, история аренды | `rental-analytics-text` | rentals-day, rental-kpis, rental-detail, rental-todos, rental-documents, rental-handoff, rental-history, activate-rental, complete-rental, returns-due, overdue-rentals | /rentals-analytics?ui=v2 |
+| продажи, статистика продаж, детали продажи, kpi продаж, статус договора, доставка, гарантия | `sale-analytics-text` | sales-list, sale-kpis, sale-detail, sale-contract-status, sale-delivery-status, sale-warranty, sale-stats, sale-update-status | /rentals-analytics?ui=v2 (Продажа tab) |
+| сервис, обслуживание, нормо-час, услуги, kpi сервиса, механик, каталог услуг | `service-analytics-text` | services-list, service-kpis, service-detail, service-catalog, service-mechanic, service-assign-mechanic, service-stats, service-activate, service-complete | /rentals-analytics?ui=v2 (Сервис tab) |
 | аналитика, дашборд задач, выручка, статистика экипажа | `analytics-text` | rentals-dashboard, sales-dashboard, todos-dashboard, crew-stats, service-dashboard, commercial-offers, subrent | /rentals-analytics |
 | каталог байков, цена, доступность, какие байки | `franchize-catalog-text` | list-bikes, bike-detail, bike-pricing, check-availability | / |
 | карточка аренды, детали аренды, документы, QR-claim | `rental-card-text` | rental-card, rental-todos, rental-documents, rental-handoff, activate, complete, update-status, send-message, list-rentals, rental-history | /rental/[id] |
@@ -60,9 +60,17 @@ permission:
 |---|---|---|
 | "покажи лиды" / "кто горячий" | leads-crm-text | list-leads --hot |
 | "аренды сегодня" / "что сегодня" | rental-analytics-text | rentals-day |
+| "kpi аренд" / "выручка сегодня" | rental-analytics-text | rental-kpis |
 | "возвраты" / "просроченные" | rental-analytics-text | returns-due / overdue-rentals |
-| "продажи" / "сколько продали" | sale-analytics-text | sales-list / sale-stats |
-| "сервис" / "обслуживание" | service-analytics-text | services-list / service-catalog |
+| "документы аренды" / "карточка аренды" | rental-analytics-text | rental-detail / rental-documents |
+| "передача байка" / "handoff" | rental-analytics-text | rental-handoff |
+| "история аренды" | rental-analytics-text | rental-history |
+| "продажи" / "сколько продали" | sale-analytics-text | sales-list / sale-kpis |
+| "статус договора" / "доставка" | sale-analytics-text | sale-contract-status / sale-delivery-status |
+| "гарантия" | sale-analytics-text | sale-warranty |
+| "сервис" / "обслуживание" | service-analytics-text | services-list / service-kpis |
+| "каталог услуг" / "нормо-час" | service-analytics-text | service-catalog |
+| "механик сервис" / "назначить механика" | service-analytics-text | service-mechanic / service-assign-mechanic |
 | "байки" / "каталог" / "цена" | franchize-catalog-text | list-bikes / bike-pricing |
 | "карточка аренды" / "документы аренды" | rental-card-text | rental-card / rental-documents |
 | "команда" / "кто онлайн" | crew-management-text | crew-members / crew-stats |
@@ -81,6 +89,11 @@ permission:
 2. `rental-analytics-text returns-due` — возвраты сегодня
 3. `rental-analytics-text overdue-rentals` — просроченные аренды
 
+**"Полная сводка за день"** → 3 аналитических навыка (зеркало v2 KPI row):
+1. `rental-analytics-text rental-kpis --date <today>` — 4 KPI по арендам
+2. `sale-analytics-text sale-kpis --date <today>` — 4 KPI по продажам
+3. `service-analytics-text service-kpis --date <today>` — 4 KPI по сервису
+
 **"Статус по экипажу"** → 2 навыка:
 1. `crew-management-text crew-stats` — участники + задачи
 2. `analytics-text todos-dashboard` — все задачи
@@ -89,8 +102,26 @@ permission:
 1. `leads-crm-text list-leads --search Рудометов` — в лидax
 2. `rental-card-text list-rentals` — в арендах
 
-**"Сколько заработали за месяц?"** → 1 навык:
-1. `leads-crm-text kpis --mode rent` — KPI по арендам
+**"Сколько заработали за месяц?"** → 3 навыка параллельно (аренды + продажи + сервис):
+1. `rental-analytics-text rentals-day --date <30d-ago>` (агрегируй по дню)
+2. `sale-analytics-text sale-stats --from <30d-ago> --to <today>`
+3. `service-analytics-text service-stats --from <30d-ago> --to <today>`
+
+**"Что с договорами?"** → 1 навык:
+1. `sale-analytics-text sale-contract-status <saleId>` — статус конкретного договора
+2. (композит) `sale-analytics-text sales-list` → для каждой продажи вызвать `sale-contract-status`
+
+**"Назначь механика на сервис"** → 2 шага:
+1. `service-analytics-text service-mechanic <rentalId>` — проверить текущего механика
+2. `service-analytics-text service-assign-mechanic <rentalId> --mechanicId <userId>` — назначить
+
+**"Карточка аренды полностью"** (зеркало RentalDetailDrawer 10 секций) → 5 команд параллельно:
+1. `rental-analytics-text rental-detail <rentalId>` — header + info grid + actions
+2. `rental-analytics-text rental-documents <rentalId>` — секция 5
+3. `rental-analytics-text rental-todos <rentalId>` — секция 6
+4. `rental-analytics-text rental-handoff <rentalId>` — секция 7
+5. `rental-analytics-text rental-history <rentalId>` — секция 9
+
 
 ## 🗄️ Supabase Context
 
@@ -164,6 +195,89 @@ node scripts/backup-supabase.mjs                             # full backup
 - PII masking: phone `+7XXXXXXXX42`, passport `XXXX…`, license `XXXX…`, registration `г. Мо…`, email `i…@`
 - Private schema: requires `Accept-Profile: private` AND `Content-Profile: private` headers
 - HTTPS only
+
+## 📊 Analytics v2 Dashboard
+
+The analytics page at `/franchize/vip-bike/rentals-analytics` has two UI versions:
+
+- **v1 (default)**: `RentalsAnalyticsClient.tsx` — single-tree dashboard, 1483 lines
+- **v2 (behind `?ui=v2`)**: `AnalyticsClientV2.tsx` — split-pane / mobile sheet / 3 tabs
+
+**Switch versions** via:
+- URL: `?ui=v2` or `?ui=v1`
+- localStorage: `localStorage.analytics_ui_v2 = "true"`
+- Floating v1/v2 toggle pill in the bottom-right corner of the page
+
+### v2 architecture (3 tabs + 4 KPIs + detail drawer)
+
+```
+AnalyticsClientV2 (wrapper — auth + theme + data fetch)
+  └─ AnalyticsClient (orchestrator — state + layout)
+      ├─ AnalyticsTabNav       (Аренда / Продажа / Сервис)
+      ├─ AnalyticsDateNav      (UTC-safe date navigator)
+      ├─ AnalyticsKPICards     (4 cards: today / revenue / active / returns-due)
+      ├─ AnalyticsRentalList   (cards for rentals OR services tab)
+      │   ├─ AnalyticsRentalCard
+      │   ├─ AnalyticsSaleCard  (sales tab uses these directly)
+      │   └─ AnalyticsServiceCard
+      ├─ AnalyticsMobileSheet  (slide-up, useDragControls — MOBILE only)
+      └─ Detail drawers (rendered inline on desktop, inside sheet on mobile):
+          ├─ RentalDetailDrawer    (10 sections, rentals tab)
+          ├─ SaleDetailDrawer      (5 sections, sales tab)
+          └─ ServiceDetailDrawer   (5 sections, services tab)
+
+Layout: split-pane on desktop (5/12 list + 7/12 detail), stacked on mobile
+        (full-width list → tap card → slide-up sheet with drawer content).
+```
+
+### v2 KPI definitions (text skills MUST mirror these exactly)
+
+**Rentals tab KPIs** (computed in `AnalyticsClient.tsx:88-107`):
+1. `totalToday` — count of rentals where `vehicle_id NOT LIKE 'vip-bike-svc-%'`
+2. `revenueToday` — `SUM(total_cost) WHERE status IN ('active', 'completed')`
+3. `activeCount` — `COUNT(*) WHERE status = 'active'`
+4. `returnsDue` — `COUNT(*) WHERE status = 'active' AND localDate(agreed_end_date) = today`
+
+**Sales tab KPIs** (in `sale-analytics-text`):
+1. `totalToday` — count of sales for date
+2. `revenueToday` — `SUM(total_sum ?? sale_price)`
+3. `avgCheck` — revenue / count
+4. `deliveredToday` — `COUNT(*) WHERE metadata->>'delivery_status' = 'delivered'`
+
+**Services tab KPIs** (in `service-analytics-text`):
+1. `totalToday` — count of service rentals (vehicle_id IN cars.type='service')
+2. `revenueToday` — `SUM(total_cost) WHERE status IN ('active', 'completed')`
+3. `activeCount` — `COUNT(*) WHERE status = 'active'`
+4. `completedCount` — `COUNT(*) WHERE status = 'completed'`
+
+### v2 detail drawer sections (text skills mirror these exactly)
+
+**RentalDetailDrawer — 10 sections** (see `rental-analytics-text` §3):
+1. Header — bike title, renter ФИО, status badge
+2. Primary actions — Activate / Complete / Cancel / Open
+3. SLA overview — 4 indicators (days_active, until_return, docs, overdue_todos)
+4. Info grid — 12 tiles
+5. Documents — 5-item checklist + verify button
+6. Todos — filtered All/Mine/Overdue
+7. Handoff — odometer + equipment + damage notes
+8. Notes — list + add input
+9. History — timeline
+10. Sticky footer — Open rental →
+
+**SaleDetailDrawer — 5 sections** (see `sale-analytics-text` §3)
+**ServiceDetailDrawer — 5 sections** (see `service-analytics-text` §3)
+
+### UTC-safe date handling (CRITICAL)
+
+The v2 web UI uses `localDateOnly()` for the `returnsDue` KPI to avoid the
+Moscow UTC+3 bug where `agreed_end_date` stored as UTC would be off by up
+to 3 hours from the user's local calendar day. Text skills MUST use the
+same local-date comparison:
+```bash
+# GOOD: extract local date from ISO
+TODAY_LOCAL=$(date +%Y-%m-%d)  # local
+# Compare: date -d "${agreed_end_date}" +%Y-%m-%d  == $TODAY_LOCAL
+```
 
 ## 📋 Common Runbooks
 
