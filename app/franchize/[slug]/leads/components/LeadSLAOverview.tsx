@@ -23,7 +23,7 @@ const SIGNAL_ICONS: Record<string, typeof Clock> = {
 const TONE_COLORS: Record<LeadSignal["tone"], string> = {
   danger: "#ef4444",
   warning: "#f59e0b",
-  neutral: "#a1a1aa",
+  neutral: "#64748b",
   good: "#22c55e",
 };
 
