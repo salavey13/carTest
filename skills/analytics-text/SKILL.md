@@ -338,6 +338,17 @@ select=sale_price,total_sum\
 - Skill полностью **read-only**. Никаких INSERT/UPDATE/PATCH.
 - Все HTTP-запросы — HTTPS.
 
+## Sibling Skills (Specialized Analytics)
+
+| Skill | Focus | Commands |
+|---|---|---|
+| `rental-analytics-text` | Rental-specific analytics (daily, detail, todos, docs, handoff, activate/complete, returns, overdue) | 9 commands |
+| `sale-analytics-text` | Sales analytics (list, detail, stats) | 3 commands |
+| `service-analytics-text` | Service analytics (list, detail, catalog, stats) | 4 commands |
+
+Use this skill (`analytics-text`) for general crew-wide dashboards (todos, crew-stats).
+Use the specialized skills for drill-down into specific rental/sale/service details.
+
 ## Related Files
 
 **Sibling text skills:**
