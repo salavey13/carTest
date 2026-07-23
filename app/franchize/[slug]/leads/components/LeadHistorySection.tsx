@@ -40,16 +40,16 @@ const EVENT_ICON: Record<string, LucideIcon> = {
 // Semantic per-event colors. Same palette as the rest of the dashboard so
 // qr_claimed (green) matches the verified check, etc.
 const EVENT_COLOR: Record<string, string> = {
-  lead_created: "#a1a1aa",
-  first_contact: "#facc15",
+  lead_created: "#64748b",
+  first_contact: "#eab308",
   telegram_sent: "#3b82f6",
-  phone_call: "#facc15",
+  phone_call: "#eab308",
   qr_sent: "#3b82f6",
   qr_claimed: "#22c55e",
   rental_created: "#8b5cf6",
   rental_active: "#22c55e",
   return_completed: "#22c55e",
-  todo_created: "#06b6d4",
+  todo_created: "#3b82f6",
   todo_completed: "#22c55e",
   note_added: "#f59e0b",
 };
