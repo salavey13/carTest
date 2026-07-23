@@ -173,7 +173,12 @@ export function LeadsClient({
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
 
   const [kpis, setKpis] = useState<LeadsKpis | null>(null);
-  const [leadsState, setLeadsState] = useState<LeadRow[]>(leads);
+  const [leadsState, setLeadsState] = useState<LeadRow[]>(
+    // Defensive: filter out null/undefined entries that may slip through if the
+    // server action returns a sparse array. Prevents `Cannot read properties of
+    // null (reading 'stageKey')` runtime crashes downstream.
+    (leads || []).filter((l): l is LeadRow => !!l && typeof l === "object"),
+  );
   const [todosState, setTodosState] = useState<LeadTodoRow[]>(todos);
 
   const [dismissDialogOpen, setDismissDialogOpen] = useState(false);
@@ -226,22 +231,40 @@ export function LeadsClient({
   // 1. Mode filter (by intent_type)
   const modeFilteredLeads = useMemo(() => {
     const allowed = MODE_INTENTS[mode];
-    return leadsState.filter((l) => allowed.includes(l.intentType || ""));
+    return leadsState.filter((l) => l && allowed.includes(l.intentType || ""));
   }, [leadsState, mode]);
 
   // 2. Enrich each lead with computed stageKey + qrStatus (memoized)
+  // Defensive: wrap computeLeadStage in try/catch — if a lead has unexpected
+  // shape (e.g. rentals is null), fall back to "new" stage rather than crash.
   const enrichedLeads = useMemo(() => {
-    return modeFilteredLeads.map((l) => ({
-      ...l,
-      stageKey: (l as { stageKey?: string }).stageKey || computeLeadStage(l),
-      qrStatus: (l as { qrStatus?: string }).qrStatus || computeQrStatus(l),
-    })) as Array<LeadRow & { stageKey: StageKey; qrStatus: string }>;
+    return modeFilteredLeads
+      .filter((l): l is LeadRow => !!l)
+      .map((l) => {
+        let stageKey: StageKey;
+        try {
+          stageKey =
+            (l as { stageKey?: string }).stageKey as StageKey ||
+            computeLeadStage(l);
+        } catch {
+          stageKey = "new";
+        }
+        let qrStatus: string;
+        try {
+          qrStatus =
+            (l as { qrStatus?: string }).qrStatus ||
+            computeQrStatus(l);
+        } catch {
+          qrStatus = "unclaimed";
+        }
+        return { ...l, stageKey, qrStatus };
+      }) as Array<LeadRow & { stageKey: StageKey; qrStatus: string }>;
   }, [modeFilteredLeads]);
 
   // 3. Stage filter
   const stageFilteredLeads = useMemo(() => {
     if (!activeStageFilter) return enrichedLeads;
-    return enrichedLeads.filter((l) => l.stageKey === activeStageFilter);
+    return enrichedLeads.filter((l) => l && l.stageKey === activeStageFilter);
   }, [enrichedLeads, activeStageFilter]);
 
   // 4. Search filter
