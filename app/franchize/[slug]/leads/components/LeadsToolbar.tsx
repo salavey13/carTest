@@ -109,7 +109,7 @@ export function LeadsToolbar(props: Props) {
       key: "documentsMissingOnly" as const,
       label: "Документы",
       icon: FileText,
-      color: "#facc15",
+      color: "#eab308",
       active: filterFlags.documentsMissingOnly,
     },
     {
