@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, AlertTriangle } from "lucide-react";
 import type { LeadRow } from "@/app/franchize/server-actions/leads";
-import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
-import { STAGE_LABELS } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
+import type { ThemeTokens } from "../hooks/useTheme";
+import { STAGE_LABELS } from "../lib/pipeline-stages";
 
 export interface DismissReason {
   value: string;
