@@ -18,7 +18,7 @@ interface Props {
 
 // Semantic tone colors — fixed hexes for severity indicators.
 const TONE_COLORS: Record<NonNullable<InfoTile["tone"]>, string> = {
-  accent: "#facc15",
+  accent: "#eab308",
   warning: "#f59e0b",
   danger: "#ef4444",
   good: "#22c55e",
