@@ -41,8 +41,8 @@ import type {
   RentalTodo,
   RentalStatus,
 } from "./components/types";
-import type { ThemeTokens } from "./components/../hooks/useTheme";
-import { useTheme } from "./components/../hooks/useTheme";
+import type { ThemeTokens } from "./hooks/useTheme";
+import { useTheme } from "./hooks/useTheme";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
