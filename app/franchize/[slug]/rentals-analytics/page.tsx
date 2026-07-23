@@ -81,23 +81,24 @@ export default async function FranchizeSlugRentalsAnalyticsPage({
         showRail={false}
       />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4" width="full">
-        <AnalyticsUiSwitch forceV2={forceV2} forceV1={forceV1}>
-          {({ useV2 }) =>
-            useV2 ? (
-              <AnalyticsClientV2
-                initialSlug={resolvedSlug}
-                initialDate={selectedDate}
-                crew={crew}
-              />
-            ) : (
-              <RentalsAnalyticsClient
-                initialSlug={resolvedSlug}
-                initialDate={selectedDate}
-                crew={crew}
-              />
-            )
+        <AnalyticsUiSwitch
+          forceV2={forceV2}
+          forceV1={forceV1}
+          v1={
+            <RentalsAnalyticsClient
+              initialSlug={resolvedSlug}
+              initialDate={selectedDate}
+              crew={crew}
+            />
           }
-        </AnalyticsUiSwitch>
+          v2={
+            <AnalyticsClientV2
+              initialSlug={resolvedSlug}
+              initialDate={selectedDate}
+              crew={crew}
+            />
+          }
+        />
       </FranchizePageShell>
     </main>
   );
