@@ -12,8 +12,8 @@ import {
   Plus,
   type LucideIcon,
 } from "lucide-react";
-import type { LeadHistoryEvent } from "@/app/franchize/[slug]/leads/leads-constants";
-import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
+import type { LeadHistoryEvent } from "../leads-constants";
+import type { ThemeTokens } from "../hooks/useTheme";
 
 interface Props {
   events: LeadHistoryEvent[];
