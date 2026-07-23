@@ -1,3 +1,16 @@
+// /app/franchize/[slug]/rentals-analytics/page.tsx
+//
+// Page entry for the rentals analytics dashboard. Supports a `?ui=v2` feature
+// flag (also stored in localStorage) that switches between the legacy
+// RentalsAnalyticsClient (v1, 1483 lines) and the new AnalyticsClientV2
+// (split-pane / mobile sheet / 3 tabs).
+//
+// Feature-flag resolution order:
+//   1. ?ui=v2 query param — explicit override
+//   2. ?ui=v1 query param — explicit override back to v1
+//   3. localStorage.analytics_ui_v2 === "true" — sticky preference
+//   4. Default: v1 (until v2 passes acceptance scenarios)
+
 import type { Metadata } from "next";
 
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
@@ -6,10 +19,13 @@ import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 import { RentalsAnalyticsClient } from "./RentalsAnalyticsClient";
+import { AnalyticsClientV2 } from "./AnalyticsClientV2";
+import { AnalyticsUiSwitch } from "./AnalyticsUiSwitch";
+import { todayLocalIso } from "./components/lib/analytics-utils";
 
 interface FranchizeSlugRentalsAnalyticsPageProps {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; ui?: string }>;
 }
 
 export async function generateMetadata({
@@ -31,15 +47,23 @@ export default async function FranchizeSlugRentalsAnalyticsPage({
   searchParams,
 }: FranchizeSlugRentalsAnalyticsPageProps) {
   const { slug } = await params;
-  const { date: dateParam } = await searchParams;
+  const { date: dateParam, ui } = await searchParams;
   const { crew } = await getFranchizeBySlug(slug);
   const resolvedSlug = crew.slug || slug;
   const activePath = `/franchize/${resolvedSlug}/rentals-analytics`;
   const surface = crewPaletteForSurface(crew.theme);
 
-  // Default to today if no date provided
-  const today = new Date().toISOString().split("T")[0];
+  // Use LOCAL date for "today" default. Using `new Date().toISOString()`
+  // would return yesterday's date between 00:00-03:00 Moscow time (UTC+3),
+  // which would then mismatch the v2 `todayLocalIso()` used inside
+  // AnalyticsClient's KPI computations.
+  const today = todayLocalIso();
   const selectedDate = dateParam || today;
+
+  // Feature flag: ?ui=v2 wins; ?ui=v1 forces legacy; otherwise the
+  // AnalyticsUiSwitch client component resolves localStorage on mount.
+  const forceV2 = ui === "v2";
+  const forceV1 = ui === "v1";
 
   return (
     <main className="min-h-screen" style={surface.page}>
@@ -50,11 +74,23 @@ export default async function FranchizeSlugRentalsAnalyticsPage({
         showRail={false}
       />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4" width="full">
-        <RentalsAnalyticsClient
-          initialSlug={resolvedSlug}
-          initialDate={selectedDate}
-          crew={crew}
-        />
+        <AnalyticsUiSwitch forceV2={forceV2} forceV1={forceV1}>
+          {({ useV2 }) =>
+            useV2 ? (
+              <AnalyticsClientV2
+                initialSlug={resolvedSlug}
+                initialDate={selectedDate}
+                crew={crew}
+              />
+            ) : (
+              <RentalsAnalyticsClient
+                initialSlug={resolvedSlug}
+                initialDate={selectedDate}
+                crew={crew}
+              />
+            )
+          }
+        </AnalyticsUiSwitch>
       </FranchizePageShell>
     </main>
   );
