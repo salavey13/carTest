@@ -69,10 +69,29 @@ export function LeadDetailContent({
   onAddNote,
   onDismissLead,
 }: Props) {
+  // Defensive null-guard: if `lead` is null/undefined (shouldn't happen —
+  // LeadsClient null-checks before rendering us — but be safe), bail with
+  // null so React skips this subtree instead of crashing.
+  if (!lead || typeof lead !== "object") {
+    return null;
+  }
+
   // ── 1. Inject computed stage + qr status onto the lead ──
+  // Wrap computeLeadStage/computeQrStatus in try/catch — they iterate over
+  // lead.rentals / lead.sales which may have unexpected shape.
   const enrichedLead = useMemo(() => {
-    const stageKey = (lead as { stageKey?: string }).stageKey || computeLeadStage(lead);
-    const qrStatus = (lead as { qrStatus?: string }).qrStatus || computeQrStatus(lead);
+    let stageKey: string;
+    try {
+      stageKey = (lead as { stageKey?: string }).stageKey || computeLeadStage(lead);
+    } catch {
+      stageKey = "new";
+    }
+    let qrStatus: string;
+    try {
+      qrStatus = (lead as { qrStatus?: string }).qrStatus || computeQrStatus(lead);
+    } catch {
+      qrStatus = "unclaimed";
+    }
     return { ...lead, stageKey, qrStatus } as LeadRow & {
       stageKey: string;
       qrStatus: string;
@@ -80,19 +99,31 @@ export function LeadDetailContent({
   }, [lead]);
 
   // ── 2. Compute SLA signals (uses the enriched lead with qrStatus set) ──
-  const signals: LeadSignal[] = useMemo(
-    () => computeLeadSignals(enrichedLead, todos),
-    [enrichedLead, todos]
-  );
+  const signals: LeadSignal[] = useMemo(() => {
+    try {
+      return computeLeadSignals(enrichedLead, todos);
+    } catch {
+      return [];
+    }
+  }, [enrichedLead, todos]);
 
   // ── 3. Compute history timeline ──
-  const history: LeadHistoryEvent[] = useMemo(
-    () => computeLeadHistory(enrichedLead, todos, notes),
-    [enrichedLead, todos, notes]
-  );
+  const history: LeadHistoryEvent[] = useMemo(() => {
+    try {
+      return computeLeadHistory(enrichedLead, todos, notes);
+    } catch {
+      return [];
+    }
+  }, [enrichedLead, todos, notes]);
 
   // ── 4. Build documents checklist from the first rental ──
-  const docs: DocumentItem[] = useMemo(() => buildDocuments(enrichedLead), [enrichedLead]);
+  const docs: DocumentItem[] = useMemo(() => {
+    try {
+      return buildDocuments(enrichedLead);
+    } catch {
+      return [];
+    }
+  }, [enrichedLead]);
 
   // ── 5. Cast todos to DrawerTodo (adds optional due_date) ──
   // LeadTodoRow now includes due_date — no cast needed
