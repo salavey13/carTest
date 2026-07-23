@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIP Bike Boss — Status Report</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg-card: #141414;
+    --bg-elevated: #1a1a1a;
+    --border: #2a2a2a;
+    --border-soft: #222;
+    --text: #f5f5f5;
+    --text-muted: #a3a3a3;
+    --text-faint: #6b6b6b;
+    --accent: #22c55e;
+    --accent-contrast: #0a0a0a;
+    --green: #22c55e;
+    --yellow: #f59e0b;
+    --orange: #f97316;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+  }
+  .header {
+    background: linear-gradient(135deg, #0a0a0a 0%, #141414 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 2rem 1.5rem;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 1.75rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--green), var(--blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .header .subtitle {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+  }
+  .header .timestamp {
+    color: var(--text-faint);
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem;
+  }
+  .section {
+    margin-bottom: 2rem;
+  }
+  .section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .section-title .icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 0.875rem;
+  }
+
+  /* KPI grid */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+  .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+  }
+  .kpi-label {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-faint);
+    margin-bottom: 0.25rem;
+  }
+  .kpi-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi-value.green { color: var(--green); }
+  .kpi-value.blue { color: var(--blue); }
+  .kpi-value.yellow { color: var(--yellow); }
+  .kpi-value.red { color: var(--red); }
+  .kpi-value.purple { color: var(--purple); }
+
+  /* Command table */
+  .cmd-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-card);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .cmd-table th {
+    background: var(--bg-elevated);
+    padding: 0.625rem 0.75rem;
+    text-align: left;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+  }
+  .cmd-table td {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.8125rem;
+    border-bottom: 1px solid var(--border-soft);
+    vertical-align: top;
+  }
+  .cmd-table tr:last-child td { border-bottom: none; }
+  .cmd-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .cmd-name {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    color: var(--green);
+    font-weight: 600;
+    font-size: 0.75rem;
+  }
+  .cmd-schedule {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+  .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-yellow { background: rgba(245,158,11,0.15); color: var(--yellow); }
+  .badge-red { background: rgba(239,68,68,0.15); color: var(--red); }
+  .badge-blue { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .badge-gray { background: rgba(107,107,107,0.15); color: var(--text-faint); }
+
+  /* Architecture diagram */
+  .arch {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    overflow-x: auto;
+    color: var(--text-muted);
+    white-space: pre;
+  }
+  .arch .highlight { color: var(--green); font-weight: 600; }
+  .arch .dim { color: var(--text-faint); }
+
+  /* Feature list */
+  .feature-list {
+    list-style: none;
+    display: grid;
+    gap: 0.5rem;
+  }
+  .feature-list li {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    font-size: 0.8125rem;
+  }
+  .feature-list .check {
+    color: var(--green);
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .feature-list .label {
+    flex: 1;
+  }
+  .feature-list .label strong {
+    color: var(--text);
+  }
+  .feature-list .label .desc {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-top: 0.125rem;
+  }
+
+  /* Skill chips */
+  .skill-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .skill-chip {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    color: var(--text-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .skill-chip .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+  .skill-chip.boss .dot { background: var(--purple); }
+
+  /* Callout */
+  .callout {
+    background: rgba(34,197,94,0.08);
+    border: 1px solid rgba(34,197,94,0.2);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin: 1rem 0;
+    font-size: 0.8125rem;
+    color: var(--text);
+  }
+  .callout.warning {
+    background: rgba(245,158,11,0.08);
+    border-color: rgba(245,158,11,0.2);
+  }
+  .callout strong { color: var(--green); }
+  .callout.warning strong { color: var(--yellow); }
+
+  /* Timeline */
+  .timeline {
+    position: relative;
+    padding-left: 1.5rem;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+  .timeline-item {
+    position: relative;
+    padding-bottom: 1rem;
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -1.5rem;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--green);
+    border: 2px solid var(--bg);
+  }
+  .timeline-item.future::before { background: var(--text-faint); }
+  .timeline-time {
+    font-size: 0.6875rem;
+    color: var(--text-faint);
+    font-family: monospace;
+  }
+  .timeline-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0.125rem 0;
+  }
+  .timeline-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .footer {
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--text-faint);
+    font-size: 0.75rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+  .footer a { color: var(--green); text-decoration: none; }
+
+  @media (max-width: 640px) {
+    .header h1 { font-size: 1.25rem; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .cmd-table { font-size: 0.75rem; }
+    .cmd-table th, .cmd-table td { padding: 0.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>VIP Bike Boss — Status Report</h1>
+  <div class="subtitle">Operating intelligence layer for the vip-bike-ops agent</div>
+  <div class="timestamp">Generated: 2026-07-24 01:15 MSK · Crew: vip-bike · Chat: 413553377</div>
+</div>
+
+<div class="container">
+
+  <!-- KPIs -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:rgba(34,197,94,0.15)">📊</span>
+      Boss KPIs
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Boss Commands</div>
+        <div class="kpi-value green">9</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Leaf Skills</div>
+        <div class="kpi-value blue">15</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Cron Triggers/Day</div>
+        <div class="kpi-value purple">~30</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Silent Commands</div>
+        <div class="kpi-value yellow">5</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Supabase Tables</div>
+        <div class="kpi-value">12+</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">PII Masking</div>
+        <div class="kpi-value green">100%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Architecture -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:rgba(59,130,246,0.15)">🏗</span>
+      Architecture
+    </div>
+    <div class="arch"><span class="dim">┌─────────────────────────────────────────────────────┐</span>
+<span class="dim">│</span>  Cron daemon (VPS or wherever)                       <span class="dim">│</span>
+<span class="dim">│</span>  └─► triggers boss-commands/&lt;script&gt;.sh             <span class="dim">│</span>
+<span class="dim">└──────────────────────┬──────────────────────────────┘</span>
+                       │
+                       ▼
+<span class="dim">┌─────────────────────────────────────────────────────┐</span>
+<span class="dim">│</span>  <span class="highlight">boss-commands/_lib.sh</span> (shared library)         <span class="dim">│</span>
+<span class="dim">│</span>  ├─ supabase_query "table" "select=..."             <span class="dim">│</span>
+<span class="dim">│</span>  ├─ send_telegram "$MESSAGE" "HTML"                 <span class="dim">│</span>
+<span class="dim">│</span>  ├─ moscow_today / moscow_now / PII masking         <span class="dim">│</span>
+<span class="dim">│</span>  └─ log() → stderr (stdout reserved for output)     <span class="dim">│</span>
+<span class="dim">└──────────────────────┬──────────────────────────────┘</span>
+                       │
+                       ▼
+<span class="dim">┌─────────────────────────────────────────────────────┐</span>
+<span class="dim">│</span>  <span class="highlight">Telegram Bot API</span>                                    <span class="dim">│</span>
+<span class="dim">│</span>  POST /bot&lt;TOKEN&gt;/sendMessage                       <span class="dim">│</span>
+<span class="dim">│</span>  { chat_id: "413553377", text: "...", parse_mode: "HTML" } <span class="dim">│</span>
+<span class="dim">└──────────────────────┬──────────────────────────────┘</span>
+                       │
+                       ▼
+                <span class="highlight">📱 salavey13's Telegram</span>
+                  (admin's phone)</div>
+  </div>
+
+  <!-- Boss Commands Table -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:rgba(139,92,246,0.15)">📋</span>
+      Boss Commands (9 total)
+    </div>
+    <table class="cmd-table">
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Schedule (MSK)</th>
+          <th>Silent?</th>
+          <th>What it does</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="cmd-name">morning-standup.sh</span></td>
+          <td><span class="cmd-schedule">09:00 daily</span></td>
+          <td><span class="badge badge-red">No</span></td>
+          <td>Hot leads + returns today + overdue rentals + pending todos</td>
+        </tr>
+        <tr>
+          <td><span class="cmd-name">evening-summary.sh</span></td>
+          <td><span class="cmd-schedule">21:00 daily</span></td>
+          <td><span class="badge badge-red">No</span></td>
+          <td>End-of-day KPI digest: rentals + sales + services + total revenue</td>
+        </tr>
+        <tr>
+          <td><span class="cmd-name">returns-reminder.sh</span></td>
+          <td><span class="cmd-schedule">hourly 09–21</span></td>
+          <td><span class="badge badge-green">Yes</span></td>
+          <td>Returns due in next 3 hours (silent if none)</td>
+        </tr>
+        <tr>
+          <td><span class="cmd-name">overdue-alert.sh</span></td>
+          <td><span class="cmd-schedule">every 2h 09–21</span></td>
+          <td><span class="badge badge-green">Yes</span></td>
+          <td>Active rentals past agreed_end_date (severity: 🟠/🔴/🔴🔴)</td>
+        </tr>
+        <tr>
+          <td><span class="cmd-name">qr-claim-watchdog.sh</span></td>
+          <td><span class="cmd-schedule">every 4h 09–21</span></td>
+          <td><span class="badge badge-green">Yes</span></td>
+          <td>Unclaimed QR codes > 17h old (matches leads SLA threshold)</td>
+        </tr>
+        <tr>
+          <td><span class="cmd-name">weekly-revenue.sh</span></td>
+          <td><span class="cmd-schedule">Mon 10:00</span></td>
+          <td><span class="badge badge-red">No</span></td>
+          <td>7-day revenue report: breakdown by stream + top-3 bikes</td>
+        </tr>
+        <tr>
+          <td><span class="cmd-name">supaplan-runner.sh</span></td>
+          <td><span class="cmd-schedule">every 30min 09–21</span></td>
+          <td><span class="badge badge-green">Yes</span></td>
+          <td>Picks next SupaPlan task, claims it, sends "task started" notification</td>
+        </tr>
+        <tr>
+          <td><span class="cmd-name">lead-stuck-watchdog.sh</span></td>
+          <td><span class="cmd-schedule">every 4h 09–21</span></td>
+          <td><span class="badge badge-green">Yes</span></td>
+          <td>Leads stuck in same stage too long (72h/48h/24h by stage)</td>
+        </tr>
+        <tr>
+          <td><span class="cmd-name">revenue-anomaly.sh</span></td>
+          <td><span class="cmd-schedule">every 2h 13–21</span></td>
+          <td><span class="badge badge-green">Yes</span></td>
+          <td>Alerts if today's revenue > 40% below 7-day rolling average</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Leaf Skills -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:rgba(34,197,94,0.15)">🌿</span>
+      Leaf Skills (15 text-based, curl + Supabase)
+    </div>
+    <div class="skill-grid">
+      <span class="skill-chip"><span class="dot"></span>leads-crm-text</span>
+      <span class="skill-chip"><span class="dot"></span>rental-analytics-text</span>
+      <span class="skill-chip"><span class="dot"></span>sale-analytics-text</span>
+      <span class="skill-chip"><span class="dot"></span>service-analytics-text</span>
+      <span class="skill-chip"><span class="dot"></span>franchize-catalog-text</span>
+      <span class="skill-chip"><span class="dot"></span>rental-card-text</span>
+      <span class="skill-chip"><span class="dot"></span>crew-management-text</span>
+      <span class="skill-chip"><span class="dot"></span>rider-profile-text</span>
+      <span class="skill-chip"><span class="dot"></span>reviews-text</span>
+      <span class="skill-chip"><span class="dot"></span>contract-draft-text</span>
+      <span class="skill-chip"><span class="dot"></span>orders-checkout-text</span>
+      <span class="skill-chip"><span class="dot"></span>crew-admin-text</span>
+      <span class="skill-chip"><span class="dot"></span>leaderboard-text</span>
+      <span class="skill-chip"><span class="dot"></span>crew-info-text</span>
+      <span class="skill-chip boss"><span class="dot"></span>vip-bike-ops (umbrella)</span>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:rgba(245,158,11,0.15)">✨</span>
+      Key Features
+    </div>
+    <ul class="feature-list">
+      <li>
+        <span class="check">✓</span>
+        <span class="label">
+          <strong>Moscow TZ-safe date handling</strong>
+          <div class="desc">All date comparisons use Europe/Moscow timezone — no UTC+3 drift between 00:00–03:00</div>
+        </span>
+      </li>
+      <li>
+        <span class="check">✓</span>
+        <span class="label">
+          <strong>PII masking built-in</strong>
+          <div class="desc">Phone +7XXXXXXXX42, passport XXXX…1234, email i…@x.ru — never echoed in full</div>
+        </span>
+      </li>
+      <li>
+        <span class="check">✓</span>
+        <span class="label">
+          <strong>Silent mode for alerts</strong>
+          <div class="desc">5 of 9 commands stay quiet when there's nothing to report — signal, not noise</div>
+        </span>
+      </li>
+      <li>
+        <span class="check">✓</span>
+        <span class="label">
+          <strong>SupaPlan integration</strong>
+          <div class="desc">Auto-picks queued tasks, claims them, notifies admin with full body + todo_path</div>
+        </span>
+      </li>
+      <li>
+        <span class="check">✓</span>
+        <span class="label">
+          <strong>Revenue anomaly detection</strong>
+          <div class="desc">Compares today vs 7-day rolling average for same time-of-day; alerts if >40% below</div>
+        </span>
+      </li>
+      <li>
+        <span class="check">✓</span>
+        <span class="label">
+          <strong>Lead stuck detection</strong>
+          <div class="desc">72h (new/contacted), 48h (contract_sent), 24h (checkout_started) thresholds by stage</div>
+        </span>
+      </li>
+      <li>
+        <span class="check">✓</span>
+        <span class="label">
+          <strong>Severity emojis</strong>
+          <div class="desc">🟠 1 item, 🔴 2–4 items, 🔴🔴 5+ items — instant visual triage</div>
+        </span>
+      </li>
+      <li>
+        <span class="check">✓</span>
+        <span class="label">
+          <strong>--dry-run mode</strong>
+          <div class="desc">Every script supports dry-run for testing without spamming Telegram</div>
+        </span>
+      </li>
+      <li>
+        <span class="check">✓</span>
+        <span class="label">
+          <strong>Failure isolation</strong>
+          <div class="desc">Telegram API errors don't crash scripts — logged and returned non-zero</div>
+        </span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- Roadmap -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:rgba(59,130,246,0.15)">🗺</span>
+      Roadmap
+    </div>
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="timeline-time">Phase 1 (DONE)</div>
+        <div class="timeline-title">One-way notifications</div>
+        <div class="timeline-desc">Cron → script → Telegram. Hardcoded to chat 413553377 for testing. 9 commands, all tested end-to-end.</div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-time">Phase 2 (NEXT)</div>
+        <div class="timeline-title">Two-way chat (bot replies)</div>
+        <div class="timeline-desc">Bot listens for messages in a private chat. Admin sends "лиды" → bot routes to vip-bike-ops umbrella → replies with synthesized text. Boss-command scripts work as both cron-triggered AND bot-triggered.</div>
+      </div>
+      <div class="timeline-item future">
+        <div class="timeline-time">Phase 3 (FUTURE)</div>
+        <div class="timeline-title">Per-operator routing</div>
+        <div class="timeline-desc">Notifications go to the operator who owns the rental/lead, not just salavey13. Routing from crew_members table.</div>
+      </div>
+      <div class="timeline-item future">
+        <div class="timeline-time">Phase 4 (FUTURE)</div>
+        <div class="timeline-title">SupaPlan auto-execute</div>
+        <div class="timeline-desc">Boss picks SupaPlan task → routes to Codex agent → agent implements → boss verifies → boss sends "done" callback. Full autonomous loop.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Callout -->
+  <div class="callout">
+    <strong>Testing target:</strong> All notifications are hardcoded to <code>chat_id: 413553377</code> (salavey13, admin). When the bot-to-chat-reply flow is built (Phase 2), this will change — but for now, this is the testing pipeline.
+  </div>
+
+  <div class="callout warning">
+    <strong>Anti-hallucination:</strong> The boss NEVER invents IDs, prices, or statuses. Every query hits the live Supabase database. PII is always masked. Output is always in Russian. Composite answers always end with "Что дальше?" suggestions.
+  </div>
+
+</div>
+
+<div class="footer">
+  VIP Bike Boss · <a href="https://github.com/salavey13/carTest">salavey13/carTest</a> · Generated by vip-bike-ops agent
+</div>
+
+</body>
+</html>
