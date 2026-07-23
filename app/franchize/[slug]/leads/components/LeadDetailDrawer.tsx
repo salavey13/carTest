@@ -189,8 +189,8 @@ export function LeadDetailDrawer(props: Props) {
   }> = [
     { icon: Phone, label: "Позвонить", action: "call", color: "#22c55e" },
     { icon: Send, label: "Написать в TG", action: "telegram", color: "#3b82f6" },
-    { icon: Bell, label: "Уведомить", action: "notify", color: "#facc15" },
-    { icon: MoreHorizontal, label: "Ещё", action: "more", color: "#a1a1aa" },
+    { icon: Bell, label: "Уведомить", action: "notify", color: "#eab308" },
+    { icon: MoreHorizontal, label: "Ещё", action: "more", color: "#64748b" },
   ];
 
   return (
@@ -250,7 +250,7 @@ export function LeadDetailDrawer(props: Props) {
                     {isHot && (
                       <span
                         className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                        style={{ background: "#ef444426", color: "#fca5a5" }}
+                        style={{ background: "#ef444426", color: "#ef4444" }}
                       >
                         <Flame className="h-3 w-3" aria-hidden /> Горячий
                       </span>
@@ -398,7 +398,7 @@ export function LeadDetailDrawer(props: Props) {
               >
                 <div className="mb-3 flex flex-wrap gap-2">
                   {([
-                    { v: "all", label: `Все (${todos.length})`, color: "#facc15" },
+                    { v: "all", label: `Все (${todos.length})`, color: "#eab308" },
                     { v: "mine", label: "Мои", color: "#3b82f6" },
                     { v: "overdue", label: "Просроченные", color: "#ef4444" },
                   ] as const).map((f) => (
@@ -497,7 +497,7 @@ export function LeadDetailDrawer(props: Props) {
                             }}
                             aria-label={isDone ? "Снять отметку" : "Отметить выполненной"}
                           >
-                            {isDone && <CheckCircle2 className="h-3 w-3" style={{ color: "#000000" }} />}
+                            {isDone && <CheckCircle2 className="h-3 w-3" style={{ color: T.accentContrast }} />}
                           </button>
                           <div className="min-w-0 flex-1">
                             <div
@@ -508,7 +508,7 @@ export function LeadDetailDrawer(props: Props) {
                             </div>
                             <div
                               className="mt-0.5 text-xs"
-                              style={{ color: isOverdue ? "#fca5a5" : T.textMuted }}
+                              style={{ color: isOverdue ? "#ef4444" : T.textMuted }}
                             >
                               {t.assigned_to || "—"}
                               {t.due_date && ` • ${formatDate(t.due_date)}`}
@@ -655,7 +655,7 @@ export function LeadDetailDrawer(props: Props) {
               type="button"
               onClick={onDismissLead}
               className="min-h-[44px] flex-1 cursor-pointer rounded-2xl px-4 py-3 text-sm font-semibold transition enabled:hover:brightness-110"
-              style={{ background: "#dc2626", color: "#ffffff" }}
+              style={{ background: "#ef4444", color: T.accentContrast }}
             >
               Закрыть лид
             </button>
