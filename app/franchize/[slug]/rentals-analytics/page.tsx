@@ -21,7 +21,6 @@ import { buildFranchizeSectionMetadata } from "../metadata";
 import { RentalsAnalyticsClient } from "./RentalsAnalyticsClient";
 import { AnalyticsClientV2 } from "./AnalyticsClientV2";
 import { AnalyticsUiSwitch } from "./AnalyticsUiSwitch";
-import { todayLocalIso } from "./components/lib/analytics-utils";
 
 interface FranchizeSlugRentalsAnalyticsPageProps {
   params: Promise<{ slug: string }>;
@@ -53,11 +52,19 @@ export default async function FranchizeSlugRentalsAnalyticsPage({
   const activePath = `/franchize/${resolvedSlug}/rentals-analytics`;
   const surface = crewPaletteForSurface(crew.theme);
 
-  // Use LOCAL date for "today" default. Using `new Date().toISOString()`
-  // would return yesterday's date between 00:00-03:00 Moscow time (UTC+3),
-  // which would then mismatch the v2 `todayLocalIso()` used inside
-  // AnalyticsClient's KPI computations.
-  const today = todayLocalIso();
+  // Use LOCAL date for "today" default IN MOSCOW TIMEZONE.
+  // The page is a server component — `new Date()` here returns the server's
+  // local time, which is UTC in production. Using `todayLocalIso()` (which
+  // uses `new Date().getFullYear()/getMonth()/getDate()`) would return the
+  // server's UTC date, not Moscow date — drifting by up to 3 hours between
+  // 00:00-03:00 Moscow. Instead, we force Europe/Moscow via `toLocaleString`
+  // with `timeZone: "Europe/Moscow"` + `en-CA` locale (which emits YYYY-MM-DD).
+  // This MUST match the client-side `todayLocalIso()` in
+  // `components/lib/analytics-utils.ts` (which runs in the user's browser TZ —
+  // typically Moscow for VIP Bike operators).
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: "Europe/Moscow",
+  });
   const selectedDate = dateParam || today;
 
   // Feature flag: ?ui=v2 wins; ?ui=v1 forces legacy; otherwise the
