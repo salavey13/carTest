@@ -16,20 +16,20 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
-import type { ThemeTokens } from "@/app/franchize/[slug]/leads/hooks/useTheme";
+import type { ThemeTokens } from "../hooks/useTheme";
 import type {
   Mode,
   StageKey,
   FilterFlags,
   SortModeV2,
   LeadSignal,
-} from "@/app/franchize/[slug]/leads/leads-constants";
+} from "../leads-constants";
 
 // Hooks
 // Note: useFilteredSortedLeads is also exported from this module but its v1
 // signature (SortMode, Segment) doesn't fit the v2 types (SortModeV2,
 // FilterFlags). The filter+sort pipeline is reimplemented inline below.
-import { useTodosMapping } from "./hooks/useLeadsData";
+import { useTodosMapping } from "../hooks/useLeadsData";
 
 // Lib
 import {
@@ -38,10 +38,10 @@ import {
   PIPELINE_STAGES,
   STAGE_LABELS,
   STAGE_COLORS,
-} from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
-import { computeLeadSignals, isHotLead } from "@/app/franchize/[slug]/leads/lib/sla-signals";
-import { DISMISS_REASONS } from "@/app/franchize/[slug]/leads/lib/dismiss-reasons";
-import { dismissLeadWithReason } from "@/app/franchize/[slug]/leads/lib/leads-dismiss";
+} from "../lib/pipeline-stages";
+import { computeLeadSignals, isHotLead } from "../lib/sla-signals";
+import { DISMISS_REASONS } from "../lib/dismiss-reasons";
+import { dismissLeadWithReason } from "@/app/franchize/server-actions/leads-dismiss";
 import { getLeadsKpis, type LeadsKpis } from "@/app/franchize/server-actions/leads-kpis";
 import { createLeadNote } from "@/app/franchize/server-actions/lead-notes";
 
