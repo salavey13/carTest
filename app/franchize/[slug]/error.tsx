@@ -24,6 +24,7 @@ export default function FranchizeSlugError({
   useEffect(() => {
     debugLogger.error("[franchize/[slug]/error]", {
       name: error.name,
+      message: error.message,
       digest: error.digest,
     });
   }, [error]);
@@ -58,7 +59,12 @@ export default function FranchizeSlugError({
               ))}
             </div>
           </div>
-          {error.digest ? <p className="mt-4 text-[11px] opacity-50" style={surface.mutedText}>debug digest: {error.digest}</p> : null}
+          {error.message && (
+            <pre className="mt-4 whitespace-pre-wrap rounded bg-red-950/20 p-3 text-xs font-mono text-red-300/80 border border-red-500/20 max-h-32 overflow-auto">
+              {error.message}
+            </pre>
+          )}
+          {error.digest && <p className="mt-2 text-[11px] opacity-50" style={surface.mutedText}>digest: {error.digest}</p>}
         </div>
       </section>
     </main>

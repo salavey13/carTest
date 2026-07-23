@@ -1,5 +1,6 @@
 // app/franchize/[slug]/leads/page.tsx
 import { CrewHeader } from "../../components/CrewHeader";
+import { FranchizeErrorBoundary } from "../../components/ErrorBoundary";
 import { getFranchizeBySlug } from "../../actions";
 import { crewPaletteWithCssVars } from "../../lib/theme";
 import { getFranchizeLeads, type LeadRow, type LeadTodoRow } from "../../server-actions/leads";
@@ -32,17 +33,24 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
           Все, кто оставил заявку, интересовался техникой или оформлял аренду
         </p>
         <AnalyticsLeadsNav slug={crew.slug || slug} />
-        <LeadsClient
-          leads={leads}
-          todos={todos}
-          accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain}
-          textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
-          bgColor={crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase}
-          isLightTheme={crew.theme.mode === "light" && !crew.theme.isAuto}
-          isAuto={crew.theme.isAuto || false}
-          crewId={crew.id}
-          slug={slug}
-        />
+        <FranchizeErrorBoundary
+          resetKey={slug}
+          fallbackTitle="Клиенты и заявки временно недоступны"
+          fallbackHref={`/franchize/${crew.slug || slug}/leads`}
+          fallbackLinkLabel="Перезагрузить"
+        >
+          <LeadsClient
+            leads={leads}
+            todos={todos}
+            accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain}
+            textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary}
+            bgColor={crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase}
+            isLightTheme={crew.theme.mode === "light" && !crew.theme.isAuto}
+            isAuto={crew.theme.isAuto || false}
+            crewId={crew.id}
+            slug={slug}
+          />
+        </FranchizeErrorBoundary>
       </div>
     </main>
   );
