@@ -101,7 +101,7 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
                   style={{ background: "#ef444420" }}
                   aria-hidden
                 >
-                  <AlertTriangle className="h-5 w-5" style={{ color: "#f87171" }} />
+                  <AlertTriangle className="h-5 w-5" style={{ color: "#ef4444" }} />
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold" style={{ color: T.text }}>
@@ -175,7 +175,7 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
                     }}
                   />
                   {requiresNote && !note.trim() && (
-                    <span className="mt-1 block text-xs" style={{ color: "#f87171" }}>
+                    <span className="mt-1 block text-xs" style={{ color: "#ef4444" }}>
                       Комментарий обязателен для этой причины
                     </span>
                   )}
@@ -228,7 +228,7 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
                 disabled={!canSubmit}
                 onClick={() => onSubmit(reason, note.trim())}
                 className="min-h-[44px] cursor-pointer rounded-2xl px-5 py-3 text-sm font-semibold transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-                style={{ background: "#dc2626", color: "#ffffff" }}
+                style={{ background: "#ef4444", color: T.accentContrast }}
               >
                 Закрыть лид
               </button>
@@ -252,7 +252,7 @@ function Row({
   T: ThemeTokens;
 }) {
   // Semantic tone colors: danger uses red-300, accent uses yellow-200.
-  const color = tone === "danger" ? "#fca5a5" : T.accent;
+  const color = tone === "danger" ? "#ef4444" : T.accent;
   return (
     <div className="flex min-h-[28px] items-center justify-between text-sm">
       <span style={{ color: T.textMuted }}>{label}</span>
