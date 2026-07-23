@@ -1,201 +1,432 @@
 "use client";
-import { useState, useMemo, useEffect, useCallback } from "react";
+
+// /analytics/components/AnalyticsClient.tsx
+//
+// Main orchestrator for the analytics v2 dashboard.
+// Composes: TabNav + DateNav + KPICards + RentalList/Empty + DetailDrawer
+// (split-pane desktop, slide-up sheet mobile).
+//
+// Mobile-first: list is full-width; tapping a card opens the bottom sheet.
+// Desktop (lg+): split-pane — list left (5/12), detail right (7/12).
+
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import type { ThemeTokens } from "../hooks/useTheme";
-import type { AnalyticsTab, AnalyticsRentalRow, AnalyticsSaleRow, AnalyticsKpis } from "./types";
+import type {
+  AnalyticsTab,
+  AnalyticsRentalRow,
+  AnalyticsSaleRow,
+  AnalyticsKpis,
+  DrawerRentalRow,
+  DrawerAction,
+  RentalTodo,
+} from "./types";
+import { isServiceRental, localDateOnly, todayLocalIso } from "./lib/analytics-utils";
+import { AnalyticsTabNav } from "./AnalyticsTabNav";
+import { AnalyticsDateNav } from "./AnalyticsDateNav";
+import { AnalyticsKPICards } from "./AnalyticsKPICards";
+import { AnalyticsRentalList } from "./AnalyticsRentalList";
+import { AnalyticsSaleCard } from "./AnalyticsSaleCard";
+import { AnalyticsEmptyState } from "./AnalyticsEmptyState";
+import { AnalyticsMobileSheet } from "./AnalyticsMobileSheet";
+import { RentalDetailDrawer } from "./RentalDetailDrawer";
+import { SaleDetailDrawer } from "./SaleDetailDrawer";
+import { ServiceDetailDrawer } from "./ServiceDetailDrawer";
+import { motion, AnimatePresence } from "framer-motion";
+import { CalendarDays } from "lucide-react";
 
 interface AnalyticsClientProps {
   initialSlug: string;
   initialDate: string;
   crew: any;
   T: ThemeTokens;
+  /** Phase 2 data props — currently we accept rentals/sales arrays from parent. */
+  rentals?: AnalyticsRentalRow[];
+  sales?: AnalyticsSaleRow[];
+  loading?: boolean;
+  todos?: RentalTodo[];
+  mechanicMap?: Record<string, string | null>;
 }
 
-export function AnalyticsClient({ initialSlug, initialDate, crew, T }: AnalyticsClientProps) {
+export function AnalyticsClient({
+  initialSlug,
+  initialDate,
+  crew,
+  T,
+  rentals = [],
+  sales = [],
+  loading = false,
+  todos = [],
+  mechanicMap = {},
+}: AnalyticsClientProps) {
   const router = useRouter();
   const [date, setDate] = useState(initialDate);
   const [activeTab, setActiveTab] = useState<AnalyticsTab>("rentals");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [rentals, setRentals] = useState<AnalyticsRentalRow[]>([]);
-  const [sales, setSales] = useState<AnalyticsSaleRow[]>([]);
-  const [serviceRentals, setServiceRentals] = useState<AnalyticsRentalRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedRentalId, setSelectedRentalId] = useState<string | null>(null);
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
 
-  // Tab config
-  const tabs: Array<{ key: AnalyticsTab; label: string }> = [
-    { key: "rentals", label: "Аренда" },
-    { key: "sales", label: "Продажа" },
-    { key: "services", label: "Сервис" },
-  ];
+  // Switch tab — reset selection SYNCHRONOUSLY (not via useEffect, which
+  // would let the wrong drawer render for one frame).
+  const handleTabChange = (tab: AnalyticsTab) => {
+    setSelectedRentalId(null);
+    setSelectedSaleId(null);
+    setActiveTab(tab);
+  };
 
-  // KPIs (computed from current data)
-  const kpis: AnalyticsKpis = useMemo(() => {
-    const today = date;
-    const activeCount = rentals.filter(r => r.status === "active").length;
-    const returnsDue = rentals.filter(r => 
-      r.status === "active" && r.agreed_end_date && new Date(r.agreed_end_date) <= new Date(today + "T23:59:59Z")
-    ).length;
-    const revenueToday = rentals
-      .filter(r => r.status === "active" || r.status === "completed")
-      .reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0);
-    return { totalToday: rentals.length, revenueToday, activeCount, returnsDue };
-  }, [rentals, date]);
-
-  // Filter service rentals (vehicle_id starts with vip-bike-svc-)
-  useEffect(() => {
-    setServiceRentals(rentals.filter(r => r.vehicle_id?.startsWith("vip-bike-svc-")));
-  }, [rentals]);
-
-  // Display rentals (exclude services from rentals tab)
-  const displayRentals = useMemo(() => 
-    rentals.filter(r => !r.vehicle_id?.startsWith("vip-bike-svc-")),
-    [rentals]
+  // Service rentals = rentals where vehicle_id starts with vip-bike-svc-
+  const serviceRentals = useMemo(
+    () => rentals.filter(isServiceRental),
+    [rentals],
   );
 
+  // Display rentals (exclude services from rentals tab)
+  const displayRentals = useMemo(
+    () => rentals.filter((r) => !isServiceRental(r)),
+    [rentals],
+  );
+
+  // KPIs (computed from current data + selected date)
+  const kpis: AnalyticsKpis = useMemo(() => {
+    // Use LOCAL date comparison — agreed_end_date is a UTC ISO string but
+    // "returns today" means "in the user's local calendar day".
+    const todayIso = date;
+    const activeCount = displayRentals.filter((r) => r.status === "active").length;
+    const returnsDue = displayRentals.filter((r) => {
+      if (r.status !== "active" || !r.agreed_end_date) return false;
+      return localDateOnly(r.agreed_end_date) === todayIso;
+    }).length;
+    const revenueToday = displayRentals
+      .filter((r) => r.status === "active" || r.status === "completed")
+      .reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0);
+    return {
+      totalToday: displayRentals.length,
+      revenueToday,
+      activeCount,
+      returnsDue,
+    };
+  }, [displayRentals, date]);
+
+  // Selected rental (with todos + notes + handoff derived from metadata)
+  const selectedRental: DrawerRentalRow | null = useMemo(() => {
+    if (!selectedRentalId) return null;
+    const rental = rentals.find((r) => r.rental_id === selectedRentalId);
+    if (!rental) return null;
+    const rentalTodos = todos.filter(
+      (t) => t.rental_id === rental.rental_id,
+    );
+    const md = (rental.metadata || {}) as Record<string, unknown>;
+    return {
+      ...rental,
+      todos: rentalTodos,
+      notes: [],
+      history: [],
+      handoff: md.handoff_at
+        ? {
+            handoff_at: md.handoff_at as string,
+            handoff_by: (md.handoff_by as string) || null,
+            odometer_before: (md.odometer_before as number) ?? null,
+            odometer_after: (md.odometer_after as number) ?? null,
+            equipment_checklist:
+              (md.equipment_checklist as Record<string, boolean>) || null,
+            damage_notes: (md.damage_notes as string) || null,
+          }
+        : null,
+    };
+  }, [selectedRentalId, rentals, todos]);
+
+  const selectedSale = useMemo(
+    () => (selectedSaleId ? sales.find((s) => s.id === selectedSaleId) || null : null),
+    [selectedSaleId, sales],
+  );
+
+  // Selected service rental (separate state isn't needed — reuse selectedRentalId,
+  // but for clarity we detect by tab).
+  const selectedServiceRental = useMemo(() => {
+    if (activeTab !== "services" || !selectedRentalId) return null;
+    return serviceRentals.find((r) => r.rental_id === selectedRentalId) || null;
+  }, [activeTab, selectedRentalId, serviceRentals]);
+
+  const isToday = date === todayLocalIso();
+
+  // ── Drawer open state ───────────────────────────────────────────────────
+  const drawerOpen =
+    (activeTab === "rentals" && !!selectedRental) ||
+    (activeTab === "sales" && !!selectedSale) ||
+    (activeTab === "services" && !!selectedServiceRental);
+
+  const closeDrawer = () => {
+    setSelectedRentalId(null);
+    setSelectedSaleId(null);
+  };
+
+  const handleRentalAction = (action: DrawerAction) => {
+    // Phase 2: wire to server actions
+    if (action === "open_rental" && selectedRentalId) {
+      router.push(`/franchize/${initialSlug}?vehicle=${selectedRentalId}`);
+      return;
+    }
+    if (action === "open_rental" && selectedSaleId) {
+      router.push(`/franchize/${initialSlug}/sales-analytics`);
+      return;
+    }
+    // Other actions: future server-action wiring
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" role="region" aria-label="Аналитика">
       {/* Tab bar */}
-      <div className="flex gap-1 rounded-2xl border p-1" style={{ borderColor: T.border, backgroundColor: T.bgCard }}>
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => { setActiveTab(tab.key); setSelectedId(null); }}
-            className="flex-1 rounded-xl py-2.5 text-sm font-medium transition"
-            style={{
-              backgroundColor: activeTab === tab.key ? T.accent : "transparent",
-              color: activeTab === tab.key ? T.accentContrast : T.textMuted,
-              minHeight: "44px",
-              cursor: "pointer",
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <AnalyticsTabNav activeTab={activeTab} onChange={handleTabChange} T={T} />
 
       {/* Date navigator */}
-      <div className="flex items-center justify-between gap-3">
-        <button
-          onClick={() => { const d = new Date(date); d.setDate(d.getDate() - 1); setDate(d.toISOString().split("T")[0]); }}
-          className="rounded-xl border p-2.5"
-          style={{ borderColor: T.border, backgroundColor: T.bgCard, color: T.text, cursor: "pointer", minHeight: "44px", minWidth: "44px" }}
-        >←</button>
-        <span className="text-sm font-medium" style={{ color: T.text }}>
-          {new Date(date).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric", weekday: "long" })}
-        </span>
-        <button
-          onClick={() => { const d = new Date(date); d.setDate(d.getDate() + 1); setDate(d.toISOString().split("T")[0]); }}
-          className="rounded-xl border p-2.5"
-          style={{ borderColor: T.border, backgroundColor: T.bgCard, color: T.text, cursor: "pointer", minHeight: "44px", minWidth: "44px" }}
-        >→</button>
-        <button
-          onClick={() => setDate(new Date().toISOString().split("T")[0])}
-          className="rounded-xl border px-3 py-2.5 text-sm"
-          style={{ borderColor: T.border, backgroundColor: T.bgCard, color: T.textMuted, cursor: "pointer", minHeight: "44px" }}
-        >Сегодня</button>
-      </div>
+      <AnalyticsDateNav date={date} onChange={setDate} T={T} isToday={isToday} />
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          { label: "Аренд сегодня", value: kpis.totalToday, color: T.text },
-          { label: "Выручка", value: `${kpis.revenueToday.toLocaleString("ru-RU")} ₽`, color: "#22c55e" },
-          { label: "Активных", value: kpis.activeCount, color: "#22c55e" },
-          { label: "Возвратов", value: kpis.returnsDue, color: kpis.returnsDue > 0 ? "#ef4444" : T.textMuted },
-        ].map((kpi, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className="rounded-2xl border p-3 md:p-4"
-            style={{ borderColor: T.border, backgroundColor: T.bgCard }}
-          >
-            <p className="text-[10px] uppercase tracking-wider" style={{ color: T.textFaint }}>{kpi.label}</p>
-            <p className="mt-1 text-xl font-bold md:text-2xl" style={{ color: kpi.color }}>{kpi.value}</p>
-          </motion.div>
-        ))}
+      <AnalyticsKPICards kpis={kpis} T={T} />
+
+      {/* List + Detail (split-pane on desktop, stacked on mobile) */}
+      <div className="grid gap-4 lg:grid-cols-12">
+        {/* Left: list */}
+        <div className="lg:col-span-5" id={`analytics-panel-${activeTab}`} role="tabpanel" aria-labelledby={`analytics-tab-${activeTab}`}>
+          {loading ? (
+            <div
+              className="rounded-2xl border p-8 text-center"
+              style={{ borderColor: T.border, backgroundColor: T.bgCard }}
+            >
+              <p className="text-sm" style={{ color: T.textMuted }}>
+                Загрузка…
+              </p>
+            </div>
+          ) : activeTab === "rentals" && displayRentals.length === 0 ? (
+            <AnalyticsEmptyState
+              label={`Нет аренд за ${new Date(date).toLocaleDateString("ru-RU")}`}
+              hint="Выберите другую дату или переключите вкладку"
+              T={T}
+              icon={CalendarDays}
+            />
+          ) : activeTab === "sales" && sales.length === 0 ? (
+            <AnalyticsEmptyState
+              label={`Нет продаж за ${new Date(date).toLocaleDateString("ru-RU")}`}
+              hint="Выберите другую дату или переключите вкладку"
+              T={T}
+              icon={CalendarDays}
+            />
+          ) : activeTab === "services" && serviceRentals.length === 0 ? (
+            <AnalyticsEmptyState
+              label={`Нет сервисных заказов за ${new Date(date).toLocaleDateString("ru-RU")}`}
+              hint="Выберите другую дату или переключите вкладку"
+              T={T}
+              icon={CalendarDays}
+            />
+          ) : activeTab === "rentals" ? (
+            <AnalyticsRentalList
+              rentals={displayRentals}
+              selectedId={selectedRentalId}
+              onSelect={setSelectedRentalId}
+              T={T}
+              variant="rentals"
+            />
+          ) : activeTab === "services" ? (
+            <AnalyticsRentalList
+              rentals={serviceRentals}
+              selectedId={selectedRentalId}
+              onSelect={setSelectedRentalId}
+              T={T}
+              variant="services"
+              mechanicMap={mechanicMap}
+            />
+          ) : (
+            // Sales tab — use sale cards directly (no list component for sales)
+            <div className="space-y-3" role="listbox" aria-label="Список продаж">
+              <AnimatePresence initial={false}>
+                {sales.map((sale) => (
+                  <motion.div
+                    key={sale.id}
+                    layout
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    role="option"
+                    aria-selected={selectedSaleId === sale.id}
+                  >
+                    <AnalyticsSaleCard
+                      sale={sale}
+                      selected={selectedSaleId === sale.id}
+                      onSelect={setSelectedSaleId}
+                      T={T}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+
+        {/* Right: detail panel (desktop only, hidden on mobile — sheet takes over) */}
+        <div className="hidden lg:col-span-7 lg:block">
+          {drawerOpen && (
+            <div
+              role="dialog"
+              aria-label="Детали записи"
+              className="sticky top-4 rounded-2xl border p-4"
+              style={{
+                borderColor: T.border,
+                backgroundColor: T.bgCard,
+                maxHeight: "calc(100vh - 120px)",
+                overflowY: "auto",
+              }}
+            >
+              {activeTab === "rentals" && selectedRental && (
+                <RentalDetailDrawerInline
+                  rental={selectedRental}
+                  T={T}
+                  onAction={handleRentalAction}
+                  onClose={closeDrawer}
+                />
+              )}
+              {activeTab === "sales" && selectedSale && (
+                <SaleDetailDrawerInline
+                  sale={selectedSale}
+                  T={T}
+                  onAction={handleRentalAction}
+                  onClose={closeDrawer}
+                />
+              )}
+              {activeTab === "services" && selectedServiceRental && (
+                <ServiceDetailDrawerInline
+                  rental={selectedServiceRental}
+                  T={T}
+                  onAction={handleRentalAction}
+                  onClose={closeDrawer}
+                  mechanicName={mechanicMap[selectedServiceRental.rental_id] ?? null}
+                />
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* List */}
-      {loading ? (
-        <div className="rounded-2xl border p-8 text-center" style={{ borderColor: T.border, backgroundColor: T.bgCard }}>
-          <p className="text-sm" style={{ color: T.textMuted }}>Загрузка...</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {(activeTab === "rentals" ? displayRentals : activeTab === "services" ? serviceRentals : []).map((rental) => {
-            const bikeTitle = rental.vehicle ? `${rental.vehicle.make || ""} ${rental.vehicle.model || ""}`.trim() : "Байк";
-            const renterName = rental.user?.full_name || "Без имени";
-            const statusColors: Record<string, string> = {
-              active: "#22c55e", completed: "#3b82f6", cancelled: "#64748b",
-              confirmed: "#8b5cf6", pending_confirmation: "#f59e0b", disputed: "#ef4444",
-            };
-            const statusColor = statusColors[rental.status] || T.textMuted;
-            const cost = Number(rental.total_cost) || 0;
-            const docsCount = (rental.passport_mainpage_photo ? 1 : 0) + (rental.passport_registration_photo ? 1 : 0) + (rental.drivers_licence_frontal_photo ? 1 : 0);
-            
-            return (
-              <div
-                key={rental.rental_id}
-                onClick={() => setSelectedId(rental.rental_id)}
-                className="relative overflow-hidden rounded-2xl border p-3 pl-4 transition md:p-4 md:pl-5"
-                style={{
-                  borderColor: selectedId === rental.rental_id ? T.borderActive : T.border,
-                  backgroundColor: T.bgCard,
-                  cursor: "pointer",
-                }}
-              >
-                <div className="absolute left-0 top-0 h-full w-[3px]" style={{ backgroundColor: statusColor }} />
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold md:text-base" style={{ color: T.text }}>{bikeTitle}</p>
-                    <p className="mt-0.5 truncate text-[11px] md:text-xs" style={{ color: T.textMuted }}>{renterName}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] md:text-[11px]" style={{ color: T.textFaint }}>
-                      <span>{new Date(rental.requested_start_date || rental.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })} → {new Date(rental.requested_end_date || rental.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}</span>
-                      <span>{cost.toLocaleString("ru-RU")} ₽</span>
-                      <span style={{ color: docsCount >= 3 ? "#22c55e" : "#ef4444" }}>{docsCount}/5 {docsCount >= 3 ? "✅" : "🔴"}</span>
-                    </div>
-                  </div>
-                  <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `${statusColor}15`, color: statusColor }}>
-                    {rental.status === "active" ? "Активна" : rental.status === "completed" ? "Завершена" : rental.status === "cancelled" ? "Отменена" : rental.status === "pending_confirmation" ? "Ожидает" : rental.status}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Sales tab */}
-          {activeTab === "sales" && sales.map((sale) => {
-            const bikeTitle = sale.vehicle ? `${sale.vehicle.make || ""} ${sale.vehicle.model || ""}`.trim() : "Байк";
-            const buyerName = sale.buyer_full_name || "Без имени";
-            const price = Number(sale.total_sum ?? sale.sale_price) || 0;
-            return (
-              <div
-                key={sale.id}
-                onClick={() => setSelectedId(sale.id)}
-                className="relative overflow-hidden rounded-2xl border p-3 pl-4 md:p-4 md:pl-5"
-                style={{ borderColor: selectedId === sale.id ? T.borderActive : T.border, backgroundColor: T.bgCard, cursor: "pointer" }}
-              >
-                <div className="absolute left-0 top-0 h-full w-[3px]" style={{ backgroundColor: "#f59e0b" }} />
-                <p className="truncate text-sm font-bold md:text-base" style={{ color: T.text }}>{bikeTitle}</p>
-                <p className="mt-0.5 truncate text-[11px] md:text-xs" style={{ color: T.textMuted }}>{buyerName}</p>
-                <p className="mt-1 text-xs font-bold" style={{ color: "#22c55e" }}>{price.toLocaleString("ru-RU")} ₽</p>
-              </div>
-            );
-          })}
-
-          {/* Empty state */}
-          {(activeTab === "rentals" && displayRentals.length === 0) ||
-           (activeTab === "sales" && sales.length === 0) ||
-           (activeTab === "services" && serviceRentals.length === 0) ? (
-            <div className="rounded-2xl border p-8 text-center" style={{ borderColor: T.border, backgroundColor: T.bgCard }}>
-              <p className="text-sm" style={{ color: T.textMuted }}>Нет данных за {new Date(date).toLocaleDateString("ru-RU")}</p>
-            </div>
-          ) : null}
-        </div>
-      )}
+      {/* Mobile sheet (only renders when drawerOpen on mobile) */}
+      <div className="lg:hidden">
+        <AnalyticsMobileSheet
+          open={drawerOpen}
+          onClose={closeDrawer}
+          T={T}
+          title={
+            activeTab === "rentals"
+              ? "Аренда"
+              : activeTab === "sales"
+                ? "Продажа"
+                : "Сервис"
+          }
+        >
+          {activeTab === "rentals" && selectedRental && (
+            <RentalDetailDrawer
+              rental={selectedRental}
+              T={T}
+              onAction={handleRentalAction}
+              onClose={closeDrawer}
+              asSheetChild
+            />
+          )}
+          {activeTab === "sales" && selectedSale && (
+            <SaleDetailDrawer
+              sale={selectedSale}
+              T={T}
+              onAction={handleRentalAction}
+              onClose={closeDrawer}
+              asSheetChild
+            />
+          )}
+          {activeTab === "services" && selectedServiceRental && (
+            <ServiceDetailDrawer
+              rental={selectedServiceRental}
+              T={T}
+              onAction={handleRentalAction}
+              onClose={closeDrawer}
+              asSheetChild
+              mechanicName={mechanicMap[selectedServiceRental.rental_id] ?? null}
+            />
+          )}
+        </AnalyticsMobileSheet>
+      </div>
     </div>
+  );
+}
+
+// ── Inline wrappers for desktop split-pane ───────────────────────────────────
+//
+// The drawer components render their own backdrop + right-side panel by default.
+// For the desktop split-pane layout we want them inline (no backdrop, no panel
+// chrome) — we render the same content via the asSheetChild path which skips
+// the backdrop. The parent provides the surrounding card chrome.
+
+function RentalDetailDrawerInline({
+  rental,
+  T,
+  onAction,
+  onClose,
+}: {
+  rental: DrawerRentalRow;
+  T: ThemeTokens;
+  onAction: (a: DrawerAction) => void;
+  onClose: () => void;
+}) {
+  return (
+    <RentalDetailDrawer
+      rental={rental}
+      T={T}
+      onAction={onAction}
+      onClose={onClose}
+      asSheetChild
+    />
+  );
+}
+
+function SaleDetailDrawerInline({
+  sale,
+  T,
+  onAction,
+  onClose,
+}: {
+  sale: AnalyticsSaleRow;
+  T: ThemeTokens;
+  onAction: (a: DrawerAction) => void;
+  onClose: () => void;
+}) {
+  return (
+    <SaleDetailDrawer
+      sale={sale}
+      T={T}
+      onAction={onAction}
+      onClose={onClose}
+      asSheetChild
+    />
+  );
+}
+
+function ServiceDetailDrawerInline({
+  rental,
+  T,
+  onAction,
+  onClose,
+  mechanicName,
+}: {
+  rental: AnalyticsRentalRow;
+  T: ThemeTokens;
+  onAction: (a: DrawerAction) => void;
+  onClose: () => void;
+  mechanicName?: string | null;
+}) {
+  return (
+    <ServiceDetailDrawer
+      rental={rental}
+      T={T}
+      onAction={onAction}
+      onClose={onClose}
+      asSheetChild
+      mechanicName={mechanicName}
+    />
   );
 }
