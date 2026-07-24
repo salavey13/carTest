@@ -28,7 +28,7 @@ function required(value, message) {
 }
 
 function getAdminClient() {
-  const url = required(process.env.NEXT_PUBLIC_SUPABASE_URL, 'Missing NEXT_PUBLIC_SUPABASE_URL');
+  const url = required(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL, 'Missing NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL alias)');
   const key = required(process.env.SUPABASE_SERVICE_ROLE_KEY, 'Missing SUPABLAN_SERVICE_ROLE_KEY');
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
