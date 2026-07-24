@@ -209,11 +209,12 @@ export async function getVehicleCalendar(vehicleId: string): Promise<{ success: 
 export async function createBooking(userId: string, vehicleId: string, startDate: Date, endDate: Date, totalPrice: number) {
     noStore();
     try {
-        const { data: vehicle, error: vehicleError } = await supabaseAdmin.from('cars').select('owner_id, make, model, image_url').eq('id', vehicleId).single();
+        const { data: vehicle, error: vehicleError } = await supabaseAdmin.from('cars').select('owner_id, crew_id, make, model, image_url').eq('id', vehicleId).single();
         if(vehicleError || !vehicle) throw new Error("Vehicle not found or error fetching owner.");
 
         const { data, error } = await supabaseAdmin.from('rentals').insert({
-            user_id: userId, vehicle_id: vehicleId, owner_id: vehicle.owner_id, status: 'pending_confirmation',
+            user_id: userId, vehicle_id: vehicleId, owner_id: vehicle.owner_id, crew_id: vehicle.crew_id || null,
+            status: 'pending_confirmation',
             payment_status: 'pending', requested_start_date: startDate.toISOString(), requested_end_date: endDate.toISOString(),
             total_cost: totalPrice, interest_amount: Math.ceil(totalPrice * 0.1)
         }).select('rental_id, interest_amount').single();
