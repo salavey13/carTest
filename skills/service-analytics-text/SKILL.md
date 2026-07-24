@@ -86,7 +86,7 @@ Output per card (matches AnalyticsServiceCard):
 Full 5-section detail (mirrors ServiceDetailDrawer):
 
 ```bash
-curl -s "$URL/rest/v1/rentals?select=*,vehicle:cars!vehicle_id(make,model,type,specs,daily_price),user:users!user_id(full_name,username,metadata)&rental_id=eq.${rentalId}" \
+curl -s "$URL/rest/v1/rentals?select=*,vehicle:cars!vehicle_id(make,model,type,specs,daily_price),user:users!rentals_user_id_fkey(full_name,username,metadata)&rental_id=eq.${rentalId}" \
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
 ```
 
