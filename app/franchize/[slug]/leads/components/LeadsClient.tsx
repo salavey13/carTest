@@ -839,6 +839,7 @@ export function LeadsClient({
               onDeleteTodo={handleDeleteTodo}
               onAddNote={handleAddNote}
               onDismissLead={() => handleDismissLeadRequest(selectedLead.user_id)}
+              asSheetChild
             />
           )}
         </MobileLeadSheet>
