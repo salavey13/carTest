@@ -55,9 +55,11 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
   const requiresNote = selected?.requiresNote ?? false;
   const canSubmit = !!reason && (!requiresNote || note.trim().length > 0);
 
+  if (!lead) return null;
+
   const expectedRevenue =
-    lead?.rentals?.reduce((s, r) => s + (Number(r.totalCost) || 0), 0) || 0;
-  const source = lead?.source || "—";
+    lead.rentals?.reduce((s, r) => s + (Number(r.totalCost) || 0), 0) || 0;
+  const source = lead.source || "—";
   const stageKey = (lead as { stageKey?: string }).stageKey || "new";
   const stage = STAGE_LABELS[stageKey] || stageKey;
 

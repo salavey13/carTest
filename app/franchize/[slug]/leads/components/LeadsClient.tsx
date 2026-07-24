@@ -216,6 +216,7 @@ export function LeadsClient({
   // ── getLeadSignals: compute signals on-the-fly for a single lead ──
   const getLeadSignals = useCallback(
     (lead: LeadRow): LeadSignal[] => {
+      if (!lead || typeof lead !== "object") return [];
       const enriched = {
         ...lead,
         stageKey: (lead as { stageKey?: string }).stageKey || computeLeadStage(lead),
