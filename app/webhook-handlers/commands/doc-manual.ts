@@ -1229,6 +1229,7 @@ async function createRentalFromDocContract(
       user_id: crewOwnerChatId,
       owner_id: crewOwnerChatId,
       created_by_operator_chat_id: crewOwnerChatId,
+      crew_id: effectiveCrewId,
       vehicle_id: bike.id,
       requested_start_date: startDateIso,
       requested_end_date: endDateIso,
