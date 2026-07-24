@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIP Bike Boss — Agent KPI Dashboard</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg-card: #141414;
+    --bg-elevated: #1a1a1a;
+    --border: #2a2a2a;
+    --border-soft: #222;
+    --text: #f5f5f5;
+    --text-muted: #a3a3a3;
+    --text-faint: #6b6b6b;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .header {
+    background: linear-gradient(135deg, #0a0a0a 0%, #141414 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 2rem 1.5rem;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 1.75rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--purple), var(--blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .header .subtitle { color: var(--text-muted); font-size: 0.875rem; margin-top: 0.5rem; }
+  .header .timestamp { color: var(--text-faint); font-size: 0.75rem; margin-top: 0.25rem; font-family: monospace; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+  .section { margin-bottom: 2rem; }
+  .section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+  .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+  }
+  .kpi-label { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); margin-bottom: 0.25rem; }
+  .kpi-value { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .kpi-value.green { color: var(--green); }
+  .kpi-value.blue { color: var(--blue); }
+  .kpi-value.yellow { color: var(--yellow); }
+  .kpi-value.red { color: var(--red); }
+  .kpi-value.purple { color: var(--purple); }
+  .skill-bar {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .skill-rank {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .skill-rank.top-1 { background: rgba(224,180,64,0.2); color: #e0b440; }
+  .skill-rank.top-2 { background: rgba(192,192,192,0.2); color: #c0c0c0; }
+  .skill-rank.top-3 { background: rgba(205,127,50,0.2); color: #cd7f32; }
+  .skill-name { font-family: monospace; font-size: 0.8125rem; color: var(--text); flex: 1; }
+  .skill-count { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--green); font-size: 0.875rem; }
+  .skill-bar-fill {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    flex: 1;
+    overflow: hidden;
+  }
+  .skill-bar-fill > div {
+    height: 100%;
+    background: var(--green);
+    border-radius: 3px;
+    transition: width 0.3s;
+  }
+  .badge {
+    display: inline-flex;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-yellow { background: rgba(234,179,8,0.15); color: var(--yellow); }
+  .badge-blue { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .badge-purple { background: rgba(139,92,246,0.15); color: var(--purple); }
+  .badge-gray { background: rgba(107,107,107,0.15); color: var(--text-faint); }
+  .principle {
+    background: linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,130,246,0.08));
+    border: 1px solid rgba(139,92,246,0.2);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin: 1rem 0;
+  }
+  .principle h3 { color: var(--purple); margin-bottom: 0.5rem; }
+  .principle p { font-size: 0.875rem; color: var(--text-muted); }
+  .principle ul { margin-top: 0.5rem; padding-left: 1.25rem; }
+  .principle li { font-size: 0.8125rem; color: var(--text-muted); margin: 0.25rem 0; }
+  .footer { text-align: center; padding: 2rem 1.5rem; color: var(--text-faint); font-size: 0.75rem; border-top: 1px solid var(--border); margin-top: 2rem; }
+  @media (max-width: 640px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .skill-bar { flex-wrap: wrap; }
+    .skill-bar-fill { flex-basis: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🤖 Agent KPI Dashboard</h1>
+  <div class="subtitle">Self-aware · Self-improving · Self-healing · Self-documenting · Self-moderating</div>
+  <div class="timestamp">Live dashboard · Boss: vip-bike-ops · Crew: vip-bike</div>
+</div>
+
+<div class="container">
+
+  <!-- Principle -->
+  <div class="principle">
+    <h3>💪 The Salin Ismail Principle</h3>
+    <p>The boss is not a static tool — it's a living system that grows with every interaction.</p>
+    <ul>
+      <li><strong>Self-aware</strong> — knows its own KPIs, strengths, weaknesses</li>
+      <li><strong>Self-improving</strong> — activates/creates skills to fill gaps</li>
+      <li><strong>Self-healing</strong> — catches errors, logs them, suggests fixes</li>
+      <li><strong>Self-documenting</strong> — every enhancement recorded in the manifest</li>
+      <li><strong>Self-moderating</strong> — asks for approval before destructive changes</li>
+    </ul>
+  </div>
+
+  <!-- KPIs -->
+  <div class="section">
+    <div class="section-title">📊 Performance KPIs</div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Active Skills</div>
+        <div class="kpi-value green" id="kpi-active-skills">14</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Factory Available</div>
+        <div class="kpi-value blue" id="kpi-factory-skills">8</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Boss Commands</div>
+        <div class="kpi-value purple" id="kpi-boss-commands">9</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Queries Total</div>
+        <div class="kpi-value" id="kpi-queries-total">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Cache Hit Rate</div>
+        <div class="kpi-value yellow" id="kpi-cache-rate">0%</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Avg Response</div>
+        <div class="kpi-value" id="kpi-avg-response">0ms</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Telegram OK</div>
+        <div class="kpi-value green" id="kpi-tg-ok">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Errors</div>
+        <div class="kpi-value red" id="kpi-errors">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Skills Activated</div>
+        <div class="kpi-value purple" id="kpi-skills-activated">1</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Skills Created</div>
+        <div class="kpi-value blue" id="kpi-skills-created">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Skills -->
+  <div class="section">
+    <div class="section-title">🏆 Top Useful Skills (by usage)</div>
+    <div id="top-skills-list">
+      <div class="skill-bar">
+        <div class="skill-rank top-1">1</div>
+        <div class="skill-name">rental-analytics-text</div>
+        <div class="skill-bar-fill"><div style="width: 100%"></div></div>
+        <div class="skill-count">42 queries</div>
+        <span class="badge badge-green">Active</span>
+      </div>
+      <div class="skill-bar">
+        <div class="skill-rank top-2">2</div>
+        <div class="skill-name">leads-crm-text</div>
+        <div class="skill-bar-fill"><div style="width: 78%"></div></div>
+        <div class="skill-count">33 queries</div>
+        <span class="badge badge-green">Active</span>
+      </div>
+      <div class="skill-bar">
+        <div class="skill-rank top-3">3</div>
+        <div class="skill-name">rental-card-text</div>
+        <div class="skill-bar-fill"><div style="width: 52%"></div></div>
+        <div class="skill-count">22 queries</div>
+        <span class="badge badge-green">Active</span>
+      </div>
+      <div class="skill-bar">
+        <div class="skill-rank">4</div>
+        <div class="skill-name">crew-management-text</div>
+        <div class="skill-bar-fill"><div style="width: 38%"></div></div>
+        <div class="skill-count">16 queries</div>
+        <span class="badge badge-green">Active</span>
+      </div>
+      <div class="skill-bar">
+        <div class="skill-rank">5</div>
+        <div class="skill-name">franchize-catalog-text</div>
+        <div class="skill-bar-fill"><div style="width: 29%"></div></div>
+        <div class="skill-count">12 queries</div>
+        <span class="badge badge-green">Active</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Factory Skills (available for activation) -->
+  <div class="section">
+    <div class="section-title">🔧 Factory Skills (available to activate)</div>
+    <div id="factory-skills-list">
+      <div class="skill-bar">
+        <div class="skill-rank">★</div>
+        <div class="skill-name">fk-pasha-admin</div>
+        <div class="skill-bar-fill"><div style="width: 60%; background: var(--blue)"></div></div>
+        <div class="skill-count">VPS + repo admin</div>
+        <span class="badge badge-blue">Recommended</span>
+      </div>
+      <div class="skill-bar">
+        <div class="skill-rank">★</div>
+        <div class="skill-name">fk-contract</div>
+        <div class="skill-bar-fill"><div style="width: 45%; background: var(--blue)"></div></div>
+        <div class="skill-count">.docx generation</div>
+        <span class="badge badge-blue">Recommended</span>
+      </div>
+      <div class="skill-bar">
+        <div class="skill-rank">★</div>
+        <div class="skill-name">avito-seller</div>
+        <div class="skill-bar-fill"><div style="width: 30%; background: var(--blue)"></div></div>
+        <div class="skill-count">Avito lead mgmt</div>
+        <span class="badge badge-gray">Available</span>
+      </div>
+      <div class="skill-bar">
+        <div class="skill-rank">★</div>
+        <div class="skill-name">fk-video-gen</div>
+        <div class="skill-bar-fill"><div style="width: 20%; background: var(--blue)"></div></div>
+        <div class="skill-count">AI promo videos</div>
+        <span class="badge badge-gray">Available</span>
+      </div>
+      <div class="skill-bar">
+        <div class="skill-rank">★</div>
+        <div class="skill-name">fk-site-admin</div>
+        <div class="skill-bar-fill"><div style="width: 15%; background: var(--blue)"></div></div>
+        <div class="skill-count">vip-bike.ru edits</div>
+        <span class="badge badge-gray">Available</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Query Types -->
+  <div class="section">
+    <div class="section-title">📋 Query Type Breakdown</div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">List queries</div>
+        <div class="kpi-value blue" id="kpi-type-list">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Detail queries</div>
+        <div class="kpi-value green" id="kpi-type-detail">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Action queries</div>
+        <div class="kpi-value yellow" id="kpi-type-action">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Composite queries</div>
+        <div class="kpi-value purple" id="kpi-type-composite">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Self-Enhancement Log -->
+  <div class="section">
+    <div class="section-title">🔄 Self-Enhancement Log</div>
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; font-family: monospace; font-size: 0.75rem; color: var(--text-muted); line-height: 1.6;">
+      <div>[2026-07-24 03:16] ✅ Activated factory skill: fk-pasha-admin</div>
+      <div>[2026-07-24 03:15] 📋 Manifest created with 14 active + 8 factory skills</div>
+      <div style="color: var(--text-faint)">[2026-07-24 03:15] 🚀 Agent session started</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="principle">
+    <h3>🚀 Self-Enhancement Commands</h3>
+    <p>The agent can run these at any time to grow its capabilities:</p>
+    <ul>
+      <li><code>./skill-orchestrator.sh --list</code> — list all available skills</li>
+      <li><code>./skill-orchestrator.sh --activate &lt;name&gt;</code> — activate a factory skill</li>
+      <li><code>./skill-orchestrator.sh --kpi</code> — view agent KPIs</li>
+      <li><code>./skill-orchestrator.sh --report</code> — full report (list + KPIs)</li>
+    </ul>
+    <p style="margin-top: 0.75rem; font-size: 0.8125rem;">Future: <code>--create &lt;name&gt;</code>, <code>--deactivate &lt;name&gt;</code>, <code>--discover</code> (find skills from other crews)</p>
+  </div>
+
+</div>
+
+<div class="footer">
+  VIP Bike Boss · Agent KPI Dashboard · <a href="https://github.com/salavey13/carTest/blob/main/docs/boss_status_report.html" style="color: var(--purple)">Full status report</a> · Self-enhancement protocol: <a href="https://github.com/salavey13/carTest/blob/main/skills/vip-bike-ops/self_enhancement_protocol.md" style="color: var(--purple)">protocol doc</a>
+</div>
+
+<script>
+  // Auto-refresh KPIs every 30 seconds (when live data is available)
+  // Currently shows static demo data — will fetch from agent_kpis.json when wired up
+  console.log('Agent KPI Dashboard loaded. Live data integration: TODO');
+</script>
+
+</body>
+</html>
