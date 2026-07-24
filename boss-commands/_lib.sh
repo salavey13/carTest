@@ -153,8 +153,137 @@ html_escape() {
   echo "$s"
 }
 
+# ─── Deep-link URL builders ──────────────────────────────────────────────────
+# Build Telegram WebApp deep links for boss command notifications.
+# Format: https://t.me/<bot>/app?startapp=<payload>
+# The useStartParamRouter hook parses these on mount and redirects.
+
+BOT_USERNAME="${BOT_USERNAME:-oneBikePlsBot}"
+WEB_BASE_URL="${WEB_BASE_URL:-https://vip-bike.ru}"
+
+# Telegram WebApp deep link
+tg_deep_link() {
+  local payload="$1"
+  echo "https://t.me/${BOT_USERNAME}/app?startapp=${payload}"
+}
+
+# Web URL (for non-Telegram contexts — email, browser)
+web_url() {
+  local path="$1"
+  local params="${2:-}"
+  if [[ -n "$params" ]]; then
+    echo "${WEB_BASE_URL}${path}?${params}"
+  else
+    echo "${WEB_BASE_URL}${path}"
+  fi
+}
+
+# Lead deep link — opens leads page with detail drawer for this lead
+lead_link() {
+  local lead_id="$1"
+  tg_deep_link "lead_${lead_id}"
+}
+
+# Lead web URL — opens leads page with ?leadId=
+lead_web_url() {
+  local lead_id="$1"
+  web_url "/franchize/${CREW_SLUG}/leads" "leadId=${lead_id}"
+}
+
+# Lead with segment — opens leads page pre-filtered
+lead_segment_link() {
+  local segment="${1:-all}"  # hot | warm | verified | troubled | all
+  tg_deep_link "leads_${segment}"
+}
+
+lead_segment_web_url() {
+  local segment="${1:-all}"
+  web_url "/franchize/${CREW_SLUG}/leads" "segment=${segment}"
+}
+
+# Rental deep link — opens analytics with rental detail
+rental_link() {
+  local rental_id="$1"
+  tg_deep_link "rental_${rental_id}"
+}
+
+rental_web_url() {
+  local rental_id="$1"
+  web_url "/franchize/${CREW_SLUG}/rentals-analytics" "ui=v2&rentalId=${rental_id}"
+}
+
+# Analytics deep link — opens analytics on specific tab + date
+analytics_link() {
+  local tab="${1:-rentals}"  # rentals | sales | services
+  local date="${2:-}"
+  if [[ -n "$date" ]]; then
+    tg_deep_link "analytics_${tab}_${date}"
+  else
+    tg_deep_link "analytics_${tab}"
+  fi
+}
+
+analytics_web_url() {
+  local tab="${1:-rentals}"
+  local date="${2:-}"
+  local params="ui=v2"
+  [[ -n "$tab" ]] && params="${params}&tab=${tab}"
+  [[ -n "$date" ]] && params="${params}&date=${date}"
+  web_url "/franchize/${CREW_SLUG}/rentals-analytics" "$params"
+}
+
+# ─── Anti-spam helpers ───────────────────────────────────────────────────────
+# These helpers prevent the bot from spamming Telegram with huge messages.
+
+# Truncate text to N chars with ellipsis
+truncate_text() {
+  local text="$1"
+  local max="${2:-500}"
+  if [[ ${#text} -gt $max ]]; then
+    echo "${text:0:$((max-3))}..."
+  else
+    echo "$text"
+  fi
+}
+
+# Format a list as top-N (anti-spam: don't dump 50 items, show top 5 + count)
+format_top_n() {
+  local items="$1"  # newline-separated list
+  local max="${2:-5}"
+  local total
+  total=$(echo "$items" | grep -c . || echo 0)
+  if [[ $total -le $max ]]; then
+    echo "$items"
+  else
+    echo "$items" | head -n "$max"
+    echo "..."
+    echo "📊 Всего: $total (показано топ-$max)"
+  fi
+}
+
+# Build a "Что дальше?" section with deep links
+format_next_steps() {
+  local steps=()
+  while [[ $# -gt 0 ]]; do
+    local label="$1"
+    local url="$2"
+    shift 2
+    steps+=("${label}: ${url}")
+  done
+  if [[ ${#steps[@]} -gt 0 ]]; then
+    echo ""
+    echo "Что дальше?"
+    for i in "${!steps[@]}"; do
+      echo "$((i+1)). ${steps[$i]}"
+    done
+  fi
+}
+
 # Export everything so subshells can use it
-export URL KEY CREW_ID CREW_SLUG BOT_TOKEN ADMIN_CHAT_ID
+export URL KEY CREW_ID CREW_SLUG BOT_TOKEN ADMIN_CHAT_ID BOT_USERNAME WEB_BASE_URL
 export -f moscow_today moscow_now moscow_now_iso
 export -f mask_phone mask_email mask_passport
 export -f send_telegram log supabase_query html_escape
+export -f tg_deep_link web_url lead_link lead_web_url lead_segment_link lead_segment_web_url
+export -f rental_link rental_web_url analytics_link analytics_web_url
+export -f truncate_text format_top_n format_next_steps
