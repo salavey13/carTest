@@ -231,6 +231,23 @@ export function AnalyticsClientV2({
     return dbUser?.user_id || passwordAuthOwnerId;
   }, [dbUser?.user_id, passwordAuthOwnerId]);
 
+  // ─── Timeout helper ────────────────────────────────────────────────────────
+  // Wraps a promise with a timeout. When Supabase returns 525 (SSL handshake
+  // failed — transient Cloudflare issue), the server action can hang for 10+
+  // seconds, triggering Vercel's Runtime Timeout. This wrapper ensures we
+  // surface the error to the user within 8 seconds instead of hanging.
+  const withTimeout = <T,>(promise: Promise<T>, ms = 8000): Promise<T> => {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`Timeout after ${ms}ms`));
+      }, ms);
+      promise.then(
+        (val) => { clearTimeout(timer); resolve(val); },
+        (err) => { clearTimeout(timer); reject(err); },
+      );
+    });
+  };
+
   // ─── Data loaders ──────────────────────────────────────────────────────────
 
   const loadRentals = useCallback(
@@ -242,12 +259,15 @@ export function AnalyticsClientV2({
       }
       setLoading(true);
       try {
-        const result = await getRentalsDashboard({
-          slug: initialSlug.trim(),
-          actorUserId,
-          date,
-          isPasswordAuth: !!passwordAuthOwnerId,
-        });
+        const result = await withTimeout(
+          getRentalsDashboard({
+            slug: initialSlug.trim(),
+            actorUserId,
+            date,
+            isPasswordAuth: !!passwordAuthOwnerId,
+          }),
+          8000,
+        );
         if (result.success && result.data) {
           setRentals(result.data.items.map(toAnalyticsRental));
         } else if (!result.success) {
@@ -255,7 +275,9 @@ export function AnalyticsClientV2({
         }
       } catch (error) {
         console.error("[AnalyticsV2] loadRentals:", error);
-        toast.error("Ошибка загрузки аренд");
+        // Don't spam toast on timeout — the loading state will clear and
+        // the user can retry by changing the date.
+        toast.error("Ошибка загрузки аренд (таймаут Supabase?)");
       } finally {
         setLoading(false);
       }
@@ -268,12 +290,15 @@ export function AnalyticsClientV2({
       const actorUserId = getActorUserId();
       if (!actorUserId) return;
       try {
-        const result = await getSalesDashboard({
-          slug: initialSlug.trim(),
-          actorUserId,
-          date,
-          isPasswordAuth: !!passwordAuthOwnerId,
-        });
+        const result = await withTimeout(
+          getSalesDashboard({
+            slug: initialSlug.trim(),
+            actorUserId,
+            date,
+            isPasswordAuth: !!passwordAuthOwnerId,
+          }),
+          8000,
+        );
         if (result.success && result.data) {
           setSales(result.data.items.map(toAnalyticsSale));
         }
@@ -288,11 +313,14 @@ export function AnalyticsClientV2({
     const actorUserId = getActorUserId();
     if (!actorUserId || !crew.id) return;
     try {
-      const result = await getCrewTodos({
-        actorUserId,
-        crewId: crew.id,
-        isPasswordAuth: !!passwordAuthOwnerId,
-      });
+      const result = await withTimeout(
+        getCrewTodos({
+          actorUserId,
+          crewId: crew.id,
+          isPasswordAuth: !!passwordAuthOwnerId,
+        }),
+        8000,
+      );
       if (result.success && result.data) {
         setTodos(result.data.map(toRentalTodo));
       }
