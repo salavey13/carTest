@@ -1,0 +1,50 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-07-24T00:16:19Z",
+  "active_skills": [
+    "leads-crm-text",
+    "rental-analytics-text",
+    "sale-analytics-text",
+    "service-analytics-text",
+    "franchize-catalog-text",
+    "rental-card-text",
+    "crew-management-text",
+    "rider-profile-text",
+    "reviews-text",
+    "contract-draft-text",
+    "orders-checkout-text",
+    "crew-admin-text",
+    "leaderboard-text",
+    "crew-info-text",
+    "fk-pasha-admin"
+  ],
+  "factory_skills_available": [
+    "fk-contract",
+    "fk-site-admin",
+    "fk-video-gen",
+    "rental-catalog-kb",
+    "avito-seller",
+    "avito-profile",
+    "factory-global-rules"
+  ],
+  "boss_commands": [
+    "morning-standup",
+    "evening-summary",
+    "returns-reminder",
+    "overdue-alert",
+    "qr-claim-watchdog",
+    "weekly-revenue",
+    "supaplan-runner",
+    "lead-stuck-watchdog",
+    "revenue-anomaly"
+  ],
+  "self_enhancement": {
+    "enabled": true,
+    "can_create_skills": true,
+    "can_modify_skills": true,
+    "can_activate_factory_skills": true,
+    "manifest_path": "skills/vip-bike-ops/skill_manifest.json",
+    "skills_dir": "skills/",
+    "factory_skills_dir": "docs/skills/"
+  }
+}
