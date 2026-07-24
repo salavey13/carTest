@@ -101,21 +101,20 @@ export function LeadDetailDrawer(props: Props) {
     onDismissLead,
   } = props;
 
-  // Defensive null-guard: if `lead` is null/undefined (shouldn't happen —
-  // LeadDetailContent null-checks before rendering us — but be safe against
-  // any unexpected crash), bail with null.
-  if (!lead || typeof lead !== "object") {
-    return null;
-  }
+  // NOTE: We CANNOT early-return before hooks (React rules-of-hooks).
+  // All hooks below handle null `lead` gracefully via null-safe accessors
+  // (the `(lead as ...)` casts + `|| "fallback"` pattern). The actual
+  // null-guard render happens at the bottom of this component, after all
+  // hooks have been called.
 
-  const stageKey = (lead as { stageKey?: string }).stageKey || "new";
+  const stageKey = (lead as { stageKey?: string } | null)?.stageKey || "new";
   const stageColor = STAGE_COLORS[stageKey] || "#64748b";
   const stageLabel = STAGE_LABELS[stageKey] || stageKey;
-  const displayName = lead.full_name || "Без имени";
-  const initials = getInitials(lead.full_name);
-  const rel = relativeTime(lead.lastSeenAt || lead.createdAt);
+  const displayName = lead?.full_name || "Без имени";
+  const initials = getInitials(lead?.full_name);
+  const rel = relativeTime(lead?.lastSeenAt || lead?.createdAt);
   const isHot = signals.some((s) => s.tone === "danger");
-  const assignee = lead.assigneeName || lead.assigneeId || "—";
+  const assignee = lead?.assigneeName || lead?.assigneeId || "—";
 
   const [todoFilter, setTodoFilter] = useState<TodoFilter>("all");
   const [newTodo, setNewTodo] = useState("");
@@ -127,24 +126,24 @@ export function LeadDetailDrawer(props: Props) {
   const [openHistory, setOpenHistory] = useState(false);
 
   const infoItems: InfoTile[] = [
-    { label: "Телефон", value: lead.phone || "—", copyable: !!lead.phone },
-    { label: "TG ID", value: lead.user_id || "—", copyable: !!lead.user_id },
-    { label: "Байк", value: lead.bikeTitle || "—" },
+    { label: "Телефон", value: lead?.phone || "—", copyable: !!lead?.phone },
+    { label: "TG ID", value: lead?.user_id || "—", copyable: !!lead?.user_id },
+    { label: "Байк", value: lead?.bikeTitle || "—" },
     { label: "Стадия", value: stageLabel, tone: "accent" },
     {
       label: "Приоритет",
-      value: `${lead.urgencyScore ?? 0}/100`,
+      value: `${lead?.urgencyScore ?? 0}/100`,
       tone:
-        (lead.urgencyScore ?? 0) >= 80
+        (lead?.urgencyScore ?? 0) >= 80
           ? "danger"
-          : (lead.urgencyScore ?? 0) >= 60
+          : (lead?.urgencyScore ?? 0) >= 60
             ? "warning"
             : "default",
     },
-    { label: "Источник", value: SOURCE_META[lead.source]?.label || lead.source },
-    { label: "Канал", value: lead.contactChannel || "—" },
-    { label: "Маршрут", value: lead.sourceRoute || "—", copyable: !!lead.sourceRoute },
-    { label: "Первый контакт", value: lead.createdAt ? formatDate(lead.createdAt) : "—" },
+    { label: "Источник", value: SOURCE_META[lead?.source]?.label || lead?.source },
+    { label: "Канал", value: lead?.contactChannel || "—" },
+    { label: "Маршрут", value: lead?.sourceRoute || "—", copyable: !!lead?.sourceRoute },
+    { label: "Первый контакт", value: lead?.createdAt ? formatDate(lead?.createdAt) : "—" },
     { label: "Последняя активность", value: rel || "—" },
     { label: "Ответственный", value: assignee },
     { label: "Следующее действие", value: STAGE_NEXT_ACTION[stageKey] || "—" },
@@ -163,8 +162,8 @@ export function LeadDetailDrawer(props: Props) {
 
   const qrStatus: QrStatus = (() => {
     const isClaimed =
-      lead.identityState === "claimed_user" || lead.identityState === "merged";
-    if (!lead.originalOperatorChatId)
+      lead?.identityState === "claimed_user" || lead?.identityState === "merged";
+    if (!lead?.originalOperatorChatId)
       return { label: "Не требуется", tone: "good" };
     if (isClaimed) return { label: "Принят", tone: "good" };
     const s = signals.find((x) => x.key === "qr_age");
@@ -192,6 +191,13 @@ export function LeadDetailDrawer(props: Props) {
     { icon: Bell, label: "Уведомить", action: "notify", color: "#eab308" },
     { icon: MoreHorizontal, label: "Ещё", action: "more", color: "#64748b" },
   ];
+
+  // ── Null-guard render ──
+  // Now that all hooks have been called, we can safely bail if lead is null.
+  // This happens AFTER hooks so React's rules-of-hooks are satisfied.
+  if (!lead || typeof lead !== "object") {
+    return null;
+  }
 
   return (
     <AnimatePresence>
@@ -240,7 +246,7 @@ export function LeadDetailDrawer(props: Props) {
                     >
                       {displayName}
                     </h2>
-                    {lead.verified && (
+                    {lead?.verified && (
                       <CheckCircle2
                         className="h-5 w-5"
                         style={{ color: "#22c55e" }}
@@ -257,7 +263,7 @@ export function LeadDetailDrawer(props: Props) {
                     )}
                   </div>
                   <div className="mt-1 text-sm" style={{ color: T.textMuted }}>
-                    {lead.phone || "—"} • {rel}
+                    {lead?.phone || "—"} • {rel}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <span
@@ -266,12 +272,12 @@ export function LeadDetailDrawer(props: Props) {
                     >
                       {stageLabel}
                     </span>
-                    {lead.username && (
+                    {lead?.username && (
                       <span
                         className="rounded-full px-3 py-1 text-[11px]"
                         style={{ background: T.bgCard, color: T.textMuted }}
                       >
-                        @{lead.username}
+                        @{lead?.username}
                       </span>
                     )}
                   </div>
@@ -336,18 +342,18 @@ export function LeadDetailDrawer(props: Props) {
               <Section
                 title="Сделки"
                 icon={Briefcase}
-                count={lead.rentals.length + lead.sales.length}
+                count={lead?.rentals.length + lead?.sales.length}
                 expanded={openDeals}
                 onToggle={() => setOpenDeals(!openDeals)}
                 T={T}
               >
                 <div className="space-y-2">
-                  {lead.rentals.length === 0 && lead.sales.length === 0 && (
+                  {lead?.rentals.length === 0 && lead?.sales.length === 0 && (
                     <p className="text-sm" style={{ color: T.textMuted }}>
                       Сделок нет
                     </p>
                   )}
-                  {lead.rentals.map((r) => (
+                  {lead?.rentals.map((r) => (
                     <div
                       key={r.rentalId}
                       className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3"
