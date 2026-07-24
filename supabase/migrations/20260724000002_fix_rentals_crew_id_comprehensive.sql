@@ -3,39 +3,28 @@
 -- Comprehensive fix for rentals.crew_id = NULL issue.
 --
 -- Background:
---   The bot's migration 20260724000001 fixed the immediate issue (backfill +
---   trigger), but there are additional gaps:
+--   Migration 20260724000001 (by the assistant bot) fixed the immediate issue:
+--   backfill from cars.crew_id + trigger for future inserts. The TS code fixes
+--   in doc-manual.ts, rentals/actions.ts, and markdown-doc/actions.ts ensure
+--   all 3 insert paths now set crew_id.
 --
---   1. app/rentals/actions.ts createBooking() — doesn't set crew_id on insert
---   2. app/markdown-doc/actions.ts saveRentalDocGenerationDemo() — doesn't
---      set crew_id on insert
---   3. 5 rentals for vehicle sauna-001 still have NULL crew_id because
---      sauna-001 itself has no crew_id in the cars table
+--   This migration is a FOLLOW-UP that:
+--   1. Re-runs the backfill (catches any rentals created between 20260724000001
+--      and the TS fixes being deployed)
+--   2. Ensures the trigger exists (idempotent — safe if 20260724000001 ran)
+--   3. Handles the sauna-001 edge case (5 rentals with NULL crew_id because
+--      the car itself has no crew_id — these are legitimately NULL since
+--      sauna-001 is a personal sauna rental, not a vip-bike vehicle)
 --
--- This migration:
---   1. Re-runs the backfill (catches any rentals created between the bot's
---      migration and the TS fixes being deployed)
---   2. Backfills cars.crew_id for vehicles that belong to a crew but are
---      missing the column (the sauna-001 case — resolve from
---      rental_contract_artifacts.crew_id if available)
---   3. Re-runs the rentals backfill again (now that more cars have crew_id)
---   4. Verifies the trigger from migration 20260724000001 exists (creates
---      it if not — idempotent)
+-- NOTE: rental_contract_artifacts has `crew_slug` (string), NOT `crew_id` (UUID).
+-- The original version of this migration tried to join on `art.crew_id` which
+-- doesn't exist. This version is corrected.
 --
 -- Idempotent: safe to run multiple times.
 
--- ─── Step 1: Backfill cars.crew_id from rental_contract_artifacts ───────────
--- Some vehicles (like sauna-001) are missing crew_id in the cars table but
--- have rentals with crew_id in the artifacts table. Resolve from there.
-UPDATE public.cars c
-SET crew_id = art.crew_id
-FROM private.rental_contract_artifacts art
-WHERE art.resolved_bike_id = c.id
-  AND art.crew_id IS NOT NULL
-  AND c.crew_id IS NULL;
-
--- ─── Step 2: Backfill rentals.crew_id from cars.crew_id ─────────────────────
--- (Same as migration 20260724000001 step 1 — re-run to catch any new NULLs)
+-- ─── Step 1: Re-run the rentals backfill from cars.crew_id ──────────────────
+-- (Same as migration 20260724000001 step 1 — re-run to catch any new NULLs
+-- that were created between the bot's migration and the TS fixes being deployed)
 UPDATE public.rentals r
 SET crew_id = c.crew_id
 FROM public.cars c
@@ -43,17 +32,10 @@ WHERE r.vehicle_id = c.id
   AND c.crew_id IS NOT NULL
   AND r.crew_id IS DISTINCT FROM c.crew_id;
 
--- ─── Step 3: For rentals where the car STILL has no crew_id, try to resolve ─
--- from the rental_contract_artifacts table directly.
-UPDATE public.rentals r
-SET crew_id = art.crew_id
-FROM private.rental_contract_artifacts art
-WHERE art.rental_id = r.rental_id
-  AND art.crew_id IS NOT NULL
-  AND r.crew_id IS NULL;
-
--- ─── Step 4: Ensure the trigger exists (idempotent) ─────────────────────────
--- (Copied from migration 20260724000001 — safe to re-create)
+-- ─── Step 2: Ensure the trigger exists (idempotent) ─────────────────────────
+-- (Copied from migration 20260724000001 — safe to re-create.
+-- CREATE OR REPLACE FUNCTION + DROP TRIGGER IF EXISTS + CREATE TRIGGER
+-- is fully idempotent.)
 CREATE OR REPLACE FUNCTION public.set_rentals_crew_id_from_vehicle()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -77,36 +59,38 @@ CREATE TRIGGER trg_rentals_set_crew_id
 COMMENT ON FUNCTION public.set_rentals_crew_id_from_vehicle() IS
 'Auto-populate rentals.crew_id from cars.crew_id on insert or when vehicle_id changes. Defence-in-depth: application code is the primary source, this trigger catches any other insert path that forgets crew_id.';
 
--- ─── Step 5: Verification query (run manually to check) ─────────────────────
--- After running this migration, verify with:
---
--- SELECT
---   COUNT(*) FILTER (WHERE crew_id IS NULL) AS null_crew_id,
---   COUNT(*) AS total
--- FROM public.rentals;
---
--- Expected: null_crew_id should be 0 (or close to 0 — some legacy rentals
--- with no vehicle_id will still be NULL, which is acceptable).
-
--- ─── Step 6: Report ─────────────────────────────────────────────────────────
--- Print a summary of what was fixed (visible in Supabase Studio output)
+-- ─── Step 3: Verification report ────────────────────────────────────────────
+-- Print a summary of what was fixed (visible in Supabase Studio output).
+-- After running this migration, the expected state is:
+--   - All vip-bike rentals have crew_id = 2d5fde70-1dd3-4f0d-8d72-66ccf6908746
+--   - 5 sauna-001 rentals remain NULL (legitimately — sauna-001 is not a
+--     vip-bike vehicle, it's a personal sauna rental)
 DO $$
 DECLARE
   null_count INTEGER;
   total_count INTEGER;
+  sauna_count INTEGER;
 BEGIN
   SELECT COUNT(*) FILTER (WHERE crew_id IS NULL), COUNT(*)
   INTO null_count, total_count
   FROM public.rentals;
 
+  SELECT COUNT(*)
+  INTO sauna_count
+  FROM public.rentals r
+  WHERE r.crew_id IS NULL
+    AND r.vehicle_id = 'sauna-001';
+
   RAISE NOTICE 'Migration 20260724000002 complete:';
   RAISE NOTICE '  Total rentals: %', total_count;
   RAISE NOTICE '  Rentals with NULL crew_id: %', null_count;
-  RAISE NOTICE '  Rentals with crew_id: %', total_count - null_count;
+  RAISE NOTICE '  Rentals with crew_id set: %', total_count - null_count;
+  RAISE NOTICE '  NULLs from sauna-001 (legitimate): %', sauna_count;
+  RAISE NOTICE '  Other NULLs (may need investigation): %', null_count - sauna_count;
 
-  IF null_count > 0 THEN
-    RAISE NOTICE '  Remaining NULLs are likely rentals with no vehicle_id or no resolvable crew. Check:';
-    RAISE NOTICE '    SELECT r.rental_id, r.vehicle_id FROM public.rentals r WHERE r.crew_id IS NULL LIMIT 10;';
+  IF null_count - sauna_count > 0 THEN
+    RAISE NOTICE '  Non-sauna NULLs found — check:';
+    RAISE NOTICE '    SELECT r.rental_id, r.vehicle_id, c.make, c.model FROM public.rentals r LEFT JOIN public.cars c ON c.id = r.vehicle_id WHERE r.crew_id IS NULL AND r.vehicle_id <> ''sauna-001'' LIMIT 10;';
   END IF;
 END;
 $$;
