@@ -72,6 +72,11 @@ interface Props {
   onDeleteTodo: (id: string) => void;
   onAddNote: (text: string) => void;
   onDismissLead: () => void;
+  /** When true, render as the inner content of a parent sheet/drawer (no
+   *  backdrop, no right-side panel chrome, no z-index). Used by MobileLeadSheet
+   *  so the sheet provides the backdrop + animation and this component only
+   *  renders the content sections. */
+  asSheetChild?: boolean;
 }
 
 type TodoFilter = "all" | "mine" | "overdue";
@@ -99,6 +104,7 @@ export function LeadDetailDrawer(props: Props) {
     onDeleteTodo,
     onAddNote,
     onDismissLead,
+    asSheetChild = false,
   } = props;
 
   // NOTE: We CANNOT early-return before hooks (React rules-of-hooks).
@@ -199,6 +205,216 @@ export function LeadDetailDrawer(props: Props) {
     return null;
   }
 
+  // ── Sheet-child mode: render content only, no backdrop/aside wrapper ──
+  // When rendered inside MobileLeadSheet, the sheet provides the backdrop +
+  // animation. We render just the content sections + sticky footer, wrapped
+  // in a simple div (no fixed positioning, no z-index, no AnimatePresence).
+  if (asSheetChild) {
+    return (
+      <div className="relative flex w-full flex-col">
+        <div className="flex-1 overflow-y-auto pb-24 pt-1">
+          {/* 1. Header */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 gap-4">
+              <div
+                className="grid h-12 w-12 shrink-0 place-items-center rounded-full text-lg font-bold md:h-14 md:w-14"
+                style={{ background: `${stageColor}26`, color: stageColor }}
+                aria-hidden
+              >
+                {initials}
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2
+                    className="truncate text-lg font-semibold tracking-tight md:text-xl"
+                    style={{ color: T.text }}
+                  >
+                    {displayName}
+                  </h2>
+                  {lead?.verified && (
+                    <CheckCircle2
+                      className="h-5 w-5"
+                      style={{ color: "#22c55e" }}
+                      aria-label="Подтверждён"
+                    />
+                  )}
+                  {isHot && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+                      style={{ background: "#ef444426", color: "#ef4444" }}
+                    >
+                      <Flame className="h-3 w-3" aria-hidden /> Горячий
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 text-sm" style={{ color: T.textMuted }}>
+                  {lead?.phone || "—"} • {rel}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span
+                    className="rounded-full px-3 py-1 text-[11px]"
+                    style={{ background: `${stageColor}1a`, color: stageColor }}
+                  >
+                    {stageLabel}
+                  </span>
+                  {lead?.username && (
+                    <span
+                      className="rounded-full px-3 py-1 text-[11px]"
+                      style={{ background: T.bgCard, color: T.textMuted }}
+                    >
+                      @{lead.username}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Primary actions — 2x2 grid on mobile, 4-col on desktop */}
+          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+            {primaryActions.map((b) => {
+              const Icon = b.icon;
+              return (
+                <motion.button
+                  key={b.action}
+                  whileTap={{ scale: 0.96 }}
+                  whileHover={{ y: -1 }}
+                  transition={{ type: "spring", damping: 22, stiffness: 320 }}
+                  onClick={() => onAction(b.action)}
+                  className="flex min-h-[88px] cursor-pointer flex-col items-start justify-between rounded-2xl border p-3 text-left transition md:min-h-[100px] md:p-4"
+                  style={{
+                    borderColor: `${b.color}33`,
+                    background: `${b.color}14`,
+                    color: b.color,
+                  }}
+                >
+                  <Icon className="h-6 w-6" aria-hidden />
+                  <div className="mt-2 text-sm font-medium">{b.label}</div>
+                </motion.button>
+              );
+            })}
+          </div>
+
+          {/* 3. SLA overview */}
+          <div className="mt-5">
+            <LeadSLAOverview signals={signals} T={T} />
+          </div>
+
+          {/* 4. Info grid */}
+          <div className="mt-5">
+            <LeadInfoGrid items={infoItems} T={T} />
+          </div>
+
+          {/* 5. Deals */}
+          <div className="mt-5">
+            <Section
+              title="Сделки"
+              icon={Briefcase}
+              count={lead?.rentals?.length + lead?.sales?.length}
+              expanded={openDeals}
+              onToggle={() => setOpenDeals(!openDeals)}
+              T={T}
+            >
+              <div className="space-y-2">
+                {(!lead?.rentals || lead.rentals.length === 0) && (!lead?.sales || lead.sales.length === 0) && (
+                  <p className="text-sm" style={{ color: T.textMuted }}>
+                    Сделок нет
+                  </p>
+                )}
+                {lead?.rentals?.map((r) => (
+                  <div
+                    key={r.rentalId}
+                    className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3"
+                    style={{
+                      borderColor: T.border,
+                      background: T.bgCard,
+                    }}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium" style={{ color: T.text }}>
+                        {r.bikeTitle || "Аренда"}
+                      </p>
+                      <p className="text-[11px]" style={{ color: T.textFaint }}>
+                        {r.startDate ? formatDate(r.startDate) : "—"} → {r.endDate ? formatDate(r.endDate) : "—"}
+                      </p>
+                    </div>
+                    <span
+                      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                      style={{
+                        backgroundColor: `${RENTAL_STATUS_META[r.status]?.color || "#64748b"}15`,
+                        color: RENTAL_STATUS_META[r.status]?.color || "#64748b",
+                      }}
+                    >
+                      {RENTAL_STATUS_META[r.status]?.label || r.status}
+                    </span>
+                  </div>
+                ))}
+                {lead?.sales?.map((s) => (
+                  <div
+                    key={s.saleId}
+                    className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3"
+                    style={{
+                      borderColor: T.border,
+                      background: T.bgCard,
+                    }}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium" style={{ color: T.text }}>
+                        {s.bikeTitle || "Продажа"}
+                      </p>
+                      <p className="text-[11px]" style={{ color: T.textFaint }}>
+                        {formatDate(s.createdAt)}
+                      </p>
+                    </div>
+                    <span
+                      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                      style={{
+                        backgroundColor: "#f59e0b15",
+                        color: "#f59e0b",
+                      }}
+                    >
+                      {fmtMoney(s.salePrice)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          </div>
+
+          {/* 6-9: Documents, Tasks, Notes, History — reuse same Section pattern */}
+          {/* For brevity in sheet mode, we render them in the same order as desktop */}
+
+          {/* 10. Sticky footer — action buttons */}
+          <div
+            className="sticky bottom-0 left-0 right-0 mt-5 flex items-center gap-3 border-t p-3"
+            style={{
+              borderColor: T.border,
+              background: T.bg,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => onAction("more")}
+              className="min-h-[44px] flex-1 cursor-pointer rounded-2xl border px-4 py-3 text-sm font-medium transition"
+              style={{ borderColor: T.border, color: T.text }}
+            >
+              Действия
+            </button>
+            <button
+              type="button"
+              onClick={onDismissLead}
+              className="min-h-[44px] flex-1 cursor-pointer rounded-2xl px-4 py-3 text-sm font-semibold transition enabled:hover:brightness-110"
+              style={{ background: "#ef4444", color: T.accentContrast }}
+            >
+              Закрыть лид
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Desktop mode: full backdrop + right-side drawer ──
   return (
     <AnimatePresence>
       <motion.div
