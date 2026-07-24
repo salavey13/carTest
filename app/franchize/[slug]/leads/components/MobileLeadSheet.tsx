@@ -13,11 +13,13 @@ interface Props {
   T: ThemeTokens;
 }
 
-// 68vh leaves room for the toolbar/funnel above the sheet and matches the
-// ~65-70vh target on mobile. Previously 0.92 which covered almost the entire
-// viewport and hid the pipeline funnel behind the sheet.
-const SHEET_HEIGHT_VH = 0.68;
-const DRAG_DISMISS_THRESHOLD = 120; // px — drag past this to dismiss
+// 55vh — "peek" style sheet that leaves the top ~45% of the screen visible
+// so operators can still see the pipeline funnel + lead count above the sheet.
+// Previously 0.68 which covered 2/3 of the viewport and hid too much context.
+// The sheet content scrolls internally, so 55vh is enough for the key info
+// (header + primary actions + SLA + info grid) without overwhelming the screen.
+const SHEET_HEIGHT_VH = 0.55;
+const DRAG_DISMISS_THRESHOLD = 100; // px — drag past this to dismiss (lowered from 120 for snappier feel)
 
 // Spring is tuned for a snappy-but-smooth open (270ms-feeling) and a slightly
 // firmer close. damping/stiffness/mass are chosen so the sheet decelerates
@@ -115,6 +117,8 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
               background: `linear-gradient(180deg, ${T.bgElevated} 0%, ${T.bg} 100%)`,
               borderColor: T.border,
               boxShadow: "0 -20px 60px rgba(0,0,0,0.55)",
+              // Subtle top accent line so the sheet feels connected to the crew theme
+              borderTopWidth: "1px",
             }}
             variants={sheetVariants}
             initial="hidden"
@@ -135,26 +139,27 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
                 pointerDown starts the drag so the gesture only fires here, not on
                 the scrollable body. */}
             <div
-              className="sticky top-0 z-10 flex shrink-0 cursor-grab items-center justify-between gap-3 px-4 pb-2.5 pt-3 active:cursor-grabbing"
+              className="sticky top-0 z-10 flex shrink-0 cursor-grab items-center justify-between gap-3 rounded-t-[28px] px-4 pb-2 pt-2.5 active:cursor-grabbing"
               style={{
-                background: `linear-gradient(180deg, ${T.bgElevated} 70%, transparent)`,
+                background: `linear-gradient(180deg, ${T.bgElevated} 85%, transparent)`,
                 touchAction: "none",
               }}
               onPointerDown={(e) => dragControls.start(e)}
             >
               <div className="flex min-w-0 items-center gap-3">
-                {/* Visible drag handle pill — gray, top-aligned, 40px wide */}
+                {/* Visible drag handle pill — centered above the title, 36px wide.
+                    Slightly more prominent (h-1.5 vs h-1) for better grab affordance. */}
                 <motion.div
-                  className="h-1.5 w-10 shrink-0 rounded-full"
-                  style={{ background: T.border }}
+                  className="h-1.5 w-9 shrink-0 rounded-full"
+                  style={{ background: T.textFaint }}
                   whileTap={{ scale: 0.85 }}
                   transition={{ type: "spring", damping: 22, stiffness: 320 }}
                   aria-hidden
                 />
                 {title && (
                   <p
-                    className="truncate text-xs font-semibold leading-tight"
-                    style={{ color: T.textMuted }}
+                    className="truncate text-sm font-semibold leading-tight"
+                    style={{ color: T.text }}
                   >
                     {title}
                   </p>
@@ -163,8 +168,8 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
               <button
                 type="button"
                 onClick={onClose}
-                className="shrink-0 rounded-xl p-2 transition"
-                style={{ color: T.textFaint }}
+                className="shrink-0 rounded-xl p-2.5 transition focus:outline-none focus-visible:ring-2"
+                style={{ color: T.textFaint, minHeight: "44px", minWidth: "44px" }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = T.bgCard;
                   e.currentTarget.style.color = T.text;
@@ -181,16 +186,19 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
 
             {/* Scrollable content area — separate from drag.
                 overscrollBehavior:contain prevents scroll chaining so swiping up
-                at the top of the content never propagates to the sheet drag. */}
+                at the top of the content never propagates to the sheet drag.
+                Bottom padding reduced from 80px to 40px since the sheet is now
+                shorter (55vh) — the extra space was for the home indicator + nav
+                bar, but 40px is enough on modern devices. */}
             <div
               className="overflow-y-auto px-4"
               style={{
-                maxHeight: `calc(${SHEET_HEIGHT_VH * 100}vh - 56px)`,
+                maxHeight: `calc(${SHEET_HEIGHT_VH * 100}vh - 52px)`,
                 WebkitOverflowScrolling: "touch",
                 overscrollBehavior: "contain",
                 // Safe-area padding at bottom (iOS home indicator) + breathing
                 // room above the bottom of the sheet.
-                paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
+                paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 40px)",
                 scrollbarWidth: "thin",
               }}
             >
