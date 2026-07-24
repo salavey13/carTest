@@ -36,7 +36,10 @@ const CONFIG = {
   // Default Codex task URL — gets user straight to task list
   // Replace with actual task URLs when available
   codexTaskUrlBase: "https://chatgpt.com/codex/cloud",
-  outputDir: "/home/z/my-project/download",
+  // Default to ./output/ in the current working directory (not a hardcoded
+  // /home/z/my-project/download/ path that doesn't exist on other machines).
+  // Override with --output /path/to/file.csv
+  outputDir: "./output",
   outputFilename: "supaplan_tasks_ULTIMATE_v5.csv",
 };
 
