@@ -28,8 +28,14 @@ function required(value, message) {
 }
 
 function getAdminClient() {
-  const url = required(process.env.NEXT_PUBLIC_SUPABASE_URL, 'Missing NEXT_PUBLIC_SUPABASE_URL');
-  const key = required(process.env.SUPABASE_SERVICE_ROLE_KEY, 'Missing SUPABLAN_SERVICE_ROLE_KEY');
+  // Accept both NEXT_PUBLIC_SUPABASE_URL (Next.js convention) and SUPABASE_URL
+  // (shorter alias used in .env files). Also accept NEXT_PUBLIC_SUPABASE_URL
+  // as a fallback for environments that only set the public var.
+  const url = required(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL,
+    'Missing NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL alias). Set one in .env or export it before running.'
+  );
+  const key = required(process.env.SUPABASE_SERVICE_ROLE_KEY, 'Missing SUPABASE_SERVICE_ROLE_KEY');
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
