@@ -346,11 +346,21 @@ export async function saveRentalDocGenerationDemo(input: {
 }) {
   if (!supabaseAdmin) return { success: false, error: "Нет подключения к Supabase admin клиенту" };
 
+  // Fetch crew_id from the vehicle so the rental is properly scoped.
+  // Without this, crew-scoped queries (rentals-dashboard, analytics skills)
+  // silently return 0 rows for rentals created via this path.
+  const { data: vehicle } = await supabaseAdmin
+    .from("cars")
+    .select("crew_id")
+    .eq("id", input.vehicleId)
+    .single();
+
   const now = new Date().toISOString();
   const { error } = await supabaseAdmin.from("rentals").insert({
     user_id: input.userId,
     owner_id: input.ownerId,
     vehicle_id: input.vehicleId,
+    crew_id: vehicle?.crew_id || null,
     status: "pending_confirmation",
     payment_status: "interest_paid",
     interest_amount: 0,
