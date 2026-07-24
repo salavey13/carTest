@@ -39,6 +39,8 @@ interface Props {
   onDeleteTodo: (id: string) => void;
   onAddNote: (text: string) => void;
   onDismissLead: () => void;
+  /** When true, render as the inner content of a parent sheet (no backdrop). */
+  asSheetChild?: boolean;
 }
 
 /**
@@ -68,6 +70,7 @@ export function LeadDetailContent({
   onDeleteTodo,
   onAddNote,
   onDismissLead,
+  asSheetChild = false,
 }: Props) {
   // NOTE: We CANNOT early-return before hooks (React rules-of-hooks).
   // All hooks below handle null `lead` gracefully via try/catch + null-safe
@@ -156,6 +159,7 @@ export function LeadDetailContent({
       onDeleteTodo={onDeleteTodo}
       onAddNote={onAddNote}
       onDismissLead={onDismissLead}
+      asSheetChild={asSheetChild}
     />
   );
 }
