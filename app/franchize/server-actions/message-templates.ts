@@ -3,51 +3,21 @@
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { z } from "zod";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types & Constants ───────────────────────────────────────────────────────
+// Types (MessageTemplate, TemplateVariable) and the TEMPLATE_VARIABLES constant
+// are imported from ./message-templates-constants to avoid "use server" export
+// restrictions (a "use server" file can only export async functions).
+import {
+  type MessageTemplate,
+  type TemplateVariable,
+  TEMPLATE_VARIABLES,
+} from "./message-templates-constants";
 
-export interface MessageTemplate {
-  id: string;
-  crew_id: string | null;
-  template_key: string;
-  name: string;
-  subject: string | null;
-  body: string;
-  channel: "telegram" | "email" | "sms";
-  language: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface TemplateVariable {
-  key: string;
-  label: string;
-  description: string;
-}
-
-// Available variables for different template contexts
-export const TEMPLATE_VARIABLES: Record<string, TemplateVariable[]> = {
-  rental: [
-    { key: "customer_name", label: "Имя клиента", description: "Полное имя клиента" },
-    { key: "customer_phone", label: "Телефон клиента", description: "Номер телефона" },
-    { key: "bike", label: "Мотоцикл", description: "Марка и модель" },
-    { key: "start_date", label: "Дата начала", description: "Дата начала аренды" },
-    { key: "start_time", label: "Время начала", description: "Время начала аренды" },
-    { key: "return_date", label: "Дата возврата", description: "Дата окончания аренды" },
-    { key: "return_time", label: "Время возврата", description: "Время окончания аренды" },
-    { key: "pickup_location", label: "Место выдачи", description: "Адрес выдачи" },
-    { key: "return_location", label: "Место возврата", description: "Адрес возврата" },
-    { key: "total_price", label: "Стоимость", description: "Общая стоимость аренды" },
-    { key: "deposit_amount", label: "Депозит", description: "Сумма депозита" },
-    { key: "payment_method", label: "Способ оплаты", description: "Способ оплаты" },
-    { key: "contact_phone", label: "Контактный телефон", description: "Телефон для связи" },
-  ],
-  review: [
-    { key: "customer_name", label: "Имя клиента", description: "Полное имя клиента" },
-    { key: "bike", label: "Мотоцикл", description: "Марка и модель" },
-    { key: "review_link", label: "Ссылка на отзыв", description: "Ссылка для оставления отзыва" },
-  ],
-};
+// Re-export TYPES only (types are erased at compile time — no runtime export).
+// TEMPLATE_VARIABLES is NOT re-exported because re-exporting a const from a
+// "use server" file is also invalid. Callers that need TEMPLATE_VARIABLES
+// must import directly from "./message-templates-constants".
+export type { MessageTemplate, TemplateVariable };
 
 // ─── Server Actions ─────────────────────────────────────────────────────────────
 
