@@ -69,12 +69,10 @@ export function LeadDetailContent({
   onAddNote,
   onDismissLead,
 }: Props) {
-  // Defensive null-guard: if `lead` is null/undefined (shouldn't happen —
-  // LeadsClient null-checks before rendering us — but be safe), bail with
-  // null so React skips this subtree instead of crashing.
-  if (!lead || typeof lead !== "object") {
-    return null;
-  }
+  // NOTE: We CANNOT early-return before hooks (React rules-of-hooks).
+  // All hooks below handle null `lead` gracefully via try/catch + null-safe
+  // accessors. The actual null-guard render happens at the bottom of this
+  // component, after all hooks have been called.
 
   // ── 1. Inject computed stage + qr status onto the lead ──
   // Wrap computeLeadStage/computeQrStatus in try/catch — they iterate over
@@ -134,6 +132,13 @@ export function LeadDetailContent({
     () => notes as LeadDrawerNote[],
     [notes]
   );
+
+  // ── Null-guard render ──
+  // Now that all hooks have been called, we can safely bail if lead is null.
+  // This happens AFTER hooks so React's rules-of-hooks are satisfied.
+  if (!lead || typeof lead !== "object") {
+    return null;
+  }
 
   return (
     <LeadDetailDrawer
