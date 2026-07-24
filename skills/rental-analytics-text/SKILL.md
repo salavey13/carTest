@@ -23,6 +23,24 @@ description: >
 - Key: from /home/z/my-project/upload/secrets.txt (SUPABASE_SERVICE_ROLE_KEY=)
 - Crew: vip-bike, ID: 2d5fde70-1dd3-4f0d-8d72-66ccf6908746
 
+## CRITICAL URL conventions (read before writing any curl)
+
+1. **URL-encode `+` as `%2B` in offset timestamps.** PostgREST parses `+` in query
+   string as space (form-urlencoded semantics), so `2026-07-17T00:00:00+03:00`
+   arrives as `2026-07-17T00:00:00 03:00` → Postgres error `22007 invalid input
+   syntax for type timestamp with time zone`. Always write `+03:00` as `%2B03:00`
+   inside curl URLs. Same for `:` (use `%3A` is optional, PostgREST tolerates it).
+2. **`users` join needs FK disambiguation.** `rentals` has TWO FKs to `users`:
+   `rentals_user_id_fkey` (user_id → users.user_id) AND `rentals_owner_id_fkey`
+   (owner_id → users.user_id). PostgREST rejects `users!user_id` with PGRST201
+   "Could not embed because more than one relationship was found". Use the
+   constraint name: `users!rentals_user_id_fkey(full_name,...)` for renter,
+   `users!rentals_owner_id_fkey(full_name,...)` for owner. Same pattern applies
+   to any other ambiguous join (`crew_members!crew_members_user_id_fkey`, etc).
+3. **Date filters**: prefer UTC `Z` suffix (`2026-07-17T00:00:00Z`) over offset
+   unless the local-date semantic matters (returns-due / KPI). When offset is
+   needed, always `%2B03:00`.
+
 ## Web UI mirror (v2)
 
 This skill mirrors the v2 analytics dashboard at
@@ -86,8 +104,8 @@ DATE="${1:-$(TZ=Europe/Moscow date +%Y-%m-%d)}"
 # Postgres stores agreed_end_date as timestamptz (UTC). To compare "today"
 # in Moscow, use the +03:00 offset bounds — same as the v2 web's
 # localDateOnly() comparison.
-START_LOCAL="${DATE}T00:00:00+03:00"
-END_LOCAL="${DATE}T23:59:59+03:00"
+START_LOCAL="${DATE}T00:00:00%2B03:00"
+END_LOCAL="${DATE}T23:59:59%2B03:00"
 curl -s "$URL/rest/v1/rentals?select=rental_id,status,agreed_end_date,total_cost&crew_id=eq.$CREW_ID&status=eq.active&agreed_end_date=gte.${START_LOCAL}&agreed_end_date=lte.${END_LOCAL}" \
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
 ```
@@ -105,7 +123,7 @@ Output format (mirror web KPI cards):
 Full 10-section detail (mirrors RentalDetailDrawer):
 
 ```bash
-curl -s "$URL/rest/v1/rentals?select=*,vehicle:cars!vehicle_id(make,model,type),user:users!user_id(full_name,username,metadata)&rental_id=eq.${rentalId}" \
+curl -s "$URL/rest/v1/rentals?select=*,vehicle:cars!vehicle_id(make,model,type),user:users!rentals_user_id_fkey(full_name,username,metadata)&rental_id=eq.${rentalId}" \
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
 ```
 
@@ -231,8 +249,8 @@ Rentals due for return: `status='active'` AND `agreed_end_date` falls on $DATE *
 DATE="${1:-$(TZ=Europe/Moscow date +%Y-%m-%d)}"
 # Use +03:00 offset bounds — same as v2 web's localDateOnly() comparison.
 # Using UTC bounds (Z suffix) would drift by 3 hours and miss returns near midnight.
-START_LOCAL="${DATE}T00:00:00+03:00"
-END_LOCAL="${DATE}T23:59:59+03:00"
+START_LOCAL="${DATE}T00:00:00%2B03:00"
+END_LOCAL="${DATE}T23:59:59%2B03:00"
 curl -s "$URL/rest/v1/rentals?select=rental_id,vehicle_id,user_id,agreed_end_date,total_cost,status&crew_id=eq.$CREW_ID&status=eq.active&agreed_end_date=gte.${START_LOCAL}&agreed_end_date=lte.${END_LOCAL}" \
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
 ```
