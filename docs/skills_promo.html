@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIP Bike — Ваш ассистент теперь знает ВСЁ</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg-card: #14141f;
+    --bg-elevated: #1a1a28;
+    --border: #2a2a3e;
+    --border-soft: #1e1e30;
+    --text: #f5f5fa;
+    --text-muted: #a3a3b8;
+    --text-faint: #6b6b80;
+    --accent: #22c55e;
+    --accent-hover: #16a34a;
+    --accent-contrast: #0a0a0f;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+    --cyan: #06b6d4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* Animated background gradient orbs */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.08;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .orb-1 { width: 600px; height: 600px; background: var(--green); top: -200px; left: -200px; animation: float-1 20s ease-in-out infinite; }
+  .orb-2 { width: 500px; height: 500px; background: var(--blue); top: 30%; right: -150px; animation: float-2 25s ease-in-out infinite; }
+  .orb-3 { width: 700px; height: 700px; background: var(--purple); bottom: -300px; left: 30%; animation: float-3 30s ease-in-out infinite; }
+  @keyframes float-1 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(100px,50px); } }
+  @keyframes float-2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-80px,80px); } }
+  @keyframes float-3 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(50px,-100px); } }
+
+  .container { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 0 1.5rem; }
+
+  /* Hero */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 2rem 1.5rem;
+    position: relative;
+  }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(34,197,94,0.1);
+    border: 1px solid rgba(34,197,94,0.3);
+    border-radius: 999px;
+    padding: 0.375rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--green);
+    margin-bottom: 2rem;
+    animation: fade-in 0.6s ease;
+  }
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 900;
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+    animation: fade-in 0.8s ease 0.1s both;
+  }
+  .hero h1 .highlight {
+    background: linear-gradient(135deg, var(--green), var(--blue), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero .tagline {
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    color: var(--text-muted);
+    max-width: 600px;
+    margin-bottom: 2.5rem;
+    animation: fade-in 1s ease 0.2s both;
+  }
+  .hero .tagline strong { color: var(--text); }
+  .hero-cta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    animation: fade-in 1.2s ease 0.3s both;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.75rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s;
+    cursor: pointer;
+    border: none;
+  }
+  .btn-primary {
+    background: var(--green);
+    color: var(--accent-contrast);
+  }
+  .btn-primary:hover { background: var(--accent-hover); transform: translateY(-2px); }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--bg-card); border-color: var(--text-muted); }
+  @keyframes fade-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Scroll indicator */
+  .scroll-hint {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--text-faint);
+    font-size: 0.75rem;
+    animation: bounce 2s infinite;
+  }
+  @keyframes bounce { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(8px); } }
+
+  /* Section */
+  .section { padding: 4rem 0; }
+  .section-title {
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 800;
+    margin-bottom: 0.75rem;
+    text-align: center;
+  }
+  .section-subtitle {
+    font-size: 1rem;
+    color: var(--text-muted);
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto 3rem;
+  }
+
+  /* Before/After comparison */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+  }
+  .comparison-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.75rem;
+    position: relative;
+  }
+  .comparison-card.before { border-color: rgba(239,68,68,0.2); }
+  .comparison-card.after { border-color: rgba(34,197,94,0.3); box-shadow: 0 0 40px rgba(34,197,94,0.08); }
+  .comparison-label {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.25rem 0.625rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+  }
+  .comparison-label.before { background: rgba(239,68,68,0.15); color: var(--red); }
+  .comparison-label.after { background: rgba(34,197,94,0.15); color: var(--green); }
+  .comparison-card h3 { font-size: 1.125rem; font-weight: 700; margin-bottom: 0.75rem; }
+  .comparison-card ul { list-style: none; }
+  .comparison-card li {
+    padding: 0.5rem 0;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .comparison-card li .icon { flex-shrink: 0; margin-top: 2px; }
+  .comparison-card.before li .icon { color: var(--red); }
+  .comparison-card.after li .icon { color: var(--green); }
+
+  /* Skills grid */
+  .skills-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .skill-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.25rem;
+    transition: all 0.3s;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .skill-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--skill-color, var(--green));
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .skill-card:hover {
+    border-color: var(--skill-color, var(--green));
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+  }
+  .skill-card:hover::before { opacity: 1; }
+  .skill-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+    background: var(--bg-elevated);
+  }
+  .skill-name {
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    font-size: 0.8125rem;
+    color: var(--skill-color, var(--green));
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+  .skill-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+  .skill-desc {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .skill-commands {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-soft);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+  .skill-cmd {
+    font-family: monospace;
+    font-size: 0.6875rem;
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+  }
+
+  /* Feature list */
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .feature {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+  .feature-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+  }
+  .feature-icon.green { background: rgba(34,197,94,0.15); }
+  .feature-icon.blue { background: rgba(59,130,246,0.15); }
+  .feature-icon.purple { background: rgba(139,92,246,0.15); }
+  .feature-icon.yellow { background: rgba(234,179,8,0.15); }
+  .feature-icon.orange { background: rgba(245,158,11,0.15); }
+  .feature-icon.cyan { background: rgba(6,182,212,0.15); }
+  .feature h4 { font-size: 0.9375rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .feature p { font-size: 0.8125rem; color: var(--text-muted); }
+
+  /* Example chat */
+  .chat-example {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    font-size: 0.8125rem;
+    line-height: 1.7;
+    overflow-x: auto;
+  }
+  .chat-msg { margin-bottom: 1rem; }
+  .chat-msg:last-child { margin-bottom: 0; }
+  .chat-label { font-weight: 700; margin-bottom: 0.25rem; }
+  .chat-label.user { color: var(--blue); }
+  .chat-label.bot { color: var(--green); }
+  .chat-content {
+    background: var(--bg-elevated);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    white-space: pre-wrap;
+    color: var(--text);
+  }
+  .chat-content.user { border-left: 3px solid var(--blue); }
+  .chat-content.bot { border-left: 3px solid var(--green); }
+
+  /* Stats */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-bottom: 3rem;
+  }
+  .stat {
+    text-align: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem 1rem;
+  }
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(135deg, var(--green), var(--blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.25rem;
+  }
+  .stat-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* CTA section */
+  .cta {
+    background: linear-gradient(135deg, rgba(34,197,94,0.08), rgba(59,130,246,0.08));
+    border: 1px solid rgba(34,197,94,0.2);
+    border-radius: 20px;
+    padding: 3rem 2rem;
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+  .cta h2 { font-size: 1.75rem; font-weight: 800; margin-bottom: 0.75rem; }
+  .cta p { font-size: 1rem; color: var(--text-muted); margin-bottom: 1.5rem; max-width: 500px; margin-left: auto; margin-right: auto; }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 3rem 1.5rem 2rem;
+    color: var(--text-faint);
+    font-size: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+  .footer a { color: var(--green); text-decoration: none; }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .comparison { grid-template-columns: 1fr; }
+    .features { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 1.75rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">
+    <span>🚀</span>
+    <span>Ассистент обновлён</span>
+  </div>
+  <h1>
+    Ваш ассистент теперь знает<br>
+    <span class="highlight">ВСЁ</span> о вашем бизнесе
+  </h1>
+  <p class="tagline">
+    Не только маркетинг. <strong>Лиды, аренды, продажи, сервис, экипаж, отзывы, контракты, заказы</strong> — 15 текстовых навыков, которые читают живую базу данных через Supabase и отвечают за секунды.
+  </p>
+  <div class="hero-cta">
+    <a href="#skills" class="btn btn-primary">Что он умеет →</a>
+    <a href="#example" class="btn btn-secondary">Пример диалога</a>
+  </div>
+  <div class="scroll-hint">↓ листайте</div>
+</section>
+
+<!-- BEFORE / AFTER -->
+<div class="container">
+  <section class="section">
+    <h2 class="section-title">Раньше vs Сейчас</h2>
+    <p class="section-subtitle">Ассистент больше не говорит «я не знаю». Он знает.</p>
+
+    <div class="comparison">
+      <div class="comparison-card before">
+        <span class="comparison-label before">❌ Раньше</span>
+        <h3>Только маркетинг</h3>
+        <ul>
+          <li><span class="icon">✗</span> «Какие у нас лиды?» — «Не знаю, у меня нет доступа к CRM»</li>
+          <li><span class="icon">✗</span> «Сколько аренд сегодня?» — «Откройте сайт и посмотрите»</li>
+          <li><span class="icon">✗</span> «Кто должен вернуть байк?» — «Проверьте в Telegram-боте»</li>
+          <li><span class="icon">✗</span> «Какая выручка за месяц?» — «Скачайте Excel из аналитики»</li>
+          <li><span class="icon">✗</span> «Закрой этот лид» — «Я не могу, у меня нет прав»</li>
+        </ul>
+      </div>
+      <div class="comparison-card after">
+        <span class="comparison-label after">✅ Сейчас</span>
+        <h3>Вся база данных</h3>
+        <ul>
+          <li><span class="icon">✓</span> «Горячие лиды?» — список за 2 секунды с SLA-сигналами</li>
+          <li><span class="icon">✓</span> «Аренды сегодня?» — 5 аренд + выручка + возвраты</li>
+          <li><span class="icon">✓</span> «Просроченные?» — 3 аренды с датой просрочки</li>
+          <li><span class="icon">✓</span> «Выручка за месяц?» — разбивка по арендам/продажам/сервису</li>
+          <li><span class="icon">✓</span> «Закрой лид» — выполнено, с указанием причины</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section class="section">
+    <h2 class="section-title">Цифры</h2>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value">15</div>
+        <div class="stat-label">Навыков</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">9</div>
+        <div class="stat-label">Boss-команд</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">12+</div>
+        <div class="stat-label">Таблиц Supabase</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">100%</div>
+        <div class="stat-label">PII masking</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">~2с</div>
+        <div class="stat-label">Средний ответ</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">0</div>
+        <div class="stat-label">Выдуманных ID</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SKILLS -->
+  <section class="section" id="skills">
+    <h2 class="section-title">Что он умеет</h2>
+    <p class="section-subtitle">15 навыков, сгруппированных по домену. Каждый — это curl к Supabase + форматированный текст.</p>
+
+    <div class="skills-grid">
+      <!-- CRM -->
+      <div class="skill-card" style="--skill-color: #22c55e">
+        <div class="skill-icon">🔥</div>
+        <div class="skill-name">leads-crm-text</div>
+        <div class="skill-title">Лиды и воронка</div>
+        <div class="skill-desc">Список лидов, горячие, SLA-сигналы, воронка по стадиям, KPI конверсии, dismiss с причиной.</div>
+        <div class="skill-commands">
+          <span class="skill-cmd">list-leads</span>
+          <span class="skill-cmd">lead-detail</span>
+          <span class="skill-cmd">kpis</span>
+          <span class="skill-cmd">pipeline-funnel</span>
+          <span class="skill-cmd">dismiss-lead</span>
+        </div>
+      </div>
+
+      <!-- Rental analytics -->
+      <div class="skill-card" style="--skill-color: #3b82f6">
+        <div class="skill-icon">🏍</div>
+        <div class="skill-name">rental-analytics-text</div>
+        <div class="skill-title">Аренды: KPI + детали</div>
+        <div class="skill-desc">4 KPI (аренды/выручка/активные/возвраты), 10-секционная карточка аренды, документы, handoff, история.</div>
+        <div class="skill-commands">
+          <span class="skill-cmd">rentals-day</span>
+          <span class="skill-cmd">rental-kpis</span>
+          <span class="skill-cmd">rental-detail</span>
+          <span class="skill-cmd">returns-due</span>
+          <span class="skill-cmd">overdue-rentals</span>
+        </div>
+      </div>
+
+      <!-- Sales analytics -->
+      <div class="skill-card" style="--skill-color: #f59e0b">
+        <div class="skill-icon">💰</div>
+        <div class="skill-name">sale-analytics-text</div>
+        <div class="skill-title">Продажи и договоры</div>
+        <div class="skill-desc">KPI продаж, статусы договоров (pending/sent/signed/paid/delivered), доставка, гарантия.</div>
+        <div class="skill-commands">
+          <span class="skill-cmd">sales-list</span>
+          <span class="skill-cmd">sale-kpis</span>
+          <span class="skill-cmd">sale-detail</span>
+          <span class="skill-cmd">contract-status</span>
+          <span class="skill-cmd">sale-warranty</span>
+        </div>
+      </div>
+
+      <!-- Service analytics -->
+      <div class="skill-card" style="--skill-color: #8b5cf6">
+        <div class="skill-icon">🔧</div>
+        <div class="skill-name">service-analytics-text</div>
+        <div class="skill-title">Сервис и механики</div>
+        <div class="skill-desc">Каталог услуг (10 позиций), назначение механиков, KPI сервиса, активация/завершение.</div>
+        <div class="skill-commands">
+          <span class="skill-cmd">services-list</span>
+          <span class="skill-cmd">service-catalog</span>
+          <span class="skill-cmd">service-mechanic</span>
+          <span class="skill-cmd">assign-mechanic</span>
+        </div>
+      </div>
+
+      <!-- Catalog -->
+      <div class="skill-card" style="--skill-color: #06b6d4">
+        <div class="skill-icon">📦</div>
+        <div class="skill-name">franchize-catalog-text</div>
+        <div class="skill-title">Каталог байков</div>
+        <div class="skill-desc">Список байков, цены, характеристики, проверка доступности на дату.</div>
+        <div class="skill-commands">
+          <span class="skill-cmd">list-bikes</span>
+          <span class="skill-cmd">bike-detail</span>
+          <span class="skill-cmd">bike-pricing</span>
+          <span class="skill-cmd">check-availability</span>
+        </div>
+      </div>
+
+      <!-- Rental card -->
+      <div class="skill-card" style="--skill-color: #22c55e">
+        <div class="skill-icon">📋</div>
+        <div class="skill-name">rental-card-text</div>
+        <div class="skill-title">Карточка аренды</div>
+        <div class="skill-desc">Полный дайв: статус, даты, арендатор, документы, QR-claim, контракт, задачи.</div>
+        <div class="skill-commands">
+          <span class="skill-cmd">rental-card</span>
+          <span class="skill-cmd">rental-documents</span>
+          <span class="skill-cmd">rental-handoff</span>
+          <span class="skill-cmd">activate</span>
+          <span class="skill-cmd">complete</span>
+        </div>
+      </div>
+
+      <!-- Crew management -->
+      <div class="skill-card" style="--skill-color: #3b82f6">
+        <div class="skill-icon">👥</div>
+        <div class="skill-name">crew-management-text</div>
+        <div class="skill-title">Экипаж и операторы</div>
+        <div class="skill-desc">Состав экипажа, роли, кто онлайн, задачи операторов, смены.</div>
+        <div class="skill-commands">
+          <span class="skill-cmd">crew-members</span>
+          <span class="skill-cmd">crew-stats</span>
+          <span class="skill-cmd">crew-todos</span>
+          <span class="skill-cmd">update-role</span>
+        </div>
+      </div>
+
+      <!-- Reviews -->
+      <div class="skill-card" style="--skill-color: #eab308">
+        <div class="skill-icon">⭐</div>
+        <div class="skill-name">reviews-text</div>
+        <div class="skill-title">Отзывы и модерация</div>
+        <div class="skill-desc">Список отзывов, рейтинги, модерация, статистика.</div>
+        <div class="skill-commands">
+          <span class="skill-cmd">list-reviews</span>
+          <span class="skill-cmd">review-detail</span>
+          <span class="skill-cmd">moderate-review</span>
+          <span class="skill-cmd">review-stats</span>
+        </div>
+      </div>
+
+      <!-- Contract draft -->
+      <div class="skill-card" style="--skill-color: #f59e0b">
+        <div class="skill-icon">📝</div>
+        <div class="skill-name">contract-draft-text</div>
+        <div class="skill-title">Договоры (черновики)</div>
+        <div class="skill-desc">Черновики договоров, одобрение/отклонение, статус STS.</div>
+        <div class="skill-commands">
+          <span class="skill-cmd">contract-draft</span>
+          <span class="skill-cmd">approve-contract</span>
+          <span class="skill-cmd">contract-status</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="section">
+    <h2 class="section-title">Почему это круто</h2>
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon green">⚡</div>
+        <div>
+          <h4>Мгновенные ответы</h4>
+          <p>Curl к Supabase REST API — ответ за ~2 секунды. Без открытия браузера, без Telegram WebApp, без ожидания загрузки React.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon blue">🔒</div>
+        <div>
+          <h4>PII маскирование</h4>
+          <p>Телефоны +7XXXXXXXX42, паспорта XXXX…1234, email i…@x.ru. Сервисный ключ Supabase никогда не попадает в вывод.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon purple">🧠</div>
+        <div>
+          <h4>Anti-hallucination</h4>
+          <p>Никаких выдуманных ID, цен, статусов. Все данные — из живой базы. Если чего-то нет, навык так и скажет.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon yellow">🕐</div>
+        <div>
+          <h4>Moscow TZ-safe</h4>
+          <p>Все даты — Europe/Moscow. Между 00:00 и 03:00 не будет «вчерашнего» дня. Сравнения дат корректны.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon orange">🤖</div>
+        <div>
+          <h4>9 Boss-команд</h4>
+          <p>Утренняя сводка, вечерний отчёт, watchdog-алерты (просрочки, QR, застрявшие лиды) — автоматически в Telegram.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon cyan">🔄</div>
+        <div>
+          <h4>Self-enhancement</h4>
+          <p>Ассистент может активировать factory-навыки (Avito, видео-генерация, .docx), создавать новые, вести свои KPI.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EXAMPLE CHAT -->
+  <section class="section" id="example">
+    <h2 class="section-title">Пример диалога</h2>
+    <p class="section-subtitle">Утренний standup — 3 параллельных запроса, один синтезированный ответ.</p>
+
+    <div class="chat-example">
+      <div class="chat-msg">
+        <div class="chat-label user">👤 Оператор:</div>
+        <div class="chat-content user">Что у меня сегодня горит?</div>
+      </div>
+      <div class="chat-msg">
+        <div class="chat-label bot">🤖 Ассистент:</div>
+        <div class="chat-content bot">🔥 Утренняя сводка — 2026-07-24, 09:00 МСК
+
+📍 Горячие лиды (3):
+• Рудометов Михаил — срочность 95 — telegram_bot — 2026-07-23
+• Алимов Станислав — срочность 90 — telegram_bot — 2026-07-23
+• Киргинцев Михаил — срочность 90 — telegram_bot — 2026-07-11
+
+📍 Возвраты сегодня (2):
+• falcon-pro-2025 → клиент 35628267… — до 18:00 — 7000 ₽
+• yamaha-r7 → клиент 73638759… — до 20:00 — 45000 ₽
+
+📍 Просроченные аренды (5):
+• falcon-pro-2025 → клиент 35628267… — просрочен с 2026-07-11
+• suzuki-gsx-s1000f → клиент 66290069… — просрочен с 2026-07-12
+• bmw-f800r → клиент 68758081… — просрочен с 2026-07-13
+...
+
+📍 Задачи с просрочкой (10):
+• 🟡 Подтвердить начальный одометр — срок 2026-06-18
+• 🟡 Подтвердить даты аренды — срок 2026-06-18
+...
+
+🌐 Открыть дашборд: https://vip-bike.ru/franchize/vip-bike/rentals-analytics?ui=v2
+
+Что дальше?
+1. Позвонить Рудометову (лид + возврат сегодня)
+2. Отправить QR Алимову (ожидает 17ч)
+3. Проверить Falcon PRO — просрочен 2д</div>
+      </div>
+      <div class="chat-msg">
+        <div class="chat-label user">👤 Оператор:</div>
+        <div class="chat-content user">покажи карточку аренды falcon-pro-2025</div>
+      </div>
+      <div class="chat-msg">
+        <div class="chat-label bot">🤖 Ассистент:</div>
+        <div class="chat-content bot">📋 Карточка аренды — falcon-pro-2025
+
+🏍 Байк: Falcon PRO 2025
+👤 Арендатор: Рудометов Михаил Сергеевич
+📱 Телефон: +7XXXXXXXX67
+📊 Статус: 🟢 Активна
+📅 Период: 20.07 → 25.07
+💰 Стоимость: 7 000 ₽
+
+📄 Документы: 3/5 ✅
+  ✓ Паспорт (основная)
+  ✓ Паспорт (регистрация)
+  ✓ Вод. удостоверение (лицо)
+  ✗ Паспорт (оборот) — запросить
+  ✗ Вод. удостоверение (оборот) — запросить
+
+📱 QR: ✅ Принят (2026-07-20 14:32)
+🔧 Handoff: ✅ Передан (одометр: 1234 → 1567)
+📝 Задачи: 3 (1 просрочена)
+
+🌐 https://vip-bike.ru/franchize/vip-bike/rental/falcon-pro-2025</div>
+      </div>
+      <div class="chat-msg">
+        <div class="chat-label user">👤 Оператор:</div>
+        <div class="chat-content user">закрой лид Киргинцева, причина: недоступен</div>
+      </div>
+      <div class="chat-msg">
+        <div class="chat-label bot">🤖 Ассистент:</div>
+        <div class="chat-content bot">✅ Лид закрыт
+
+• Лид: Киргинцев Михаил Александрович
+• Причина: unreachable (недоступен)
+• Stage: dismissed
+• Время: 2026-07-24 09:01 МСК
+
+Лид убран из воронки. KPI конверсии обновлены.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOSS COMMANDS -->
+  <section class="section">
+    <h2 class="section-title">Boss-команды (автоматические)</h2>
+    <p class="section-subtitle">9 скриптов, которые бегут по расписанию и шлют уведомления в Telegram.</p>
+
+    <div class="skills-grid">
+      <div class="skill-card" style="--skill-color: #22c55e">
+        <div class="skill-icon">🌅</div>
+        <div class="skill-name">morning-standup</div>
+        <div class="skill-title">Утренняя сводка</div>
+        <div class="skill-desc">09:00 — горячие лиды + возвраты + просроченные + задачи. Каждый день.</div>
+      </div>
+      <div class="skill-card" style="--skill-color: #3b82f6">
+        <div class="skill-icon">📊</div>
+        <div class="skill-name">evening-summary</div>
+        <div class="skill-title">Итоги дня</div>
+        <div class="skill-desc">21:00 — KPI по арендам/продажам/сервису + общая выручка.</div>
+      </div>
+      <div class="skill-card" style="--skill-color: #ef4444">
+        <div class="skill-icon">🔴</div>
+        <div class="skill-name">overdue-alert</div>
+        <div class="skill-title">Алерты просрочек</div>
+        <div class="skill-desc">Каждые 2ч — просроченные аренды с severity-эмодзи. Молчит, если пусто.</div>
+      </div>
+      <div class="skill-card" style="--skill-color: #8b5cf6">
+        <div class="skill-icon">📋</div>
+        <div class="skill-name">supaplan-runner</div>
+        <div class="skill-title">SupaPlan задачи</div>
+        <div class="skill-desc">Каждые 30мин — берёт следующую задачу из очереди, Clifford'ит, уведомляет.</div>
+      </div>
+      <div class="skill-card" style="--skill-color: #f59e0b">
+        <div class="skill-icon">📉</div>
+        <div class="skill-name">revenue-anomaly</div>
+        <div class="skill-title">Аномалия выручки</div>
+        <div class="skill-desc">Каждые 2ч — сравнение с 7-дневным средним. Алерт, если ниже на 40%+.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section">
+    <div class="cta">
+      <h2>Готовы попробовать?</h2>
+      <p>Ассистент уже работает. Откройте чат и спросите: «что у меня сегодня горит?»</p>
+      <div class="hero-cta">
+        <a href="https://vip-bike.ru/franchize/vip-bike/rentals-analytics?ui=v2" class="btn btn-primary">Открыть дашборд →</a>
+        <a href="https://github.com/salavey13/carTest/tree/main/skills" class="btn btn-secondary">Все навыки на GitHub</a>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  VIP Bike Electro · Ассистент обновлён 2026-07-24 · 15 навыков · 9 boss-команд · 0 выдуманных данных<br>
+  <a href="https://github.com/salavey13/carTest">salavey13/carTest</a> · Powered by Supabase + curl + bash
+</div>
+
+</body>
+</html>
