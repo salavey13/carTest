@@ -2,6 +2,9 @@
 //
 // Page entry for the rentals analytics dashboard. v2 is the default UI.
 // v1 accessible via ?ui=v1 query param or localStorage.analytics_ui_v2 = "false".
+//
+// This is a Server Component. It does NOT contain any "use client" code inline.
+// The client-side theme resolution + UI switch lives in UiSwitchWithTheme.tsx.
 
 import type { Metadata } from "next";
 
@@ -10,10 +13,7 @@ import { FranchizePageShell } from "@/app/franchize/components/FranchizePageShel
 import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
-import { RentalsAnalyticsClient } from "./RentalsAnalyticsClient";
-import { AnalyticsClientV2 } from "./AnalyticsClientV2";
-import { AnalyticsUiSwitch } from "./AnalyticsUiSwitch";
-import { useTheme, type ThemeTokens } from "./hooks/useTheme";
+import { UiSwitchWithTheme } from "./UiSwitchWithTheme";
 
 interface FranchizeSlugRentalsAnalyticsPageProps {
   params: Promise<{ slug: string }>;
@@ -32,56 +32,6 @@ export async function generateMetadata({
       "Ежедневная статистика аренд с детальной информацией по каждому заказу и документам.",
     pathSuffix: "/rentals-analytics",
   });
-}
-
-// Wrapper to build theme tokens on the client side (AnalyticsUiSwitch needs them).
-// This is a client component that reads the crew theme + builds T via useTheme.
-function UiSwitchWithTheme({
-  forceV2,
-  forceV1,
-  crew,
-  resolvedSlug,
-  selectedDate,
-}: {
-  forceV2: boolean;
-  forceV1: boolean;
-  crew: any;
-  resolvedSlug: string;
-  selectedDate: string;
-}) {
-  "use client";
-  // Resolve theme tokens from crew theme (same logic as AnalyticsClientV2)
-  const isAuto = crew?.theme?.isAuto ?? true;
-  const palette = crew?.theme?.palettes?.dark || crew?.theme?.palette || {};
-  const T: ThemeTokens = useTheme({
-    isAuto,
-    isLightTheme: false,
-    textColor: palette.textPrimary || "#ffffff",
-    bgColor: palette.bgBase || "#0a0a0a",
-    accentColor: palette.accentMain || "#22c55e",
-  });
-
-  return (
-    <AnalyticsUiSwitch
-      forceV2={forceV2}
-      forceV1={forceV1}
-      T={T}
-      v1={
-        <RentalsAnalyticsClient
-          initialSlug={resolvedSlug}
-          initialDate={selectedDate}
-          crew={crew}
-        />
-      }
-      v2={
-        <AnalyticsClientV2
-          initialSlug={resolvedSlug}
-          initialDate={selectedDate}
-          crew={crew}
-        />
-      }
-    />
-  );
 }
 
 export default async function FranchizeSlugRentalsAnalyticsPage({
