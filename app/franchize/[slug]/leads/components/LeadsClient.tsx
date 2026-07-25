@@ -57,6 +57,9 @@ import { LeadDetailContent } from "./LeadDetailContent";
 import { MobileLeadSheet } from "./MobileLeadSheet";
 import { DismissLeadDialog } from "./DismissLeadDialog";
 import { EmptyState } from "./EmptyState";
+import { useAppContext } from "@/contexts/AppContext";
+import { AnalyticsPasswordEntry } from "@/app/franchize/components/AnalyticsPasswordEntry";
+import { AnalyticsLoading } from "@/app/franchize/components/AnalyticsLoading";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -115,6 +118,10 @@ export function LeadsClient({
   isAuto = false,
 }: LeadsClientProps) {
   const router = useRouter();
+  const { dbUser, isLoading: authLoading } = useAppContext();
+  // Password gate — same pattern as RentalsAnalyticsClient.
+  const [passwordAuthOwnerId, setPasswordAuthOwnerId] = useState<string | null>(null);
+  const shouldShowPassword = !authLoading && !dbUser && !passwordAuthOwnerId;
 
   // ── Theme tokens (built inline to avoid pulling useTheme's full API) ──
   const T: ThemeTokens = useMemo(() => {
@@ -690,6 +697,24 @@ export function LeadsClient({
     () => leadsState.find((l) => l.user_id === dismissLeadId) || null,
     [leadsState, dismissLeadId]
   );
+
+  // ── Password gate ──
+  // Must be AFTER all hooks (useState/useEffect/useMemo/useCallback) to satisfy
+  // React rules-of-hooks. Same pattern as RentalsAnalyticsClient.
+  if (authLoading) {
+    const accentMain = isAuto ? "var(--franchize-accent-main)" : accentColor;
+    const bgBase = isAuto ? "var(--franchize-bg-base)" : bgColor;
+    return <AnalyticsLoading accentMain={accentMain} bgBase={bgBase} />;
+  }
+  if (shouldShowPassword) {
+    return (
+      <AnalyticsPasswordEntry
+        crewName={slug}
+        slug={slug}
+        onAuthenticated={(ownerId) => setPasswordAuthOwnerId(ownerId)}
+      />
+    );
+  }
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
