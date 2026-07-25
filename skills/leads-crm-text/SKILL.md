@@ -367,6 +367,37 @@ select=stage,intent_type\
 | `kpis`           | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/leads       |
 | `pipeline-funnel`| https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/leads       |
 
+
+## 🔗 Deep Links (ОБЯЗАТЕЛЬНО используй в ответах)
+
+Каждый ответ, упоминающий лида, ДОЛЖЕН содержать tappable-ссылку для перехода в WebApp.
+
+### Форматы ссылок
+
+| Что показать | Telegram deep link | Web URL |
+|---|---|---|
+| Конкретный лид (откроется drawer) | `https://t.me/oneBikePlsBot/app?startapp=lead_{userId}` | `https://vip-bike.ru/franchize/vip-bike/leads?leadId={userId}` |
+| Горячие лиды (segment) | `https://t.me/oneBikePlsBot/app?startapp=leads_hot` | `https://vip-bike.ru/franchize/vip-bike/leads?segment=hot` |
+| Тёплые лиды | `?startapp=leads_warm` | `?segment=warm` |
+| Клиенты | `?startapp=leads_verified` | `?segment=verified` |
+
+### Хелперы в boss-commands/_lib.sh
+
+```bash
+lead_link "425868767"           # → https://t.me/oneBikePlsBot/app?startapp=lead_425868767
+lead_web_url "425868767"        # → https://vip-bike.ru/franchize/vip-bike/leads?leadId=425868767
+lead_segment_link "hot"         # → ?startapp=leads_hot
+lead_segment_web_url "hot"      # → ?segment=hot
+```
+
+### Правило
+
+В конце каждого ответа с упоминанием лида добавляй:
+```
+📋 Открыть: <deep_link>
+```
+Если упоминаешь несколько лидов — давай ссылку на каждого или на сегмент.
+
 ## Anti-hallucination: флаги, которых НЕ существует
 
 - ~~`--json`~~ — не существует. Skill всегда выводит текстовую таблицу (это и есть смысл skill'а).
