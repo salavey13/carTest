@@ -24,6 +24,10 @@ interface UiSwitchWithThemeProps {
   crew: any;
   resolvedSlug: string;
   selectedDate: string;
+  /** Deep-link params from URL (Phase 2 of startParamRouter PRD) */
+  initialTab?: string;
+  initialRentalId?: string;
+  initialSaleId?: string;
 }
 
 export function UiSwitchWithTheme({
@@ -32,6 +36,9 @@ export function UiSwitchWithTheme({
   crew,
   resolvedSlug,
   selectedDate,
+  initialTab,
+  initialRentalId,
+  initialSaleId,
 }: UiSwitchWithThemeProps) {
   // Resolve theme tokens from crew theme (same logic as AnalyticsClientV2)
   const isAuto = crew?.theme?.isAuto ?? true;
@@ -61,6 +68,9 @@ export function UiSwitchWithTheme({
           initialSlug={resolvedSlug}
           initialDate={selectedDate}
           crew={crew}
+          initialTab={initialTab}
+          initialRentalId={initialRentalId}
+          initialSaleId={initialSaleId}
         />
       }
     />
