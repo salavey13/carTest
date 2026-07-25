@@ -221,6 +221,37 @@ curl -s -X PATCH "$URL/rest/v1/rentals?rental_id=eq.${rentalId}" \
   -d '{"status":"completed","agreed_end_date":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}'
 ```
 
+
+## 🔗 Deep Links (ОБЯЗАТЕЛЬНО используй в ответах)
+
+Каждый ответ, упоминающий продажу/сервис, ДОЛЖЕН содержать tappable-ссылку.
+
+### Форматы ссылок
+
+| Что показать | Telegram deep link | Web URL |
+|---|---|---|
+| Вкладка Продажа | `https://t.me/oneBikePlsBot/app?startapp=analytics_sales` | `https://vip-bike.ru/franchize/vip-bike/rentals-analytics?ui=v2&tab=sales` |
+| Конкр. продажа (drawer) | `?startapp=analytics_sale_{saleId}` | `?ui=v2&tab=sales&saleId={saleId}` |
+| Вкладка Сервис | `?startapp=analytics_services` | `?ui=v2&tab=services` |
+| Конкр. сервис (drawer) | `?startapp=rental_{rentalId}` | `?ui=v2&tab=services&rentalId={rentalId}` |
+| Дашборд (текущая дата) | `?startapp=analytics_rentals` | `?ui=v2` |
+
+### Хелперы в boss-commands/_lib.sh
+
+```bash
+analytics_link "sales"          # → ?startapp=analytics_sales
+analytics_link "services"       # → ?startapp=analytics_services
+rental_link "{rentalId}"        # → ?startapp=rental_{rentalId} (for service rental detail)
+analytics_web_url "sales"       # → web URL with tab=sales
+```
+
+### Правило
+
+В конце каждого ответа добавляй:
+```
+📋 Открыть: <deep_link>
+```
+
 ## Anti-hallucination
 - ~~--json~~, ~~--outFile~~, ~~--crew~~
 - Always check both `vehicle_id LIKE 'vip-bike-svc-%'` AND `vehicle_id IN (cars.type='service')` — some legacy services use one convention, some the other
