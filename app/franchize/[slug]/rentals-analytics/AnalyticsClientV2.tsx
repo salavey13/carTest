@@ -66,6 +66,10 @@ interface AnalyticsClientV2Props {
   initialSlug: string;
   initialDate: string;
   crew: CrewLike;
+  /** Deep-link params from URL (Phase 2 of startParamRouter PRD) */
+  initialTab?: string;
+  initialRentalId?: string;
+  initialSaleId?: string;
 }
 
 // Convert a v1 RentalDashboardItem to the v2 AnalyticsRentalRow shape.
@@ -206,6 +210,9 @@ export function AnalyticsClientV2({
   initialSlug,
   initialDate,
   crew,
+  initialTab,
+  initialRentalId,
+  initialSaleId,
 }: AnalyticsClientV2Props) {
   const { dbUser, isLoading: authLoading } = useAppContext();
 
@@ -377,6 +384,9 @@ export function AnalyticsClientV2({
       mechanicMap={buildMechanicMap(rentals, todos)}
       date={date}
       onDateChange={setDate}
+      initialTab={initialTab}
+      initialRentalId={initialRentalId}
+      initialSaleId={initialSaleId}
     />
   );
 }
