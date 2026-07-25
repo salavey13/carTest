@@ -1126,7 +1126,12 @@ async function createRentalFromDocContract(
   userId: string,
   context: DocFlowContext,
   bike: any,
-  docSha256: string
+  docSha256: string,
+  /** The total_sum from the rental_contract_artifact — if available, used as
+   *  the source of truth for total_cost instead of re-calculating from dates.
+   *  Prevents pricing bugs when dates get garbled between contract generation
+   *  and rental row creation. See: docs/310k_investigation_report.md */
+  docContractTotalSum?: number
 ): Promise<string | null> {
   try {
     logger.info('[/doc] createRentalFromDocContract: starting', {
@@ -1175,7 +1180,24 @@ async function createRentalFromDocContract(
     const start = new Date(startDateIso);
     const end = new Date(endDateIso);
     const hours = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10;
-    const days = Math.max(1, Math.ceil(hours / 24));
+    
+    // Validate date range — if end is before start, the dates are inverted.
+    // This happened in production (rental 94b5b41d: requested_start=2026-08-07
+    // but agreed_start=2026-07-08 — DD.MM got swapped to MM.DD somewhere).
+    // Without this check, negative hours → tierResult.price=0 → fallback
+    // baseDailyPrice * max(1, ceil(negative/24)) = baseDailyPrice * 1.
+    // But with some date combinations the calculator can produce wild values
+    // (e.g. 310,000 ₽ for a 1-day rental because it computed 31 days).
+    if (hours <= 0) {
+      logger.error('[/doc] INVALID DATE RANGE: end before start', {
+        startDateIso, endDateIso, hours,
+        rentStartDate: context.rentStartDate,
+        rentEndDate: context.rentEndDate,
+      });
+      // Use 1 day as fallback to avoid wild price calculations
+      // The operator should correct the dates manually
+    }
+    const days = Math.max(1, Math.ceil(Math.abs(hours) / 24));
 
     // Use tier-aware pricing calculator (handles 3h/6h/12h tiers, weekday/weekend, multi-day)
     const specsForPricing = {
@@ -1193,7 +1215,30 @@ async function createRentalFromDocContract(
     };
     const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateIso);
     const dailyPrice = tierResult.rate > 0 ? tierResult.rate : baseDailyPrice;
-    const totalCost = tierResult.price > 0 ? tierResult.price : baseDailyPrice * days;
+    
+    // SOURCE OF TRUTH: If the contract artifact already has a total_sum,
+    // use it instead of re-calculating. The contract was generated with
+    // correct dates + pricing — re-calculating from potentially garbled
+    // dates can produce wildly wrong values (e.g. 310,000 ₽ instead of
+    // 10,000 ₽ when DD.MM dates get swapped to MM.DD).
+    // See investigation: docs/310k_investigation_report.md
+    const contractTotalSum = docContractTotalSum ?? null;
+    const calculatedCost = tierResult.price > 0 ? tierResult.price : baseDailyPrice * days;
+    const totalCost = contractTotalSum && contractTotalSum > 0
+      ? contractTotalSum  // Trust the contract
+      : calculatedCost;   // Fallback to calculation
+    
+    if (contractTotalSum && contractTotalSum !== calculatedCost) {
+      logger.warn('[/doc] Price mismatch: contract vs calculated', {
+        contractTotalSum,
+        calculatedCost,
+        hours,
+        days,
+        dailyPrice,
+        startDateIso,
+        endDateIso,
+      });
+    }
 
     logger.info('[/doc] createRentalFromDocContract: pricing', {
       dailyPrice,
