@@ -289,6 +289,34 @@ assignee:users!crew_todos_assigned_to_fkey(user_id,full_name,username)\
 | `rental-contract`  | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/rental/<rentalId>                          |
 | `rental-todos`     | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/rental/<rentalId>                          |
 
+
+## 🔗 Deep Links (ОБЯЗАТЕЛЬНО используй в ответах)
+
+Каждый ответ с карточкой аренды ДОЛЖЕН содержать tappable-ссылку.
+
+### Форматы ссылок
+
+| Что показать | Telegram deep link | Web URL |
+|---|---|---|
+| Карточка аренды (analytics drawer) | `https://t.me/oneBikePlsBot/app?startapp=rental_{rentalId}` | `https://vip-bike.ru/franchize/vip-bike/rentals-analytics?ui=v2&rentalId={rentalId}` |
+| Аренда во вкладке Аренда | `?startapp=analytics_rental_{rentalId}` | `?ui=v2&tab=rentals&rentalId={rentalId}` |
+| Дашборд аналитики | `?startapp=analytics_rentals` | `?ui=v2` |
+
+### Хелперы в boss-commands/_lib.sh
+
+```bash
+rental_link "94b5b41d-..."      # → ?startapp=rental_94b5b41d-...
+rental_web_url "94b5b41d-..."   # → ?ui=v2&rentalId=94b5b41d-...
+```
+
+### Правило
+
+В конце каждого ответа с карточкой аренды добавляй:
+```
+📋 Открыть: <deep_link>
+🌐 Веб: <web_url>
+```
+
 ## Anti-hallucination: флаги, которых НЕ существует
 
 - ~~`--json`~~ — не существует. Только текст.
