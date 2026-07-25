@@ -320,6 +320,64 @@ curl -s "https://raw.githubusercontent.com/salavey13/carTest/refs/heads/main/<pa
 # Push via GitHub API
 ```
 
+
+## 🔗 Deep Links (ОБЯЗАТЕЛЬНО используй в ответах и уведомлениях)
+
+Все навыки теперь поддерживают deep links — tappable-ссылки, которые открывают WebApp на нужном экране.
+Каждый ответ, упоминающий конкретного лида/аренду/продажу/аналитику, ДОЛЖЕН содержать deep link.
+
+### Полная таблица ссылок
+
+| Что показать | Telegram deep link | Web URL |
+|---|---|---|
+| Лид (drawer) | `?startapp=lead_{userId}` | `/leads?leadId={userId}` |
+| Сегмент лидов | `?startapp=leads_hot` | `/leads?segment=hot` |
+| Аренда (drawer) | `?startapp=rental_{rentalId}` | `/rentals-analytics?ui=v2&rentalId={rentalId}` |
+| Вкладка Аренда | `?startapp=analytics_rentals` | `/rentals-analytics?ui=v2&tab=rentals` |
+| Вкладка + дата | `?startapp=analytics_rentals_2026-07-24` | `/rentals-analytics?ui=v2&tab=rentals&date=2026-07-24` |
+| Конкр. аренда во вкладке | `?startapp=analytics_rental_{rentalId}` | `/rentals-analytics?ui=v2&tab=rentals&rentalId={rentalId}` |
+| Вкладка Продажа | `?startapp=analytics_sales` | `/rentals-analytics?ui=v2&tab=sales` |
+| Конкр. продажа | `?startapp=analytics_sale_{saleId}` | `/rentals-analytics?ui=v2&tab=sales&saleId={saleId}` |
+| Вкладка Сервис | `?startapp=analytics_services` | `/rentals-analytics?ui=v2&tab=services` |
+
+Базовый URL для Telegram: `https://t.me/oneBikePlsBot/app`
+Базовый URL для Web: `https://vip-bike.ru/franchize/vip-bike`
+
+### Хелперы в boss-commands/_lib.sh
+
+```bash
+lead_link "425868767"               # → ?startapp=lead_425868767
+lead_segment_link "hot"             # → ?startapp=leads_hot
+rental_link "94b5b41d-..."          # → ?startapp=rental_94b5b41d-...
+analytics_link "rentals"            # → ?startapp=analytics_rentals
+analytics_link "rentals" "2026-07-24"  # → ?startapp=analytics_rentals_2026-07-24
+analytics_link "sales"              # → ?startapp=analytics_sales
+analytics_link "services"           # → ?startapp=analytics_services
+# Web URL variants:
+lead_web_url "425868767"            # → /leads?leadId=425868767
+rental_web_url "94b5b41d-..."       # → /rentals-analytics?ui=v2&rentalId=...
+analytics_web_url "rentals" "2026-07-24"
+```
+
+### Правила использования
+
+1. **ВСЕГДА** добавляй deep link в конце ответа, упоминающего конкретную сущность
+2. Если упоминаешь несколько — давай ссылку на каждого или на фильтр/сегмент
+3. В boss-командах (уведомлениях) — добавляй ссылки в секцию "Что дальше?"
+4. Используй Telegram deep links (`t.me/oneBikePlsBot/app?startapp=...`) для Telegram-контекста
+5. Используй Web URLs (`vip-bike.ru/franchize/...`) для email/браузера/не-Telegram контекста
+6. Формат в ответе: `📋 Открыть: <link>` или `🌐 Веб: <link>`
+
+### Пример
+
+```
+🔥 Рудометов Михаил — urgency 95 — QR не принят 17ч
+🏍 Ducati Panigale S Electro
+
+📋 Открыть: https://t.me/oneBikePlsBot/app?startapp=lead_425868767
+📊 Дашборд: https://t.me/oneBikePlsBot/app?startapp=analytics_rentals_2026-07-24
+```
+
 ## 🚫 Anti-hallucination
 
 - НЕ выдумывай rental_id, lead_id, user_id — запрашивай из БД
