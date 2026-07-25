@@ -97,7 +97,10 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
         </div>
       </section>
 
-      {/* ── Review CTA ── Yandex Maps review link */}
+      {/* ── Review CTA ── Yandex Maps review link
+          Only show if crew has reviewsLink set. No more hardcoded fallback
+          to someone else's Yandex Maps link. */}
+      {crew.reviewsLink && (
       <section
         id="review"
         className="mx-auto w-full max-w-7xl scroll-mt-20 px-4 pb-16 pt-6 2xl:max-w-[1600px]"
@@ -160,7 +163,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
             </p>
 
             <a
-              href={crew.reviewsLink || "https://yandex.ru/maps/org/vip_bike_electro/81589395232/reviews/"}
+              href={crew.reviewsLink}
               target="_blank"
               rel="noreferrer noopener"
               className="group relative mt-6 inline-flex items-center justify-center gap-2 overflow-hidden rounded-2xl px-8 py-4 text-sm font-bold uppercase tracking-wide transition-transform hover:-translate-y-0.5 active:scale-95"
@@ -203,6 +206,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
           </div>
         </div>
       </section>
+      )}
       </DisplayModeProvider>
 
       <CrewFooter crew={crew} />
