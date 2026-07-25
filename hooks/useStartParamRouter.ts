@@ -79,6 +79,94 @@ function parseRentDeepLink(param: string): { bikeId: string; docSha256: string |
   return { bikeId, docSha256 };
 }
 
+/**
+ * Parse a lead_ deep-link parameter.
+ *
+ * Formats:
+ *   lead_{userId}           → open leads page with this lead's detail drawer
+ *   leads_{segment}         → open leads page pre-filtered (hot|warm|verified|troubled)
+ *
+ * Returns null if the param doesn't match.
+ */
+function parseLeadDeepLink(param: string): { leadId?: string; segment?: string } | null {
+  // lead_{userId} — specific lead detail
+  if (param.startsWith("lead_") && !param.startsWith("leads_")) {
+    const leadId = param.slice(5).trim();
+    if (!leadId) return null;
+    return { leadId };
+  }
+
+  // leads_{segment} — pre-filtered list
+  if (param.startsWith("leads_")) {
+    const segment = param.slice(6).trim().toLowerCase();
+    const validSegments = ["hot", "warm", "verified", "troubled", "all"];
+    if (segment && validSegments.includes(segment)) {
+      return { segment };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Parse a rental_ deep-link parameter (for analytics page, NOT the rent_ QR link).
+ *
+ * Formats:
+ *   rental_{rentalId}  → open analytics page with this rental's detail drawer
+ *
+ * Returns null if the param doesn't start with "rental_".
+ */
+function parseRentalDetailDeepLink(param: string): { rentalId: string } | null {
+  if (!param.startsWith("rental_")) return null;
+  const rentalId = param.slice(7).trim();
+  if (!rentalId) return null;
+  return { rentalId };
+}
+
+/**
+ * Parse an analytics_ deep-link parameter.
+ *
+ * Formats:
+ *   analytics_{tab}              → open analytics on a specific tab (rentals|sales|services)
+ *   analytics_{tab}_{date}       → open analytics on a specific tab + date
+ *   analytics_rental_{rentalId}  → open analytics rentals tab with rental detail
+ *   analytics_sale_{saleId}      → open analytics sales tab with sale detail
+ *
+ * Returns null if the param doesn't start with "analytics_".
+ */
+function parseAnalyticsDeepLink(param: string): {
+  tab?: string;
+  date?: string;
+  rentalId?: string;
+  saleId?: string;
+} | null {
+  if (!param.startsWith("analytics_")) return null;
+  const rest = param.slice(10); // after "analytics_"
+
+  // analytics_rental_{rentalId}
+  if (rest.startsWith("rental_")) {
+    return { tab: "rentals", rentalId: rest.slice(7) };
+  }
+
+  // analytics_sale_{saleId}
+  if (rest.startsWith("sale_")) {
+    return { tab: "sales", saleId: rest.slice(5) };
+  }
+
+  // analytics_{tab}_{date} — e.g. analytics_rentals_2026-07-24
+  const dateMatch = rest.match(/^(rentals|sales|services)_(\d{4}-\d{2}-\d{2})$/);
+  if (dateMatch) {
+    return { tab: dateMatch[1], date: dateMatch[2] };
+  }
+
+  // analytics_{tab} — e.g. analytics_rentals
+  if (["rentals", "sales", "services"].includes(rest)) {
+    return { tab: rest };
+  }
+
+  return null;
+}
+
 export function useStartParamRouter() {
   const router = useRouter();
   const pathname = usePathname();
@@ -433,6 +521,40 @@ export function useStartParamRouter() {
           }
         } else if (START_PARAM_PAGE_MAP[paramToProcess]) {
           targetPath = START_PARAM_PAGE_MAP[paramToProcess];
+        } else if (paramToProcess.startsWith("lead_") || paramToProcess.startsWith("leads_")) {
+          // ── Lead deep links: lead_{userId} or leads_{segment} ──
+          const parsed = parseLeadDeepLink(paramToProcess);
+          if (parsed) {
+            const crewSlug = userCrewInfo?.slug || "vip-bike";
+            const params = new URLSearchParams();
+            if (parsed.leadId) params.set("leadId", parsed.leadId);
+            if (parsed.segment) params.set("segment", parsed.segment);
+            targetPath = `/franchize/${crewSlug}/leads${params.toString() ? `?${params.toString()}` : ""}`;
+            logger.info(`[ClientLayout] Routing to leads: ${targetPath}`);
+          }
+        } else if (paramToProcess.startsWith("rental_")) {
+          // ── Rental detail deep link: rental_{rentalId} ──
+          // (NOT "rent_" which is the QR claim link handled above)
+          const parsed = parseRentalDetailDeepLink(paramToProcess);
+          if (parsed) {
+            const crewSlug = userCrewInfo?.slug || "vip-bike";
+            targetPath = `/franchize/${crewSlug}/rentals-analytics?ui=v2&rentalId=${parsed.rentalId}`;
+            logger.info(`[ClientLayout] Routing to rental detail: ${targetPath}`);
+          }
+        } else if (paramToProcess.startsWith("analytics_")) {
+          // ── Analytics deep links: analytics_{tab}, analytics_{tab}_{date}, ──
+          // ── analytics_rental_{id}, analytics_sale_{id} ──
+          const parsed = parseAnalyticsDeepLink(paramToProcess);
+          if (parsed) {
+            const crewSlug = userCrewInfo?.slug || "vip-bike";
+            const params = new URLSearchParams({ ui: "v2" });
+            if (parsed.tab) params.set("tab", parsed.tab);
+            if (parsed.date) params.set("date", parsed.date);
+            if (parsed.rentalId) params.set("rentalId", parsed.rentalId);
+            if (parsed.saleId) params.set("saleId", parsed.saleId);
+            targetPath = `/franchize/${crewSlug}/rentals-analytics?${params.toString()}`;
+            logger.info(`[ClientLayout] Routing to analytics: ${targetPath}`);
+          }
         } else if (paramToProcess.startsWith("crew_")) {
           const content = paramToProcess.substring(5);
           if (content.endsWith("_join_crew")) {
