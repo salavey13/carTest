@@ -17,7 +17,7 @@ import { UiSwitchWithTheme } from "./UiSwitchWithTheme";
 
 interface FranchizeSlugRentalsAnalyticsPageProps {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ date?: string; ui?: string }>;
+  searchParams: Promise<{ date?: string; ui?: string; tab?: string; rentalId?: string; saleId?: string }>;
 }
 
 export async function generateMetadata({
@@ -39,7 +39,7 @@ export default async function FranchizeSlugRentalsAnalyticsPage({
   searchParams,
 }: FranchizeSlugRentalsAnalyticsPageProps) {
   const { slug } = await params;
-  const { date: dateParam, ui } = await searchParams;
+  const { date: dateParam, ui, tab: tabParam, rentalId: rentalIdParam, saleId: saleIdParam } = await searchParams;
   const { crew } = await getFranchizeBySlug(slug);
   const resolvedSlug = crew.slug || slug;
   const activePath = `/franchize/${resolvedSlug}/rentals-analytics`;
@@ -69,6 +69,9 @@ export default async function FranchizeSlugRentalsAnalyticsPage({
           crew={crew}
           resolvedSlug={resolvedSlug}
           selectedDate={selectedDate}
+          initialTab={tabParam}
+          initialRentalId={rentalIdParam}
+          initialSaleId={saleIdParam}
         />
       </FranchizePageShell>
     </main>
