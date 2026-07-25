@@ -165,7 +165,12 @@ export function LeadsClient({
   const [activeStageFilter, setActiveStageFilter] = useState<StageKey | null>(null);
   const [filterFlags, setFilterFlags] = useState<FilterFlags>(DEFAULT_FILTER_FLAGS);
   const [viewMode, setViewMode] = useState<"list" | "board">("list");
-  const [activeSegment, setActiveSegment] = useState<string>("all");
+  const [activeSegment, setActiveSegment] = useState<string>(
+    // Phase 3: read ?segment= from URL for deep-link support
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("segment") || "all"
+      : "all"
+  );
   // Source / owner dropdown filters. Previously referenced but never declared,
   // which broke the toolbar (TS2304: Cannot find name 'sourceFilter') AND meant
   // changing the dropdowns had no effect on the list.
