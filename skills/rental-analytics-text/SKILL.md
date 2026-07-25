@@ -279,6 +279,39 @@ For each active rental, compute 4 SLA indicators:
 
 Priority order: `return_overdue` (10) > `until_return` (8) > `docs` (5) > `days_active` (1).
 
+
+## 🔗 Deep Links (ОБЯЗАТЕЛЬНО используй в ответах)
+
+Каждый ответ, упоминающий аренду или аналитику, ДОЛЖЕН содержать tappable-ссылку.
+
+### Форматы ссылок
+
+| Что показать | Telegram deep link | Web URL |
+|---|---|---|
+| Конкретная аренда (откроется drawer) | `https://t.me/oneBikePlsBot/app?startapp=rental_{rentalId}` | `https://vip-bike.ru/franchize/vip-bike/rentals-analytics?ui=v2&rentalId={rentalId}` |
+| Вкладка Аренда | `?startapp=analytics_rentals` | `?ui=v2&tab=rentals` |
+| Вкладка + дата | `?startapp=analytics_rentals_2026-07-24` | `?ui=v2&tab=rentals&date=2026-07-24` |
+| Конкр. аренда во вкладке | `?startapp=analytics_rental_{rentalId}` | `?ui=v2&tab=rentals&rentalId={rentalId}` |
+| Дашборд (текущая дата) | `?startapp=analytics_rentals` | `?ui=v2` |
+
+### Хелперы в boss-commands/_lib.sh
+
+```bash
+rental_link "94b5b41d-..."      # → ?startapp=rental_94b5b41d-...
+rental_web_url "94b5b41d-..."   # → ?ui=v2&rentalId=94b5b41d-...
+analytics_link "rentals"        # → ?startapp=analytics_rentals
+analytics_link "rentals" "2026-07-24"  # → ?startapp=analytics_rentals_2026-07-24
+analytics_web_url "rentals" "2026-07-24"  # → web URL with tab+date
+```
+
+### Правило
+
+В конце каждого ответа с упоминанием аренды/аналитики добавляй:
+```
+📋 Открыть: <deep_link>
+📊 Дашборд: <analytics_link>
+```
+
 ## Anti-hallucination
 - ~~--json~~ — text output only
 - ~~--outFile~~ — stdout only
