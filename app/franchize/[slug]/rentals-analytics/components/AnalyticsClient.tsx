@@ -40,17 +40,17 @@ interface AnalyticsClientProps {
   initialDate: string;
   crew: any;
   T: ThemeTokens;
-  /** Phase 2 data props — currently we accept rentals/sales arrays from parent. */
   rentals?: AnalyticsRentalRow[];
   sales?: AnalyticsSaleRow[];
   loading?: boolean;
   todos?: RentalTodo[];
   mechanicMap?: Record<string, string | null>;
-  /** Controlled date — when provided, AnalyticsClient becomes controlled and
-   *  emits onDateChange instead of managing its own date state. Required for
-   *  the v2 wrapper to refetch on date navigation. */
   date?: string;
   onDateChange?: (next: string) => void;
+  /** Deep-link params from URL (Phase 2 of startParamRouter PRD) */
+  initialTab?: string;
+  initialRentalId?: string;
+  initialSaleId?: string;
 }
 
 export function AnalyticsClient({
@@ -65,6 +65,9 @@ export function AnalyticsClient({
   mechanicMap = {},
   date: controlledDate,
   onDateChange,
+  initialTab,
+  initialRentalId,
+  initialSaleId,
 }: AnalyticsClientProps) {
   const router = useRouter();
   // Date state: controlled (when parent passes `date` + `onDateChange`) or
@@ -76,9 +79,11 @@ export function AnalyticsClient({
     if (onDateChange) onDateChange(next);
     else setInternalDate(next);
   };
-  const [activeTab, setActiveTab] = useState<AnalyticsTab>("rentals");
-  const [selectedRentalId, setSelectedRentalId] = useState<string | null>(null);
-  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>(
+    (["rentals", "sales", "services"].includes(initialTab || "") ? initialTab : "rentals") as AnalyticsTab
+  );
+  const [selectedRentalId, setSelectedRentalId] = useState<string | null>(initialRentalId ?? null);
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(initialSaleId ?? null);
 
   // Switch tab — reset selection SYNCHRONOUSLY (not via useEffect, which
   // would let the wrong drawer render for one frame).
