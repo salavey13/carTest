@@ -174,7 +174,7 @@ curl -s "$URL/rest/v1/rentals?select=metadata&rental_id=eq.${rentalId}" \
 
 # From user_rental_secrets (verified OCR data)
 curl -s "$URL/rest/v1/user_rental_secrets?select=renter_full_name,renter_passport,renter_passport_issue_date,renter_registration,renter_driver_license,renter_phone,renter_email,verification_status,doc_sha256&source_rental_id=eq.${rentalId}" \
-  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Accept-Profile: private"
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Accept-Profile: private" -H "Accept-Profile: private"
 ```
 
 Output: `Docs: 3/5 ✅` (or `2/5 🔴 — missing: passport_back, license_back`).
@@ -186,7 +186,7 @@ Handoff state from `rental_handoffs` table (or `metadata.handoff_*` fields).
 ```bash
 # Primary: rental_handoffs table
 curl -s "$URL/rest/v1/rental_handoffs?select=handoff_at,handoff_by,odometer_before,odometer_after,equipment_checklist,damage_notes&rental_id=eq.${rentalId}&order=handoff_at.desc&limit=1" \
-  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Accept-Profile: private"
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Accept-Profile: private" -H "Accept-Profile: private"
 
 # Fallback: metadata JSONB fields
 curl -s "$URL/rest/v1/rentals?select=metadata&rental_id=eq.${rentalId}" \
