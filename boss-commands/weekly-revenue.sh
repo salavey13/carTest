@@ -36,7 +36,7 @@ SALES_DATA=$(supabase_query "sale_contract_artifacts" \
   "select=id,total_sum,sale_price,created_at&crew_slug=eq.${CREW_SLUG}&created_at=gte.${FROM_UTC}&created_at=lte.${TO_UTC}" \
   "private")
 
-SALE_REVENUE=$(echo "$SALES_DATA" | jq 'map(.total_sum // (.sale_price | tonumber) // 0) | add // 0')
+SALE_REVENUE=$(echo "$SALES_DATA" | jq 'map(.total_sum // ((.sale_price // "0") | gsub(" "; "") | tonumber) // 0) | add // 0')
 SALE_COUNT=$(echo "$SALES_DATA" | jq 'length')
 
 # ─── Services ────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ MESSAGE="📅 <b>Недельный отчёт</b> — ${WEEK_DISPLAY}
 <b>Топ-3 байка по выручке:</b>
 ${TOP_BIKES}
 
-🌐 <a href=\"https://vip-bike.ru/franchize/vip-bike/rentals-analytics?ui=v2\">Открыть дашборд</a>"
+📊 Дашборд: <a href="$(analytics_link "rentals")">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
