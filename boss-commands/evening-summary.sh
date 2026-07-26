@@ -60,8 +60,14 @@ SALE_KPIS=$(echo "$SALES_DATA" | jq -r '
 # ─── Service KPIs ────────────────────────────────────────────────────────────
 SVC_IDS=$(supabase_query "cars" "select=id&crew_id=eq.${CREW_ID}&type=eq.service" | jq -r '[.[].id] | join(",")')
 
-SERVICES_DATA=$(supabase_query "rentals" \
-  "select=rental_id,status,total_cost,created_at&crew_id=eq.${CREW_ID}&vehicle_id=in.(${SVC_IDS})&created_at=gte.${START_UTC}&created_at=lte.${END_UTC}")
+# Guard: if no service vehicles, skip the services query
+if [[ -z "$SVC_IDS" ]]; then
+  log "No service vehicles found — skipping services KPI"
+  SERVICES_DATA='[]'
+else
+  SERVICES_DATA=$(supabase_query "rentals" \
+    "select=rental_id,status,total_cost,created_at&crew_id=eq.${CREW_ID}&vehicle_id=in.(${SVC_IDS})&created_at=gte.${START_UTC}&created_at=lte.${END_UTC}")
+fi
 
 SERVICE_KPIS=$(echo "$SERVICES_DATA" | jq -r '
   {
@@ -108,7 +114,7 @@ ${SERVICE_KPIS}
 ━━━━━━━━━━━━━━━━━━
 <b>Итого выручка за день: ${TOTAL_REVENUE} ₽</b>
 
-🌐 <a href=\"https://vip-bike.ru/franchize/vip-bike/rentals-analytics?ui=v2\">Открыть дашборд</a>"
+📊 Дашборд: <a href="$(analytics_link "rentals" "$TODAY")">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
