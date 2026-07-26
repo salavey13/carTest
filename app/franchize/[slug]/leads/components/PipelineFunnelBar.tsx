@@ -45,7 +45,7 @@ export function PipelineFunnelBar({ stages, activeStage, onStageSelect, T }: Pro
       <div
         // Mobile: horizontal scroll with hidden scrollbar.
         // Desktop: 9-col grid, no overflow.
-        className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2 lg:grid lg:grid-cols-9 lg:gap-0 lg:overflow-visible lg:pb-0"
+        className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-2 snap-x lg:grid lg:grid-cols-9 lg:gap-0 lg:overflow-visible lg:pb-0"
         style={{ scrollbarWidth: "none" }}
       >
         {stages.map((stage, i) => {
@@ -63,7 +63,7 @@ export function PipelineFunnelBar({ stages, activeStage, onStageSelect, T }: Pro
               aria-pressed={active}
               // Mobile: min-w-[80px] so segments stay readable but compact.
               // Desktop: full-width column with no min-width constraint.
-              className="group relative flex min-w-[80px] flex-1 items-center gap-2 rounded-2xl px-3 py-3 text-left transition-colors lg:min-w-0 lg:flex-col lg:items-start lg:gap-1 lg:rounded-none lg:px-3 lg:py-4 lg:first:rounded-l-2xl lg:last:rounded-r-2xl"
+              className="group relative flex min-w-[72px] shrink-0 snap-start flex-1 items-center gap-1.5 rounded-2xl px-2.5 py-2.5 text-left transition-colors lg:min-w-0 lg:shrink lg:flex-col lg:items-start lg:gap-1 lg:rounded-none lg:px-3 lg:py-4 lg:first:rounded-l-2xl lg:last:rounded-r-2xl"
               style={{
                 background: active ? bgActive : bg,
                 border: `1px solid ${active ? stage.color : hexA(stage.color, 0.18)}`,
@@ -74,13 +74,13 @@ export function PipelineFunnelBar({ stages, activeStage, onStageSelect, T }: Pro
               }}
             >
               <div
-                className="text-[11px] font-medium uppercase tracking-wide"
+                className="text-[9px] font-medium uppercase tracking-wide md:text-[11px]"
                 style={{ color: stage.color }}
               >
                 {stage.label}
               </div>
               <div
-                className="text-2xl font-bold tabular-nums"
+                className="text-xl font-bold tabular-nums md:text-2xl"
                 style={{ color: T.text }}
               >
                 {stage.count}
