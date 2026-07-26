@@ -66,7 +66,7 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
       />
 
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-hidden">
           <p
             className="truncate text-sm font-bold md:text-base"
             style={{ color: T.text }}
@@ -131,7 +131,7 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
           )}
         </div>
 
-        <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="flex shrink-0 flex-col items-end gap-1 max-w-[35%]">
           <span
             className="rounded-full px-2 py-0.5 text-[10px] font-medium"
             style={{
