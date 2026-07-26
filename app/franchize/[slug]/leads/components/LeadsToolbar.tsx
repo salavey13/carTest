@@ -65,7 +65,7 @@ const SORT_OPTIONS: Array<{ value: SortModeV2; label: string }> = [
  *   Row 2 (desktop): dropdowns in a row + view toggle + export on the right.
  *
  * All touch targets are ≥44px (min-h-[44px]) for accessibility.
- * Filter pills are horizontally scrollable on mobile (overflow-x-auto with
+ * Filter pills are horizontally scrollable on mobile (overflow-x-auto overscroll-x-contain with
  * hidden scrollbar) so they don't push the layout wider than the viewport.
  */
 export function LeadsToolbar(props: Props) {
@@ -193,7 +193,7 @@ export function LeadsToolbar(props: Props) {
       <div className="flex flex-wrap items-center gap-2">
         {/* Pills row — horizontally scrollable on mobile with hidden scrollbar */}
         <div
-          className="-mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1 lg:mx-0 lg:px-0 lg:overflow-visible lg:pb-0"
+          className="-mx-1 flex max-w-full gap-2 overflow-x-auto overscroll-x-contain px-1 pb-1 lg:mx-0 lg:px-0 lg:overflow-visible lg:pb-0"
           style={{ scrollbarWidth: "none" }}
           aria-label="Быстрые фильтры"
         >
