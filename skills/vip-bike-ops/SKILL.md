@@ -7,6 +7,7 @@ permission:
     "leads-crm-text": "allow"
     "analytics-text": "allow"
     "franchize-catalog-text": "allow"
+    "catalog-adder-text": "allow"
     "rental-card-text": "allow"
     "rental-analytics-text": "allow"
     "sale-analytics-text": "allow"
@@ -44,6 +45,7 @@ permission:
 | сервис, обслуживание, нормо-час, услуги, kpi сервиса, механик, каталог услуг | `service-analytics-text` | services-list, service-kpis, service-detail, service-catalog, service-mechanic, service-assign-mechanic, service-stats, service-activate, service-complete | /rentals-analytics?ui=v2 (Сервис tab) |
 | аналитика, дашборд задач, выручка, статистика экипажа | `analytics-text` | rentals-dashboard, sales-dashboard, todos-dashboard, crew-stats, service-dashboard, commercial-offers, subrent | /rentals-analytics |
 | каталог байков, цена, доступность, какие байки | `franchize-catalog-text` | list-bikes, bike-detail, bike-pricing, check-availability | / |
+| добавить байк, новый байк в каталог, выложи байк, добавить услугу, выставить на продажу, шаблон байка | `catalog-adder-text` | add-bike, add-service, add-sale-item, list-catalog, get-reference | /admin |
 | карточка аренды, детали аренды, документы, QR-claim | `rental-card-text` | rental-card, rental-todos, rental-documents, rental-handoff, activate, complete, update-status, send-message, list-rentals, rental-history | /rental/[id] |
 | экипаж, участники, роли, задачи оператора, смены | `crew-management-text` | crew-info, crew-members, crew-member-detail, crew-stats, crew-todos, crew-todo-stats, update-member-role, crew-shifts | /crew |
 | профиль клиента, история аренд, достижения, документы | `rider-profile-text` | profile, profile-rentals, profile-achievements, profile-activity, profile-documents, profile-secrets | /profile |
