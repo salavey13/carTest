@@ -32,10 +32,31 @@ RETURNS_DATA=$(supabase_query "rentals" \
 RETURNS_COUNT=$(echo "$RETURNS_DATA" | jq 'length')
 
 # Silent if no returns in the window
-if [[ "$RETURNS_COUNT" == "0" ]]; then
+if [[ "$RETURNS_COUNT" == "0" || -z "$RETURNS_COUNT" ]]; then
   log "No returns due in next 3h — staying silent"
   exit 0
 fi
+
+# ─── State-aware dedup ──
+# Only alert about each return once (12h cooldown — covers the 3h window + buffer)
+NEW_RETURNS=$(echo "$RETURNS_DATA" | jq -r '
+  .[] |
+  "RENTAL:\(.rental_id):\(.vehicle_id):\(.user_id[0:8]):\(.agreed_end_date[11:16]):\(.total_cost // 0)"
+' | while IFS=: read -r prefix rid vid uid time cost; do
+  if ! already_alerted "returns" "$rid" 43200; then
+    echo "• $vid → клиент ${uid}… | до $time UTC | ${cost} ₽"
+    record_alert "returns" "$rid"
+  fi
+done)
+
+NEW_COUNT=$(echo "$NEW_RETURNS" | grep -c "^•" || echo 0)
+if [[ "$NEW_COUNT" == "0" ]]; then
+  log "All $RETURNS_COUNT returns already alerted — staying silent"
+  exit 0
+fi
+
+RETURNS_LIST="$NEW_RETURNS"
+RETURNS_COUNT="$NEW_COUNT"
 
 # ─── Format the reminder ─────────────────────────────────────────────────────
 RETURNS_LIST=$(echo "$RETURNS_DATA" | jq -r '
@@ -44,13 +65,14 @@ RETURNS_LIST=$(echo "$RETURNS_DATA" | jq -r '
   ) | join("\n")
 ')
 
+DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
 MESSAGE="⏰ <b>Возвраты в ближайшие 3 часа</b> — ${RETURNS_COUNT} шт.
 
 ${RETURNS_LIST}
 
 🔔 Проверено в ${NOW_DISPLAY} МСК
 
-📊 Дашборд: <a href="$(analytics_link "rentals" "$TODAY")">Открыть</a>"
+📊 Дашборд: <a href="${DASHBOARD_LINK}">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
