@@ -28,10 +28,18 @@ OVERDUE_DATA=$(supabase_query "rentals" \
 OVERDUE_COUNT=$(echo "$OVERDUE_DATA" | jq 'length')
 
 # Silent if no overdue rentals — don't spam the chat
-if [[ "$OVERDUE_COUNT" == "0" ]]; then
+if [[ "$OVERDUE_COUNT" == "0" || -z "$OVERDUE_COUNT" ]]; then
   log "No overdue rentals — staying silent"
   exit 0
 fi
+
+# ─── State-aware dedup (script-level batch cooldown) ──
+# Only fire once per 4h for overdue alerts (cron runs every 2h)
+if already_alerted "overdue_batch" "all" 14400; then
+  log "Overdue alerts already sent in last 4h — staying silent"
+  exit 0
+fi
+record_alert "overdue_batch" "all"
 
 # ─── Format the alert ────────────────────────────────────────────────────────
 OVERDUE_LIST=$(echo "$OVERDUE_DATA" | jq -r '
@@ -49,13 +57,14 @@ else
   SEVERITY="🟠"
 fi
 
+DASHBOARD_LINK="$(analytics_link "rentals")"
 MESSAGE="${SEVERITY} <b>Просроченные аренды</b> — ${OVERDUE_COUNT} шт.
 
 ${OVERDUE_LIST}
 
 🔔 Проверено в ${NOW_DISPLAY} МСК
 
-📊 Дашборд: <a href="$(analytics_link "rentals")">Открыть</a>"
+📊 Дашборд: <a href="${DASHBOARD_LINK}">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
