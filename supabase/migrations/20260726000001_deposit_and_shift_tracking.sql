@@ -35,7 +35,7 @@ ALTER TABLE public.rentals ADD COLUMN IF NOT EXISTS deposit_notes text;
 -- ─── Deposit audit log ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.deposit_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  rental_id text NOT NULL REFERENCES public.rentals(rental_id) ON DELETE CASCADE,
+  rental_id uuid NOT NULL REFERENCES public.rentals(rental_id) ON DELETE CASCADE,
   action text NOT NULL CHECK (action IN ('collected', 'returned', 'adjusted', 'noted')),
   amount numeric,
   method text,
