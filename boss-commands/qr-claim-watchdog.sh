@@ -26,7 +26,7 @@ log "Running qr-claim-watchdog at $NOW_DISPLAY МСК (threshold: 17h)"
 # `user_rental_secrets` (private schema) has columns: id, source_rental_id,
 # renter_full_name, qr_generated_at, qr_claimed_at, chat_id, etc.
 STALE_QRS=$(supabase_query "user_rental_secrets" \
-  "select=id,source_rental_id,renter_full_name,qr_generated_at,chat_id&crew_slug=eq.${CREW_SLUG}&qr_claimed_at=is.null&qr_generated_at=lt.${SEVENTEEN_HOURS_AGO_UTC}&order=qr_generated_at.asc" \
+  "select=id,source_rental_id,renter_full_name,qr_generated_at,chat_id&crew_slug=eq.${CREW_SLUG}&qr_claimed_at=is.null&qr_generated_at=lt.${SEVENTEEN_HOURS_AGO_UTC}&order=qr_generated_at.asc&limit=5" \
   "private")
 
 STALE_COUNT=$(echo "$STALE_QRS" | jq 'length')
@@ -64,7 +64,7 @@ ${STALE_LIST}
 2. Проверить правильность телефона/email
 3. Сгенерировать новый QR если истёк
 
-🌐 <a href=\"https://vip-bike.ru/franchize/vip-bike/leads\">Открыть лиды</a>"
+📊 Дашборд: <a href="$(analytics_link "rentals")">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
