@@ -32,7 +32,7 @@ HOT_LEADS=$(supabase_query "franchize_intents" \
     if length == 0 then "Нет горячих лидов"
     else
       map({
-        name: (.metadata.renterName // .metadata.name // .metadata.full_name // "Без имени"),
+        name: (.metadata.renterName // .metadata.name // .metadata.full_name // .metadata.clientName // .metadata.firstName // .metadata.customer_name // .metadata.renter_name // "Без имени"),
         score: .urgency_score,
         source: (.contact_channel // .source_route // "лид"),
         last_seen: (.last_seen_at // .created_at)
@@ -49,7 +49,7 @@ START_LOCAL="${TODAY}T00:00:00+03:00"
 END_LOCAL="${TODAY}T23:59:59+03:00"
 
 RETURNS_DUE=$(supabase_query "rentals" \
-  "select=rental_id,vehicle_id,user_id,agreed_end_date,total_cost&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=gte.${START_LOCAL}&agreed_end_date=lte.${END_LOCAL}&order=agreed_end_date.asc" \
+  "select=rental_id,vehicle_id,user_id,agreed_end_date,total_cost&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=gte.${START_LOCAL}&agreed_end_date=lte.${END_LOCAL}&order=agreed_end_date.asc&limit=5" \
   | jq -r '
     if length == 0 then "Нет возвратов сегодня"
     else
@@ -63,7 +63,7 @@ RETURNS_COUNT=$(echo "$RETURNS_DUE" | head -1 | grep -q "^Нет" && echo 0 || e
 NOW_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 OVERDUE=$(supabase_query "rentals" \
-  "select=rental_id,vehicle_id,user_id,agreed_end_date,total_cost&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=lt.${NOW_UTC}&order=agreed_end_date.asc" \
+  "select=rental_id,vehicle_id,user_id,agreed_end_date,total_cost&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=lt.${NOW_UTC}&order=agreed_end_date.asc&limit=5" \
   | jq -r '
     if length == 0 then "Нет просроченных аренд"
     else
@@ -71,10 +71,10 @@ OVERDUE=$(supabase_query "rentals" \
     end
   ')
 
-OVERDUE_COUNT=$(echo "$OVERDUE" | head -1 | grep -q "^Нет" && echo 0 || echo "$OVERDUE" | wc -l)
+OVERDUE_COUNT=$(echo "$OVERDUE" | head -1 | grep -q "^Нет" && echo 0 || echo "$OVERDUE" | grep -c . || echo 0)
 
 # ─── 4. Pending todos (not done, with due_date today or earlier) ─────────────
-TODAY_START_UTC="${TODAY}T23:59:59Z"
+TODAY_START_UTC="$(moscow_today_end_utc)"
 PENDING_TODOS=$(supabase_query "crew_todos" \
   "select=id,title,priority,due_date,assigned_to&crew_id=eq.${CREW_ID}&status=neq.done&due_date=lte.${TODAY_START_UTC}&order=due_date.asc&limit=10" \
   | jq -r '
@@ -107,7 +107,7 @@ ${OVERDUE}
 📍 <b>Задачи с просрочкой (${TODOS_COUNT}):</b>
 ${PENDING_TODOS}
 
-🌐 <a href=\"https://vip-bike.ru/franchize/vip-bike/rentals-analytics?ui=v2\">Открыть дашборд</a>"
+📊 Дашборд: <a href="$(analytics_link "rentals" "$TODAY")">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
