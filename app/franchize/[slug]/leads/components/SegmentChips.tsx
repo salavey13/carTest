@@ -36,7 +36,7 @@ export function SegmentChips({ segments, activeSegment, onChange, T }: Props) {
   return (
     <section aria-label="Сегменты" className="-mx-4 px-4 lg:mx-0 lg:px-0">
       <div
-        className="flex gap-2 overflow-x-auto pb-1 lg:flex-wrap lg:overflow-visible lg:pb-0"
+        className="flex min-w-0 gap-2 overflow-x-auto pb-1 lg:flex-wrap lg:overflow-visible lg:pb-0"
         style={{ scrollbarWidth: "none" }}
       >
         {segments.map((seg, i) => {
