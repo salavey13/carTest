@@ -62,6 +62,7 @@ TOP_BIKES=$(echo "$RENTALS_DATA" | jq -r '
 TOTAL_REVENUE=$(( RENTAL_REVENUE + SALE_REVENUE + SERVICE_REVENUE ))
 
 # ─── Compose message ─────────────────────────────────────────────────────────
+DASHBOARD_LINK="$(analytics_link "rentals")"
 MESSAGE="📅 <b>Недельный отчёт</b> — ${WEEK_DISPLAY}
 
 <b>💰 Итого выручка: ${TOTAL_REVENUE} ₽</b>
@@ -74,7 +75,7 @@ MESSAGE="📅 <b>Недельный отчёт</b> — ${WEEK_DISPLAY}
 <b>Топ-3 байка по выручке:</b>
 ${TOP_BIKES}
 
-📊 Дашборд: <a href="$(analytics_link "rentals")">Открыть</a>"
+📊 Дашборд: <a href="${DASHBOARD_LINK}">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
