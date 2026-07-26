@@ -93,6 +93,7 @@ PENDING_TODOS=$(supabase_query "crew_todos" \
 TODOS_COUNT=$(echo "$PENDING_TODOS" | head -1 | grep -q "^Нет" && echo 0 || echo "$PENDING_TODOS" | wc -l)
 
 # ─── Compose message ─────────────────────────────────────────────────────────
+DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
 MESSAGE="🔥 <b>Утренняя сводка</b> — ${TODAY}, ${NOW_DISPLAY} МСК
 
 📍 <b>Горячие лиды (${HOT_LEADS_COUNT}):</b>
@@ -107,7 +108,7 @@ ${OVERDUE}
 📍 <b>Задачи с просрочкой (${TODOS_COUNT}):</b>
 ${PENDING_TODOS}
 
-📊 Дашборд: <a href="$(analytics_link "rentals" "$TODAY")">Открыть</a>"
+📊 Дашборд: <a href="${DASHBOARD_LINK}">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
