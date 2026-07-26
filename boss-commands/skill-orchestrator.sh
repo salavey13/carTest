@@ -229,7 +229,7 @@ ${by_type}
 ${top_skills}
 
 <b>Производительность:</b>
-• Cache hit rate: ${cache_rate}% (${cache_hits}/${cache_hits}+${cache_misses})
+• Cache hit rate: ${cache_rate}% (${cache_hits}/$((${cache_hits}+${cache_misses})))
 • Telegram отправок: ✅ ${tg_ok} / ❌ ${tg_fail}
 • Ошибок: ${errors}
 
@@ -254,11 +254,18 @@ case "$MODE" in
     report_kpis
     ;;
   --report|*)
-    # Full report (default)
-    list_skills
-    echo
-    echo "---"
-    echo
-    report_kpis
+    # Full report (default) — send to Telegram
+    local full_report
+    full_report=$(list_skills)
+    full_report="${full_report}
+
+---
+$(report_kpis)"
+    
+    if [[ -z "$NOTIFY_SILENT" ]]; then
+      send_telegram "$full_report" "HTML"
+    else
+      echo "$full_report"
+    fi
     ;;
 esac
