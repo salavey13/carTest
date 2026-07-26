@@ -100,6 +100,7 @@ EOF
 )
 
 # ─── Compose message ─────────────────────────────────────────────────────────
+DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
 MESSAGE="📊 <b>Итоги дня</b> — ${TODAY}, ${NOW_DISPLAY} МСК
 
 <b>🏍 Аренды</b>
@@ -114,7 +115,7 @@ ${SERVICE_KPIS}
 ━━━━━━━━━━━━━━━━━━
 <b>Итого выручка за день: ${TOTAL_REVENUE} ₽</b>
 
-📊 Дашборд: <a href="$(analytics_link "rentals" "$TODAY")">Открыть</a>"
+📊 Дашборд: <a href="${DASHBOARD_LINK}">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
