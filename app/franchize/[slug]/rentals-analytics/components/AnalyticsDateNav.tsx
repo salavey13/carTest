@@ -38,7 +38,7 @@ export function AnalyticsDateNav({ date, onChange, T, isToday }: AnalyticsDateNa
         type="button"
         onClick={() => onChange(shiftDateIso(date, -1))}
         aria-label="Предыдущий день"
-        className="rounded-xl p-2.5 transition focus:outline-none focus-visible:ring-2"
+        className="rounded-xl p-2 transition focus:outline-none focus-visible:ring-2 md:p-2.5"
         style={btnBase}
       >
         <ChevronLeft className="h-5 w-5" aria-hidden />
@@ -54,7 +54,7 @@ export function AnalyticsDateNav({ date, onChange, T, isToday }: AnalyticsDateNa
       >
         <Calendar className="h-4 w-4 shrink-0" aria-hidden style={{ color: T.textMuted }} />
         <span
-          className="truncate text-sm font-medium"
+          className="truncate text-xs font-medium md:text-sm"
           style={{ color: T.text }}
         >
           {formatDateLong(date)}
@@ -65,7 +65,7 @@ export function AnalyticsDateNav({ date, onChange, T, isToday }: AnalyticsDateNa
         type="button"
         onClick={() => onChange(shiftDateIso(date, 1))}
         aria-label="Следующий день"
-        className="rounded-xl p-2.5 transition focus:outline-none focus-visible:ring-2"
+        className="rounded-xl p-2 transition focus:outline-none focus-visible:ring-2 md:p-2.5"
         style={btnBase}
       >
         <ChevronRight className="h-5 w-5" aria-hidden />
@@ -76,7 +76,7 @@ export function AnalyticsDateNav({ date, onChange, T, isToday }: AnalyticsDateNa
         onClick={() => onChange(todayLocalIso())}
         disabled={isToday}
         aria-label="Перейти к сегодняшней дате"
-        className="rounded-xl border px-3 py-2.5 text-sm font-medium transition focus:outline-none focus-visible:ring-2 disabled:opacity-50"
+        className="rounded-xl border px-2.5 py-2 text-xs font-medium transition focus:outline-none focus-visible:ring-2 disabled:opacity-50 md:px-3 md:py-2.5 md:text-sm"
         style={{
           borderColor: T.border,
           backgroundColor: isToday ? "transparent" : T.bgCard,
