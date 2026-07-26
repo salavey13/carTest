@@ -32,10 +32,31 @@ STALE_QRS=$(supabase_query "user_rental_secrets" \
 STALE_COUNT=$(echo "$STALE_QRS" | jq 'length')
 
 # Silent if no stale QRs
-if [[ "$STALE_COUNT" == "0" ]]; then
+if [[ "$STALE_COUNT" == "0" || -z "$STALE_COUNT" ]]; then
   log "No stale unclaimed QRs — staying silent"
   exit 0
 fi
+
+# ─── State-aware dedup ──
+# Only alert about each stale QR once per 12h
+NEW_STALE=$(echo "$STALE_QRS" | jq -r '
+  .[] |
+  "QR:\(.source_rental_id):\(.renter_full_name // "Без имени"):\(.qr_generated_at[0:10]):\(.qr_generated_at[11:16])"
+' | while IFS=: read -r prefix rid name date time; do
+  if ! already_alerted "qr_stale" "$rid" 43200; then
+    echo "• $name → аренда ${rid:0:8}… | QR отправлен $date $time"
+    record_alert "qr_stale" "$rid"
+  fi
+done)
+
+NEW_COUNT=$(echo "$NEW_STALE" | grep -c "^•" || echo 0)
+if [[ "$NEW_COUNT" == "0" ]]; then
+  log "All $STALE_COUNT stale QRs already alerted — staying silent"
+  exit 0
+fi
+
+STALE_LIST="$NEW_STALE"
+STALE_COUNT="$NEW_COUNT"
 
 # ─── Format the alert ────────────────────────────────────────────────────────
 STALE_LIST=$(echo "$STALE_QRS" | jq -r '
@@ -53,6 +74,7 @@ else
   SEVERITY="🟠"
 fi
 
+DASHBOARD_LINK="$(analytics_link "rentals")"
 MESSAGE="${SEVERITY} <b>QR не принят > 17 часов</b> — ${STALE_COUNT} шт.
 
 ${STALE_LIST}
@@ -64,7 +86,7 @@ ${STALE_LIST}
 2. Проверить правильность телефона/email
 3. Сгенерировать новый QR если истёк
 
-📊 Дашборд: <a href="$(analytics_link "rentals")">Открыть</a>"
+📊 Дашборд: <a href="${DASHBOARD_LINK}">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
