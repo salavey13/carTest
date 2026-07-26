@@ -55,17 +55,17 @@ export function LeadSLAOverview({ signals, T }: Props) {
   }
 
   return (
-    <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <section className="flex items-stretch gap-1 overflow-x-auto pb-1 md:grid md:grid-cols-4 md:overflow-visible md:gap-1" style={{ scrollbarWidth: "none" }}>
       {top4.map((s, i) => {
         const Icon = SIGNAL_ICONS[s.key] || Clock;
         const color = TONE_COLORS[s.tone] || TONE_COLORS.neutral;
         return (
+          <div key={s.key} className="flex shrink-0 items-stretch md:shrink md:flex-1">
           <motion.div
-            key={s.key}
             initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ type: "spring", damping: 22, stiffness: 260, delay: i * 0.05 }}
-            className="glass-panel flex flex-col items-center gap-2 rounded-2xl p-4 text-center"
+            className="glass-panel relative flex w-full min-w-[100px] flex-col items-center gap-1.5 rounded-2xl p-3 text-center md:min-w-0 md:p-4"
           >
             {/* Circular icon with colored ring */}
             <div
@@ -98,6 +98,23 @@ export function LeadSLAOverview({ signals, T }: Props) {
               </div>
             )}
           </motion.div>
+          {/* Pointy arrow connector — indicates movement through SLA stages */}
+          {i < top4.length - 1 && (
+            <div
+              className="flex shrink-0 items-center px-0.5"
+              aria-hidden
+            >
+              <div
+                className="h-0 w-0"
+                style={{
+                  borderTop: "8px solid transparent",
+                  borderBottom: "8px solid transparent",
+                  borderLeft: `10px solid ${T.border}`,
+                }}
+              />
+            </div>
+          )}
+          </div>
         );
       })}
     </section>
