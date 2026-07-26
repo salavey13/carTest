@@ -279,6 +279,128 @@ format_next_steps() {
   fi
 }
 
+
+# ─── State-aware alert dedup ─────────────────────────────────────────────────
+# Prevents the same alert from firing repeatedly. Uses a simple JSON file.
+ALERTS_STATE_FILE="${ALERTS_STATE_FILE:-/tmp/boss-alerts-state.json}"
+
+# Check if we already alerted about this entity recently
+# Usage: already_alerted "overdue" "rental_abc123" 3600
+# Returns 0 (true) if alerted within the last N seconds, 1 (false) otherwise
+already_alerted() {
+  local alert_type="$1"
+  local entity_id="$2"
+  local cooldown="${3:-3600}"  # default 1h
+  local now
+  now=$(date +%s)
+  local key="${alert_type}:${entity_id}"
+
+  if [[ ! -f "$ALERTS_STATE_FILE" ]]; then
+    return 1  # no state file → not alerted
+  fi
+
+  local last_alerted
+  last_alerted=$(jq -r --arg k "$key" '.[$k] // 0' "$ALERTS_STATE_FILE" 2>/dev/null || echo 0)
+
+  if [[ "$last_alerted" == "null" || "$last_alerted" == "0" ]]; then
+    return 1  # never alerted
+  fi
+
+  local age=$(( now - last_alerted ))
+  if [[ $age -lt $cooldown ]]; then
+    return 0  # still in cooldown → already alerted
+  fi
+  return 1  # cooldown expired → can alert again
+}
+
+# Record that we alerted about this entity
+# Usage: record_alert "overdue" "rental_abc123"
+record_alert() {
+  local alert_type="$1"
+  local entity_id="$2"
+  local key="${alert_type}:${entity_id}"
+  local now
+  now=$(date +%s)
+
+  mkdir -p "$(dirname "$ALERTS_STATE_FILE")"
+
+  # Read existing state or start fresh
+  local state
+  if [[ -f "$ALERTS_STATE_FILE" ]]; then
+    state=$(cat "$ALERTS_STATE_FILE" 2>/dev/null || echo '{}')
+  else
+    state='{}'
+  fi
+
+  # Update + prune entries older than 48h
+  local cutoff=$(( now - 172800 ))  # 48h
+  echo "$state" | jq --arg k "$key" --argjson now "$now" --argjson cutoff "$cutoff" '
+    .[$k] = $now |
+    to_entries | map(select(.value > $cutoff)) | from_entries
+  ' > "${ALERTS_STATE_FILE}.tmp" && mv "${ALERTS_STATE_FILE}.tmp" "$ALERTS_STATE_FILE"
+}
+
+# ─── Moscow time helpers ────────────────────────────────────────────────────
+# Convert ISO timestamp to Moscow HH:MM (for display)
+moscow_hhmm() {
+  local iso="$1"
+  [[ -z "$iso" || "$iso" == "null" ]] && echo "—" && return
+  TZ=Europe/Moscow date -d "$iso" +"%H:%M" 2>/dev/null || echo "—"
+}
+
+# Convert ISO timestamp to Moscow DD.MM.YYYY HH:MM
+moscow_fmt() {
+  local iso="$1"
+  [[ -z "$iso" || "$iso" == "null" ]] && echo "—" && return
+  TZ=Europe/Moscow date -d "$iso" +"%d.%m.%Y %H:%M" 2>/dev/null || echo "—"
+}
+
+# Get today's start/end in UTC (proper Moscow→UTC conversion)
+moscow_today_start_utc() {
+  local today
+  today=$(TZ=Europe/Moscow date +%Y-%m-%d)
+  date -u -d "${today}T00:00:00+03:00" +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+moscow_today_end_utc() {
+  local today
+  today=$(TZ=Europe/Moscow date +%Y-%m-%d)
+  date -u -d "${today}T23:59:59+03:00" +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+# ─── Improved name resolution ────────────────────────────────────────────────
+# Tries every possible name field in metadata, then falls back to phone/user_id
+resolve_lead_name() {
+  local metadata_json="$1"
+  local phone="$2"
+  local tg_id="$3"
+  echo "$metadata_json" | jq -r '
+    def try_name:
+      .renterName // .name // .full_name // .clientName //
+      .firstName // .contact_name // .customer_name //
+      .renter_name // .buyerName //
+      (if .firstName and .lastName then (.firstName + " " + .lastName) else empty end) //
+      null;
+    (try_name // (
+      if .phone and .phone != "" then "Клиент +" + (.phone | .[-2:]) else empty end
+    )) // "Без имени"
+  ' 2>/dev/null || echo "Без имени"
+}
+
+# ─── Inline keyboard support for Telegram ───────────────────────────────────
+# Send a Telegram message with inline keyboard buttons
+# Usage: send_telegram_keyboard "message" '[[{"text":"✅ Решено","callback_data":"ack:rental_abc"},{"text":"👁 Открыть","url":"https://t.me/..."}]]'
+send_telegram_keyboard() {
+  local text="$1"
+  local keyboard="$2"
+  local api_url="https://api.telegram.org/bot${BOT_TOKEN}/sendMessage"
+
+  local payload
+  payload=$(jq -n     --arg chat_id "$ADMIN_CHAT_ID"     --arg text "$text"     --argjson keyboard "$keyboard"     '{chat_id: $chat_id, text: $text, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: {inline_keyboard: $keyboard}}')
+
+  curl -s -X POST "$api_url"     -H "Content-Type: application/json"     -d "$payload" >/dev/null 2>&1 || true
+}
+
 # Export everything so subshells can use it
 export URL KEY CREW_ID CREW_SLUG BOT_TOKEN ADMIN_CHAT_ID BOT_USERNAME WEB_BASE_URL
 export -f moscow_today moscow_now moscow_now_iso
@@ -287,3 +409,5 @@ export -f send_telegram log supabase_query html_escape
 export -f tg_deep_link web_url lead_link lead_web_url lead_segment_link lead_segment_web_url
 export -f rental_link rental_web_url analytics_link analytics_web_url
 export -f truncate_text format_top_n format_next_steps
+export -f already_alerted record_alert moscow_hhmm moscow_fmt moscow_today_start_utc moscow_today_end_utc resolve_lead_name send_telegram_keyboard
+export ALERTS_STATE_FILE
