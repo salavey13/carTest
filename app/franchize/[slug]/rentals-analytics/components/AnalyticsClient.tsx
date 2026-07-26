@@ -214,7 +214,7 @@ export function AnalyticsClient({
       {/* List + Detail (split-pane on desktop, stacked on mobile) */}
       <div className="grid gap-4 lg:grid-cols-12">
         {/* Left: list */}
-        <div className="lg:col-span-5" id={`analytics-panel-${activeTab}`} role="tabpanel" aria-labelledby={`analytics-tab-${activeTab}`}>
+        <div className="min-w-0 lg:col-span-5" id={`analytics-panel-${activeTab}`} role="tabpanel" aria-labelledby={`analytics-tab-${activeTab}`}>
           {loading ? (
             <div
               className="rounded-2xl border p-8 text-center"
@@ -291,7 +291,7 @@ export function AnalyticsClient({
         </div>
 
         {/* Right: detail panel (desktop only, hidden on mobile — sheet takes over) */}
-        <div className="hidden lg:col-span-7 lg:block">
+        <div className="hidden min-w-0 lg:col-span-7 lg:block">
           {drawerOpen && (
             <div
               role="dialog"
