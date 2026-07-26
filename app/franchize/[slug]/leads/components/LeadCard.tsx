@@ -96,7 +96,7 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
         aria-hidden
       />
 
-      <div className="flex gap-3">
+      <div className="flex min-w-0 gap-3">
         {/* Avatar — 40px mobile, 48px desktop */}
         <div
           className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-bold md:h-12 md:w-12 md:text-base"
@@ -135,6 +135,19 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
                     {pending}
                   </span>
                 )}
+                {/* Dismiss button — compact, after name */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDismiss(lead.user_id);
+                  }}
+                  className="ml-auto flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition"
+                  style={{ color: T.textFaint, minHeight: "28px", minWidth: "28px" }}
+                  aria-label="Закрыть лид"
+                >
+                  <MoreVertical className="h-3.5 w-3.5" />
+                </button>
               </div>
               {/* Metadata: 11px mobile / 13px desktop */}
               <div
@@ -216,7 +229,7 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
                 style={{
                   borderColor: `${slaColor}40`,
                   background: `${slaColor}1a`,
-                  minWidth: 140,
+                  minWidth: 0,
                 }}
               >
                 <div
@@ -239,29 +252,9 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
           )}
         </div>
 
-        {/* Chevron + overflow */}
-        <div className="flex shrink-0 flex-col items-end justify-between">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDismiss(lead.user_id);
-            }}
-            className="cursor-pointer rounded-lg p-1.5 transition"
-            style={{ color: T.textFaint }}
-            aria-label="Закрыть лид"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(239,68,68,0.1)";
-              e.currentTarget.style.color = "#ef4444";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = T.textFaint;
-            }}
-          >
-            <MoreVertical className="h-4 w-4" />
-          </button>
-          <ChevronRight className="h-5 w-5" style={{ color: T.accent }} aria-hidden />
+        {/* Chevron only — dismiss moved to title row for better mobile UX */}
+        <div className="flex shrink-0 items-start">
+          <ChevronRight className="mt-1 h-5 w-5" style={{ color: T.accent }} aria-hidden />
         </div>
       </div>
     </motion.article>
