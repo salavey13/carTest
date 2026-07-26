@@ -137,7 +137,7 @@ MESSAGE="📋 <b>SupaPlan задача взята (force mode)</b> — ${NOW_DIS
 ${NOTIFICATION_INTRO}
 
 <b>Описание:</b>
-<pre>${TASK_BODY_SHORT}</pre>
+<pre>$(html_escape "${TASK_BODY_SHORT}")</pre>
 
 🆔 Task ID: <code>${CLAIM_ID}</code>
 📦 Capability: <code>${CAPABILITY}</code>
