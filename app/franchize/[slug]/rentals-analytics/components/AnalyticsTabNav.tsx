@@ -33,7 +33,7 @@ export function AnalyticsTabNav({ activeTab, onChange, T, tabs = DEFAULT_TABS }:
     <div
       role="tablist"
       aria-label="Разделы аналитики"
-      className="flex gap-1 rounded-2xl border p-1"
+      className="flex min-w-0 gap-1 overflow-x-auto rounded-2xl border p-1"
       style={{ borderColor: T.border, backgroundColor: T.bgCard }}
     >
       {tabs.map((tab) => {
