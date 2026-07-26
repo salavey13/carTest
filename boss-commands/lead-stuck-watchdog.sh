@@ -85,6 +85,14 @@ if [[ "$STUCK_LEADS" == "STUCK_NONE" ]]; then
   exit 0
 fi
 
+# ─── State-aware dedup ──
+# Script-level cooldown: only fire once per 12h for the stuck-leads alert type
+if already_alerted "lead_stuck_batch" "all" 43200; then
+  log "Stuck leads already alerted in last 12h — staying silent"
+  exit 0
+fi
+record_alert "lead_stuck_batch" "all"
+
 STUCK_COUNT=$(echo "$STUCK_LEADS" | wc -l)
 
 # Severity
@@ -96,6 +104,7 @@ else
   SEVERITY="🟠"
 fi
 
+LEADS_LINK="$(lead_segment_link "troubled")"
 MESSAGE="${SEVERITY} <b>Застрявшие лиды</b> — ${STUCK_COUNT} шт.
 
 ${STUCK_LEADS}
@@ -107,7 +116,7 @@ ${STUCK_LEADS}
 2. Обновить стадию вручную если прогресс есть
 3. Dismiss если клиент потерян
 
-📋 Лиды: <a href="$(lead_segment_link "troubled")">Открыть проблемные</a>"
+📋 Лиды: <a href="${LEADS_LINK}">Открыть проблемные</a>"
 
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
   echo "$MESSAGE" | sed 's/<[^>]*>//g'
