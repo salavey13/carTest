@@ -23,7 +23,7 @@ log "Running overdue-alert check at $NOW_DISPLAY МСК"
 
 # ─── Get all active rentals past their agreed_end_date ──────────────────────
 OVERDUE_DATA=$(supabase_query "rentals" \
-  "select=rental_id,vehicle_id,user_id,agreed_end_date,total_cost,created_by_operator_chat_id&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=lt.${NOW_UTC}&order=agreed_end_date.asc")
+  "select=rental_id,vehicle_id,user_id,agreed_end_date,total_cost,created_by_operator_chat_id&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=lt.${NOW_UTC}&order=agreed_end_date.asc&limit=5")
 
 OVERDUE_COUNT=$(echo "$OVERDUE_DATA" | jq 'length')
 
@@ -55,7 +55,7 @@ ${OVERDUE_LIST}
 
 🔔 Проверено в ${NOW_DISPLAY} МСК
 
-🌐 <a href=\"https://vip-bike.ru/franchize/vip-bike/rentals-analytics?ui=v2\">Открыть дашборд</a>"
+📊 Дашборд: <a href="$(analytics_link "rentals")">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
