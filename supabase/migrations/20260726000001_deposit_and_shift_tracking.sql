@@ -57,7 +57,7 @@ DO $$ BEGIN
         SELECT 1 FROM public.rentals r
         WHERE r.rental_id = deposit_log.rental_id
         AND r.crew_id IN (
-          SELECT crew_id FROM public.crew_members WHERE user_id = auth.uid()
+          SELECT crew_id FROM public.crew_members WHERE user_id = (auth.jwt() ->> 'chat_id')
         )
       )
     );
