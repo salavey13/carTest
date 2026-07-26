@@ -1270,6 +1270,15 @@ async function createRentalFromDocContract(
     }
 
     // Create rentals row
+    // Deposit tracking: record the deposit amount + method from the /doc flow.
+    // The operator chose deposit via buildDepositChoiceKeyboard (cash/STS/custom).
+    // If stsPledgeUsed=true, deposit_method='none' (STS replaces cash deposit).
+    // Otherwise, deposit_method='cash' (default — /doc doesn't support bank transfer yet).
+    const depositAmount = context.stsPledgeUsed
+      ? 0  // STS replaces cash deposit
+      : Number(context.depositOverride || bike.specs?.deposit_rub || 20000);
+    const depositMethod = context.stsPledgeUsed ? 'none' : 'cash';
+
     const rentalInsert = {
       user_id: crewOwnerChatId,
       owner_id: crewOwnerChatId,
@@ -1283,11 +1292,23 @@ async function createRentalFromDocContract(
       status: 'active',
       payment_status: 'fully_paid',
       total_cost: Math.round(totalCost),
+      // Deposit tracking (migration 20260726000001)
+      deposit_amount: depositAmount,
+      deposit_method: depositMethod,
+      deposit_collected_at: new Date().toISOString(),
+      deposit_collected_by: String(userId), // operator who ran /doc
+      deposit_returned: false,
       metadata: {
         source: 'doc_command',
         daily_price: dailyPrice,
         created_by: 'doc-manual',
         doc_sha256: docSha256,
+        deposit: {
+          amount: depositAmount,
+          method: depositMethod,
+          sts_pledge_used: !!context.stsPledgeUsed,
+          override: context.depositOverride || null,
+        },
       },
     };
 
