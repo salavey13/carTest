@@ -66,13 +66,13 @@ STUCK_LEADS=$(echo "$LEADS_DATA" | jq -r '
         urgency: .urgency_score,
         hours_stuck: hours_since(.last_seen_at // .created_at),
         threshold: stuck_threshold(.stage),
-        name: (if .metadata and (.metadata | type) == "object" then (.metadata.renterName // .metadata.name // .metadata.full_name // "Без имени") else "Без имени" end),
+        name: (if .metadata and (.metadata | type) == "object" then (.metadata.renterName // .metadata.name // .metadata.full_name // .metadata.clientName // .metadata.firstName // .metadata.customer_name // .metadata.renter_name // "Без имени") else "Без имени" end),
         reason: stuck_label(.stage)
       }
     | select(.hours_stuck > .threshold and .threshold < 999)
   )
   | sort_by(-.hours_stuck)
-  | .[0:10]
+  | .[0:5]
   | if length == 0 then "STUCK_NONE"
     else
       map("• \(.name) — срочность \(.urgency) — стадия: \(.stage) — \(.reason) (уже \((.hours_stuck | floor))ч)")
@@ -107,7 +107,7 @@ ${STUCK_LEADS}
 2. Обновить стадию вручную если прогресс есть
 3. Dismiss если клиент потерян
 
-🌐 <a href=\"https://vip-bike.ru/franchize/vip-bike/leads\">Открыть лиды</a>"
+📋 Лиды: <a href="$(lead_segment_link "troubled")">Открыть проблемные</a>"
 
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
   echo "$MESSAGE" | sed 's/<[^>]*>//g'
