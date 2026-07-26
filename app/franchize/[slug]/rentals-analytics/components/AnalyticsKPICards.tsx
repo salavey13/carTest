@@ -35,7 +35,7 @@ export function AnalyticsKPICards({ kpis, T }: AnalyticsKPICardsProps) {
 
   return (
     <div
-      className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+      className="grid min-w-0 grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-3"
       role="region"
       aria-label="Ключевые показатели"
     >
@@ -58,7 +58,7 @@ export function AnalyticsKPICards({ kpis, T }: AnalyticsKPICardsProps) {
             {kpi.label}
           </p>
           <p
-            className="mt-1 text-xl font-bold tabular-nums md:text-2xl"
+            className="mt-1 text-lg font-bold tabular-nums md:text-2xl"
             style={{ color: kpi.color }}
           >
             {kpi.value}
