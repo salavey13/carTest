@@ -1334,6 +1334,27 @@ async function createRentalFromDocContract(
     }
 
     logger.info('[/doc] Created rental:', rental.rental_id);
+
+    // ── Log deposit collection to deposit_log (audit trail) ──
+    if (depositAmount > 0) {
+      try {
+        await supabaseAdmin.from('deposit_log').insert({
+          rental_id: rental.rental_id,
+          action: 'collected',
+          amount: depositAmount,
+          method: depositMethod,
+          operator_chat_id: String(userId),
+          notes: context.stsPledgeUsed
+            ? 'STS pledge used (no cash deposit)'
+            : `Cash deposit collected via /doc by operator ${userId}`,
+        });
+        logger.info('[/doc] Deposit logged:', { rental_id: rental.rental_id, amount: depositAmount, method: depositMethod });
+      } catch (depError) {
+        // Non-fatal — don't fail the rental creation just because the audit log failed
+        logger.error('[/doc] Failed to log deposit (non-fatal):', depError);
+      }
+    }
+
     return rental.rental_id;
   } catch (error) {
     logger.error('[/doc] Rental creation exception:', error);
