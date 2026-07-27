@@ -205,6 +205,21 @@ export function LeadsClient({
     // null (reading 'stageKey')` runtime crashes downstream.
     (leads || []).filter((l): l is LeadRow => !!l && typeof l === "object"),
   );
+
+  // Auto-focus a lead from the URL (?leadId=…) — used by startapp deep-link
+  // `lead_<id>` from Telegram notifications / boss commands.
+  // MUST be after leadsState is defined (TDZ — Cannot access before initialization).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const leadId = params.get("leadId");
+    if (!leadId) return;
+    // Only set if the lead is actually in the loaded list — otherwise the
+    // detail pane shows an empty state. Re-runs when leadsState updates.
+    if (leadsState.some((l) => l.user_id === leadId)) {
+      setSelectedId((prev) => (prev === leadId ? prev : leadId));
+    }
+  }, [leadsState]);
   const [todosState, setTodosState] = useState<LeadTodoRow[]>(todos);
 
   const [dismissDialogOpen, setDismissDialogOpen] = useState(false);
