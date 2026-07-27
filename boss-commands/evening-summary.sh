@@ -103,13 +103,13 @@ EOF
 DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
 MESSAGE="📊 <b>Итоги дня</b> — ${TODAY}, ${NOW_DISPLAY} МСК
 
-<b>🏍 Аренды</b>
+<b>🏍 <a href="$(analytics_link "rentals" "$TODAY")">Аренды</a></b>
 ${RENTAL_KPIS}
 
-<b>💰 Продажи</b>
+<b>💰 <a href="$(analytics_link "sales" "$TODAY")">Продажи</a></b>
 ${SALE_KPIS}
 
-<b>🔧 Сервис</b>
+<b>🔧 <a href="$(analytics_link "services" "$TODAY")">Сервис</a></b>
 ${SERVICE_KPIS}
 
 ━━━━━━━━━━━━━━━━━━
