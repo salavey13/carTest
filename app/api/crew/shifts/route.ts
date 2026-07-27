@@ -10,8 +10,49 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 export async function DELETE(request: Request) {
   try {
     const body = await request.json();
-    const { shiftId, slug } = body;
+    const { shiftId, slug, removeMember, userId } = body;
 
+    // ── Member removal mode ──
+    if (removeMember && slug && userId) {
+      // Get crew ID + owner from slug
+      const { data: crew, error: crewError } = await supabaseAdmin
+        .from("crews")
+        .select("id, owner_id")
+        .eq("slug", slug)
+        .single();
+
+      if (crewError || !crew) {
+        return NextResponse.json({ error: "Crew not found" }, { status: 404 });
+      }
+
+      // Can't remove the owner
+      if (userId === crew.owner_id) {
+        return NextResponse.json({ error: "Нельзя удалить владельца экипажа" }, { status: 403 });
+      }
+
+      // Remove the member from crew_members
+      const { error: removeError } = await supabaseAdmin
+        .from("crew_members")
+        .delete()
+        .eq("crew_id", crew.id)
+        .eq("user_id", userId);
+
+      if (removeError) {
+        return NextResponse.json({ error: "Failed to remove member: " + removeError.message }, { status: 500 });
+      }
+
+      // Also end any active shift
+      await supabaseAdmin
+        .from("crew_member_shifts")
+        .update({ clock_out_time: new Date().toISOString() })
+        .eq("crew_id", crew.id)
+        .eq("member_id", userId)
+        .is("clock_out_time", null);
+
+      return NextResponse.json({ success: true, removed: true });
+    }
+
+    // ── Shift end mode (original) ──
     if (!shiftId || !slug) {
       return NextResponse.json({ error: "Missing shiftId or slug" }, { status: 400 });
     }
