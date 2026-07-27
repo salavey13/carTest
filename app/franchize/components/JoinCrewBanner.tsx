@@ -105,8 +105,25 @@ export function JoinCrewBanner({ slug }: { slug: string }) {
     // Clean the URL — remove join_crew param
     const url = new URL(window.location.href);
     url.searchParams.delete("join_crew");
-    router.replace(url.pathname + url.search, { scroll: false });
-  }, [router]);
+    // On success — redirect to crew page (not just close the dialog)
+    if (state === "success" && slug) {
+      router.replace(`/franchize/${slug}/crew`);
+    } else if (state === "already_member" && slug) {
+      router.replace(`/franchize/${slug}/crew`);
+    } else {
+      router.replace(url.pathname + url.search, { scroll: false });
+    }
+  }, [router, state, slug]);
+
+  // Auto-redirect on success after 2.5s
+  useEffect(() => {
+    if (state === "success" && slug) {
+      const timer = setTimeout(() => {
+        router.replace(`/franchize/${slug}/crew`);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [state, slug, router]);
 
   if (!isJoinIntent) return null;
 
@@ -179,11 +196,18 @@ export function JoinCrewBanner({ slug }: { slug: string }) {
           <div className="flex flex-col gap-3 mt-4">
             <button
               onClick={handleClose}
-              className="w-full rounded-xl bg-zinc-800 px-6 py-3 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-zinc-700 active:scale-95"
+              className="w-full rounded-xl bg-zinc-800 px-6 py-3 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-zinc-700 active:scale-95 min-h-[44px]"
             >
-              {state === "success" ? "К каталогу" : "Закрыть"}
+              {state === "success" ? "Перейти к экипажу →" : state === "already_member" ? "Перейти к экипажу →" : "Закрыть"}
             </button>
           </div>
+        )}
+
+        {/* Auto-redirect after 2.5s on success */}
+        {state === "success" && (
+          <p className="text-center text-xs text-zinc-500 mt-2">
+            Автоматический переход через 2.5с…
+          </p>
         )}
       </DialogContent>
     </Dialog>
