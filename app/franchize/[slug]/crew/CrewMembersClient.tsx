@@ -149,16 +149,20 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
     };
 
     const handleRemoveMember = async (userId: string, name: string) => {
-        if (!confirm(`Удалить ${name} из экипажа?`)) return;
+        if (!confirm(`Удалить ${name} из экипажа?\n\nУчастник потеряет доступ к экипажу.`)) return;
         try {
-            const res = await fetch(`/api/crew/members?slug=${crewSlug}&userId=${userId}`, {
+            // Use the existing shifts API with a custom action
+            const res = await fetch(`/api/crew/shifts`, {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ slug: crewSlug, removeMember: true, userId }),
             });
             if (res.ok) {
-                window.location.reload();
+                // Optimistic: remove from local state
+                setMembers(prev => prev.filter(m => m.user_id !== userId));
             } else {
-                alert("Не удалось удалить участника");
+                const err = await res.json().catch(() => ({}));
+                alert(err.error || "Не удалось удалить участника");
             }
         } catch (e) {
             alert("Ошибка: " + (e instanceof Error ? e.message : "unknown"));
