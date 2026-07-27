@@ -189,12 +189,12 @@ export function LeadsToolbar(props: Props) {
         </div>
       </div>
 
-      {/* Row 2: horizontally-scrollable filter pills + view toggle + export */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Row 2: horizontally-scrollable filter pills only */}
+      <div className="flex min-w-0 items-center gap-2">
         {/* Pills row — horizontally scrollable on mobile with hidden scrollbar */}
         <div
-          className="-mx-1 flex max-w-full gap-2 overflow-x-auto overscroll-x-contain px-1 pb-1 lg:mx-0 lg:px-0 lg:overflow-visible lg:pb-0"
-          style={{ scrollbarWidth: "none" }}
+          className="-mx-1 flex min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain px-1 pb-1 lg:mx-0 lg:px-0 lg:overflow-visible lg:pb-0"
+          style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
           aria-label="Быстрые фильтры"
         >
           {pills.map((p) => {
@@ -231,9 +231,13 @@ export function LeadsToolbar(props: Props) {
           })}
         </div>
 
-        {/* View mode toggle — 44px touch target */}
+      </div>
+
+      {/* Row 3: view toggle + export — below filters, near the list */}
+      <div className="flex items-center justify-between gap-2">
+        {/* View mode toggle */}
         <div
-          className="ml-auto flex rounded-full border p-1"
+          className="flex rounded-full border p-1"
           style={{ borderColor: T.border }}
           role="group"
           aria-label="Режим отображения"
@@ -266,11 +270,11 @@ export function LeadsToolbar(props: Props) {
           })}
         </div>
 
-        {/* Export — 44px target */}
+        {/* Export */}
         <button
           type="button"
           onClick={onExport}
-          className="inline-flex min-h-[44px] cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium transition"
+          className="inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition"
           style={{ borderColor: T.border, color: T.textMuted }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = T.bgCardHover;
