@@ -44,7 +44,9 @@ NEW_RETURNS=$(echo "$RETURNS_DATA" | jq -r '
   "RENTAL:\(.rental_id):\(.vehicle_id):\(.user_id[0:8]):\(.agreed_end_date[11:16]):\(.total_cost // 0)"
 ' | while IFS=: read -r prefix rid vid uid time cost; do
   if ! already_alerted "returns" "$rid" 43200; then
-    echo "• $vid → клиент ${uid}… | до $time UTC | ${cost} ₽"
+    local rlink
+    rlink=$(rental_link "$rid")
+    echo "• $vid → клиент ${uid}… | до $time UTC | ${cost} ₽\n  📋 <a href=\"${rlink}\">Открыть</a>"
     record_alert "returns" "$rid"
   fi
 done)
