@@ -32,17 +32,31 @@ HOT_LEADS=$(supabase_query "franchize_intents" \
     if length == 0 then "Нет горячих лидов"
     else
       map({
+        id: .id,
         name: (.metadata.renterName // .metadata.name // .metadata.full_name // .metadata.clientName // .metadata.firstName // .metadata.customer_name // .metadata.renter_name // "Без имени"),
         score: .urgency_score,
         source: (.contact_channel // .source_route // "лид"),
         last_seen: (.last_seen_at // .created_at)
       }) |
-      map("• \(.name) — срочность \(.score) — \(.source) — \(.last_seen[0:10])") |
+      map("\(.id)\t\(.name)\t\(.score)\t\(.source)\t\(.last_seen[0:10])") |
       join("\n")
     end
   ')
 
-HOT_LEADS_COUNT=$(echo "$HOT_LEADS" | head -1 | grep -q "^Нет" && echo 0 || echo "$HOT_LEADS" | wc -l)
+# Format hot leads with per-lead deep links
+if echo "$HOT_LEADS" | head -1 | grep -q "^Нет"; then
+  HOT_LEADS_COUNT=0
+else
+  HOT_LEADS_COUNT=$(echo "$HOT_LEADS" | grep -c . || echo 0)
+  FORMATTED=""
+  while IFS=$'\t' read -r lid name score source last_seen; do
+    ll=$(lead_link "$lid")
+    FORMATTED="${FORMATTED}• ${name} — срочность ${score} — ${source} — ${last_seen}
+  📋 <a href=\"${ll}\">Открыть</a>
+"
+  done <<< "$HOT_LEADS"
+  HOT_LEADS="$FORMATTED"
+fi
 
 # ─── 2. Returns due today (Moscow TZ) ───────────────────────────────────────
 START_LOCAL="${TODAY}T00:00:00+03:00"
