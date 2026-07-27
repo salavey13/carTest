@@ -178,6 +178,20 @@ export function LeadsClient({
       ? new URLSearchParams(window.location.search).get("segment") || "all"
       : "all"
   );
+
+  // Auto-focus a lead from the URL (?leadId=…) — used by startapp deep-link
+  // `lead_<id>` from Telegram notifications / boss commands.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const leadId = params.get("leadId");
+    if (!leadId) return;
+    // Only set if the lead is actually in the loaded list — otherwise the
+    // detail pane shows an empty state. Re-runs when leadsState updates.
+    if (leadsState.some((l) => l.user_id === leadId)) {
+      setSelectedId((prev) => (prev === leadId ? prev : leadId));
+    }
+  }, [leadsState]);
   // Source / owner dropdown filters. Previously referenced but never declared,
   // which broke the toolbar (TS2304: Cannot find name 'sourceFilter') AND meant
   // changing the dropdowns had no effect on the list.
