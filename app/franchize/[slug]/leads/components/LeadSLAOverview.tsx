@@ -101,17 +101,16 @@ export function LeadSLAOverview({ signals, T }: Props) {
           {/* Pointy arrow connector — indicates movement through SLA stages */}
           {i < top4.length - 1 && (
             <div
-              className="flex shrink-0 items-center px-0.5"
+              className="flex shrink-0 items-center justify-center px-1"
               aria-hidden
             >
-              <div
-                className="h-0 w-0"
-                style={{
-                  borderTop: "8px solid transparent",
-                  borderBottom: "8px solid transparent",
-                  borderLeft: `10px solid ${T.border}`,
-                }}
-              />
+              <svg
+                width="16" height="24" viewBox="0 0 16 24"
+                fill="none" xmlns="http://www.w3.org/2000/svg"
+                style={{ color: T.textFaint, minWidth: "16px" }}
+              >
+                <path d="M2 4L12 12L2 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </div>
           )}
           </div>
