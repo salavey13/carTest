@@ -12,6 +12,7 @@ import { Users, Crown, Shield, ArrowLeft, UserCog, ChevronUp } from "lucide-reac
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { updateCrewMemberRole } from '../../server-actions/update-crew-member-role';
+import { UserPlus, Trash2 } from 'lucide-react';
 
 type LiveStatus = 'online' | 'riding' | 'offline';
 
@@ -132,20 +133,61 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
         }
     };
 
+    // Invite link generation
+    const inviteUrl = typeof window !== "undefined" && crewSlug
+        ? `https://t.me/oneBikePlsBot/app?startapp=crew_${crewSlug}_join_crew`
+        : "";
+    const shareInviteUrl = typeof window !== "undefined"
+        ? `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent("Присоединяйся к нашему экипажу в VIP Bike!")}`
+        : "";
+
+    const handleShareInvite = () => {
+        if (typeof window === "undefined") return;
+        const tg = (window as any).Telegram?.WebApp;
+        if (tg?.openLink) tg.openLink(shareInviteUrl);
+        else window.open(shareInviteUrl, "_blank");
+    };
+
+    const handleRemoveMember = async (userId: string, name: string) => {
+        if (!confirm(`Удалить ${name} из экипажа?`)) return;
+        try {
+            const res = await fetch(`/api/crew/members?slug=${crewSlug}&userId=${userId}`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+            });
+            if (res.ok) {
+                window.location.reload();
+            } else {
+                alert("Не удалось удалить участника");
+            }
+        } catch (e) {
+            alert("Ошибка: " + (e instanceof Error ? e.message : "unknown"));
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
                 <Link href={`/franchize/${crewSlug}/crew`}>
                     <ArrowLeft className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
                 </Link>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                     <h1 className="text-2xl font-bold uppercase tracking-tight">Состав экипажа</h1>
-                    <p className="text-muted-foreground text-sm">{crew.name}</p>
+                    <p className="text-muted-foreground text-sm truncate">{crew.name}</p>
                 </div>
                 <Badge variant="outline">
                     {onlineCount} / {totalCount} На смене
                 </Badge>
+                {/* Invite button — moved from profile dropdown */}
+                <button
+                    type="button"
+                    onClick={handleShareInvite}
+                    className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 min-h-[44px]"
+                >
+                    <UserPlus className="h-4 w-4" />
+                    Пригласить
+                </button>
             </div>
 
             {/* Members List */}
@@ -238,6 +280,19 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
                                         </div>
                                     )}
                                 </div>
+
+                            {/* Remove member — owner/co_owner only, can't remove other owners */}
+                            {(myCrewRole === 'owner' || myCrewRole === 'co_owner') && member.role !== 'owner' && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveMember(member.user_id, member.username || member.user_id)}
+                                    className="ml-auto inline-flex items-center gap-1 rounded-lg border border-red-500/30 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-red-400 transition-colors hover:bg-red-500/10 min-h-[28px]"
+                                    aria-label="Удалить из экипажа"
+                                >
+                                    <Trash2 className="h-3 w-3" />
+                                    Удалить
+                                </button>
+                            )}
                             </CardContent>
                         </Card>
                     );
