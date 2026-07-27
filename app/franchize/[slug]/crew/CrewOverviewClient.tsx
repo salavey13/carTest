@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAppContext } from '@/contexts/AppContext';
 import Link from "next/link";
-import { Users, Clock, Settings, Calendar } from "lucide-react";
+import { Users, Clock, Settings, Calendar, UserPlus } from "lucide-react";
 
 export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlug: string; initialCrew: any }) {
     const { userCrewMemberships } = useAppContext();
@@ -37,16 +37,33 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold uppercase tracking-tighter">Управление экипажем</h1>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-bold uppercase tracking-tighter md:text-3xl">Управление экипажем</h1>
                     <p className="text-muted-foreground text-sm mt-1">{crew?.name || crewSlug}</p>
                 </div>
-                {isProvider && <Badge className="bg-primary">ПРОВАЙДЕР</Badge>}
+                <div className="flex items-center gap-2">
+                    {isProvider && <Badge className="bg-primary">ПРОВАЙДЕР</Badge>}
+                    {/* Invite button — quick access */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_${crewSlug}_join_crew`;
+                            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent("Присоединяйся к нашему экипажу в VIP Bike!")}`;
+                            const tg = (window as any).Telegram?.WebApp;
+                            if (tg?.openLink) tg.openLink(shareUrl);
+                            else window.open(shareUrl, "_blank");
+                        }}
+                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 min-h-[44px]"
+                    >
+                        <UserPlus className="h-4 w-4" />
+                        Пригласить
+                    </button>
+                </div>
             </div>
 
             {/* Quick Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
                 <Card>
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
@@ -94,7 +111,7 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
             </div>
 
             {/* Management Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
                 <Card className="hover:border-primary transition-colors">
                     <Link href={`/franchize/${crewSlug}/crew/members`}>
                         <CardContent className="p-6">
