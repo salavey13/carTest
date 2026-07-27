@@ -669,14 +669,21 @@ export function LeadsClient({
   }, [leadsState]);
 
   // ── Available owners for the toolbar dropdown ──
-  // Uses ownerName when available, falls back to ownerId. Skips null/empty.
+  // Only show actual crew operators (from originalOperatorChatId / ownerId),
+  // not random renter user_ids that might appear as ownerId on some leads.
+  // Filters to unique operator IDs that appear in the leads data.
   const availableOwners = useMemo(() => {
     const set = new Set<string>();
     for (const l of leadsState) {
-      const name = l.ownerName || l.ownerId;
-      if (name) set.add(name);
+      // ownerId is set when the lead was created by an operator (via /doc)
+      // Only include it if it looks like a Telegram chat ID (numeric, 5-12 digits)
+      const oid = l.ownerId || l.originalOperatorChatId;
+      if (oid && /^\d{5,12}$/.test(oid)) {
+        const name = l.ownerName || oid;
+        set.add(name);
+      }
     }
-    return Array.from(set);
+    return Array.from(set).sort();
   }, [leadsState]);
 
   // ── Whether any filter is currently active (drives EmptyState copy + reset) ──
