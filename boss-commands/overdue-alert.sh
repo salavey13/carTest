@@ -44,9 +44,19 @@ record_alert "overdue_batch" "all"
 # ─── Format the alert ────────────────────────────────────────────────────────
 OVERDUE_LIST=$(echo "$OVERDUE_DATA" | jq -r '
   map(
-    "• \(.vehicle_id) → клиент \(.user_id[0:8])… | просрочен с \(.agreed_end_date[0:10]) \(.agreed_end_date[11:16]) | \(.total_cost // 0) ₽"
+    "\(.rental_id)\t\(.vehicle_id)\t\(.user_id[0:8])\t\(.agreed_end_date[0:10])\t\(.agreed_end_date[11:16])\t\(.total_cost // 0)"
   ) | join("\n")
 ')
+
+# Format with per-rental deep links
+FORMATTED=""
+while IFS=$'\t' read -r rid vid uid date time cost; do
+  rl=$(rental_link "$rid")
+  FORMATTED="${FORMATTED}• ${vid} → клиент ${uid}… | просрочен с ${date} ${time} | ${cost} ₽
+  📋 <a href=\"${rl}\">Открыть</a>
+"
+done <<< "$OVERDUE_LIST"
+OVERDUE_LIST="$FORMATTED"
 
 # Severity emoji
 if [[ "$OVERDUE_COUNT" -ge 5 ]]; then
