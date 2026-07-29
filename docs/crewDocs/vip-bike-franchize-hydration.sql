@@ -64,9 +64,11 @@ set
         -- showCreateButton: when true (default), exposes "Создать франшизу"
         -- / "Оформление экипажа" entries in the crew header profile dropdown.
         -- Set to false on crews that should not advertise franchize creation
-        -- (e.g. read-only demo crews, sandbox tenants). VIP BIKE opts in.
+        -- (e.g. read-only demo crews, sandbox tenants, primary tenants like
+        -- VIP BIKE that don't want their customers creating competing crews
+        -- from inside VIP BIKE's own header).
         'ui', jsonb_build_object(
-          'showCreateButton', true
+          'showCreateButton', false
         ),
         'branding', jsonb_build_object(
           'name', 'VIP BIKE ELECTRO',
