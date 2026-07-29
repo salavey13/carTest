@@ -120,21 +120,39 @@ export async function createCrew({ name, description, logo_url, owner_id, slug, 
     if (!name || !slug) {
       throw new Error("Название и slug экипажа обязательны.");
     }
-    
-    // Check if this is an upgrade request (crew already exists)
+
+    // Check if a crew with this slug already exists.
+    // BUG FIX (was BUG #5 in code review): previously, if a crew with the
+    // requested slug already existed, this action silently UPDATED it,
+    // overwriting its metadata even when the caller was NOT the owner.
+    // That allowed any authenticated user to hijack another crew's metadata
+    // by calling createCrew with the same slug.
+    //
+    // New behavior:
+    //   - If crew exists AND caller is the owner → treat as upgrade (update fields)
+    //   - If crew exists AND caller is NOT the owner → reject with friendly error
+    //   - If crew doesn't exist → proceed with insert (Step 1 below)
     const { data: existingCrew, error: checkError } = await supabaseAdmin
       .from('crews')
-      .select('id, metadata')
+      .select('id, owner_id, metadata')
       .eq('slug', slug)
       .maybeSingle();
 
     if (checkError) throw checkError;
-    
-    // If crew exists, update it instead of creating a new one
+
+    // If crew exists, only allow the owner to "upgrade" it
     if (existingCrew) {
-      // Merge existing metadata with new metadata
+      if (existingCrew.owner_id !== owner_id) {
+        logger.warn(`[createCrew Action] Slug '${slug}' already taken by owner ${existingCrew.owner_id}; rejected request from ${owner_id}`);
+        return {
+          success: false,
+          error: `Slug '${slug}' уже занят другим экипажем. Выберите другой slug.`,
+        };
+      }
+
+      // Caller IS the owner — upgrade existing crew's metadata
       const updatedMetadata = { ...existingCrew.metadata, ...metadata };
-      
+
       const { data, error } = await supabaseAdmin
         .from("crews")
         .update({
@@ -150,11 +168,11 @@ export async function createCrew({ name, description, logo_url, owner_id, slug, 
         .single();
 
       if (error) throw error;
-      
+
       logger.info(`[upgradeCrew Action] Successfully upgraded crew ${slug}`);
       return { success: true, data: data };
     }
-    
+
     // --- Step 1: Create the crew ---
     const { data, error } = await supabaseAdmin
       .from("crews")
