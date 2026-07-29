@@ -29,7 +29,10 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   wb: "/wblanding",
   wb_dashboard: "/wblanding",
   "audit-tool": "/wblanding",
-  create_crew: "/wblanding",
+  // Route create_crew deep link directly to the crew-creation form anchor
+  // so users land on <CrewCreationForm> (which calls createCrew() server action)
+  // instead of having to scroll past the rest of /wblanding to find the form.
+  create_crew: "/wblanding#create-crew-form",
   reports: "/wblanding",
   crews: "/crews",
   "repo-xml": "/repo-xml",
