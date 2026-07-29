@@ -1,3 +1,4 @@
+// /app/franchize/components/CrewHeader.tsx
 "use client";
 
 import Image from "next/image";
@@ -284,6 +285,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                 borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}
                 currentSlug={crew.slug}
                 telegramBotUsername={crew.contacts.telegramBotUsername}
+                crewUi={crew.ui ?? null}
               />
             </CrewButtonErrorBoundary>
             {SHOW_CART && isInTelegramContext && (
