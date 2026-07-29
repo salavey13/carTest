@@ -33,19 +33,27 @@ export const CrewCreationForm = () => {
     e.preventDefault();
     if (!dbUser?.user_id) { toast.error("Войдите в систему!"); return; }
     if (!slug) { toast.error("Slug обязателен"); return; }
-    
+
     setIsSubmitting(true);
     try {
       const result = await createCrew({
         name, slug, description, logo_url: logoUrl, owner_id: dbUser.user_id, hq_location: hqLocation,
       });
-      
+
       if (result.success && result.data) {
         toast.success(`Штаб "${result.data.name}" развернут!`);
         await checkAndUnlockFeatureAchievement(dbUser.user_id, 'wb_crew_created', true);
-        await refreshDbUser(); 
+        await refreshDbUser();
         await notifyAdmin(`🎉 New Crew: ${result.data.name} by ${dbUser.username}`);
         await sendComplexMessage(dbUser.user_id, `🎉 Склад "${result.data.name}" готов.`, []);
+        // After a successful create, send the user straight to the franchize
+        // customization editor for their new crew — this is the natural "next step"
+        // (the crew row now exists, so saveFranchizeConfig will accept edits).
+        const newSlug = result.data.slug || slug;
+        if (typeof window !== "undefined") {
+          // Use window.location for a full navigation so the new crew context loads cleanly.
+          window.location.href = `/franchize/create?slug=${encodeURIComponent(newSlug)}&just_created=1`;
+        }
       } else { throw new Error(result.error || "Error creating crew"); }
     } catch (error) {
       toast.error("Ошибка создания: " + (error as Error).message);
@@ -57,8 +65,8 @@ export const CrewCreationForm = () => {
     if (dbUser?.user_id) {
       checkAndUnlockFeatureAchievement(dbUser.user_id, 'wb_crew_invite_sent', true).catch(() => null);
     }
-    // FIX: Correct link
-    const inviteUrl = `https://t.me/oneBikePlsBot/sklad?startapp=crew_${userCrewInfo.slug}_join_crew`;
+    // FIX: Use /app (Telegram WebApp path) instead of legacy /sklad which 404s in production.
+    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_${userCrewInfo.slug}_join_crew`;
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=Вступай в команду склада ${userCrewInfo.name}!`;
     window.open(shareUrl, "_blank");
   };
