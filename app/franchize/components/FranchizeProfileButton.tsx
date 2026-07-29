@@ -70,9 +70,18 @@ interface FranchizeProfileButtonProps {
   // FIX: Added optional telegramBotUsername prop so the Telegram CTA
   // can be constructed dynamically per-crew instead of hardcoding oneBikePlsBot.
   telegramBotUsername?: string;
+  /**
+   * Optional crew UI feature flags. Currently consumed:
+   *   - showCreateButton?: boolean  (default: true)
+   *       When false, hides the "Создать франшизу" / "Оформление экипажа"
+   *       entries from the profile dropdown. CrewHeader can pass the
+   *       resolved crew.ui object down so this stays reactive to metadata
+   *       changes driven by SQL hydration.
+   */
+  crewUi?: { showCreateButton?: boolean } | null;
 }
 
-export function FranchizeProfileButton({ bgColor, textColor, borderColor, currentSlug, telegramBotUsername }: FranchizeProfileButtonProps) {
+export function FranchizeProfileButton({ bgColor, textColor, borderColor, currentSlug, telegramBotUsername, crewUi }: FranchizeProfileButtonProps) {
   const { dbUser, user, userCrewInfo, isInTelegramContext, tg } = useAppContext();
   const { theme, setTheme } = useTheme();
 
@@ -96,6 +105,33 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   const franchizeAdminHref = `/franchize/${effectiveSlug}/admin`;
   const franchizeDashboardHref = `/franchize/${effectiveSlug}/dashboard`;
   const franchizeProfileHref = `/franchize/${effectiveSlug}/profile`;
+
+  // ── "Create franchise" button visibility & target ──
+  // Visibility is configurable per-crew via metadata.franchize.ui.showCreateButton (default: true).
+  // - When user already owns a crew (userCrewInfo?.slug is set and they're the owner),
+  //   the link goes to the customization editor for their crew: /franchize/create?slug=<their-slug>
+  // - When user has no crew, the link goes to the real create form: /wblanding#create-crew-form
+  //   (which calls createCrew() server action and inserts a new crew row + owner membership).
+  const showCreateFranchiseButton = crewUi?.showCreateButton !== false;
+
+  const createFranchiseHref = useMemo(() => {
+    // If user already owns a crew → customize it
+    if (userCrewInfo?.slug && userCrewInfo?.is_owner) {
+      return `/franchize/create?slug=${encodeURIComponent(userCrewInfo.slug)}`;
+    }
+    // If user is admin of an existing crew and we have its slug → customize it
+    if (effectiveSlug && (isCurrentCrewAdmin || userIsAdmin)) {
+      return `/franchize/create?slug=${encodeURIComponent(effectiveSlug)}`;
+    }
+    // Otherwise → real create flow (inserts new crew row via createCrew())
+    return `/wblanding#create-crew-form`;
+  }, [userCrewInfo, effectiveSlug, isCurrentCrewAdmin, userIsAdmin]);
+
+  const createFranchiseLabel = useMemo(() => {
+    if (userCrewInfo?.slug && userCrewInfo?.is_owner) return "Оформление экипажа";
+    if (effectiveSlug && (isCurrentCrewAdmin || userIsAdmin)) return "Оформление экипажа";
+    return "Создать франшизу";
+  }, [userCrewInfo, effectiveSlug, isCurrentCrewAdmin, userIsAdmin]);
 
   // Construct the Telegram WebApp URL dynamically from crew metadata
   const telegramWebAppUrl = useMemo(() => {
@@ -219,16 +255,20 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
     const label = tmeHref.includes("/app?startapp=") ? "Открыть в TG" : "Написать в TG";
     return (
       <div className="flex items-center gap-2">
-        {/* Create-franchise shortcut — available to ALL visitors, no auth required to view */}
-        <Link
-          href="/franchize/create"
-          aria-label="Создать франшизу"
-          className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-          style={{ backgroundColor: bgColor, color: textColor, borderColor }}
-        >
-          <Sparkles className="h-4 w-4 text-amber-500" />
-          <span className="hidden sm:inline">Создать франшизу</span>
-        </Link>
+        {/* Create-franchise shortcut — available to ALL visitors when enabled per-crew.
+            For non-logged-in users we always go to the real create form
+            (they cannot customize a crew they don't own yet). */}
+        {showCreateFranchiseButton && (
+          <Link
+            href="/wblanding#create-crew-form"
+            aria-label="Создать франшизу"
+            className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            style={{ backgroundColor: bgColor, color: textColor, borderColor }}
+          >
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            <span className="hidden sm:inline">Создать франшизу</span>
+          </Link>
+        )}
         <a
           href={tmeHref}
           target="_blank"
@@ -338,24 +378,34 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             <span className="truncate">{theme === "dark" ? "Светлая тема" : "Темная тема"}</span>
           </DropdownMenuItem>
 
-          {/* Create / edit franchise — available for ALL users (read-only for non-owners, full edit for owners/admins) */}
-          {/* Pass current slug context so crew owners land on their own franchize editor pre-loaded */}
-          <DropdownMenuItem asChild>
-            <Link
-              href={effectiveSlug ? `/franchize/create?slug=${encodeURIComponent(effectiveSlug)}` : "/franchize/create"}
-              className="cursor-pointer flex min-w-0 items-center gap-2 w-full"
-            >
-              <Sparkles className="mr-2 h-4 w-4 shrink-0 text-amber-500" />
-              <span className="truncate">Создать франшизу</span>
-            </Link>
-          </DropdownMenuItem>
+          {/* Create / customize franchise — visible by default, can be disabled per-crew
+              via metadata.franchize.ui.showCreateButton === false.
+              Target URL branches on whether the user already owns a crew:
+                - Owner of existing crew  → /franchize/create?slug=<their-slug>  (customization editor)
+                - Admin of existing crew  → /franchize/create?slug=<their-slug>  (customization editor, may be read-only)
+                - No crew                 → /wblanding#create-crew-form          (real create flow via createCrew())
+          */}
+          {showCreateFranchiseButton && (
+            <DropdownMenuItem asChild>
+              <Link
+                href={createFranchiseHref}
+                className="cursor-pointer flex min-w-0 items-center gap-2 w-full"
+              >
+                <Sparkles className="mr-2 h-4 w-4 shrink-0 text-amber-500" />
+                <span className="truncate">{createFranchiseLabel}</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
 
-          <DropdownMenuItem asChild>
-            <Link href="/franchize/create" className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-              <Palette className="mr-2 h-4 w-4 shrink-0" />
-              <span className="truncate">Оформление экипажа</span>
-            </Link>
-          </DropdownMenuItem>
+          {/* Direct link to the customization editor (always available when a slug context exists) */}
+          {showCreateFranchiseButton && effectiveSlug && (
+            <DropdownMenuItem asChild>
+              <Link href={`/franchize/create?slug=${encodeURIComponent(effectiveSlug)}`} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                <Palette className="mr-2 h-4 w-4 shrink-0" />
+                <span className="truncate">Оформление экипажа</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
 
           {(userIsAdmin || isCurrentCrewAdmin) && effectiveSlug ? (
             <DropdownMenuItem asChild>
