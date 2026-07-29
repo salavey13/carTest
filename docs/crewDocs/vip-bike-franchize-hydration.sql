@@ -60,6 +60,14 @@ set
         'version', '2026-06-13-v4',
         'enabled', true,
         'slug', 'vip-bike',
+        -- UI feature flags consumed by FranchizeProfileButton (and similar).
+        -- showCreateButton: when true (default), exposes "Создать франшизу"
+        -- / "Оформление экипажа" entries in the crew header profile dropdown.
+        -- Set to false on crews that should not advertise franchize creation
+        -- (e.g. read-only demo crews, sandbox tenants). VIP BIKE opts in.
+        'ui', jsonb_build_object(
+          'showCreateButton', true
+        ),
         'branding', jsonb_build_object(
           'name', 'VIP BIKE ELECTRO',
           'shortName', 'VIP_BIKE',
