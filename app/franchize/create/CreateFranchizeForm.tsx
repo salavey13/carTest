@@ -9,8 +9,12 @@ import {
   loadFranchizeConfigBySlug,
   saveFranchizeConfig,
 } from "@/app/franchize/actions";
+// NEW: server action that actually inserts a row into public.crews.
+// Used by the inline "create new crew" step (stage === "create").
+import { createCrew } from "@/app/actions";
+import { toast } from "sonner";
 
-type Stage = "palette" | "content" | "map" | "ai" | "ops";
+type Stage = "create" | "palette" | "content" | "map" | "ai" | "ops";
 
 const TEMPLATE_PAYLOAD = {
   instruction: "Персонализируй этот franchize JSON под владельца и бренд. Сохрани структуру ключей.",
@@ -177,9 +181,95 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
   const [message, setMessage] = useState("Укажите slug, подберите цвета, проверьте локально и сохраните.");
   const [canEdit, setCanEdit] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [stage, setStage] = useState<Stage>("palette");
-  const { dbUser, user } = useAppContext();
+  // ── Initial stage logic ──
+  // - If ?just_created=1 is in URL (we just came from a successful createCrew),
+  //   go straight to "palette" so user can customize their new crew.
+  // - If ?slug= is in URL, go straight to "palette" to load + edit.
+  // - If user has no crew (no initialSlug AND no ?just_created), default to
+  //   "create" stage so they can create their crew first. The "palette" tab
+  //   is still accessible via the tab strip — there's no hard lock.
+  const [stage, setStage] = useState<Stage>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("just_created") === "1") return "palette";
+      if (params.get("slug")) return "palette";
+    }
+    return "create";
+  });
+  const { dbUser, user, userCrewInfo, refreshDbUser } = useAppContext() as {
+    dbUser?: any; user?: any;
+    userCrewInfo?: { slug?: string; is_owner?: boolean } | null;
+    refreshDbUser?: () => Promise<void>;
+  };
   const actorUserId = dbUser?.user_id ?? (user?.id ? String(user.id) : "");
+
+  // ── Inline "create new crew" form state ──
+  // Mirrors the fields in app/wblanding/components/CrewCreationForm.tsx so the
+  // user can create a crew directly from /franchize/create without bouncing
+  // to /wblanding. After createCrew() succeeds we:
+  //   1. refresh dbUser so userCrewInfo updates with the new slug,
+  //   2. setForm({ slug: newSlug }) + onLoad(newSlug) so the customization
+  //      editor loads the freshly-created crew (canEdit becomes true),
+  //   3. switch stage to "palette".
+  const [createName, setCreateName] = useState("");
+  const [createSlug, setCreateSlug] = useState("");
+  const [createDescription, setCreateDescription] = useState("");
+  const [createLogoUrl, setCreateLogoUrl] = useState("");
+  const [createHqLocation, setCreateHqLocation] = useState("56.3269,44.0059");
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Auto-generate slug from name (same algorithm as CrewCreationForm)
+  const generateSlug = (name: string) =>
+    name.toLowerCase().trim().replace(/[\s_]+/g, "-").replace(/[^\w-]+/g, "").replace(/--+/g, "-").replace(/^-+|-+$/g, "");
+
+  useEffect(() => {
+    setCreateSlug(generateSlug(createName));
+  }, [createName]);
+
+  const handleCreateCrew = useCallback(async () => {
+    if (!actorUserId) {
+      toast.error("Войдите в систему, чтобы создать экипаж.");
+      return;
+    }
+    if (!createName.trim() || !createSlug.trim()) {
+      toast.error("Название и slug обязательны.");
+      return;
+    }
+    setIsCreating(true);
+    try {
+      const result = await createCrew({
+        name: createName.trim(),
+        slug: createSlug.trim(),
+        description: createDescription.trim(),
+        logo_url: createLogoUrl.trim(),
+        owner_id: actorUserId,
+        hq_location: createHqLocation.trim(),
+      });
+      if (!result.success || !result.data) {
+        toast.error(result.error || "Ошибка создания экипажа.");
+        return;
+      }
+      toast.success(`Экипаж "${result.data.name}" создан! Теперь настройте оформление.`);
+      // Refresh dbUser so userCrewInfo picks up the new slug
+      if (refreshDbUser) await refreshDbUser();
+      // Load the freshly-created crew into the customization editor
+      setForm((prev) => ({ ...prev, slug: result.data!.slug }));
+      await onLoad(result.data.slug);
+      // Update URL so reloads preserve the just-created state
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.set("slug", result.data.slug);
+        url.searchParams.set("just_created", "1");
+        window.history.replaceState({}, "", url.toString());
+      }
+      setStage("palette");
+    } catch (e) {
+      toast.error("Ошибка создания: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setIsCreating(false);
+    }
+  }, [actorUserId, createName, createSlug, createDescription, createLogoUrl, createHqLocation, onLoad, refreshDbUser]);
+
 
   const initialSlugAppliedRef = useRef(false);
   const loadRequestIdRef = useRef(0);
@@ -401,14 +491,20 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
         <p className="mt-2 text-xs" style={{ color: ui.muted }}>Чужие данные доступны в read-only после загрузки. Сохранять может только owner экипажа или all-admin.</p>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        {[
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+        {([
+          ["create", "Создать экипаж"],
           ["palette", "Фаза 1: Цвета"],
           ["content", "Фаза 2: Контент"],
           ["map", "Фаза 3: Карта"],
           ["ai", "Фаза 4: AI JSON"],
           ["ops", "Пульт запуска"],
-        ].map(([value, label]) => (
+        ] as const).map(([value, label]) => {
+          // Hide "create" tab if user already owns a crew (they don't need it)
+          if (value === "create" && userCrewInfo?.slug && userCrewInfo?.is_owner) {
+            return null;
+          }
+          return (
           <button
             key={value}
             type="button"
@@ -422,8 +518,109 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
           >
             {label}
           </button>
-        ))}
+          );
+        })}
       </div>
+
+      {stage === "create" && (
+        <section
+          id="create-crew-form"
+          className={`${sectionClass} grid gap-4`}
+          style={{ borderColor: ui.accent, backgroundColor: ui.sectionBg }}
+        >
+          <div>
+            <h2 className="text-lg font-medium" style={{ color: ui.text }}>Создать новый экипаж</h2>
+            <p className="mt-1 text-sm" style={{ color: ui.muted }}>
+              Заполните название и slug — экипаж сразу появится в базе, и вы сможете настроить оформление на следующих вкладках.
+            </p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="text-sm" style={{ color: ui.text }}>
+              Название экипажа *
+              <input
+                className={inputClass}
+                style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }}
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                placeholder="VIP BIKE ELECTRO"
+                disabled={isCreating}
+              />
+            </label>
+            <label className="text-sm" style={{ color: ui.text }}>
+              Slug (URL) *
+              <input
+                className={inputClass}
+                style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }}
+                value={createSlug}
+                onChange={(e) => setCreateSlug(e.target.value)}
+                placeholder="vip-bike-electro"
+                disabled={isCreating}
+              />
+            </label>
+          </div>
+
+          <label className="text-sm" style={{ color: ui.text }}>
+            Описание
+            <textarea
+              className={inputClass}
+              style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text, minHeight: "80px" }}
+              value={createDescription}
+              onChange={(e) => setCreateDescription(e.target.value)}
+              placeholder="Прокат электромотоциклов без категории А…"
+              disabled={isCreating}
+            />
+          </label>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="text-sm" style={{ color: ui.text }}>
+              URL логотипа (необязательно)
+              <input
+                className={inputClass}
+                style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }}
+                value={createLogoUrl}
+                onChange={(e) => setCreateLogoUrl(e.target.value)}
+                placeholder="https://…/logo.png"
+                disabled={isCreating}
+              />
+            </label>
+            <label className="text-sm" style={{ color: ui.text }}>
+              Координаты штаба (lat,lng)
+              <input
+                className={inputClass}
+                style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }}
+                value={createHqLocation}
+                onChange={(e) => setCreateHqLocation(e.target.value)}
+                placeholder="56.2954,43.9446"
+                disabled={isCreating}
+              />
+            </label>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleCreateCrew}
+              disabled={isCreating || !actorUserId}
+              className="rounded-xl px-5 py-3 text-sm font-bold transition hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: ui.accent, color: ui.accentText }}
+            >
+              {isCreating ? "Создаём…" : "Создать экипаж"}
+            </button>
+            {!actorUserId && (
+              <p className="text-xs" style={{ color: ui.muted }}>
+                Войдите через Telegram, чтобы создать экипаж.
+              </p>
+            )}
+            {userCrewInfo?.slug && (
+              <p className="text-xs" style={{ color: ui.muted }}>
+                У вас уже есть экипаж <code style={{ color: ui.accent }}>{userCrewInfo.slug}</code> —
+                вы можете настроить его на вкладке «Фаза 1: Цвета».
+              </p>
+            )}
+          </div>
+        </section>
+      )}
 
       <section className={`${sectionClass} grid gap-3 md:grid-cols-2`} style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
         <label className="text-sm">Slug экипажа
