@@ -215,6 +215,14 @@ export interface FranchizeCrewVM {
   contentBlocks: FranchizeContentBlocks;
   reviewsLink?: string;
   cta: CtaBlock;
+  /**
+   * UI feature flags surfaced from metadata.franchize.ui.
+   * Used by FranchizeProfileButton to hide/show per-crew entries.
+   * Defaults are applied when the metadata block is missing.
+   */
+  ui: {
+    showCreateButton: boolean;
+  };
 }
 
 export interface CtaBlock {
@@ -665,6 +673,11 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     buttonLabel: "Записаться",
     buttonHref: "",
   },
+  ui: {
+    // Show "Создать франшизу" by default on empty crews.
+    // Crews that want to hide it set metadata.franchize.ui.showCreateButton=false in SQL.
+    showCreateButton: true,
+  },
 });
 
 export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugResult> {
@@ -943,6 +956,12 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         description: readPath(franchize, ["cta", "description"], ""),
         buttonLabel: readPath(franchize, ["cta", "buttonLabel"], "Записаться"),
         buttonHref: readPath(franchize, ["cta", "buttonHref"], ""),
+      },
+      ui: {
+        // Visibility of the "Создать франшизу" / "Оформление экипажа" entries
+        // in FranchizeProfileButton. Default true; crews can opt out by setting
+        // metadata.franchize.ui.showCreateButton=false (e.g. via SQL hydration).
+        showCreateButton: readPath(franchize, ["ui", "showCreateButton"], true) !== false,
       },
     };
 
