@@ -30,6 +30,8 @@ import type {
 // signature (SortMode, Segment) doesn't fit the v2 types (SortModeV2,
 // FilterFlags). The filter+sort pipeline is reimplemented inline below.
 import { useTodosMapping } from "../hooks/useLeadsData";
+import { useLeadFilters } from "../hooks/useLeadFilters";
+import { useLeadActions } from "../hooks/useLeadActions";
 
 // Lib
 import {
@@ -40,10 +42,10 @@ import {
   STAGE_COLORS,
 } from "../lib/pipeline-stages";
 import { computeLeadSignals, isHotLead } from "../lib/sla-signals";
-import { DISMISS_REASONS } from "../lib/dismiss-reasons";
+// DISMISS_REASONS now in useLeadActions hook
 import { dismissLeadWithReason } from "@/app/franchize/server-actions/leads-dismiss";
-import { getLeadsKpis, type LeadsKpis } from "@/app/franchize/server-actions/leads-kpis";
-import { createLeadNote } from "@/app/franchize/server-actions/lead-notes";
+// getLeadsKpis now in useLeadActions hook
+// createLeadNote now in useLeadActions hook
 
 // Components
 import { LeadsAppShell } from "./LeadsAppShell";
@@ -78,15 +80,7 @@ interface LeadsClientProps {
 // ── Constants ───────────────────────────────────────────────────────────────
 
 /** Intent types grouped by Mode — matches getLeadsKpis server action. */
-const MODE_INTENTS: Record<Mode, string[]> = {
-  rent: [
-    "rent", "test_drive", "test_ride_click", "checkout_start", "prebuy",
-    "trade_in", "finance", "hold_created", "payment_failure", "payment_success",
-    "map_click", "contact_click",
-  ],
-  sale: ["sale"],
-  service: ["service"],
-};
+// MODE_INTENTS moved to useLeadFilters hook
 
 const MODE_TABS: Array<{ value: Mode; label: string; icon: LucideIcon; color: string }> = [
   { value: "rent", label: "Аренда", icon: Bike, color: "#22c55e" },
@@ -94,15 +88,7 @@ const MODE_TABS: Array<{ value: Mode; label: string; icon: LucideIcon; color: st
   { value: "service", label: "Сервис", icon: Wrench, color: "#3b82f6" },
 ];
 
-const DEFAULT_FILTER_FLAGS: FilterFlags = {
-  overdueOnly: false,
-  unclaimedQrOnly: false,
-  documentsMissingOnly: false,
-  activeRentalOnly: false,
-  returnDueOnly: false,
-  dismissedOnly: false,
-  hideOperatorPlaceholders: false,
-};
+// DEFAULT_FILTER_FLAGS moved to useLeadFilters hook
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
@@ -165,549 +151,33 @@ export function LeadsClient({
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [sortMode, setSortMode] = useState<SortModeV2>("recent");
-  const [mode, setMode] = useState<Mode>("rent");
-  const [activeStageFilter, setActiveStageFilter] = useState<StageKey | null>(null);
-  const [filterFlags, setFilterFlags] = useState<FilterFlags>(DEFAULT_FILTER_FLAGS);
-  const [viewMode, setViewMode] = useState<"list" | "board">("list");
-  const [activeSegment, setActiveSegment] = useState<string>(
-    // Phase 3: read ?segment= from URL for deep-link support
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("segment") || "all"
-      : "all"
-  );
-
-  // Source / owner dropdown filters. Previously referenced but never declared,
-  // which broke the toolbar (TS2304: Cannot find name 'sourceFilter') AND meant
-  // changing the dropdowns had no effect on the list.
-  const [sourceFilter, setSourceFilter] = useState<string>("all");
-  const [ownerFilter, setOwnerFilter] = useState<string>("all");
-
-  const [kpis, setKpis] = useState<LeadsKpis | null>(null);
-  const [leadsState, setLeadsState] = useState<LeadRow[]>(
-    // Defensive: filter out null/undefined entries that may slip through if the
-    // server action returns a sparse array. Prevents `Cannot read properties of
-    // null (reading 'stageKey')` runtime crashes downstream.
-    (leads || []).filter((l): l is LeadRow => !!l && typeof l === "object"),
-  );
-
-  // Auto-focus a lead from the URL (?leadId=…) — used by startapp deep-link
-  // `lead_<id>` from Telegram notifications / boss commands.
-  // MUST be after leadsState is defined (TDZ — Cannot access before initialization).
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const leadId = params.get("leadId");
-    if (!leadId) return;
-    // Only set if the lead is actually in the loaded list — otherwise the
-    // detail pane shows an empty state. Re-runs when leadsState updates.
-    if (leadsState.some((l) => l.user_id === leadId)) {
-      setSelectedId((prev) => (prev === leadId ? prev : leadId));
-    }
-  }, [leadsState]);
-  const [todosState, setTodosState] = useState<LeadTodoRow[]>(todos);
-
-  const [dismissDialogOpen, setDismissDialogOpen] = useState(false);
-  const [dismissLeadId, setDismissLeadId] = useState<string | null>(null);
-
-  // ── Writable leads/todos state syncs with prop changes ──
-  // NOTE: leads/todos state is initialized once from props.
-  // Do NOT sync on every prop change — that would clobber optimistic updates.
-  // router.refresh() will cause a re-render with new prop refs, but we preserve
-  // the writable state by only initializing on mount.
-  // If server data changes significantly, the user can pull-to-refresh manually.
-
-  // ── Debounce search ──
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
-
-  // ── Fetch KPIs (server action) when mode changes ──
-  useEffect(() => {
-    let cancelled = false;
-    getLeadsKpis(slug, mode)
-      .then((result) => {
-        if (!cancelled) setKpis(result);
-      })
-      .catch(() => {
-        if (!cancelled) setKpis({ totalLeads: 0, hotLeads: 0, conversionRate: 0, monthlyRevenue: 0 });
-      });
-    return () => { cancelled = true; };
-  }, [slug, mode]);
-
-  // ── Todo mapping hook ──
-  const { getTodosForLead } = useTodosMapping(todosState);
-
-  // ── getLeadSignals: compute signals on-the-fly for a single lead ──
-  const getLeadSignals = useCallback(
-    (lead: LeadRow): LeadSignal[] => {
-      if (!lead || typeof lead !== "object") return [];
-      const enriched = {
-        ...lead,
-        stageKey: (lead as { stageKey?: string }).stageKey || computeLeadStage(lead),
-        qrStatus: (lead as { qrStatus?: string }).qrStatus || computeQrStatus(lead),
-      };
-      return computeLeadSignals(enriched, todosState);
-    },
-    [todosState]
-  );
-
-  // ── Filter pipeline: mode → stage → search → source/owner → filterFlags → segment → sort ──
-
-  // 1. Mode filter (by intent_type)
-  const modeFilteredLeads = useMemo(() => {
-    const allowed = MODE_INTENTS[mode];
-    return leadsState.filter((l) => l && allowed.includes(l.intentType || ""));
-  }, [leadsState, mode]);
-
-  // 2. Enrich each lead with computed stageKey + qrStatus (memoized)
-  // Defensive: wrap computeLeadStage in try/catch — if a lead has unexpected
-  // shape (e.g. rentals is null), fall back to "new" stage rather than crash.
-  const enrichedLeads = useMemo(() => {
-    return modeFilteredLeads
-      .filter((l): l is LeadRow => !!l)
-      .map((l) => {
-        let stageKey: StageKey;
-        try {
-          stageKey =
-            (l as { stageKey?: string }).stageKey as StageKey ||
-            computeLeadStage(l);
-        } catch {
-          stageKey = "new";
-        }
-        let qrStatus: string;
-        try {
-          qrStatus =
-            (l as { qrStatus?: string }).qrStatus ||
-            computeQrStatus(l);
-        } catch {
-          qrStatus = "unclaimed";
-        }
-        return { ...l, stageKey, qrStatus };
-      }) as Array<LeadRow & { stageKey: StageKey; qrStatus: string }>;
-  }, [modeFilteredLeads]);
-
-  // 3. Stage filter
-  const stageFilteredLeads = useMemo(() => {
-    if (!activeStageFilter) return enrichedLeads;
-    return enrichedLeads.filter((l) => l && l.stageKey === activeStageFilter);
-  }, [enrichedLeads, activeStageFilter]);
-
-  // 4. Search filter
-  const searchFilteredLeads = useMemo(() => {
-    if (!debouncedSearch.trim()) return stageFilteredLeads;
-    const q = debouncedSearch.toLowerCase();
-    return stageFilteredLeads.filter((l) =>
-      (l.full_name || "").toLowerCase().includes(q) ||
-      (l.phone || "").includes(q) ||
-      (l.username || "").toLowerCase().includes(q) ||
-      (l.bikeTitle || "").toLowerCase().includes(q) ||
-      (l.sourceRoute || "").toLowerCase().includes(q)
-    );
-  }, [stageFilteredLeads, debouncedSearch]);
-
-  // 4b. Source + owner dropdown filters. Previously these state values were
-  // referenced by the toolbar but never declared and never applied here, so
-  // changing the dropdowns had no visible effect on the list.
-  const sourceOwnerFilteredLeads = useMemo(() => {
-    let result = searchFilteredLeads;
-    if (sourceFilter !== "all") {
-      result = result.filter((l) => l.source === sourceFilter);
-    }
-    if (ownerFilter !== "all") {
-      // Match either ownerId or ownerName so the dropdown keeps working even
-      // when the owner has a name but the lead only stores the id (or vice versa).
-      result = result.filter(
-        (l) => l.ownerId === ownerFilter || l.ownerName === ownerFilter
-      );
-    }
-    return result;
-  }, [searchFilteredLeads, sourceFilter, ownerFilter]);
-
-  // 5. FilterFlags (overdue, qr, docs, active, returnDue, dismissed, hideOperatorPlaceholders)
-  const flagFilteredLeads = useMemo(() => {
-    const now = Date.now();
-    return sourceOwnerFilteredLeads.filter((l) => {
-      const leadTodos = getTodosForLead(l);
-      const hasOverdueTodo = leadTodos.some(
-        (t) => !!(t as { due_date?: string | null }).due_date &&
-          new Date((t as { due_date?: string | null }).due_date!).getTime() < now &&
-          t.status !== "done"
-      );
-      const hasMissingDocs = l.rentals.some(
-        (r) => !r.passportMainpagePhoto || !r.passportRegistrationPhoto || !r.driversLicenceFrontalPhoto
-      );
-      const hasActiveRental = l.rentals.some((r) => r.status === "active");
-      const hasReturnDue = l.rentals.some(
-        (r) => r.status === "active" && r.endDate && new Date(r.endDate).getTime() - now < 24 * 60 * 60 * 1000
-      );
-      const isDismissed = l.stageKey === "closed_lost" || l.intentStage === "dismissed";
-      const isOperatorPlaceholder = l.identityState === "operator_placeholder" && l.rentals.length === 0 && l.sales.length === 0 && leadTodos.length === 0;
-
-      if (filterFlags.overdueOnly && !hasOverdueTodo) return false;
-      if (filterFlags.unclaimedQrOnly && l.qrStatus !== "unclaimed") return false;
-      if (filterFlags.documentsMissingOnly && !hasMissingDocs) return false;
-      if (filterFlags.activeRentalOnly && !hasActiveRental) return false;
-      if (filterFlags.returnDueOnly && !hasReturnDue) return false;
-      if (filterFlags.dismissedOnly && !isDismissed) return false;
-      if (filterFlags.hideOperatorPlaceholders && isOperatorPlaceholder) return false;
-      return true;
-    });
-  }, [sourceOwnerFilteredLeads, filterFlags, getTodosForLead]);
-
-  // 6. Segment filter (All / Hot / Overdue / Clients)
-  const segmentFilteredLeads = useMemo(() => {
-    if (activeSegment === "all") return flagFilteredLeads;
-    return flagFilteredLeads.filter((l) => {
-      if (activeSegment === "hot") return isHotLead(l, todosState);
-      if (activeSegment === "overdue") {
-        const leadTodos = getTodosForLead(l);
-        return leadTodos.some(
-          (t) => !!(t as { due_date?: string | null }).due_date &&
-            new Date((t as { due_date?: string | null }).due_date!).getTime() < Date.now() &&
-            t.status !== "done"
-        );
-      }
-      if (activeSegment === "clients") return l.verified || l.rentals.length > 0 || l.sales.length > 0;
-      return true;
-    });
-  }, [flagFilteredLeads, activeSegment, todosState, getTodosForLead]);
-
-  // 7. Sort
-  const sortedLeads = useMemo(() => {
-    const arr = [...segmentFilteredLeads];
-    const byRecency = (a: LeadRow, b: LeadRow) =>
-      new Date(b.lastSeenAt || b.createdAt || 0).getTime() - new Date(a.lastSeenAt || a.createdAt || 0).getTime();
-
-    switch (sortMode) {
-      case "urgent":
-        return arr.sort((a, b) => {
-          const aT = getTodosForLead(a).filter((t) => t.status !== "done").length;
-          const bT = getTodosForLead(b).filter((t) => t.status !== "done").length;
-          const aScore = (a.urgencyScore || 0) + aT * 20;
-          const bScore = (b.urgencyScore || 0) + bT * 20;
-          if (aScore !== bScore) return bScore - aScore;
-          return byRecency(a, b);
-        });
-      case "name":
-        return arr.sort((a, b) => (a.full_name || "яя").localeCompare(b.full_name || "яя", "ru"));
-      case "spent":
-        return arr.sort((a, b) => (b.totalSpent || 0) - (a.totalSpent || 0));
-      case "sla":
-        return arr.sort((a, b) => {
-          const aS = getLeadSignals(a);
-          const bS = getLeadSignals(b);
-          const aP = aS[0]?.priority ?? -1;
-          const bP = bS[0]?.priority ?? -1;
-          if (aP !== bP) return bP - aP;
-          return byRecency(a, b);
-        });
-      case "return_due":
-        return arr.sort((a, b) => {
-          const aEnd = a.rentals.find((r) => r.status === "active")?.endDate;
-          const bEnd = b.rentals.find((r) => r.status === "active")?.endDate;
-          if (!aEnd && !bEnd) return byRecency(a, b);
-          if (!aEnd) return 1;
-          if (!bEnd) return -1;
-          return new Date(aEnd).getTime() - new Date(bEnd).getTime();
-        });
-      case "overdue_todos":
-        return arr.sort((a, b) => {
-          const aO = getTodosForLead(a).filter((t) => (t as { due_date?: string | null }).due_date && new Date((t as { due_date?: string | null }).due_date!).getTime() < Date.now() && t.status !== "done").length;
-          const bO = getTodosForLead(b).filter((t) => (t as { due_date?: string | null }).due_date && new Date((t as { due_date?: string | null }).due_date!).getTime() < Date.now() && t.status !== "done").length;
-          if (aO !== bO) return bO - aO;
-          return byRecency(a, b);
-        });
-      case "recent":
-      default:
-        return arr.sort(byRecency);
-    }
-  }, [segmentFilteredLeads, sortMode, getTodosForLead, getLeadSignals]);
-
-  // ── Pipeline stage counts (from filtered leads) ──
-  const pipelineStages: PipelineStage[] = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const l of enrichedLeads) {
-      counts.set(l.stageKey, (counts.get(l.stageKey) || 0) + 1);
-    }
-    return PIPELINE_STAGES.map((s) => ({
-      key: s.key,
-      label: STAGE_LABELS[s.key] || s.key,
-      color: STAGE_COLORS[s.key] || "#64748b",
-      count: counts.get(s.key) || 0,
-    }));
-  }, [enrichedLeads]);
-
-  // ── Segment chips data ──
-  const segmentChips: SegmentChip[] = useMemo(() => {
-    const hotCount = enrichedLeads.filter((l) => isHotLead(l, todosState)).length;
-    const overdueCount = enrichedLeads.filter((l) => {
-      const ts = getTodosForLead(l);
-      return ts.some((t) => (t as { due_date?: string | null }).due_date && new Date((t as { due_date?: string | null }).due_date!).getTime() < Date.now() && t.status !== "done");
-    }).length;
-    const clientsCount = enrichedLeads.filter((l) => l.verified || l.rentals.length > 0 || l.sales.length > 0).length;
-    return [
-      { key: "all", label: "Все", count: enrichedLeads.length, color: T.accent },
-      { key: "hot", label: "Горячие", count: hotCount, color: "#ef4444" },
-      { key: "overdue", label: "Просроченные", count: overdueCount, color: "#f59e0b" },
-      { key: "clients", label: "Клиенты", count: clientsCount, color: "#22c55e" },
-    ];
-  }, [enrichedLeads, todosState, getTodosForLead, T.accent]);
-
-  // ── Leads by stage (for board view) ──
-  const leadsByStage = useMemo(() => {
-    const map: Record<string, LeadRow[]> = {};
-    for (const s of PIPELINE_STAGES) map[s.key] = [];
-    for (const l of sortedLeads) {
-      const key = l.stageKey || "new";
-      if (!map[key]) map[key] = [];
-      map[key].push(l);
-    }
-    return map;
-  }, [sortedLeads]);
-
-  // ── Selected lead + its todos ──
-  const selectedLead = useMemo(
-    () => sortedLeads.find((l) => l.user_id === selectedId) || null,
-    [sortedLeads, selectedId]
-  );
-
-  // ── Handlers ───────────────────────────────────────────────────────────────
-
-  const handleFilterFlagsChange = useCallback((patch: Partial<FilterFlags>) => {
-    setFilterFlags((prev) => ({ ...prev, ...patch }));
-  }, []);
-
-  const handleStageSelect = useCallback((key: string) => {
-    setActiveStageFilter((prev) => (prev === key ? null : (key as StageKey)));
-  }, []);
-
-  const handleSelectLead = useCallback((lead: LeadRow) => {
-    setSelectedId(lead.user_id);
-  }, []);
-
-  const handleDismissLeadRequest = useCallback((leadId: string) => {
-    setDismissLeadId(leadId);
-    setDismissDialogOpen(true);
-  }, []);
-
-  const handleDismissLeadConfirm = useCallback(
-    async (reason: string, note: string) => {
-      if (!dismissLeadId) return;
-      const targetId = dismissLeadId;
-      // Optimistic remove
-      setLeadsState((prev) => prev.filter((l) => l.user_id !== targetId));
-      setSelectedId((prev) => (prev === targetId ? null : prev));
-      setDismissDialogOpen(false);
-      setDismissLeadId(null);
-      try {
-        await dismissLeadWithReason({
-          slug,
-          leadId: targetId,
-          reason,
-          note: note || undefined,
-        });
-      } catch {
-        // Server action will log; revert would require re-fetch.
-      }
-      router.refresh();
-    },
-    [dismissLeadId, slug, router]
-  );
-
-  const handleTodoUpdate = useCallback(
-    (action: "toggle" | "delete" | "add", todoId: string, todo?: LeadTodoRow) => {
-      setTodosState((prev) => {
-        if (action === "toggle") {
-          return prev.map((t) =>
-            t.id === todoId ? { ...t, status: t.status === "done" ? "pending" : "done" } : t
-          );
-        }
-        if (action === "delete") return prev.filter((t) => t.id !== todoId);
-        if (action === "add" && todo) return [todo, ...prev];
-        return prev;
-      });
-    },
-    []
-  );
-
-  // Todo CRUD handlers used by LeadDetailContent
-  const handleCreateTodo = useCallback(
-    async (title: string) => {
-      if (!selectedLead) return;
-      const newTodo: LeadTodoRow = {
-        id: `tmp-${Date.now()}`,
-        lead_id: selectedLead.user_id,
-        user_id: selectedLead.user_id,
-        phone: selectedLead.phone,
-        rental_id: selectedLead.rentals[0]?.rentalId || null,
-        title,
-        description: null,
-        status: "pending",
-        priority: "medium",
-        category: "manual",
-        created_at: new Date().toISOString(),
-        completed_at: null,
-        assigned_to: null,
-      };
-      handleTodoUpdate("add", newTodo.id, newTodo);
-      // Fire-and-forget server create via API route
-      try {
-        await fetch("/api/franchize/lead-todo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            slug,
-            crewId,
-            leadId: selectedLead.user_id,
-            title,
-            phone: selectedLead.phone,
-            rentalId: selectedLead.rentals[0]?.rentalId || null,
-          }),
-        });
-        router.refresh();
-      } catch {
-        /* network error — optimistic state already updated */
-      }
-    },
-    [selectedLead, slug, crewId, handleTodoUpdate, router]
-  );
-
-  const handleToggleTodo = useCallback(
-    async (todoId: string) => {
-      handleTodoUpdate("toggle", todoId);
-      try {
-        await fetch("/api/franchize/lead-todo", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ todoId, slug, crewId, action: "toggle" }),
-        });
-        router.refresh();
-      } catch {
-        /* network error */
-      }
-    },
-    [handleTodoUpdate, slug, crewId, router]
-  );
-
-  const handleDeleteTodo = useCallback(
-    async (todoId: string) => {
-      handleTodoUpdate("delete", todoId);
-      try {
-        await fetch("/api/franchize/lead-todo", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ todoId, slug, crewId }),
-        });
-        router.refresh();
-      } catch {
-        /* network error */
-      }
-    },
-    [handleTodoUpdate, slug, crewId, router]
-  );
-
-  const [notesState, setNotesState] = useState<Array<{ id: string; text: string; created_at: string; created_by: string | null }>>([]);
-
-  // Reset notes when the selected lead changes
-  useEffect(() => {
-    setNotesState([]);
-  }, [selectedId]);
-
-  const handleAddNote = useCallback(
-    async (text: string) => {
-      if (!selectedLead) return;
-      // Optimistic add to local state so the drawer + history update immediately
-      const optimisticNote = {
-        id: `tmp-${Date.now()}`,
-        text,
-        created_at: new Date().toISOString(),
-        created_by: null,
-      };
-      setNotesState((prev) => [optimisticNote, ...prev]);
-      try {
-        await createLeadNote({
-          leadId: selectedLead.user_id,
-          crewId,
-          text,
-        });
-        router.refresh();
-      } catch {
-        /* network error — optimistic state already updated */
-      }
-    },
-    [selectedLead, crewId, router]
-  );
-
-  const handleDrawerAction = useCallback(
-    (action: string) => {
-      if (action === "dismiss") {
-        if (selectedLead) handleDismissLeadRequest(selectedLead.user_id);
-        return;
-      }
-      if (action === "call" && selectedLead?.phone) {
-        window.open(`tel:${selectedLead.phone}`, "_self");
-        return;
-      }
-      if (action === "telegram" && selectedLead?.username) {
-        window.open(`https://t.me/${selectedLead.username}`, "_blank");
-        return;
-      }
-      // Other actions (notify, request_docs, resend_qr, open_contract, etc.) — handled by sub-components.
-    },
-    [selectedLead, handleDismissLeadRequest]
-  );
-
-  // ── Available sources for the toolbar dropdown ──
-  const availableSources = useMemo(() => {
-    const set = new Set<string>();
-    for (const l of leadsState) set.add(l.source);
-    return Array.from(set);
-  }, [leadsState]);
-
-  // ── Available owners for the toolbar dropdown ──
-  // Only show actual crew operators (from originalOperatorChatId / ownerId),
-  // not random renter user_ids that might appear as ownerId on some leads.
-  // Filters to unique operator IDs that appear in the leads data.
-  const availableOwners = useMemo(() => {
-    const set = new Set<string>();
-    for (const l of leadsState) {
-      // ownerId is set when the lead was created by an operator (via /doc)
-      // Only include it if it looks like a Telegram chat ID (numeric, 5-12 digits)
-      const oid = l.ownerId || l.originalOperatorChatId;
-      if (oid && /^\d{5,12}$/.test(oid)) {
-        const name = l.ownerName || oid;
-        set.add(name);
-      }
-    }
-    return Array.from(set).sort();
-  }, [leadsState]);
-
-  // ── Whether any filter is currently active (drives EmptyState copy + reset) ──
-  const hasActiveFilters = useMemo(() => {
-    return (
-      !!debouncedSearch.trim() ||
-      sourceFilter !== "all" ||
-      ownerFilter !== "all" ||
-      activeStageFilter !== null ||
-      activeSegment !== "all" ||
-      Object.values(filterFlags).some(Boolean)
-    );
-  }, [debouncedSearch, sourceFilter, ownerFilter, activeStageFilter, activeSegment, filterFlags]);
-
-  // ── Reset ALL filters (used by EmptyState "Сбросить фильтры" button) ──
-  const handleResetAllFilters = useCallback(() => {
-    setSearchQuery("");
-    setDebouncedSearch("");
-    setSourceFilter("all");
-    setOwnerFilter("all");
-    setActiveStageFilter(null);
-    setActiveSegment("all");
-    setFilterFlags(DEFAULT_FILTER_FLAGS);
-  }, []);
+  // ── Filters + derived data (extracted to useLeadFilters hook) ──
+  const {
+    searchQuery, setSearchQuery,
+    sortMode, setSortMode,
+    mode, setMode,
+    activeStageFilter,
+    activeSegment, setActiveSegment,
+    sourceFilter, setSourceFilter,
+    ownerFilter, setOwnerFilter,
+    filterFlags,
+    enrichedLeads,
+    sortedLeads,
+    pipelineStages,
+    segmentChips,
+    leadsByStage,
+    availableSources,
+    availableOwners,
+    hasActiveFilters,
+    handleFilterFlagsChange,
+    handleStageSelect,
+    handleResetAllFilters,
+  } = useLeadFilters({
+    leadsState,
+    todosState,
+    getTodosForLead,
+    getLeadSignals,
+  });
 
   // ── Selected lead's todos (for the detail drawer) ──
   const selectedLeadTodos = useMemo(
@@ -716,10 +186,15 @@ export function LeadsClient({
   );
 
   // ── Dismiss dialog lead object ──
-  const dismissLead = useMemo(
-    () => leadsState.find((l) => l.user_id === dismissLeadId) || null,
-    [leadsState, dismissLeadId]
-  );
+  // dismissLead now comes from useLeadActions hook
+
+  // ── View mode (list/board) ──
+  const [viewMode, setViewMode] = useState<"list" | "board">("list");
+
+  // ── Fetch KPIs when mode changes ──
+  useEffect(() => {
+    void fetchKpis(mode);
+  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Password gate ──
   // Must be AFTER all hooks (useState/useEffect/useMemo/useCallback) to satisfy
@@ -901,7 +376,7 @@ export function LeadsClient({
         <DismissLeadDialog
           open={dismissDialogOpen}
           lead={dismissLead}
-          reasons={DISMISS_REASONS}
+          reasons={DISMISS_REASONS || []}
           T={T}
           onSubmit={handleDismissLeadConfirm}
           onCancel={() => {
