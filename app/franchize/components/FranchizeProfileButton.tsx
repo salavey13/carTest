@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, ChevronDown, LayoutDashboard, Palette, Settings, Shield, IdCard, MessageCircle, Send, UserPlus, Users, Moon, Sun, BarChart3, PhoneCall } from "lucide-react";
+import { Bell, ChevronDown, LayoutDashboard, Palette, Plus, Settings, Shield, Sparkles, IdCard, MessageCircle, Send, UserPlus, Users, Moon, Sun, BarChart3, PhoneCall } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
@@ -218,17 +218,29 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
       : `https://t.me/${botName}`;
     const label = tmeHref.includes("/app?startapp=") ? "Открыть в TG" : "Написать в TG";
     return (
-      <a
-        href={tmeHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={label}
-        className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-        style={{ backgroundColor: bgColor, color: textColor, borderColor }}
-      >
-        <Send className="h-4 w-4" />
-        <span className="hidden sm:inline">{label}</span>
-      </a>
+      <div className="flex items-center gap-2">
+        {/* Create-franchise shortcut — available to ALL visitors, no auth required to view */}
+        <Link
+          href="/franchize/create"
+          aria-label="Создать франшизу"
+          className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          style={{ backgroundColor: bgColor, color: textColor, borderColor }}
+        >
+          <Sparkles className="h-4 w-4 text-amber-500" />
+          <span className="hidden sm:inline">Создать франшизу</span>
+        </Link>
+        <a
+          href={tmeHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={label}
+          className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          style={{ backgroundColor: bgColor, color: textColor, borderColor }}
+        >
+          <Send className="h-4 w-4" />
+          <span className="hidden sm:inline">{label}</span>
+        </a>
+      </div>
     );
   }
 
@@ -324,6 +336,18 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
               <Moon className="mr-2 h-4 w-4 text-blue-500" />
             )}
             <span className="truncate">{theme === "dark" ? "Светлая тема" : "Темная тема"}</span>
+          </DropdownMenuItem>
+
+          {/* Create / edit franchise — available for ALL users (read-only for non-owners, full edit for owners/admins) */}
+          {/* Pass current slug context so crew owners land on their own franchize editor pre-loaded */}
+          <DropdownMenuItem asChild>
+            <Link
+              href={effectiveSlug ? `/franchize/create?slug=${encodeURIComponent(effectiveSlug)}` : "/franchize/create"}
+              className="cursor-pointer flex min-w-0 items-center gap-2 w-full"
+            >
+              <Sparkles className="mr-2 h-4 w-4 shrink-0 text-amber-500" />
+              <span className="truncate">Создать франшизу</span>
+            </Link>
           </DropdownMenuItem>
 
           <DropdownMenuItem asChild>
