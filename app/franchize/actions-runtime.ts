@@ -1324,7 +1324,13 @@ async function resolveFranchizeEditorAccess(actorUserId: string | undefined, cre
     .eq("user_id", actorUserId)
     .maybeSingle();
 
-  return membership?.membership_status === "active" && membership.role === "owner";
+  // BUG FIX (was BUG #6 in code review): previously only `role === "owner"`
+  // was allowed. This was inconsistent with FranchizeProfileButton.tsx which
+  // already grants admin/co_owner the right to view crew-operator links
+  // (leads, rentals, analytics). Now admin and co_owner roles can also
+  // save franchize config edits, matching the dropdown's expectations.
+  return membership?.membership_status === "active"
+    && (membership.role === "owner" || membership.role === "admin" || membership.role === "co_owner");
 }
 
 async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promise<FranchizeConfigInput> {
