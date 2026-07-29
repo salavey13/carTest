@@ -110,8 +110,9 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   // Visibility is configurable per-crew via metadata.franchize.ui.showCreateButton (default: true).
   // - When user already owns a crew (userCrewInfo?.slug is set and they're the owner),
   //   the link goes to the customization editor for their crew: /franchize/create?slug=<their-slug>
-  // - When user has no crew, the link goes to the real create form: /wblanding#create-crew-form
-  //   (which calls createCrew() server action and inserts a new crew row + owner membership).
+  // - When user has no crew, the link goes to /franchize/create#create-crew-form
+  //   which is the inline "Создать экипаж" tab on the franchize create page.
+  //   That tab calls createCrew() and then transitions to the customization editor.
   const showCreateFranchiseButton = crewUi?.showCreateButton !== false;
 
   const createFranchiseHref = useMemo(() => {
@@ -123,8 +124,11 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
     if (effectiveSlug && (isCurrentCrewAdmin || userIsAdmin)) {
       return `/franchize/create?slug=${encodeURIComponent(effectiveSlug)}`;
     }
-    // Otherwise → real create flow (inserts new crew row via createCrew())
-    return `/wblanding#create-crew-form`;
+    // Otherwise → real create flow. /franchize/create now has an inline
+    // "Создать экипаж" tab (stage === "create") that calls createCrew() and
+    // then transitions to the customization editor for the new crew.
+    // No more bounce to /wblanding.
+    return `/franchize/create#create-crew-form`;
   }, [userCrewInfo, effectiveSlug, isCurrentCrewAdmin, userIsAdmin]);
 
   const createFranchiseLabel = useMemo(() => {
@@ -260,7 +264,7 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             (they cannot customize a crew they don't own yet). */}
         {showCreateFranchiseButton && (
           <Link
-            href="/wblanding#create-crew-form"
+            href="/franchize/create#create-crew-form"
             aria-label="Создать франшизу"
             className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             style={{ backgroundColor: bgColor, color: textColor, borderColor }}
