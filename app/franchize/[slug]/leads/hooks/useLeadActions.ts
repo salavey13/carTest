@@ -9,7 +9,7 @@
 
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
 import { dismissLeadWithReason } from "../lib/leads-dismiss";
@@ -21,6 +21,7 @@ interface UseLeadActionsProps {
   slug: string;
   crewId: string;
   selectedLead: LeadRow | null;
+  leadsState: LeadRow[];
   dbUser?: { user_id: string } | null;
   passwordAuthOwnerId?: string | null;
   onTodoUpdate: (action: "toggle" | "delete" | "add", todoId: string, todo?: LeadTodoRow) => void;
@@ -33,6 +34,7 @@ export function useLeadActions({
   slug,
   crewId,
   selectedLead,
+  leadsState,
   dbUser,
   passwordAuthOwnerId,
   onTodoUpdate,
@@ -65,15 +67,9 @@ export function useLeadActions({
       const targetId = dismissLeadId;
       if (!targetId) return;
 
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (dbUser?.user_id) {
-        headers["x-telegram-user-id"] = dbUser.user_id;
-      } else if (passwordAuthOwnerId) {
-        headers["x-auth-password"] = passwordAuthOwnerId;
-      }
-
       try {
-        // Use the server action directly
+        // Use the server action directly — it accepts the slug/leadId/reason/note payload
+        // and resolves auth from the current request context (cookie or password header)
         await dismissLeadWithReason({
           slug,
           leadId: targetId,
@@ -93,7 +89,7 @@ export function useLeadActions({
         alert("Не удалось закрыть лид. Попробуйте позже.");
       }
     },
-    [dismissLeadId, slug, dbUser, passwordAuthOwnerId, onDismissOptimistic, onClearSelection, router]
+    [dismissLeadId, slug, passwordAuthOwnerId, onDismissOptimistic, onClearSelection, router]
   );
 
   // ── Create todo ──
@@ -240,6 +236,3 @@ export function useLeadActions({
     DISMISS_REASONS,
   };
 }
-
-// Need useMemo import
-import { useMemo } from "react";
