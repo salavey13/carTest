@@ -833,7 +833,11 @@ export async function addRentalPhoto(rentalId: string, userId: string, photoUrl:
 export async function confirmVehiclePickup(rentalId: string, userId: string) {
     noStore();
     try {
-        const { data: rental, error: fetchError } = await supabaseAdmin.from('rentals').select('owner_id, metadata').eq('rental_id', rentalId).single();
+        const { data: rental, error: fetchError } = await supabaseAdmin
+            .from('rentals')
+            .select('rental_id, owner_id, user_id, crew_id, metadata')
+            .eq('rental_id', rentalId)
+            .maybeSingle();
         if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
         if (rental.owner_id !== userId) return { success: false, error: "Только владелец может подтвердить получение." };
         const currentMetadata = (rental.metadata as Record<string, any>) || {};
@@ -841,7 +845,7 @@ export async function confirmVehiclePickup(rentalId: string, userId: string) {
         if (!hasPickupFreeze) {
             return { success: false, error: "Сначала заполните Pickup Freeze в блоке Rental Documents." };
         }
-        
+
         // Шаг 1: Обновляем JSON metadata и статус в ОДНОМ запросе
         const newMetadata = {
             ...currentMetadata,
@@ -850,22 +854,39 @@ export async function confirmVehiclePickup(rentalId: string, userId: string) {
 
         const { error: updateError } = await supabaseAdmin
             .from('rentals')
-            .update({ 
+            .update({
                 status: 'active',
                 metadata: newMetadata,
                 updated_at: new Date().toISOString()
             })
             .eq('rental_id', rentalId);
-        
+
         if (updateError) throw updateError;
 
         // Шаг 2: Создаем событие для уведомления
-        const { error: eventError } = await supabaseAdmin.from('events').insert({ 
-            rental_id: rentalId, type: 'pickup_confirmed', created_by: userId 
+        const { error: eventError } = await supabaseAdmin.from('events').insert({
+            rental_id: rentalId, type: 'pickup_confirmed', created_by: userId
         });
         if(eventError) logger.error(`[confirmVehiclePickup] Rental updated but failed to create event for ${rentalId}:`, eventError);
 
         await notifyRentalLifecycle(rentalId, 'pickup_confirmed');
+
+        // ── BUG C fix: create closure todos so operators get reminders ──
+        // When a rental becomes "active", immediately create 5 closure todos
+        // (inspect bike, capture odometer, refund deposit, request review,
+        // mark completed). These show up in the operator's todo list and in
+        // the RentalReturnChecklist on the dedicated /rental/[id] page.
+        // Idempotent — won't duplicate if called twice.
+        try {
+            const { createRentalClosureTodos } = await import("@/app/franchize/server-actions/rental-verification-todos");
+            await createRentalClosureTodos(
+                rentalId,
+                rental.crew_id || "",
+                rental.user_id || null
+            );
+        } catch (closureErr) {
+            logger.warn(`[confirmVehiclePickup] Failed to create closure todos (non-fatal):`, closureErr);
+        }
 
         return { success: true, data: 'OK' };
     } catch (e: any) {
@@ -1022,40 +1043,183 @@ export async function addRentalDamageReport(
     }
 }
 
-export async function confirmVehicleReturn(rentalId: string, userId: string) {
+export async function confirmVehicleReturn(
+  rentalId: string,
+  userId: string,
+  closureData?: {
+    odometerAfter?: number | null;
+    damageNotes?: string | null;
+    depositReturned?: boolean | null;
+    returnNotes?: string | null;
+  }
+) {
     noStore();
     try {
-        const { data: rental, error: fetchError } = await supabaseAdmin.from('rentals').select('owner_id, metadata').eq('rental_id', rentalId).single();
+        // ── Fetch rental + vehicle for closure flow ────────────────────────────
+        const { data: rental, error: fetchError } = await supabaseAdmin
+            .from('rentals')
+            .select('rental_id, owner_id, user_id, crew_id, vehicle_id, metadata, total_cost, agreed_end_date, agreed_start_date, vehicle:cars(make, model, id, specs)')
+            .eq('rental_id', rentalId)
+            .maybeSingle();
         if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
-        if (rental.owner_id !== userId) return { success: false, error: "Только владелец может подтвердить возврат." };
 
-        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-        // Шаг 1: Обновляем JSON metadata и статус в ОДНОМ запросе
+        // ── BUG J fix: relax auth — allow owner, admins, and crew members ──
+        // Previously only `rental.owner_id === userId` was allowed, which meant
+        // crew members (mechanic, co_owner, admin) couldn't close rentals from
+        // the dedicated /rental/[id] page even though they could from the
+        // analytics dashboard (which uses updateRentalStatus). Now we mirror
+        // the auth check from updateRentalStatus.
+        const isOwner = rental.owner_id === userId;
+        let isCrewMember = false;
+        let isAdmin = false;
+        if (!isOwner) {
+            // Check crew membership
+            if (rental.crew_id) {
+                const { data: membership } = await supabaseAdmin
+                    .from('crew_members')
+                    .select('role, membership_status')
+                    .eq('crew_id', rental.crew_id)
+                    .eq('user_id', userId)
+                    .maybeSingle();
+                if (membership?.membership_status === "active"
+                    && ["owner", "admin", "co_owner"].includes(membership.role)) {
+                    isCrewMember = true;
+                }
+            }
+            // Check user admin flag
+            if (!isCrewMember) {
+                const { data: userRow } = await supabaseAdmin
+                    .from('users')
+                    .select('metadata, username')
+                    .eq('user_id', userId)
+                    .maybeSingle();
+                const userMeta = userRow?.metadata as Record<string, unknown> | null;
+                if (userMeta?.role === "admin" || userMeta?.status === "admin") {
+                    isAdmin = true;
+                }
+            }
+        }
+        if (!isOwner && !isCrewMember && !isAdmin) {
+            return { success: false, error: "Недостаточно прав для подтверждения возврата." };
+        }
+
+        // ── Build closure metadata ─────────────────────────────────────────────
+        // BUG B fix: capture odometer_after, damage_notes, deposit_returned,
+        // return_notes — previously these were silently dropped, leaving the
+        // rental row with no closure record.
         const currentMetadata = (rental.metadata as Record<string, any>) || {};
+        const nowIso = new Date().toISOString();
         const newMetadata = {
             ...currentMetadata,
-            return_confirmed_at: new Date().toISOString()
+            return_confirmed_at: nowIso,
+            return_confirmed_by: userId,
+            // Closure data (optional but recommended)
+            ...(closureData?.odometerAfter != null ? { odometer_after: closureData.odometerAfter } : {}),
+            ...(closureData?.damageNotes != null ? { damage_notes: closureData.damageNotes } : {}),
+            ...(closureData?.depositReturned != null ? { deposit_returned: closureData.depositReturned } : {}),
+            ...(closureData?.returnNotes != null ? { return_notes: closureData.returnNotes } : {}),
+            // History entry
+            history: [
+                ...((currentMetadata.history as any[]) || []),
+                {
+                    status: "completed",
+                    at: nowIso,
+                    by: userId,
+                    message: closureData?.returnNotes || closureData?.damageNotes || "Return confirmed",
+                },
+            ],
         };
 
         const { error: updateError } = await supabaseAdmin
             .from('rentals')
-            .update({ 
+            .update({
                 status: 'completed',
                 payment_status: 'fully_paid', // Считаем, что на этом этапе все расчеты завершены
                 metadata: newMetadata,
-                updated_at: new Date().toISOString()
+                updated_at: nowIso,
             })
             .eq('rental_id', rentalId);
 
         if (updateError) throw updateError;
 
+        // ── BUG B fix: update bike's last_known_odometer ───────────────────────
+        // Mirror what updateRentalStatus does (rentals-dashboard.ts:2076-2096)
+        // so the next renter's prefill gets the up-to-date reading.
+        if (closureData?.odometerAfter != null && rental.vehicle_id) {
+            try {
+                const vehicle = rental.vehicle as { id?: string; specs?: Record<string, unknown> } | null;
+                if (vehicle?.id) {
+                    const { data: car } = await supabaseAdmin
+                        .from("cars")
+                        .select("specs")
+                        .eq("id", vehicle.id)
+                        .maybeSingle();
+                    if (car) {
+                        const specs = (car.specs || {}) as Record<string, unknown>;
+                        await supabaseAdmin
+                            .from("cars")
+                            .update({ specs: { ...specs, last_known_odometer: closureData.odometerAfter } })
+                            .eq("id", vehicle.id);
+                    }
+                }
+            } catch (odoErr) {
+                logger.warn(`[confirmVehicleReturn] Odometer save failed (non-fatal):`, odoErr);
+            }
+        }
+
         // Шаг 2: Создаем событие для уведомления
-        const { error: eventError } = await supabaseAdmin.from('events').insert({ 
-            rental_id: rentalId, type: 'return_confirmed', created_by: userId 
+        const { error: eventError } = await supabaseAdmin.from('events').insert({
+            rental_id: rentalId, type: 'return_confirmed', created_by: userId
         });
         if(eventError) logger.error(`[confirmVehicleReturn] Rental updated but failed to create event for ${rentalId}:`, eventError);
         await notifyRentalLifecycle(rentalId, 'return_confirmed');
-        
+
+        // ── BUG B fix: send closure receipt to renter ──────────────────────────
+        // Previously only a generic lifecycle event was sent. Now we send a
+        // detailed receipt with odometer reading, deposit status, and a
+        // thank-you / review-request nudge.
+        if (rental.user_id) {
+            try {
+                const vehicle = rental.vehicle as { make?: string; model?: string } | null;
+                const bikeName = vehicle ? `${vehicle.make || ""} ${vehicle.model || ""}`.trim() : "байк";
+                const receiptParts: string[] = [
+                    `✅ <b>Аренда завершена</b>`,
+                    ``,
+                    `🚲 ${bikeName}`,
+                    `📋 Статус: <b>завершена</b>`,
+                ];
+                if (closureData?.odometerAfter != null) {
+                    receiptParts.push(`📏 Финальный одометр: ${closureData.odometerAfter} км`);
+                }
+                if (closureData?.depositReturned) {
+                    receiptParts.push(`💰 Депозит: возвращён`);
+                } else if (closureData?.depositReturned === false) {
+                    receiptParts.push(`💰 Депозит: удержан (уточните у оператора)`);
+                }
+                if (closureData?.damageNotes) {
+                    receiptParts.push(`📝 Заметки: ${closureData.damageNotes}`);
+                }
+                receiptParts.push(``, `Спасибо за аренду! Будем рады отзыву.`);
+
+                const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
+                await fetch(`${siteUrl}/api/forward-telegram`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        chat_id: rental.user_id,
+                        method: "sendMessage",
+                        payload: {
+                            text: receiptParts.join("\n"),
+                            parse_mode: "HTML",
+                        },
+                    }),
+                    signal: AbortSignal.timeout(10000),
+                });
+            } catch (tgErr) {
+                logger.warn(`[confirmVehicleReturn] Receipt notify failed (non-fatal):`, tgErr);
+            }
+        }
+
         return { success: true, data: 'OK' };
     } catch (e: any) {
         logger.error(`[confirmVehicleReturn] Error:`, e);
