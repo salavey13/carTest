@@ -485,11 +485,63 @@ export async function createRentalClosureTodos(
  * Mirror of completeRentalVerificationTodo but for closure category.
  */
 export async function completeRentalClosureTodo(
-  todoId: string
+  todoId: string,
+  actorUserId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     if (!todoId) {
       return { success: false, error: "todoId is required" };
+    }
+    if (!actorUserId) {
+      return { success: false, error: "actorUserId is required" };
+    }
+
+    // CRITICAL FIX (code review 2026-07-30): previously this function had NO
+    // auth check — any user who could guess a todo UUID could mark any crew's
+    // closure todos as done. Now we:
+    // 1. Fetch the todo to get its crew_id
+    // 2. Check the actor is a member of that crew with owner/admin/co_owner role
+    // 3. Only then allow the update
+    const { data: todo, error: fetchErr } = await supabaseAdmin
+      .from("crew_todos")
+      .select("crew_id, category")
+      .eq("id", todoId)
+      .eq("category", "rental_closure")
+      .maybeSingle();
+
+    if (fetchErr) {
+      console.error("[rental-closure-todos] Fetch error:", fetchErr);
+      return { success: false, error: fetchErr.message };
+    }
+    if (!todo) {
+      return { success: false, error: "Todo not found or not a closure todo." };
+    }
+
+    // Auth check: actor must be a crew member with operator role
+    const { data: membership } = await supabaseAdmin
+      .from("crew_members")
+      .select("role, membership_status")
+      .eq("crew_id", todo.crew_id)
+      .eq("user_id", actorUserId)
+      .maybeSingle();
+
+    const isCrewOperator = membership?.membership_status === "active"
+      && ["owner", "admin", "co_owner"].includes(membership.role);
+
+    // Also allow global admins
+    let isGlobalAdmin = false;
+    if (!isCrewOperator) {
+      const { data: userRow } = await supabaseAdmin
+        .from("users")
+        .select("metadata")
+        .eq("user_id", actorUserId)
+        .maybeSingle();
+      const userMeta = userRow?.metadata as Record<string, unknown> | null;
+      isGlobalAdmin = userMeta?.role === "admin" || userMeta?.status === "admin";
+    }
+
+    if (!isCrewOperator && !isGlobalAdmin) {
+      return { success: false, error: "Недостаточно прав для выполнения этого действия." };
     }
 
     const { error } = await supabaseAdmin
