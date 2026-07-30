@@ -1,0 +1,68 @@
+# .github/workflows/ci-tests.yml
+#
+# Runs vitest + lint on every push to main and every PR.
+# Catches test failures + lint errors BEFORE they hit Vercel deploy.
+#
+# Vercel only runs `next build` — it does NOT run `npm test` or `npm run lint`.
+# This workflow fills that gap so test failures block merging.
+#
+# Cost: ~2-3 min per run on GitHub-hosted runner (free tier: 2000 min/month for private repos).
+
+name: CI Tests + Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs when a new commit is pushed to the same branch
+concurrency:
+  group: ci-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Vitest + ESLint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run ESLint
+        run: bun run lint
+        continue-on-error: false  # Block on lint errors
+
+      - name: Run TypeScript type-check
+        run: npx tsc --noEmit --skipLibCheck
+        continue-on-error: false  # Block on type errors
+
+      - name: Run vitest
+        run: bun run test
+        env:
+          # Vitest doesn't need real Supabase creds — all tests mock supabaseAdmin
+          # But some setup files may reference env vars, so set safe defaults.
+          NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: test-key
+          NEXT_PUBLIC_SITE_URL: https://test.example.com
+        continue-on-error: false  # Block on test failures
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-output
+          path: |
+            coverage/
+            test-results/
+          retention-days: 7
