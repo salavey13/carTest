@@ -1178,7 +1178,30 @@ export async function confirmVehicleReturn(
         // Previously only a generic lifecycle event was sent. Now we send a
         // detailed receipt with odometer reading, deposit status, and a
         // thank-you / review-request nudge.
+        //
+        // Polish 2026-07-30: fall back to rental_contract_artefacts.telegram_chat_id
+        // when rentals.user_id is null (bot/QR-flow rentals). Log a warning if
+        // BOTH are null so the operator knows the receipt was skipped.
+        let receiptChatId: string | null = null;
         if (rental.user_id) {
+            receiptChatId = rental.user_id;
+        } else {
+            // Fallback: query private.rental_contract_artefacts by rental_id FK
+            try {
+                const { data: artefact } = await supabaseAdmin
+                    .from("rental_contract_artefacts")
+                    .select("telegram_chat_id")
+                    .eq("rental_id", rentalId)
+                    .maybeSingle();
+                if (artefact?.telegram_chat_id) {
+                    receiptChatId = String(artefact.telegram_chat_id).trim();
+                }
+            } catch (artefactErr) {
+                logger.warn(`[confirmVehicleReturn] Failed to fetch rental_contract_artefacts fallback:`, artefactErr);
+            }
+        }
+
+        if (receiptChatId) {
             try {
                 const vehicle = rental.vehicle as { make?: string; model?: string } | null;
                 const bikeName = vehicle ? `${vehicle.make || ""} ${vehicle.model || ""}`.trim() : "байк";
@@ -1206,7 +1229,7 @@ export async function confirmVehicleReturn(
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        chat_id: rental.user_id,
+                        chat_id: receiptChatId,
                         method: "sendMessage",
                         payload: {
                             text: receiptParts.join("\n"),
@@ -1218,6 +1241,8 @@ export async function confirmVehicleReturn(
             } catch (tgErr) {
                 logger.warn(`[confirmVehicleReturn] Receipt notify failed (non-fatal):`, tgErr);
             }
+        } else {
+            logger.warn(`[confirmVehicleReturn] No renter chat_id available (user_id is null AND rental_contract_artefacts.telegram_chat_id is null/missing) — receipt skipped for rental ${rentalId}`);
         }
 
         return { success: true, data: 'OK' };
