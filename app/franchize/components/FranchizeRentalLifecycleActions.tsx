@@ -267,6 +267,9 @@ export function FranchizeRentalLifecycleActions({
           not tracked, damage wasn't recorded. */}
       {closureModalOpen && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="closure-modal-title"
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
           onClick={() => !isPending && setClosureModalOpen(false)}
@@ -280,7 +283,7 @@ export function FranchizeRentalLifecycleActions({
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-bold mb-1" style={{ color: "var(--lifecycle-text)" }}>
+            <h3 id="closure-modal-title" className="text-lg font-bold mb-1" style={{ color: "var(--lifecycle-text)" }}>
               Подтвердить возврат
             </h3>
             <p className="text-xs mb-4" style={{ color: "var(--lifecycle-muted)" }}>
