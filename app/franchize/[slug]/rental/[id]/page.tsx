@@ -7,6 +7,11 @@ import { FranchizeErrorBoundary } from "../../../components/ErrorBoundary";
 import { DisplayModeProvider } from "../../../components/DisplayModeContext";
 import { FranchizeRentalLifecycleActions } from "../../../components/FranchizeRentalLifecycleActions";
 import { FranchizePageShell } from "../../../components/FranchizePageShell";
+// NEW (polish 2026-07-30): role-based visibility for operator-only panels.
+// Verification checklist + return checklist toggle UI are crew-internal —
+// renters shouldn't see them. Wraps the panels so they auto-hide for
+// non-operator viewers (renter, guest).
+import { FranchizeRentalRoleGuard } from "../../../components/FranchizeRentalRoleGuard";
 import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRentalDocumentsPanel";
 import { RentalChecklistPanel } from "../../../components/RentalChecklistPanel";
 import { RentalMessageInput } from "../../../components/RentalMessageInput";
@@ -415,6 +420,16 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             <p className={rental.totalCost > 0 ? "" : "sm:col-span-2"}>
               <span style={{ color: textSecondary }}>Транспорт:</span> {rental.vehicleTitle}
             </p>
+            {/* NEW (polish 2026-07-30): show renter name when available.
+                Comes from rental_contract_artefacts.renter_full_name (passport OCR)
+                for bot/QR-flow rentals. Empty for web-app-flow rentals where
+                we don't store the renter's full name (only their Telegram user_id). */}
+            {rental.renterFullName && (
+              <p className="sm:col-span-2">
+                <span style={{ color: textSecondary }}>Арендатор:</span>{" "}
+                <span className="font-semibold" style={{ color: textPrimary }}>{rental.renterFullName}</span>
+              </p>
+            )}
             {rental.contractOriginalSha256 ? (
               <p className="sm:col-span-2 break-all text-xs">
                 <span style={{ color: textSecondary }}>SHA256:</span>{" "}
@@ -423,18 +438,30 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             ) : null}
           </div>
 
-          {/* Interactive checklist */}
+          {/* Interactive checklist — operator-only (polish 2026-07-30).
+              The verification checklist (passport, license, odometer_start, dates)
+              is crew-internal. Renters shouldn't see "verify your passport" —
+              that's an operator task. Wrapped in FranchizeRentalRoleGuard so
+              it auto-hides for renters + guests. */}
           {rental.found && (
-            <div className="pt-2">
-              <RentalChecklistPanel
-                rentalId={rental.rentalId}
-                crewId={crew.id}
-                slug={resolvedSlug}
-                accentColor={accent}
-                metadata={(rental.metadata as Record<string, any>) || undefined}
-                status={status}
-              />
-            </div>
+            <FranchizeRentalRoleGuard
+              allowedRoles={["owner", "operator", "admin"]}
+              ownerId={rental.ownerId}
+              renterId={rental.renterId}
+              renterTelegramChatId={rental.renterTelegramChatId}
+              crewId={crew.id}
+            >
+              <div className="pt-2">
+                <RentalChecklistPanel
+                  rentalId={rental.rentalId}
+                  crewId={crew.id}
+                  slug={resolvedSlug}
+                  accentColor={accent}
+                  metadata={(rental.metadata as Record<string, any>) || undefined}
+                  status={status}
+                />
+              </div>
+            </FranchizeRentalRoleGuard>
           )}
 
           {/* Action buttons */}
@@ -514,6 +541,11 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             rentalId={rental.rentalId}
             ownerId={rental.ownerId}
             renterId={rental.renterId}
+            // NEW (polish 2026-07-30): pass fallback renter identity from
+            // rental_contract_artefacts so the role check works even when
+            // rentals.user_id is null (bot/QR-flow rentals).
+            renterTelegramChatId={rental.renterTelegramChatId}
+            renterFullName={rental.renterFullName}
             crewId={crew.id}
             status={status}
             paymentStatus={rental.paymentStatus}
