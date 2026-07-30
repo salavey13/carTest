@@ -3,7 +3,6 @@ import { CrewHeader } from "../../components/CrewHeader";
 import { FranchizeErrorBoundary } from "../../components/ErrorBoundary";
 import { getFranchizeBySlug } from "../../actions";
 import { crewPaletteWithCssVars } from "../../lib/theme";
-import { getFranchizeLeads, type LeadRow, type LeadTodoRow } from "../../server-actions/leads";
 import { LeadsClient } from "./components/LeadsClient";
 import { AnalyticsLeadsNav } from "../../components/AnalyticsLeadsNav";
 
@@ -18,9 +17,23 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
   const { crew } = await getFranchizeBySlug(slug);
   const surface = crewPaletteWithCssVars(crew.theme);
 
-  const result = await getFranchizeLeads(slug);
-  const leads: LeadRow[] = (result.leads || []).filter(Boolean) as LeadRow[];
-  const todos: LeadTodoRow[] = (result.todos || []).filter(Boolean) as LeadTodoRow[];
+  // SECURITY FIX (polish 2026-07-30): previously this page called
+  // `getFranchizeLeads(slug)` on the server and passed the full leads + todos
+  // arrays as props to LeadsClient. That meant ALL leads data was in the
+  // HTML payload (visible via view-source) BEFORE the client-side password
+  // gate kicked in. Anyone with the slug could read every lead's phone,
+  // name, rental history, etc.
+  //
+  // Now we pass EMPTY arrays and let LeadsClient fetch the data via the
+  // `getFranchizeLeads` server action AFTER the password gate passes.
+  // This matches the pattern already used by RentalsListClient
+  // (app/franchize/[slug]/rentals/RentalsListClient.tsx).
+  //
+  // The LeadsClient component already supports this — its useEffect that
+  // reads ?leadId= from URL doesn't depend on the initial leads prop, and
+  // the password gate renders before any leads UI.
+  const leads: never[] = [];
+  const todos: never[] = [];
 
   return (
     <main className="min-h-screen" style={surface.page}>
