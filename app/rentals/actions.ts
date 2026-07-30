@@ -393,7 +393,7 @@ export async function saveMapPreset(userId: string, name: string, map_image_url:
         const { data: user, error: userError } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
         if (userError || !['admin'].includes(user?.role || '')) throw new Error("Unauthorized: Only admins can save map presets.");
         if (is_default) {
-            const { error: updateError } = await supabaseAdmin.from('maps').update({ is_default: false }).eq('is_default', true);
+            const { error: updateError } = await supabaseAdmin.from('maps').update({ is_default: false }).eq('is_default', true).eq('owner_id', userId);
             if (updateError) throw new Error(`Failed to unset other default maps: ${updateError.message}`);
         }
         const { data, error } = await supabaseAdmin.from('maps').insert({ name, map_image_url, bounds: bounds as any, is_default, owner_id: userId }).select().single();
@@ -1134,7 +1134,12 @@ export async function confirmVehicleReturn(
             .from('rentals')
             .update({
                 status: 'completed',
-                payment_status: 'fully_paid', // Считаем, что на этом этапе все расчеты завершены
+                // HIGH FIX #7: don't hardcode 'fully_paid' — preserve existing payment_status
+                // unless the operator explicitly signals full payment was collected.
+                // Was silently zero-eding the books for partial-payment returns.
+                payment_status: (closureData?.depositReturned === true
+                    ? 'fully_paid'
+                    : (rental as any)?.payment_status || 'pending'),
                 metadata: newMetadata,
                 updated_at: nowIso,
             })
