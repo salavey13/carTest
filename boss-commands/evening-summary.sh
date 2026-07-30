@@ -101,6 +101,42 @@ EOF
 
 # ─── Compose message ─────────────────────────────────────────────────────────
 DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
+
+# ─── Per-rental deep links for active rentals (BUG E fix) ────────────────────
+# Build a "📋 Активные аренды" section so operators can tap straight into each
+# open rental's detail page (where the closure UI lives). Without this, the
+# digest only shows "Активных: N" with no way to drill into a specific rental.
+ACTIVE_RENTALS_LIST=""
+ACTIVE_RENTALS_LIST=$(echo "$RENTALS_DATA" | jq -r '
+  [.[] | select(.status == "active")] | .[0:5] |
+  map("• \(.vehicle_id) — \(.agreed_end_date[11:16]) UTC — \(.total_cost // 0) ₽") | join("\n")
+')
+ACTIVE_RENTALS_LINKS=""
+if [[ -n "$ACTIVE_RENTALS_LIST" && "$ACTIVE_RENTALS_LIST" != "" ]]; then
+  # Build per-rental "📋 Открыть" links using rental_link() from _lib.sh.
+  # rental_link emits tg_deep_link "rental_<id>" which useStartParamRouter
+  # routes to /franchize/<slug>/rental/<id> (the dedicated rental page
+  # with closure UI).
+  ACTIVE_RENTALS_LINKS=$(echo "$RENTALS_DATA" | jq -r '
+    [.[] | select(.status == "active")] | .[0:5] | .[] | .rental_id
+  ' | while read -r rid; do
+    local rlink
+    rlink=$(rental_link "$rid")
+    printf '  📋 <a href="%s">Открыть %s</a>\n' "$rlink" "${rid:0:8}"
+  done)
+fi
+
+ACTIVE_SECTION=""
+if [[ -n "$ACTIVE_RENTALS_LIST" && "$ACTIVE_RENTALS_LIST" != "" ]]; then
+  ACTIVE_SECTION="<b>📋 Активные аренды (до 5):</b>
+${ACTIVE_RENTALS_LIST}
+
+${ACTIVE_RENTALS_LINKS}
+
+━━━━━━━━━━━━━━━━━━
+"
+fi
+
 MESSAGE="📊 <b>Итоги дня</b> — ${TODAY}, ${NOW_DISPLAY} МСК
 
 <b>🏍 <a href="$(analytics_link "rentals" "$TODAY")">Аренды</a></b>
@@ -113,7 +149,7 @@ ${SALE_KPIS}
 ${SERVICE_KPIS}
 
 ━━━━━━━━━━━━━━━━━━
-<b>Итого выручка за день: ${TOTAL_REVENUE} ₽</b>
+${ACTIVE_SECTION}<b>Итого выручка за день: ${TOTAL_REVENUE} ₽</b>
 
 📊 Дашборд: <a href="${DASHBOARD_LINK}">Открыть</a>"
 
