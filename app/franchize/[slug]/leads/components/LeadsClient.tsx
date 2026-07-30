@@ -34,18 +34,11 @@ import { useLeadFilters } from "../hooks/useLeadFilters";
 import { useLeadActions } from "../hooks/useLeadActions";
 
 // Lib
-import {
-  computeLeadStage,
-  computeQrStatus,
-  PIPELINE_STAGES,
-  STAGE_LABELS,
-  STAGE_COLORS,
-} from "../lib/pipeline-stages";
-import { computeLeadSignals, isHotLead } from "../lib/sla-signals";
-// DISMISS_REASONS now in useLeadActions hook
-import { dismissLeadWithReason } from "@/app/franchize/server-actions/leads-dismiss";
-// getLeadsKpis now in useLeadActions hook
-// createLeadNote now in useLeadActions hook
+// All pipeline / SLA / dismiss / KPI / note logic now lives in the
+// useLeadFilters and useLeadActions hooks. We only need computeLeadSignals
+// here for the getLeadSignals callback (which is itself passed back into
+// useLeadFilters for sort-by-urgent).
+import { computeLeadSignals } from "../lib/sla-signals";
 
 // Components
 import { LeadsAppShell } from "./LeadsAppShell";
@@ -55,7 +48,7 @@ import { PipelineFunnelBar, type PipelineStage } from "./PipelineFunnelBar";
 import { SegmentChips, type SegmentChip } from "./SegmentChips";
 import { LeadList } from "./LeadList";
 import { LeadBoard } from "./LeadBoard";
-import { LeadDetailContent } from "./LeadDetailContent";
+import { LeadDetailContent, type LeadDetailContentNote } from "./LeadDetailContent";
 import { MobileLeadSheet } from "./MobileLeadSheet";
 import { DismissLeadDialog } from "./DismissLeadDialog";
 import { EmptyState } from "./EmptyState";
@@ -151,6 +144,54 @@ export function LeadsClient({
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // ── Writable leads/todos state ──
+  // `leads` and `todos` props come from the server; we keep them in local
+  // state so dismiss / todo CRUD can do optimistic updates and then
+  // router.refresh() re-syncs with the server.
+  const [leadsState, setLeadsState] = useState<LeadRow[]>(leads);
+  const [todosState, setTodosState] = useState<LeadTodoRow[]>(todos);
+
+  // Keep local state in sync when server props change (e.g. after router.refresh())
+  useEffect(() => {
+    setLeadsState(leads);
+  }, [leads]);
+  useEffect(() => {
+    setTodosState(todos);
+  }, [todos]);
+
+  // ── Todo mapping (rental_id / phone / user_id matching) ──
+  const { getTodosForLead } = useTodosMapping(todosState);
+
+  // ── Compute SLA signals for a lead (used by LeadCard / LeadList / LeadBoard) ──
+  const getLeadSignals = useCallback(
+    (lead: LeadRow): LeadSignal[] => {
+      try {
+        return computeLeadSignals(lead, todosState);
+      } catch {
+        return [];
+      }
+    },
+    [todosState]
+  );
+
+  // ── Todo CRUD handler (passed to useLeadActions for optimistic updates) ──
+  const handleTodoUpdate = useCallback(
+    (action: "toggle" | "delete" | "add", todoId: string, todo?: LeadTodoRow) => {
+      setTodosState((prev) => {
+        if (action === "toggle") {
+          return prev.map((t) =>
+            t.id === todoId ? { ...t, status: t.status === "done" ? "pending" : "done" } : t
+          );
+        }
+        if (action === "delete") return prev.filter((t) => t.id !== todoId);
+        if (action === "add" && todo) return [todo, ...prev];
+        return prev;
+      });
+    },
+    []
+  );
+
   // ── Filters + derived data (extracted to useLeadFilters hook) ──
   const {
     searchQuery, setSearchQuery,
@@ -179,22 +220,96 @@ export function LeadsClient({
     getLeadSignals,
   });
 
+  // ── Selected lead (derived from sortedLeads + selectedId) ──
+  const selectedLead = useMemo(
+    () => (selectedId ? sortedLeads.find((l) => l.user_id === selectedId) ?? null : null),
+    [selectedId, sortedLeads]
+  );
+
   // ── Selected lead's todos (for the detail drawer) ──
   const selectedLeadTodos = useMemo(
     () => (selectedLead ? getTodosForLead(selectedLead) : []),
     [selectedLead, getTodosForLead]
   );
 
-  // ── Dismiss dialog lead object ──
-  // dismissLead now comes from useLeadActions hook
-
   // ── View mode (list/board) ──
   const [viewMode, setViewMode] = useState<"list" | "board">("list");
+
+  // ── Notes state for the currently selected lead ──
+  // Notes are loaded/added on-demand; we keep them per-render so the
+  // LeadDetailContent drawer can show newly added notes immediately.
+  // The actual persistence is handled by useLeadActions.handleAddNote
+  // (which calls createLeadNote server action).
+  const [notesState, setNotesState] = useState<LeadDetailContentNote[]>([]);
+
+  // Reset notes when selection changes
+  useEffect(() => {
+    setNotesState([]);
+  }, [selectedId]);
+
+  // ── Lead selection handler (wraps setSelectedId) ──
+  const handleSelectLead = useCallback((lead: LeadRow) => {
+    setSelectedId(lead.user_id);
+  }, []);
+
+  // ── Add note wrapper — calls hook's handleAddNote and updates local state ──
+  // handleAddNoteFromHook is renamed on import to avoid clash; we wrap it
+  // so the LeadDetailContent drawer sees an updated notes list immediately.
+
+  // ── Async actions (extracted to useLeadActions hook) ──
+  // dismiss, todo CRUD, notes, drawer actions, KPI fetch — all live in the hook.
+  const {
+    dismissDialogOpen,
+    setDismissDialogOpen,
+    dismissLead,
+    kpis,
+    fetchKpis,
+    handleDismissLeadRequest,
+    handleDismissLeadConfirm,
+    handleCreateTodo,
+    handleToggleTodo,
+    handleDeleteTodo,
+    handleAddNote: handleAddNoteFromHook,
+    handleDrawerAction,
+    DISMISS_REASONS,
+  } = useLeadActions({
+    slug,
+    crewId,
+    selectedLead,
+    leadsState,
+    dbUser,
+    passwordAuthOwnerId,
+    onTodoUpdate: handleTodoUpdate,
+    onDismissOptimistic: (leadId) => {
+      setLeadsState((prev) => prev.filter((l) => l.user_id !== leadId));
+    },
+    onClearSelection: () => setSelectedId(null),
+    router,
+  });
+
+  // ── Wrap handleAddNote so the new note shows up in notesState immediately ──
+  const handleAddNote = useCallback(
+    async (text: string) => {
+      const newNote = await handleAddNoteFromHook(text);
+      if (newNote) {
+        setNotesState((prev) => [
+          {
+            id: newNote.id,
+            text: newNote.text,
+            created_at: newNote.created_at,
+            created_by: newNote.created_by ?? null,
+          },
+          ...prev,
+        ]);
+      }
+    },
+    [handleAddNoteFromHook]
+  );
 
   // ── Fetch KPIs when mode changes ──
   useEffect(() => {
     void fetchKpis(mode);
-  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, fetchKpis]);
 
   // ── Password gate ──
   // Must be AFTER all hooks (useState/useEffect/useMemo/useCallback) to satisfy
@@ -245,7 +360,17 @@ export function LeadsClient({
           onOwnerChange={setOwnerFilter}
           availableOwners={availableOwners}
           stageValue={activeStageFilter || "all"}
-          onStageChange={(v) => setActiveStageFilter(v === "all" ? null : (v as StageKey))}
+          onStageChange={(v) => {
+            // useLeadFilters exports handleStageSelect which toggles: if the
+            // same stage is clicked again, it clears the filter (returns null).
+            if (v === "all") {
+              // Clicked "all" — if a stage is currently active, clear it by
+              // toggling that stage. If none active, no-op.
+              if (activeStageFilter) handleStageSelect(activeStageFilter);
+            } else {
+              handleStageSelect(v);
+            }
+          }}
           filterFlags={filterFlags}
           onFilterFlagsChange={handleFilterFlagsChange}
           viewMode={viewMode}
@@ -380,8 +505,10 @@ export function LeadsClient({
           T={T}
           onSubmit={handleDismissLeadConfirm}
           onCancel={() => {
+            // Closing the dialog is enough — useLeadActions internally tracks
+            // dismissLeadId and clears it on next open. We just toggle the
+            // open state here.
             setDismissDialogOpen(false);
-            setDismissLeadId(null);
           }}
         />
       </div>
