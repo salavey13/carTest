@@ -41,8 +41,8 @@ fi
 # Only alert about each return once (12h cooldown — covers the 3h window + buffer)
 NEW_RETURNS=$(echo "$RETURNS_DATA" | jq -r '
   .[] |
-  "RENTAL:\(.rental_id):\(.vehicle_id):\(.user_id[0:8]):\(.agreed_end_date[11:16]):\(.total_cost // 0)"
-' | while IFS=: read -r prefix rid vid uid time cost; do
+  "RENTAL|\(.rental_id)|\(.vehicle_id)|\(.user_id[0:8])|\(.agreed_end_date[11:16])|\(.total_cost // 0)"
+' | while IFS=| read -r prefix rid vid uid time cost; do
   if ! already_alerted "returns" "$rid" 43200; then
     local rlink
     rlink=$(rental_link "$rid")
