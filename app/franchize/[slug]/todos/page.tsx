@@ -2,7 +2,16 @@
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Calendar, RefreshCw, ChevronLeft, ChevronRight, Bell, Bike, ShoppingBag, Wallet, CheckCircle2, Circle, Plus, Trash2, AlertTriangle, Clock, Zap } from 'lucide-react'
+import { Calendar, RefreshCw, ChevronLeft, ChevronRight, Bell, Bike, ShoppingBag, Wallet, CheckCircle2, Circle, Plus, Trash2, AlertTriangle, Clock, Zap, Lock } from 'lucide-react'
+// NEW (polish 2026-07-30): auth gate for todos page.
+// Previously the page had NO auth check — anyone visiting /franchize/<slug>/todos
+// could see the full vip-bike dashboard (rentals, sales, reminders, todos) with
+// customer names, prices, rental dates. Now we require either Telegram WebApp
+// auth (dbUser) or the analytics password.
+import { useAppContext } from '@/contexts/AppContext'
+import { usePasswordGate } from '../leads/hooks/usePasswordGate'
+import { AnalyticsPasswordEntry } from '../../components/AnalyticsPasswordEntry'
+import { AnalyticsLoading } from '../../components/AnalyticsLoading'
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -121,6 +130,74 @@ export default function Home() {
 
 function HomeInner() {
   const searchParams = useSearchParams()
+
+  // ── NEW (polish 2026-07-30): auth gate ──
+  // Require either Telegram WebApp auth or analytics password before showing
+  // any dashboard data. Without this, the page was publicly accessible.
+  const { dbUser, isLoading: authLoading } = useAppContext()
+  const slug = searchParams.get('slug') || 'vip-bike'
+  const isInTelegram = typeof window !== 'undefined' && !!(window as any).Telegram?.WebApp?.initData
+  const {
+    showPasswordEntry,
+    passwordInput,
+    setPasswordInput,
+    passwordError,
+    isPasswordValidating,
+    passwordAuthed,
+    handlePasswordSubmit,
+  } = usePasswordGate(slug, isInTelegram, dbUser?.user_id)
+
+  // While AppContext is still resolving auth, show a loading spinner.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#121520] flex items-center justify-center">
+        <AnalyticsLoading accentMain="#F4BD55" bgBase="#121520" />
+      </div>
+    )
+  }
+
+  // If user is not authed via Telegram AND password gate is showing,
+  // render the password entry form instead of the dashboard.
+  const isAuthed = !!(dbUser?.user_id || passwordAuthed)
+  if (!isAuthed && showPasswordEntry) {
+    return (
+      <div className="min-h-screen bg-[#121520] flex items-center justify-center px-4">
+        <div className="w-full max-w-sm space-y-4 rounded-2xl border border-[#2A2E3E] bg-[#1A1D29] p-6">
+          <div className="text-center">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#2A2E3E]">
+              <Lock className="h-6 w-6 text-[#F4BD55]" />
+            </div>
+            <h2 className="text-lg font-bold text-[#E6D8C4]">Дашборд экипажа</h2>
+            <p className="mt-1 text-sm text-[#7D828C]">Введите пароль для доступа</p>
+          </div>
+          <input
+            type="password"
+            value={passwordInput}
+            onChange={(e) => setPasswordInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+            placeholder="••••••••"
+            disabled={isPasswordValidating}
+            className="w-full rounded-xl border border-[#2A2E3E] bg-[#121520] px-4 py-3 text-center tracking-widest text-[#E6D8C4] outline-none focus:border-[#F4BD55]"
+            autoFocus
+          />
+          {passwordError && (
+            <p className="flex items-center justify-center gap-1.5 text-center text-sm text-red-400">
+              <Lock className="h-4 w-4" /> {passwordError}
+            </p>
+          )}
+          <button
+            onClick={handlePasswordSubmit}
+            disabled={isPasswordValidating || !passwordInput.trim()}
+            className="w-full rounded-xl bg-[#F4BD55] py-3 font-bold text-[#121520] transition hover:opacity-90 disabled:opacity-50"
+          >
+            {isPasswordValidating ? 'Проверка...' : 'Войти'}
+          </button>
+          <p className="text-center text-xs text-[#7D828C]">Пароль можно получить через бота: /analytics_pass</p>
+        </div>
+      </div>
+    )
+  }
+
   const initialDate = searchParams.get('date') || todayStr()
   const [date, setDate] = useState<string>(initialDate)
   const [data, setData] = useState<DashboardData | null>(null)
