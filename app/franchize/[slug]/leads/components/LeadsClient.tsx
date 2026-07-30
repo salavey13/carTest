@@ -334,9 +334,15 @@ export function LeadsClient({
   // password entry screen is showing.
   const isAuthed = !!(dbUser?.user_id || passwordAuthOwnerId);
   const leadsFetchedRef = useRef(false);
+  // HIGH FIX #8: reset the fetch ref when slug changes so navigating from
+  // crew A to crew B actually fetches crew B's leads (was stuck on crew A
+  // because the ref was never cleared)
+  useEffect(() => {
+    leadsFetchedRef.current = false;
+  }, [slug]);
   useEffect(() => {
     if (!isAuthed || authLoading || shouldShowPassword) return;
-    if (leadsFetchedRef.current) return;  // dedupe — only fetch once per mount
+    if (leadsFetchedRef.current) return;  // dedupe — only fetch once per slug
     leadsFetchedRef.current = true;
 
     let cancelled = false;
@@ -423,9 +429,7 @@ export function LeadsClient({
           onFilterFlagsChange={handleFilterFlagsChange}
           viewMode={viewMode}
           onViewModeChange={(v) => setViewMode(v as "list" | "board")}
-          onExport={() => {
-            // Future: CSV export
-          }}
+          onExport={undefined}  // LOW #21: disabled until CSV export is implemented
           T={T}
         />
 
