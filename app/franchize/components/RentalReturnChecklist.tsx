@@ -25,6 +25,7 @@ export function RentalReturnChecklist({
 }: RentalReturnChecklistProps) {
   const [todos, setTodos] = useState<ReturnTodo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +39,54 @@ export function RentalReturnChecklist({
     });
     return () => { cancelled = true; };
   }, [rentalId, crewId]);
+
+  // BUG F fix: toggle a closure todo's status (pending ↔ done).
+  // Previously the checklist was read-only — operators could see items but
+  // couldn't act on them from the dedicated /rental/[id] page. Now each
+  // todo has a tap target that flips its status via the lead-todo API
+  // (PATCH /api/franchize/lead-todo with action=toggle).
+  const handleToggle = async (todoId: string, currentStatus: string) => {
+    setTogglingId(todoId);
+    try {
+      // Optimistic update
+      setTodos((prev) =>
+        prev.map((t) =>
+          t.id === todoId ? { ...t, status: currentStatus === "done" ? "pending" : "done" } : t
+        )
+      );
+
+      const res = await fetch("/api/franchize/lead-todo", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          todoId,
+          slug: crewId, // crewId is used as slug in the API auth check
+          crewId,
+          action: "toggle",
+        }),
+      });
+
+      if (!res.ok) {
+        // Revert optimistic update on failure
+        setTodos((prev) =>
+          prev.map((t) =>
+            t.id === todoId ? { ...t, status: currentStatus } : t
+          )
+        );
+        console.error("[RentalReturnChecklist] Toggle failed:", await res.text());
+      }
+    } catch (e) {
+      // Revert + log
+      setTodos((prev) =>
+        prev.map((t) =>
+          t.id === todoId ? { ...t, status: currentStatus } : t
+        )
+      );
+      console.error("[RentalReturnChecklist] Toggle error:", e);
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   // Fallback: default return items shown when no DB todos exist yet
   const defaultItems = [
@@ -68,19 +117,26 @@ export function RentalReturnChecklist({
           <ul className="space-y-1.5">
             {displayTodos.map((todo) => {
               const isDone = todo.status === "done";
+              const isToggling = togglingId === todo.id;
               return (
                 <li key={todo.id} className="flex gap-2 items-start">
-                  <span
-                    className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-[10px] font-bold"
+                  {/* BUG F fix: tap-to-toggle button (was static span) */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggle(todo.id, todo.status)}
+                    disabled={isToggling}
+                    aria-label={isDone ? "Отметить как невыполненное" : "Отметить как выполненное"}
+                    className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-[10px] font-bold transition-colors hover:scale-110 disabled:opacity-50"
                     style={{
                       backgroundColor: isDone
                         ? "color-mix(in srgb, var(--franchize-accent-main, #22c55e) 20%, transparent)"
                         : "color-mix(in srgb, var(--franchize-text-secondary, #aaa) 12%, transparent)",
                       color: isDone ? "var(--franchize-accent-main, #22c55e)" : textSecondary,
+                      cursor: isToggling ? "wait" : "pointer",
                     }}
                   >
-                    {isDone ? "✓" : "○"}
-                  </span>
+                    {isToggling ? "…" : isDone ? "✓" : "○"}
+                  </button>
                   <span style={{ textDecoration: isDone ? "line-through" : "none", opacity: isDone ? 0.6 : 1 }}>
                     {todo.title.replace(/^[^\s]+\s/, "")}
                   </span>
@@ -99,7 +155,7 @@ export function RentalReturnChecklist({
         )}
         {!loading && displayTodos && (
           <p className="mt-3" style={{ color: textSecondary }}>
-            Отмеченные пункты выполнены. При возврате оператор проверит комплектацию и состояние.
+            Нажмите на кружок, чтобы отметить пункт выполненным. При возврате оператор проверит комплектацию и состояние.
           </p>
         )}
         {!loading && !displayTodos && (
