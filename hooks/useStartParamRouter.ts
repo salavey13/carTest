@@ -538,11 +538,23 @@ export function useStartParamRouter() {
         } else if (paramToProcess.startsWith("rental_")) {
           // ── Rental detail deep link: rental_{rentalId} ──
           // (NOT "rent_" which is the QR claim link handled above)
+          //
+          // BUG FIX (was BUG A+H in code review): previously this routed to
+          // /franchize/<slug>/rentals-analytics?rentalId=<id> (analytics drawer)
+          // — but the analytics drawer has no proper closure UI (no odometer
+          // prompt, no deposit-refund checkbox, no damage notes input).
+          // The dedicated /franchize/<slug>/rental/<id> page is where
+          // FranchizeRentalLifecycleActions + RentalReturnChecklist live, so
+          // deep links from boss-commands (returns-reminder.sh, evening-summary.sh)
+          // should land operators THERE.
+          //
+          // If you want the analytics drawer, use `analytics_rental_<id>`
+          // (handled by parseAnalyticsDeepLink below).
           const parsed = parseRentalDetailDeepLink(paramToProcess);
           if (parsed) {
             const crewSlug = userCrewInfo?.slug || "vip-bike";
-            targetPath = `/franchize/${crewSlug}/rentals-analytics?ui=v2&rentalId=${parsed.rentalId}`;
-            logger.info(`[ClientLayout] Routing to rental detail: ${targetPath}`);
+            targetPath = `/franchize/${crewSlug}/rental/${parsed.rentalId}`;
+            logger.info(`[ClientLayout] Routing to dedicated rental page: ${targetPath}`);
           }
         } else if (paramToProcess.startsWith("analytics_")) {
           // ── Analytics deep links: analytics_{tab}, analytics_{tab}_{date}, ──
