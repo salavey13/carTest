@@ -5,6 +5,7 @@ import {
   useMemo,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,6 +33,11 @@ import type {
 import { useTodosMapping } from "../hooks/useLeadsData";
 import { useLeadFilters } from "../hooks/useLeadFilters";
 import { useLeadActions } from "../hooks/useLeadActions";
+// NEW (polish 2026-07-30): server action for fetching leads AFTER auth passes.
+// Previously the page passed leads as server-side props (visible in HTML payload
+// before password gate). Now the page passes empty arrays and LeadsClient
+// fetches via this action once the user is authed.
+import { getFranchizeLeads } from "../../server-actions/leads";
 
 // Lib
 // All pipeline / SLA / dismiss / KPI / note logic now lives in the
@@ -310,6 +316,43 @@ export function LeadsClient({
   useEffect(() => {
     void fetchKpis(mode);
   }, [mode, fetchKpis]);
+
+  // ── NEW (polish 2026-07-30): fetch leads AFTER auth passes ──
+  // The page now passes empty leads/todos arrays (security fix — see page.tsx
+  // comment). We fetch the real data here once the user is authed, then
+  // setLeadsState + setTodosState so the existing hooks (useLeadFilters,
+  // useLeadActions) react to the new data.
+  //
+  // `isAuthed` = user is either logged in via Telegram WebApp (dbUser) OR
+  // entered the analytics password (passwordAuthOwnerId). We don't fetch
+  // while authLoading is true (AppContext still resolving) or while the
+  // password entry screen is showing.
+  const isAuthed = !!(dbUser?.user_id || passwordAuthOwnerId);
+  const leadsFetchedRef = useRef(false);
+  useEffect(() => {
+    if (!isAuthed || authLoading || shouldShowPassword) return;
+    if (leadsFetchedRef.current) return;  // dedupe — only fetch once per mount
+    leadsFetchedRef.current = true;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await getFranchizeLeads(slug);
+        if (cancelled) return;
+        if (result.success) {
+          const fetchedLeads = (result.leads || []).filter(Boolean) as LeadRow[];
+          const fetchedTodos = (result.todos || []).filter(Boolean) as LeadTodoRow[];
+          setLeadsState(fetchedLeads);
+          setTodosState(fetchedTodos);
+        } else {
+          console.error("[LeadsClient] getFranchizeLeads failed:", result.error);
+        }
+      } catch (e) {
+        if (!cancelled) console.error("[LeadsClient] getFranchizeLeads error:", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthed, authLoading, shouldShowPassword, slug]);
 
   // ── Password gate ──
   // Must be AFTER all hooks (useState/useEffect/useMemo/useCallback) to satisfy
