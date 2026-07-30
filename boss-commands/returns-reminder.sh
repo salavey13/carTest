@@ -46,7 +46,11 @@ NEW_RETURNS=$(echo "$RETURNS_DATA" | jq -r '
   if ! already_alerted "returns" "$rid" 43200; then
     local rlink
     rlink=$(rental_link "$rid")
-    echo "• $vid → клиент ${uid}… | до $time UTC | ${cost} ₽\n  📋 <a href=\"${rlink}\">Открыть</a>"
+    # Use printf so \n becomes a real newline (echo "...\n..." in bash doesn't
+    # interpret escapes unless using echo -e or $'...'). Real newlines are
+    # needed so the message renders correctly in Telegram.
+    printf '• %s → клиент %s… | до %s UTC | %s ₽\n  📋 <a href="%s">Открыть</a>\n' \
+      "$vid" "$uid" "$time" "$cost" "$rlink"
     record_alert "returns" "$rid"
   fi
 done)
@@ -57,15 +61,16 @@ if [[ "$NEW_COUNT" == "0" ]]; then
   exit 0
 fi
 
+# BUG FIX (was BUG D in code review): previously this script OVERWROTE the
+# `RETURNS_LIST` variable with a plain jq filter that had NO deep links,
+# silently discarding the per-rental "📋 Открыть" links built above by
+# rental_link(). Operators got the count but no way to tap into a rental.
+# Now we use `NEW_RETURNS` directly so each rental has its tappable link.
 RETURNS_LIST="$NEW_RETURNS"
 RETURNS_COUNT="$NEW_COUNT"
 
 # ─── Format the reminder ─────────────────────────────────────────────────────
-RETURNS_LIST=$(echo "$RETURNS_DATA" | jq -r '
-  map(
-    "• \(.vehicle_id) → клиент \(.user_id[0:8])… | до \(.agreed_end_date[11:16]) UTC | \(.total_cost // 0) ₽"
-  ) | join("\n")
-')
+# (per-rental lines already built above with deep links — no reformat here)
 
 DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
 MESSAGE="⏰ <b>Возвраты в ближайшие 3 часа</b> — ${RETURNS_COUNT} шт.
