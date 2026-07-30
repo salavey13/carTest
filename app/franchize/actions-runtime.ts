@@ -4769,6 +4769,15 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   vehicleTitle: string;
   renterId: string;
   ownerId: string;
+  // NEW (polish 2026-07-30): fallback renter identity for bot/QR-flow rentals.
+  // When rentals.user_id is null (rental created via bot / QR claim), the
+  // renter's Telegram chat ID lives in private.rental_contract_artefacts.telegram_chat_id
+  // and their full name (from passport OCR) lives in renter_full_name.
+  // UI components (FranchizeRentalLifecycleActions) and server actions
+  // (confirmVehicleReturn receipt, notifyRentalLifecycle) should fall back to
+  // these when renterId is empty.
+  renterTelegramChatId: string;
+  renterFullName: string;
   agreedEndDate: string | null;
   requestedEndDate: string | null;
   metadata: Record<string, unknown> | null;
@@ -4793,6 +4802,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       vehicleTitle: "—",
       renterId: "",
       ownerId: "",
+      renterTelegramChatId: "",
+      renterFullName: "",
       agreedEndDate: null,
       requestedEndDate: null,
       metadata: null,
@@ -4824,6 +4835,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       vehicleTitle: "—",
       renterId: "",
       ownerId: "",
+      renterTelegramChatId: "",
+      renterFullName: "",
       agreedEndDate: null,
       requestedEndDate: null,
       metadata: null,
@@ -4853,6 +4866,32 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
         ? "expired"
       : "not_verified";
 
+  // ── NEW (polish 2026-07-30): fetch fallback renter identity from
+  // private.rental_contract_artefacts by rental_id FK ──
+  // For bot/QR-flow rentals, rentals.user_id may be null. The actual renter
+  // chat ID lives in rental_contract_artefacts.telegram_chat_id and the
+  // renter's full name (from passport OCR) lives in renter_full_name.
+  // Both are surfaced to UI + server actions so receipts / notifications
+  // work even when user_id is missing.
+  let renterTelegramChatId = "";
+  let renterFullName = "";
+  try {
+    const { data: artefact } = await supabaseAdmin
+      .from("rental_contract_artefacts")
+      .select("telegram_chat_id, renter_full_name")
+      .eq("rental_id", safeRentalId)
+      .maybeSingle();
+    if (artefact) {
+      renterTelegramChatId = typeof artefact.telegram_chat_id === "string" ? artefact.telegram_chat_id.trim() : "";
+      renterFullName = typeof artefact.renter_full_name === "string" ? artefact.renter_full_name.trim() : "";
+    }
+  } catch (artefactErr) {
+    // Non-fatal — the rental_contract_artefacts table may not exist on
+    // databases that haven't run migration 20260612000000, or the service
+    // role may lack private-schema access. Log + continue with empty strings.
+    console.warn("[getFranchizeRentalCard] Failed to fetch rental_contract_artefacts fallback:", artefactErr);
+  }
+
   return {
     found: true,
     rentalId: data.rental_id,
@@ -4863,6 +4902,10 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     vehicleTitle: `${vehicle?.make ?? "Vehicle"} ${vehicle?.model ?? ""}`.trim(),
     renterId: data.user_id ?? "",
     ownerId: data.owner_id ?? "",
+    // Fallbacks from rental_contract_artefacts (empty when rental was created
+    // via web app flow — rentals.user_id is set in that case)
+    renterTelegramChatId,
+    renterFullName,
     agreedEndDate: data.agreed_end_date || null,
     requestedEndDate: data.requested_end_date || null,
     metadata,
