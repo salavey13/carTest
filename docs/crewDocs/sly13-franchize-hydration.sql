@@ -4,14 +4,19 @@
 --          "Создать франшизу" button is intentionally ENABLED — opposite of
 --          vip-bike which has it disabled. This is the demo / dev / personal
 --          tenant where new franchize creation is encouraged.
--- Safe to re-run: uses ON CONFLICT + jsonb_set
--- Updated: 2026-07-30
+-- Safe to re-run: uses ON CONFLICT (slug) + jsonb_set + ON CONFLICT (crew_id, user_id)
+-- Updated: 2026-07-30 — fix duplicate-key crash on re-run, set owner_id=413553377, email=salavey13@gmail.com
 
 begin;
 
 -- 1) Ensure crew exists
+-- FIX: previously used ON CONFLICT (id) with a hardcoded UUID, which crashed
+-- with `duplicate key value violates unique constraint "crews_slug_key"`
+-- when an existing sly13 crew row had a different UUID. Now we use
+-- ON CONFLICT (slug) so the upsert matches by slug (the natural key users
+-- actually care about), and we don't pin a specific UUID — let Postgres
+-- generate one for new rows, keep the existing one for existing rows.
 insert into public.crews (
-  id,
   name,
   description,
   logo_url,
@@ -23,26 +28,25 @@ insert into public.crews (
   updated_at
 )
 values (
-  '3a7c1f20-2b3a-4c5d-8e6f-901234567890',
   'SLY13',
   'Личная витрина salavey13 — разработка, демо, песочница для новых франшиз.',
   '',
-  '356282674',
+  '413553377',
   'sly13',
   '56.2954, 43.9446',
   '{}'::jsonb,
   now(),
   now()
 )
-on conflict (id) do update
+on conflict (slug) do update
 set
   name = excluded.name,
   description = excluded.description,
   logo_url = excluded.logo_url,
   owner_id = excluded.owner_id,
-  slug = excluded.slug,
   hq_location = excluded.hq_location,
   updated_at = now();
+
 
 -- 2) Canonical franchize metadata payload
 update public.crews c
@@ -154,7 +158,7 @@ set
         'contacts', jsonb_build_object(
           'address', 'Нижний Новгород',
           'phone', '+7 900 000 00 00',
-          'email', 'salavey13@mail.ru',
+          'email', 'salavey13@gmail.com',
           'telegram', '@salavey13',
           'telegramBotUsername', 'oneBikePlsBot',
           'workingHours', '09:00 - 23:00 (ежедневно)',
@@ -222,10 +226,12 @@ set
 where c.slug = 'sly13';
 
 -- 4) Ensure owner is in crew_members
+-- FIX: updated user_id from '356282674' (wrong — that was vip-bike's owner)
+-- to '413553377' (salavey13's actual Telegram user ID).
 insert into public.crew_members (crew_id, user_id, role, membership_status)
 select
   c.id,
-  '356282674',
+  '413553377',
   'owner',
   'active'
 from public.crews c
