@@ -244,7 +244,7 @@ describe('Doc Creation — TG Bot /doc Command Flow', () => {
         passportIssueDate: '2020-01-15',
         registration: 'г. Нижний Новгород, ул. Ленина, д. 1',
         driverLicenseSeries: '99',
-        driverLicenseNumber: '76123456',
+        driverLicenseNumber: '123456',
       };
 
       const bikeData = {
