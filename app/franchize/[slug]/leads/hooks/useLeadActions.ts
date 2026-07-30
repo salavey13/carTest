@@ -12,7 +12,9 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
-import { dismissLeadWithReason } from "../lib/leads-dismiss";
+// FIX: leads-dismiss lives in app/franchize/server-actions/, NOT in leads/lib/.
+// Was `../lib/leads-dismiss` which caused "Module not found" build error.
+import { dismissLeadWithReason } from "@/app/franchize/server-actions/leads-dismiss";
 import { getLeadsKpis, type LeadsKpis } from "@/app/franchize/server-actions/leads-kpis";
 import { createLeadNote } from "@/app/franchize/server-actions/lead-notes";
 import { DISMISS_REASONS } from "../lib/dismiss-reasons";
