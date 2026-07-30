@@ -147,57 +147,12 @@ function HomeInner() {
     handlePasswordSubmit,
   } = usePasswordGate(slug, isInTelegram, dbUser?.user_id)
 
-  // While AppContext is still resolving auth, show a loading spinner.
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-[#121520] flex items-center justify-center">
-        <AnalyticsLoading accentMain="#F4BD55" bgBase="#121520" />
-      </div>
-    )
-  }
-
-  // If user is not authed via Telegram AND password gate is showing,
-  // render the password entry form instead of the dashboard.
-  const isAuthed = !!(dbUser?.user_id || passwordAuthed)
-  if (!isAuthed && showPasswordEntry) {
-    return (
-      <div className="min-h-screen bg-[#121520] flex items-center justify-center px-4">
-        <div className="w-full max-w-sm space-y-4 rounded-2xl border border-[#2A2E3E] bg-[#1A1D29] p-6">
-          <div className="text-center">
-            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#2A2E3E]">
-              <Lock className="h-6 w-6 text-[#F4BD55]" />
-            </div>
-            <h2 className="text-lg font-bold text-[#E6D8C4]">Дашборд экипажа</h2>
-            <p className="mt-1 text-sm text-[#7D828C]">Введите пароль для доступа</p>
-          </div>
-          <input
-            type="password"
-            value={passwordInput}
-            onChange={(e) => setPasswordInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handlePasswordSubmit()}
-            placeholder="••••••••"
-            disabled={isPasswordValidating}
-            className="w-full rounded-xl border border-[#2A2E3E] bg-[#121520] px-4 py-3 text-center tracking-widest text-[#E6D8C4] outline-none focus:border-[#F4BD55]"
-            autoFocus
-          />
-          {passwordError && (
-            <p className="flex items-center justify-center gap-1.5 text-center text-sm text-red-400">
-              <Lock className="h-4 w-4" /> {passwordError}
-            </p>
-          )}
-          <button
-            onClick={handlePasswordSubmit}
-            disabled={isPasswordValidating || !passwordInput.trim()}
-            className="w-full rounded-xl bg-[#F4BD55] py-3 font-bold text-[#121520] transition hover:opacity-90 disabled:opacity-50"
-          >
-            {isPasswordValidating ? 'Проверка...' : 'Войти'}
-          </button>
-          <p className="text-center text-xs text-[#7D828C]">Пароль можно получить через бота: /analytics_pass</p>
-        </div>
-      </div>
-    )
-  }
-
+  // ── ALL hooks must be called BEFORE any early return (rules-of-hooks) ──
+  // The ESLint errors at lines 202-249 were because the early returns below
+  // (loading spinner, password form) were placed BEFORE useState/useCallback/
+  // useEffect. React requires hooks to be called in the same order on every
+  // render — early returns break that invariant. Now all hooks are declared
+  // first, then the conditional renders happen at the end.
   const initialDate = searchParams.get('date') || todayStr()
   const [date, setDate] = useState<string>(initialDate)
   const [data, setData] = useState<DashboardData | null>(null)
@@ -237,19 +192,78 @@ function HomeInner() {
     }
   }, [showOpenTodos])
 
+  // Only fetch dashboard data when authed — avoids wasted API calls while
+  // the password form is showing. Hooks are still called unconditionally
+  // (rules-of-hooks), but the effect body early-returns when not authed.
+  const isAuthed = !!(dbUser?.user_id || passwordAuthed)
+
   useEffect(() => {
+    if (!isAuthed) return
     fetchData(date)
-  }, [date, fetchData])
+  }, [date, fetchData, isAuthed])
 
   useEffect(() => {
+    if (!isAuthed) return
     fetchTodos(date)
-  }, [date, fetchTodos])
+  }, [date, fetchTodos, isAuthed])
 
-  // Auto-refresh every 60s
+  // Auto-refresh every 60s — only when authed
   useEffect(() => {
+    if (!isAuthed) return
     const t = setInterval(() => fetchData(date), 60000)
     return () => clearInterval(t)
-  }, [date, fetchData])
+  }, [date, fetchData, isAuthed])
+
+  // ── Early returns (AFTER all hooks) ──
+  // While AppContext is still resolving auth, show a loading spinner.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#121520] flex items-center justify-center">
+        <AnalyticsLoading accentMain="#F4BD55" bgBase="#121520" />
+      </div>
+    )
+  }
+
+  // If user is not authed via Telegram AND password gate is showing,
+  // render the password entry form instead of the dashboard.
+  if (!isAuthed && showPasswordEntry) {
+    return (
+      <div className="min-h-screen bg-[#121520] flex items-center justify-center px-4">
+        <div className="w-full max-w-sm space-y-4 rounded-2xl border border-[#2A2E3E] bg-[#1A1D29] p-6">
+          <div className="text-center">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#2A2E3E]">
+              <Lock className="h-6 w-6 text-[#F4BD55]" />
+            </div>
+            <h2 className="text-lg font-bold text-[#E6D8C4]">Дашборд экипажа</h2>
+            <p className="mt-1 text-sm text-[#7D828C]">Введите пароль для доступа</p>
+          </div>
+          <input
+            type="password"
+            value={passwordInput}
+            onChange={(e) => setPasswordInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+            placeholder="••••••••"
+            disabled={isPasswordValidating}
+            className="w-full rounded-xl border border-[#2A2E3E] bg-[#121520] px-4 py-3 text-center tracking-widest text-[#E6D8C4] outline-none focus:border-[#F4BD55]"
+            autoFocus
+          />
+          {passwordError && (
+            <p className="flex items-center justify-center gap-1.5 text-center text-sm text-red-400">
+              <Lock className="h-4 w-4" /> {passwordError}
+            </p>
+          )}
+          <button
+            onClick={handlePasswordSubmit}
+            disabled={isPasswordValidating || !passwordInput.trim()}
+            className="w-full rounded-xl bg-[#F4BD55] py-3 font-bold text-[#121520] transition hover:opacity-90 disabled:opacity-50"
+          >
+            {isPasswordValidating ? 'Проверка...' : 'Войти'}
+          </button>
+          <p className="text-center text-xs text-[#7D828C]">Пароль можно получить через бота: /analytics_pass</p>
+        </div>
+      </div>
+    )
+  }
 
   // ── Todo handlers ──
   const addTodo = async () => {
