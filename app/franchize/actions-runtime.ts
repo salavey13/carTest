@@ -2345,7 +2345,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         legal_address: crewSecrets.legalAddress,
         ogrnip: crewSecrets.ogrnip,
         inn: crewSecrets.inn,
-        phone: crewSecrets.email ? "" : "",
+        phone: "",
         document_key: `service-${payload.slug}-${payload.orderId}`,
       };
 
@@ -2533,7 +2533,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           inn: crewSecrets.inn,
           legal_address: crewSecrets.legalAddress,
           return_address: crewSecrets.returnAddress || crewSecrets.legalAddress,
-          phone: crewSecrets.email ? "" : "",
+          phone: "",
           email: crewSecrets.email,
           signature_timestamp: now.toLocaleString("ru-RU"),
           document_key: `testdrive-${payload.slug}-${payload.orderId}-bike${bikeIndex}`,
@@ -3143,7 +3143,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             const { data: rentalRow, error: rentalInsertError } = await supabaseAdmin
               .from("rentals")
               .insert({
-                user_id: payload.phone || payload.telegramUserId,
+                user_id: payload.telegramUserId || null,
                 owner_id: crewOwnerChatId || payload.telegramUserId,
                 vehicle_id: doc.bikeId, // FIX: was bikeName (a label), now uses actual bike ID
                 crew_id: crewId,
@@ -3176,7 +3176,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               // passport registration, drivers license, odometer, dates)
               try {
                 const { createRentalVerificationTodos } = await import("@/app/franchize/server-actions/rental-verification-todos");
-                const leadId = payload.phone || payload.telegramUserId;
+                const leadId = payload.telegramUserId || payload.phone || "";
                 const todosResult = await createRentalVerificationTodos(rentalRow.rental_id, crewId, leadId);
                 if (todosResult.success) {
                   logger.info(`[franchize] Created ${todosResult.created} verification todos for rental ${rentalRow.rental_id}`);
@@ -3212,7 +3212,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
       await upsertFranchizeLead({
         slug: payload.slug,
-        userId: payload.phone || payload.telegramUserId,
+        userId: payload.telegramUserId || payload.phone || "",
         intentType: resolvedIntentType,
         stage: "contract_generated",
         bikeId: isServiceFlow ? payload.cartLines[0]?.itemId : bikeDocs[0]?.bikeId,
@@ -3249,7 +3249,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           logger.warn("[franchize] Cannot create crew_todos: crew not found for slug:", payload.slug);
         } else {
         const crewId = crewRowForTodos.id;
-        const leadId = payload.phone || payload.telegramUserId;
+        const leadId = payload.telegramUserId || payload.phone || "";
         const baseTs = Date.now();
         const allTodoPromises: Promise<unknown>[] = [];
 
@@ -3337,7 +3337,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           logger.warn("[franchize] Cannot create sale crew_todos: crew not found for slug:", payload.slug);
         } else {
           const crewId = crewRowForSaleTodos.id;
-          const leadId = payload.phone || payload.telegramUserId;
+          const leadId = payload.telegramUserId || payload.phone || "";
           const baseTs = Date.now();
           const saleTodoPromises: Promise<unknown>[] = [];
 
@@ -3400,11 +3400,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         const { data: crewRowForSvcTodos } = await supabaseAdmin.from("crews").select("id").eq("slug", payload.slug).maybeSingle();
         if (crewRowForSvcTodos?.id) {
           const crewId = crewRowForSvcTodos.id;
-          const leadId = payload.phone || payload.telegramUserId;
+          const leadId = payload.telegramUserId || payload.phone || "";
           const baseTs = Date.now();
           const svcTodoPromises: Promise<unknown>[] = [];
 
-          const clientLabel = payload.recipient || payload.phone || payload.telegramUserId || "клиент";
+          const clientLabel = payload.recipient || payload.phone || "клиент";
 
           for (let serviceIndex = 0; serviceIndex < payload.cartLines.length; serviceIndex++) {
             const line = payload.cartLines[serviceIndex];
