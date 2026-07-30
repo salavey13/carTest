@@ -514,7 +514,8 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <button type="button" onClick={() => {
-                  const url = `https://t.me/oneBikePlsBot/app?startapp=crew_${effectiveSlug}_join_crew`;
+                  const botName = telegramBotUsername || "oneBikePlsBot";
+            const url = `https://t.me/${botName}/app?startapp=crew_${effectiveSlug}_join_crew`;
                   const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent("Присоединяйся к нашему экипажу в VibeRider!")}`;
                   if (isInTelegramContext && tg) tg.openLink(shareUrl);
                   else window.open(shareUrl, "_blank");
