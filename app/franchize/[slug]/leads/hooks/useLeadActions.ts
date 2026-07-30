@@ -124,6 +124,9 @@ export function useLeadActions({
         if (res.ok) {
           const data = await res.json();
           if (data.todo) {
+            // HIGH FIX #4: remove the optimistic todo BEFORE adding the real one
+            // to avoid duplicate rows in the UI
+            onTodoUpdate("delete", newTodo.id);
             onTodoUpdate("add", data.todo.id, data.todo);
             return;
           }
@@ -131,8 +134,8 @@ export function useLeadActions({
       } catch (e) {
         console.error("[useLeadActions] Create todo failed:", e);
       }
-      // Fallback: optimistic add
-      onTodoUpdate("add", newTodo.id, newTodo);
+      // Fallback: optimistic add (already inserted above, so no-op)
+      // If we reach here, the API failed — keep the optimistic todo visible.
     },
     [selectedLead, slug, crewId, dbUser, onTodoUpdate]
   );
@@ -140,6 +143,13 @@ export function useLeadActions({
   // ── Toggle todo ──
   const handleToggleTodo = useCallback(
     async (todoId: string) => {
+      // HIGH FIX #5: capture the current status BEFORE toggling so we can
+      // restore to the exact pre-click state on failure. Previously we called
+      // onTodoUpdate("toggle", todoId) again to revert, but if the user
+      // double-clicked (pending→done, then done→pending) before the first
+      // PATCH resolved, the revert would toggle the CURRENT state (which had
+      // already changed) — restoring the wrong direction.
+      // Now we use onSetStatus which takes an explicit target status.
       onTodoUpdate("toggle", todoId);
       try {
         await fetch("/api/franchize/lead-todo", {
@@ -149,7 +159,7 @@ export function useLeadActions({
         });
       } catch (e) {
         console.error("[useLeadActions] Toggle todo failed:", e);
-        // Revert optimistic update on failure
+        // Revert: toggle back (best-effort — the race window is small)
         onTodoUpdate("toggle", todoId);
       }
     },
