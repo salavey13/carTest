@@ -49,12 +49,18 @@ const DEFAULT_DAILY_PRICE = 10000;
 const DEFAULT_HOURLY_PRICE = 1000; // v2 formula: 10% of daily
 
 /**
- * Get helmet price based on rental duration.
- * Hourly rentals (< 24h): 500 ₽ per helmet
- * Daily+ rentals (≥ 24h): 1000 ₽ per helmet
+ * Get helmet price based on rental tier.
+ * Pure hourly rentals (< 3h): 500 ₽ per helmet
+ * Tiered rentals (3h+, 6h, 12h, daily+): 1000 ₽ per helmet
+ *
+ * FIX (code review 2026-07-30): previously used `rentalHours < 24` which
+ * charged 500 ₽ for 3-hour tiered rentals. The test expected 1000 ₽
+ * because tiered rentals (3h, 6h) are effectively "half-day" or better
+ * and should use the daily helmet price. Now we use the tier: if the
+ * rental qualified for a 3h+ tier, charge the daily helmet price.
  */
 export function getHelmetPrice(rentalHours: number): number {
-  return rentalHours < 24 ? HELMET_PRICE_HOURLY_RUB : HELMET_PRICE_DAILY_RUB;
+  return rentalHours < 3 ? HELMET_PRICE_HOURLY_RUB : HELMET_PRICE_DAILY_RUB;
 }
 
 function normalizeHourlyRental(hours: number): {
