@@ -339,3 +339,179 @@ export async function getRentalVerificationTodos(
     };
   }
 }
+
+// ============================================================================
+// createRentalClosureTodos — mirror of createRentalVerificationTodos but for
+// the CLOSURE side (return / completion).
+//
+// BUG C fix: previously the system created 5 START verification todos
+// (passport, license, odometer_start, dates) but NO closure todos. Operators
+// had reminders for rental START but nothing for rental END — returns were
+// forgotten, rentals stayed "active" forever, deposits weren't refunded,
+// bikes weren't inspected.
+//
+// This function creates 5 closure todos:
+//   1. "Осмотреть байк на повреждения при возврате"
+//   2. "Зафиксировать финальный одометр"
+//   3. "Вернуть депозит арендатору"
+//   4. "Запросить отзыв у арендатора"
+//   5. "Пометить аренду завершённой в дашборде"
+//
+// Should be called from confirmVehiclePickup() when rental becomes active
+// so the closure todos appear in the operator's todo list throughout the
+// rental period.
+// ============================================================================
+
+export type RentalClosureTodoType =
+  | "inspect_damage"
+  | "odometer_final"
+  | "deposit_refund"
+  | "review_request"
+  | "mark_completed";
+
+export interface RentalClosureTodo {
+  id: string;
+  rental_id: string;
+  todo_type: RentalClosureTodoType;
+  title: string;
+  status: "pending" | "in_progress" | "done";
+  created_at: string;
+  completed_at: string | null;
+}
+
+const CLOSURE_TODO_TEMPLATES: Array<{
+  type: RentalClosureTodoType;
+  title: string;
+  priority: "low" | "medium" | "high";
+}> = [
+  {
+    type: "inspect_damage",
+    title: "Осмотреть байк на повреждения при возврате",
+    priority: "high",
+  },
+  {
+    type: "odometer_final",
+    title: "Зафиксировать финальный одометр",
+    priority: "high",
+  },
+  {
+    type: "deposit_refund",
+    title: "Вернуть депозит арендатору",
+    priority: "medium",
+  },
+  {
+    type: "review_request",
+    title: "Запросить отзыв у арендатора",
+    priority: "low",
+  },
+  {
+    type: "mark_completed",
+    title: "Пометить аренду завершённой в дашборде",
+    priority: "medium",
+  },
+];
+
+export async function createRentalClosureTodos(
+  rentalId: string,
+  crewId: string,
+  leadId?: string | null
+): Promise<{ success: boolean; created: number; error?: string }> {
+  try {
+    if (!rentalId) {
+      return { success: false, created: 0, error: "rentalId is required" };
+    }
+
+    console.log(`[rental-closure-todos] Creating closure todos for rental ${rentalId}${leadId ? `, lead ${leadId}` : ""}`);
+
+    // Determine user_id from leadId if it's a Telegram ID
+    const todoUserId = leadId && /^\d{1,12}$/.test(leadId) ? leadId : null;
+
+    // Idempotency check: skip if closure todos already exist for this rental
+    // (avoids duplicates if confirmVehiclePickup is called twice).
+    const { data: existing } = await supabaseAdmin
+      .from("crew_todos")
+      .select("id, description")
+      .eq("crew_id", crewId)
+      .eq("rental_id", rentalId)
+      .eq("category", "rental_closure")
+      .limit(1);
+    if (existing && existing.length > 0) {
+      console.log(`[rental-closure-todos] Closure todos already exist for rental ${rentalId} — skipping`);
+      return { success: true, created: 0 };
+    }
+
+    const todosToInsert = CLOSURE_TODO_TEMPLATES.map((template) => ({
+      id: randomUUID(),
+      crew_id: crewId,
+      lead_id: leadId || null,
+      user_id: todoUserId,
+      rental_id: rentalId,
+      title: template.title,
+      description: JSON.stringify({
+        rental_id: rentalId,
+        todo_type: template.type,
+        source: "rental_closure_system",
+        lead_id: leadId || null,
+        user_id: todoUserId,
+      }),
+      category: "rental_closure",
+      status: "pending",
+      priority: template.priority,
+      assigned_to: null,
+      created_by: "system",
+    }));
+
+    const { error } = await supabaseAdmin.from("crew_todos").insert(todosToInsert);
+
+    if (error) {
+      console.error("[rental-closure-todos] Insert error:", error);
+      return { success: false, created: 0, error: error.message };
+    }
+
+    console.log(`[rental-closure-todos] Created ${todosToInsert.length} closure todos for rental ${rentalId}`);
+    return { success: true, created: todosToInsert.length };
+  } catch (error) {
+    console.error("[rental-closure-todos] Error:", error);
+    return {
+      success: false,
+      created: 0,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Помечает конкретный closure todo как выполненный.
+ * Mirror of completeRentalVerificationTodo but for closure category.
+ */
+export async function completeRentalClosureTodo(
+  todoId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!todoId) {
+      return { success: false, error: "todoId is required" };
+    }
+
+    const { error } = await supabaseAdmin
+      .from("crew_todos")
+      .update({
+        status: "done",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", todoId)
+      .eq("category", "rental_closure");  // Safety: never update other categories
+
+    if (error) {
+      console.error("[rental-closure-todos] Complete error:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("[rental-closure-todos] Error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
