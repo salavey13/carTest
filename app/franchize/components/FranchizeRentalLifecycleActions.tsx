@@ -14,6 +14,12 @@ interface FranchizeRentalLifecycleActionsProps {
   rentalId: string;
   ownerId: string;
   renterId: string;
+  // NEW (polish 2026-07-30): fallback renter identity for bot/QR-flow rentals.
+  // When rentals.user_id is null (rental created via bot / QR claim), the
+  // renter's Telegram chat ID lives in private.rental_contract_artefacts.telegram_chat_id.
+  // We use it to detect the renter role when renterId is empty.
+  renterTelegramChatId?: string;
+  renterFullName?: string;
   crewId: string;
   status: string;
   paymentStatus: string;
@@ -33,6 +39,8 @@ export function FranchizeRentalLifecycleActions({
   rentalId,
   ownerId,
   renterId,
+  renterTelegramChatId,
+  renterFullName,
   crewId,
   status,
   paymentStatus,
@@ -48,13 +56,16 @@ export function FranchizeRentalLifecycleActions({
   const role = useMemo(() => {
     if (!dbUser?.user_id) return "guest" as const;
     if (dbUser.user_id === ownerId) return "owner" as const;
-    if (dbUser.user_id === renterId) return "renter" as const;
+    // Polish 2026-07-30: also match against renterTelegramChatId fallback
+    // (for bot/QR-flow rentals where rentals.user_id is null).
+    if (renterId && dbUser.user_id === renterId) return "renter" as const;
+    if (renterTelegramChatId && dbUser.user_id === renterTelegramChatId) return "renter" as const;
     // Check if user is a crew member with admin/co_owner/owner role
     const membership = userCrewMemberships.find((m) => m.crewId === crewId);
     if (membership && ["owner", "admin", "co_owner"].includes(membership.role)) return "owner" as const;
     if (membership) return "member" as const;
     return "guest" as const;
-  }, [dbUser?.user_id, ownerId, renterId, userCrewMemberships, crewId]);
+  }, [dbUser?.user_id, ownerId, renterId, renterTelegramChatId, userCrewMemberships, crewId]);
 
   const withAction = (name: string, callback: () => Promise<void>) => {
     setPendingAction(name);
@@ -139,7 +150,7 @@ export function FranchizeRentalLifecycleActions({
     >
       <p className="text-xs uppercase tracking-[0.16em] text-[var(--lifecycle-muted)]">Lifecycle controls</p>
       <p className="mt-1 text-xs text-[var(--lifecycle-muted)]">
-        Роль: {role === "owner" ? "владелец" : role === "renter" ? "арендатор" : "наблюдатель"} · payment: {paymentStatus}
+        Роль: {role === "owner" ? "владелец" : role === "renter" ? `арендатор${renterFullName ? ` (${renterFullName})` : ""}` : "наблюдатель"} · payment: {paymentStatus}
       </p>
 
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
