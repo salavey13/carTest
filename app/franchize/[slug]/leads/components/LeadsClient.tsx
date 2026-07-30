@@ -37,7 +37,12 @@ import { useLeadActions } from "../hooks/useLeadActions";
 // Previously the page passed leads as server-side props (visible in HTML payload
 // before password gate). Now the page passes empty arrays and LeadsClient
 // fetches via this action once the user is authed.
-import { getFranchizeLeads } from "../../server-actions/leads";
+// FIX: use the same absolute @/app/franchize/server-actions/leads path that
+// line 19 already uses for the LeadRow type import. Relative `../../server-actions/leads`
+// would resolve to app/franchize/[slug]/server-actions/leads (WRONG — that dir
+// doesn't exist). Build was failing with "Module not found: Can't resolve
+// '../../server-actions/leads'".
+import { getFranchizeLeads } from "@/app/franchize/server-actions/leads";
 
 // Lib
 // All pipeline / SLA / dismiss / KPI / note logic now lives in the
