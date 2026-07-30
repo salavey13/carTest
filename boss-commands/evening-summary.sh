@@ -112,7 +112,7 @@ ACTIVE_RENTALS_LIST=$(echo "$RENTALS_DATA" | jq -r '
   map("• \(.vehicle_id) — \(.agreed_end_date[11:16]) UTC — \(.total_cost // 0) ₽") | join("\n")
 ')
 ACTIVE_RENTALS_LINKS=""
-if [[ -n "$ACTIVE_RENTALS_LIST" && "$ACTIVE_RENTALS_LIST" != "" ]]; then
+if [[ -n "$ACTIVE_RENTALS_LIST" ]]; then
   # Build per-rental "📋 Открыть" links using rental_link() from _lib.sh.
   # rental_link emits tg_deep_link "rental_<id>" which useStartParamRouter
   # routes to /franchize/<slug>/rental/<id> (the dedicated rental page
@@ -127,7 +127,7 @@ if [[ -n "$ACTIVE_RENTALS_LIST" && "$ACTIVE_RENTALS_LIST" != "" ]]; then
 fi
 
 ACTIVE_SECTION=""
-if [[ -n "$ACTIVE_RENTALS_LIST" && "$ACTIVE_RENTALS_LIST" != "" ]]; then
+if [[ -n "$ACTIVE_RENTALS_LIST" ]]; then
   ACTIVE_SECTION="<b>📋 Активные аренды (до 5):</b>
 ${ACTIVE_RENTALS_LIST}
 
