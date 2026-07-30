@@ -95,6 +95,17 @@ export function FranchizeRentalLifecycleActions({
   const canUploadStartPhoto = role === "renter" && ["pending_confirmation", "confirmed"].includes(status);
   const canUploadEndPhoto = role === "renter" && status === "active";
 
+  // ── BUG G fix: closure-data modal state ──
+  // Previously the "Подтвердить возврат" button called confirmVehicleReturn
+  // with NO arguments — so odometer_after, damage_notes, deposit_returned
+  // were silently dropped. Now we open a small modal first that prompts the
+  // operator for these fields, then call confirmVehicleReturn with the data.
+  const [closureModalOpen, setClosureModalOpen] = useState(false);
+  const [closureOdometer, setClosureOdometer] = useState("");
+  const [closureDamageNotes, setClosureDamageNotes] = useState("");
+  const [closureDepositReturned, setClosureDepositReturned] = useState(true);
+  const [closureReturnNotes, setClosureReturnNotes] = useState("");
+
   // Themed CSS vars
   const lifecycleVars = useMemo(() => {
     if (isAuto) {
@@ -164,20 +175,17 @@ export function FranchizeRentalLifecycleActions({
           <button
             type="button"
             disabled={isPending}
-            onClick={() =>
-              withAction("return", async () => {
-                if (!dbUser?.user_id) {
-                  toast.error("Нужна авторизация в Telegram WebApp.");
-                  return;
-                }
-                const result = await confirmVehicleReturn(rentalId, dbUser.user_id);
-                if (!result.success) {
-                  toast.error(result.error || "Не удалось подтвердить возврат.");
-                  return;
-                }
-                toast.success("Возврат подтвержден. Обновите карточку для актуального статуса.");
-              })
-            }
+            onClick={() => {
+              // BUG G fix: open the closure-data modal instead of immediately
+              // calling confirmVehicleReturn. The modal collects odometer_after,
+              // damage_notes, deposit_returned, return_notes — then the actual
+              // confirmVehicleReturn call happens in handleSubmitClosure.
+              setClosureOdometer("");
+              setClosureDamageNotes("");
+              setClosureDepositReturned(true);
+              setClosureReturnNotes("");
+              setClosureModalOpen(true);
+            }}
             className="rounded-xl bg-[var(--lifecycle-accent-hover)] px-3 py-2 text-sm font-semibold text-[#16130A] transition-colors hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lifecycle-accent)]"
           >
             {pendingAction === "return" ? "Подтверждаем..." : "Подтвердить возврат"}
@@ -238,6 +246,158 @@ export function FranchizeRentalLifecycleActions({
         <p className="mt-3 text-xs text-[var(--lifecycle-muted)]">
           Подтверждение выдачи будет доступно после сохранения выдачи в документах аренды.
         </p>
+      )}
+
+      {/* ── BUG G fix: closure-data modal ──
+          Collects odometer_after, damage_notes, deposit_returned, return_notes
+          before calling confirmVehicleReturn. Previously the button called
+          confirmVehicleReturn with NO arguments — closure data was silently
+          dropped, bikes never got last_known_odometer updated, deposits were
+          not tracked, damage wasn't recorded. */}
+      {closureModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+          onClick={() => !isPending && setClosureModalOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-md rounded-2xl border p-5"
+            style={{
+              backgroundColor: "var(--lifecycle-bg)",
+              borderColor: "var(--lifecycle-border)",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold mb-1" style={{ color: "var(--lifecycle-text)" }}>
+              Подтвердить возврат
+            </h3>
+            <p className="text-xs mb-4" style={{ color: "var(--lifecycle-muted)" }}>
+              Заполните поля перед закрытием аренды. Все данные сохранятся в карточку.
+            </p>
+
+            <div className="space-y-3">
+              <label className="block">
+                <span className="text-xs font-semibold" style={{ color: "var(--lifecycle-muted)" }}>
+                  Финальный одометр (км)
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={closureOdometer}
+                  onChange={(e) => setClosureOdometer(e.target.value)}
+                  placeholder="например, 12345"
+                  disabled={isPending}
+                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                  style={{
+                    backgroundColor: "var(--lifecycle-bg)",
+                    borderColor: "var(--lifecycle-border)",
+                    color: "var(--lifecycle-text)",
+                  }}
+                />
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={closureDepositReturned}
+                  onChange={(e) => setClosureDepositReturned(e.target.checked)}
+                  disabled={isPending}
+                  className="h-4 w-4"
+                />
+                <span className="text-sm" style={{ color: "var(--lifecycle-text)" }}>
+                  Депозит возвращён арендатору
+                </span>
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-semibold" style={{ color: "var(--lifecycle-muted)" }}>
+                  Заметки о повреждениях (если есть)
+                </span>
+                <textarea
+                  value={closureDamageNotes}
+                  onChange={(e) => setClosureDamageNotes(e.target.value)}
+                  placeholder="Царапины, потёртости, отсутствующие детали…"
+                  disabled={isPending}
+                  rows={2}
+                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none resize-none"
+                  style={{
+                    backgroundColor: "var(--lifecycle-bg)",
+                    borderColor: "var(--lifecycle-border)",
+                    color: "var(--lifecycle-text)",
+                  }}
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-semibold" style={{ color: "var(--lifecycle-muted)" }}>
+                  Комментарий оператора (необязательно)
+                </span>
+                <textarea
+                  value={closureReturnNotes}
+                  onChange={(e) => setClosureReturnNotes(e.target.value)}
+                  placeholder="Любые дополнительные заметки…"
+                  disabled={isPending}
+                  rows={2}
+                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none resize-none"
+                  style={{
+                    backgroundColor: "var(--lifecycle-bg)",
+                    borderColor: "var(--lifecycle-border)",
+                    color: "var(--lifecycle-text)",
+                  }}
+                />
+              </label>
+            </div>
+
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setClosureModalOpen(false)}
+                disabled={isPending}
+                className="flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition-opacity hover:opacity-85 disabled:opacity-50"
+                style={{
+                  backgroundColor: "color-mix(in srgb, var(--lifecycle-border) 30%, transparent)",
+                  color: "var(--lifecycle-text)",
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() =>
+                  withAction("return", async () => {
+                    if (!dbUser?.user_id) {
+                      toast.error("Нужна авторизация в Telegram WebApp.");
+                      return;
+                    }
+                    const result = await confirmVehicleReturn(rentalId, dbUser.user_id, {
+                      odometerAfter: closureOdometer ? parseInt(closureOdometer, 10) : null,
+                      damageNotes: closureDamageNotes.trim() || null,
+                      depositReturned: closureDepositReturned,
+                      returnNotes: closureReturnNotes.trim() || null,
+                    });
+                    if (!result.success) {
+                      toast.error(result.error || "Не удалось подтвердить возврат.");
+                      return;
+                    }
+                    toast.success("Возврат подтверждён. Карточка обновится.");
+                    setClosureModalOpen(false);
+                    // router.refresh() re-fetches server data so the page reflects the new "completed" status
+                    router.refresh();
+                  })
+                }
+                className="flex-1 rounded-xl px-3 py-2 text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-50"
+                style={{
+                  backgroundColor: "var(--lifecycle-accent)",
+                  color: "#16130A",
+                }}
+              >
+                {pendingAction === "return" ? "Сохраняем…" : "Закрыть аренду"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
