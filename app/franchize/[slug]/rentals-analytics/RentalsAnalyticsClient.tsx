@@ -1325,9 +1325,11 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                               )}
                             </td>
                             <td className="px-3 md:px-5 py-3 md:py-4 text-center hidden sm:table-cell">
-                              <span className="text-base md:text-lg font-bold" style={{ color: rental.documentSecret ? "#34d399" : borderSoft }}>
+                              {/* Verification: /doc flow = always verified (operator saw docs).
+                                  Web-app flow = verified only if documentSecret.verification_status === "verified" */}
+              <span className="text-base md:text-lg font-bold" style={{ color: rental.documentSecret ? "#34d399" : borderSoft }} title={rental.documentSecret?.is_web_app_flow ? "Web-app flow" : "Verified via /doc"}>
                                 {rental.documentSecret ? "✓" : "—"}
-                              </span>
+              </span>
                             </td>
                             <td className="px-3 md:px-5 py-3 md:py-4 text-center hidden md:table-cell">
                               {rental.odometerStart || rental.odometerEnd ? (
