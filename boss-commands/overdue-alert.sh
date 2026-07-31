@@ -74,7 +74,7 @@ ${OVERDUE_LIST}
 
 🔔 Проверено в ${NOW_DISPLAY} МСК
 
-📊 Дашборд: <a href="${DASHBOARD_LINK}">Открыть</a>"
+📊 Дашборд: <a href=\"${DASHBOARD_LINK}\">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then

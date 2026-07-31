@@ -116,7 +116,7 @@ ${STUCK_LEADS}
 2. Обновить стадию вручную если прогресс есть
 3. Dismiss если клиент потерян
 
-📋 Проблемные лиды: <a href="${LEADS_LINK}">Открыть</a>"
+📋 Проблемные лиды: <a href=\"${LEADS_LINK}\">Открыть</a>"
 
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
   echo "$MESSAGE" | sed 's/<[^>]*>//g'

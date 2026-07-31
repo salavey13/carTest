@@ -137,21 +137,25 @@ ${ACTIVE_RENTALS_LINKS}
 "
 fi
 
+RENTALS_LINK="$(analytics_link "rentals" "$TODAY")"
+SALES_LINK="$(analytics_link "sales" "$TODAY")"
+SERVICES_LINK="$(analytics_link "services" "$TODAY")"
+
 MESSAGE="📊 <b>Итоги дня</b> — ${TODAY}, ${NOW_DISPLAY} МСК
 
-<b>🏍 <a href="$(analytics_link "rentals" "$TODAY")">Аренды</a></b>
+<b>🏍 <a href=\"${RENTALS_LINK}\">Аренды</a></b>
 ${RENTAL_KPIS}
 
-<b>💰 <a href="$(analytics_link "sales" "$TODAY")">Продажи</a></b>
+<b>💰 <a href=\"${SALES_LINK}\">Продажи</a></b>
 ${SALE_KPIS}
 
-<b>🔧 <a href="$(analytics_link "services" "$TODAY")">Сервис</a></b>
+<b>🔧 <a href=\"${SERVICES_LINK}\">Сервис</a></b>
 ${SERVICE_KPIS}
 
 ━━━━━━━━━━━━━━━━━━
 ${ACTIVE_SECTION}<b>Итого выручка за день: ${TOTAL_REVENUE} ₽</b>
 
-📊 Дашборд: <a href="${DASHBOARD_LINK}">Открыть</a>"
+📊 Дашборд: <a href=\"${DASHBOARD_LINK}\">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then

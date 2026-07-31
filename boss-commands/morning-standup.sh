@@ -122,7 +122,7 @@ ${OVERDUE}
 📍 <b>Задачи с просрочкой (${TODOS_COUNT}):</b>
 ${PENDING_TODOS}
 
-📊 Дашборд: <a href="${DASHBOARD_LINK}">Открыть</a>"
+📊 Дашборд: <a href=\"${DASHBOARD_LINK}\">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
