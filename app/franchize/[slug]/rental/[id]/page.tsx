@@ -284,17 +284,6 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
 
               {status === "active" && (
                 <>
-                  <RentalLink
-                    href={bikeSearchHref}
-                    className="flex items-center justify-center gap-2 rounded-xl border px-4 py-3 font-semibold transition hover:opacity-85"
-                    style={{ borderColor: accent, color: accent }}
-                  >
-                    <Timer className="h-4 w-4 shrink-0" /> Продлить
-                  </RentalLink>
-                  <p className="text-[11px] leading-tight text-center" style={{ color: textSecondary }}>
-                    Откроет каталог с этим же байком — сможете оформить новую аренду
-                  </p>
-
                   <RentalReturnChecklist
                     rentalId={rental.rentalId}
                     crewId={crew.id}
@@ -316,22 +305,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                 textSecondary={textSecondary}
               />
 
-              <div className="grid grid-cols-2 gap-2">
-                <RentalLink
-                  href={catalogHref}
-                  className="rounded-xl border px-3 py-2 text-center text-xs transition hover:opacity-85"
-                  style={{ borderColor: borderSoft }}
-                >
-                  Каталог
-                </RentalLink>
-                <RentalLink
-                  href={profileHref}
-                  className="rounded-xl border px-3 py-2 text-center text-xs transition hover:opacity-85"
-                  style={{ borderColor: borderSoft }}
-                >
-                  Профиль
-                </RentalLink>
-              </div>
+              {/* Removed redundant Каталог/Профиль buttons — already in CrewHeader + RentalEscapeHatch */}
             </div>
           </div>
         </section>
@@ -385,7 +359,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               {verificationText}
             </span>
             <RentalLink
-              href={`/doc-verifier?integrationScope=${encodeURIComponent(rental.contractVerifierScope || `rental:${rental.rentalId}`)}&documentKey=${encodeURIComponent(rental.contractDocumentKey || `rental-${slug}-${rental.rentalId}`)}`}
+              href={`/franchize/${resolvedSlug}/verify-doc?integrationScope=${encodeURIComponent(rental.contractVerifierScope || `rental:${rental.rentalId}`)}&documentKey=${encodeURIComponent(rental.contractDocumentKey || `rental-${slug}-${rental.rentalId}`)}`}
               className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:opacity-85"
               style={{ borderColor: accent, color: accent }}
             >
@@ -495,13 +469,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                   <RefreshCw className="h-4 w-4 shrink-0" />
                   Продлить
                 </RentalLink>
-                <RentalLink
-                  href={catalogHref}
-                  className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm transition hover:opacity-85"
-                  style={{ borderColor: borderSoft, color: textPrimary }}
-                >
-                  Каталог
-                </RentalLink>
+                {/* Removed redundant Каталог button — already in CrewHeader */}
               </>
             ) : (
               <>
@@ -513,13 +481,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                   <Sparkles className="h-4 w-4 shrink-0" />
                   Продолжить
                 </RentalLink>
-                <RentalLink
-                  href={catalogHref}
-                  className="inline-flex justify-center rounded-xl border px-4 py-3 text-sm transition hover:opacity-85"
-                  style={{ borderColor: borderSoft, color: textPrimary }}
-                >
-                  Каталог
-                </RentalLink>
+                {/* Removed redundant Каталог button — already in CrewHeader */}
               </>
             )}
           </div>
