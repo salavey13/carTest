@@ -43,7 +43,7 @@ export const SEGMENT_META: Record<Segment, { label: string; icon: typeof Flame; 
   hot:       { label: "Горячие",     icon: Flame,       color: "#ef4444" },
   verified:  { label: "Клиенты",     icon: CheckCircle, color: "#10b981" },
   warm:      { label: "Заявки",      icon: Phone,       color: "#3b82f6" },
-  troubled:  { label: "Проблемные",  icon: AlertCircle, color: "#dc2626" },
+  troubled:  { label: "Ждут внимания", icon: AlertCircle, color: "#f59e0b" },
 };
 
 export type ViewMode = "list" | "board";
@@ -52,7 +52,7 @@ export type DetailSection = "contacts" | "deals" | "tasks" | "notes";
 
 export const SORT_OPTIONS: { value: SortMode; label: string }[] = [
   { value: "recent",  label: "Свежие" },
-  { value: "urgent",  label: "🔥 Срочные" },
+  { value: "urgent",  label: "⏱ По приоритету" },
   { value: "spent",   label: "💰 По выручке" },
   { value: "name",    label: "А → Я" },
 ];
