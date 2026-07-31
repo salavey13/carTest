@@ -509,6 +509,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             renterTelegramChatId={rental.renterTelegramChatId}
             renterFullName={rental.renterFullName}
             crewId={crew.id}
+            crewSlug={resolvedSlug}
             status={status}
             paymentStatus={rental.paymentStatus}
             hasPickupFreeze={Boolean((rental.metadata as { pickup_freeze?: { frozen_at?: unknown } } | null)?.pickup_freeze?.frozen_at)}
