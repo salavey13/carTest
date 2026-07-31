@@ -73,7 +73,7 @@ RETURNS_COUNT="$NEW_COUNT"
 # (per-rental lines already built above with deep links — no reformat here)
 
 DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
-MESSAGE="⏰ <b>Возвраты в ближайшие 3 часа</b> — ${RETURNS_COUNT} шт.
+MESSAGE="⏰ <b>Скоро возвраты (в ближайшие 3 часа)</b> — ${RETURNS_COUNT} шт.
 
 ${RETURNS_LIST}
 
