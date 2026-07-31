@@ -11,6 +11,8 @@ import {
   STAGE_BOTTLENECK,
   getVerificationStatus,
   VERIFICATION_LABELS,
+  getStageBottleneck,
+  getFlowType,
 } from "../lib/pipeline-stages";
 import { SOURCE_META } from "../leads-constants";
 import {
@@ -73,8 +75,12 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
   const returnDate = rental?.endDate ? formatDate(rental.endDate) : null;
   const pending = signals.filter((s) => s.tone === "warning" || s.tone === "danger").length;
 
-  // Next Step pill — the bottleneck for this stage
-  const bottleneck = STAGE_BOTTLENECK[stageKey as StageKey] || STAGE_BOTTLENECK.new;
+  // Next Step pill — flow-aware bottleneck for this stage.
+  // Different flows (/doc vs web-app) have different bottlenecks at the same stage:
+  // - /doc flow: QR stages apply (renter needs to scan QR), no photo upload needed
+  // - Web-app flow: QR stages don't apply (chat_id auto-shared), photo upload is bottleneck
+  const bottleneck = getStageBottleneck(lead);
+  const flowType = getFlowType(lead);
 
   // Verification status — different for /doc flow vs web-app flow
   const verifStatus = getVerificationStatus(lead);
@@ -283,19 +289,38 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
       )}
 
       {/* Verification badge — shows whether docs are verified.
-          /doc flow = verified (operator saw physical docs).
-          Web-app flow = unverified/pending (needs photo check). */}
-      {verifMeta.label && (
-        <span
-          className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
-          style={{
-            backgroundColor: `${verifMeta.color}15`,
-            color: verifMeta.color,
-          }}
-        >
-          {verifMeta.icon} {verifMeta.label}
-        </span>
-      )}
+          /doc flow = verified (operator saw physical docs during /doc command).
+          Web-app flow = unverified/pending (needs photo upload + OCR + operator check). */}
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        {/* Flow type badge — shows how this lead was created */}
+        {flowType === "doc" && (
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+            style={{ backgroundColor: "#06b6d415", color: "#06b6d4" }}
+          >
+            📋 /doc
+          </span>
+        )}
+        {flowType === "webapp" && (
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+            style={{ backgroundColor: "#8b5cf615", color: "#8b5cf6" }}
+          >
+            🌐 Веб
+          </span>
+        )}
+        {verifMeta.label && (
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+            style={{
+              backgroundColor: `${verifMeta.color}15`,
+              color: verifMeta.color,
+            }}
+          >
+            {verifMeta.icon} {verifMeta.label}
+          </span>
+        )}
+      </div>
     </motion.article>
   );
 }
