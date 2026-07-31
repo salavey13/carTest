@@ -22,6 +22,55 @@ export const STAGE_COLORS: Record<StageKey, string> = Object.fromEntries(
   PIPELINE_STAGES.map((s) => [s.key, s.color]),
 );
 
+/**
+ * The bottleneck for each stage — the ONE thing blocking transition to the
+ * next stage. Shown as a "Next Step" pill on LeadCard so operators don't
+ * have to think "what do I do next?"
+ */
+export const STAGE_BOTTLENECK: Record<StageKey, { label: string; action: string; color: string }> = {
+  new:               { label: "Связаться",         action: "telegram",  color: "#ef4444" },
+  needs_contact:     { label: "Создать договор",    action: "create_doc", color: "#f59e0b" },
+  contract_sent:     { label: "Отправить QR",       action: "resend_qr", color: "#eab308" },
+  awaiting_qr_claim: { label: "Переслать QR",       action: "resend_qr", color: "#f97316" },
+  documents_missing: { label: "Проверить фото",     action: "verify_photos", color: "#f97316" },
+  active_rental:     { label: "Открыть аренду",     action: "open_rental", color: "#22c55e" },
+  return_due:        { label: "Закрыть аренду",     action: "close_rental", color: "#ef4444" },
+  closed_won:        { label: "Запросить отзыв",    action: "request_review", color: "#22c55e" },
+  closed_lost:       { label: "Открыть повторно",   action: "reopen",    color: "#64748b" },
+};
+
+/**
+ * Verification status for each flow type.
+ * /doc flow: verified on creation (operator saw physical docs)
+ * Web-app flow: unverified until operator checks uploaded photos
+ */
+export function getVerificationStatus(lead: LeadRow): "verified" | "unverified" | "pending" | "not_needed" {
+  // /doc flow: if the lead has a rental with originalOperatorChatId,
+  // it was created by an operator via /doc command → docs were verified in person
+  if (lead.originalOperatorChatId && lead.rentals.length > 0) {
+    return "verified";
+  }
+  // Web-app flow: if the lead has a rental but no operator chat ID,
+  // it was created by the renter via web app → needs photo verification
+  if (lead.rentals.length > 0 && !lead.originalOperatorChatId) {
+    const r = lead.rentals[0] as any;
+    const hasPhotos = r.passportMainpagePhoto || r.passportRegistrationPhoto || r.driversLicenceFrontalPhoto;
+    const verified = r.metadata?.contract_verifier?.status === "verified";
+    if (verified) return "verified";
+    if (hasPhotos) return "pending";
+    return "unverified";
+  }
+  // No rental yet — verification not needed
+  return "not_needed";
+}
+
+export const VERIFICATION_LABELS: Record<string, { label: string; color: string; icon: string }> = {
+  verified:    { label: "Документы проверены",   color: "#22c55e", icon: "✓" },
+  unverified:  { label: "Фото не загружены",     color: "#ef4444", icon: "✗" },
+  pending:     { label: "Фото на проверке",       color: "#f59e0b", icon: "⏳" },
+  not_needed:  { label: "",                        color: "#64748b", icon: "" },
+};
+
 export const STAGE_NEXT_ACTION: Record<StageKey, string> = {
   new: "Написать в Telegram",
   needs_contact: "Написать в Telegram",
