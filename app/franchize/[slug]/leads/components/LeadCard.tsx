@@ -3,11 +3,14 @@
 import { motion } from "framer-motion";
 import { CheckCircle2, ChevronRight, Phone, Clock, MoreVertical } from "lucide-react";
 import type { LeadRow } from "@/app/franchize/server-actions/leads";
-import type { LeadSignal } from "../leads-constants";
+import type { LeadSignal, StageKey } from "../leads-constants";
 import type { ThemeTokens } from "../hooks/useTheme";
 import {
   STAGE_LABELS,
   STAGE_COLORS,
+  STAGE_BOTTLENECK,
+  getVerificationStatus,
+  VERIFICATION_LABELS,
 } from "../lib/pipeline-stages";
 import { SOURCE_META } from "../leads-constants";
 import {
@@ -69,6 +72,13 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
   const revenue = lead.totalSpent || (rental?.totalCost ?? 0);
   const returnDate = rental?.endDate ? formatDate(rental.endDate) : null;
   const pending = signals.filter((s) => s.tone === "warning" || s.tone === "danger").length;
+
+  // Next Step pill — the bottleneck for this stage
+  const bottleneck = STAGE_BOTTLENECK[stageKey as StageKey] || STAGE_BOTTLENECK.new;
+
+  // Verification status — different for /doc flow vs web-app flow
+  const verifStatus = getVerificationStatus(lead);
+  const verifMeta = VERIFICATION_LABELS[verifStatus];
 
   return (
     <motion.article
@@ -257,6 +267,35 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
           <ChevronRight className="mt-1 h-5 w-5" style={{ color: T.accent }} aria-hidden />
         </div>
       </div>
+      {/* Next Step pill — the bottleneck for this stage.
+          Tells the operator exactly what to do next without thinking. */}
+      {bottleneck.label && (
+        <div
+          className="mt-2 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold md:text-xs"
+          style={{
+            backgroundColor: `${bottleneck.color}15`,
+            color: bottleneck.color,
+          }}
+        >
+          <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: bottleneck.color }} />
+          {bottleneck.label}
+        </div>
+      )}
+
+      {/* Verification badge — shows whether docs are verified.
+          /doc flow = verified (operator saw physical docs).
+          Web-app flow = unverified/pending (needs photo check). */}
+      {verifMeta.label && (
+        <span
+          className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+          style={{
+            backgroundColor: `${verifMeta.color}15`,
+            color: verifMeta.color,
+          }}
+        >
+          {verifMeta.icon} {verifMeta.label}
+        </span>
+      )}
     </motion.article>
   );
 }
