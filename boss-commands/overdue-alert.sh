@@ -68,11 +68,11 @@ else
 fi
 
 DASHBOARD_LINK="$(analytics_link "rentals")"
-MESSAGE="${SEVERITY} <b>Просроченные аренды</b> — ${OVERDUE_COUNT} шт.
+MESSAGE="${SEVERITY} <b>Аренды ждут возврата</b> — ${OVERDUE_COUNT} шт.
 
 ${OVERDUE_LIST}
 
-🔔 Проверено в ${NOW_DISPLAY} МСК
+🔔 Обновлено в ${NOW_DISPLAY} МСК
 
 📊 Дашборд: <a href=\"${DASHBOARD_LINK}\">Открыть</a>"
 
