@@ -659,7 +659,7 @@ export async function getRentalReturnTodos(
       .from("crew_todos")
       .select("id, title, status, priority, category, description, rental_id")
       .eq("crew_id", crewId)
-      .or(`rental_id.eq.${rentalId},description.ilike.%${rentalId}%`)
+      .eq("rental_id", rentalId)
       .order("created_at", { ascending: true });
 
     if (error) {
@@ -671,15 +671,10 @@ export async function getRentalReturnTodos(
     // where rental_id column might be null but description has it.
     // This is redundant for rows caught by the SQL filter above, but ensures
     // no todos are missed for pre-migration data.
-    const rentalTodos = (allTodos || []).filter((t) => {
-      // Fast path: rental_id column matches (indexed)
-      if (t.rental_id === rentalId) return true;
-      // Fallback: parse description JSON for legacy rows
-      try {
-        const desc = JSON.parse(t.description || "{}");
-        return desc.rental_id === rentalId;
-      } catch { return false; }
-    });
+    // FIX: was using .or() with description.ilike.%rentalId% which matched
+    // todos from OTHER rentals when rentalId was a substring of another ID.
+    // Now queries ONLY by the indexed rental_id column — precise match.
+    const rentalTodos = allTodos || [];
 
     return {
       success: true,
