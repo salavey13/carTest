@@ -21,6 +21,7 @@ interface FranchizeRentalLifecycleActionsProps {
   renterTelegramChatId?: string;
   renterFullName?: string;
   crewId: string;
+  crewSlug?: string;
   status: string;
   paymentStatus: string;
   hasPickupFreeze: boolean;
@@ -42,6 +43,7 @@ export function FranchizeRentalLifecycleActions({
   renterTelegramChatId,
   renterFullName,
   crewId,
+  crewSlug,
   status,
   paymentStatus,
   hasPickupFreeze,
@@ -61,11 +63,14 @@ export function FranchizeRentalLifecycleActions({
     if (renterId && dbUser.user_id === renterId) return "renter" as const;
     if (renterTelegramChatId && dbUser.user_id === renterTelegramChatId) return "renter" as const;
     // Check if user is a crew member with admin/co_owner/owner role
-    const membership = userCrewMemberships.find((m) => m.crewId === crewId);
+    // Try matching by crewId (UUID) first, then by slug (more reliable —
+    // the UUID can mismatch if the crew was recreated or the ID format differs)
+    const membership = userCrewMemberships.find((m) => m.crewId === crewId)
+      || (crewSlug ? userCrewMemberships.find((m) => m.slug === crewSlug) : undefined);
     if (membership && ["owner", "admin", "co_owner"].includes(membership.role)) return "owner" as const;
     if (membership) return "member" as const;
     return "guest" as const;
-  }, [dbUser?.user_id, ownerId, renterId, renterTelegramChatId, userCrewMemberships, crewId]);
+  }, [dbUser?.user_id, ownerId, renterId, renterTelegramChatId, userCrewMemberships, crewId, crewSlug]);
 
   const withAction = (name: string, callback: () => Promise<void>) => {
     setPendingAction(name);
