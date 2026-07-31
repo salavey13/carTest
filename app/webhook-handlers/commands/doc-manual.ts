@@ -316,8 +316,8 @@ function buildHasLicenseKeyboard(): KeyboardButton[][] {
 function buildConfirmKeyboard(): KeyboardButton[][] {
   return [
     [
-      { text: "✅ Всё верно", callback_data: "ok" },
-      { text: "↩️ Начать заново", callback_data: "restart" },
+      { text: "✅ Всё верно — генерируем", callback_data: "ok" },
+      { text: "✏️ Исправить", callback_data: "restart" },
     ],
     [{ text: "❌ Отменить", callback_data: "cancel" }],
   ];
@@ -421,7 +421,10 @@ function buildEquipmentKeyboard(context: DocFlowContext): KeyboardButton[][] {
     [
       { text: `${charger ? "✅" : "⬜"} Зарядка`, callback_data: "eq_charger" },
     ],
-    [{ text: "✅ Готово", callback_data: "eq_done" }],
+    [
+      { text: "✅ Готово", callback_data: "eq_done" },
+      { text: "⏭ Без допов", callback_data: "eq_skip_all" },
+    ],
     [{ text: "❌ Отменить", callback_data: "cancel" }],
   ];
 }
@@ -1622,7 +1625,8 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         const formData = new FormData();
         formData.append("chat_id", String(chatId));
         formData.append("photo", new Blob([new Uint8Array(qrPngBuffer)], { type: "image/png" }), "qr.png");
-        formData.append("caption", `📲 QR для быстрой повторной аренды
+        formData.append("caption", `📲 QR-код для арендатора
+\nПокажите этот QR клиенту — он откроет карточку аренды в Telegram\n
 ${qrDeepLink}`);
         formData.append("parse_mode", "HTML");
         await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN}/sendPhoto`, { method: "POST", body: formData });
@@ -1692,7 +1696,16 @@ ${qrDeepLink}`);
           const rentalWebUrl = `${siteUrl}/franchize/${resolvedSlug}/rental/${rentalId}`;
           try {
             await sendComplexMessage(chatId,
-              `✅ Аренда создана!\n\n📋 Карточка аренды: ${rentalId.slice(0, 8)}\n\nОткрыть карточку для продолжения выдачи:`,
+              `✅ *Аренда создана!*\n\n` +
+              `🏍 ${bike.make} ${bike.model}\n` +
+              `👤 ${context.mpFullName || '—'}\n` +
+              `📅 ${context.rentStartDate || '?'} ${context.rentStartTime || ''} → ${context.rentEndDate || '?'} ${context.rentEndTime || ''}\n` +
+              `💰 ${vars.subtotal_rub || '?'} ₽\n\n` +
+              `*Дальнейшие шаги:*\n` +
+              `1️⃣ Откройте карточку аренды\n` +
+              `2️⃣ Зафиксируйте выдачу (одометр + фото)\n` +
+              `3️⃣ Подтвердите выдачу → аренда активна\n\n` +
+              `👇 Откройте карточку для продолжения:`,
               [[
                 { text: '📋 Открыть карточку', url: rentalDeepLink },
                 { text: '🌐 В браузере', url: rentalWebUrl },
@@ -1710,6 +1723,24 @@ ${qrDeepLink}`);
         }
       } catch (rentalErr) {
         logger.error('[/doc] Rental creation exception:', rentalErr);
+      }
+    }
+
+    // ── For SALE flow: send a success message with sale details ──
+    if (!isRent) {
+      try {
+        await sendComplexMessage(chatId,
+          `✅ *Договор купли-продажи готов!*\n\n` +
+          `🏍 ${bike.make} ${bike.model}\n` +
+          `👤 ${context.mpFullName || '—'}\n` +
+          `💰 ${context.salePrice || '?'} ₽\n\n` +
+          `Договор отправлен выше ↑\n` +
+          `QR для покупателя — ниже ↓`,
+          [],
+          { removeKeyboard: true, parseMode: 'Markdown' }
+        );
+      } catch (saleMsgErr) {
+        logger.warn('[/doc] Sale success message failed:', saleMsgErr);
       }
     }
 
