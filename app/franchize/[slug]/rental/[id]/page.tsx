@@ -156,10 +156,10 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             <div className="flex items-start gap-3">
               <span className="text-lg shrink-0 mt-0.5">⚠️</span>
               <div>
-                <p className="font-semibold" style={{ color: "#ef4444" }}>Аренда просрочена</p>
+                <p className="font-semibold" style={{ color: "#ef4444" }}>Пора оформить возврат</p>
                 <p className="mt-1 opacity-80">
                   Дата возврата ({formatRuDate(new Date(endDate))}) уже прошла, но статус всё ещё «Активна».
-                  Закройте аренду вручную — переведите в «Завершена» или «Просрочена».
+                  Завершите аренду — остался один шаг.
                 </p>
               </div>
             </div>
