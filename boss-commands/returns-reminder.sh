@@ -41,16 +41,16 @@ fi
 # Only alert about each return once (12h cooldown — covers the 3h window + buffer)
 NEW_RETURNS=$(echo "$RETURNS_DATA" | jq -r '
   .[] |
-  "RENTAL|\(.rental_id)|\(.vehicle_id)|\(.user_id[0:8])|\(.agreed_end_date[11:16])|\(.total_cost // 0)"
-' | while IFS=| read -r prefix rid vid uid time cost; do
+  "RENTAL|\(.rental_id)|\(.agreed_end_date[11:16])|\(.total_cost // 0)"
+' | while IFS=| read -r prefix rid time cost; do
   if ! already_alerted "returns" "$rid" 43200; then
     local rlink
     rlink=$(rental_link "$rid")
     # Use printf so \n becomes a real newline (echo "...\n..." in bash doesn't
     # interpret escapes unless using echo -e or $'...'). Real newlines are
     # needed so the message renders correctly in Telegram.
-    printf '• %s → клиент %s… | до %s UTC | %s ₽\n  📋 <a href="%s">Открыть</a>\n' \
-      "$vid" "$uid" "$time" "$cost" "$rlink"
+    printf '• Аренда #%s — до %s UTC | %s ₽\n  📋 <a href="%s">Открыть</a>\n' \
+      "${rid:0:8}" "$time" "$cost" "$rlink"
     record_alert "returns" "$rid"
   fi
 done)
