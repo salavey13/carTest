@@ -63,25 +63,35 @@ START_LOCAL="${TODAY}T00:00:00+03:00"
 END_LOCAL="${TODAY}T23:59:59+03:00"
 
 RETURNS_DUE=$(supabase_query "rentals" \
-  "select=rental_id,vehicle_id,user_id,agreed_end_date,total_cost&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=gte.${START_LOCAL}&agreed_end_date=lte.${END_LOCAL}&order=agreed_end_date.asc&limit=5" \
+  "select=rental_id,agreed_end_date,total_cost&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=gte.${START_LOCAL}&agreed_end_date=lte.${END_LOCAL}&order=agreed_end_date.asc&limit=5" \
   | jq -r '
     if length == 0 then "Нет возвратов сегодня"
     else
-      map("• \(.vehicle_id) → клиент \(.user_id[0:8])… — до \(.agreed_end_date[11:16]) — \(.total_cost) ₽") | join("\n")
+      map("• Аренда #\(.rental_id[0:8]) — до \(.agreed_end_date[11:16]) — \(.total_cost) ₽") | join("\n")
     end
   ')
 
 RETURNS_COUNT=$(echo "$RETURNS_DUE" | head -1 | grep -q "^Нет" && echo 0 || echo "$RETURNS_DUE" | wc -l)
 
+# Build per-rental deep links for returns due
+RETURNS_LINKS=""
+if [[ "$RETURNS_COUNT" -gt 0 ]]; then
+  RETURNS_LINKS=$(echo "$RETURNS_DUE_DATA" | jq -r '.[].rental_id' 2>/dev/null | while read -r rid; do
+    local rlink
+    rlink=$(rental_link "$rid")
+    printf '  📋 <a href="%s">Открыть %s</a>\n' "$rlink" "${rid:0:8}"
+  done)
+fi
+
 # ─── 3. Overdue rentals ─────────────────────────────────────────────────────
 NOW_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 OVERDUE=$(supabase_query "rentals" \
-  "select=rental_id,vehicle_id,user_id,agreed_end_date,total_cost&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=lt.${NOW_UTC}&order=agreed_end_date.asc&limit=5" \
+  "select=rental_id,agreed_end_date&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=lt.${NOW_UTC}&order=agreed_end_date.asc&limit=5" \
   | jq -r '
     if length == 0 then "Нет просроченных аренд"
     else
-      map("• \(.vehicle_id) → клиент \(.user_id[0:8])… — просрочен с \(.agreed_end_date[0:10])") | join("\n")
+      map("• Аренда #\(.rental_id[0:8]) — просрочен с \(.agreed_end_date[0:10])") | join("\n")
     end
   ')
 
