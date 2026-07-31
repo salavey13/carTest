@@ -52,10 +52,10 @@ STUCK_LEADS_RAW=$(echo "$LEADS_DATA" | jq -r '
     end;
 
   def stuck_label(stage):
-    if stage == "new" or stage == "hold_created" or stage == "interest_paid" then "нет контакта > 72ч"
-    elif stage == "contacted" or stage == "offer_sent" or stage == "manual_reserved" then "нет прогресса > 72ч"
-    elif stage == "contract_generated" then "договор не отправлен > 48ч"
-    elif stage == "checkout_started" then "чек-аут не завершён > 24ч"
+    if stage == "new" or stage == "hold_created" or stage == "interest_paid" then "ждёт контакта 72ч+"
+    elif stage == "contacted" or stage == "offer_sent" or stage == "manual_reserved" then "ждёт следующего шага 72ч+"
+    elif stage == "contract_generated" then "договор готов к отправке 48ч+"
+    elif stage == "checkout_started" then "чек-аут ждёт завершения 24ч+"
     else ""
     end;
 
@@ -106,7 +106,7 @@ else
 fi
 
 LEADS_LINK="$(lead_segment_link "troubled")"
-MESSAGE="${SEVERITY} <b>Застрявшие лиды</b> — ${STUCK_COUNT} шт.
+MESSAGE="${SEVERITY} <b>Лиды ждут развития</b> — ${STUCK_COUNT} шт.
 
 ${STUCK_LEADS}
 
