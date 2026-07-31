@@ -1685,6 +1685,26 @@ ${qrDeepLink}`);
         rentalId = await createRentalFromDocContract(chatId, String(userId), context, bike, docSha256);
         if (rentalId) {
           logger.info('[/doc] Rental created successfully:', rentalId);
+          // Send a deep link to the rental page so the operator can continue
+          // the handoff process in the web app (pickup freeze, photos, etc.)
+          const rentalDeepLink = `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'oneBikePlsBot'}/app?startapp=rental_${rentalId}`;
+          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://v0-car-test.vercel.app';
+          const rentalWebUrl = `${siteUrl}/franchize/${resolvedSlug}/rental/${rentalId}`;
+          try {
+            await sendComplexMessage(chatId,
+              `✅ Аренда создана!\n\n📋 Карточка аренды: ${rentalId.slice(0, 8)}\n\nОткрыть карточку для продолжения выдачи:`,
+              [[
+                { text: '📋 Открыть карточку', url: rentalDeepLink },
+                { text: '🌐 В браузере', url: rentalWebUrl },
+              ]],
+              {
+                keyboardType: 'inline',
+                parseMode: 'Markdown',
+              }
+            );
+          } catch (linkErr) {
+            logger.warn('[/doc] Failed to send rental link:', linkErr);
+          }
         } else {
           logger.warn('[/doc] Failed to create rental, continuing without rental_id');
         }
