@@ -8,14 +8,14 @@
 // The rental page's "Verify" button now links here instead.
 
 import type { Metadata } from "next";
-import { getFranchizeBySlug } from "../../../actions";
-import { CrewHeader } from "../../../components/CrewHeader";
-import { CrewFooter } from "../../../components/CrewFooter";
-import { FranchizePageShell } from "../../../components/FranchizePageShell";
-import { FranchizeErrorBoundary } from "../../../components/ErrorBoundary";
-import { buildFranchizeIntentLinks } from "../../../lib/section-links";
-import { crewPaletteForSurface } from "../../../lib/theme";
-import { buildFranchizeSectionMetadata } from "../../metadata";
+import { getFranchizeBySlug } from "../../actions";
+import { CrewHeader } from "../../components/CrewHeader";
+import { CrewFooter } from "../../components/CrewFooter";
+import { FranchizePageShell } from "../../components/FranchizePageShell";
+import { FranchizeErrorBoundary } from "../../components/ErrorBoundary";
+import { buildFranchizeIntentLinks } from "../../lib/section-links";
+import { crewPaletteForSurface } from "../../lib/theme";
+import { buildFranchizeSectionMetadata } from "../metadata";
 import { VerifyDocClient } from "./VerifyDocClient";
 
 interface VerifyDocPageProps {
