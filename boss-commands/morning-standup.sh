@@ -51,7 +51,7 @@ else
   FORMATTED=""
   while IFS=$'\t' read -r lid name score source last_seen; do
     ll=$(lead_link "$lid")
-    FORMATTED="${FORMATTED}• ${name} — срочность ${score} — ${source} — ${last_seen}
+    FORMATTED="${FORMATTED}• ${name} — приоритет ${score} — ${source} — ${last_seen}
   📋 <a href=\"${ll}\">Открыть</a>
 "
   done <<< "$HOT_LEADS"
@@ -89,9 +89,9 @@ NOW_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 OVERDUE=$(supabase_query "rentals" \
   "select=rental_id,agreed_end_date&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=lt.${NOW_UTC}&order=agreed_end_date.asc&limit=5" \
   | jq -r '
-    if length == 0 then "Нет просроченных аренд"
+    if length == 0 then "Все аренды в графике ✓"
     else
-      map("• Аренда #\(.rental_id[0:8]) — просрочен с \(.agreed_end_date[0:10])") | join("\n")
+      map("• Аренда #\(.rental_id[0:8]) — ждёт оформления с \(.agreed_end_date[0:10])") | join("\n")
     end
   ')
 
@@ -102,14 +102,14 @@ TODAY_START_UTC="$(moscow_today_end_utc)"
 PENDING_TODOS=$(supabase_query "crew_todos" \
   "select=id,title,priority,due_date,assigned_to&crew_id=eq.${CREW_ID}&status=neq.done&due_date=lte.${TODAY_START_UTC}&order=due_date.asc&limit=10" \
   | jq -r '
-    if length == 0 then "Нет просроченных задач"
+    if length == 0 then "Все задачи в было ✓"
     else
       map({
         title: .title,
         pri: (if .priority == "high" then "🔴" elif .priority == "medium" then "🟡" else "⚪" end),
         due: (.due_date[0:10])
       }) |
-      map("• \(.pri) \(.title) — срок \(.due)") |
+      map("• \(.pri) \(.title) — было \(.due)") |
       join("\n")
     end
   ')
@@ -126,10 +126,10 @@ ${HOT_LEADS}
 📍 <b>Возвраты сегодня (${RETURNS_COUNT}):</b>
 ${RETURNS_DUE}
 
-📍 <b>Просроченные аренды (${OVERDUE_COUNT}):</b>
+📍 <b>Аренды к возврату (${OVERDUE_COUNT}):</b>
 ${OVERDUE}
 
-📍 <b>Задачи с просрочкой (${TODOS_COUNT}):</b>
+📍 <b>Задачи в фокусе (${TODOS_COUNT}):</b>
 ${PENDING_TODOS}
 
 📊 Дашборд: <a href=\"${DASHBOARD_LINK}\">Открыть</a>"
