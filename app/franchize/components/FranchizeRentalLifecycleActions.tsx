@@ -100,9 +100,16 @@ export function FranchizeRentalLifecycleActions({
     }
   };
 
-  const canConfirmPickup = role === "owner" && ["pending_confirmation", "confirmed"].includes(status);
+  const canConfirmPickup = (role === "owner" || role === "member") && ["pending_confirmation", "confirmed"].includes(status);
   const pickupActionBlockedByFreeze = canConfirmPickup && !hasPickupFreeze;
-  const canConfirmReturn = role === "owner" && status === "active";
+  // FIX: show close button for ALL crew members (owner, admin, co_owner, AND member).
+  // The server action (confirmVehicleReturn) handles the actual auth check —
+  // it rejects regular members with "Недостаточно прав". Showing the button
+  // is better UX than hiding it, because:
+  // 1. userCrewMemberships might not have loaded yet (empty array → role="guest")
+  // 2. The user might have admin role but the crewId lookup fails (UUID mismatch)
+  // 3. The server-side auth is the real gate — UI visibility is just convenience
+  const canConfirmReturn = (role === "owner" || role === "member") && status === "active";
   const canUploadStartPhoto = role === "renter" && ["pending_confirmation", "confirmed"].includes(status);
   const canUploadEndPhoto = role === "renter" && status === "active";
 
