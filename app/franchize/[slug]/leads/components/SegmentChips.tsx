@@ -21,7 +21,7 @@ interface Props {
 
 /**
  * Horizontal scrollable pill chips for segment filtering.
- * Default segments: All / Hot / Overdue / Clients.
+ * Default segments: All / Hot / В фокусе / Clients.
  *
  * Active chip: solid accent background (T.accent) with accent-contrast text +
  * a subtle accent ring. The active chip's count badge uses the segment's own
