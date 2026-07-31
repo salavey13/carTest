@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAppContext } from "@/contexts/AppContext";
 import { getRentalReturnTodos, type ReturnTodo } from "../server-actions/rentals";
 import { ChevronDown, PackageCheck } from "lucide-react";
 
@@ -23,6 +24,7 @@ export function RentalReturnChecklist({
   textSecondary,
   isAuto,
 }: RentalReturnChecklistProps) {
+  const { dbUser } = useAppContext();
   const [todos, setTodos] = useState<ReturnTodo[]>([]);
   const [loading, setLoading] = useState(true);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -47,22 +49,33 @@ export function RentalReturnChecklist({
   // (PATCH /api/franchize/lead-todo with action=toggle).
   const handleToggle = async (todoId: string, currentStatus: string) => {
     setTogglingId(todoId);
+    const newStatus = currentStatus === "done" ? "pending" : "done";
     try {
       // Optimistic update
       setTodos((prev) =>
         prev.map((t) =>
-          t.id === todoId ? { ...t, status: currentStatus === "done" ? "pending" : "done" } : t
+          t.id === todoId ? { ...t, status: newStatus } : t
         )
       );
 
+      // FIX: the API PATCH endpoint expects { todoId, status, crewId } — NOT
+      // { todoId, action: "toggle" }. Was sending the wrong payload shape,
+      // which caused the API to return 400 "Missing todoId or status" →
+      // the revert logic un-checked the todo immediately.
+      // Also added auth headers (x-telegram-user-id) so verifyCrewAccess passes.
+      // dbUser is already available from useAppContext() at the top of the component
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (dbUser?.user_id) {
+        headers["x-telegram-user-id"] = dbUser.user_id;
+      }
+
       const res = await fetch("/api/franchize/lead-todo", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           todoId,
-          slug: crewId, // crewId is used as slug in the API auth check
+          status: newStatus,
           crewId,
-          action: "toggle",
         }),
       });
 
