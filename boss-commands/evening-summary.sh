@@ -35,7 +35,7 @@ RENTAL_KPIS=$(echo "$RENTALS_DATA" | jq -r '
     completed: ([.[] | select(.status == "completed")] | length),
     revenue: ([.[] | select(.status == "active" or .status == "completed") | (.total_cost // 0)] | add // 0)
   } |
-  "Аренд сегодня: \(.total)\nВыручка: \(.revenue) ₽\nАктивных: \(.active)\nЗавершено: \(.completed)"
+  "Аренд сегодня: \(.total)\nВыручка: \(.revenue) ₽\nАктивных: \(.active)\nЗавершено: \(.completed)\(.completed == 0 ? " — день открыт" : "")"
 ')
 
 # ─── Sales KPIs ──────────────────────────────────────────────────────────────
@@ -76,7 +76,7 @@ SERVICE_KPIS=$(echo "$SERVICES_DATA" | jq -r '
     completed: ([.[] | select(.status == "completed")] | length),
     revenue: ([.[] | select(.status == "active" or .status == "completed") | (.total_cost // 0)] | add // 0)
   } |
-  "Сервисов сегодня: \(.total)\nВыручка: \(.revenue) ₽\nАктивных: \(.active)\nЗавершено: \(.completed)"
+  "Сервисов сегодня: \(.total)\nВыручка: \(.revenue) ₽\nАктивных: \(.active)\nЗавершено: \(.completed)\(.completed == 0 ? " — день открыт" : "")"
 ')
 
 # ─── Total revenue ───────────────────────────────────────────────────────────
