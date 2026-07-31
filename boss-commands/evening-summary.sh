@@ -26,7 +26,7 @@ START_UTC="${TODAY}T00:00:00Z"
 END_UTC="${TODAY}T23:59:59Z"
 
 RENTALS_DATA=$(supabase_query "rentals" \
-  "select=rental_id,status,total_cost,agreed_end_date&crew_id=eq.${CREW_ID}&or=(and(created_at.gte.${START_UTC},created_at.lte.${END_UTC}),and(agreed_start_date.lte.${END_UTC},agreed_end_date.gte.${START_UTC}))&vehicle_id=not.like.vip-bike-svc-*")
+  "select=rental_id,status,total_cost,agreed_end_date,vehicle_id&crew_id=eq.${CREW_ID}&or=(and(created_at.gte.${START_UTC},created_at.lte.${END_UTC}),and(agreed_start_date.lte.${END_UTC},agreed_end_date.gte.${START_UTC}))&vehicle_id=not.like.vip-bike-svc-*")
 
 RENTAL_KPIS=$(echo "$RENTALS_DATA" | jq -r '
   {
@@ -109,7 +109,7 @@ DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
 ACTIVE_RENTALS_LIST=""
 ACTIVE_RENTALS_LIST=$(echo "$RENTALS_DATA" | jq -r '
   [.[] | select(.status == "active")] | .[0:5] |
-  map("• \(.vehicle_id) — \(.agreed_end_date[11:16]) UTC — \(.total_cost // 0) ₽") | join("\n")
+  map("• Аренда #\(.rental_id[0:8]) — до \(.agreed_end_date[11:16]) UTC — \(.total_cost // 0) ₽") | join("\n")
 ')
 ACTIVE_RENTALS_LINKS=""
 if [[ -n "$ACTIVE_RENTALS_LIST" ]]; then
