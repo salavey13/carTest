@@ -957,6 +957,10 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         buttonLabel: readPath(franchize, ["cta", "buttonLabel"], "Записаться"),
         buttonHref: readPath(franchize, ["cta", "buttonHref"], ""),
       },
+      // FIX: populate reviewsLink from catalog metadata.
+      // The SQL hydration has `rewiewsLink` (with a typo) in catalog metadata.
+      // We check both spellings for robustness.
+      reviewsLink: readPath(franchize, ["catalog", "rewiewsLink"], readPath(franchize, ["catalog", "reviewsLink"], "")) || undefined,
       ui: {
         // Visibility of the "Создать франшизу" / "Оформление экипажа" entries
         // in FranchizeProfileButton. Default true; crews can opt out by setting
