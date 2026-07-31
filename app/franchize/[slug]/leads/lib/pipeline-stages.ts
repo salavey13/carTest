@@ -28,14 +28,44 @@ export const STAGE_COLORS: Record<StageKey, string> = Object.fromEntries(
  * have to think "what do I do next?"
  */
 export const STAGE_BOTTLENECK: Record<StageKey, { label: string; action: string; color: string }> = {
+  // /doc flow: operator hasn't reached out to renter yet
+  // Web-app flow: renter browsed but didn't complete checkout
   new:               { label: "Связаться",         action: "telegram",  color: "#ef4444" },
+
+  // Operator contacted lead, but no contract yet.
+  // Bottleneck: need to generate contract (via /doc or web form)
   needs_contact:     { label: "Создать договор",    action: "create_doc", color: "#f59e0b" },
-  contract_sent:     { label: "Отправить QR",       action: "resend_qr", color: "#eab308" },
-  awaiting_qr_claim: { label: "Переслать QR",       action: "resend_qr", color: "#f97316" },
-  documents_missing: { label: "Проверить фото",     action: "verify_photos", color: "#f97316" },
+
+  // /doc flow: contract generated, QR code created.
+  // QR can ONLY be shown manually (no auto-reshow). Operator must:
+  // - Open the contract-draft page in TG WebApp
+  // - Show QR to renter in person, OR
+  // - If renter's phone is known: send QR as a TG message to that phone number
+  // Web-app flow: this stage doesn't apply (no QR needed — TG chat_id auto-shared)
+  contract_sent:     { label: "Показать QR",        action: "show_qr",  color: "#eab308" },
+
+  // /doc flow: QR was shown/sent but renter hasn't opened TG WebApp yet.
+  // Cannot auto-reshow — operator must physically show QR again or
+  // send it via TG to the renter's phone (if known).
+  // Web-app flow: this stage doesn't apply (renter already authed)
+  awaiting_qr_claim: { label: "Переслать QR лично",  action: "show_qr",  color: "#f97316" },
+
+  // WEB-APP FLOW ONLY: renter authed via TG (chat_id auto-shared, no QR needed).
+  // Bottleneck: renter needs to fill in text info (ФИО, passport, license)
+  // AND upload photos. Photos can be auto-OCR'd via /api/docphotoocr endpoint.
+  // /doc flow: this stage doesn't apply (docs already verified by operator)
+  documents_missing: { label: "Загрузить фото",     action: "upload_photos", color: "#f97316" },
+
+  // Rental is active. Bottleneck: monitor return date.
   active_rental:     { label: "Открыть аренду",     action: "open_rental", color: "#22c55e" },
+
+  // Return due within 24h or overdue. Bottleneck: close rental.
   return_due:        { label: "Закрыть аренду",     action: "close_rental", color: "#ef4444" },
+
+  // Completed. Bottleneck: request review for repeat business.
   closed_won:        { label: "Запросить отзыв",    action: "request_review", color: "#22c55e" },
+
+  // Lost. Bottleneck: reactivate.
   closed_lost:       { label: "Открыть повторно",   action: "reopen",    color: "#64748b" },
 };
 
@@ -45,20 +75,23 @@ export const STAGE_BOTTLENECK: Record<StageKey, { label: string; action: string;
  * Web-app flow: unverified until operator checks uploaded photos
  */
 export function getVerificationStatus(lead: LeadRow): "verified" | "unverified" | "pending" | "not_needed" {
-  // /doc flow: if the lead has a rental with originalOperatorChatId,
-  // it was created by an operator via /doc command → docs were verified in person
+  // /doc flow: operator created the rental via /doc command.
+  // The operator physically saw the passport + license → VERIFIED on creation.
+  // No photos needed — docs were verified in person during the /doc session.
   if (lead.originalOperatorChatId && lead.rentals.length > 0) {
     return "verified";
   }
-  // Web-app flow: if the lead has a rental but no operator chat ID,
-  // it was created by the renter via web app → needs photo verification
+  // Web-app flow: renter created the rental via web form.
+  // TG chat_id is auto-shared (no QR needed). Bottleneck is photo upload.
+  // Photos can be auto-OCR'd via /api/docphotoocr endpoint (recognizeDocument).
+  // Until photos are uploaded AND verified by operator → UNVERIFIED.
   if (lead.rentals.length > 0 && !lead.originalOperatorChatId) {
     const r = lead.rentals[0] as any;
     const hasPhotos = r.passportMainpagePhoto || r.passportRegistrationPhoto || r.driversLicenceFrontalPhoto;
     const verified = r.metadata?.contract_verifier?.status === "verified";
     if (verified) return "verified";
-    if (hasPhotos) return "pending";
-    return "unverified";
+    if (hasPhotos) return "pending";  // photos uploaded, awaiting operator check
+    return "unverified";               // no photos yet — renter needs to upload
   }
   // No rental yet — verification not needed
   return "not_needed";
@@ -70,6 +103,71 @@ export const VERIFICATION_LABELS: Record<string, { label: string; color: string;
   pending:     { label: "Фото на проверке",       color: "#f59e0b", icon: "⏳" },
   not_needed:  { label: "",                        color: "#64748b", icon: "" },
 };
+
+/**
+ * Flow type for a lead — determines which stages apply and what the
+ * bottleneck is at each stage.
+ *
+ * "doc": operator-initiated via /doc TG command.
+ *   - Docs verified in person (passport + license OCR'd during /doc)
+ *   - QR code generated for renter to claim their TG identity
+ *   - Bottleneck: QR claim (renter needs to open TG WebApp)
+ *   - No photo upload needed (already verified)
+ *
+ * "webapp": renter-initiated via web catalog.
+ *   - TG chat_id auto-shared (no QR needed)
+ *   - Renter fills text fields (ФИО, phone) — may be inaccurate
+ *   - Photos needed for verification (auto-OCR via /api/docphotoocr)
+ *   - Bottleneck: photo upload + operator verification
+ *
+ * "none": no rental yet (pre-contract stage)
+ */
+export function getFlowType(lead: LeadRow): "doc" | "webapp" | "none" {
+  if (!lead.rentals.length) return "none";
+  if (lead.originalOperatorChatId) return "doc";
+  return "webapp";
+}
+
+/**
+ * Get the flow-specific bottleneck for a lead.
+ * Different flows have different bottlenecks at the same stage:
+ *
+ * Stage "contract_sent":
+ *   - doc flow: "Показать QR" (QR must be shown manually, no auto-reshow)
+ *   - webapp flow: N/A (web-app flow skips QR entirely)
+ *
+ * Stage "awaiting_qr_claim":
+ *   - doc flow: "Переслать QR лично" (can't auto-reshow — must show in person
+ *     or send via TG to renter's phone if known)
+ *   - webapp flow: N/A
+ *
+ * Stage "documents_missing":
+ *   - doc flow: N/A (docs already verified during /doc)
+ *   - webapp flow: "Загрузить фото" (photos can be auto-OCR'd)
+ */
+export function getStageBottleneck(lead: LeadRow): { label: string; action: string; color: string } {
+  const stage = (lead as { stageKey?: string }).stageKey as StageKey || "new";
+  const flow = getFlowType(lead);
+  const defaultBottleneck = STAGE_BOTTLENECK[stage] || STAGE_BOTTLENECK.new;
+
+  // Flow-specific overrides
+  if (flow === "webapp") {
+    // Web-app flow: QR stages don't apply (chat_id auto-shared)
+    if (stage === "contract_sent" || stage === "awaiting_qr_claim") {
+      // Web-app flow skips QR → bottleneck is photo upload
+      return { label: "Загрузить фото", action: "upload_photos", color: "#f97316" };
+    }
+  }
+
+  if (flow === "doc") {
+    // /doc flow: documents_missing stage doesn't apply (already verified)
+    if (stage === "documents_missing") {
+      return { label: "Ожидает QR", action: "show_qr", color: "#eab308" };
+    }
+  }
+
+  return defaultBottleneck;
+}
 
 export const STAGE_NEXT_ACTION: Record<StageKey, string> = {
   new: "Написать в Telegram",
