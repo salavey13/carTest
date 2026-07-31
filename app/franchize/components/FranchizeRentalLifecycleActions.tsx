@@ -114,6 +114,7 @@ export function FranchizeRentalLifecycleActions({
   const [closureModalOpen, setClosureModalOpen] = useState(false);
   const [closureOdometer, setClosureOdometer] = useState("");
   const [closureDamageNotes, setClosureDamageNotes] = useState("");
+  const [closureDamageLevel, setClosureDamageLevel] = useState<"none" | "light" | "heavy">("none");
   const [closureDepositReturned, setClosureDepositReturned] = useState(true);
   const [closureReturnNotes, setClosureReturnNotes] = useState("");
 
@@ -193,6 +194,7 @@ export function FranchizeRentalLifecycleActions({
               // confirmVehicleReturn call happens in handleSubmitClosure.
               setClosureOdometer("");
               setClosureDamageNotes("");
+              setClosureDamageLevel("none");
               setClosureDepositReturned(true);
               setClosureReturnNotes("");
               setClosureModalOpen(true);
@@ -324,24 +326,54 @@ export function FranchizeRentalLifecycleActions({
                 </span>
               </label>
 
-              <label className="block">
+              <div>
                 <span className="text-xs font-semibold" style={{ color: "var(--lifecycle-muted)" }}>
-                  Заметки о повреждениях (если есть)
+                  Состояние ТС при возврате
                 </span>
-                <textarea
-                  value={closureDamageNotes}
-                  onChange={(e) => setClosureDamageNotes(e.target.value)}
-                  placeholder="Царапины, потёртости, отсутствующие детали…"
-                  disabled={isPending}
-                  rows={2}
-                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none resize-none"
-                  style={{
-                    backgroundColor: "var(--lifecycle-bg)",
-                    borderColor: "var(--lifecycle-border)",
-                    color: "var(--lifecycle-text)",
-                  }}
-                />
-              </label>
+                <div className="mt-1.5 grid grid-cols-3 gap-2">
+                  {([
+                    { value: "none", label: "Без повреждений", color: "#22c55e" },
+                    { value: "light", label: "Лёгкие", color: "#f59e0b" },
+                    { value: "heavy", label: "Серьёзные", color: "#ef4444" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setClosureDamageLevel(opt.value)}
+                      disabled={isPending}
+                      className="rounded-lg border px-2 py-2 text-xs font-semibold transition"
+                      style={{
+                        borderColor: closureDamageLevel === opt.value ? opt.color : "var(--lifecycle-border)",
+                        backgroundColor: closureDamageLevel === opt.value ? `${opt.color}20` : "transparent",
+                        color: closureDamageLevel === opt.value ? opt.color : "var(--lifecycle-text)",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {closureDamageLevel !== "none" && (
+                <label className="block">
+                  <span className="text-xs font-semibold" style={{ color: "var(--lifecycle-muted)" }}>
+                    Детали повреждений
+                  </span>
+                  <textarea
+                    value={closureDamageNotes}
+                    onChange={(e) => setClosureDamageNotes(e.target.value)}
+                    placeholder="Опишите повреждения: царапины, потёртости, отсутствующие детали…"
+                    disabled={isPending}
+                    rows={2}
+                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none resize-none"
+                    style={{
+                      backgroundColor: "var(--lifecycle-bg)",
+                      borderColor: "var(--lifecycle-border)",
+                      color: "var(--lifecycle-text)",
+                    }}
+                  />
+                </label>
+              )}
 
               <label className="block">
                 <span className="text-xs font-semibold" style={{ color: "var(--lifecycle-muted)" }}>
@@ -387,7 +419,9 @@ export function FranchizeRentalLifecycleActions({
                     }
                     const result = await confirmVehicleReturn(rentalId, dbUser.user_id, {
                       odometerAfter: closureOdometer ? parseInt(closureOdometer, 10) : null,
-                      damageNotes: closureDamageNotes.trim() || null,
+                      damageNotes: closureDamageLevel !== "none"
+                        ? `[${closureDamageLevel === "heavy" ? "Серьёзные повреждения" : "Лёгкие повреждения"}] ${closureDamageNotes.trim()}`
+                        : null,
                       depositReturned: closureDepositReturned,
                       returnNotes: closureReturnNotes.trim() || null,
                     });
