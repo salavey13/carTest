@@ -34,7 +34,8 @@ LEADS_DATA=$(supabase_query "franchize_intents" \
 #   - contacted / offer_sent / manual_reserved       → stuck if > 72h
 #   - contract_generated                              → stuck if > 48h
 #   - checkout_started                                → stuck if > 24h
-STUCK_LEADS=$(echo "$LEADS_DATA" | jq -r '
+# Build stuck leads list with per-lead deep links
+STUCK_LEADS_RAW=$(echo "$LEADS_DATA" | jq -r '
   def hours_since(iso):
     if iso == null then 9999
     else
@@ -75,7 +76,7 @@ STUCK_LEADS=$(echo "$LEADS_DATA" | jq -r '
   | .[0:5]
   | if length == 0 then "STUCK_NONE"
     else
-      map("• \(.name) — срочность \(.urgency) — стадия: \(.stage) — \(.reason) (уже \((.hours_stuck | floor))ч)")
+      map("• \(.name) — срочность \(.urgency) — \(.reason) (уже \((.hours_stuck | floor))ч)")
       | join("\n")
     end
 ')
