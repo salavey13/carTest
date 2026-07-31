@@ -82,7 +82,7 @@ export function EmptyState({ hasFilters, searchQuery, onReset, T }: EmptyStatePr
         {hasFilters
           ? showSearchTip
             ? "Поиск не дал результатов"
-            : "По выбранным фильтрам ничего нет"
+            : "По этим фильтрам пусто"
           : "Живые лиды появятся здесь"}
       </motion.p>
 
