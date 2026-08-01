@@ -1082,7 +1082,7 @@ export async function confirmVehicleReturn(
                     .eq('user_id', userId)
                     .maybeSingle();
                 if (membership?.membership_status === "active"
-                    && ["owner", "admin", "co_owner"].includes(membership.role)) {
+                    && ["owner", "admin", "co_owner", "member"].includes(membership.role)) {
                     isCrewMember = true;
                 }
             }
