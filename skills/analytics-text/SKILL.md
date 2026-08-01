@@ -6,16 +6,16 @@ description: >
   the web analytics pages when only CLI/Telegram channel is available.
   Trigger phrases (RU): "аналитика аренд", "статистика продаж", "дашборд задач",
   "сколько аренд сегодня", "выручка за месяц", "статистика экипажа", "аренды за дату",
-  "продажи за дату", "просроченные задачи", "сколько заработали", "KPI экипажа".
+  "продажи за дату", "задачи в фокусе", "сколько заработали", "KPI экипажа".
   Trigger phrases (EN): "rentals analytics text", "analytics dashboard text",
   "sales dashboard", "todos dashboard", "crew stats", "revenue today",
-  "rentals count today", "overdue todos", "crew KPIs".
+  "rentals count today", "todo in focuss", "crew KPIs".
 ---
 
 # analytics-text — VIP Bike
 
-Триггер-фразы (RU): **`аналитика аренд`**, **`статистика продаж`**, **`дашборд задач`**, **`сколько аренд сегодня`**, **`выручка за месяц`**, **`статистика экипажа`**, **`аренды за дату`**, **`продажи за дату`**, **`просроченные задачи`**, **`сколько заработали`**, **`KPI экипажа`**.
-Триггер-фразы (EN): `rentals analytics text`, `analytics dashboard text`, `sales dashboard`, `todos dashboard`, `crew stats`, `revenue today`, `rentals count today`, `overdue todos`, `crew KPIs`.
+Триггер-фразы (RU): **`аналитика аренд`**, **`статистика продаж`**, **`дашборд задач`**, **`сколько аренд сегодня`**, **`выручка за месяц`**, **`статистика экипажа`**, **`аренды за дату`**, **`продажи за дату`**, **`задачи в фокусе`**, **`сколько заработали`**, **`KPI экипажа`**.
+Триггер-фразы (EN): `rentals analytics text`, `analytics dashboard text`, `sales dashboard`, `todos dashboard`, `crew stats`, `revenue today`, `rentals count today`, `todo in focuss`, `crew KPIs`.
 
 ## Overview
 
@@ -28,7 +28,7 @@ Use this skill when:
 - Нужно быстро увидеть количество аренд / продаж / задач за день без открытия браузера.
 - Нужно посчитать выручку за период (день / месяц).
 - Нужно вывести сводку по задачам экипажа (pending / in_progress / done / overdue).
-- Нужно оценить статистику операторов (кто закрыл больше задач, у кого больше просрочек).
+- Нужно оценить статистику операторов (кто закрыл больше задач, у кого больше в фокусеек).
 - Нужно morning standup-summary по аналитике.
 
 ## Supabase Access
@@ -228,7 +228,7 @@ select=assigned_to,status,due_date\
 ```
 === Статистика экипажа vip-bike (4 активных) ===
 
-Имя                       Роль      Задач    Выполнено   Просрочено
+Имя                       Роль      Задач    Выполнено   Ждёт оформленияо
 salavey13 (admin)         admin     15       7           1
 Roman_Vip_Bike_Electro    co_owner  12       7           1
 DJORUDJOV                 member    8        5           1
