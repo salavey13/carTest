@@ -423,7 +423,6 @@ function buildEquipmentKeyboard(context: DocFlowContext): KeyboardButton[][] {
     ],
     [
       { text: "✅ Готово", callback_data: "eq_done" },
-      { text: "⏭ Без допов", callback_data: "eq_skip_all" },
     ],
     [{ text: "❌ Отменить", callback_data: "cancel" }],
   ];
@@ -3157,21 +3156,6 @@ export async function handleDocCallback(
     await setState(userId, "equipment", context);
     logger.info(`[/doc] eq_boots: ${userId} → boots=${context.boots}`);
     await sendComplexMessage(chatId, `👢 Боты: ${context.boots ? "✅" : "⬜"}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
-    return true;
-  }
-
-  if (callbackData === "eq_skip_all") {
-    context.helmets = 0;
-    context.gloves = 0;
-    context.jacket = false;
-    context.boots = false;
-    context.net = false;
-    context.backpack = false;
-    context.bag = false;
-    context.charger = false;
-    await setState(userId, "equipment", context);
-    logger.info(`[/doc] eq_skip_all: ${userId} → all equipment skipped`);
-    await gotoOdometer(chatId, userId, context);
     return true;
   }
 
