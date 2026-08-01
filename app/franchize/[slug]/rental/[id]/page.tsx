@@ -524,6 +524,19 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             )}
           </div>
 
+          {/* Documents panel — collapsible to reduce visual noise.
+              Contains: pickup freeze, damage reports, photo references.
+              The closure modal (in FranchizeRentalLifecycleActions) has its
+              own quick damage level selector for the receipt — different purpose. */}
+          <details className="group rounded-2xl border" style={{ borderColor: borderSoft }}>
+            <summary
+              className="flex cursor-pointer items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold list-none"
+              style={{ color: textPrimary }}
+            >
+              <span>📎 Документы и фиксация</span>
+              <span className="text-xs opacity-60 group-open:rotate-180 transition">▼</span>
+            </summary>
+            <div className="border-t px-4 py-3">
           <FranchizeErrorBoundary fallbackTitle="Документы временно недоступны" fallbackMessage="Попробуйте перезагрузить.">
           <FranchizeRentalDocumentsPanel
             rentalId={rental.rentalId}
@@ -535,6 +548,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             isAuto={isAuto}
           />
           </FranchizeErrorBoundary>
+            </div>
+          </details>
 
           <FranchizeErrorBoundary fallbackTitle="Действия временно недоступны" fallbackMessage="Попробуйте перезагрузить.">
           <FranchizeRentalLifecycleActions
