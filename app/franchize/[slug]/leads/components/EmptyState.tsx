@@ -24,7 +24,7 @@ interface EmptyStateProps {
  *   operator sees where leads will come from.
  */
 export function EmptyState({ hasFilters, searchQuery, onReset, T }: EmptyStateProps) {
-  const showSearchTip = hasFilters && !!searchQuery && searchQuery.length > 0;
+  const showSearchTip = hasFilters && !!searchQuery;
   const showFilterTip = hasFilters && !showSearchTip;
 
   return (
