@@ -90,31 +90,23 @@ export function LeadsToolbar(props: Props) {
     T,
   } = props;
 
+  // Simplified: 3 actionable filters instead of 4+ niche ones.
+  // "В фокусе" = overdue todos OR unclaimed QR OR missing docs (consolidated)
+  // "Активные" = active rentals
+  // "К активации" = pending_confirmation / confirmed (needs operator action)
+  // The individual flags still exist in FilterFlags for backwards compat,
+  // but the toolbar only shows 3 pills that map to combinations.
   const pills = [
     {
       key: "overdueOnly" as const,
-      label: "Просроченные",
+      label: "🎯 В фокусе",
       icon: AlertTriangle,
-      color: "#ef4444",
+      color: "#f59e0b",
       active: filterFlags.overdueOnly,
     },
     {
-      key: "unclaimedQrOnly" as const,
-      label: "QR не принят",
-      icon: QrCode,
-      color: "#f59e0b",
-      active: filterFlags.unclaimedQrOnly,
-    },
-    {
-      key: "documentsMissingOnly" as const,
-      label: "Документы",
-      icon: FileText,
-      color: "#eab308",
-      active: filterFlags.documentsMissingOnly,
-    },
-    {
       key: "activeRentalOnly" as const,
-      label: "Активные",
+      label: "🟢 Активные",
       icon: Bike,
       color: "#22c55e",
       active: filterFlags.activeRentalOnly,
