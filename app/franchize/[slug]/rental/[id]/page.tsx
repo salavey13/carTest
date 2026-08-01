@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { ExternalLink, Info, RefreshCw, RotateCcw, ShoppingCart, Sparkles, Timer } from "lucide-react";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
@@ -184,6 +185,20 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             {statusLabel[status] || status}
           </span>
         </div>
+
+        {/* Bike photo — 9:16 aspect ratio, shown at top */}
+        {rental.bikePhotoUrl && (
+          <div className="relative w-full overflow-hidden rounded-3xl border" style={{ borderColor: borderSoft, maxHeight: "400px" }}>
+            <Image
+              src={rental.bikePhotoUrl}
+              alt={rental.vehicleTitle}
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
+              className="object-cover"
+              style={{ position: "relative", width: "100%", height: "auto", aspectRatio: "9 / 16", maxHeight: "400px" }}
+            />
+          </div>
+        )}
 
         {/* Status + next steps */}
         <section className="rounded-3xl border p-4 md:p-6" style={surface.subtleCard}>
@@ -404,11 +419,13 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               <span style={{ color: textSecondary }}>Транспорт:</span> {rental.vehicleTitle}
             </p>
             {/* Rent dates — show start and end date */}
-            {(rental.agreedEndDate || rental.requestedEndDate) && (
+            {(rental.agreedStartDate || rental.agreedEndDate || rental.requestedEndDate) && (
               <p className="sm:col-span-2">
                 <span style={{ color: textSecondary }}>Период аренды:</span>{" "}
                 <span className="font-semibold" style={{ color: textPrimary }}>
-                  {formatRuDate(new Date(rental.agreedEndDate || rental.requestedEndDate || ""))}
+                  {rental.agreedStartDate ? formatRuDate(new Date(rental.agreedStartDate)) : "—"}
+                  {" → "}
+                  {rental.agreedEndDate ? formatRuDate(new Date(rental.agreedEndDate)) : (rental.requestedEndDate ? formatRuDate(new Date(rental.requestedEndDate)) : "—")}
                 </span>
               </p>
             )}
@@ -420,6 +437,9 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               <p className="sm:col-span-2">
                 <span style={{ color: textSecondary }}>Арендатор:</span>{" "}
                 <span className="font-semibold" style={{ color: textPrimary }}>{rental.renterFullName}</span>
+                {rental.renterPhone && (
+                  <span style={{ color: textSecondary }}> · {rental.renterPhone}</span>
+                )}
               </p>
             )}
             {rental.contractOriginalSha256 ? (
