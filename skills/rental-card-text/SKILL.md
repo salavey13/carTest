@@ -137,7 +137,7 @@ storage_path:      contracts/2026/07/ra_vip-bike_…_a1b2c3d4.docx
 — QR-claim —
 Sent at:           2026-07-21T14:36:00Z
 First viewed:      2026-07-21T15:02:00Z
-Claimed at:        — (не принят)
+Claimed at:        — (ждёт активации)
 Regenerations:     1
 Verification:      pending
 
@@ -167,7 +167,7 @@ select=rental_id,passport_mainpage_photo,passport_registration_photo,drivers_lic
 ```
 === Документы аренды a1b2c3d4-... ===
 Паспорт (главная):     ✓ загружен
-Паспорт (регистрация): ✗ отсутствует
+Паспорт (регистрация): ✗ к загрузке
 Водительские права:    ✓ загружены
 
 Рекомендация: запросить у рентера регистрацию паспорта.
@@ -198,7 +198,7 @@ Chat ID:              78901234 (renter's Telegram)
 Verification:         pending
 QR generated at:      2026-07-21T14:36:00Z
 First viewed at:      2026-07-21T15:02:00Z
-Claimed at:           — (не принят)
+Claimed at:           — (ждёт активации)
 Regeneration count:   1
 
 Статус: 🔴 unclaimed — рентер открыл QR, но не принял secrets.
@@ -341,7 +341,7 @@ rental_web_url "94b5b41d-..."   # → ?ui=v2&rentalId=94b5b41d-...
 | `supabase_4xx`      | `Supabase <table> 4xx: <body>`        | Неверный select, RLS                                                  | 2    | Проверить схему (раздел "Schema Access")         |
 | `supabase_5xx`      | `Supabase <table> 5xx: <body>`        | Supabase лежит                                                        | 2    | Повторить через минуту                           |
 | `no_contract`       | `No contract artifact found`          | Аренда есть, но contract artifact не создан                           | 0    | Вывод: `Contract artifact: — (не сгенерирован)`  |
-| `no_qr`             | `No user_rental_secret found`         | QR ещё не генерировался                                               | 0    | Вывод: `QR-claim: — (QR не отправлялся)`         |
+| `no_qr`             | `No user_rental_secret found`         | QR ещё не генерировался                                               | 0    | Вывод: `QR-claim: — (QR ещё не отправлялся)`         |
 | `invalid_uuid`      | `Invalid UUID: <rentalId>`            | `rentalId` не парсится как UUID                                       | 2    | Использовать полный UUID                         |
 
 ## Security
@@ -355,7 +355,7 @@ rental_web_url "94b5b41d-..."   # → ?ui=v2&rentalId=94b5b41d-...
   - ФИО → фамилия с инициалами.
   - STS (VIN, plate) — показывать полностью только в приватных каналах (operator chat), не в публичных.
 - **Private schema headers**: для `rental_contract_artifacts`, `user_rental_secrets` обязателен `Accept-Profile: private`. Без него PostgREST вернёт 404.
-- **Photo URLs**: `passport_mainpage_photo`, `passport_registration_photo`, `drivers_licence_frontal_photo` — это Storage paths. Не выводить URL в stdout (могут быть подписаны и reused). Только факт наличия (`✓ загружен` / `✗ отсутствует`).
+- **Photo URLs**: `passport_mainpage_photo`, `passport_registration_photo`, `drivers_licence_frontal_photo` — это Storage paths. Не выводить URL в stdout (могут быть подписаны и reused). Только факт наличия (`✓ загружен` / `✗ к загрузке`).
 - Skill полностью **read-only**.
 - Все HTTP-запросы — HTTPS.
 
