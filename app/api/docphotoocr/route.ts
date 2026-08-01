@@ -194,7 +194,64 @@ export async function POST(request: NextRequest): Promise<NextResponse<OcrRespon
     // 8. Cleanup: удаляем фото из docpix (152-ФЗ compliance)
     await supabaseAdmin.storage.from("docpix").remove([storagePath]);
     
-    // 9. Возвращаем успех
+    // 9. Notify operator that docs are verified and ready for activation
+    // The web-app renter uploaded photos → OCR extracted fields automatically →
+    // operator gets a TG message with a deep link to the rental page to activate.
+    try {
+      const { data: rental } = await supabaseAdmin
+        .from("rentals")
+        .select("crew_id, crew:crews!inner(slug, owner_id, name)")
+        .eq("rental_id", rentalId)
+        .maybeSingle();
+      
+      if (rental?.crew?.owner_id && rental?.crew?.slug) {
+        const crewSlug = rental.crew.slug;
+        const crewName = rental.crew.name || crewSlug;
+        const ownerChatId = rental.crew.owner_id;
+        const rentalDeepLink = `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'oneBikePlsBot'}/app?startapp=rental_${rentalId}`;
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://v0-car-test.vercel.app';
+        const rentalWebUrl = `${siteUrl}/franchize/${crewSlug}/rental/${rentalId}`;
+        
+        const docLabel = docType === "passport_mainpage" ? "Паспорт" 
+          : docType === "passport_registration" ? "Прописка" 
+          : "Вод. удостоверение";
+        
+        const notifyText = [
+          `✅ Документы загружены и распознаны`,
+          ``,
+          `📋 ${docLabel} — OCR успешно`,
+          `👤 ${fields.fullName || '—'}`,
+          `🔑 Аренда: ${rentalId.slice(0, 8)}`,
+          `🏍 Экипаж: ${crewName}`,
+          ``,
+          `Документы готовы к проверке — активируйте аренду:`,
+        ].join("\n");
+        
+        await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://v0-car-test.vercel.app'}/api/forward-telegram`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: ownerChatId,
+            method: "sendMessage",
+            payload: {
+              text: notifyText,
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [[
+                  { text: "📋 Открыть карточку", url: rentalDeepLink },
+                  { text: "🌐 В браузере", url: rentalWebUrl },
+                ]]
+              }
+            },
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
+      }
+    } catch (notifyErr) {
+      console.warn("[OCR] Operator notification failed (non-fatal):", notifyErr);
+    }
+
+    // 10. Возвращаем успех
     return NextResponse.json({
       success: true,
       fields: fields as Record<string, string | null>,
