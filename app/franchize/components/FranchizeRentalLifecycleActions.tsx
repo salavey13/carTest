@@ -210,6 +210,11 @@ export function FranchizeRentalLifecycleActions({
               setClosureDepositReturned(true);
               setClosureReturnNotes("");
               setClosureModalOpen(true);
+              // Scroll to modal after render
+              setTimeout(() => {
+                const modal = document.querySelector('[role="dialog"]');
+                if (modal) modal.scrollIntoView({ behavior: "smooth", block: "center" });
+              }, 50);
             }}
             className="rounded-xl bg-[var(--lifecycle-accent-hover)] px-3 py-2 text-sm font-semibold text-[#16130A] transition-colors hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lifecycle-accent)]"
           >
@@ -284,12 +289,12 @@ export function FranchizeRentalLifecycleActions({
           role="dialog"
           aria-modal="true"
           aria-labelledby="closure-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.85)" }}
           onClick={() => !isPending && setClosureModalOpen(false)}
         >
           <div
-            className="relative w-full max-w-md rounded-2xl border p-5"
+            className="relative w-full max-w-md my-8 rounded-2xl border p-5"
             style={{
               backgroundColor: "var(--lifecycle-bg)",
               borderColor: "var(--lifecycle-border)",
