@@ -121,6 +121,22 @@ export function RentalReturnChecklist({
       >
         <PackageCheck className="h-4 w-4 shrink-0" />
         Что вернуть
+        {displayTodos && (() => {
+          const done = displayTodos.filter(t => t.status === "done").length;
+          const total = displayTodos.length;
+          const allDone = done === total;
+          return (
+            <span
+              className="ml-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+              style={{
+                backgroundColor: allDone ? "#22c55e20" : `${accentColor}20`,
+                color: allDone ? "#22c55e" : accentColor,
+              }}
+            >
+              {allDone ? "✓ Готово!" : `${done}/${total}`}
+            </span>
+          );
+        })()}
         <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
       </summary>
       <div className="border-t px-4 py-3 text-xs space-y-2" style={{ borderColor, color: textPrimary }}>
@@ -166,11 +182,22 @@ export function RentalReturnChecklist({
             ))}
           </ul>
         )}
-        {!loading && displayTodos && (
-          <p className="mt-3" style={{ color: textSecondary }}>
-            Нажмите на кружок, чтобы отметить пункт выполненным. При возврате оператор проверит комплектацию и состояние.
-          </p>
-        )}
+        {!loading && displayTodos && (() => {
+          const done = displayTodos.filter(t => t.status === "done").length;
+          const total = displayTodos.length;
+          if (done === total) {
+            return (
+              <p className="mt-3 font-semibold" style={{ color: "#22c55e" }}>
+                ✓ Все задачи закрыты — возврат оформлен идеально!
+              </p>
+            );
+          }
+          return (
+            <p className="mt-3" style={{ color: textSecondary }}>
+              Нажмите на кружок, чтобы отметить пункт выполненным. Прогресс: {done}/{total}.
+            </p>
+          );
+        })()}
         {!loading && !displayTodos && (
           <p className="mt-3" style={{ color: textSecondary }}>
             При возврате оператор проверит комплектацию и состояние. Депозит вернём после акта.
