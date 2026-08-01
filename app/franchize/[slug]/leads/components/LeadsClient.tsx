@@ -343,7 +343,6 @@ export function LeadsClient({
   useEffect(() => {
     if (!isAuthed || authLoading || shouldShowPassword) return;
     if (leadsFetchedRef.current) return;  // dedupe — only fetch once per slug
-    leadsFetchedRef.current = true;
 
     let cancelled = false;
     (async () => {
@@ -351,6 +350,7 @@ export function LeadsClient({
         const result = await getFranchizeLeads(slug);
         if (cancelled) return;
         if (result.success) {
+          leadsFetchedRef.current = true;  // only mark as fetched on success
           const fetchedLeads = (result.leads || []).filter(Boolean) as LeadRow[];
           const fetchedTodos = (result.todos || []).filter(Boolean) as LeadTodoRow[];
           setLeadsState(fetchedLeads);
