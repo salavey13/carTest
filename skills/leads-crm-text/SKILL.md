@@ -5,17 +5,17 @@ description: >
   (curl) and outputs formatted text — same data as `/franchize/vip-bike/leads` UI
   but as CLI/table output. Read + dismiss. No UI, no JSON blobs.
   Trigger phrases (RU): "покажи лиды", "статус лидов", "список лидов", "кто горячий",
-  "закрой лид", "отклони лид", "воронка", "SLA лидов", "просроченные задачи",
+  "закрой лид", "отклони лид", "воронка", "SLA лидов", "задачи в фокусе",
   "KPI лидов", "аналитика лидов", "лиды по аренде", "лиды по продаже", "сервисные лиды".
   Trigger phrases (EN): "leads text", "text leads dashboard", "show leads",
-  "lead status", "hot leads", "close lead", "dismiss lead", "leads pipeline",
+  "lead status", "priority leads", "close lead", "dismiss lead", "leads pipeline",
   "leads funnel", "leads KPIs", "overdue lead todos".
 ---
 
 # Leads CRM (text) — VIP Bike
 
-Триггер-фразы (RU): **`покажи лиды`**, **`статус лидов`**, **`список лидов`**, **`кто горячий`**, **`закрой лид`**, **`отклони лид`**, **`воронка`**, **`SLA лидов`**, **`просроченные задачи`**, **`KPI лидов`**, **`аналитика лидов`**, **`лиды по аренде`**, **`лиды по продаже`**, **`сервисные лиды`**.
-Триггер-фразы (EN): `leads text`, `text leads dashboard`, `show leads`, `lead status`, `hot leads`, `close lead`, `dismiss lead`, `leads pipeline`, `leads funnel`, `leads KPIs`, `overdue lead todos`.
+Триггер-фразы (RU): **`покажи лиды`**, **`статус лидов`**, **`список лидов`**, **`кто горячий`**, **`закрой лид`**, **`отклони лид`**, **`воронка`**, **`SLA лидов`**, **`задачи в фокусе`**, **`KPI лидов`**, **`аналитика лидов`**, **`лиды по аренде`**, **`лиды по продаже`**, **`сервисные лиды`**.
+Триггер-фразы (EN): `leads text`, `text leads dashboard`, `show leads`, `lead status`, `priority leads`, `close lead`, `dismiss lead`, `leads pipeline`, `leads funnel`, `leads KPIs`, `overdue lead todos`.
 
 ## Overview
 
@@ -28,11 +28,11 @@ Skill использует только `curl` к Supabase REST API (PostgREST) 
 Use this skill when:
 
 - Нужно быстро увидеть список лидов без открытия браузера / Telegram WebApp.
-- Нужно отфильтровать горячих / просроченных / QR-не-принятых лидов из CLI (для утреннего standup).
+- Нужно отфильтровать горячих / в фокусе / QR-не-принятых лидов из CLI (для утреннего standup).
 - Нужно показать детали одного лида (контакты, аренды, задачи, документы, QR-claim).
 - Нужно закрыть / отклонить лид с указанием причины (`dismiss-lead`).
 - Нужно вывести KPI (конверсия, выручка, горячие) или воронку по стадиям.
-- Нужно вывести список просроченных задач конкретного оператора.
+- Нужно вывести список задач в фокусе конкретного оператора.
 - Нужно оценить service-режим (`intent_type='service'`).
 
 ## Supabase Access
@@ -96,16 +96,16 @@ select=id,telegram_user_id,phone,stage,urgency_score\
 
 ```
 === Лиды VIP Bike (48 всего, 48 горячих) ===
-Фильтр: стадия: QR не принят → показано 13
+Фильтр: стадия: QR ждёт активации → показано 13
 
 Имя                     Телефон           Стадия                SLA               Назначен                Байк                  Выручка
 ──────────────────────  ────────────────  ────────────────────  ────────────────  ──────────────────────  ────────────────────  ──────────
-Логунов Егор            +79861720402      QR не принят          60 🔴             Джордан (member)        BMW F800R             4704k₽
-Шевчук Эдуард           +74929993333      QR не принят          2д 3ч 🔴          Артур С. (admin)        Regulmoto Nibbler …   2970k₽
-Молев Георгий           +79307020134      QR не принят          9д 4ч 🔴          Илья О. (owner)         BMW F800R             25k₽
+Логунов Егор            +79861720402      QR ждёт активации          60 🔴             Джордан (member)        BMW F800R             4704k₽
+Шевчук Эдуард           +74929993333      QR ждёт активации          2д 3ч 🔴          Артур С. (admin)        Regulmoto Nibbler …   2970k₽
+Молев Георгий           +79307020134      QR ждёт активации          9д 4ч 🔴          Илья О. (owner)         BMW F800R             25k₽
 
 === Воронка ===
-Новые: 16 | Нужен контакт: 1 | Договор отправлен: 8 | QR не принят: 13 | Документы отсутствуют: 6 | Активные: 0 | Возврат: 2 | Закрыто: 2 | Потеряно: 0
+Новые: 16 | Нужен контакт: 1 | Договор отправлен: 8 | QR ждёт активации: 13 | Документы отсутствуют: 6 | Активные: 0 | Возврат: 2 | Закрыто: 2 | Потеряно: 0
 ```
 
 🌐 Web: `https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/leads`
@@ -157,7 +157,7 @@ Identity state:     claimed_user
 Pipeline stage:     awaiting_qr_claim
 QR status:          unclaimed (sent 9д 4ч ago)
 SLA signals:        🔴 qr_age (9д 4ч), 🔴 first_contact (10д)
-Next action:        Позвонить клиенту — QR-ссылка не принята уже 9 дней
+Next action:        Позвонить клиенту — QR-ссылка ждёт активацииа уже 9 дней
 
 — Контакты —
 Телефон:   +79 861 720 402
@@ -247,7 +247,7 @@ curl -sS -X PATCH "${SUPABASE_URL}/rest/v1/franchize_intents?id=eq.${INTENT_ID}"
 ### 4. `list-todos` — список задач лида
 
 ```bash
-# Только просроченные задачи экипажа по лидам (lead_followup + rental_verification)
+# Только задачи в фокусе экипажа по лидам (lead_followup + rental_verification)
 NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%S.000Z')"
 curl -sS "${SUPABASE_URL}/rest/v1/crew_todos?\
 select=id,title,description,status,due_date,priority,category,assigned_to,lead_id,phone\
@@ -267,7 +267,7 @@ select=id,title,status,due_date,category,lead_id\
 **Пример вывода:**
 
 ```
-=== Просроченные задачи (3) ===
+=== Ждёт оформленияные задачи (3) ===
 #1  ⚠️ overdue   Позвонить Андрею по аренде Falcon Lynx     assigned: salavey13   due: 22.07
 #2  ⚠️ overdue   Проверить паспорт Закиров Артур             assigned: salavey13   due: 21.07
 #3  ⚠️ overdue   Отправить КП для ООО Вектор                 assigned: Roman_Vip  due: 25.07
@@ -327,7 +327,7 @@ select=stage,intent_type\
 
 ```
 === Воронка ===
-Новые: 16 | Нужен контакт: 1 | Договор отправлен: 8 | QR не принят: 13 | Документы отсутствуют: 6 | Активные: 0 | Возврат: 2 | Закрыто: 2 | Потеряно: 0
+Новые: 16 | Нужен контакт: 1 | Договор отправлен: 8 | QR ждёт активации: 13 | Документы отсутствуют: 6 | Активные: 0 | Возврат: 2 | Закрыто: 2 | Потеряно: 0
 
 Всего лидов: 48
 Горячих:     48
@@ -457,7 +457,7 @@ ALTER TABLE public.franchize_intents
 ALTER TABLE public.franchize_intents DROP CONSTRAINT IF EXISTS franchize_intents_intent_type_allowed;
 ALTER TABLE public.franchize_intents ADD CONSTRAINT franchize_intents_intent_type_allowed CHECK (
   intent_type = ANY (ARRAY[
-    'checkout_start', 'payment_failure', 'payment_success', 'hold_created',
+    'checkout_start', 'payment_retry needed', 'payment_success', 'hold_created',
     'map_click', 'contact_click', 'test_ride_click', 'test_ride',
     'prebuy', 'trade_in', 'finance', 'rent', 'sale', 'service'
   ])
