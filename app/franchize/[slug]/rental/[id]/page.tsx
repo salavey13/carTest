@@ -284,15 +284,24 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
 
               {status === "active" && (
                 <>
-                  <RentalReturnChecklist
-                    rentalId={rental.rentalId}
+                  <FranchizeRentalRoleGuard
+                    allowedRoles={["owner", "operator", "admin"]}
+                    ownerId={rental.ownerId}
+                    renterId={rental.renterId}
+                    renterTelegramChatId={rental.renterTelegramChatId}
                     crewId={crew.id}
-                    accentColor={accent}
-                    borderColor={borderSoft}
-                    textPrimary={textPrimary}
-                    textSecondary={textSecondary}
-                    isAuto={isAuto}
-                  />
+                    crewSlug={resolvedSlug}
+                  >
+                    <RentalReturnChecklist
+                      rentalId={rental.rentalId}
+                      crewId={crew.id}
+                      accentColor={accent}
+                      borderColor={borderSoft}
+                      textPrimary={textPrimary}
+                      textSecondary={textSecondary}
+                      isAuto={isAuto}
+                    />
+                  </FranchizeRentalRoleGuard>
                 </>
               )}
 
