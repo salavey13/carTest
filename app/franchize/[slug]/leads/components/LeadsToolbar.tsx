@@ -41,7 +41,7 @@ interface Props {
   onFilterFlagsChange: (f: Partial<FilterFlags>) => void;
   viewMode: ViewMode;
   onViewModeChange: (v: ViewMode) => void;
-  onExport: () => void;
+  onExport?: () => void;
   T: ThemeTokens;
 }
 
@@ -262,7 +262,8 @@ export function LeadsToolbar(props: Props) {
           })}
         </div>
 
-        {/* Export */}
+        {/* Export — only shown when onExport is provided */}
+        {onExport && (
         <button
           type="button"
           onClick={onExport}
@@ -279,6 +280,7 @@ export function LeadsToolbar(props: Props) {
         >
           <Download className="h-3.5 w-3.5" aria-hidden /> Экспорт
         </button>
+        )}
       </div>
     </section>
   );
