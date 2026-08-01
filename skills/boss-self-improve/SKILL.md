@@ -3,7 +3,7 @@ name: boss-self-improve
 description: >
   The boss improves itself on every run. Reads error logs, identifies patterns,
   suggests fixes, learns from past mistakes. No silent deaths — always notifies
-  admin on failure and retries on next cron.
+  admin on retry needed and retries on next cron.
   Trigger phrases: "boss debug", "boss errors", "self improve", "что сломалось",
   "boss health", "retry failed", "boss self-heal".
 ---
@@ -44,20 +44,20 @@ source "$(dirname "$0")/_error_handler.sh"
 The `_error_handler.sh` provides:
 - `trap ERR` → sends Telegram notification on any unhandled error
 - `trap EXIT` → logs execution time
-- `_boss_retry_check` → detects if this is a retry after a previous failure
+- `_boss_retry_check` → detects if this is a retry after a previous retry needed
 - `boss_self_debug` → analyzes error patterns and suggests fixes
 
 ## Commands
 
 ### 1. boss-health
-Check the health of all boss commands — last run time, success/failure, error count.
+Check the health of all boss commands — last run time, success/retry needed, error count.
 
 ```bash
 # Check error log
 cat /tmp/boss-errors/error-log.txt 2>/dev/null | tail -20
 
 # Check which scripts ran recently
-for script in morning-standup evening-summary overdue-alert returns-reminder; do
+for script in morning-standup evening-summary return-alert returns-reminder; do
   last_run=$(stat -c %Y "/tmp/boss-errors/last-run-${script}" 2>/dev/null || echo 0)
   if [[ $last_run -gt 0 ]]; then
     age=$(( $(date +%s) - last_run ))
@@ -81,7 +81,7 @@ Output:
 === Boss Self-Debug Report ===
 
 Errors by script:
-  12 overdue-alert.sh
+  12 return-alert.sh
   3 evening-summary.sh
   1 morning-standup.sh
 
@@ -158,8 +158,8 @@ When ANY boss command fails:
 
 1. **Trap fires** → `_boss_error_handler` sends Telegram notification:
    ```
-   🚨 Boss error — overdue-alert.sh
-   Script: overdue-alert.sh
+   🚨 Boss error — return-alert.sh
+   Script: return-alert.sh
    Function: main
    Line: 28
    Exit code: 1
@@ -172,11 +172,11 @@ When ANY boss command fails:
 
 3. **Retry marker** → `/tmp/boss-errors/last-fail-{script}` is created
 
-4. **Next cron run** → `_boss_retry_check` detects the retry marker, logs "RETRY after failure", removes the marker
+4. **Next cron run** → `_boss_retry_check` detects the retry marker, logs "RETRY after retry needed", removes the marker
 
 5. **If retry succeeds** → normal operation resumes, admin gets no further notifications
 
-6. **If retry fails 3× in a row** → boss-self-heal runs automatically, checks connectivity, clears stale state, notifies admin with "🚨 3 consecutive failures — needs manual intervention"
+6. **If retry fails 3× in a row** → boss-self-heal runs automatically, checks connectivity, clears stale state, notifies admin with "🚨 3 consecutive retry neededs — needs manual intervention"
 
 ## Self-improvement loop
 
@@ -188,7 +188,7 @@ Every week (Monday 10:00, before weekly-revenue):
    ```
    🤖 Weekly self-improvement report:
 
-   📊 Last week: 42 runs, 3 errors (7% failure rate)
+   📊 Last week: 42 runs, 3 errors (7% retry rate)
    ⚠️ Pattern: Supabase 525 SSL errors spiking on weekends
 
    📚 I learned:
@@ -199,7 +199,7 @@ Every week (Monday 10:00, before weekly-revenue):
    💡 Suggestions:
    1. Add deposit-outstanding to morning-standup
    2. Add shift-check-in button to morning-standup
-   3. Reduce overdue-alert frequency on weekends (less traffic)
+   3. Reduce return-alert frequency on weekends (less traffic)
 
    Shall I implement any of these? Reply with numbers.
    ```
