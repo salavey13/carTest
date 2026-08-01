@@ -75,26 +75,32 @@ export const STAGE_BOTTLENECK: Record<StageKey, { label: string; action: string;
  * Web-app flow: unverified until operator checks uploaded photos
  */
 export function getVerificationStatus(lead: LeadRow): "verified" | "unverified" | "pending" | "not_needed" {
-  // /doc flow: operator created the rental via /doc command.
-  // The operator physically saw the passport + license → VERIFIED on creation.
-  // No photos needed — docs were verified in person during the /doc session.
-  if (lead.originalOperatorChatId && lead.rentals.length > 0) {
+  if (lead.rentals.length === 0) return "not_needed";
+
+  const r = lead.rentals[0] as any;
+
+  // RULE 1: Active rentals are ALWAYS verified.
+  // If the bike was handed off (status=active), docs were checked —
+  // either by the operator via /doc (saw physical docs) or via photo
+  // verification before activation. You can't activate without verifying.
+  if (r.status === "active" || r.status === "completed") {
     return "verified";
   }
-  // Web-app flow: renter created the rental via web form.
-  // TG chat_id is auto-shared (no QR needed). Bottleneck is photo upload.
-  // Photos can be auto-OCR'd via /api/docphotoocr endpoint (recognizeDocument).
-  // Until photos are uploaded AND verified by operator → UNVERIFIED.
-  if (lead.rentals.length > 0 && !lead.originalOperatorChatId) {
-    const r = lead.rentals[0] as any;
-    const hasPhotos = r.passportMainpagePhoto || r.passportRegistrationPhoto || r.driversLicenceFrontalPhoto;
-    const verified = r.metadata?.contract_verifier?.status === "verified";
-    if (verified) return "verified";
-    if (hasPhotos) return "pending";  // photos uploaded, awaiting operator check
-    return "unverified";               // no photos yet — renter needs to upload
+
+  // RULE 2: /doc flow = always verified (operator saw physical docs).
+  // This covers pending_confirmation/confirmed rentals created via /doc.
+  if (lead.originalOperatorChatId) {
+    return "verified";
   }
-  // No rental yet — verification not needed
-  return "not_needed";
+
+  // RULE 3: Web-app flow, not yet active = needs verification.
+  // These rentals were created by the renter via web form.
+  // Unverified state only applies here — until operator checks photos.
+  const hasPhotos = r.passportMainpagePhoto || r.passportRegistrationPhoto || r.driversLicenceFrontalPhoto;
+  const verified = r.metadata?.contract_verifier?.status === "verified";
+  if (verified) return "verified";
+  if (hasPhotos) return "pending";  // photos uploaded, awaiting operator check
+  return "unverified";               // no photos yet — renter needs to upload
 }
 
 export const VERIFICATION_LABELS: Record<string, { label: string; color: string; icon: string }> = {
