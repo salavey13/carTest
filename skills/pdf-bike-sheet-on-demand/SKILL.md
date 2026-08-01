@@ -145,7 +145,7 @@ PDF содержит (для одного байка):
 
 ### 1. Boss-command: генерация PDF после нового лида на покупку
 ```bash
-# В lead-stuck-watchdog.sh когда лид завис на intent=prebuy:
+# В lead-development-watchdog.sh когда лид готов к покупке (intent=prebuy):
 node skills/pdf-bike-sheet-on-demand/scripts/generate-bike-pdf.mjs \
   --slug "$LEAD_SLUG" \
   --bikeId "$LEAD_BIKE_ID" \
@@ -187,10 +187,12 @@ node skills/qr-deeplink-on-demand/scripts/generate-qr.mjs \
 
 ## Error Handling
 
+Все ошибки возвращают JSON с `ok: false` и понятным сообщением. PDF сохраняется даже при ошибке отправки в Telegram.
+
 - Bike not found → exit 4 + JSON `{"ok": false, "error": "Bike not found: <bikeId>"}`
 - API endpoint 401 → exit 5 + JSON `{"ok": false, "error": "Unauthorized — check SUPABASE_SERVICE_ROLE_KEY"}`
 - Network timeout (15s) → exit 6 + JSON `{"ok": false, "error": "API timeout"}`
-- Telegram send failure → exit 7 + JSON `{"ok": true, "telegramSent": false, "telegramError": "..."}` (PDF still saved)
+- Telegram delivery pending → exit 7 + JSON `{"ok": true, "telegramSent": false, "telegramError": "..."}` (PDF still saved)
 
 ## Связанные файлы в репозитории
 
