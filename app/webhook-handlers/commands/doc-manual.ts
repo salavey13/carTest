@@ -1620,7 +1620,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
     }
 
     // Send QR as separate photo (if available)
-    if (qrPngBuffer) {
+    if (qrPngBuffer && isRent) {
       try {
         const formData = new FormData();
         formData.append("chat_id", String(chatId));
@@ -1735,7 +1735,7 @@ ${qrDeepLink}`);
           `👤 ${context.mpFullName || '—'}\n` +
           `💰 ${context.salePrice || '?'} ₽\n\n` +
           `Договор отправлен выше ↑\n` +
-          `QR для покупателя — ниже ↓`,
+          `Карточку продажи смотрите в аналитике →`,
           [],
           { removeKeyboard: true, parseMode: 'Markdown' }
         );
@@ -3157,6 +3157,21 @@ export async function handleDocCallback(
     await setState(userId, "equipment", context);
     logger.info(`[/doc] eq_boots: ${userId} → boots=${context.boots}`);
     await sendComplexMessage(chatId, `👢 Боты: ${context.boots ? "✅" : "⬜"}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData === "eq_skip_all") {
+    context.helmets = 0;
+    context.gloves = 0;
+    context.jacket = false;
+    context.boots = false;
+    context.net = false;
+    context.backpack = false;
+    context.bag = false;
+    context.charger = false;
+    await setState(userId, "equipment", context);
+    logger.info(`[/doc] eq_skip_all: ${userId} → all equipment skipped`);
+    await gotoOdometer(chatId, userId, context);
     return true;
   }
 
