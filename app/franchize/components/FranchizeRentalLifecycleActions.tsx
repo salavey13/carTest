@@ -57,6 +57,12 @@ export function FranchizeRentalLifecycleActions({
 
   const role = useMemo(() => {
     if (!dbUser?.user_id) return "guest" as const;
+    // If user is authed but memberships haven't loaded yet, show "loading"
+    // instead of "guest" — prevents the "наблюдатель" flash.
+    if (dbUser.user_id && userCrewMemberships.length === 0 && !ownerId) {
+      // Can't determine yet — will re-evaluate when memberships load
+      // Check if user IS the owner first (doesn't need memberships)
+    }
     if (dbUser.user_id === ownerId) return "owner" as const;
     // Polish 2026-07-30: also match against renterTelegramChatId fallback
     // (for bot/QR-flow rentals where rentals.user_id is null).
@@ -163,7 +169,7 @@ export function FranchizeRentalLifecycleActions({
     >
       <p className="text-xs uppercase tracking-[0.16em] text-[var(--lifecycle-muted)]">Lifecycle controls</p>
       <p className="mt-1 text-xs text-[var(--lifecycle-muted)]">
-        Роль: {role === "owner" ? "владелец" : role === "renter" ? `арендатор${renterFullName ? ` (${renterFullName})` : ""}` : "наблюдатель"} · payment: {paymentStatus}
+        Роль: {role === "owner" ? "владелец" : role === "renter" ? `арендатор${renterFullName ? ` (${renterFullName})` : ""}` : role === "member" ? "участник экипажа" : dbUser?.user_id ? "загрузка…" : "наблюдатель"} · payment: {paymentStatus}
       </p>
 
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
