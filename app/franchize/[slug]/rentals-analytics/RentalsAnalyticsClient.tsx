@@ -252,7 +252,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
       if (!result.success) {
         if (result.error?.includes("прав") || result.error?.includes("доступ")) {
-          setShowPasswordEntry(true);
+          setPasswordAuthOwnerId(null);
           toast.error("Требуется пароль");
           return;
         }
@@ -284,7 +284,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
       if (result.success) setDateRange(result.data || null);
       else if (result.error?.includes("прав")) {
-        setShowPasswordEntry(true);
+        setPasswordAuthOwnerId(null);
       }
     } catch (error) {
       console.error("[Analytics] Date range error:", error);
@@ -1327,7 +1327,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                             <td className="px-3 md:px-5 py-3 md:py-4 text-center hidden sm:table-cell">
                               {/* Verification: /doc flow = always verified (operator saw docs).
                                   Web-app flow = verified only if documentSecret.verification_status === "verified" */}
-              <span className="text-base md:text-lg font-bold" style={{ color: rental.documentSecret ? "#34d399" : borderSoft }} title={rental.documentSecret?.is_web_app_flow ? "Web-app flow" : "Verified via /doc"}>
+              <span className="text-base md:text-lg font-bold" style={{ color: rental.documentSecret ? "#34d399" : borderSoft }} title={rental.documentSecret ? (rental.documentSecret.is_web_app_flow ? "Web-app flow" : "Verified via /doc") : "Не верифицирован"}>
                                 {rental.documentSecret ? "✓" : "—"}
               </span>
                             </td>
