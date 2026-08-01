@@ -99,10 +99,10 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
 
   // Status-aware explanatory text
   const statusHint: Record<string, string> = {
-    pending_confirmation: "Заявка ждёт подтверждения владельцем.",
+    pending_confirmation: "Аренда готова к активации — подтвердите выдачу.",
     confirmed: "Аренда подтверждена. Можно открыть в Telegram для деталей.",
-    active: "ТС у арендатора. Следим за сроками возврата.",
-    completed: "Аренда завершена. Спасибо!",
+    active: "ТС у арендатора. Готовьте возврат к указанной дате.",
+    completed: "Аренда завершена ✓ — запросите отзыв у клиента.",
     cancelled: "Аренда отменена.",
   };
   const hintText = rental.found ? (statusHint[status] || "") : "Сделка не найдена. Проверьте ссылку или вернитесь в каталог.";
