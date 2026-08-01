@@ -39,8 +39,8 @@ permission:
 
 | Ключевые слова | Skill | Команды | Web-ссылка |
 |---|---|---|---|
-| лиды, воронка, KPI, dismiss, QR не принят, горячие | `leads-crm-text` | list-leads, lead-detail, dismiss-lead, list-todos, kpis, pipeline-funnel | /leads |
-| аренды сегодня, возвраты, просроченные, активировать, kpi аренд, документы аренды, передача байка, история аренды | `rental-analytics-text` | rentals-day, rental-kpis, rental-detail, rental-todos, rental-documents, rental-handoff, rental-history, activate-rental, complete-rental, returns-due, overdue-rentals | /rentals-analytics?ui=v2 |
+| лиды, воронка, KPI, dismiss, QR ждёт активации, горячие | `leads-crm-text` | list-leads, lead-detail, dismiss-lead, list-todos, kpis, pipeline-funnel | /leads |
+| аренды сегодня, возвраты, ждёт оформленияные, активировать, kpi аренд, документы аренды, передача байка, история аренды | `rental-analytics-text` | rentals-day, rental-kpis, rental-detail, rental-todos, rental-documents, rental-handoff, rental-history, activate-rental, complete-rental, returns-due, rentals-awaiting-return | /rentals-analytics?ui=v2 |
 | продажи, статистика продаж, детали продажи, kpi продаж, статус договора, доставка, гарантия | `sale-analytics-text` | sales-list, sale-kpis, sale-detail, sale-contract-status, sale-delivery-status, sale-warranty, sale-stats, sale-update-status | /rentals-analytics?ui=v2 (Продажа tab) |
 | сервис, обслуживание, нормо-час, услуги, kpi сервиса, механик, каталог услуг | `service-analytics-text` | services-list, service-kpis, service-detail, service-catalog, service-mechanic, service-assign-mechanic, service-stats, service-activate, service-complete | /rentals-analytics?ui=v2 (Сервис tab) |
 | аналитика, дашборд задач, выручка, статистика экипажа | `analytics-text` | rentals-dashboard, sales-dashboard, todos-dashboard, crew-stats, service-dashboard, commercial-offers, subrent | /rentals-analytics |
@@ -63,7 +63,7 @@ permission:
 | "покажи лиды" / "кто горячий" | leads-crm-text | list-leads --hot |
 | "аренды сегодня" / "что сегодня" | rental-analytics-text | rentals-day |
 | "kpi аренд" / "выручка сегодня" | rental-analytics-text | rental-kpis |
-| "возвраты" / "просроченные" | rental-analytics-text | returns-due / overdue-rentals |
+| "возвраты" / "ждёт оформленияные" | rental-analytics-text | returns-due / rentals-awaiting-return |
 | "документы аренды" / "карточка аренды" | rental-analytics-text | rental-detail / rental-documents |
 | "передача байка" / "handoff" | rental-analytics-text | rental-handoff |
 | "история аренды" | rental-analytics-text | rental-history |
@@ -89,7 +89,7 @@ permission:
 **"Что у меня сегодня горит?"** → 3 навыка параллельно:
 1. `leads-crm-text list-leads --hot` — горячие лиды
 2. `rental-analytics-text returns-due` — возвраты сегодня
-3. `rental-analytics-text overdue-rentals` — просроченные аренды
+3. `rental-analytics-text rentals-awaiting-return` — аренды к возврату
 
 **"Полная сводка за день"** → 3 аналитических навыка (зеркало v2 KPI row):
 1. `rental-analytics-text rental-kpis --date <today>` — 4 KPI по арендам
@@ -163,7 +163,7 @@ Computed by `computeLeadStage()` in `app/franchize/[slug]/leads/lib/pipeline-sta
 |---|---|
 | time_since_first_contact | gray<24h, yellow<72h, red>72h |
 | time_since_last_action | green<1h, yellow<4h, orange<24h, red>24h |
-| overdue_todo_count | gray=0, yellow=1, red≥2 |
+| todo_in_focus_count | gray=0, yellow=1, red≥2 |
 | rental_start_proximity | gray>7d, yellow>1d, red<1d |
 | unclaimed_qr_age | gray<1h, yellow<17h, red>48h |
 | time_until_return | green>3d, yellow>1d, red<1d |
@@ -257,7 +257,7 @@ Layout: split-pane on desktop (5/12 list + 7/12 detail), stacked on mobile
 **RentalDetailDrawer — 10 sections** (see `rental-analytics-text` §3):
 1. Header — bike title, renter ФИО, status badge
 2. Primary actions — Activate / Complete / Cancel / Open
-3. SLA overview — 4 indicators (days_active, until_return, docs, overdue_todos)
+3. SLA overview — 4 indicators (days_active, until_return, docs, todo_in_focuss)
 4. Info grid — 12 tiles
 5. Documents — 5-item checklist + verify button
 6. Todos — filtered All/Mine/Overdue
@@ -285,7 +285,7 @@ TODAY_LOCAL=$(date +%Y-%m-%d)  # local
 
 ### 1. Morning standup
 ```bash
-# Hot leads + overdue + returns due
+# Priority leads + overdue + returns due
 node skills/leads-crm-text/leads-query.mjs list-leads --hot --limit 5
 node skills/rental-analytics-text/rental-query.mjs returns-due  # (or curl)
 curl -s "$URL/rest/v1/crew_todos?select=id,title,due_date&crew_id=eq.$CREW_ID&status=neq.done&due_date=lt.now()" -H "apikey: $KEY"
@@ -373,7 +373,7 @@ analytics_web_url "rentals" "2026-07-24"
 ### Пример
 
 ```
-🔥 Рудометов Михаил — urgency 95 — QR не принят 17ч
+🔥 Рудометов Михаил — urgency 95 — QR ждёт активации 17ч
 🏍 Ducati Panigale S Electro
 
 📋 Открыть: https://t.me/oneBikePlsBot/app?startapp=lead_425868767
