@@ -107,6 +107,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   const theme = useFranchizeTheme(crew.theme);
 
   const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [selectedRentalId, setSelectedRentalId] = useState<string | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [verificationFilter, setVerificationFilter] = useState<"all" | "verified" | "pending" | "revoked">("all");
   const [rentals, setRentals] = useState<RentalDashboardItem[]>([]);
@@ -1119,9 +1120,17 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                 textSecondary={textSecondary}
               />
 
-{/* Todos */}
+{/* Todos — filtered by selected rental when one is clicked */}
+              {selectedRentalId && (
+                <div className="flex items-center gap-2 text-xs" style={{ color: textSecondary }}>
+                  <span>📋 Задачи для аренды #{selectedRentalId.slice(0, 8)}</span>
+                  <button onClick={() => setSelectedRentalId(null)} className="text-xs underline" style={{ color: accentMain }}>
+                    показать все
+                  </button>
+                </div>
+              )}
               <TodosSection
-                todos={todos}
+                todos={selectedRentalId ? todos.filter(t => t.rental_id === selectedRentalId) : todos}
                 todoStats={todoStats}
                 loadingTodos={loadingTodos}
                 todoFilter={todoFilter}
@@ -1281,7 +1290,11 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                               </span>
                             </td>
                             <td className="px-3 md:px-5 py-3 md:py-4">
-                              <div className="text-xs md:text-sm font-semibold leading-tight" style={{ color: textPrimary }}>{rental.renter_full_name || rental.user?.full_name || rental.user?.username || "—"}</div>
+                              <div className="text-xs md:text-sm font-semibold leading-tight" style={{ color: textPrimary }}>{rental.renter_full_name
+  || (rental.isOperatorPlaceholder ? "Клиент (имя в договоре)" : null)
+  || rental.user?.full_name
+  || rental.user?.username
+  || "—"}</div>
                               <div className="text-[10px] md:text-xs mt-0.5" style={{ color: textSecondary }}>
                                 {rental.vehicle?.make} {rental.vehicle?.model}
                               </div>
