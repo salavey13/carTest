@@ -403,6 +403,15 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             <p className={rental.totalCost > 0 ? "" : "sm:col-span-2"}>
               <span style={{ color: textSecondary }}>Транспорт:</span> {rental.vehicleTitle}
             </p>
+            {/* Rent dates — show start and end date */}
+            {(rental.agreedEndDate || rental.requestedEndDate) && (
+              <p className="sm:col-span-2">
+                <span style={{ color: textSecondary }}>Период аренды:</span>{" "}
+                <span className="font-semibold" style={{ color: textPrimary }}>
+                  {formatRuDate(rental.agreedEndDate || rental.requestedEndDate || "")}
+                </span>
+              </p>
+            )}
             {/* NEW (polish 2026-07-30): show renter name when available.
                 Comes from rental_contract_artefacts.renter_full_name (passport OCR)
                 for bot/QR-flow rentals. Empty for web-app-flow rentals where
