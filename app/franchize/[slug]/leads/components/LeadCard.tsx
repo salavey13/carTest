@@ -8,7 +8,6 @@ import type { ThemeTokens } from "../hooks/useTheme";
 import {
   STAGE_LABELS,
   STAGE_COLORS,
-  STAGE_BOTTLENECK,
   getVerificationStatus,
   VERIFICATION_LABELS,
   getStageBottleneck,
