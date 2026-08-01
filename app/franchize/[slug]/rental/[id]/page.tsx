@@ -408,7 +408,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               <p className="sm:col-span-2">
                 <span style={{ color: textSecondary }}>Период аренды:</span>{" "}
                 <span className="font-semibold" style={{ color: textPrimary }}>
-                  {formatRuDate(rental.agreedEndDate || rental.requestedEndDate || "")}
+                  {formatRuDate(new Date(rental.agreedEndDate || rental.requestedEndDate || ""))}
                 </span>
               </p>
             )}
