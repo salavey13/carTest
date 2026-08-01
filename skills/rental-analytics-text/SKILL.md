@@ -7,16 +7,16 @@ description: >
   handoff state, todos filtered per rental, history timeline, QR status,
   activate/complete rental.
   Trigger phrases: "аренды сегодня", "статус аренд", "возвраты сегодня",
-  "просроченные аренды", "kpi аренд", "карточка аренды", "документы аренды",
+  "аренды к возврату", "kpi аренд", "карточка аренды", "документы аренды",
   "передача байка", "история аренды", "активировать аренду", "завершить аренду",
   "rentals today", "rental kpis", "rental detail", "returns due",
-  "overdue rentals", "rental documents", "rental handoff", "rental history",
+  "rentals awaiting return", "rental documents", "rental handoff", "rental history",
   "activate rental", "complete rental"
 ---
 
 # rental-analytics-text
 
-Триггер-фразы: **`аренды сегодня`**, **`статус аренд`**, **`возвраты сегодня`**, **`просроченные аренды`**, **`kpi аренд`**, **`карточка аренды`**, **`документы аренды`**, **`передача байка`**, **`история аренды`**, **`активировать аренду`**, **`завершить аренду`**, **`rentals today`**, **`rental kpis`**, **`rental detail`**, **`returns due`**, **`overdue rentals`**, **`rental documents`**, **`rental handoff`**, **`rental history`**
+Триггер-фразы: **`аренды сегодня`**, **`статус аренд`**, **`возвраты сегодня`**, **`аренды к возврату`**, **`kpi аренд`**, **`карточка аренды`**, **`документы аренды`**, **`передача байка`**, **`история аренды`**, **`активировать аренду`**, **`завершить аренду`**, **`rentals today`**, **`rental kpis`**, **`rental detail`**, **`returns due`**, **`rentals awaiting return`**, **`rental documents`**, **`rental handoff`**, **`rental history`**
 
 ## Supabase Access
 - URL: https://inmctohsodgdohamhzag.supabase.co
@@ -134,7 +134,7 @@ Sections (in order):
    - `days_active` (since `agreed_start_date`)
    - `until_return` (or `return_overdue` if past)
    - `docs` (`3/5` completeness)
-   - `overdue_todos` count for this rental
+   - `todo_in_focuss` count for this rental
 4. **Info grid** (12 tiles):
    - Байк, Арендатор, Телефон, Статус, Оплата, Начало, Конец, Стоимость, Депозит, Оператор, Экипаж, Создана
 5. **Documents** — 5-item checklist:
@@ -257,7 +257,7 @@ curl -s "$URL/rest/v1/rentals?select=rental_id,vehicle_id,user_id,agreed_end_dat
 
 Output: list with renter ФИО + bike + `agreed_end_date` formatted as `до 18:00`.
 
-### 11. overdue-rentals
+### 11. rentals-awaiting-return
 Active rentals past their `agreed_end_date`.
 
 ```bash
@@ -266,7 +266,7 @@ curl -s "$URL/rest/v1/rentals?select=rental_id,vehicle_id,user_id,agreed_end_dat
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
 ```
 
-Output: list with `Просрочен: 3д` countdown per row.
+Output: list with `Ждёт оформления: 3д` countdown per row.
 
 ## SLA signal computation (matches computeSlaSignals in lib/analytics-utils.ts)
 
@@ -274,7 +274,7 @@ For each active rental, compute 4 SLA indicators:
 1. `days_active` — floor((now - agreed_start_date) / 86400000) → "5д"
 2. `until_return` — floor((agreed_end_date - now) / 3600000) → "2д 3ч" or "5ч"
    - tone: `good` (>72h), `warning` (24-72h), `danger` (<24h)
-3. `return_overdue` — if agreed_end_date < now → "Просрочен: 3д" (tone: `danger`)
+3. `return_overdue` — if agreed_end_date < now → "Ждёт оформления: 3д" (tone: `danger`)
 4. `docs` — `3/5` completeness (tone: `good` if 5/5, `warning` if 2-4, `danger` if ≤1)
 
 Priority order: `return_overdue` (10) > `until_return` (8) > `docs` (5) > `days_active` (1).
