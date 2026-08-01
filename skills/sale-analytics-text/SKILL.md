@@ -103,7 +103,7 @@ curl -s "$URL/rest/v1/sale_contract_artifacts?select=id,metadata,warranty_months
 ```
 
 Status values (in `metadata.contract_status`):
-- `pending` — договор создан, не отправлен
+- `pending` — договор создан, готов к отправке
 - `sent` — отправлен покупателю
 - `signed` — подписан покупателем
 - `paid` — оплата получена
