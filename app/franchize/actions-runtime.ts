@@ -4782,8 +4782,11 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   // these when renterId is empty.
   renterTelegramChatId: string;
   renterFullName: string;
+  renterPhone: string;
+  agreedStartDate: string | null;
   agreedEndDate: string | null;
   requestedEndDate: string | null;
+  bikePhotoUrl: string;
   metadata: Record<string, unknown> | null;
   contractVerificationStatus: "verified" | "not_verified" | "expired";
   contractVerifierScope: string;
@@ -4808,8 +4811,11 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       ownerId: "",
       renterTelegramChatId: "",
       renterFullName: "",
+      renterPhone: "",
+      agreedStartDate: null,
       agreedEndDate: null,
       requestedEndDate: null,
+      bikePhotoUrl: "",
       metadata: null,
       contractVerificationStatus: "not_verified",
       contractVerifierScope: "",
@@ -4824,7 +4830,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
 
   const { data, error } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, agreed_end_date, requested_end_date, metadata, vehicle:cars(make, model)")
+    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, agreed_start_date, agreed_end_date, requested_end_date, metadata, vehicle:cars(make, model, specs)")
     .eq("rental_id", safeRentalId)
     .maybeSingle();
 
@@ -4841,8 +4847,11 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       ownerId: "",
       renterTelegramChatId: "",
       renterFullName: "",
+      renterPhone: "",
+      agreedStartDate: null,
       agreedEndDate: null,
       requestedEndDate: null,
+      bikePhotoUrl: "",
       metadata: null,
       contractVerificationStatus: "not_verified",
       contractVerifierScope: "",
@@ -4879,15 +4888,17 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   // work even when user_id is missing.
   let renterTelegramChatId = "";
   let renterFullName = "";
+  let renterPhone = "";
   try {
     const { data: artefact } = await supabaseAdmin
       .from("rental_contract_artefacts")
-      .select("telegram_chat_id, renter_full_name")
+      .select("telegram_chat_id, renter_full_name, renter_phone")
       .eq("rental_id", safeRentalId)
       .maybeSingle();
     if (artefact) {
       renterTelegramChatId = typeof artefact.telegram_chat_id === "string" ? artefact.telegram_chat_id.trim() : "";
       renterFullName = typeof artefact.renter_full_name === "string" ? artefact.renter_full_name.trim() : "";
+      renterPhone = typeof artefact.renter_phone === "string" ? artefact.renter_phone.trim() : "";
     }
   } catch (artefactErr) {
     // Non-fatal — the rental_contract_artefacts table may not exist on
@@ -4895,6 +4906,11 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     // role may lack private-schema access. Log + continue with empty strings.
     console.warn("[getFranchizeRentalCard] Failed to fetch rental_contract_artefacts fallback:", artefactErr);
   }
+
+  // Extract bike photo from vehicle specs (gallery array or image_url)
+  const vehicleSpecs = (vehicle as any)?.specs ?? {};
+  const gallery = Array.isArray(vehicleSpecs.gallery) ? vehicleSpecs.gallery : [];
+  const bikePhotoUrl = gallery[0] || vehicleSpecs.image_url || "";
 
   return {
     found: true,
@@ -4906,10 +4922,13 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     vehicleTitle: `${vehicle?.make ?? "Vehicle"} ${vehicle?.model ?? ""}`.trim(),
     renterId: data.user_id ?? "",
     ownerId: data.owner_id ?? "",
+    agreedStartDate: data.agreed_start_date || null,
     // Fallbacks from rental_contract_artefacts (empty when rental was created
     // via web app flow — rentals.user_id is set in that case)
     renterTelegramChatId,
     renterFullName,
+    renterPhone,
+    bikePhotoUrl,
     agreedEndDate: data.agreed_end_date || null,
     requestedEndDate: data.requested_end_date || null,
     metadata,
