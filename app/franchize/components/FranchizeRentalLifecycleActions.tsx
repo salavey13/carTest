@@ -106,7 +106,7 @@ export function FranchizeRentalLifecycleActions({
   };
 
   const canConfirmPickup = (role === "owner" || role === "member") && ["pending_confirmation", "confirmed"].includes(status);
-  const pickupActionBlockedByFreeze = canConfirmPickup && !hasPickupFreeze;
+  const pickupNeedsFreezeFirst = canConfirmPickup && !hasPickupFreeze;
   // FIX: show close button for ALL crew members (owner, admin, co_owner, AND member).
   // The server action (confirmVehicleReturn) handles the actual auth check —
   // it rejects regular members with "Недостаточно прав". Showing the button
@@ -170,7 +170,7 @@ export function FranchizeRentalLifecycleActions({
         {canConfirmPickup && (
           <button
             type="button"
-            disabled={isPending || pickupActionBlockedByFreeze}
+            disabled={isPending || pickupNeedsFreezeFirst}
             onClick={() =>
               withAction("pickup", async () => {
                 if (!dbUser?.user_id) {
@@ -267,7 +267,7 @@ export function FranchizeRentalLifecycleActions({
       </div>
 
       {role === "guest" && <p className="mt-3 text-xs text-[var(--lifecycle-muted)]">Действия доступны владельцу, арендатору или участнику экипажа.</p>}
-      {pickupActionBlockedByFreeze && (
+      {pickupNeedsFreezeFirst && (
         <p className="mt-3 text-xs text-[var(--lifecycle-muted)]">
           Подтверждение выдачи будет доступно после сохранения выдачи в документах аренды.
         </p>
