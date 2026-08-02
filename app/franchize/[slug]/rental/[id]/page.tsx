@@ -7,7 +7,8 @@ import { CrewHeader } from "../../../components/CrewHeader";
 import { FranchizeErrorBoundary } from "../../../components/ErrorBoundary";
 import { DisplayModeProvider } from "../../../components/DisplayModeContext";
 import { FranchizeRentalLifecycleActions } from "../../../components/FranchizeRentalLifecycleActions";
-import { FranchizePageShell } from "../../../components/FranchizePageShell";
+// goodmorning-polish: removed FranchizePageShell import — replaced with plain <div>
+// to avoid backdrop-blur breaking position:fixed on QuickActionBar + excessive padding.
 import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRentalDocumentsPanel";
 // goodmorning-polish: removed RentalChecklistPanel import (broken local-state toggle,
 // was duplicating RentalReturnChecklist which persists via API)
@@ -81,6 +82,36 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
   const textPrimary = isAuto ? "var(--franchize-text-primary)" : (p?.textPrimary || "#FFFFFF");
   const textSecondary = isAuto ? "var(--franchize-text-secondary)" : (p?.textSecondary || "#AAAAAA");
   const borderSoft = isAuto ? "var(--franchize-border-soft)" : (p?.borderSoft || "#333333");
+
+  // goodmorning-polish: CSS vars for the plain div that replaced FranchizePageShell.
+  // Sets shadcn/ui vars so any Button/Dialog components inside still get themed correctly.
+  const shellVarsFallback: React.CSSProperties = {
+    "--background": isAuto ? "hsl(var(--background))" : (p?.bgCard || "#1a1a1a"),
+    "--foreground": isAuto ? "hsl(var(--foreground))" : (p?.textPrimary || "#FFFFFF"),
+    "--card": isAuto ? "hsl(var(--card))" : (p?.bgCard || "#1a1a1a"),
+    "--card-foreground": isAuto ? "hsl(var(--card-foreground))" : (p?.textPrimary || "#FFFFFF"),
+    "--primary": isAuto ? "var(--franchize-accent-main)" : (p?.accentMain || "#B8860B"),
+    "--primary-foreground": accentTextOn,
+    "--border": isAuto ? "var(--franchize-border-soft)" : (p?.borderSoft || "#333333"),
+    "--ring": isAuto ? "var(--franchize-accent-main)" : (p?.accentMain || "#B8860B"),
+    "--franchize-shell-accent": accent,
+    "--franchize-shell-text": textPrimary,
+    "--franchize-shell-muted": textSecondary,
+    "--franchize-shell-border": borderSoft,
+    "--franchize-shell-card": isAuto ? "var(--franchize-bg-card)" : (p?.bgCard || "#1a1a1a"),
+  } as React.CSSProperties;
+
+  // goodmorning-polish: translate payment status to Russian
+  const paymentStatusLabels: Record<string, string> = {
+    fully_paid: "Полностью оплачена",
+    interest_paid: "Предоплата получена",
+    pending: "Ожидает оплаты",
+    partial: "Частичная оплата",
+    refunded: "Возврат средств",
+  };
+  const paymentStatusLabel = rental.paymentStatus
+    ? (paymentStatusLabels[rental.paymentStatus] || rental.paymentStatus)
+    : null;
 
   // goodmorning-polish: removed dealStarted + profileHref (unused after streamline)
   const catalogHref = `/franchize/${resolvedSlug}`;
@@ -174,17 +205,16 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
       </FranchizeErrorBoundary>
       </DisplayModeProvider>
 
-      <FranchizePageShell theme={crew.theme} contentClassName="space-y-4 px-3 py-3 max-w-2xl mx-auto">
-        {/* goodmorning-polish: streamlined rental page — removed duplicate sections,
-            static "Текущие задачи" list (Timeline already shows status), duplicate
-            "Продлить" buttons (one is enough), and the broken local-state checklist
-            (RentalChecklistPanel — items uncheck on re-render; keep only RentalReturnChecklist
-            which persists via API). */}
-
+      {/* goodmorning-polish: replaced <FranchizePageShell> with plain <div>.
+          PageShell had backdrop-blur which creates a containing block that breaks
+          position:fixed for the QuickActionBar (bar stuck to page bottom, not viewport).
+          Also had excessive padding (py-8 + p-6 + rounded-[2rem]). Now: minimal padding,
+          no backdrop-blur, no border shell. Content flows edge-to-edge with small margin. */}
+      <div className="mx-auto w-full max-w-2xl px-3 py-2" style={shellVarsFallback}>
         {/* Inline CSS for bottom spacer + portrait bike photo aspect ratio */}
         <style>{`
           @media (max-width: 768px) {
-            .rental-quick-bar-spacer { height: 110px; }
+            .rental-quick-bar-spacer { height: 140px; }
             .rental-bike-photo { aspect-ratio: 1 / 1; }
           }
           @media (min-width: 769px) {
@@ -231,18 +261,12 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           />
         )}
 
-        {/* Compact header — title + status + IdealBadge (NO duplicate status badge below) */}
+        {/* Compact header — status + IdealBadge only.
+            Bike title + ID are already shown on the photo overlay above,
+            so we don't repeat them here. */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="space-y-1 min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-lg font-bold truncate" style={{ color: textPrimary }}>
-                {rental.vehicleTitle || "Карточка аренды"}
-              </h1>
-              {rental.found && (
-                <span className="text-xs font-mono shrink-0" style={{ color: textSecondary }}>
-                  #{rental.rentalId?.slice(0, 8)}
-                </span>
-              )}
               {rental.found && (
                 <RentalIdealBadge
                   verified={isVerified}
@@ -308,8 +332,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
 
           {/* Detail grid — 2 columns on desktop, 1 on mobile */}
           <div className="grid gap-2 text-sm sm:grid-cols-2 max-sm:grid-cols-1">
-            {rental.paymentStatus && (
-              <p><span style={{ color: textSecondary }}>Оплата:</span> {rental.paymentStatus}</p>
+            {paymentStatusLabel && (
+              <p><span style={{ color: textSecondary }}>Оплата:</span> {paymentStatusLabel}</p>
             )}
             {rental.totalCost > 0 && (
               <p><span style={{ color: textSecondary }}>Итого:</span> {rental.totalCost.toLocaleString("ru-RU")} ₽</p>
@@ -520,37 +544,37 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           />
         )}
 
-        {/* Quick-action floating bar (Idea B) */}
-        {rental.found && (
-          <RentalQuickActionBar
-            rentalId={rental.rentalId}
-            showProlong={status === "active"}
-            showClose={status === "active"}
-            showMessagerent={status !== "completed" && status !== "cancelled"}
-            prolongHref={bikeSearchHref}
-            ownerId={rental.ownerId}
-            renterId={rental.renterId}
-            renterTelegramChatId={rental.renterTelegramChatId}
-            crewId={rental.crewId || crew.id}
-            crewSlug={resolvedSlug}
-            accentColor={accent}
-            accentTextOn={accentTextOn}
-            borderColor={borderSoft}
-            textPrimary={textPrimary}
-          />
-        )}
-
         {/* Bottom spacer so QuickActionBar doesn't overlap last button.
-            110px on mobile to clear phone native nav + the bar. */}
+            140px on mobile to clear phone native nav + the bar. */}
         {rental.found && status !== "completed" && status !== "cancelled" && (
           <div className="rental-quick-bar-spacer" aria-hidden="true" />
         )}
         </FranchizeErrorBoundary>
-      </FranchizePageShell>
+      </div>
 
-      {/* goodmorning-polish: removed <CrewFooter> — it added visual noise + scroll length
-          on the rental page without providing value. CrewHeader at top + in-flow nav
-          buttons (Каталог/Профиль) already cover navigation. */}
+      {/* Quick-action floating bar (Idea B) — OUTSIDE the content div.
+          goodmorning-polish: moved outside FranchizePageShell's replacement div
+          because backdrop-blur/transform on ancestors breaks position:fixed.
+          Now a direct child of <main> → position:fixed sticks to viewport. */}
+      {rental.found && (
+        <RentalQuickActionBar
+          rentalId={rental.rentalId}
+          showProlong={status === "active"}
+          showClose={status === "active"}
+          showMessagerent={status !== "completed" && status !== "cancelled"}
+          prolongHref={bikeSearchHref}
+          ownerId={rental.ownerId}
+          renterId={rental.renterId}
+          renterTelegramChatId={rental.renterTelegramChatId}
+          crewId={rental.crewId || crew.id}
+          crewSlug={resolvedSlug}
+          accentColor={accent}
+          accentTextOn={accentTextOn}
+          borderColor={borderSoft}
+          textPrimary={textPrimary}
+        />
+      )}
+
     </main>
   );
 }
