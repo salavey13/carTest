@@ -221,16 +221,17 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             .rental-quick-bar-spacer { height: 24px; }
             .rental-bike-photo { aspect-ratio: 9 / 16; max-height: 70vh; }
           }
-          /* goodmorning-polish: slide-up animation for QuickActionBar expand.
-             FAB (48px circle) → full bar slides up + fades in. */
+          /* goodmorning-polish: slide-LEFT animation for QuickActionBar expand.
+             FAB (48px circle, bottom-right) → full bar slides in from the RIGHT
+             (translateX positive → 0) + scales up from 0.69 (drastic, cool effect). */
           @keyframes slideup {
             from {
               opacity: 0;
-              transform: translateY(12px) scale(0.85);
+              transform: translateX(40px) scale(0.69);
             }
             to {
               opacity: 1;
-              transform: translateY(0) scale(1);
+              transform: translateX(0) scale(1);
             }
           }
         `}</style>
