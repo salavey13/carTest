@@ -67,8 +67,10 @@ export function RentalExtendModal({
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
-  // Today's date as YYYY-MM-DD for date input `min` attribute
-  const todayStr = new Date().toISOString().slice(0, 10);
+  // S4 fix: use locale-aware date (sv-SE = YYYY-MM-DD format) instead of toISOString()
+  // which returns UTC. In Moscow (UTC+3), toISOString().slice(0,10) returns YESTERDAY
+  // between 00:00 and 03:00 local time — confusing for operators.
+  const todayStr = new Date().toLocaleDateString("sv-SE");
 
   // a11y: Escape closes modal, focus returns to trigger button.
   // Doesn't implement full focus trap (Tab cycle) — would need react-focus-lock lib.
@@ -85,10 +87,12 @@ export function RentalExtendModal({
     // Lock body scroll while modal open
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    // Focus first interactive element on open
+    // S3 fix: focus the FIRST DATE INPUT specifically, not just any input/button.
+    // Previously `querySelector("input, button")` matched the X close button first
+    // (it appears earlier in DOM) → autofocus hit close, dangerous for keyboard users.
     const timer = setTimeout(() => {
-      const firstInput = dialogRef.current?.querySelector<HTMLInputElement>("input, button");
-      firstInput?.focus();
+      const firstDateInput = dialogRef.current?.querySelector<HTMLInputElement>("input[type='date']");
+      firstDateInput?.focus();
     }, 0);
     return () => {
       document.removeEventListener("keydown", handleKey);
@@ -98,11 +102,12 @@ export function RentalExtendModal({
   }, [open, isPending]);
 
   const openModal = () => {
-    // Default: start = today, end = +1 day (or original rental's end if known)
+    // S4 fix: use locale-aware dates (sv-SE = YYYY-MM-DD) instead of toISOString().
+    // Prevents the modal defaulting to yesterday in Moscow between 00:00-03:00.
     const today = new Date();
-    const start = today.toISOString().slice(0, 10);
+    const start = today.toLocaleDateString("sv-SE");
     const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-    const end = tomorrow.toISOString().slice(0, 10);
+    const end = tomorrow.toLocaleDateString("sv-SE");
     setStartDate(start);
     setEndDate(end);
     setOpen(true);
