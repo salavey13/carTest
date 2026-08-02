@@ -162,6 +162,8 @@ export function RentalExtendModal({
         ref={triggerRef}
         type="button"
         onClick={openModal}
+        // goodmorning-polish: ID for QuickActionBar scroll target ("Продлить" button scrolls here)
+        id="extend-modal-trigger"
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls="extend-modal-title"
