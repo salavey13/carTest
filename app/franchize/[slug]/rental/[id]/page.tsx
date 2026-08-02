@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { ExternalLink, Info, RefreshCw, RotateCcw, ShoppingCart, Sparkles, Timer } from "lucide-react";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
-import { CrewFooter } from "../../../components/CrewFooter";
+// goodmorning-polish: removed CrewFooter import (footer ditched on rental page)
 import { FranchizeErrorBoundary } from "../../../components/ErrorBoundary";
 import { DisplayModeProvider } from "../../../components/DisplayModeContext";
 import { FranchizeRentalLifecycleActions } from "../../../components/FranchizeRentalLifecycleActions";
@@ -177,11 +177,24 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
       </DisplayModeProvider>
 
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6">
-        {/* goodmorning-fixes: removed <RentalEscapeHatch> — its "← В каталог"/"👤 Профиль"
+        {/* goodmorning-fixes #2: removed <RentalEscapeHatch> — its "← В каталог"/"👤 Профиль"
             buttons were redundant with the in-flow nav buttons below, AND using
             window.location.href on relative URLs in TG WebApp keeps the startapp
             param alive → user gets bounced back to rental page. The CrewHeader
             already provides navigation; the action buttons below cover catalog/profile. */}
+
+        {/* goodmorning-polish: reserve bottom space so QuickActionBar (fixed position)
+            doesn't overlap the last button ("Подтвердить возврат"). Bar is ~64px tall
+            + safe-area inset; we add 96px (24 × 4px) of bottom padding when the bar
+            is visible (status === active or any non-completed/cancelled status). */}
+        <style>{`
+          @media (max-width: 768px) {
+            .rental-quick-bar-spacer { height: 96px; }
+          }
+          @media (min-width: 769px) {
+            .rental-quick-bar-spacer { height: 24px; }
+          }
+        `}</style>
 
         {/* Top-level error boundary: if any client component crashes during hydration,
             the CrewHeader + navigation stays interactive while this section degrades gracefully. */}
@@ -859,9 +872,17 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             textPrimary={textPrimary}
           />
         )}
+
+        {/* goodmorning-polish: bottom spacer so QuickActionBar (fixed at viewport bottom)
+            doesn't overlap the last in-flow button. Only rendered when bar would be visible. */}
+        {rental.found && status !== "completed" && status !== "cancelled" && (
+          <div className="rental-quick-bar-spacer" aria-hidden="true" />
+        )}
       </FranchizePageShell>
 
-      <CrewFooter crew={crew} />
+      {/* goodmorning-polish: removed <CrewFooter> — it added visual noise + scroll length
+          on the rental page without providing value. CrewHeader at top + in-flow nav
+          buttons (Каталог/Профиль) already cover navigation. */}
     </main>
   );
 }
