@@ -284,8 +284,25 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
 
   try {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
-    // S7 fix: removed `(crew-slug)/` route-group literal from URL — was causing 404.
-    const webUrl = `${siteUrl}/franchize/${crewSlug || "vip-bike"}/rental/${newRentalId}`;
+
+    // C1 fix (review-goodnight-final): fetch crew slug from DB.
+    // S7 fix used `${crewSlug || "vip-bike"}` but crewSlug was never declared →
+    // ReferenceError thrown → caught by outer try/catch → operator NEVER received
+    // the "Аренда продлена" TG notification (silent regression).
+    let resolvedCrewSlug = "vip-bike";
+    if (original.crew_id) {
+      try {
+        const { data: crewRow } = await supabase
+          .from("crews")
+          .select("slug")
+          .eq("id", original.crew_id)
+          .maybeSingle();
+        if (crewRow?.slug) resolvedCrewSlug = crewRow.slug;
+      } catch {
+        // keep fallback
+      }
+    }
+    const webUrl = `${siteUrl}/franchize/${resolvedCrewSlug}/rental/${newRentalId}`;
     const botLink = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
 
     const operatorMessage =
@@ -333,16 +350,20 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
   }
 
   // ── 6. Audit notification to boss ──
+  // NC1 fix (review-goodnight-final): notifyAdmin uses Markdown parseMode by default.
+  // Raw interpolation of bikeTitle/renterFullName could break Markdown on names like
+  // "Ivan_Ivanov" or "Test [Bike]" → message fails to send. Escape via escapeHtml
+  // and switch to HTML parseMode (consistent with the operator + renter messages above).
   try {
-    await notifyAdmin(
+    const adminMessage =
       `🔄 Аренда продлена\n` +
-      `🏍 ${bikeTitle}\n` +
-      `👤 ${renterFullName}\n` +
-      `🔑 Новая аренда: ${shortId}\n` +
+      `🏍 ${escapeHtml(bikeTitle)}\n` +
+      `👤 ${escapeHtml(renterFullName)}\n` +
+      `🔑 Новая аренда: ${escapeHtml(shortId)}\n` +
       `📅 ${dateRangeStr} (${newDays} дн.)\n` +
       `💰 ${newTotal.toLocaleString("ru-RU")} ₽\n` +
-      `🔗 Из оригинала: ${originalRentalId.slice(0, 8)}`,
-    );
+      `🔗 Из оригинала: ${escapeHtml(originalRentalId.slice(0, 8))}`;
+    await notifyAdmin(adminMessage);
   } catch (adminErr) {
     console.warn("[extendRental] Admin notify failed (non-fatal):", adminErr);
   }
