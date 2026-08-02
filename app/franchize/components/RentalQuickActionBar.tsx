@@ -198,16 +198,24 @@ export function RentalQuickActionBar({
   // Now safe to early-return — hooks above have already been called unconditionally
   if (!mounted) return null;
 
-  // Collapsed FAB (after X click) — small floating action button to expand back.
-  // Uses LayoutGrid icon (not Calendar) — the FAB represents "show all actions", not "prolong".
+  // Collapsed FAB — small floating action button.
+  // goodmorning-polish: rounded-full + gap from screen edge (bottom-5 right-5 = 20px gap).
+  // Animate slide-out to full bar on expand via CSS transition on max-width/opacity.
   if (collapsed) {
     return (
       <button
         type="button"
         onClick={handleExpand}
         aria-label="Показать быстрые действия"
-        className="fixed bottom-4 right-4 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-transform hover:scale-105 md:bottom-6 md:right-6"
-        style={{ backgroundColor: accentColor, color: accentTextOn }}
+        // goodmorning-polish: floating FAB — gap from edge, rounded-full, shadow.
+        // bottom-5 right-5 = 20px gap on mobile, bottom-6 right-6 = 24px on desktop.
+        className="fixed bottom-5 right-5 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full shadow-xl transition-all duration-300 hover:scale-105 md:bottom-6 md:right-6"
+        style={{
+          backgroundColor: accentColor,
+          color: accentTextOn,
+          // Subtle floating shadow
+          boxShadow: "0 8px 24px rgba(0, 0, 0, 0.25)",
+        }}
       >
         <LayoutGrid className="h-5 w-5" />
       </button>
@@ -220,13 +228,14 @@ export function RentalQuickActionBar({
     <div
       role="toolbar"
       aria-label="Быстрые действия"
-      // goodmorning-polish: added shadow-lg + higher z-index (z-50) so the bar
-      // is visually distinct from page content and stays above modals/dropdowns.
-      // Was z-40 which could clash with sticky headers.
-      className="fixed inset-x-0 bottom-0 z-50 border-t bg-white/95 backdrop-blur-md shadow-lg dark:bg-zinc-900/95 md:inset-x-auto md:bottom-4 md:right-4 md:max-w-xs md:rounded-2xl md:border md:shadow-xl"
+      // goodmorning-polish: floating bar with gap from screen edge + rounded corners.
+      // Mobile: inset-x-4 bottom-5 (16px L/R gap, 20px bottom gap) + rounded-2xl.
+      // Desktop: bottom-6 right-6 (24px gap) + max-w-xs + rounded-2xl.
+      // Slide-in animation: starts collapsed (opacity-0 translate-y-2) → animates to full.
+      className="fixed inset-x-4 bottom-5 z-50 rounded-2xl border bg-white/95 backdrop-blur-md shadow-xl transition-all duration-300 dark:bg-zinc-900/95 md:inset-x-auto md:bottom-6 md:right-6 md:max-w-xs animate-[slideup_0.3s_ease-out]"
       style={{
         borderColor,
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        // No safe-area padding needed — bar floats above native nav with gap
       }}
     >
       <div className="flex items-center gap-1 p-2 md:gap-2 md:p-3">
