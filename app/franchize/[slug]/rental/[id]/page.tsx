@@ -210,7 +210,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           position:fixed for the QuickActionBar (bar stuck to page bottom, not viewport).
           Also had excessive padding (py-8 + p-6 + rounded-[2rem]). Now: minimal padding,
           no backdrop-blur, no border shell. Content flows edge-to-edge with small margin. */}
-      <div className="mx-auto w-full max-w-2xl px-3 py-2" style={shellVarsFallback}>
+      <div className="mx-auto w-full max-w-2xl px-3 py-3 space-y-4" style={shellVarsFallback}>
         {/* Inline CSS for bottom spacer + portrait bike photo aspect ratio */}
         <style>{`
           @media (max-width: 768px) {
@@ -220,6 +220,18 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           @media (min-width: 769px) {
             .rental-quick-bar-spacer { height: 24px; }
             .rental-bike-photo { aspect-ratio: 9 / 16; max-height: 70vh; }
+          }
+          /* goodmorning-polish: slide-up animation for QuickActionBar expand.
+             FAB (48px circle) → full bar slides up + fades in. */
+          @keyframes slideup {
+            from {
+              opacity: 0;
+              transform: translateY(12px) scale(0.85);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
           }
         `}</style>
 
