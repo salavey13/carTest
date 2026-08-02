@@ -220,7 +220,10 @@ export function RentalQuickActionBar({
     <div
       role="toolbar"
       aria-label="Быстрые действия"
-      className="fixed inset-x-0 bottom-0 z-40 border-t bg-white/95 backdrop-blur-md dark:bg-zinc-900/95 md:inset-x-auto md:bottom-4 md:right-4 md:max-w-xs md:rounded-2xl md:border"
+      // goodmorning-polish: added shadow-lg + higher z-index (z-50) so the bar
+      // is visually distinct from page content and stays above modals/dropdowns.
+      // Was z-40 which could clash with sticky headers.
+      className="fixed inset-x-0 bottom-0 z-50 border-t bg-white/95 backdrop-blur-md shadow-lg dark:bg-zinc-900/95 md:inset-x-auto md:bottom-4 md:right-4 md:max-w-xs md:rounded-2xl md:border md:shadow-xl"
       style={{
         borderColor,
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
