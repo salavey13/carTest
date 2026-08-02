@@ -186,7 +186,9 @@ export function RentalTimeline({
                 </button>
                 {!isLast && (
                   <div
-                    className="mt-3 h-0.5 w-6 sm:w-10"
+                    // goodmorning-polish: narrower dashes so all 6 stages fit without horizontal scroll.
+                    // Was w-6 sm:w-10 (24-40px). Now w-2 sm:w-3 (8-12px) — 3x narrower.
+                    className="mt-3 h-0.5 w-2 sm:w-3 shrink-0"
                     style={{
                       backgroundColor: displayStages[idx + 1].done ? accentColor : borderSoft,
                     }}
