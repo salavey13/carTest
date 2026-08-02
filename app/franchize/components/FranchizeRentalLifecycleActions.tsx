@@ -167,12 +167,11 @@ export function FranchizeRentalLifecycleActions({
         borderColor: "var(--lifecycle-border)",
       }}
     >
-      <p className="text-xs uppercase tracking-[0.16em] text-[var(--lifecycle-muted)]">Lifecycle controls</p>
-      <p className="mt-1 text-xs text-[var(--lifecycle-muted)]">
-        Роль: {role === "owner" ? "владелец" : role === "renter" ? `арендатор${renterFullName ? ` (${renterFullName})` : ""}` : role === "member" ? "участник экипажа" : dbUser?.user_id ? "загрузка…" : "наблюдатель"} · payment: {paymentStatus}
-      </p>
+      {/* goodmorning-polish: removed "Lifecycle controls" heading + "Роль: ... · payment: ..." line.
+          This info is already visible elsewhere on the page (status badge, detail grid shows
+          payment status in Russian). Keeping it here was redundant visual noise. */}
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         {canConfirmPickup && (
           <button
             type="button"
