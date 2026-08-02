@@ -34,11 +34,12 @@ export function RentalBikePhoto({
   borderColor,
 }: RentalBikePhotoProps) {
   return (
-    <div className="relative rounded-3xl overflow-hidden border" style={{ borderColor }}>
+    <div className="rental-bike-photo relative rounded-2xl overflow-hidden border w-full" style={{ borderColor }}>
       <img
         src={src}
         alt={alt}
-        className="w-full h-48 sm:h-64 object-cover"
+        // goodmorning-polish: portrait 9:16 on desktop, square on mobile (via .rental-bike-photo CSS)
+        className="w-full h-full object-cover"
         loading="lazy"
         onError={(e) => {
           // Hide image container if image fails to load (broken URL etc.)
