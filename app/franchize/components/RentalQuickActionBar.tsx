@@ -169,7 +169,10 @@ export function RentalQuickActionBar({
         label: "Продлить",
         icon: Calendar,
         primary: true,
-        href: prolongHref,
+        // goodmorning-polish: scroll to the ExtendModal button on the page (like "Закрыть"
+        // scrolls to lifecycle-actions). Was: prolongHref → opened catalog for a moment
+        // then bounced back. Now: direct scroll to #extend-modal-trigger.
+        onClick: () => scrollToSection("extend-modal-trigger"),
       });
     }
     // "Закрыть" requires operator role — the scroll target #lifecycle-actions
