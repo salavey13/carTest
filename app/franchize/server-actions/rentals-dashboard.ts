@@ -1951,9 +1951,11 @@ export async function updateRentalStatus(input: {
     }
 
     // ── Fetch current rental for metadata merge + renter chat_id ──
+    // S5 fix: include vehicle.id in SELECT — needed for the bike-specs odometer save below.
+    // Was: vehicle:cars(make, model) only → vehicle.id was always undefined → save never fired.
     const { data: rental } = await supabaseAdmin
       .from("rentals")
-      .select("rental_id, status as old_status, metadata, user_id, vehicle:cars(make, model)")
+      .select("rental_id, status as old_status, metadata, user_id, vehicle:cars(id, make, model)")
       .eq("rental_id", rentalId)
       .maybeSingle();
 
@@ -2426,7 +2428,7 @@ export async function activateRental(input: {
           from: emailUser,
           to: emailTo,
           subject: `✅ Аренда активирована — ${vehicle.make} ${vehicle.model} (одометр: ${odometerBefore} км)`,
-          text: `${congratText}\n\nДоговор прикреплён к письму.`,
+          text: `${congratTextOperator}\n\nДоговор прикреплён к письму.`,
           attachments: [{
             filename: docFileName,
             content: Buffer.from(docxBuf),
