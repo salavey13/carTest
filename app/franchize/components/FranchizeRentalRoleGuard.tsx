@@ -8,35 +8,27 @@ import { useAppContext } from "@/contexts/AppContext";
  * FranchizeRentalRoleGuard
  * ──────────────────────────────────────────────────────────────────────────
  * Hides its children unless the current user has one of the allowed roles
- * for this rental. Used on the dedicated /franchize/[slug]/rental/[id] page
- * to keep operator-only panels (verification checklist, return checklist
- * toggle UI, internal documents) out of the renter's view.
+ * for this rental.
  *
  * Roles:
  *   - "owner"    : rental.owner_id === dbUser.user_id
  *   - "renter"   : rental.renterId === dbUser.user_id
- *                  OR (fallback) rental.renterTelegramChatId === dbUser.user_id
- *                  (the fallback handles bot/QR-flow rentals where
- *                   rentals.user_id is null but rental_contract_artefacts.telegram_chat_id
- *                   holds the renter's chat ID)
+ *                  OR rental.renterTelegramChatId === dbUser.user_id
  *   - "operator" : crew member with role owner/admin/co_owner
  *   - "admin"    : user.metadata.role === "admin" (global admin)
  *   - "guest"    : none of the above
  *
- * Props:
- *   - allowedRoles: array of roles that can see the children
- *   - ownerId, renterId, renterTelegramChatId, crewId: identity inputs for role detection
+ * BUGFIX (goodmorning-fixes): added crewSlug fallback prop.
+ * Previously only matched by crewId (UUID), but AppContext's
+ * userCrewMemberships sometimes uses a different crewId format than the
+ * rental's crew.id. The crewSlug fallback is more reliable because slugs
+ * are stable strings. Mirror of FIX 4 from analytics-46 (which was applied
+ * to FranchizeRentalLifecycleActions but never made it to the role guard).
  *
- * Example:
- *   <FranchizeRentalRoleGuard
- *     allowedRoles={["operator", "admin"]}
- *     ownerId={rental.ownerId}
- *     renterId={rental.renterId}
- *     renterTelegramChatId={rental.renterTelegramChatId}
- *     crewId={crew.id}
- *   >
- *     <RentalChecklistPanel ... />  // hidden from renters + guests
- *   </FranchizeRentalRoleGuard>
+ * Also: broadened "operator" to include ALL crew roles (owner/admin/co_owner/
+ * member). Previously "member" role was excluded → regular crew members
+ * couldn't see checklist or close button. The server-side auth still gates
+ * the actual mutations, so showing the UI is safe.
  */
 interface FranchizeRentalRoleGuardProps {
   allowedRoles: Array<"owner" | "renter" | "operator" | "admin" | "guest">;
@@ -44,6 +36,8 @@ interface FranchizeRentalRoleGuardProps {
   renterId?: string;
   renterTelegramChatId?: string;
   crewId?: string;
+  /** Crew slug — more reliable than crewId for matching (use both when available) */
+  crewSlug?: string;
   children: React.ReactNode;
   /** Optional fallback to render when the user's role is not in allowedRoles */
   fallback?: React.ReactNode;
@@ -55,6 +49,7 @@ export function FranchizeRentalRoleGuard({
   renterId,
   renterTelegramChatId,
   crewId,
+  crewSlug,
   children,
   fallback = null,
 }: FranchizeRentalRoleGuardProps) {
@@ -71,10 +66,16 @@ export function FranchizeRentalRoleGuard({
     if (renterId && dbUser.user_id === renterId) return "renter";
     if (renterTelegramChatId && dbUser.user_id === renterTelegramChatId) return "renter";
 
-    // Crew operator (owner/admin/co_owner of the crew that owns this rental)
-    if (crewId) {
-      const membership = userCrewMemberships.find((m) => m.crewId === crewId);
-      if (membership && ["owner", "admin", "co_owner"].includes(membership.role)) {
+    // Crew operator — try matching by crewId first, then by crewSlug (more reliable).
+    // Broadened to include ALL crew roles (member, owner, admin, co_owner) —
+    // the server-side auth still gates mutations, so showing the UI is safe.
+    if (crewId || crewSlug) {
+      const membership = userCrewMemberships.find((m) => {
+        if (crewId && m.crewId === crewId) return true;
+        if (crewSlug && m.slug === crewSlug) return true;
+        return false;
+      });
+      if (membership && ["owner", "admin", "co_owner", "member"].includes(membership.role)) {
         return "operator";
       }
     }
@@ -86,7 +87,7 @@ export function FranchizeRentalRoleGuard({
     }
 
     return "guest";
-  }, [dbUser?.user_id, dbUser?.metadata, ownerId, renterId, renterTelegramChatId, crewId, userCrewMemberships]);
+  }, [dbUser?.user_id, dbUser?.metadata, ownerId, renterId, renterTelegramChatId, crewId, crewSlug, userCrewMemberships]);
 
   if (allowedRoles.includes(role)) {
     return <>{children}</>;
