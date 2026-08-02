@@ -30,6 +30,7 @@ import { FranchizeRentalRoleGuard } from "../../../components/FranchizeRentalRol
 import { RentalExtendModal } from "../../../components/RentalExtendModal";
 import { RenterActionsPanel } from "../../../components/RenterActionsPanel";
 import { GuestRentalCta } from "../../../components/GuestRentalCta";
+import { RentalBikePhoto } from "../../../components/RentalBikePhoto";
 
 interface FranchizeRentalPageProps {
   params: Promise<{ slug: string; id: string }>;
@@ -471,40 +472,18 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           </section>
         ) : null}
 
-        {/* goodmorning-fixes: Bike photo hero — was missing entirely from page.
-            Shows vehicle.image_url (or specs.gallery[0] fallback) with status badge overlay. */}
+        {/* goodmorning-fixes: Bike photo hero — extracted to Client Component
+            because Server Components can't pass onError to <img>. */}
         {rental.found && rental.vehicleImageUrl && (
-          <div className="relative rounded-3xl overflow-hidden border" style={{ borderColor: borderSoft }}>
-            <img
-              src={rental.vehicleImageUrl}
-              alt={rental.vehicleTitle || "Байк"}
-              className="w-full h-48 sm:h-64 object-cover"
-              loading="lazy"
-              onError={(e) => {
-                // Hide image container if image fails to load (broken URL etc.)
-                (e.currentTarget.parentElement as HTMLElement).style.display = "none";
-              }}
-            />
-            {/* Status badge overlay */}
-            <div className="absolute top-3 left-3">
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-md"
-                style={{ backgroundColor: statusStyle.badgeBg, color: statusStyle.badgeText }}
-              >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: statusStyle.badgeText }} />
-                {statusLabel[status] || status}
-              </span>
-            </div>
-            {/* Bike title overlay */}
-            {rental.vehicleTitle && (
-              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-                <p className="text-sm font-bold text-white truncate">{rental.vehicleTitle}</p>
-                {rental.found && (
-                  <p className="text-[11px] text-white/70 font-mono">#{rental.rentalId?.slice(0, 8)}</p>
-                )}
-              </div>
-            )}
-          </div>
+          <RentalBikePhoto
+            src={rental.vehicleImageUrl}
+            alt={rental.vehicleTitle || "Байк"}
+            statusLabel={statusLabel[status] || status}
+            statusBadgeBg={statusStyle.badgeBg}
+            statusBadgeText={statusStyle.badgeText}
+            rentalShortId={rental.rentalId?.slice(0, 8)}
+            borderColor={borderSoft}
+          />
         )}
 
         {/* Deal started badge */}
