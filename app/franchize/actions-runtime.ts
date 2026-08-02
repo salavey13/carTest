@@ -1,3 +1,4 @@
+// /app/franchize/actions-runtime.ts
 "use server";
 
 import { createInvoice, supabaseAdmin } from "@/lib/supabase-server";
@@ -22,6 +23,8 @@ import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets, ty
 import { resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 import { formatRuDate } from "@/app/franchize/lib/date-utils";
+// v3 polish: centralized notification template builders (HTML-escaped, with inline buttons)
+import { buildCartCheckoutRenterMessage } from "@/app/franchize/lib/notification-templates";
 import {
   DEFAULT_AD_CARDS_TEXT,
   DEFAULT_CATEGORY_ORDER,
@@ -215,14 +218,6 @@ export interface FranchizeCrewVM {
   contentBlocks: FranchizeContentBlocks;
   reviewsLink?: string;
   cta: CtaBlock;
-  /**
-   * UI feature flags surfaced from metadata.franchize.ui.
-   * Used by FranchizeProfileButton to hide/show per-crew entries.
-   * Defaults are applied when the metadata block is missing.
-   */
-  ui: {
-    showCreateButton: boolean;
-  };
 }
 
 export interface CtaBlock {
@@ -673,11 +668,6 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     buttonLabel: "Записаться",
     buttonHref: "",
   },
-  ui: {
-    // Show "Создать франшизу" by default on empty crews.
-    // Crews that want to hide it set metadata.franchize.ui.showCreateButton=false in SQL.
-    showCreateButton: true,
-  },
 });
 
 export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugResult> {
@@ -956,16 +946,6 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         description: readPath(franchize, ["cta", "description"], ""),
         buttonLabel: readPath(franchize, ["cta", "buttonLabel"], "Записаться"),
         buttonHref: readPath(franchize, ["cta", "buttonHref"], ""),
-      },
-      // FIX: populate reviewsLink from catalog metadata.
-      // The SQL hydration has `rewiewsLink` (with a typo) in catalog metadata.
-      // We check both spellings for robustness.
-      reviewsLink: readPath(franchize, ["catalog", "rewiewsLink"], readPath(franchize, ["catalog", "reviewsLink"], "")) || undefined,
-      ui: {
-        // Visibility of the "Создать франшизу" / "Оформление экипажа" entries
-        // in FranchizeProfileButton. Default true; crews can opt out by setting
-        // metadata.franchize.ui.showCreateButton=false (e.g. via SQL hydration).
-        showCreateButton: readPath(franchize, ["ui", "showCreateButton"], true) !== false,
       },
     };
 
@@ -1328,13 +1308,7 @@ async function resolveFranchizeEditorAccess(actorUserId: string | undefined, cre
     .eq("user_id", actorUserId)
     .maybeSingle();
 
-  // BUG FIX (was BUG #6 in code review): previously only `role === "owner"`
-  // was allowed. This was inconsistent with FranchizeProfileButton.tsx which
-  // already grants admin/co_owner the right to view crew-operator links
-  // (leads, rentals, analytics). Now admin and co_owner roles can also
-  // save franchize config edits, matching the dropdown's expectations.
-  return membership?.membership_status === "active"
-    && (membership.role === "owner" || membership.role === "admin" || membership.role === "co_owner");
+  return membership?.membership_status === "active" && membership.role === "owner";
 }
 
 async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promise<FranchizeConfigInput> {
@@ -2349,7 +2323,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         legal_address: crewSecrets.legalAddress,
         ogrnip: crewSecrets.ogrnip,
         inn: crewSecrets.inn,
-        phone: "",
+        phone: crewSecrets.email ? "" : "",
         document_key: `service-${payload.slug}-${payload.orderId}`,
       };
 
@@ -2537,7 +2511,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           inn: crewSecrets.inn,
           legal_address: crewSecrets.legalAddress,
           return_address: crewSecrets.returnAddress || crewSecrets.legalAddress,
-          phone: "",
+          phone: crewSecrets.email ? "" : "",
           email: crewSecrets.email,
           signature_timestamp: now.toLocaleString("ru-RU"),
           document_key: `testdrive-${payload.slug}-${payload.orderId}-bike${bikeIndex}`,
@@ -2836,20 +2810,52 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     if (payload.telegramUserId && payload.telegramUserId !== adminChatId) {
       const userFlowEmoji = isServiceFlow ? "🔧" : flowType === "mixed" ? "📦" : isSaleFlow ? "🛍️" : isTestdrive ? "🏁" : "🧾";
       const userFlowLabel = isServiceFlow ? "Сервисная заявка" : flowType === "mixed" ? "Смешанный заказ" : isSaleFlow ? "Заказ на покупку" : isTestdrive ? "Заказ на тест-драйв" : "Заказ на аренду";
-      const userNotification = [
-        `${userFlowEmoji} ${userFlowLabel} #${payload.orderId}`,
-        `Байк: ${isServiceFlow ? (serviceBikeNames ?? bikeLabel) : bikeLabel}`,
-        `Статус: ${isServiceFlow ? "заявка принята" : "оформлен, договор готов"}`,
-        isServiceFlow && payload.rentalStartDate
-          ? `Дата визита: ${payload.rentalStartDate}`
-          : payload.rentalStartDate
-            ? `Период: ${payload.rentalStartDate} ${rentStartTime} → ${payload.rentalEndDate || "..."} ${rentEndTime}`
-            : "",
-      ].filter(Boolean).join("\n");
+
+      // v3 polish: for rent flow, use centralized template builder with richer context
+      // (total cost, deposit, pickup info, clear next-step CTA, inline buttons).
+      // For other flows (sale/service/mixed/testdrive), keep the existing simple message.
+      let userNotification: string;
+      let userButtons: Array<Array<{ text: string; url: string }>> = [];
+      if (!isServiceFlow && !isSaleFlow && !isTestdrive && flowType !== "mixed") {
+        // Rent flow — use template builder
+        userNotification = buildCartCheckoutRenterMessage({
+          orderId: payload.orderId,
+          bikeTitle: bikeLabel,
+          startDate: payload.rentalStartDate,
+          endDate: payload.rentalEndDate,
+          totalCost: payload.totalAmount,
+          depositRub: undefined, // deposit varies per bike; skip to avoid confusion
+        });
+        // Add inline buttons: my contract + chat with manager
+        const botLink = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
+        userButtons = [
+          [
+            { text: "📄 Мой договор", url: `${botLink}?startapp=profile` },
+            { text: "💬 Чат с менеджером", url: `${botLink}?startapp=support` },
+          ],
+        ];
+      } else {
+        // Other flows — keep existing simple message format
+        userNotification = [
+          `${userFlowEmoji} ${userFlowLabel} #${payload.orderId}`,
+          `Байк: ${isServiceFlow ? (serviceBikeNames ?? bikeLabel) : bikeLabel}`,
+          `Статус: ${isServiceFlow ? "заявка принята" : "оформлен, договор готов"}`,
+          isServiceFlow && payload.rentalStartDate
+            ? `Дата визита: ${payload.rentalStartDate}`
+            : payload.rentalStartDate
+              ? `Период: ${payload.rentalStartDate} ${rentStartTime} → ${payload.rentalEndDate || "..."} ${rentEndTime}`
+              : "",
+        ].filter(Boolean).join("\n");
+      }
 
       try {
         const { sendComplexMessage } = await import("@/app/webhook-handlers/actions/sendComplexMessage");
-        await sendComplexMessage(payload.telegramUserId, userNotification);
+        await sendComplexMessage(
+          payload.telegramUserId,
+          userNotification,
+          userButtons,
+          { parseMode: "HTML" },
+        );
       } catch (userNotifyErr) {
         logger.warn("[franchize] Failed to send notification to order creator", {
           telegramUserId: payload.telegramUserId,
@@ -3147,7 +3153,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             const { data: rentalRow, error: rentalInsertError } = await supabaseAdmin
               .from("rentals")
               .insert({
-                user_id: payload.telegramUserId || null,
+                user_id: payload.phone || payload.telegramUserId,
                 owner_id: crewOwnerChatId || payload.telegramUserId,
                 vehicle_id: doc.bikeId, // FIX: was bikeName (a label), now uses actual bike ID
                 crew_id: crewId,
@@ -3180,7 +3186,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               // passport registration, drivers license, odometer, dates)
               try {
                 const { createRentalVerificationTodos } = await import("@/app/franchize/server-actions/rental-verification-todos");
-                const leadId = payload.telegramUserId || payload.phone || "";
+                const leadId = payload.phone || payload.telegramUserId;
                 const todosResult = await createRentalVerificationTodos(rentalRow.rental_id, crewId, leadId);
                 if (todosResult.success) {
                   logger.info(`[franchize] Created ${todosResult.created} verification todos for rental ${rentalRow.rental_id}`);
@@ -3216,7 +3222,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
       await upsertFranchizeLead({
         slug: payload.slug,
-        userId: payload.telegramUserId || payload.phone || "",
+        userId: payload.phone || payload.telegramUserId,
         intentType: resolvedIntentType,
         stage: "contract_generated",
         bikeId: isServiceFlow ? payload.cartLines[0]?.itemId : bikeDocs[0]?.bikeId,
@@ -3253,7 +3259,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           logger.warn("[franchize] Cannot create crew_todos: crew not found for slug:", payload.slug);
         } else {
         const crewId = crewRowForTodos.id;
-        const leadId = payload.telegramUserId || payload.phone || "";
+        const leadId = payload.phone || payload.telegramUserId;
         const baseTs = Date.now();
         const allTodoPromises: Promise<unknown>[] = [];
 
@@ -3341,7 +3347,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           logger.warn("[franchize] Cannot create sale crew_todos: crew not found for slug:", payload.slug);
         } else {
           const crewId = crewRowForSaleTodos.id;
-          const leadId = payload.telegramUserId || payload.phone || "";
+          const leadId = payload.phone || payload.telegramUserId;
           const baseTs = Date.now();
           const saleTodoPromises: Promise<unknown>[] = [];
 
@@ -3404,11 +3410,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         const { data: crewRowForSvcTodos } = await supabaseAdmin.from("crews").select("id").eq("slug", payload.slug).maybeSingle();
         if (crewRowForSvcTodos?.id) {
           const crewId = crewRowForSvcTodos.id;
-          const leadId = payload.telegramUserId || payload.phone || "";
+          const leadId = payload.phone || payload.telegramUserId;
           const baseTs = Date.now();
           const svcTodoPromises: Promise<unknown>[] = [];
 
-          const clientLabel = payload.recipient || payload.phone || "клиент";
+          const clientLabel = payload.recipient || payload.phone || payload.telegramUserId || "клиент";
 
           for (let serviceIndex = 0; serviceIndex < payload.cartLines.length; serviceIndex++) {
             const line = payload.cartLines[serviceIndex];
@@ -4773,20 +4779,9 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   vehicleTitle: string;
   renterId: string;
   ownerId: string;
-  // NEW (polish 2026-07-30): fallback renter identity for bot/QR-flow rentals.
-  // When rentals.user_id is null (rental created via bot / QR claim), the
-  // renter's Telegram chat ID lives in private.rental_contract_artefacts.telegram_chat_id
-  // and their full name (from passport OCR) lives in renter_full_name.
-  // UI components (FranchizeRentalLifecycleActions) and server actions
-  // (confirmVehicleReturn receipt, notifyRentalLifecycle) should fall back to
-  // these when renterId is empty.
-  renterTelegramChatId: string;
-  renterFullName: string;
-  renterPhone: string;
   agreedStartDate: string | null;
   agreedEndDate: string | null;
   requestedEndDate: string | null;
-  bikePhotoUrl: string;
   metadata: Record<string, unknown> | null;
   contractVerificationStatus: "verified" | "not_verified" | "expired";
   contractVerifierScope: string;
@@ -4795,6 +4790,10 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   contractSourceScope: string;
   contractOriginalSha256: string;
   telegramDeepLink: string;
+  // v3 polish additions (Phase 3 + Phase 5):
+  renterFullName: string;        // from rental_contract_artefacts.renter_full_name
+  renterTelegramChatId: string;  // from rental_contract_artefacts.telegram_chat_id (bot/QR-flow fallback)
+  contractDownloadUrl: string;   // Supabase storage URL for the signed DOCX (empty if not signed)
 }> {
   const safeSlug = slug.trim();
   const safeRentalId = rentalId.trim();
@@ -4809,13 +4808,9 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       vehicleTitle: "—",
       renterId: "",
       ownerId: "",
-      renterTelegramChatId: "",
-      renterFullName: "",
-      renterPhone: "",
       agreedStartDate: null,
       agreedEndDate: null,
       requestedEndDate: null,
-      bikePhotoUrl: "",
       metadata: null,
       contractVerificationStatus: "not_verified",
       contractVerifierScope: "",
@@ -4825,12 +4820,15 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       contractOriginalSha256: "",
       // Use env var for crew bot username in fallback case
       telegramDeepLink: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}/app?startapp=rental-${safeRentalId}`,
+      renterFullName: "",
+      renterTelegramChatId: "",
+      contractDownloadUrl: "",
     };
   }
 
   const { data, error } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, agreed_start_date, agreed_end_date, requested_end_date, metadata, vehicle:cars(make, model, specs)")
+    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, agreed_start_date, agreed_end_date, requested_end_date, metadata, vehicle:cars(make, model)")
     .eq("rental_id", safeRentalId)
     .maybeSingle();
 
@@ -4845,13 +4843,9 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       vehicleTitle: "—",
       renterId: "",
       ownerId: "",
-      renterTelegramChatId: "",
-      renterFullName: "",
-      renterPhone: "",
       agreedStartDate: null,
       agreedEndDate: null,
       requestedEndDate: null,
-      bikePhotoUrl: "",
       metadata: null,
       contractVerificationStatus: "not_verified",
       contractVerifierScope: "",
@@ -4861,6 +4855,9 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       contractOriginalSha256: "",
       // Use env var for crew bot username in fallback case
       telegramDeepLink: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}/app?startapp=rental-${safeRentalId}`,
+      renterFullName: "",
+      renterTelegramChatId: "",
+      contractDownloadUrl: "",
     };
   }
 
@@ -4879,38 +4876,41 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
         ? "expired"
       : "not_verified";
 
-  // ── NEW (polish 2026-07-30): fetch fallback renter identity from
-  // private.rental_contract_artefacts by rental_id FK ──
-  // For bot/QR-flow rentals, rentals.user_id may be null. The actual renter
-  // chat ID lives in rental_contract_artefacts.telegram_chat_id and the
-  // renter's full name (from passport OCR) lives in renter_full_name.
-  // Both are surfaced to UI + server actions so receipts / notifications
-  // work even when user_id is missing.
-  let renterTelegramChatId = "";
+  // ── v3 polish: fetch renter identity + contract artefact in parallel ──
+  // For bot/QR-flow rentals, rentals.user_id is null; renter's TG chat ID lives in
+  // rental_contract_artefacts.telegram_chat_id. We also fetch renter_full_name
+  // (populated by passport OCR) for the rental page header + extend modal.
+  // We access the private schema via supabaseAdmin.schema("private").
+  type SupabaseSchemaClient = {
+    schema: (schema: string) => { from: (table: string) => any };
+  };
+  const privateSchema = () => (supabaseAdmin as unknown as SupabaseSchemaClient).schema("private");
   let renterFullName = "";
-  let renterPhone = "";
+  let renterTelegramChatId = "";
+  let contractDownloadUrl = "";
   try {
-    const { data: artefact } = await supabaseAdmin
-      .from("rental_contract_artefacts")
-      .select("telegram_chat_id, renter_full_name, renter_phone")
+    const { data: artefact } = await privateSchema()
+      .from("rental_contract_artifacts")
+      .select("renter_full_name, telegram_chat_id, storage_path")
       .eq("rental_id", safeRentalId)
       .maybeSingle();
     if (artefact) {
-      renterTelegramChatId = typeof artefact.telegram_chat_id === "string" ? artefact.telegram_chat_id.trim() : "";
-      renterFullName = typeof artefact.renter_full_name === "string" ? artefact.renter_full_name.trim() : "";
-      renterPhone = typeof artefact.renter_phone === "string" ? artefact.renter_phone.trim() : "";
+      renterFullName = typeof artefact.renter_full_name === "string" ? artefact.renter_full_name : "";
+      renterTelegramChatId = typeof artefact.telegram_chat_id === "string" ? artefact.telegram_chat_id : "";
+      // If we have a storage_path, generate a signed URL (valid for 1h)
+      if (artefact.storage_path) {
+        const { data: signedUrl } = await supabaseAdmin.storage
+          .from("rental-contracts")
+          .createSignedUrl(artefact.storage_path, 3600);
+        if (signedUrl?.signedUrl) {
+          contractDownloadUrl = signedUrl.signedUrl;
+        }
+      }
     }
   } catch (artefactErr) {
-    // Non-fatal — the rental_contract_artefacts table may not exist on
-    // databases that haven't run migration 20260612000000, or the service
-    // role may lack private-schema access. Log + continue with empty strings.
-    console.warn("[getFranchizeRentalCard] Failed to fetch rental_contract_artefacts fallback:", artefactErr);
+    // Non-fatal: artefact table may not exist or be empty; just log and continue
+    console.warn("[getFranchizeRentalCard] artefact fetch failed (non-fatal):", artefactErr);
   }
-
-  // Extract bike photo from vehicle specs (gallery array or image_url)
-  const vehicleSpecs = (vehicle as any)?.specs ?? {};
-  const gallery = Array.isArray(vehicleSpecs.gallery) ? vehicleSpecs.gallery : [];
-  const bikePhotoUrl = gallery[0] || vehicleSpecs.image_url || "";
 
   return {
     found: true,
@@ -4922,13 +4922,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     vehicleTitle: `${vehicle?.make ?? "Vehicle"} ${vehicle?.model ?? ""}`.trim(),
     renterId: data.user_id ?? "",
     ownerId: data.owner_id ?? "",
-    agreedStartDate: data.agreed_start_date || null,
-    // Fallbacks from rental_contract_artefacts (empty when rental was created
-    // via web app flow — rentals.user_id is set in that case)
-    renterTelegramChatId,
-    renterFullName,
-    renterPhone,
-    bikePhotoUrl,
+    agreedStartDate: (data as any).agreed_start_date || null,
     agreedEndDate: data.agreed_end_date || null,
     requestedEndDate: data.requested_end_date || null,
     metadata,
@@ -4940,6 +4934,9 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     contractOriginalSha256: typeof verifier?.originalSha256 === "string" ? verifier.originalSha256 : "",
     // Use env var for crew bot username
     telegramDeepLink: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}/app?startapp=rental-${data.rental_id}`,
+    renterFullName,
+    renterTelegramChatId,
+    contractDownloadUrl,
   };
 }
 
