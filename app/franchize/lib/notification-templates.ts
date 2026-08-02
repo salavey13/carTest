@@ -367,10 +367,13 @@ export function buildContractApprovedMessage(input: ContractApprovedInput): stri
   const lines: string[] = [];
 
   const safeBikeTitle = escapeHtml(bikeTitle);
+  // S8 fix: actually use renterName (was accepted but ignored previously)
+  const safeRenterName = renterName ? escapeHtml(renterName) : "";
 
   lines.push(`✅ <b>Договор утверждён!</b>`);
   lines.push("");
   lines.push(`🏍 ${safeBikeTitle}`);
+  if (safeRenterName) lines.push(`👤 ${safeRenterName}`);
   if (range) lines.push(`📅 ${range}`);
   if (shortRentalId) lines.push(`🔑 Аренда: ${escapeHtml(shortRentalId)}`);
   lines.push("");
