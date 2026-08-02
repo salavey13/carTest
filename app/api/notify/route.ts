@@ -36,7 +36,10 @@ export async function POST(request: NextRequest) {
                 owner:rentals_owner_id_fkey (username)
             `)
             .eq('rental_id', rental_id)
-            .single();
+            .maybeSingle(); // goodmorning-fixes: was .single() — throws "multiple (or no) rows returned"
+                            // when user_id is null (bot/QR-flow rentals where renter hasn't claimed yet).
+                            // The renter:rentals_user_id_fkey and owner:rentals_owner_id_fkey joins
+                            // return 0 rows for null FKs. .maybeSingle() returns null gracefully.
         
         if (error || !rentalContext) {
             throw new Error(`Failed to fetch rental context for rental_id ${rental_id}: ${error?.message}`);
