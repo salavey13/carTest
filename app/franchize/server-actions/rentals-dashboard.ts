@@ -1,7 +1,13 @@
+// /app/franchize/server-actions/rentals-dashboard.ts
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { z } from "zod";
+// v3 polish: centralized notification template builders (with HTML escaping + status-aware emojis)
+import {
+  buildRentalStatusChangeMessage,
+  buildActivationMessage,
+} from "@/app/franchize/lib/notification-templates";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,10 +24,6 @@ export interface RentalDashboardItem {
   requested_end_date: string | null;
   created_at: string;
   metadata: Record<string, unknown>;
-  /** Preserved from rental creation — set by /doc-manual, null for web-flow rentals */
-  created_by_operator_chat_id: string | null;
-  /** True when this rental is still in operator-placeholder state (unclaimed QR) */
-  isOperatorPlaceholder: boolean;
   vehicle: {
     id: string;
     make: string;
@@ -61,13 +63,9 @@ export interface RentalDashboardItem {
 
 export interface RentalDashboardSummary {
   totalCount: number;
-  /** Alias for totalCount, used by client (RentalsAnalyticsClient.tsx) */
-  totalRentals: number;
   totalRevenue: number;
   byStatus: Record<string, number>;
   byPaymentStatus: Record<string, number>;
-  /** Count of operator-placeholder rentals (unclaimed, user_id === operator) */
-  operatorPlaceholderCount: number;
 }
 
 export interface RentalDashboardResult {
@@ -252,7 +250,6 @@ export async function getRentalsDashboard(input: {
       requested_end_date,
       created_at,
       metadata,
-      created_by_operator_chat_id,
       vehicle:cars!inner(id, make, model, crew_id, type, specs),
       user:users!rentals_user_id_fkey(user_id, full_name, username, metadata)
     `;
@@ -309,36 +306,6 @@ export async function getRentalsDashboard(input: {
         items.push({ ...rental, documentSecret: null });
       }
       // Skip duplicate (user, vehicle) pairs - older rental generations
-    }
-
-    // ── Operator-placeholder detection (§13.4c #7) ──────────────────────────
-    // Fetch crew members to identify operator chat IDs. Rentals where
-    // user_id === created_by_operator_chat_id (or user_id is a crew member)
-    // are still in pre-claim state — the renter hasn't scanned the QR yet.
-    const crewOperatorIds = new Set<string>();
-    try {
-      const { data: crewMembers } = await supabaseAdmin
-        .from("crew_members")
-        .select("user_id")
-        .eq("crew_id", crew.id);
-      if (crewMembers) {
-        for (const m of crewMembers) crewOperatorIds.add(m.user_id);
-      }
-    } catch (e) {
-      console.warn("[rentals-dashboard] Failed to fetch crew members for operator detection:", e);
-    }
-    // Also treat the crew owner as an operator
-    if (crew.owner_id) crewOperatorIds.add(crew.owner_id);
-
-    // Classify each item; only mark as operator-placeholder if user_id is an
-    // operator AND the rental was created by that operator (has matching
-    // created_by_operator_chat_id). Web-flow rentals (no created_by_operator_chat_id)
-    // with operator user_id are NOT placeholders — they're operator-as-renter.
-    for (const item of items) {
-      const createdByOp = (item as any).created_by_operator_chat_id as string | null;
-      const isOperatorId = crewOperatorIds.has(item.user_id);
-      const isSameAsCreator = createdByOp != null && item.user_id === createdByOp;
-      item.isOperatorPlaceholder = isOperatorId && isSameAsCreator;
     }
 
     // Filter by verification status if specified - DEDUPLICATED per rental
@@ -474,11 +441,9 @@ export async function getRentalsDashboard(input: {
     // Calculate summary statistics
     const summary: RentalDashboardSummary = {
       totalCount: items.length,
-      totalRentals: items.length,
       totalRevenue: items.reduce((sum, r) => sum + (r.total_cost || 0), 0),
       byStatus: {},
       byPaymentStatus: {},
-      operatorPlaceholderCount: 0,
     };
 
     // Count by status
@@ -488,8 +453,6 @@ export async function getRentalsDashboard(input: {
 
       const paymentStatus = item.payment_status || "unknown";
       summary.byPaymentStatus[paymentStatus] = (summary.byPaymentStatus[paymentStatus] || 0) + 1;
-
-      if (item.isOperatorPlaceholder) summary.operatorPlaceholderCount++;
     }
 
     console.log("[rentals-dashboard] Returning result:", {
@@ -2034,26 +1997,22 @@ export async function updateRentalStatus(input: {
       return { success: false, error: updateError.message };
     }
 
-    // ── If operator provided a message → notify renter via Telegram ──
-    if (operatorMessage && rental?.user_id) {
+    // ── ALWAYS notify renter on status change (v3 polish: was only if operatorMessage) ──
+    // CRITICAL FIX: previously, if operator flipped status without typing a message,
+    // the renter had NO IDEA their rental was marked completed/cancelled.
+    // Now we always send a notification, using a warm default if no message provided.
+    if (rental?.user_id) {
       const renterChatId = rental.user_id;
       const vehicle = rental?.vehicle as { make?: string; model?: string } | null;
       const bikeName = vehicle ? `${vehicle.make || ""} ${vehicle.model || ""}`.trim() : "байк";
 
-      const statusLabels: Record<string, string> = {
-        active: "активирована",
-        completed: "завершена",
-        cancelled: "отклонена",
-        confirmed: "подтверждена",
-        disputed: "в споре",
-      };
-      const statusLabel = statusLabels[status] || status;
-
-      const messageText = `ℹ️ <b>Аренда ${statusLabel}</b>\n\n` +
-        `🚲 ${bikeName}\n` +
-        `📋 Статус: <b>${statusLabel}</b>\n\n` +
-        `📝 Сообщение оператора:\n${operatorMessage}\n\n` +
-        `По вопросам — пишите в чат.`;
+      // v3 polish: use centralized template builder (with HTML escaping + status-aware emoji + warm defaults)
+      const messageText = buildRentalStatusChangeMessage({
+        status: status as "active" | "completed" | "cancelled" | "confirmed" | "disputed",
+        bikeTitle: bikeName,
+        operatorMessage: operatorMessage || undefined,
+        shortRentalId: rentalId.slice(0, 8),
+      });
 
       try {
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
@@ -2322,20 +2281,39 @@ export async function activateRental(input: {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
     const forwardUrl = `${siteUrl}/api/forward-telegram`;
 
-    // Congratulatory message
-    const congratText = `✅ <b>Аренда активирована!</b>\n\n` +
-      `🚲 ${vehicle.make} ${vehicle.model}\n` +
-      `📅 ${vars.rent_start_date} → ${vars.rent_end_date}\n` +
-      `📊 Одометр: ${odometerBefore} км\n` +
-      `👤 ${secretData.renter_full_name || renter?.full_name || "Арендатор"}\n\n` +
-      `Договор сформирован и отправлен. Приятной поездки! 🏍️`;
+    // v3 polish: split activation message into renter (warm) vs operator (operational) variants.
+    // Previously the same "Приятной поездки! 🏍️" went to renter, owner, AND admin —
+    // boss doesn't need sentiment, he needs deposit + return time.
+    const bikeTitle = `${vehicle.make} ${vehicle.model}`.trim();
+    const renterName = secretData.renter_full_name || renter?.full_name || "Арендатор";
+
+    const congratTextRenter = buildActivationMessage({
+      bikeTitle,
+      startDate: vars.rent_start_date,
+      endDate: vars.rent_end_date,
+      odometerKm: odometerBefore,
+      shortRentalId: rentalId.slice(0, 8),
+      recipient: "renter",
+    });
+
+    const congratTextOperator = buildActivationMessage({
+      bikeTitle,
+      startDate: vars.rent_start_date,
+      endDate: vars.rent_end_date,
+      odometerKm: odometerBefore,
+      renterName,
+      shortRentalId: rentalId.slice(0, 8),
+      recipient: "operator",
+    });
 
     const qrCaption = `📲 <b>QR для быстрой аренды</b>\n🔗 ${qrDeepLink}`;
 
-    // Helper to send DOCX + QR + message to a single chat
-    // If skipQr=true → renter already has QR from initial DOCX, no need to resend
-    async function sendToChat(chatId: string, opts?: { skipQr?: boolean }) {
+    // Helper to send DOCX + QR + message to a single chat.
+    // v3 polish: now accepts `messageText` param so renter gets warm variant,
+    // owner/admin get operational variant.
+    async function sendToChat(chatId: string, opts?: { skipQr?: boolean; messageText?: string }) {
       if (!chatId || !/^\d+$/.test(chatId)) return;
+      const textToSend = opts?.messageText || congratTextRenter;
       try {
         // First send congratulatory message
         await fetch(forwardUrl, {
@@ -2344,7 +2322,7 @@ export async function activateRental(input: {
           body: JSON.stringify({
             chat_id: chatId,
             method: "sendMessage",
-            payload: { text: congratText, parse_mode: "HTML" },
+            payload: { text: textToSend, parse_mode: "HTML" },
           }),
           signal: AbortSignal.timeout(8000),
         });
@@ -2411,16 +2389,16 @@ export async function activateRental(input: {
     const renterChatId = renter?.user_id || secretData.chat_id || "";
     const renterAlreadyLinked = !!renterChatId; // Has existing TG account → no need for QR
 
-    // Send to renter — skip QR if already linked
-    if (renterChatId) await sendToChat(renterChatId, { skipQr: renterAlreadyLinked });
+    // Send to renter — skip QR if already linked. Use warm renter variant.
+    if (renterChatId) await sendToChat(renterChatId, { skipQr: renterAlreadyLinked, messageText: congratTextRenter });
 
-    // Send to crew owner — always include QR (they may forward it)
+    // Send to crew owner — always include QR (they may forward it). Use operational variant.
     const crewOwnerChatId = crew.owner_id;
-    if (crewOwnerChatId) await sendToChat(crewOwnerChatId);
+    if (crewOwnerChatId) await sendToChat(crewOwnerChatId, { messageText: congratTextOperator });
 
-    // Send to admin (salavey13) — always include QR
+    // Send to admin (salavey13) — always include QR. Use operational variant.
     const adminChatId = "413553377";
-    await sendToChat(adminChatId);
+    await sendToChat(adminChatId, { messageText: congratTextOperator });
 
     // ── 7. Send via email ──
     try {
