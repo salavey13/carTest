@@ -86,7 +86,8 @@ export function RentalTimeline({
 }: RentalTimelineProps) {
   const [selected, setSelected] = useState<string | null>(null);
 
-  const isCancelled = status === "cancelled";
+  // N1 fix: removed dead `isCancelled` variable (was never used after the
+  // displayStages simplification — cancelled rentals now preserve real history).
   const isCompleted = status === "completed";
   const stages: TimelineStage[] = [
     {
