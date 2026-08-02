@@ -4777,8 +4777,12 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   paymentStatus: string;
   totalCost: number;
   vehicleTitle: string;
+  vehicleImageUrl: string;     // goodmorning-fixes: bike photo for rental page header
   renterId: string;
   ownerId: string;
+  crewId: string;              // goodmorning-fixes: crew.id for role guard
+  crewSlug: string;            // goodmorning-fixes: crew.slug (more reliable than crewId)
+  createdAt: string | null;    // goodmorning-fixes: rentals.created_at for timeline
   agreedStartDate: string | null;
   agreedEndDate: string | null;
   requestedEndDate: string | null;
@@ -4806,8 +4810,12 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       paymentStatus: "interest_paid",
       totalCost: 0,
       vehicleTitle: "—",
+      vehicleImageUrl: "",
       renterId: "",
       ownerId: "",
+      crewId: "",
+      crewSlug: "",
+      createdAt: null,
       agreedStartDate: null,
       agreedEndDate: null,
       requestedEndDate: null,
@@ -4828,7 +4836,9 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
 
   const { data, error } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, agreed_start_date, agreed_end_date, requested_end_date, metadata, vehicle:cars(make, model)")
+    // goodmorning-fixes: added created_at (for timeline "Создан" timestamp),
+    // image_url + specs (for bike photo), crew:crews(slug) (for crewSlug fallback in role guard)
+    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, agreed_start_date, agreed_end_date, requested_end_date, created_at, metadata, vehicle:cars(make, model, image_url, specs), crew:crews!rentals_crew_id_fkey(id, slug)")
     .eq("rental_id", safeRentalId)
     .maybeSingle();
 
@@ -4841,8 +4851,12 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       paymentStatus: "interest_paid",
       totalCost: 0,
       vehicleTitle: "—",
+      vehicleImageUrl: "",
       renterId: "",
       ownerId: "",
+      crewId: "",
+      crewSlug: "",
+      createdAt: null,
       agreedStartDate: null,
       agreedEndDate: null,
       requestedEndDate: null,
@@ -4861,7 +4875,25 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     };
   }
 
-  const vehicle = data.vehicle as { make?: string; model?: string } | null;
+  // goodmorning-fixes: extract vehicle image_url + specs.gallery for bike photo
+  const vehicle = data.vehicle as { make?: string; model?: string; image_url?: string; specs?: { gallery?: string[]; image_urls?: string[] } } | null;
+  const vehicleImageUrl = (() => {
+    if (!vehicle) return "";
+    if (vehicle.image_url) return vehicle.image_url;
+    const gallery = vehicle.specs?.gallery;
+    if (Array.isArray(gallery) && gallery.length > 0 && typeof gallery[0] === "string") return gallery[0];
+    const imageUrls = vehicle.specs?.image_urls;
+    if (Array.isArray(imageUrls) && imageUrls.length > 0 && typeof imageUrls[0] === "string") return imageUrls[0];
+    return "";
+  })();
+
+  // goodmorning-fixes: extract crewId + crewSlug for role guard (slug is more reliable)
+  const crewRow = (data as any).crew as { id?: string; slug?: string } | null;
+  const crewId = crewRow?.id || "";
+  const crewSlug = crewRow?.slug || safeSlug; // fallback to URL slug
+
+  // goodmorning-fixes: rentals.created_at for timeline "Создан" timestamp
+  const createdAt = (data as any).created_at ? String((data as any).created_at) : null;
 
   const metadata = (data.metadata as Record<string, unknown> | null) ?? null;
   const verifier = metadata && typeof metadata.contract_verifier === "object" ? (metadata.contract_verifier as Record<string, unknown>) : null;
@@ -4920,8 +4952,12 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     paymentStatus: data.payment_status ?? "interest_paid",
     totalCost: Number(data.total_cost ?? 0),
     vehicleTitle: `${vehicle?.make ?? "Vehicle"} ${vehicle?.model ?? ""}`.trim(),
+    vehicleImageUrl,
     renterId: data.user_id ?? "",
     ownerId: data.owner_id ?? "",
+    crewId,
+    crewSlug,
+    createdAt,
     agreedStartDate: (data as any).agreed_start_date || null,
     agreedEndDate: data.agreed_end_date || null,
     requestedEndDate: data.requested_end_date || null,
