@@ -54,6 +54,8 @@ interface RentalQuickActionBarProps {
   renterId?: string;
   renterTelegramChatId?: string;
   crewId?: string;
+  /** goodmorning-fixes: crewSlug fallback — more reliable than crewId for matching */
+  crewSlug?: string;
   accentColor: string;
   accentTextOn: string;
   borderColor: string;
@@ -70,6 +72,7 @@ export function RentalQuickActionBar({
   renterId,
   renterTelegramChatId,
   crewId,
+  crewSlug,
   accentColor,
   accentTextOn,
   borderColor,
@@ -117,18 +120,23 @@ export function RentalQuickActionBar({
   // Required because #lifecycle-actions is wrapped in <FranchizeRentalRoleGuard>
   // on the page: for renters/guests the scroll target doesn't exist in the DOM,
   // so the "Закрыть" button would be a no-op. We hide it for non-operators.
+  // goodmorning-fixes: added crewSlug fallback + broadened to include "member" role.
   const { dbUser, userCrewMemberships } = useAppContext();
   const isOperator = useMemo(() => {
     if (!dbUser?.user_id) return false;
     if (ownerId && dbUser.user_id === ownerId) return true;
-    if (crewId) {
-      const m = userCrewMemberships.find((mem) => mem.crewId === crewId);
-      if (m && ["owner", "admin", "co_owner"].includes(m.role)) return true;
+    if (crewId || crewSlug) {
+      const m = userCrewMemberships.find((mem) => {
+        if (crewId && mem.crewId === crewId) return true;
+        if (crewSlug && mem.slug === crewSlug) return true;
+        return false;
+      });
+      if (m && ["owner", "admin", "co_owner", "member"].includes(m.role)) return true;
     }
     const meta = (dbUser.metadata as Record<string, unknown> | null) ?? null;
     if (meta?.role === "admin" || meta?.status === "admin") return true;
     return false;
-  }, [dbUser?.user_id, dbUser?.metadata, ownerId, crewId, userCrewMemberships]);
+  }, [dbUser?.user_id, dbUser?.metadata, ownerId, crewId, crewSlug, userCrewMemberships]);
 
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
