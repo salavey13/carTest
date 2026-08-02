@@ -57,6 +57,8 @@ import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets } f
 import { privateSchema } from "@/lib/private-secrets";
 import nodemailer from "nodemailer";
 import { calculatePriceForDuration, getHelmetPrice } from "@/app/franchize/lib/pricing-calculator";
+// v3 polish: centralized notification templates (HTML-escaped, Russian-ized, with deep links)
+import { buildDocSuccessMessage, buildDocAdminAuditMessage } from "@/app/franchize/lib/notification-templates";
 import { isCrewMember } from "@/app/lib/user-rental-secrets";
 import { createLeadFollowupTodos } from "@/app/franchize/server-actions/crew-todos";
 import { createRentalVerificationTodos } from "@/app/franchize/server-actions/rental-verification-todos";
@@ -84,47 +86,6 @@ async function getDocCrewSlug(userId: string): Promise<string> {
   } catch (error) {
     logger.warn("[/doc] Failed to read crew slug from user_states, using default:", error);
     return "vip-bike";
-  }
-}
-
-/**
- * Fetch recent callback leads (web "перезвоните" CTA) that carry a phone, for a
- * crew. Used in the client_phone step to auto-suggest the client phone so the
- * operator can link the contract to the web lead in ONE tap instead of skipping.
- *
- * Skipping was the root cause of 45/57 rental_contract_artifacts having
- * renter_phone = NULL: the phone step is optional and operators routinely hit
- * "Пропустить", which keys the lead by the operator's TG id (collapsing all of
- * one operator's clients into a single franchize_intents row) and leaves the
- * phone empty everywhere. Surfacing existing callback phones makes collection
- * 1-tap when the client actually came from the site.
- */
-async function getRecentCallbackPhones(slug: string): Promise<Array<{ phone: string; name: string | null }>> {
-  try {
-    const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-    const { data, error } = await supabaseAdmin
-      .from("franchize_intents")
-      .select("phone, metadata, last_seen_at")
-      .eq("slug", slug)
-      .eq("intent_type", "contact_click")
-      .not("phone", "is", null)
-      .gte("last_seen_at", since)
-      .order("last_seen_at", { ascending: false })
-      .limit(8);
-    if (error || !data) return [];
-    const seen = new Set<string>();
-    const out: Array<{ phone: string; name: string | null }> = [];
-    for (const row of data) {
-      const phone = (row.phone || "").trim();
-      if (!phone || seen.has(phone)) continue;
-      seen.add(phone);
-      const meta = (row.metadata as Record<string, unknown> | null) || {};
-      out.push({ phone, name: (meta.name as string) || null });
-    }
-    return out;
-  } catch (e) {
-    logger.warn("[/doc] getRecentCallbackPhones failed:", e);
-    return [];
   }
 }
 
@@ -316,8 +277,8 @@ function buildHasLicenseKeyboard(): KeyboardButton[][] {
 function buildConfirmKeyboard(): KeyboardButton[][] {
   return [
     [
-      { text: "✅ Всё верно — генерируем", callback_data: "ok" },
-      { text: "✏️ Исправить", callback_data: "restart" },
+      { text: "✅ Всё верно", callback_data: "ok" },
+      { text: "↩️ Начать заново", callback_data: "restart" },
     ],
     [{ text: "❌ Отменить", callback_data: "cancel" }],
   ];
@@ -421,9 +382,7 @@ function buildEquipmentKeyboard(context: DocFlowContext): KeyboardButton[][] {
     [
       { text: `${charger ? "✅" : "⬜"} Зарядка`, callback_data: "eq_charger" },
     ],
-    [
-      { text: "✅ Готово", callback_data: "eq_done" },
-    ],
+    [{ text: "✅ Готово", callback_data: "eq_done" }],
     [{ text: "❌ Отменить", callback_data: "cancel" }],
   ];
 }
@@ -1128,12 +1087,7 @@ async function createRentalFromDocContract(
   userId: string,
   context: DocFlowContext,
   bike: any,
-  docSha256: string,
-  /** The total_sum from the rental_contract_artifact — if available, used as
-   *  the source of truth for total_cost instead of re-calculating from dates.
-   *  Prevents pricing bugs when dates get garbled between contract generation
-   *  and rental row creation. See: docs/310k_investigation_report.md */
-  docContractTotalSum?: number
+  docSha256: string
 ): Promise<string | null> {
   try {
     logger.info('[/doc] createRentalFromDocContract: starting', {
@@ -1182,24 +1136,7 @@ async function createRentalFromDocContract(
     const start = new Date(startDateIso);
     const end = new Date(endDateIso);
     const hours = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10;
-    
-    // Validate date range — if end is before start, the dates are inverted.
-    // This happened in production (rental 94b5b41d: requested_start=2026-08-07
-    // but agreed_start=2026-07-08 — DD.MM got swapped to MM.DD somewhere).
-    // Without this check, negative hours → tierResult.price=0 → fallback
-    // baseDailyPrice * max(1, ceil(negative/24)) = baseDailyPrice * 1.
-    // But with some date combinations the calculator can produce wild values
-    // (e.g. 310,000 ₽ for a 1-day rental because it computed 31 days).
-    if (hours <= 0) {
-      logger.error('[/doc] INVALID DATE RANGE: end before start', {
-        startDateIso, endDateIso, hours,
-        rentStartDate: context.rentStartDate,
-        rentEndDate: context.rentEndDate,
-      });
-      // Use 1 day as fallback to avoid wild price calculations
-      // The operator should correct the dates manually
-    }
-    const days = Math.max(1, Math.ceil(Math.abs(hours) / 24));
+    const days = Math.max(1, Math.ceil(hours / 24));
 
     // Use tier-aware pricing calculator (handles 3h/6h/12h tiers, weekday/weekend, multi-day)
     const specsForPricing = {
@@ -1217,30 +1154,7 @@ async function createRentalFromDocContract(
     };
     const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateIso);
     const dailyPrice = tierResult.rate > 0 ? tierResult.rate : baseDailyPrice;
-    
-    // SOURCE OF TRUTH: If the contract artifact already has a total_sum,
-    // use it instead of re-calculating. The contract was generated with
-    // correct dates + pricing — re-calculating from potentially garbled
-    // dates can produce wildly wrong values (e.g. 310,000 ₽ instead of
-    // 10,000 ₽ when DD.MM dates get swapped to MM.DD).
-    // See investigation: docs/310k_investigation_report.md
-    const contractTotalSum = docContractTotalSum ?? null;
-    const calculatedCost = tierResult.price > 0 ? tierResult.price : baseDailyPrice * days;
-    const totalCost = contractTotalSum && contractTotalSum > 0
-      ? contractTotalSum  // Trust the contract
-      : calculatedCost;   // Fallback to calculation
-    
-    if (contractTotalSum && contractTotalSum !== calculatedCost) {
-      logger.warn('[/doc] Price mismatch: contract vs calculated', {
-        contractTotalSum,
-        calculatedCost,
-        hours,
-        days,
-        dailyPrice,
-        startDateIso,
-        endDateIso,
-      });
-    }
+    const totalCost = tierResult.price > 0 ? tierResult.price : baseDailyPrice * days;
 
     logger.info('[/doc] createRentalFromDocContract: pricing', {
       dailyPrice,
@@ -1272,20 +1186,10 @@ async function createRentalFromDocContract(
     }
 
     // Create rentals row
-    // Deposit tracking: record the deposit amount + method from the /doc flow.
-    // The operator chose deposit via buildDepositChoiceKeyboard (cash/STS/custom).
-    // If stsPledgeUsed=true, deposit_method='none' (STS replaces cash deposit).
-    // Otherwise, deposit_method='cash' (default — /doc doesn't support bank transfer yet).
-    const depositAmount = context.stsPledgeUsed
-      ? 0  // STS replaces cash deposit
-      : Number(context.depositOverride || bike.specs?.deposit_rub || 20000);
-    const depositMethod = context.stsPledgeUsed ? 'none' : 'cash';
-
     const rentalInsert = {
       user_id: crewOwnerChatId,
       owner_id: crewOwnerChatId,
       created_by_operator_chat_id: crewOwnerChatId,
-      crew_id: effectiveCrewId,
       vehicle_id: bike.id,
       requested_start_date: startDateIso,
       requested_end_date: endDateIso,
@@ -1294,23 +1198,11 @@ async function createRentalFromDocContract(
       status: 'active',
       payment_status: 'fully_paid',
       total_cost: Math.round(totalCost),
-      // Deposit tracking (migration 20260726000001)
-      deposit_amount: depositAmount,
-      deposit_method: depositMethod,
-      deposit_collected_at: new Date().toISOString(),
-      deposit_collected_by: String(userId), // operator who ran /doc
-      deposit_returned: false,
       metadata: {
         source: 'doc_command',
         daily_price: dailyPrice,
         created_by: 'doc-manual',
         doc_sha256: docSha256,
-        deposit: {
-          amount: depositAmount,
-          method: depositMethod,
-          sts_pledge_used: !!context.stsPledgeUsed,
-          override: context.depositOverride || null,
-        },
       },
     };
 
@@ -1336,27 +1228,6 @@ async function createRentalFromDocContract(
     }
 
     logger.info('[/doc] Created rental:', rental.rental_id);
-
-    // ── Log deposit collection to deposit_log (audit trail) ──
-    if (depositAmount > 0) {
-      try {
-        await supabaseAdmin.from('deposit_log').insert({
-          rental_id: rental.rental_id,
-          action: 'collected',
-          amount: depositAmount,
-          method: depositMethod,
-          operator_chat_id: String(userId),
-          notes: context.stsPledgeUsed
-            ? 'STS pledge used (no cash deposit)'
-            : `Cash deposit collected via /doc by operator ${userId}`,
-        });
-        logger.info('[/doc] Deposit logged:', { rental_id: rental.rental_id, amount: depositAmount, method: depositMethod });
-      } catch (depError) {
-        // Non-fatal — don't fail the rental creation just because the audit log failed
-        logger.error('[/doc] Failed to log deposit (non-fatal):', depError);
-      }
-    }
-
     return rental.rental_id;
   } catch (error) {
     logger.error('[/doc] Rental creation exception:', error);
@@ -1619,13 +1490,12 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
     }
 
     // Send QR as separate photo (if available)
-    if (qrPngBuffer && isRent) {
+    if (qrPngBuffer) {
       try {
         const formData = new FormData();
         formData.append("chat_id", String(chatId));
         formData.append("photo", new Blob([new Uint8Array(qrPngBuffer)], { type: "image/png" }), "qr.png");
-        formData.append("caption", `📲 QR-код для арендатора
-\nПокажите этот QR клиенту — он откроет карточку аренды в Telegram\n
+        formData.append("caption", `📲 QR для быстрой повторной аренды
 ${qrDeepLink}`);
         formData.append("parse_mode", "HTML");
         await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN}/sendPhoto`, { method: "POST", body: formData });
@@ -1688,58 +1558,11 @@ ${qrDeepLink}`);
         rentalId = await createRentalFromDocContract(chatId, String(userId), context, bike, docSha256);
         if (rentalId) {
           logger.info('[/doc] Rental created successfully:', rentalId);
-          // Send a deep link to the rental page so the operator can continue
-          // the handoff process in the web app (pickup freeze, photos, etc.)
-          const rentalDeepLink = `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'oneBikePlsBot'}/app?startapp=rental_${rentalId}`;
-          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://v0-car-test.vercel.app';
-          const rentalWebUrl = `${siteUrl}/franchize/${resolvedSlug}/rental/${rentalId}`;
-          try {
-            await sendComplexMessage(chatId,
-              `✅ *Аренда создана!*\n\n` +
-              `🏍 ${bike.make} ${bike.model}\n` +
-              `👤 ${context.mpFullName || '—'}\n` +
-              `📅 ${context.rentStartDate || '?'} ${context.rentStartTime || ''} → ${context.rentEndDate || '?'} ${context.rentEndTime || ''}\n` +
-              `💰 ${vars.subtotal_rub || '?'} ₽\n\n` +
-              `*Дальнейшие шаги:*\n` +
-              `1️⃣ Откройте карточку аренды\n` +
-              `2️⃣ Зафиксируйте выдачу (одометр + фото)\n` +
-              `3️⃣ Подтвердите выдачу → аренда активна\n\n` +
-              `👇 Откройте карточку для продолжения:`,
-              [[
-                { text: '📋 Открыть карточку', url: rentalDeepLink },
-                { text: '🌐 В браузере', url: rentalWebUrl },
-              ]],
-              {
-                keyboardType: 'inline',
-                parseMode: 'Markdown',
-              }
-            );
-          } catch (linkErr) {
-            logger.warn('[/doc] Failed to send rental link:', linkErr);
-          }
         } else {
           logger.warn('[/doc] Failed to create rental, continuing without rental_id');
         }
       } catch (rentalErr) {
         logger.error('[/doc] Rental creation exception:', rentalErr);
-      }
-    }
-
-    // ── For SALE flow: send a success message with sale details ──
-    if (!isRent) {
-      try {
-        await sendComplexMessage(chatId,
-          `✅ *Договор купли-продажи готов!*\n\n` +
-          `🏍 ${bike.make} ${bike.model}\n` +
-          `👤 ${context.mpFullName || '—'}\n` +
-          `💰 ${context.salePrice || '?'} ₽\n\n` +
-          `Договор отправлен выше ↑\n` +
-          `Карточку продажи смотрите в аналитике →`,
-          [],
-          { removeKeyboard: true, parseMode: 'Markdown' }
-        );
-      } catch (saleMsgErr) {
-        logger.warn('[/doc] Sale success message failed:', saleMsgErr);
       }
     }
 
@@ -1901,22 +1724,57 @@ ${qrDeepLink}`);
     }
     }
 
-  // ── Send confirmation to the operator
+  // ── Send confirmation to the operator (v3 polish: rich context + deep links) ──
+  // Was: "✅ Договор аренды готов!" with generic "🚀 Открыть" button → bot app root.
+  // Now: full context (bike, client, dates, price, rental ID) + 2 deep-link buttons.
+  const bikeTitleForMsg = `${bike.make} ${bike.model}`.trim();
+  const startDateForMsg = isRent ? `${context.rentStartDate || ""} ${context.rentStartTime || ""}`.trim() : undefined;
+  const endDateForMsg = isRent ? `${context.rentEndDate || ""} ${context.rentEndTime || ""}`.trim() : undefined;
+  const depositForMsg = isRent ? Number(context.depositOverride || 20000) : undefined;
+
+  const successText = buildDocSuccessMessage({
+    isRent,
+    bikeTitle: bikeTitleForMsg,
+    clientName: context.mpFullName,
+    startDate: startDateForMsg,
+    endDate: endDateForMsg,
+    salePrice: !isRent ? Number(context.salePrice || 0) : undefined,
+    depositRub: depositForMsg,
+    categories: isRent ? (context.mlCategories || []) : undefined,
+    shortRentalId: rentalId || undefined ? (rentalId as string).slice(0, 8) : undefined,
+    crewSlug: resolvedSlug,
+  });
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const webUrl = rentalId ? `${siteUrl}/franchize/${resolvedSlug}/rental/${rentalId}` : "";
+  const botLink = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
+  const tgDeepLink = rentalId
+    ? `${botLink}?startapp=rental_${rentalId}`
+    : botLink;
+
   await sendComplexMessage(
     chatId,
-    `✅ *${isRent ? 'Договор аренды' : 'Договор купли-продажи'} готов!*${isRent ? `\n\n🛡 Категории: ${(context.mlCategories || []).join(", ")}` : ""}`,
-    [[{ text: "🚀 Открыть", url: process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app" }]],
-    { removeKeyboard: true, parseMode: "Markdown" },
+    successText,
+    [[
+      { text: "📋 Открыть аренду", url: tgDeepLink },
+      ...(webUrl ? [{ text: "🌐 В браузере", url: webUrl }] : []),
+    ]],
+    { removeKeyboard: true, parseMode: "HTML" },
   );
 
-  await notifyAdmin(
-    `📄 ${isRent ? 'Аренда' : 'Продажа'} (ввод с кнопок)\n` +
-    `User: ${userId}\n` +
-    `Bike: ${bike.make} ${bike.model}\n` +
-    `Client: ${context.mpFullName}` +
-    (isRent ? `\nCats: ${(context.mlCategories || []).join(", ")}` : "") +
-    (!isRent ? `\nPrice: ${Number(context.salePrice || 0).toLocaleString("ru-RU")} ₽` : ""),
-  );
+  // ── Notify boss/admin (v3 polish: Russian-ized keys, no English "User:/Bike:/Client:") ──
+  const auditText = buildDocAdminAuditMessage({
+    isRent,
+    bikeTitle: bikeTitleForMsg,
+    clientName: context.mpFullName,
+    startDate: startDateForMsg,
+    endDate: endDateForMsg,
+    salePrice: !isRent ? Number(context.salePrice || 0) : undefined,
+    depositRub: depositForMsg,
+    shortRentalId: rentalId || undefined ? (rentalId as string).slice(0, 8) : undefined,
+    crewSlug: resolvedSlug,
+  });
+  await notifyAdmin(auditText);
 
   // --- Create/update lead in franchize_intents ---
   // This ensures the client appears on the leads page with proper state
@@ -3462,26 +3320,19 @@ export async function handleDocCallback(
   }
 
   if (callbackData === "ok") {
-    // Before generating: ask for client phone (links contract to web callback lead).
-    // Auto-suggest recent "перезвоните" leads from the site so the operator can
-    // pick the client in one tap. This prevents the recurring NULL-phone case
-    // (operator used to skip the optional step → renter_phone NULL everywhere).
+    // Before generating: ask for optional client phone (for callback leads)
+    // This links the contract to the web lead (phone = user_id in users table)
     if (!context.clientPhoneResolved) {
       await setState(userId, "client_phone", context);
-      const suggestSlug = await getDocCrewSlug(userId);
-      const suggestions = await getRecentCallbackPhones(suggestSlug);
-      const rows: KeyboardButton[][] = [];
-      if (suggestions.length) {
-        for (const s of suggestions.slice(0, 6)) {
-          rows.push([{ text: `👤 ${s.name || "Клиент с сайта"} · ${s.phone}`, callback_data: `ph_pick:${s.phone}` }]);
-        }
-      }
-      rows.push([{ text: "⏭ Пропустить (без телефона)", callback_data: "ph_skip" }]);
-      rows.push([{ text: "❌ Отменить", callback_data: "cancel" }]);
-      const header = suggestions.length
-        ? "📞 *Телефон клиента*\n\nЗаявки с сайта (перезвон) за 14 дней. Выберите клиента — договор привяжется к заявке:\n\nЛибо введите номер вручную, либо пропустите."
-        : "📞 *Телефон клиента*\n\nВведите номер клиента — договор привяжется к заявке с сайта (если была).\n\nИли нажмите «Пропустить».";
-      await sendComplexMessage(chatId, header, rows, { keyboardType: "inline", parseMode: "Markdown" });
+      await sendComplexMessage(
+        chatId,
+        "📞 *Телефон клиента*\n\nЕсли клиент пришёл с сайта (заявка на звонок), введите его номер — договор привяжется к заявке.\n\nИли нажмите «Пропустить».",
+        [
+          [{ text: "⏭ Пропустить", callback_data: "ph_skip" }],
+          [{ text: "❌ Отменить", callback_data: "cancel" }],
+        ],
+        { keyboardType: "inline", parseMode: "Markdown" },
+      );
       return true;
     }
     const docCrewSlug = await getDocCrewSlug(userId);
@@ -3499,25 +3350,6 @@ export async function handleDocCallback(
     const docCrewSlug = await getDocCrewSlug(userId);
     await sendComplexMessage(chatId, "⏳ Генерирую...", [], { removeKeyboard: true });
     const success = await generateContract(chatId, userId, context, docCrewSlug);
-    if (success) {
-      await clearState(userId);
-    }
-    return true;
-  }
-
-  // Operator picked a suggested callback-lead phone → link contract to that lead.
-  if (callbackData.startsWith("ph_pick:")) {
-    const phone = callbackData.slice("ph_pick:".length).trim();
-    if (!/^[\d+]{10,16}$/.test(phone)) {
-      await sendComplexMessage(chatId, "❌ Некорректный номер. Введите вручную или пропустите.", [], { removeKeyboard: true });
-      return true;
-    }
-    context.clientPhone = phone;
-    context.clientPhoneResolved = true;
-    await setState(userId, "confirm", context);
-    await sendComplexMessage(chatId, `✅ Телефон клиента: ${phone}\n\n⏳ Генерирую...`, [], { removeKeyboard: true });
-    const crewSlug = await getDocCrewSlug(userId);
-    const success = await generateContract(chatId, userId, context, crewSlug);
     if (success) {
       await clearState(userId);
     }
