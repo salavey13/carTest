@@ -65,34 +65,34 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
   const { originalRentalId, newStartDate, newEndDate, clientRequestId } = input;
 
   if (!originalRentalId || !newStartDate || !newEndDate) {
-    return { success: false, error: "Missing required fields." };
+    return { success: false, error: "Не указаны обязательные поля." };
   }
 
   // Basic UUID format check (not full RFC 4122, but catches obvious garbage)
   const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRe.test(originalRentalId)) {
-    return { success: false, error: "Invalid rental ID format." };
+    return { success: false, error: "Неверный формат ID аренды." };
   }
 
   // Date format check (YYYY-MM-DD)
   const dateRe = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateRe.test(newStartDate) || !dateRe.test(newEndDate)) {
-    return { success: false, error: "Invalid date format. Use YYYY-MM-DD." };
+    return { success: false, error: "Неверный формат даты. Используйте ГГГГ-ММ-ДД." };
   }
 
   const start = new Date(newStartDate);
   const end = new Date(newEndDate);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return { success: false, error: "Invalid date format." };
+    return { success: false, error: "Неверный формат даты." };
   }
   if (end < start) {
-    return { success: false, error: "End date must be after or equal to start date." };
+    return { success: false, error: "Дата окончания должна быть позже или равна дате начала." };
   }
   // Max duration cap — prevent abuse (1000-day rental at daily price would be a billing bug)
   const maxDays = 365;
   const days = Math.ceil((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
   if (days > maxDays) {
-    return { success: false, error: `Rental duration exceeds ${maxDays} days.` };
+    return { success: false, error: `Срок аренды превышает ${maxDays} дней.` };
   }
 
   // ── Idempotency check — if clientRequestId was provided and we already have
@@ -113,7 +113,7 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
   const cookieStore = await cookies();
   const callerUserId = cookieStore.get("tg_user_id")?.value;
   if (!callerUserId) {
-    return { success: false, error: "Not authenticated." };
+    return { success: false, error: "Требуется авторизация." };
   }
 
   const supabase = supabaseAdmin;
@@ -131,6 +131,8 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
       payment_status,
       status,
       metadata,
+      agreed_start_date,
+      agreed_end_date,
       vehicles:vehicle_id ( id, make, model, daily_price )
     `)
     .eq("rental_id", originalRentalId)
@@ -172,16 +174,19 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
   const isGlobalAdmin = callerMeta?.role === "admin" || callerMeta?.status === "admin";
 
   if (!isOwner && !isCrewOperator && !isGlobalAdmin) {
-    return { success: false, error: "Not authorized to extend this rental." };
+    return { success: false, error: "Нет прав на продление этой аренды." };
   }
 
   // ── 2. Bike availability check — prevent double-booking ──
   // Query overlapping active/confirmed rentals for the same vehicle.
+  // S1 fix: exclude the original rental itself, otherwise mid-rental extensions
+  // (e.g., extending an active rental by 1 day) would always show "already booked".
   const { data: overlapping } = await supabase
     .from("rentals")
     .select("rental_id")
     .eq("vehicle_id", original.vehicle_id)
     .in("status", ["active", "confirmed", "pending_confirmation"])
+    .neq("rental_id", originalRentalId)
     .or(`and(agreed_start_date.lte.${newEndDate},agreed_end_date.gte.${newStartDate})`)
     .limit(1)
     .maybeSingle();
@@ -196,9 +201,17 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
   }
 
   // Sanity-check daily price — fall back to original rental's daily price if vehicle has 0/null
+  // S2 fix: compute original rental's duration from its own dates, not the new rental's dates.
+  // Previously used `days` (new rental duration) as divisor → wrong fallback price for
+  // extensions of different lengths.
   const originalMeta = (original.metadata as Record<string, any> | null) ?? {};
+  const originalStart = original.agreed_start_date ? new Date(original.agreed_start_date) : null;
+  const originalEnd = original.agreed_end_date ? new Date(original.agreed_end_date) : null;
+  const originalDays = (originalStart && originalEnd)
+    ? Math.max(1, Math.ceil((originalEnd.getTime() - originalStart.getTime()) / (24 * 60 * 60 * 1000)))
+    : 1;
   const fallbackDailyPrice = Number(originalMeta.extension_daily_price) ||
-    (original.total_cost ? Number(original.total_cost) / Math.max(1, days) : 0);
+    (original.total_cost ? Number(original.total_cost) / originalDays : 0);
   const dailyPrice = Number(vehicle.daily_price) || fallbackDailyPrice;
   if (dailyPrice <= 0) {
     return { success: false, error: "Не удалось определить дневную цену байка." };
@@ -247,16 +260,23 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
   const shortId = newRentalId.slice(0, 8);
   const dateRangeStr = `${start.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })} → ${end.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })}`;
 
-  // Fetch renter name for operator message (was missing in v1 — operator didn't know WHO they were extending for)
-  let renterName = "клиент";
+  // P2 fix: use privateSchema() + correct table name (rental_contract_artifacts, American spelling).
+  // Was: rental_contract_artefacts (British) in default public schema → silent 404, renter never notified.
+  type SupabaseSchemaClient = {
+    schema: (schema: string) => { from: (table: string) => any };
+  };
+  const privateSchemaLocal = () => (supabaseAdmin as unknown as SupabaseSchemaClient).schema("private");
+  let renterFullName = "клиент";
+  let renterChatId = "";
   try {
-    const { data: renterArtefact } = await supabase
-      .from("rental_contract_artefacts")
+    const { data: artefact } = await privateSchemaLocal()
+      .from("rental_contract_artifacts")
       .select("renter_full_name, telegram_chat_id")
       .eq("rental_id", originalRentalId)
       .maybeSingle();
-    if (renterArtefact?.renter_full_name) {
-      renterName = renterArtefact.renter_full_name;
+    if (artefact) {
+      if (artefact.renter_full_name) renterFullName = artefact.renter_full_name;
+      if (artefact.telegram_chat_id) renterChatId = String(artefact.telegram_chat_id);
     }
   } catch {
     // ignore — non-fatal
@@ -264,13 +284,14 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
 
   try {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
-    const webUrl = `${siteUrl}/franchize/(crew-slug)/rental/${newRentalId}`;
+    // S7 fix: removed `(crew-slug)/` route-group literal from URL — was causing 404.
+    const webUrl = `${siteUrl}/franchize/${crewSlug || "vip-bike"}/rental/${newRentalId}`;
     const botLink = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
 
     const operatorMessage =
       `✅ <b>Аренда продлена</b>\n` +
       `🏍 ${escapeHtml(bikeTitle)}\n` +
-      `👤 ${escapeHtml(renterName)}\n` +
+      `👤 ${escapeHtml(renterFullName)}\n` +
       `📅 ${dateRangeStr} (${newDays} дн.)\n` +
       `💰 ${newTotal.toLocaleString("ru-RU")} ₽\n` +
       `🔑 Аренда: ${escapeHtml(shortId)}\n\n` +
@@ -292,19 +313,10 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
 
   // ── 5. Notify renter (if they have a telegram_chat_id from artefacts) ──
   try {
-    const { data: artefact } = await supabase
-      .from("rental_contract_artefacts")
-      .select("telegram_chat_id, renter_full_name")
-      .eq("rental_id", originalRentalId)
-      .maybeSingle();
+    const finalRenterChatId = renterChatId || original.user_id || "";
+    const renterName = renterFullName;
 
-    const renterChatId = (artefact as any)?.telegram_chat_id || original.user_id;
-    // renterName was already fetched above; update it if the artefact has a fuller name
-    if (artefact?.renter_full_name && renterName === "клиент") {
-      renterName = artefact.renter_full_name;
-    }
-
-    if (renterChatId) {
+    if (finalRenterChatId) {
       const renterMessage =
         `✅ <b>Ваша аренда продлена</b>\n` +
         `🏍 ${escapeHtml(bikeTitle)}\n` +
@@ -312,7 +324,7 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
         `💰 ${newTotal.toLocaleString("ru-RU")} ₽\n\n` +
         `Менеджер активирует аренду и пришлёт договор. Приятной поездки! 🏍️`;
 
-      await sendComplexMessage(String(renterChatId), renterMessage, [], {
+      await sendComplexMessage(String(finalRenterChatId), renterMessage, [], {
         parseMode: "HTML",
       });
     }
@@ -325,7 +337,7 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
     await notifyAdmin(
       `🔄 Аренда продлена\n` +
       `🏍 ${bikeTitle}\n` +
-      `👤 ${renterName}\n` +
+      `👤 ${renterFullName}\n` +
       `🔑 Новая аренда: ${shortId}\n` +
       `📅 ${dateRangeStr} (${newDays} дн.)\n` +
       `💰 ${newTotal.toLocaleString("ru-RU")} ₽\n` +
