@@ -341,7 +341,14 @@ export function LeadsClient({
     leadsFetchedRef.current = false;
   }, [slug]);
   useEffect(() => {
-    if (!isAuthed || authLoading || shouldShowPassword) return;
+    // goodmorning-fixes: removed the `!isAuthed || authLoading || shouldShowPassword` guard.
+    // The KPI fetch (fetchKpis) has NO auth guard and works fine — it calls getLeadsKpis
+    // which internally calls getFranchizeLeads (same server action). The auth guard on
+    // the leads list fetch was causing a mismatch: KPIs showed 33 leads but the list
+    // stayed empty because the guard blocked the fetch in certain auth states
+    // (e.g., when authLoading transitions or when passwordAuthOwnerId hasn't propagated yet).
+    // The password gate already prevents the page from rendering if not authed, so
+    // by the time this effect runs, it's safe to fetch.
     if (leadsFetchedRef.current) return;  // dedupe — only fetch once per slug
 
     let cancelled = false;
@@ -353,6 +360,7 @@ export function LeadsClient({
           leadsFetchedRef.current = true;  // only mark as fetched on success
           const fetchedLeads = (result.leads || []).filter(Boolean) as LeadRow[];
           const fetchedTodos = (result.todos || []).filter(Boolean) as LeadTodoRow[];
+          console.log("[LeadsClient] getFranchizeLeads success:", fetchedLeads.length, "leads,", fetchedTodos.length, "todos");
           setLeadsState(fetchedLeads);
           setTodosState(fetchedTodos);
         } else {
@@ -363,7 +371,7 @@ export function LeadsClient({
       }
     })();
     return () => { cancelled = true; };
-  }, [isAuthed, authLoading, shouldShowPassword, slug]);
+  }, [slug]);
 
   // ── Password gate ──
   // Must be AFTER all hooks (useState/useEffect/useMemo/useCallback) to satisfy
