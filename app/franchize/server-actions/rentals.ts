@@ -1,3 +1,4 @@
+// /app/franchize/server-actions/rentals.ts
 "use server";
 
 import { createClient } from '@supabase/supabase-js';
@@ -11,6 +12,12 @@ import type {
   ContractDraftData,
 } from '../lib/rental-contract-types';
 import { buildRentalContractVariables } from '@/app/lib/rental-contract-vars';
+// v3 polish: centralized notification templates (HTML-escaped, with rental ID + next steps)
+import {
+  buildContractApprovedMessage,
+  buildContractDeclinedMessage,
+  buildRenterMessageRelay,
+} from '@/app/franchize/lib/notification-templates';
 import {
   renderTemplateToDocx,
   uploadDocxToStorage,
@@ -438,7 +445,14 @@ export async function approveContract(
     }
 
     const filename = `rental-contract-${bike.make}-${bike.model}-${dates.start}.docx`;
-    const caption = `✅ <b>Договор аренды утвержден</b>\n${bike.make} ${bike.model}\n${dates.start} — ${dates.end}\n\nСкачать: ${downloadUrl}`;
+    // v3 polish: use centralized template (with rental ID + next steps, was missing both)
+    const caption = buildContractApprovedMessage({
+      bikeTitle: `${bike.make} ${bike.model}`.trim(),
+      startDate: dates.start,
+      endDate: dates.end,
+      renterName: draft.renter_full_name || undefined,
+      shortRentalId: input.rentalId.slice(0, 8),
+    }) + `\n\nСкачать: ${downloadUrl}`;
 
     await sendDocxViaTelegram({
       buffer,
@@ -533,13 +547,12 @@ export async function declineContract(
       return { success: false, error: `Failed to update draft: ${updateError.message}` };
     }
 
-    const message = `
-❌ <b>Запрос на договор отклонен</b>
-
-${input.reason ? `<b>Причина:</b> ${input.reason}` : ''}
-
-Пожалуйста, свяжитесь с владельцем техники для уточнения деталей.
-`.trim();
+    // v3 polish: use centralized template (with rental ID + contact CTA, was missing both)
+    const message = buildContractDeclinedMessage({
+      reason: input.reason,
+      ownerTelegramUsername: process.env.TELEGRAM_SUPPORT_USERNAME || undefined,
+      shortRentalId: input.rentalId.slice(0, 8),
+    });
 
     const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -586,7 +599,7 @@ export async function sendRentalMessage(
 
     const { data: rental, error } = await supabaseAdmin
       .from("rentals")
-      .select("owner_id, rental_id")
+      .select("owner_id, rental_id, user_id, user:users(full_name, username)")
       .eq("rental_id", rentalId)
       .maybeSingle();
 
@@ -599,6 +612,10 @@ export async function sendRentalMessage(
       return { success: false, error: "Владелец не найден" };
     }
 
+    // v3 polish: fetch renter's display name for the relay message prefix
+    const renterUser = (rental as any).user as { full_name?: string; username?: string } | null;
+    const renterName = renterUser?.full_name || renterUser?.username || "Арендатор";
+
     const forwardApiUrl =
       process.env.FORWARD_TELEGRAM_API ||
       "https://v0-car-test.vercel.app/api/forward-telegram";
@@ -610,8 +627,13 @@ export async function sendRentalMessage(
         chat_id: ownerChatId,
         method: "sendMessage",
         payload: {
-          text: `📩 Сообщение по аренде #${rentalId.slice(0, 8)}:\n\n${message.trim()}`,
-          parse_mode: "Markdown",
+          // v3 polish: use centralized template (with renter name prefix + truncation indicator)
+          text: buildRenterMessageRelay({
+            renterName,
+            message: message.trim(),
+            shortRentalId: rentalId.slice(0, 8),
+          }),
+          parse_mode: "HTML",
         },
       }),
     });
@@ -650,16 +672,11 @@ export async function getRentalReturnTodos(
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Fetch crew_todos matching this rental — uses indexed rental_id column
-    // with a description JSON fallback for legacy rows (pre-migration 20260720120200).
-    // The rental_id column is indexed (idx_crew_todos_rental_id) and backfilled
-    // from description JSON during migration, so this is a fast indexed query for
-    // most rows with a safe fallback for any missed legacy rows.
+    // Fetch ALL crew_todos for this crew (both lead_followup and rental_verification)
     const { data: allTodos, error } = await supabaseAdmin
       .from("crew_todos")
-      .select("id, title, status, priority, category, description, rental_id")
+      .select("id, title, status, priority, category, description")
       .eq("crew_id", crewId)
-      .eq("rental_id", rentalId)
       .order("created_at", { ascending: true });
 
     if (error) {
@@ -667,14 +684,24 @@ export async function getRentalReturnTodos(
       return { success: false, error: error.message };
     }
 
-    // Client-side safety filter: also parse description JSON for any legacy rows
-    // where rental_id column might be null but description has it.
-    // This is redundant for rows caught by the SQL filter above, but ensures
-    // no todos are missed for pre-migration data.
-    // FIX: was using .or() with description.ilike.%rentalId% which matched
-    // todos from OTHER rentals when rentalId was a substring of another ID.
-    // Now queries ONLY by the indexed rental_id column — precise match.
-    const rentalTodos = allTodos || [];
+    // Filter by rental_id in description JSON
+    const rentalTodos = (allTodos || []).filter((t) => {
+      if (t.category === "rental_verification") {
+        // Verification todos store rental_id directly in description
+        try {
+          const desc = JSON.parse(t.description || "{}");
+          return desc.rental_id === rentalId;
+        } catch { return false; }
+      }
+      // lead_followup todos may have rental_id or be generally return-related
+      if (t.category === "lead_followup") {
+        try {
+          const desc = JSON.parse(t.description || "{}");
+          return desc.rental_id === rentalId;
+        } catch { return false; }
+      }
+      return false;
+    });
 
     return {
       success: true,
