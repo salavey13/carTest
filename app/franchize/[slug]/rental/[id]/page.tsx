@@ -16,7 +16,8 @@ import { RentalTelegramGuard } from "../../../components/RentalTelegramGuard";
 import { crewPaletteForSurface, readablePaletteTextOnColor } from "../../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../../metadata";
 import { formatRuDate } from "../../../lib/date-utils";
-import { RentalEscapeHatch } from "../../../components/RentalEscapeHatch";
+// goodmorning-fixes: removed RentalEscapeHatch import (component no longer used —
+// its buttons were redundant + caused startapp-param stickiness in TG WebApp)
 import { RentalLink } from "../../../components/RentalLink";
 // Polish v2 components (Ideas A–G from RENTAL_PAGE_PRD.md)
 import { RentalIdealBadge } from "../../../components/RentalIdealBadge";
@@ -87,16 +88,22 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
   const status = rental.status || "pending_confirmation";
   const statusStyle = statusPalette[status] || statusPalette.pending_confirmation;
 
+  // goodmorning-fixes: active rentals are ALWAYS verified (operator saw physical docs at pickup).
+  // Was: showed "Не верифицирован" even when status=active → confusing for operators.
+  const effectiveVerificationStatus =
+    status === "active" || status === "completed"
+      ? "verified" as const
+      : rental.contractVerificationStatus;
   const verificationText =
-    rental.contractVerificationStatus === "verified"
+    effectiveVerificationStatus === "verified"
       ? "Верифицирован"
-      : rental.contractVerificationStatus === "expired"
+      : effectiveVerificationStatus === "expired"
         ? "Истёк"
         : "Не верифицирован";
   const verificationStatusStyle =
-    rental.contractVerificationStatus === "verified"
+    effectiveVerificationStatus === "verified"
       ? statusPalette.active
-      : rental.contractVerificationStatus === "expired"
+      : effectiveVerificationStatus === "expired"
         ? statusPalette.pending_confirmation
         : { badgeBg: `${textSecondary}20`, badgeText: textSecondary };
 
@@ -132,12 +139,17 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
   const isVerified = rental.contractVerificationStatus === "verified" || status === "active";
 
   // ── Polish v2: rental stage timestamps for Timeline ──
-  const createdAt = rentalMeta?.created_at ?? rentalMeta?.createdAt ?? null;
-  const verifiedAt = rentalMeta?.verified_at ?? rentalMeta?.verifiedAt ?? null;
-  const pickedUpAt = rentalMeta?.picked_up_at ?? rentalMeta?.pickedUpAt ?? null;
+  // goodmorning-fixes: prefer rental.createdAt (from rentals.created_at column) over metadata.
+  // Production metadata doesn't always have created_at — the DB column is the source of truth.
+  // Also try metadata.history[] for status-change timestamps (operator-driven events).
+  const historyArr = Array.isArray(rentalMeta?.history) ? (rentalMeta!.history as Array<{ status?: string; at?: string }>) : [];
+  const findHistoryAt = (status: string) => historyArr.find((h) => h.status === status)?.at || null;
+  const createdAt = rental.createdAt ?? rentalMeta?.created_at ?? rentalMeta?.createdAt ?? null;
+  const verifiedAt = rentalMeta?.verified_at ?? rentalMeta?.verifiedAt ?? findHistoryAt("confirmed") ?? null;
+  const pickedUpAt = rentalMeta?.picked_up_at ?? rentalMeta?.pickedUpAt ?? findHistoryAt("active") ?? null;
   const activeAt = rentalMeta?.active_at ?? rentalMeta?.activeAt ?? pickedUpAt;
-  const returnedAt = closureData?.returned_at ?? rentalMeta?.returned_at ?? null;
-  const completedAt = rentalMeta?.completed_at ?? rentalMeta?.completedAt ?? null;
+  const returnedAt = closureData?.returned_at ?? rentalMeta?.returned_at ?? findHistoryAt("completed") ?? null;
+  const completedAt = rentalMeta?.completed_at ?? rentalMeta?.completedAt ?? findHistoryAt("completed") ?? null;
 
   // ── Stale rental detection ──
   // If the rental is "active" but the agreed/requested end date has passed,
@@ -164,8 +176,11 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
       </DisplayModeProvider>
 
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6">
-        {/* Escape hatch: Escape key + Telegram BackButton + direct button */}
-        <RentalEscapeHatch catalogHref={catalogHref} profileHref={profileHref} />
+        {/* goodmorning-fixes: removed <RentalEscapeHatch> — its "← В каталог"/"👤 Профиль"
+            buttons were redundant with the in-flow nav buttons below, AND using
+            window.location.href on relative URLs in TG WebApp keeps the startapp
+            param alive → user gets bounced back to rental page. The CrewHeader
+            already provides navigation; the action buttons below cover catalog/profile. */}
 
         {/* Top-level error boundary: if any client component crashes during hydration,
             the CrewHeader + navigation stays interactive while this section degrades gracefully. */}
@@ -355,7 +370,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                     ownerId={rental.ownerId}
                     renterId={rental.renterId}
                     renterTelegramChatId={rental.renterTelegramChatId}
-                    crewId={crew.id}
+                    crewId={rental.crewId || crew.id}
+                    crewSlug={resolvedSlug}
                     fallback={
                       <RentalLink
                         href={bikeSearchHref}
@@ -387,7 +403,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
 
                   <RentalReturnChecklist
                     rentalId={rental.rentalId}
-                    crewId={crew.id}
+                    crewId={rental.crewId || crew.id}
+                    crewSlug={resolvedSlug}
                     accentColor={accent}
                     borderColor={borderSoft}
                     textPrimary={textPrimary}
@@ -454,6 +471,42 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           </section>
         ) : null}
 
+        {/* goodmorning-fixes: Bike photo hero — was missing entirely from page.
+            Shows vehicle.image_url (or specs.gallery[0] fallback) with status badge overlay. */}
+        {rental.found && rental.vehicleImageUrl && (
+          <div className="relative rounded-3xl overflow-hidden border" style={{ borderColor: borderSoft }}>
+            <img
+              src={rental.vehicleImageUrl}
+              alt={rental.vehicleTitle || "Байк"}
+              className="w-full h-48 sm:h-64 object-cover"
+              loading="lazy"
+              onError={(e) => {
+                // Hide image container if image fails to load (broken URL etc.)
+                (e.currentTarget.parentElement as HTMLElement).style.display = "none";
+              }}
+            />
+            {/* Status badge overlay */}
+            <div className="absolute top-3 left-3">
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-md"
+                style={{ backgroundColor: statusStyle.badgeBg, color: statusStyle.badgeText }}
+              >
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: statusStyle.badgeText }} />
+                {statusLabel[status] || status}
+              </span>
+            </div>
+            {/* Bike title overlay */}
+            {rental.vehicleTitle && (
+              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+                <p className="text-sm font-bold text-white truncate">{rental.vehicleTitle}</p>
+                {rental.found && (
+                  <p className="text-[11px] text-white/70 font-mono">#{rental.rentalId?.slice(0, 8)}</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Deal started badge */}
         {dealStarted && status !== "completed" && status !== "cancelled" && (
           <div
@@ -477,11 +530,11 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               {verificationText}
             </span>
             <RentalLink
-              href={`/doc-verifier?integrationScope=${encodeURIComponent(rental.contractVerifierScope || `rental:${rental.rentalId}`)}&documentKey=${encodeURIComponent(rental.contractDocumentKey || `rental-${slug}-${rental.rentalId}`)}`}
+              href={`/franchize/${resolvedSlug}/verify-doc?rental=${rental.rentalId}&scope=${encodeURIComponent(rental.contractVerifierScope || `rental:${rental.rentalId}`)}&key=${encodeURIComponent(rental.contractDocumentKey || `rental-${slug}-${rental.rentalId}`)}`}
               className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:opacity-85"
               style={{ borderColor: accent, color: accent }}
             >
-              Verify
+              Проверить
             </RentalLink>
             {rental.docVerifierRecordId && (
               <span className="text-[11px]" style={{ color: textSecondary }}>
@@ -508,6 +561,28 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             )}
             {rental.totalCost > 0 && (
               <p><span style={{ color: textSecondary }}>Итого:</span> {rental.totalCost.toLocaleString("ru-RU")} ₽</p>
+            )}
+            {/* goodmorning-fixes: dates were missing entirely. Show start → end range. */}
+            {(rental.agreedStartDate || rental.agreedEndDate) && (
+              <p className={rental.totalCost > 0 ? "" : "sm:col-span-2"}>
+                <span style={{ color: textSecondary }}>Период:</span>{" "}
+                <span className="font-semibold">
+                  {rental.agreedStartDate
+                    ? formatRuDate(new Date(rental.agreedStartDate))
+                    : "?"}
+                  {" → "}
+                  {rental.agreedEndDate
+                    ? formatRuDate(new Date(rental.agreedEndDate))
+                    : "?"}
+                </span>
+              </p>
+            )}
+            {/* goodmorning-fixes: renter name was missing. Show from rental_contract_artefacts.renter_full_name. */}
+            {rental.renterFullName && (
+              <p>
+                <span style={{ color: textSecondary }}>Арендатор:</span>{" "}
+                <span className="font-semibold">{rental.renterFullName}</span>
+              </p>
             )}
             <p className={rental.totalCost > 0 ? "" : "sm:col-span-2"}>
               <span style={{ color: textSecondary }}>Транспорт:</span> {rental.vehicleTitle}
@@ -552,7 +627,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               ownerId={rental.ownerId}
               renterId={rental.renterId}
               renterTelegramChatId={rental.renterTelegramChatId}
-              crewId={crew.id}
+              crewId={rental.crewId || crew.id}
+                    crewSlug={resolvedSlug}
               fallback={
                 <div className="pt-2 text-xs opacity-60" style={{ color: textSecondary }}>
                   📋 Чек-лист виден только операторам экипажа.
@@ -562,7 +638,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               <div className="pt-2">
                 <RentalChecklistPanel
                   rentalId={rental.rentalId}
-                  crewId={crew.id}
+                  crewId={rental.crewId || crew.id}
+                    crewSlug={resolvedSlug}
                   slug={resolvedSlug}
                   accentColor={accent}
                   metadata={(rental.metadata as Record<string, any>) || undefined}
@@ -601,7 +678,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                   ownerId={rental.ownerId}
                   renterId={rental.renterId}
                   renterTelegramChatId={rental.renterTelegramChatId}
-                  crewId={crew.id}
+                  crewId={rental.crewId || crew.id}
+                    crewSlug={resolvedSlug}
                   fallback={
                     <RentalLink
                       href={bikeSearchHref}
@@ -663,13 +741,15 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
-            crewId={crew.id}
+            crewId={rental.crewId || crew.id}
+                    crewSlug={resolvedSlug}
           >
             <FranchizeErrorBoundary fallbackTitle="Документы временно недоступны" fallbackMessage="Попробуйте перезагрузить.">
             <FranchizeRentalDocumentsPanel
               rentalId={rental.rentalId}
               ownerId={rental.ownerId}
-              crewId={crew.id}
+              crewId={rental.crewId || crew.id}
+                    crewSlug={resolvedSlug}
               status={status}
               metadata={rental.metadata}
               palette={p}
@@ -685,7 +765,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
-            crewId={crew.id}
+            crewId={rental.crewId || crew.id}
+                    crewSlug={resolvedSlug}
           >
             <div id="lifecycle-actions">
               <FranchizeErrorBoundary fallbackTitle="Действия временно недоступны" fallbackMessage="Попробуйте перезагрузить.">
@@ -693,7 +774,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                 rentalId={rental.rentalId}
                 ownerId={rental.ownerId}
                 renterId={rental.renterId}
-                crewId={crew.id}
+                crewId={rental.crewId || crew.id}
+                    crewSlug={resolvedSlug}
                 status={status}
                 paymentStatus={rental.paymentStatus}
                 hasPickupFreeze={Boolean((rental.metadata as { pickup_freeze?: { frozen_at?: unknown } } | null)?.pickup_freeze?.frozen_at)}
@@ -738,7 +820,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
-            crewId={crew.id}
+            crewId={rental.crewId || crew.id}
+                    crewSlug={resolvedSlug}
             contractVerified={isVerified}
             contractDownloadUrl={rental.contractDownloadUrl || null}
             photoUploadHref={`/franchize/${resolvedSlug}/verify-doc?rental=${rental.rentalId}`}
@@ -760,7 +843,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
-            crewId={crew.id}
+            crewId={rental.crewId || crew.id}
+                    crewSlug={resolvedSlug}
             bikeTitle={rental.vehicleTitle}
             statusLabel={statusLabel[status]}
             telegramDeepLink={rental.telegramDeepLink}
@@ -788,7 +872,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
-            crewId={crew.id}
+            crewId={rental.crewId || crew.id}
+                    crewSlug={resolvedSlug}
             accentColor={accent}
             accentTextOn={accentTextOn}
             borderColor={borderSoft}
