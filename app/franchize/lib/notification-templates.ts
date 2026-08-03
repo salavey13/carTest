@@ -50,6 +50,12 @@ interface DocSuccessInput extends BaseTemplateInput {
   totalCost?: number;
   depositRub?: number;
   categories?: string[];
+  /** BUG 13 fix: rental status — determines "Что дальше" advice.
+   *  - "active": rental already activated, docs verified → "покажите QR-код"
+   *  - other/undefined: pending → "проверьте документы и активируйте" */
+  rentalStatus?: string;
+  /** BUG 16 fix: crew slug for inline button URLs (leads, analytics) */
+  crewSlug?: string;
 }
 
 interface RentalStatusChangeInput extends BaseTemplateInput {
@@ -145,6 +151,14 @@ function formatDateRange(start?: string, end?: string): string {
   const fmt = (iso?: string) => {
     if (!iso) return "?";
     try {
+      // BUG 12 fix: /doc command passes dates as "DD.MM.YYYY HH:MM" (Russian format).
+      // new Date("03.08.2026") interprets as March 8 (US MM.DD format), not August 3.
+      // Detect DD.MM.YYYY pattern and extract DD.MM directly without Date parsing.
+      const m = iso.match(/^(\d{2})\.(\d{2})\.(\d{4})/);
+      if (m) {
+        return `${m[1]}.${m[2]}`;  // Already DD.MM — no conversion needed
+      }
+      // Fallback: try standard Date parsing (for ISO dates from DB)
       const d = new Date(iso);
       if (Number.isNaN(d.getTime())) return "?";
       return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
@@ -184,7 +198,7 @@ function truncate(s: string, max: number): { text: string; wasTruncated: boolean
  * Replaces the old "✅ Договор аренды готов!" with full context + deep link.
  */
 export function buildDocSuccessMessage(input: DocSuccessInput): string {
-  const { isRent, bikeTitle, clientName, startDate, endDate, salePrice, totalCost, depositRub, categories, shortRentalId } = input;
+  const { isRent, bikeTitle, clientName, startDate, endDate, salePrice, totalCost, depositRub, categories, shortRentalId, rentalStatus, crewSlug } = input;
   const lines: string[] = [];
 
   // CRITICAL: escapeHtml on all user-supplied strings to prevent HTML injection
@@ -206,10 +220,20 @@ export function buildDocSuccessMessage(input: DocSuccessInput): string {
   }
   if (safeCategories.length > 0) lines.push(`🛡 Категории: ${safeCategories.join(", ")}`);
   if (shortRentalId) lines.push(`🔑 Аренда: ${escapeHtml(shortRentalId)}`);
+  if (crewSlug) lines.push(`👥 Экипаж: ${escapeHtml(crewSlug)}`);
   lines.push("");
-  lines.push(isRent
-    ? "Что дальше: проверьте документы и активируйте аренду."
-    : "Что дальше: подпишите акт приёма-передачи и проконтролируйте оплату.");
+  // BUG 13 fix: context-aware "Что дальше" based on rental status.
+  // /doc creates rentals with status=active (operator verified docs in person).
+  // Old message always said "проверьте документы и активируйте" — wrong for active rentals.
+  if (isRent) {
+    if (rentalStatus === "active") {
+      lines.push("📱 QR-код отправлен отдельным сообщением — покажите его арендатору для привязки Telegram.");
+    } else {
+      lines.push("Что дальше: проверьте документы и активируйте аренду.");
+    }
+  } else {
+    lines.push("Что дальше: подпишите акт приёма-передачи и проконтролируйте оплату.");
+  }
 
   return lines.join("\n");
 }
