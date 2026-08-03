@@ -1743,6 +1743,9 @@ ${qrDeepLink}`);
     categories: isRent ? (context.mlCategories || []) : undefined,
     shortRentalId: rentalId || undefined ? (rentalId as string).slice(0, 8) : undefined,
     crewSlug: resolvedSlug,
+    // BUG 13 fix: pass rental status so "Что дальше" advice is context-aware.
+    // /doc creates rentals with status=active → advice becomes "покажите QR-код"
+    rentalStatus: isRent ? "active" : undefined,
   });
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
@@ -1751,6 +1754,9 @@ ${qrDeepLink}`);
   const tgDeepLink = rentalId
     ? `${botLink}?startapp=rental_${rentalId}`
     : botLink;
+  // BUG 16 fix: add leads + analytics buttons (was only 2 buttons, user reported 0 appeared)
+  const leadsWebUrl = `${siteUrl}/franchize/${resolvedSlug}/leads`;
+  const analyticsWebUrl = `${siteUrl}/franchize/${resolvedSlug}/rentals-analytics`;
 
   await sendComplexMessage(
     chatId,
@@ -1758,6 +1764,8 @@ ${qrDeepLink}`);
     [[
       { text: "📋 Открыть аренду", url: tgDeepLink },
       ...(webUrl ? [{ text: "🌐 В браузере", url: webUrl }] : []),
+      ...(isRent ? [{ text: "👥 Лиды", url: leadsWebUrl }] : []),
+      ...(isRent ? [{ text: "📈 Аналитика", url: analyticsWebUrl }] : []),
     ]],
     { removeKeyboard: true, parseMode: "HTML" },
   );
@@ -1779,7 +1787,12 @@ ${qrDeepLink}`);
   // --- Create/update lead in franchize_intents ---
   // This ensures the client appears on the leads page with proper state
   const leadPhone = context.clientPhone || "";
-  const leadUserId = leadPhone || String(userId);
+  // BUG 11 fix: always use operator's Telegram chat ID as leadUserId, NEVER the phone.
+  // Was: leadUserId = leadPhone || String(userId) → phone stored as user_id in
+  // franchize_intents.telegram_user_id, crew_todos.lead_id, and potentially users.user_id.
+  // Phone is NOT a Telegram chat ID — storing it as user_id pollutes the users table
+  // and breaks lead matching. Phone goes in the separate `phone` field.
+  const leadUserId = String(userId);
   try {
     const { upsertFranchizeLead } = await import("@/app/franchize/lib/leads");
     await upsertFranchizeLead({
@@ -1825,7 +1838,8 @@ ${qrDeepLink}`);
         logger.error("[/doc] Bike has no crew_id, cannot create rent todos", { bikeId: bike.id });
       } else {
       const crewId = bike.crew_id;
-      const leadId = context.clientPhone || String(userId);
+      // BUG 11 fix: use operator's chat ID, not phone (same as leadUserId above)
+      const leadId = String(userId);
 
       const result = await createLeadFollowupTodos({
         crewId,
@@ -1873,7 +1887,8 @@ ${qrDeepLink}`);
         logger.error("[/doc] Bike has no crew_id, cannot create sale todos", { bikeId: bike.id });
       } else {
       const crewId = bike.crew_id;
-      const leadId = context.clientPhone || String(userId);
+      // BUG 11 fix: use operator's chat ID, not phone (same as leadUserId above)
+      const leadId = String(userId);
 
       const result = await createLeadFollowupTodos({
         crewId,
