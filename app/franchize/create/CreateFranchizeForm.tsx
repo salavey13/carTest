@@ -226,51 +226,6 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
     setCreateSlug(generateSlug(createName));
   }, [createName]);
 
-  const handleCreateCrew = useCallback(async () => {
-    if (!actorUserId) {
-      toast.error("Войдите в систему, чтобы создать экипаж.");
-      return;
-    }
-    if (!createName.trim() || !createSlug.trim()) {
-      toast.error("Название и slug обязательны.");
-      return;
-    }
-    setIsCreating(true);
-    try {
-      const result = await createCrew({
-        name: createName.trim(),
-        slug: createSlug.trim(),
-        description: createDescription.trim(),
-        logo_url: createLogoUrl.trim(),
-        owner_id: actorUserId,
-        hq_location: createHqLocation.trim(),
-      });
-      if (!result.success || !result.data) {
-        toast.error(result.error || "Ошибка создания экипажа.");
-        return;
-      }
-      toast.success(`Экипаж "${result.data.name}" создан! Теперь настройте оформление.`);
-      // Refresh dbUser so userCrewInfo picks up the new slug
-      if (refreshDbUser) await refreshDbUser();
-      // Load the freshly-created crew into the customization editor
-      setForm((prev) => ({ ...prev, slug: result.data!.slug }));
-      await onLoad(result.data.slug);
-      // Update URL so reloads preserve the just-created state
-      if (typeof window !== "undefined") {
-        const url = new URL(window.location.href);
-        url.searchParams.set("slug", result.data.slug);
-        url.searchParams.set("just_created", "1");
-        window.history.replaceState({}, "", url.toString());
-      }
-      setStage("palette");
-    } catch (e) {
-      toast.error("Ошибка создания: " + (e instanceof Error ? e.message : String(e)));
-    } finally {
-      setIsCreating(false);
-    }
-  }, [actorUserId, createName, createSlug, createDescription, createLogoUrl, createHqLocation, onLoad, refreshDbUser]);
-
-
   const initialSlugAppliedRef = useRef(false);
   const loadRequestIdRef = useRef(0);
 
@@ -469,6 +424,51 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
       if (typeof result.canEdit === "boolean") setCanEdit(result.canEdit);
     });
   };
+
+  const handleCreateCrew = useCallback(async () => {
+    if (!actorUserId) {
+      toast.error("Войдите в систему, чтобы создать экипаж.");
+      return;
+    }
+    if (!createName.trim() || !createSlug.trim()) {
+      toast.error("Название и slug обязательны.");
+      return;
+    }
+    setIsCreating(true);
+    try {
+      const result = await createCrew({
+        name: createName.trim(),
+        slug: createSlug.trim(),
+        description: createDescription.trim(),
+        logo_url: createLogoUrl.trim(),
+        owner_id: actorUserId,
+        hq_location: createHqLocation.trim(),
+      });
+      if (!result.success || !result.data) {
+        toast.error(result.error || "Ошибка создания экипажа.");
+        return;
+      }
+      toast.success(`Экипаж "${result.data.name}" создан! Теперь настройте оформление.`);
+      const newSlug = result.data.slug || createSlug.trim();
+      // Refresh dbUser so userCrewInfo picks up the new slug
+      if (refreshDbUser) await refreshDbUser();
+      // Load the freshly-created crew into the customization editor
+      setForm((prev) => ({ ...prev, slug: newSlug }));
+      await onLoad(newSlug);
+      // Update URL so reloads preserve the just-created state
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.set("slug", newSlug);
+        url.searchParams.set("just_created", "1");
+        window.history.replaceState({}, "", url.toString());
+      }
+      setStage("palette");
+    } catch (e) {
+      toast.error("Ошибка создания: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setIsCreating(false);
+    }
+  }, [actorUserId, createName, createSlug, createDescription, createLogoUrl, createHqLocation, onLoad, refreshDbUser]);
 
 
   useEffect(() => {
