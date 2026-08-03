@@ -146,9 +146,18 @@ export function ContactPanel({ lead, T, todos }: ContactPanelProps) {
       )}
 
       <div className="grid grid-cols-2 gap-2">
-        {lead.phone && <InfoTile label="Телефон" value={lead.phone} T={T} />}
+        {/* BUG 2 fix: show "Не указан" when phone is null for /doc-flow leads (operator skipped phone input) */}
+        <InfoTile label="Телефон" value={lead.phone || "Не указан"} T={T} />
         {lead.username && <InfoTile label="Telegram" value={`@${lead.username}`} T={T} />}
-        {lead.telegramChatId && <InfoTile label="TG ID" value={lead.telegramChatId} T={T} />}
+        {/* BUG 3 fix: TG ID shows name key (e.g. "name:савостьянов...") for /doc-flow leads where
+            QR hasn't been scanned. Only show actual numeric chat IDs; for name-keyed leads,
+            show "QR не отсканирован" if the lead has an originalOperatorChatId. */}
+        {lead.telegramChatId && /^\d+$/.test(lead.telegramChatId) && (
+          <InfoTile label="TG ID" value={lead.telegramChatId} T={T} />
+        )}
+        {(!lead.telegramChatId || !/^\d+$/.test(lead.telegramChatId)) && lead.originalOperatorChatId && (
+          <InfoTile label="TG ID" value="QR не отсканирован" T={T} />
+        )}
         {lead.bikeTitle && <InfoTile label="Байк" value={lead.bikeTitle} T={T} />}
         {lead.intentStage && <InfoTile label="Стадия" value={STAGE_LABELS[lead.intentStage] || lead.intentStage} T={T} />}
         {lead.urgencyScore != null && <InfoTile label="Приоритет" value={`${lead.urgencyScore}/100`} T={T} />}
@@ -157,6 +166,10 @@ export function ContactPanel({ lead, T, todos }: ContactPanelProps) {
         {lead.contactChannel && <InfoTile label="Канал" value={lead.contactChannel} T={T} />}
         {(lead.totalSpent || 0) > 0 && <InfoTile label="Выручка" value={fmtMoney(lead.totalSpent)} T={T} />}
         {lead.lastRentalDate && <InfoTile label="Последняя аренда" value={formatDate(lead.lastRentalDate)} T={T} />}
+        {/* BUG 6 fix: trim trailing dots from owner name */}
+        {lead.ownerName && (
+          <InfoTile label="Ответственный" value={lead.ownerName.replace(/\.+$/, "").trim()} T={T} />
+        )}
         {lead.troubled && (
           <div className="col-span-full flex min-h-[44px] items-center gap-2 rounded-lg border p-2.5" style={{ borderColor: "#dc262640", backgroundColor: "#dc262608" }}>
             <AlertCircle className="h-4 w-4 shrink-0" style={{ color: "#dc2626" }} aria-hidden />
