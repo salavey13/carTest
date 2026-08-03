@@ -102,7 +102,10 @@ export async function createRentalVerificationTodos(
       status: "pending",
       priority: template.priority,
       assigned_to: null,
-      created_by: "system",
+      // goodmorning-fixes BUG 10: removed created_by: "system" — FK constraint on
+      // crew_todos.created_by REFERENCES users(user_id). "system" doesn't exist in users
+      // table → FK violation → 0 verification todos created. Leave unset (NULL) like
+      // createLeadFollowupTodos does.
     }));
 
     const { error } = await supabaseAdmin.from("crew_todos").insert(todosToInsert);
@@ -458,7 +461,10 @@ export async function createRentalClosureTodos(
       status: "pending",
       priority: template.priority,
       assigned_to: null,
-      created_by: "system",
+      // goodmorning-fixes BUG 10: removed created_by: "system" — FK constraint on
+      // crew_todos.created_by REFERENCES users(user_id). "system" doesn't exist in users
+      // table → FK violation → 0 verification todos created. Leave unset (NULL) like
+      // createLeadFollowupTodos does.
     }));
 
     const { error } = await supabaseAdmin.from("crew_todos").insert(todosToInsert);
