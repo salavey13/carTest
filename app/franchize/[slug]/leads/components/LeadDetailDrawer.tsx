@@ -27,7 +27,7 @@ import {
   STAGE_COLORS,
   STAGE_NEXT_ACTION,
 } from "../lib/pipeline-stages";
-import { SOURCE_META } from "../leads-constants";
+import { SOURCE_META, RENTAL_STATUS_META } from "../leads-constants";
 import {
   getInitials,
   relativeTime,
