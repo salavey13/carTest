@@ -1748,7 +1748,7 @@ ${qrDeepLink}`);
     rentalStatus: isRent ? "active" : undefined,
   });
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
   const webUrl = rentalId ? `${siteUrl}/franchize/${resolvedSlug}/rental/${rentalId}` : "";
   const botLink = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
   const tgDeepLink = rentalId
