@@ -181,8 +181,16 @@ function RentalRow({ rental, slug, T }: RentalRowProps) {
   return (
     <>
       <div className="rounded-xl border p-3" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
+        {/* BUG 9 fix: make bike title a clickable link to the rental page */}
         <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold" style={{ color: T.text }}>{rental.bikeTitle || "Байк"}</p>
+          {rental.rentalId ? (
+            <a href={`/franchize/${slug}/rental/${rental.rentalId}`}
+               className="text-xs font-semibold hover:underline" style={{ color: T.accent }}>
+              {rental.bikeTitle || "Байк"} <ExternalLink className="inline h-3 w-3 ml-0.5" />
+            </a>
+          ) : (
+            <p className="text-xs font-semibold" style={{ color: T.text }}>{rental.bikeTitle || "Байк"}</p>
+          )}
           <span className="rounded-full px-2 py-0.5 text-[10px] font-medium"
             style={{ backgroundColor: (isPastRental && rental.status === "pending_confirmation" ? "#64748b" : meta.color) + "15",
                     color: isPastRental && rental.status === "pending_confirmation" ? "#64748b" : meta.color }}>
