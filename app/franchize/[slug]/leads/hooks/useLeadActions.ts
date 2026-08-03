@@ -211,10 +211,9 @@ export function useLeadActions({
           if (selectedLead.phone) {
             window.open(`tel:${selectedLead.phone}`, "_self");
           } else if (selectedLead.telegramChatId) {
-            // No phone — open TG chat instead (can't call without phone)
-            window.open(`https://t.me/${selectedLead.telegramChatId}`, "_blank");
+            // L1 fix: use tg:// scheme (numeric ID, not username). https://t.me/<number> doesn't work.
+            window.open(`tg://user?id=${selectedLead.telegramChatId}`, "_blank");
           } else {
-            // No phone, no TG — nothing we can do
             console.log("[useLeadActions] No phone or TG for call action");
           }
           break;
@@ -232,24 +231,23 @@ export function useLeadActions({
           break;
         case "notify":
           // BUG 8 fix: implement "Уведомить" — was a no-op.
-          // Send a TG notification to the renter via the bot's forward-telegram API.
-          // This is fire-and-forget — if it fails, the operator will see no toast
-          // (non-critical path).
+          // L3 fix: /api/forward-telegram route doesn't exist in current app — use the
+          // sendRentalMessage server action from rentals.ts instead, which does the same
+          // thing (sends a TG message to the renter via the bot). We pass a generic
+          // notification message. This is fire-and-forget — non-critical path.
           if (selectedLead.telegramChatId) {
             try {
-              const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
-              fetch(`${siteUrl}/api/forward-telegram`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  chat_id: selectedLead.telegramChatId,
-                  method: "sendMessage",
-                  payload: {
-                    text: `📋 У вас есть непросмотренное уведомление от экипажа. Откройте карточку аренды для деталей.`,
-                    parse_mode: "HTML",
-                  },
-                }),
-                signal: AbortSignal.timeout(8000),
+              // Dynamically import to avoid bundling server action in client if not needed
+              import("@/app/franchize/server-actions/rentals").then(async ({ sendRentalMessage }) => {
+                // Use a synthetic rentalId if the lead has one, otherwise pass empty
+                const rentalId = selectedLead.rentals?.[0]?.rentalId || "";
+                if (rentalId) {
+                  await sendRentalMessage(
+                    rentalId,
+                    `📋 У вас есть непросмотренное уведомление от экипажа. Откройте карточку аренды для деталей.`,
+                    selectedLead.telegramChatId || ""
+                  );
+                }
               }).catch(() => { /* non-fatal */ });
             } catch (e) {
               console.warn("[useLeadActions] notify action failed:", e);
@@ -257,13 +255,16 @@ export function useLeadActions({
           }
           break;
         case "more":
-          // BUG 8 fix: "Ещё" — was a no-op. Scroll to the dismiss button at bottom
-          // of the drawer so the operator can access "Закрыть лид" + other actions.
-          // This is a simple but functional behavior — the "more" actions (dismiss,
-          // add note, create todo) are already in the drawer, just further down.
-          const dismissBtn = document.querySelector('[data-action="dismiss-lead"]');
-          if (dismissBtn) {
-            (dismissBtn as HTMLElement).scrollIntoView({ behavior: "smooth", block: "center" });
+          // BUG 8 fix: "Ещё" — was a no-op. Scroll to the bottom of the lead detail
+          // content area where the dismiss button + notes + todos live.
+          // L2 fix: instead of querying a non-existent [data-action] selector,
+          // find the scrollable content container and scroll to bottom.
+          const contentArea = document.querySelector('[class*="space-y-3"]');
+          if (contentArea) {
+            (contentArea as HTMLElement).scrollIntoView({ behavior: "smooth", block: "end" });
+          } else {
+            // Fallback: scroll the whole window to bottom
+            window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
           }
           break;
         case "dismiss":
