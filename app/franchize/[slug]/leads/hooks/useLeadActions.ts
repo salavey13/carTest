@@ -206,16 +206,68 @@ export function useLeadActions({
       if (!selectedLead) return;
       switch (action) {
         case "call":
-          if (selectedLead.phone) window.open(`tel:${selectedLead.phone}`, "_self");
+          // BUG 8 fix: fall back to telegramChatId if phone is null (for /doc-flow leads
+          // where phone wasn't entered, we can still try calling via TG if QR was claimed)
+          if (selectedLead.phone) {
+            window.open(`tel:${selectedLead.phone}`, "_self");
+          } else if (selectedLead.telegramChatId) {
+            // No phone — open TG chat instead (can't call without phone)
+            window.open(`https://t.me/${selectedLead.telegramChatId}`, "_blank");
+          } else {
+            // No phone, no TG — nothing we can do
+            console.log("[useLeadActions] No phone or TG for call action");
+          }
           break;
         case "telegram":
-          if (selectedLead.username) window.open(`https://t.me/${selectedLead.username}`, "_blank");
+          // BUG 8 fix: fall back to telegramChatId if username is null.
+          // /doc-flow leads often don't have a TG username — use chat_id directly.
+          if (selectedLead.username) {
+            window.open(`https://t.me/${selectedLead.username}`, "_blank");
+          } else if (selectedLead.telegramChatId) {
+            // Open TG by chat_id (works for bots, may not work for user-to-user)
+            window.open(`tg://user?id=${selectedLead.telegramChatId}`, "_blank");
+          } else {
+            console.log("[useLeadActions] No username or chat_id for telegram action");
+          }
+          break;
+        case "notify":
+          // BUG 8 fix: implement "Уведомить" — was a no-op.
+          // Send a TG notification to the renter via the bot's forward-telegram API.
+          // This is fire-and-forget — if it fails, the operator will see no toast
+          // (non-critical path).
+          if (selectedLead.telegramChatId) {
+            try {
+              const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
+              fetch(`${siteUrl}/api/forward-telegram`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: selectedLead.telegramChatId,
+                  method: "sendMessage",
+                  payload: {
+                    text: `📋 У вас есть непросмотренное уведомление от экипажа. Откройте карточку аренды для деталей.`,
+                    parse_mode: "HTML",
+                  },
+                }),
+                signal: AbortSignal.timeout(8000),
+              }).catch(() => { /* non-fatal */ });
+            } catch (e) {
+              console.warn("[useLeadActions] notify action failed:", e);
+            }
+          }
+          break;
+        case "more":
+          // BUG 8 fix: "Ещё" — was a no-op. Scroll to the dismiss button at bottom
+          // of the drawer so the operator can access "Закрыть лид" + other actions.
+          // This is a simple but functional behavior — the "more" actions (dismiss,
+          // add note, create todo) are already in the drawer, just further down.
+          const dismissBtn = document.querySelector('[data-action="dismiss-lead"]');
+          if (dismissBtn) {
+            (dismissBtn as HTMLElement).scrollIntoView({ behavior: "smooth", block: "center" });
+          }
           break;
         case "dismiss":
           handleDismissLeadRequest(selectedLead.user_id);
-          break;
-        case "more":
-          // Could open a context menu
           break;
       }
     },
