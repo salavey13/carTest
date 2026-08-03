@@ -133,6 +133,13 @@ export function FranchizeAdminClient({
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [filterType, setFilterType] = useState<"all" | "bike" | "car">("all");
   const [loadingFleet, setLoadingFleet] = useState(false);
+  // M4: debounced fleet search
+  const [fleetSearch, setFleetSearch] = useState("");
+  const [debouncedFleetSearch, setDebouncedFleetSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedFleetSearch(fleetSearch), 300);
+    return () => clearTimeout(t);
+  }, [fleetSearch]);
   const [failedNotifications, setFailedNotifications] = useState<
     Array<{
       orderId: string;
@@ -203,7 +210,13 @@ export function FranchizeAdminClient({
       slug,
       actorUserId: dbUser.user_id,
     });
-    if (!result.success) return;
+    if (!result.success) {
+      // M4 fix: surface silent loader failures with toast + retry
+      toast.error("Не удалось загрузить уведомления", {
+        action: { label: "Попробовать снова", onClick: () => loadFailedNotifications() },
+      });
+      return;
+    }
     setFailedNotifications(result.items || []);
   }, [dbUser?.user_id, slug]);
 
@@ -232,7 +245,13 @@ export function FranchizeAdminClient({
       slug,
       actorUserId: dbUser.user_id,
     });
-    if (!result.success) return;
+    if (!result.success) {
+      // M4 fix: surface silent loader failures with toast + retry
+      toast.error("Не удалось загрузить завершённые аренды", {
+        action: { label: "Попробовать снова", onClick: () => loadSuccessfulRentals() },
+      });
+      return;
+    }
     setSuccessfulRentals(result.items || []);
   }, [dbUser?.user_id, slug]);
 
@@ -242,7 +261,13 @@ export function FranchizeAdminClient({
       slug,
       actorUserId: dbUser.user_id,
     });
-    if (!result.success) return;
+    if (!result.success) {
+      // M4 fix: surface silent loader failures with toast + retry
+      toast.error("Не удалось загрузить отзывы", {
+        action: { label: "Попробовать снова", onClick: () => loadReviews() },
+      });
+      return;
+    }
     setReviews(result.items || []);
   }, [dbUser?.user_id, slug]);
 
@@ -285,10 +310,21 @@ export function FranchizeAdminClient({
 
   const visible = useMemo(
     () =>
-      fleet.filter((item) =>
-        filterType === "all" ? true : item.type === filterType,
-      ),
-    [fleet, filterType],
+      fleet.filter((item) => {
+        if (filterType !== "all" && item.type !== filterType) return false;
+        // M4: debounced fleet search — match on make/model/vin/id
+        if (debouncedFleetSearch.trim()) {
+          const q = debouncedFleetSearch.toLowerCase();
+          const make = (item.make || "").toLowerCase();
+          const model = (item.model || "").toLowerCase();
+          const id = (item.id || "").toLowerCase();
+          const specs = item.specs as Record<string, unknown> | null;
+          const vin = String(specs?.vin || "").toLowerCase();
+          return make.includes(q) || model.includes(q) || id.includes(q) || vin.includes(q);
+        }
+        return true;
+      }),
+    [fleet, filterType, debouncedFleetSearch],
   );
 
   const vinAudit = useMemo(() => {
@@ -411,6 +447,32 @@ export function FranchizeAdminClient({
             </Button>
           );
         })}
+      </div>
+
+      {/* M4: debounced fleet search */}
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          type="text"
+          value={fleetSearch}
+          onChange={(e) => setFleetSearch(e.target.value)}
+          placeholder="Поиск по технике: марка, модель, VIN, ID..."
+          className="h-9 flex-1 rounded-lg border px-3 text-sm outline-none"
+          style={{
+            borderColor: "var(--fr-admin-border)",
+            backgroundColor: "var(--fr-admin-bg)",
+            color: "var(--fr-admin-text)",
+          }}
+        />
+        {fleetSearch && (
+          <button
+            type="button"
+            onClick={() => setFleetSearch("")}
+            className="text-xs opacity-50 hover:opacity-100"
+            style={{ color: "var(--fr-admin-text)" }}
+          >
+            Очистить
+          </button>
+        )}
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
