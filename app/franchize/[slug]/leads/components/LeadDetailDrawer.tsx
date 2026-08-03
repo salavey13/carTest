@@ -64,6 +64,7 @@ interface Props {
   signals: LeadSignal[];
   history: LeadHistoryEvent[];
   docs: DocumentItem[];
+  slug: string;
   T: ThemeTokens;
   onClose: () => void;
   onAction: (action: string) => void;
@@ -96,6 +97,7 @@ export function LeadDetailDrawer(props: Props) {
     signals,
     history,
     docs,
+    slug,
     T,
     onClose,
     onAction,
@@ -322,12 +324,15 @@ export function LeadDetailDrawer(props: Props) {
                   </p>
                 )}
                 {lead?.rentals?.map((r) => (
-                  <div
+                  <a
                     key={r.rentalId}
-                    className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3"
+                    href={r.rentalId ? `/franchize/${slug}/rental/${r.rentalId}` : undefined}
+                    className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3 transition hover:opacity-80"
                     style={{
                       borderColor: T.border,
                       background: T.bgCard,
+                      color: "inherit",
+                      textDecoration: "none",
                     }}
                   >
                     <div className="min-w-0">
@@ -347,7 +352,7 @@ export function LeadDetailDrawer(props: Props) {
                     >
                       {RENTAL_STATUS_META[r.status]?.label || r.status}
                     </span>
-                  </div>
+                  </a>
                 ))}
                 {lead?.sales?.map((s) => (
                   <div
@@ -570,12 +575,15 @@ export function LeadDetailDrawer(props: Props) {
                     </p>
                   )}
                   {lead?.rentals.map((r) => (
-                    <div
+                    <a
                       key={r.rentalId}
-                      className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3"
+                      href={r.rentalId ? `/franchize/${slug}/rental/${r.rentalId}` : undefined}
+                      className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3 transition hover:opacity-80"
                       style={{
                         borderColor: T.border,
                         background: T.bgCard,
+                        color: "inherit",
+                        textDecoration: "none",
                       }}
                     >
                       <div className="min-w-0">
@@ -590,7 +598,7 @@ export function LeadDetailDrawer(props: Props) {
                       <div className="shrink-0 text-sm font-semibold" style={{ color: T.text }}>
                         {fmtMoney(r.totalCost)}
                       </div>
-                    </div>
+                    </a>
                   ))}
                 </div>
               </Section>

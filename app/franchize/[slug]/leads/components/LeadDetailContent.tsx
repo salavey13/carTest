@@ -31,6 +31,7 @@ interface Props {
   lead: LeadRow;
   todos: LeadTodoRow[];
   notes?: LeadDetailContentNote[];
+  slug: string;
   T: ThemeTokens;
   onClose: () => void;
   onAction: (action: string) => void;
@@ -62,6 +63,7 @@ export function LeadDetailContent({
   lead,
   todos,
   notes = [],
+  slug,
   T,
   onClose,
   onAction,
@@ -151,6 +153,7 @@ export function LeadDetailContent({
       signals={signals}
       history={history}
       docs={docs}
+      slug={slug}
       T={T}
       onClose={onClose}
       onAction={onAction}
