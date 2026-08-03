@@ -42,6 +42,7 @@ import {
   type QrStatus,
 } from "./LeadDocumentsSection";
 import { LeadHistorySection } from "./LeadHistorySection";
+import { RentalLink } from "@/app/franchize/components/RentalLink";
 
 export interface LeadDrawerNote {
   id: string;
@@ -323,37 +324,52 @@ export function LeadDetailDrawer(props: Props) {
                     Сделок нет
                   </p>
                 )}
-                {lead?.rentals?.map((r) => (
-                  <a
-                    key={r.rentalId}
-                    href={r.rentalId ? `/franchize/${slug}/rental/${r.rentalId}` : undefined}
-                    className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3 transition hover:opacity-80"
-                    style={{
-                      borderColor: T.border,
-                      background: T.bgCard,
-                      color: "inherit",
-                      textDecoration: "none",
-                    }}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium" style={{ color: T.text }}>
-                        {r.bikeTitle || "Аренда"}
-                      </p>
-                      <p className="text-[11px]" style={{ color: T.textFaint }}>
-                        {r.startDate ? formatDate(r.startDate) : "—"} → {r.endDate ? formatDate(r.endDate) : "—"}
-                      </p>
+                {lead?.rentals?.map((r) => {
+                  const rowStyle = {
+                    borderColor: T.border,
+                    background: T.bgCard,
+                    color: "inherit",
+                    textDecoration: "none",
+                  };
+                  const rowContent = (
+                    <>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium" style={{ color: T.text }}>
+                          {r.bikeTitle || "Аренда"}
+                        </p>
+                        <p className="text-[11px]" style={{ color: T.textFaint }}>
+                          {r.startDate ? formatDate(r.startDate) : "—"} → {r.endDate ? formatDate(r.endDate) : "—"}
+                        </p>
+                      </div>
+                      <span
+                        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                        style={{
+                          backgroundColor: `${RENTAL_STATUS_META[r.status]?.color || "#64748b"}15`,
+                          color: RENTAL_STATUS_META[r.status]?.color || "#64748b",
+                        }}
+                      >
+                        {RENTAL_STATUS_META[r.status]?.label || r.status}
+                      </span>
+                    </>
+                  );
+                  if (r.rentalId) {
+                    return (
+                      <RentalLink
+                        key={r.rentalId}
+                        href={`/franchize/${slug}/rental/${r.rentalId}`}
+                        className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3 transition hover:opacity-80"
+                        style={rowStyle}
+                      >
+                        {rowContent}
+                      </RentalLink>
+                    );
+                  }
+                  return (
+                    <div key={r.rentalId || r.startDate} className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3" style={rowStyle}>
+                      {rowContent}
                     </div>
-                    <span
-                      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
-                      style={{
-                        backgroundColor: `${RENTAL_STATUS_META[r.status]?.color || "#64748b"}15`,
-                        color: RENTAL_STATUS_META[r.status]?.color || "#64748b",
-                      }}
-                    >
-                      {RENTAL_STATUS_META[r.status]?.label || r.status}
-                    </span>
-                  </a>
-                ))}
+                  );
+                })}
                 {lead?.sales?.map((s) => (
                   <div
                     key={s.saleId}
@@ -574,32 +590,47 @@ export function LeadDetailDrawer(props: Props) {
                       Сделок нет
                     </p>
                   )}
-                  {lead?.rentals.map((r) => (
-                    <a
-                      key={r.rentalId}
-                      href={r.rentalId ? `/franchize/${slug}/rental/${r.rentalId}` : undefined}
-                      className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3 transition hover:opacity-80"
-                      style={{
-                        borderColor: T.border,
-                        background: T.bgCard,
-                        color: "inherit",
-                        textDecoration: "none",
-                      }}
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium" style={{ color: T.text }}>
-                          {r.bikeTitle || "Байк"}
+                  {lead?.rentals.map((r) => {
+                    const rowStyle = {
+                      borderColor: T.border,
+                      background: T.bgCard,
+                      color: "inherit" as const,
+                      textDecoration: "none" as const,
+                    };
+                    const rowContent = (
+                      <>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium" style={{ color: T.text }}>
+                            {r.bikeTitle || "Байк"}
+                          </div>
+                          <div className="text-xs" style={{ color: T.textMuted }}>
+                            {r.startDate ? formatDate(r.startDate) : "—"} →{" "}
+                            {r.endDate ? formatDate(r.endDate) : "—"}
+                          </div>
                         </div>
-                        <div className="text-xs" style={{ color: T.textMuted }}>
-                          {r.startDate ? formatDate(r.startDate) : "—"} →{" "}
-                          {r.endDate ? formatDate(r.endDate) : "—"}
+                        <div className="shrink-0 text-sm font-semibold" style={{ color: T.text }}>
+                          {fmtMoney(r.totalCost)}
                         </div>
+                      </>
+                    );
+                    if (r.rentalId) {
+                      return (
+                        <RentalLink
+                          key={r.rentalId}
+                          href={`/franchize/${slug}/rental/${r.rentalId}`}
+                          className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3 transition hover:opacity-80"
+                          style={rowStyle}
+                        >
+                          {rowContent}
+                        </RentalLink>
+                      );
+                    }
+                    return (
+                      <div key={r.rentalId || r.startDate} className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3" style={rowStyle}>
+                        {rowContent}
                       </div>
-                      <div className="shrink-0 text-sm font-semibold" style={{ color: T.text }}>
-                        {fmtMoney(r.totalCost)}
-                      </div>
-                    </a>
-                  ))}
+                    );
+                  })}
                 </div>
               </Section>
             </div>
