@@ -556,6 +556,9 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
           createdAt: a.created_at,
           lastSeenAt: a.created_at,
           verified: true,
+          // goodmorning-fixes: set intentType so mode filter ("rent") includes artifact leads.
+          // Was: no intentType → mode filter rejected them → leads list empty.
+          intentType: "rent",
           // Store the operator's telegram_chat_id separately (not as lead key)
           telegramChatId: preferPhone ? null : (a.telegram_chat_id || null),
           originalOperatorChatId: originalOp,
@@ -582,6 +585,8 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
             createdAt: s.created_at,
             lastSeenAt: s.created_at,
             verified: s.verification_status === "verified",
+            // goodmorning-fixes: set intentType so mode filter ("rent") includes secret leads.
+            intentType: "rent",
             telegramChatId: s.chat_id,
             rentals: [],
             sales: [],
@@ -680,6 +685,8 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
             createdAt: r.requested_start_date,
             lastSeenAt: r.requested_start_date,
             verified: ["active", "completed", "confirmed"].includes(r.status || ""),
+            // goodmorning-fixes: set intentType so mode filter ("rent") includes rental leads.
+            intentType: "rent",
             telegramChatId: /^\d+$/.test(r.user_id) ? r.user_id : null,
             originalOperatorChatId: originalOp,
             rentals: [rentalRow],
@@ -741,6 +748,8 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
           createdAt: s.created_at,
           lastSeenAt: s.created_at,
           verified: true,
+          // goodmorning-fixes: set intentType so mode filter ("sale") includes sale leads.
+          intentType: "sale",
           telegramChatId: s.telegram_chat_id || null,
           rentals: [],
           sales: [saleRow],
