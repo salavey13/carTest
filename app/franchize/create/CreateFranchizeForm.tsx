@@ -180,6 +180,8 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
   });
   const [message, setMessage] = useState("Укажите slug, подберите цвета, проверьте локально и сохраните.");
   const [canEdit, setCanEdit] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+  const [isLoadingConfig, setIsLoadingConfig] = useState(false);
   const [isPending, startTransition] = useTransition();
   // ── Initial stage logic ──
   // - If ?just_created=1 is in URL (we just came from a successful createCrew),
@@ -196,11 +198,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
     }
     return "create";
   });
-  const { dbUser, user, userCrewInfo, refreshDbUser } = useAppContext() as {
-    dbUser?: any; user?: any;
-    userCrewInfo?: { slug?: string; is_owner?: boolean } | null;
-    refreshDbUser?: () => Promise<void>;
-  };
+  const { dbUser, user, userCrewInfo, refreshDbUser } = useAppContext();
   const actorUserId = dbUser?.user_id ?? (user?.id ? String(user.id) : "");
 
   // ── Inline "create new crew" form state ──
@@ -331,6 +329,13 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
 
   const updateField = <K extends keyof FranchizeConfigInput>(key: K, value: FranchizeConfigInput[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    setFieldErrors((prev) => {
+      const errorKey = key as string;
+      if (!prev[errorKey]) return prev;
+      const next = { ...prev };
+      delete next[errorKey];
+      return next;
+    });
   };
 
   const copyToClipboard = async (value: string, successText: string) => {
@@ -388,6 +393,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
   const onLoad = useCallback((slugOverride?: string) => {
     startTransition(async () => {
       const requestId = ++loadRequestIdRef.current;
+      setIsLoadingConfig(true);
       const slugCandidate = slugOverride ?? form.slug;
       const normalizedCandidate = typeof slugCandidate === "string" ? slugCandidate.trim() : "";
       const slugToLoad = normalizedCandidate || "vip-bike";
@@ -398,8 +404,10 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
 
       const result = await loadFranchizeConfigBySlug(slugToLoad, actorUserId);
       if (requestId !== loadRequestIdRef.current) {
+        setIsLoadingConfig(false);
         return;
       }
+      setIsLoadingConfig(false);
 
       if (!result.ok || !result.data) return setMessage(result.message);
       setForm({
@@ -420,6 +428,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
 
       const result = await saveFranchizeConfig(form, actorUserId);
       setMessage(result.message);
+      if (result.errors) setFieldErrors(result.errors);
       if (result.data) setForm(result.data);
       if (typeof result.canEdit === "boolean") setCanEdit(result.canEdit);
     });
@@ -481,6 +490,78 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
 
   const sectionClass = "rounded-2xl border p-4";
   const inputClass = "w-full rounded-xl border px-3 py-2 text-sm outline-none transition";
+  const fieldErrorText = (key: string) => fieldErrors[key]?.[0];
+  const inputStyleFor = (key: string) => ({
+    borderColor: fieldErrorText(key) ? "#ef4444" : ui.border,
+    backgroundColor: ui.inputBg,
+    color: ui.text,
+  });
+  const renderFieldError = (key: string) =>
+    fieldErrorText(key) ? (
+      <span className="mt-1 block text-xs" style={{ color: "#ef4444" }}>{fieldErrorText(key)}</span>
+    ) : null;
+
+  const stageLabels: Record<Stage, string> = {
+    create: "Создать",
+    palette: "Цвета",
+    content: "Контент",
+    map: "Карта",
+    ai: "AI JSON",
+    ops: "Пульт",
+  };
+
+  const isStageComplete = (stageToCheck: Stage): boolean => {
+    switch (stageToCheck) {
+      case "create":
+        return Boolean(userCrewInfo?.slug || form.slug);
+      case "palette":
+        return Boolean(form.bgBase && form.accentMain && form.textPrimary);
+      case "content":
+        return Boolean(form.brandName && form.phone && form.address);
+      case "map":
+        return Boolean(form.mapGps && form.telegram);
+      case "ai":
+        return Boolean(form.advancedJson);
+      case "ops":
+        return canEdit;
+      default:
+        return false;
+    }
+  };
+
+  const renderStepProgress = () => (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2" style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
+      {(Object.keys(stageLabels) as Stage[]).map((key) => {
+        const complete = isStageComplete(key);
+        const active = stage === key;
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setStage(key)}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition"
+            style={{
+              backgroundColor: active ? `${ui.accent}26` : "transparent",
+              color: active ? ui.accent : complete ? ui.text : ui.muted,
+              borderColor: "transparent",
+            }}
+          >
+            <span
+              className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold"
+              style={{
+                backgroundColor: complete ? ui.accent : ui.sectionBg,
+                color: complete ? ui.accentText : ui.muted,
+                border: `1px solid ${complete ? ui.accent : ui.border}`,
+              }}
+            >
+              {complete ? "✓" : Object.keys(stageLabels).indexOf(key) + 1}
+            </span>
+            {stageLabels[key]}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 rounded-3xl border p-4 md:p-6" style={{ backgroundColor: ui.cardBg, borderColor: ui.border, color: ui.text }}>
@@ -521,6 +602,17 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
           );
         })}
       </div>
+
+      {renderStepProgress()}
+
+      {isLoadingConfig && (
+        <div className={`${sectionClass} grid gap-3`} style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
+          {[0, 1, 2, 3].map((item) => (
+            <div key={item} className="h-10 animate-pulse rounded-xl" style={{ backgroundColor: `${ui.muted}22` }} />
+          ))}
+          <p className="text-sm" style={{ color: ui.muted }}>Загружаю конфиг экипажа...</p>
+        </div>
+      )}
 
       {stage === "create" && (
         <section
@@ -624,7 +716,8 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
 
       <section className={`${sectionClass} grid gap-3 md:grid-cols-2`} style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
         <label className="text-sm">Slug экипажа
-          <input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.slug} onChange={(e) => updateField("slug", e.target.value)} placeholder="vip-bike" />
+          <input className={inputClass} style={inputStyleFor("slug")} value={form.slug} onChange={(e) => updateField("slug", e.target.value)} placeholder="vip-bike" />
+          {renderFieldError("slug")}
         </label>
         <div className="flex items-end gap-2"><button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ backgroundColor: ui.accent, color: ui.accentText }} onClick={() => onLoad()}>Загрузить по slug</button></div>
       </section>
@@ -676,8 +769,8 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
       {stage === "content" && (
         <section className={`${sectionClass} grid gap-3 md:grid-cols-3`} style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
           <h2 className="md:col-span-3 text-lg font-medium" style={{ color: ui.text }}>Тексты, контакты, меню, заказ</h2>
-          <label className="text-sm">Название бренда<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.brandName} onChange={(e) => updateField("brandName", e.target.value)} /></label>
-          <label className="text-sm">Слоган<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.tagline} onChange={(e) => updateField("tagline", e.target.value)} /></label>
+          <label className="text-sm">Название бренда<input className={inputClass} style={inputStyleFor("brandName")} value={form.brandName} onChange={(e) => updateField("brandName", e.target.value)} />{renderFieldError("brandName")}</label>
+          <label className="text-sm">Слоган<input className={inputClass} style={inputStyleFor("tagline")} value={form.tagline} onChange={(e) => updateField("tagline", e.target.value)} />{renderFieldError("tagline")}</label>
           <label className="text-sm">Логотип URL<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.logoUrl} onChange={(e) => updateField("logoUrl", e.target.value)} /></label>
           <label className="text-sm">Телефон<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.phone} onChange={(e) => updateField("phone", e.target.value)} /></label>
                     <label className="text-sm">Адрес<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.address} onChange={(e) => updateField("address", e.target.value)} /></label>
@@ -827,6 +920,16 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
         <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60" style={{ backgroundColor: ui.accent, color: ui.accentText }} disabled={isPending || !canEdit} onClick={onSave}>{canEdit ? "Сохранить в Supabase" : "Read-only"}</button>
         <p className="text-sm" style={{ color: ui.muted }}>{isPending ? "Обрабатываю..." : message}</p>
       </div>
+      {Object.keys(fieldErrors).length > 0 && (
+        <div className="rounded-xl border p-3 text-sm" style={{ borderColor: "#ef4444", backgroundColor: "#fef2f2", color: "#991b1b" }}>
+          <p className="font-semibold">Не пройдена проверка полей — исправьте значения и сохраните снова:</p>
+          <ul className="mt-1 list-inside list-disc">
+            {Object.entries(fieldErrors).map(([key, messages]) => (
+              <li key={key}>{key}: {messages.join("; ")}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
