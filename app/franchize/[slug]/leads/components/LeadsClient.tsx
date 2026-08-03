@@ -163,13 +163,11 @@ export function LeadsClient({
   const [leadsState, setLeadsState] = useState<LeadRow[]>(leads);
   const [todosState, setTodosState] = useState<LeadTodoRow[]>(todos);
 
-  // Keep local state in sync when server props change (e.g. after router.refresh())
-  useEffect(() => {
-    setLeadsState(leads);
-  }, [leads]);
-  useEffect(() => {
-    setTodosState(todos);
-  }, [todos]);
+  // goodmorning-fixes: REMOVED the sync effects that were resetting leadsState/todosState
+  // back to the `leads`/`todos` props (which are [] from the page for security).
+  // These effects fired on every re-render (when the prop reference changed), undoing
+  // the fetch: leads appeared for a second, then disappeared back to 0.
+  // The page intentionally passes [] — the fetch effect is the sole source of truth.
 
   // ── Todo mapping (rental_id / phone / user_id matching) ──
   const { getTodosForLead } = useTodosMapping(todosState);
@@ -341,14 +339,12 @@ export function LeadsClient({
     leadsFetchedRef.current = false;
   }, [slug]);
   useEffect(() => {
-    // goodmorning-fixes: removed the `!isAuthed || authLoading || shouldShowPassword` guard.
-    // The KPI fetch (fetchKpis) has NO auth guard and works fine — it calls getLeadsKpis
-    // which internally calls getFranchizeLeads (same server action). The auth guard on
-    // the leads list fetch was causing a mismatch: KPIs showed 33 leads but the list
-    // stayed empty because the guard blocked the fetch in certain auth states
-    // (e.g., when authLoading transitions or when passwordAuthOwnerId hasn't propagated yet).
-    // The password gate already prevents the page from rendering if not authed, so
-    // by the time this effect runs, it's safe to fetch.
+    // goodmorning-fixes: auth guard with isAuthed in deps so effect re-fires when auth completes.
+    // Previously removed the guard entirely → fetch fired during authLoading, succeeded,
+    // but then the (now-removed) sync effect reset state to []. Now that sync effect is gone,
+    // we can safely add the guard back. The guard prevents unnecessary fetches during
+    // the password gate, and isAuthed in deps ensures re-fire when auth state changes.
+    if (!isAuthed || authLoading || shouldShowPassword) return;
     if (leadsFetchedRef.current) return;  // dedupe — only fetch once per slug
 
     let cancelled = false;
@@ -357,10 +353,9 @@ export function LeadsClient({
         const result = await getFranchizeLeads(slug);
         if (cancelled) return;
         if (result.success) {
-          leadsFetchedRef.current = true;  // only mark as fetched on success
+          leadsFetchedRef.current = true;
           const fetchedLeads = (result.leads || []).filter(Boolean) as LeadRow[];
           const fetchedTodos = (result.todos || []).filter(Boolean) as LeadTodoRow[];
-          console.log("[LeadsClient] getFranchizeLeads success:", fetchedLeads.length, "leads,", fetchedTodos.length, "todos");
           setLeadsState(fetchedLeads);
           setTodosState(fetchedTodos);
         } else {
@@ -371,7 +366,7 @@ export function LeadsClient({
       }
     })();
     return () => { cancelled = true; };
-  }, [slug]);
+  }, [isAuthed, authLoading, shouldShowPassword, slug]);
 
   // ── Password gate ──
   // Must be AFTER all hooks (useState/useEffect/useMemo/useCallback) to satisfy
