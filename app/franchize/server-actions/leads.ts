@@ -687,6 +687,12 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
             verified: ["active", "completed", "confirmed"].includes(r.status || ""),
             // goodmorning-fixes: set intentType so mode filter ("rent") includes rental leads.
             intentType: "rent",
+            // BUG 4+5 fix: default sourceRoute/contactChannel for /doc-flow leads.
+            // These leads don't have a matching franchize_intent (different identity key),
+            // so sourceRoute and contactChannel are null. For /doc-flow leads (detected
+            // via originalOperatorChatId), default to "/doc-manual" and "telegram_bot".
+            sourceRoute: originalOp ? "/doc-manual" : null,
+            contactChannel: originalOp ? "telegram_bot" : null,
             telegramChatId: /^\d+$/.test(r.user_id) ? r.user_id : null,
             originalOperatorChatId: originalOp,
             rentals: [rentalRow],
