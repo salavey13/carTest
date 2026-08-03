@@ -115,6 +115,13 @@ export function useLeadActions({
         due_date: null,
       };
 
+      // Insert the optimistic todo FIRST so it appears immediately. Previously
+      // the optimistic add only happened in the success branch (swapping for the
+      // real one), so on API failure the operator's typed todo silently vanished.
+      // Now it shows right away; on success we swap it for the server todo, and on
+      // failure we leave it visible (the next router.refresh() reconciles with DB).
+      onTodoUpdate("add", newTodo.id, newTodo);
+
       try {
         const res = await fetch("/api/franchize/lead-todo", {
           method: "POST",
@@ -124,18 +131,16 @@ export function useLeadActions({
         if (res.ok) {
           const data = await res.json();
           if (data.todo) {
-            // HIGH FIX #4: remove the optimistic todo BEFORE adding the real one
-            // to avoid duplicate rows in the UI
+            // Remove the optimistic duplicate, then add the real one so the UI
+            // never shows two rows for the same task.
             onTodoUpdate("delete", newTodo.id);
             onTodoUpdate("add", data.todo.id, data.todo);
-            return;
           }
         }
       } catch (e) {
         console.error("[useLeadActions] Create todo failed:", e);
+        // Keep the optimistic todo visible — the next router.refresh() resyncs.
       }
-      // Fallback: optimistic add (already inserted above, so no-op)
-      // If we reach here, the API failed — keep the optimistic todo visible.
     },
     [selectedLead, slug, crewId, dbUser, onTodoUpdate]
   );
@@ -235,22 +240,28 @@ export function useLeadActions({
           // sendRentalMessage server action from rentals.ts instead, which does the same
           // thing (sends a TG message to the renter via the bot). We pass a generic
           // notification message. This is fire-and-forget — non-critical path.
-          if (selectedLead.telegramChatId) {
-            try {
-              // Dynamically import to avoid bundling server action in client if not needed
-              import("@/app/franchize/server-actions/rentals").then(async ({ sendRentalMessage }) => {
-                // Use a synthetic rentalId if the lead has one, otherwise pass empty
-                const rentalId = selectedLead.rentals?.[0]?.rentalId || "";
-                if (rentalId) {
+          {
+            const notifyChatId = selectedLead.telegramChatId || "";
+            const notifyRentalId = selectedLead.rentals?.[0]?.rentalId || "";
+            if (notifyChatId && notifyRentalId) {
+              try {
+                // Dynamically import to avoid bundling server action in client if not needed
+                import("@/app/franchize/server-actions/rentals").then(async ({ sendRentalMessage }) => {
                   await sendRentalMessage(
-                    rentalId,
+                    notifyRentalId,
                     `📋 У вас есть непросмотренное уведомление от экипажа. Откройте карточку аренды для деталей.`,
-                    selectedLead.telegramChatId || ""
+                    notifyChatId
                   );
-                }
-              }).catch(() => { /* non-fatal */ });
-            } catch (e) {
-              console.warn("[useLeadActions] notify action failed:", e);
+                }).catch(() => { /* non-fatal */ });
+              } catch (e) {
+                console.warn("[useLeadActions] notify action failed:", e);
+              }
+            } else if (selectedLead.phone) {
+              // No rental to attach a TG message to (pre-contract lead) — nothing to
+              // fall back to, so surface a concrete next step instead of a silent no-op.
+              alert(`Уведомить по Telegram пока нечего (нет активной аренды). Позвоните клиенту: ${selectedLead.phone}`);
+            } else {
+              alert("Уведомить нельзя: нет Telegram-чата и активной аренды для отправки.");
             }
           }
           break;
