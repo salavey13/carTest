@@ -513,6 +513,7 @@ export function LeadsClient({
                 lead={selectedLead}
                 todos={selectedLeadTodos}
                 notes={notesState}
+                slug={slug}
                 T={T}
                 onClose={() => setSelectedId(null)}
                 onAction={handleDrawerAction}
@@ -539,6 +540,7 @@ export function LeadsClient({
               lead={selectedLead}
               todos={selectedLeadTodos}
               notes={notesState}
+              slug={slug}
               T={T}
               onClose={() => setSelectedId(null)}
               onAction={handleDrawerAction}
