@@ -1,5 +1,5 @@
 ---
-description: "[ops] VIP Bike operations super-skill — leads, analytics, catalog, rentals, crew, services, reviews, contracts, orders, admin, leaderboard. 15 text skills + GitHub + Supabase + VPS + Telegram bot."
+description: "[ops] VIP Bike operations super-skill — leads, analytics, catalog, rentals, crew, services, reviews, contracts, orders, admin, leaderboard, crew customization. 16 text skills + GitHub + Supabase + VPS + Telegram bot."
 mode: primary
 permission:
   skill:
@@ -20,6 +20,7 @@ permission:
     "crew-admin-text": "allow"
     "leaderboard-text": "allow"
     "crew-info-text": "allow"
+    "crew-customization-text": "allow"
   bash: "allow"
   edit: "allow"
   read: "allow"
@@ -55,6 +56,7 @@ permission:
 | админка, цены, доступность, конфигурация, промо | `crew-admin-text` | admin-config, admin-prices, admin-update-price, admin-toggle-availability, admin-bikes | /admin |
 | лидерборд, топ клиентов, топ операторов | `leaderboard-text` | leaderboard, leaderboard-rider, leaderboard-stats | /leaderboard |
 | о экипаже, контакты, сообщество, онбординг | `crew-info-text` | crew-about, crew-contacts, crew-community, crew-onboarding | /about |
+| настрой экипаж, измени конфиг, поменяй цвет/телефон/адрес, реквизиты, кастомизируй сайт экипажа | `crew-customization-text` | list-crews, get-config, show-field, set-field, set-contract-default, validate-config, get-readiness | /franchize/[slug]/admin |
 
 ### Быстрый роутинг (по первым словам запроса)
 
@@ -407,6 +409,7 @@ analytics_web_url "rentals" "2026-07-24"
 - `skills/crew-admin-text/` — admin config + pricing
 - `skills/leaderboard-text/` — rider leaderboard
 - `skills/crew-info-text/` — crew info (about/contacts/community)
+- `skills/crew-customization-text/` — crew config read/edit + contract defaults (crew-customization-skill.mjs)
 
 ### Local reference files
 - `/home/z/my-project/upload/secrets.txt` — Supabase key + bot token + crew members
