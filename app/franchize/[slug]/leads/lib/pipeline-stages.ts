@@ -198,7 +198,16 @@ export function computeLeadStage(lead: LeadRow): StageKey {
   if (lead.intentStage === "dismissed") return "closed_lost";
   if (lead.sales.length > 0 && lead.rentals.length === 0) return "closed_won";
   if (lead.rentals.length > 0) {
-    const r = lead.rentals[0];
+    // BUG 1 fix: find the MOST RELEVANT rental by status priority, not just rentals[0].
+    // Was: const r = lead.rentals[0] → if first rental is old/confirmed, stage was wrong
+    // even when a newer active rental exists. Now we sort by status priority.
+    const statusPriority: Record<string, number> = {
+      active: 5, confirmed: 4, pending_confirmation: 3, completed: 2, cancelled: 1,
+    };
+    const relevantRental = [...lead.rentals].sort((a, b) =>
+      (statusPriority[b.status] || 0) - (statusPriority[a.status] || 0)
+    )[0];
+    const r = relevantRental;
     if (r.status === "completed") return "closed_won";
     if (r.status === "cancelled") return "closed_lost";
     if (r.status === "active") return isPastOrDueSoon(r.endDate) ? "return_due" : "active_rental";
