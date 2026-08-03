@@ -59,15 +59,12 @@ STALE_LIST="$NEW_STALE"
 STALE_COUNT="$NEW_COUNT"
 
 # ─── Format the alert ────────────────────────────────────────────────────────
-# goodmorning-polish: added per-rental deep link (was: only dashboard link).
-# Also: removed misleading "если истёк" — QRs don't expire in this system.
-# Reworded actions to be kinder + more actionable.
-# Use rental_link() helper from _lib.sh (returns https://t.me/BOT/app?startapp=rental_<id>)
+# goodmorning-polish: per-rental deep links + kinder wording.
 STALE_LIST=""
 while IFS= read -r row; do
-  RID=$(echo "$row" | jq -r '.source_rental_id')
+  RID=$(echo "$row" | jq -r '.source_rental_id // ""')
   RNAME=$(echo "$row" | jq -r '.renter_full_name // "Без имени"')
-  QR_SENT=$(echo "$row" | jq -r '.qr_generated_at')
+  QR_SENT=$(echo "$row" | jq -r '.qr_generated_at // ""')
   QR_DATE="${QR_SENT:0:10}"
   QR_TIME="${QR_SENT:11:5}"
   RLINK="$(rental_link "$RID")"
@@ -89,12 +86,12 @@ DASHBOARD_LINK="$(analytics_link "rentals")"
 MESSAGE="${SEVERITY} <b>QR ещё не принят</b> — ${STALE_COUNT} шт.
 
 ${STALE_LIST}
-🔔 Проверено в ${NOW_DISPLAY} МСК
+🔔 Обновлено в ${NOW_DISPLAY} МСК
 
 💬 Что можно сделать:
 1. Напомните клиенту в Telegram — возможно, не заметил уведомление
-2. Проверьте правильность телефона/email в карточке аренды
-3. Перешлите QR повторно из карточки аренды
+2. Проверьте правильность телефона в карточке аренды
+3. Перешлите QR повторно — откройте карточку аренды и покажите код
 
 📊 Дашборд: <a href=\"${DASHBOARD_LINK}\">Открыть</a>"
 
