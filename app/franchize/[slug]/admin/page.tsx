@@ -46,6 +46,15 @@ export default async function FranchizeSlugAdminPage({
         groupLinks={items.map((item) => item.category)}
       />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4">
+        {/* U5: breadcrumb navigation */}
+        <nav className="flex items-center gap-1.5 text-xs" style={{ color: "var(--franchize-text-secondary, #999)" }}>
+          <a href={`/franchize/${resolvedSlug}`} className="hover:underline" style={{ color: "var(--franchize-accent-main, #D99A00)" }}>
+            {crew.branding?.name || resolvedSlug}
+          </a>
+          <span>/</span>
+          <span style={{ color: "var(--franchize-text-primary, #fff)" }}>Админка</span>
+        </nav>
+
         {/* M4: wrap admin client in error boundary so a crash doesn't take down the whole page */}
         <FranchizeErrorBoundary
           resetKey={resolvedSlug}
