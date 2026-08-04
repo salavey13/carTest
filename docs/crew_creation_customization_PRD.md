@@ -273,3 +273,85 @@ Private crew secrets (separate storage, `getCrewSensitiveDataOrDefault`):
 - Secrets: `lib/private-secrets.ts` (`getCrewSensitiveDataOrDefault`, `saveCrewSensitiveData`)
 - Skills to mirror: `skills/catalog-adder-text/SKILL.md`, `skills/franchize-catalog-text/SKILL.md`, `skills/crew-management-text/SKILL.md`, `skills/deal-contract-from-photos/SKILL.md` (script pattern)
 - QA: `npm run typecheck:franchize`, `npm run test:franchize`
+
+---
+
+## 12. Code Review + UI/UX Audit (2026-08-04)
+
+### 12.1 Ship-blocking bugs (FIXED)
+
+| # | Bug | File | Fix |
+|---|-----|------|-----|
+| B1 | `--fr-admin-bg` CSS variable missing → fleet search input transparent | FranchizeAdminClient.tsx:394-401 | Added `["--fr-admin-bg"]: resolvedPalette.bgBase` |
+| B2 | `applyAdvancedJsonLocally` crashes on non-array `footer.socialLinks` | CreateFranchizeForm.tsx:384 | Added `Array.isArray()` guard before `.map()` |
+
+### 12.2 Code quality issues (TOP 5 — for follow-up)
+
+| # | Issue | File | Severity |
+|---|-------|------|----------|
+| L4 | `buildSyntheticVin` stores fake VINs as real in `specs.vin` — no `is_synthetic` flag, legal/contract risk | FranchizeAdminClient.tsx:103 | 🟡 High |
+| L7/L8 | `configToMetadata` overwrites `header.menuLinks` and `footer.socialLinks` wholesale — loses extra fields (icon, type) on round-trip | franchize-config-contract.ts | 🟡 High |
+| L10 | Skill script uses service-role key with NO technical auth check — relies on LLM to enforce per SKILL.md | crew-customization-skill.mjs | 🟡 High |
+| L15 | No empty state for fleet — when 0 vehicles, no "Добавьте первый байк" CTA | FranchizeAdminClient.tsx | 🟢 Medium |
+| L2 | Stage progress shows "create" as not-completed for crew owners who can't click it | CreateFranchizeForm.tsx:532 | 🟢 Medium |
+
+### 12.3 UI/UX Enhancement Opportunities (TOP 10, prioritized)
+
+| # | Enhancement | Impact | Effort | Phase |
+|---|-------------|--------|--------|-------|
+| U1 | **"Last refreshed Xs ago" + manual refresh button** on successfulRentals (60s polling is invisible to user) | High — user doesn't know if data is stale | Small | M4+ |
+| U2 | **EmptyState component** when fleet is empty (icon + heading + "Добавьте первый байк" CTA) | High — currently shows blank space | Small | M4+ |
+| U3 | **Live preview iframe** of `/franchize/[slug]` in CreateFranchizeForm (close the "does this look right?" loop) | High — biggest UX gap vs competitors | Medium | M3+ |
+| U4 | **Persist form draft to localStorage** (don't lose palette tweaks on accidental refresh) | Medium — prevents data loss frustration | Small | M3+ |
+| U5 | **Breadcrumb navigation** (`Экипажи / vip-bike / Админка`) | Medium — improves orientation | Small | M4+ |
+| U6 | **"Login required" state** when `dbUser` is null (currently shows empty panels silently) | Medium — confusing for non-authed visitors | Small | M4+ |
+| U7 | **Ctrl+S keyboard shortcut** for save in CreateFranchizeForm | Low — power user convenience | Small | M3+ |
+| U8 | **Pagination / "Show more"** for fleet chips (8), successfulRentals (10), reviews (8) | Low — only matters for large fleets | Medium | M4+ |
+| U9 | **Mobile bottom sheet** for `CarSubmissionForm` (currently pushes page down significantly) | Medium — mobile UX gap | Medium | M4+ |
+| U10 | **`aria-invalid` + `aria-describedby`** on errored fields (screen reader accessibility) | Low — a11y compliance | Small | M3+ |
+
+### 12.4 Verified correct (20 items)
+
+- ✅ Contract module is genuinely pure (no `@/` aliases, importable by Node 24)
+- ✅ `saveFranchizeConfig` validates → checks access → merges advancedJson → persists to metadata + secrets
+- ✅ M4 error boundary wrapper properly wraps FranchizeAdminClient
+- ✅ M4 toasts with retry on 3 silent loader failures
+- ✅ M4 debounced fleet search (300ms) filters by make/model/VIN/ID
+- ✅ fieldErrors state + inline error display + error summary panel
+- ✅ isLoadingConfig state + loading skeleton
+- ✅ StepProgress header (6 steps with completion check)
+- ✅ useAppContext properly typed (no `any` cast)
+- ✅ Skill script's `--dryRun`, `maskSecrets`, schema validation, anti-hallucination header
+- ✅ `tsconfig.allowImportingTsExtensions` correctly enables `.ts` import
+- ✅ `metadataToConfig` correctly reads backward-compatible with existing metadata
+- ✅ `toFranchizeConfigInput` wrapper passes secrets correctly
+- ✅ `FranchizeSuccessfulRentalVM` interface restored
+- ✅ Pre-existing TS2367 at line 2240 (not from this branch's changes)
+- ✅ useFranchizeTheme defensive palette resolution
+- ✅ AnalyticsPasswordEntry CSS-var switch
+- ✅ Skill wired into vip-bike-ops SKILL.md
+- ✅ Brace balance verified on all files
+- ✅ B1 + B2 fixes applied and verified
+
+### 12.5 Verdict
+
+**MERGE** after B1 + B2 fixes (both applied). The branch is safe to merge to main.
+
+Follow-up issues should be created for:
+1. L4 (synthetic VIN legal risk) — highest priority code quality fix
+2. L7/L8 (array clobbering in configToMetadata) — data loss on round-trip
+3. L10 (skill auth gap) — defense-in-depth for service-role writes
+4. U1-U4 (refresh visibility, empty state, live preview, draft persistence) — highest-impact UX improvements
+
+### 12.6 Updated milestones
+
+| # | Deliverable | Status |
+|---|-------------|--------|
+| M1 | PRD | ✅ Done |
+| M2 | Config contract module + actions-runtime rewiring | ✅ Done |
+| M3 | Editor: fieldErrors + loading + StepProgress + typed context | ✅ Done |
+| M4 | Admin polish: toasts, retry, fleet search, error boundary | ✅ Done |
+| M5 | Skill script + SKILL.md | ✅ Done |
+| M6 | QA: code review + B1/B2 fixes + typecheck | ✅ Done |
+| M7 | UI/UX enhancements (U1-U10) | ⏳ Follow-up |
+| M8 | Code quality fixes (L4, L7/L8, L10) | ⏳ Follow-up |
