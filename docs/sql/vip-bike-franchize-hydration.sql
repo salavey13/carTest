@@ -60,6 +60,12 @@ set
         'version', '2026-06-13-v4',
         'enabled', true,
         'slug', 'vip-bike',
+        -- UI feature flags consumed by FranchizeProfileButton.
+        -- showCreateButton=false: VIP BIKE does NOT advertise "Создать франшизу"
+        -- in the crew header profile dropdown (mirrors crewDocs version).
+        'ui', jsonb_build_object(
+          'showCreateButton', false
+        ),
         'branding', jsonb_build_object(
           'name', 'VIP BIKE ELECTRO',
           'shortName', 'VIP_BIKE',
@@ -279,7 +285,7 @@ set
           ),
           'showTwoColumnsMobile', true,
           'useModalDetails', true,
-          'rewiewsLink', 'https://yandex.ru/maps/org/vip_bike_electro/81589395232/reviews/',
+          'reviewsLink', 'https://yandex.ru/maps/org/vip_bike_electro/81589395232/reviews/',
           'promoBanners', jsonb_build_array(
             jsonb_build_object(
               'id', 'electro-2026',
