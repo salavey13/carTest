@@ -183,6 +183,30 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [isLoadingConfig, setIsLoadingConfig] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  // U4: persist form draft to localStorage so accidental refresh doesn't lose palette tweaks.
+  // Only saves non-empty slug + changed fields. Cleared on successful save.
+  const DRAFT_KEY = "franchize-config-draft";
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === "object" && parsed.slug) {
+          setForm(prev => ({ ...prev, ...parsed }));
+          setMessage("Восстановлен черновик из localStorage. Проверьте и сохраните.");
+        }
+      }
+    } catch { /* ignore corrupt draft */ }
+  }, []);
+  useEffect(() => {
+    // Only save if form has meaningful data (slug is set)
+    if (form.slug) {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(form));
+      } catch { /* storage full or disabled */ }
+    }
+  }, [form]);
   // ── Initial stage logic ──
   // - If ?just_created=1 is in URL (we just came from a successful createCrew),
   //   go straight to "palette" so user can customize their new crew.
@@ -434,6 +458,10 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
       if (result.errors) setFieldErrors(result.errors);
       if (result.data) setForm(result.data);
       if (typeof result.canEdit === "boolean") setCanEdit(result.canEdit);
+      // U4: clear draft on successful save
+      if (result.success) {
+        try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+      }
     });
   };
 
