@@ -55,7 +55,7 @@ export function RentalQrCode({
       <img
         src={qrImageUrl}
         alt="QR код для арендатора"
-        className="h-24 w-24 shrink-0 rounded-lg"
+        className="h-24 w-24 shrink-0"
         loading="lazy"
       />
       <div className="min-w-0 flex-1">
