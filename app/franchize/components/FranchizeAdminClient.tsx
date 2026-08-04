@@ -398,6 +398,8 @@ export function FranchizeAdminClient({
         ["--fr-admin-border" as string]: resolvedPalette.borderSoft,
         ["--fr-admin-text" as string]: resolvedPalette.textPrimary,
         ["--fr-admin-muted" as string]: resolvedPalette.textSecondary,
+        // B1 fix: was missing → fleet search input had transparent background
+        ["--fr-admin-bg" as string]: resolvedPalette.bgBase,
       }}
     >
       <p className="text-xs font-medium tracking-wide text-[var(--fr-admin-accent)]">
