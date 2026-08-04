@@ -546,14 +546,37 @@ export function configToMetadata(input: FranchizeConfigInput, sourceFranchize: U
     },
     header: {
       ...(readPath(sourceFranchize, ["header"], {}) as UnknownRecord),
-      menuLinks,
+      // L7 fix: merge parsed menuLinks with existing ones — preserve extra fields (icon, type)
+      // that the text format can't represent. Match by label+href.
+      menuLinks: (() => {
+        const existing = readArrayPath<UnknownRecord>(sourceFranchize, ["header", "menuLinks"]);
+        const parsed = menuLinks;
+        return parsed.map((parsedLink) => {
+          const match = existing.find((ex) =>
+            readPath(ex, ["label"], "") === parsedLink.label &&
+            readPath(ex, ["href"], "") === parsedLink.href
+          );
+          return match ? { ...match, ...parsedLink } : parsedLink;
+        });
+      })(),
     },
     footer: {
       ...(readPath(sourceFranchize, ["footer"], {}) as UnknownRecord),
       phone: input.phone,
       email: input.email,
       address: input.address,
-      socialLinks: parseSocialLinks(input.socialLinksText),
+      // L8 fix: same merge strategy for socialLinks — preserve extra fields
+      socialLinks: (() => {
+        const existing = readArrayPath<UnknownRecord>(sourceFranchize, ["footer", "socialLinks"]);
+        const parsed = parseSocialLinks(input.socialLinksText);
+        return parsed.map((parsedLink) => {
+          const match = existing.find((ex) =>
+            readPath(ex, ["label"], "") === parsedLink.label &&
+            readPath(ex, ["href"], "") === parsedLink.href
+          );
+          return match ? { ...match, ...parsedLink } : parsedLink;
+        });
+      })(),
     },
     contacts: {
       ...(readPath(sourceFranchize, ["contacts"], {}) as UnknownRecord),
