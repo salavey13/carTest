@@ -65,7 +65,8 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, statu
   const [fuelLevel, setFuelLevel] = useState("4/5");
   const [freezeNotes, setFreezeNotes] = useState("");
   const [checklist, setChecklist] = useState<string[]>(freezeChecklistOptions.slice(0, 2));
-  const [damagePhase, setDamagePhase] = useState<"pickup" | "return">("pickup");
+  // For active rentals, bike already handed off — default to "return" phase
+  const [damagePhase, setDamagePhase] = useState<"pickup" | "return">(status === "active" ? "return" : "pickup");
   const [damageSeverity, setDamageSeverity] = useState<"minor" | "major">("minor");
   const [damageNotes, setDamageNotes] = useState("");
 
@@ -184,7 +185,8 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, statu
         <p className="text-sm font-medium" style={{ color: theme.textPrimary }}>Отчёты о повреждениях ({damageReports.length})</p>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           <select className="rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.inputText }} value={damagePhase} onChange={(e) => setDamagePhase(e.target.value as "pickup" | "return")}>
-            <option value="pickup">На выдаче</option>
+            {/* For active rentals, bike already handed off — only "На возврате" makes sense */}
+            {status !== "active" && <option value="pickup">На выдаче</option>}
             <option value="return">На возврате</option>
           </select>
           <select className="rounded-lg border px-2 py-1.5 text-sm" style={{ borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.inputText }} value={damageSeverity} onChange={(e) => setDamageSeverity(e.target.value as "minor" | "major")}>
