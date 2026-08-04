@@ -12,7 +12,7 @@ import type { FranchizeTheme } from "@/lib/franchize-config";
  * Uses useLayoutEffect to set CSS variables synchronously before browser paint,
  * preventing "dark flash" on initial load.
  */
-export function useFranchizeTheme(theme: FranchizeTheme) {
+export function useFranchizeTheme(theme: Partial<FranchizeTheme>) {
   const { resolvedTheme = "dark" } = useTheme();
   const isAuto = theme.isAuto;
 
@@ -23,27 +23,21 @@ export function useFranchizeTheme(theme: FranchizeTheme) {
   effectImpl(() => {
     const root = document.documentElement;
 
-    if (isAuto) {
-      // Use global theme preference when mode is 'auto'
-      const palette = resolvedTheme === "light" ? theme.palettes?.light : theme.palettes?.dark;
-      if (palette) {
-        root.style.setProperty("--franchize-bg-base", palette.bgBase);
-        root.style.setProperty("--franchize-bg-card", palette.bgCard);
-        root.style.setProperty("--franchize-accent-main", palette.accentMain);
-        root.style.setProperty("--franchize-accent-hover", palette.accentMainHover);
-        root.style.setProperty("--franchize-text-primary", palette.textPrimary);
-        root.style.setProperty("--franchize-text-secondary", palette.textSecondary);
-        root.style.setProperty("--franchize-border-soft", palette.borderSoft);
-      }
-    } else {
-      // Use crew's fixed palette when mode is not 'auto'
-      root.style.setProperty("--franchize-bg-base", theme.palette.bgBase);
-      root.style.setProperty("--franchize-bg-card", theme.palette.bgCard);
-      root.style.setProperty("--franchize-accent-main", theme.palette.accentMain);
-      root.style.setProperty("--franchize-accent-hover", theme.palette.accentMainHover);
-      root.style.setProperty("--franchize-text-primary", theme.palette.textPrimary);
-      root.style.setProperty("--franchize-text-secondary", theme.palette.textSecondary);
-      root.style.setProperty("--franchize-border-soft", theme.palette.borderSoft);
+    // Resolve the palette defensively. Some callers pass a partial/empty theme
+    // (e.g. `useFranchizeTheme({})`), and previously the else-branch dereferenced
+    // `theme.palette.*` directly, throwing
+    // "Cannot read properties of undefined (reading 'accentMain')" (or 'bgBase').
+    const palette = isAuto
+      ? (resolvedTheme === "light" ? theme.palettes?.light : theme.palettes?.dark)
+      : theme.palette;
+    if (palette) {
+      root.style.setProperty("--franchize-bg-base", palette.bgBase);
+      root.style.setProperty("--franchize-bg-card", palette.bgCard);
+      root.style.setProperty("--franchize-accent-main", palette.accentMain);
+      root.style.setProperty("--franchize-accent-hover", palette.accentMainHover);
+      root.style.setProperty("--franchize-text-primary", palette.textPrimary);
+      root.style.setProperty("--franchize-text-secondary", palette.textSecondary);
+      root.style.setProperty("--franchize-border-soft", palette.borderSoft);
     }
   }, [theme, isAuto, resolvedTheme]);
 

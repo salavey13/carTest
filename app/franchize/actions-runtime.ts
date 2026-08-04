@@ -15,7 +15,28 @@ import { getUserRentalSecrets as getVerifiedRentalSecrets, saveUserRentalSecrets
 import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
 import { upsertFranchizeIntent } from "@/app/franchize/server-actions/intents";
 import { cloneFranchizeContentBlocks, readFranchizeContentBlocks, type FranchizeContentBlocks } from "@/app/franchize/lib/content-blocks";
-import { resolveFranchizeTheme, resolvePaletteByMode } from "@/app/franchize/lib/theme-resolver";
+import { resolveFranchizeTheme } from "@/app/franchize/lib/theme-resolver";
+// Single source of truth for the crew config contract (types, zod schema,
+// defaults, configToMetadata / metadataToConfig). Pure — reused by the editor
+// UI and by the bot skill script (scripts/crew-customization-skill.mjs).
+import {
+  type FranchizeConfigInput,
+  type FranchizeConfigState,
+  type UnknownRecord,
+  defaultFranchizeConfig,
+  franchizeConfigSchema,
+  configToMetadata,
+  metadataToConfig,
+  parseJsonObject,
+  readPath,
+  readArrayPath,
+  normalizeCrewSlug,
+  withSlug,
+  extractFooterSocialLinks,
+  extractFooterColumns,
+  fallbackMenuLinks,
+  normalizeCatalogOrder,
+} from "@/app/franchize/lib/franchize-config-contract";
 import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context";
 import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
 import { CURRENT_RENTAL_TEMPLATE_VERSION } from "@/lib/rental-template-version";
@@ -26,27 +47,13 @@ import { formatRuDate } from "@/app/franchize/lib/date-utils";
 // v3 polish: centralized notification template builders (HTML-escaped, with inline buttons)
 import { buildCartCheckoutRenterMessage } from "@/app/franchize/lib/notification-templates";
 import {
-  DEFAULT_AD_CARDS_TEXT,
-  DEFAULT_CATEGORY_ORDER,
-  DEFAULT_CONTRACT_PREFILL,
-  DEFAULT_DELIVERY_MODES_TEXT,
   DEFAULT_FOOTER_TEXT_COLOR,
-  DEFAULT_FRANCHIZE_BRAND,
   DEFAULT_FRANCHIZE_THEME,
-  DEFAULT_LIGHT_THEME_PALETTE,
   DEFAULT_MAP_BOUNDS,
-  DEFAULT_MAP_GPS,
-  DEFAULT_MAP_IMAGE_URL,
-  DEFAULT_MENU_LINK_TEMPLATES,
-  DEFAULT_PAYMENT_OPTIONS_TEXT,
-  DEFAULT_PROMO_BANNERS_TEXT,
   DEFAULT_SHOWCASE_GROUPS,
-  DEFAULT_SOCIAL_LINKS_TEXT,
-  DEFAULT_TELEGRAM_BOT_URL,
 } from "@/lib/franchize-config";
 
 
-type UnknownRecord = Record<string, unknown>;
 const FRANCHIZE_RENTAL_DOCS_SAFE_ERROR =
   "Не удалось подготовить документы аренды. Мы уже передали заявку оператору — попробуйте ещё раз или напишите в Telegram.";
 
@@ -89,6 +96,7 @@ type RentalAvailabilityRow = {
 const RENTAL_END_GRACE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export type { FranchizeTheme } from "@/lib/franchize-config";
+export type { FranchizeConfigInput, FranchizeConfigState } from "@/app/franchize/lib/franchize-config-contract";
 
 export interface FranchizeHeaderVM {
   brandName: string;
@@ -97,7 +105,6 @@ export interface FranchizeHeaderVM {
   logoHref: string;
   menuLinks: Array<{ label: string; href: string }>;
 }
-
 
 export interface FranchizeSuccessfulRentalVM {
   rentalId: string;
@@ -242,182 +249,8 @@ export interface FranchizeBySlugResult {
   items: CatalogItemVM[];
 }
 
-export interface FranchizeConfigInput {
-  slug: string;
-  brandName: string;
-  tagline: string;
-  logoUrl: string;
-  themeMode: string;
-  bgBase: string;
-  bgCard: string;
-  accentMain: string;
-  accentMainHover: string;
-  textPrimary: string;
-  textSecondary: string;
-  borderSoft: string;
-  lightBgBase: string;
-  lightBgCard: string;
-  lightAccentMain: string;
-  lightAccentMainHover: string;
-  lightTextPrimary: string;
-  lightTextSecondary: string;
-  lightBorderSoft: string;
-  phone: string;
-  email: string;
-  address: string;
-  telegram: string;
-  mapGps: string;
-  mapImageUrl: string;
-  mapBoundsTop: string;
-  mapBoundsBottom: string;
-  mapBoundsLeft: string;
-  mapBoundsRight: string;
-  socialLinksText: string;
-  menuLinksText: string;
-  categoryOrderText: string;
-  promoBannersText: string;
-  adCardsText: string;
-  allowPromo: boolean;
-  deliveryModesText: string;
-  paymentOptionsText: string;
-  defaultMode: string;
-  issuerName: string;
-  issuerRepresentative: string;
-  includedMileage: string;
-  overageRateRub: string;
-  bikeValueRub: string;
-  bikeValueWords: string;
-  lateReturnPenaltyRub: string;
-  returnAddress: string;
-  contractDefaultsJson: string;
-  docTemplatesJson: string;
-  advancedJson: string;
-}
-
-export interface FranchizeConfigState {
-  ok: boolean;
-  message: string;
-  errors?: Record<string, string[]>;
-  data?: FranchizeConfigInput;
-  canEdit?: boolean;
-}
 
 const defaultTheme = DEFAULT_FRANCHIZE_THEME;
-
-const franchizeConfigSchema = z.object({
-  slug: z.string().trim().min(2, "Slug is required"),
-  brandName: z.string().trim().min(2, "Brand name is required"),
-  tagline: z.string().trim().min(2, "Tagline is required"),
-  logoUrl: z.string().trim().optional(),
-  themeMode: z.string().trim().min(2, "Theme mode is required"),
-  bgBase: z.string().trim().min(4, "bgBase is required"),
-  bgCard: z.string().trim().min(4, "bgCard is required"),
-  accentMain: z.string().trim().min(4, "accentMain is required"),
-  accentMainHover: z.string().trim().min(4, "accentMainHover is required"),
-  textPrimary: z.string().trim().min(4, "textPrimary is required"),
-  textSecondary: z.string().trim().min(4, "textSecondary is required"),
-  borderSoft: z.string().trim().min(4, "borderSoft is required"),
-  lightBgBase: z.string().trim().min(4, "lightBgBase is required"),
-  lightBgCard: z.string().trim().min(4, "lightBgCard is required"),
-  lightAccentMain: z.string().trim().min(4, "lightAccentMain is required"),
-  lightAccentMainHover: z.string().trim().min(4, "lightAccentMainHover is required"),
-  lightTextPrimary: z.string().trim().min(4, "lightTextPrimary is required"),
-  lightTextSecondary: z.string().trim().min(4, "lightTextSecondary is required"),
-  lightBorderSoft: z.string().trim().min(4, "lightBorderSoft is required"),
-  phone: z.string().trim().default(""),
-  email: z.string().trim().default(""),
-  address: z.string().trim().default(""),
-  telegram: z.string().trim().default(""),
-  mapGps: z.string().trim().default(""),
-  mapImageUrl: z.string().trim().default(""),
-  mapBoundsTop: z.string().trim().default(String(DEFAULT_MAP_BOUNDS.top)),
-  mapBoundsBottom: z.string().trim().default(String(DEFAULT_MAP_BOUNDS.bottom)),
-  mapBoundsLeft: z.string().trim().default(String(DEFAULT_MAP_BOUNDS.left)),
-  mapBoundsRight: z.string().trim().default(String(DEFAULT_MAP_BOUNDS.right)),
-  socialLinksText: z.string().default(DEFAULT_SOCIAL_LINKS_TEXT),
-  menuLinksText: z.string().default(""),
-  categoryOrderText: z.string().default(""),
-  promoBannersText: z.string().default(""),
-  adCardsText: z.string().default(""),
-  allowPromo: z.coerce.boolean().default(true),
-  deliveryModesText: z.string().default(DEFAULT_DELIVERY_MODES_TEXT),
-  paymentOptionsText: z.string().default(DEFAULT_PAYMENT_OPTIONS_TEXT),
-  defaultMode: z.string().trim().default("pickup"),
-  issuerName: z.string().trim().default(""),
-  issuerRepresentative: z.string().trim().default(""),
-  includedMileage: z.string().trim().default(""),
-  overageRateRub: z.string().trim().default(""),
-  bikeValueRub: z.string().trim().default(""),
-  bikeValueWords: z.string().trim().default(""),
-  lateReturnPenaltyRub: z.string().trim().default(""),
-  returnAddress: z.string().trim().default(""),
-  contractDefaultsJson: z.string().default(""),
-  docTemplatesJson: z.string().default(""),
-  advancedJson: z.string().default(""),
-});
-
-const defaultFranchizeConfig: FranchizeConfigInput = {
-  slug: "",
-  brandName: DEFAULT_FRANCHIZE_BRAND.brandName,
-  tagline: DEFAULT_FRANCHIZE_BRAND.tagline,
-  logoUrl: "",
-  themeMode: defaultTheme.mode,
-  bgBase: defaultTheme.palette.bgBase,
-  bgCard: defaultTheme.palette.bgCard,
-  accentMain: defaultTheme.palette.accentMain,
-  accentMainHover: defaultTheme.palette.accentMainHover,
-  textPrimary: defaultTheme.palette.textPrimary,
-  textSecondary: defaultTheme.palette.textSecondary,
-  borderSoft: defaultTheme.palette.borderSoft,
-  lightBgBase: DEFAULT_LIGHT_THEME_PALETTE.bgBase,
-  lightBgCard: DEFAULT_LIGHT_THEME_PALETTE.bgCard,
-  lightAccentMain: DEFAULT_LIGHT_THEME_PALETTE.accentMain,
-  lightAccentMainHover: DEFAULT_LIGHT_THEME_PALETTE.accentMainHover,
-  lightTextPrimary: DEFAULT_LIGHT_THEME_PALETTE.textPrimary,
-  lightTextSecondary: DEFAULT_LIGHT_THEME_PALETTE.textSecondary,
-  lightBorderSoft: DEFAULT_LIGHT_THEME_PALETTE.borderSoft,
-  phone: "",
-  email: "",
-  address: "",
-  telegram: "",
-  mapGps: DEFAULT_MAP_GPS,
-  mapImageUrl: DEFAULT_MAP_IMAGE_URL,
-  mapBoundsTop: String(DEFAULT_MAP_BOUNDS.top),
-  mapBoundsBottom: String(DEFAULT_MAP_BOUNDS.bottom),
-  mapBoundsLeft: String(DEFAULT_MAP_BOUNDS.left),
-  mapBoundsRight: String(DEFAULT_MAP_BOUNDS.right),
-  socialLinksText: DEFAULT_SOCIAL_LINKS_TEXT,
-  menuLinksText: DEFAULT_MENU_LINK_TEMPLATES.map((link) => `${link.label}|${link.href}`).join("\n"),
-  categoryOrderText: DEFAULT_CATEGORY_ORDER,
-  promoBannersText: DEFAULT_PROMO_BANNERS_TEXT,
-  adCardsText: DEFAULT_AD_CARDS_TEXT,
-  allowPromo: true,
-  deliveryModesText: DEFAULT_DELIVERY_MODES_TEXT,
-  paymentOptionsText: DEFAULT_PAYMENT_OPTIONS_TEXT,
-  defaultMode: "pickup",
-  issuerName: "",
-  issuerRepresentative: "",
-  includedMileage: DEFAULT_CONTRACT_PREFILL.includedMileage,
-  overageRateRub: DEFAULT_CONTRACT_PREFILL.overageRateRub,
-  bikeValueRub: DEFAULT_CONTRACT_PREFILL.bikeValueRub,
-  bikeValueWords: DEFAULT_CONTRACT_PREFILL.bikeValueWords,
-  lateReturnPenaltyRub: DEFAULT_CONTRACT_PREFILL.lateReturnPenaltyRub,
-  returnAddress: DEFAULT_CONTRACT_PREFILL.returnAddress,
-  contractDefaultsJson: "",
-  docTemplatesJson: "",
-  advancedJson: "",
-};
-
-function readPath<T>(obj: unknown, path: string[], fallback: T): T {
-  let current: unknown = obj;
-  for (const key of path) {
-    if (!current || typeof current !== "object" || !(key in current)) {
-      return fallback;
-    }
-    current = (current as UnknownRecord)[key];
-  }
-  return (current as T) ?? fallback;
-}
 
 function readNumberPath(obj: unknown, paths: string[][], fallback = 0): number {
   for (const path of paths) {
@@ -509,107 +342,6 @@ function buildCrewRatingSummary(rows: UnknownRecord[]) {
   { label: "Контакты", href: `/franchize/${slug}/contacts` },
   { label: "Корзина", href: `/franchize/${slug}/cart` },
 ];*/
-function readArrayPath<T>(obj: unknown, path: string[], fallback: T[] = []): T[] {
-  const value = readPath<unknown>(obj, path, fallback);
-  return Array.isArray(value) ? (value as T[]) : fallback;
-}
-
-const fallbackMenuLinks = (slug: string) => DEFAULT_MENU_LINK_TEMPLATES.map((link) => ({
-  label: link.label,
-  href: withSlug(link.href, slug),
-}));
-
-function normalizeCrewSlug(value: string): string {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/%20/g, " ")
-    .replace(/\s+/g, "-")
-    .replace(/_+/g, "-")
-    .replace(/-+/g, "-");
-}
-
-const withSlug = (href: string, slug: string) => {
-  if (!href) {
-    return href;
-  }
-
-  if (href.includes("{slug}")) {
-    return href.replaceAll("{slug}", slug);
-  }
-
-  switch (href) {
-    case "/franchize/about":
-      return `/franchize/${slug}/about`;
-    case "/franchize/contacts":
-      return `/franchize/${slug}/contacts`;
-    case "/franchize/cart":
-      return `/franchize/${slug}/cart`;
-    case "/franchize/rentals":
-      return `/franchize/${slug}/rentals`;
-    default:
-      return href;
-  }
-};
-
-function parseSocialLinks(lines: string): Array<{ label: string; href: string }> {
-  return lines
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [label, href] = line.split("|").map((value) => value.trim());
-      return { label: label || "Social", href: href || DEFAULT_TELEGRAM_BOT_URL };
-    });
-}
-
-function extractFooterSocialLinks(franchize: UnknownRecord, fallbackTelegram: string) {
-  const explicit = readArrayPath<UnknownRecord>(franchize, ["footer", "socialLinks"]);
-  const fromExplicit = explicit
-    .map((item) => ({ label: readPath(item, ["label"], ""), href: readPath(item, ["href"], "") }))
-    .filter((item) => item.label && item.href);
-
-  if (fromExplicit.length > 0) return fromExplicit;
-
-  const columns = readArrayPath<UnknownRecord>(franchize, ["footer", "columns"]);
-  const fromColumns = columns.flatMap((column) => {
-    const items = readArrayPath<UnknownRecord>(column, ["items"]);
-    return items
-      .map((item) => ({
-        label: readPath(item, ["label"], readPath(item, ["value"], "")),
-        href: readPath(item, ["href"], ""),
-      }))
-      .filter((entry) => entry.label && entry.href);
-  });
-
-  if (fromColumns.length > 0) return fromColumns;
-
-  if (fallbackTelegram) {
-    return [{ label: fallbackTelegram, href: `https://t.me/${fallbackTelegram.replace("@", "")}` }];
-  }
-
-  return [{ label: "Telegram", href: DEFAULT_TELEGRAM_BOT_URL }];
-}
-
-function extractFooterColumns(franchize: UnknownRecord, slug: string) {
-  const rawColumns = readArrayPath<UnknownRecord>(franchize, ["footer", "columns"]);
-  if (rawColumns.length === 0) return [];
-
-  const withSlug = (href: string) =>
-    href.includes("{slug}") ? href.replaceAll("{slug}", slug) : href;
-
-  return rawColumns.map((col) => ({
-    title: readPath(col, ["title"], ""),
-    items: (readArrayPath<UnknownRecord>(col, ["items"])).map((item) => ({
-      type: readPath(item, ["type"], "text") as "link" | "external" | "text" | "phone",
-      label: readPath(item, ["label"], ""),
-      value: readPath(item, ["value"], ""),
-      href: item.href ? withSlug(readPath(item, ["href"], "")) : undefined,
-      icon: readPath(item, ["icon"], ""),
-    })),
-  })).filter((col) => col.title || col.items.length > 0);
-}
-
 const emptyCrew = (slug: string): FranchizeCrewVM => ({
   id: "",
   slug,
@@ -1187,100 +919,6 @@ export async function markCrewBikesAvailable(slug: string) {
   return { success: true };
 }
 
-function splitCsv(text: string): string[] {
-  return text
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
-function normalizeCampaignHref(href: string, slug: string): string {
-  const clean = href.trim();
-  if (!clean) {
-    return `/franchize/${slug}#catalog-sections`;
-  }
-
-  if (clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("mailto:") || clean.startsWith("tel:")) {
-    return clean;
-  }
-
-  return withSlug(clean, slug);
-}
-
-function trimCampaignTitle(title: string, fallback: string): string {
-  const normalized = title.replace(/\s+/g, " ").trim();
-  if (!normalized) {
-    return fallback;
-  }
-
-  return normalized.length > 72 ? `${normalized.slice(0, 69)}...` : normalized;
-}
-
-function parsePromoBanners(lines: string, slug: string): Array<{ id: string; title: string; subtitle: string; code: string; href: string; imageUrl: string; activeFrom: string; activeTo: string; priority: number; ctaLabel: string }> {
-  return lines
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line, index) => {
-      const [id, title, subtitle, code, href, imageUrl, activeFrom, activeTo, priority, ctaLabel] = line.split("|").map((value) => value.trim());
-      return {
-        id: id || `promo-${index + 1}`,
-        title: trimCampaignTitle(title || "", `Promo ${index + 1}`),
-        subtitle: subtitle || "",
-        code: code || "",
-        href: normalizeCampaignHref(href || "", slug),
-        imageUrl: imageUrl || "",
-        activeFrom: activeFrom || "",
-        activeTo: activeTo || "",
-        priority: Number.isFinite(Number(priority)) ? Number(priority) : 50,
-        ctaLabel: ctaLabel || "Открыть",
-      };
-    });
-}
-
-function parseAdCards(lines: string, slug: string): Array<{ id: string; title: string; subtitle: string; href: string; imageUrl: string; badge: string; activeFrom: string; activeTo: string; priority: number; ctaLabel: string }> {
-  return lines
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line, index) => {
-      const [id, title, subtitle, href, imageUrl, badge, activeFrom, activeTo, priority, ctaLabel] = line.split("|").map((value) => value.trim());
-      return {
-        id: id || `ad-${index + 1}`,
-        title: trimCampaignTitle(title || "", `Анонс ${index + 1}`),
-        subtitle: subtitle || "",
-        href: normalizeCampaignHref(href || "", slug),
-        imageUrl: imageUrl || "",
-        badge: badge || "Анонс",
-        activeFrom: activeFrom || "",
-        activeTo: activeTo || "",
-        priority: Number.isFinite(Number(priority)) ? Number(priority) : 40,
-        ctaLabel: ctaLabel || "Подробнее",
-      };
-    });
-}
-
-function parseMenuLinks(lines: string, slug: string): Array<{ label: string; href: string }> {
-  return lines
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [label, href] = line.split("|").map((value) => value.trim());
-      return {
-        label: label || "Ссылка",
-        href: withSlug(href || `/franchize/${slug}`, slug),
-      };
-    });
-}
-
-function normalizeCatalogOrder(categories: string[]): string[] {
-  const unique = Array.from(new Set(categories.filter(Boolean)));
-  const regular = unique.filter((category) => !category.toLowerCase().includes("wbitem"));
-  const wbItems = unique.filter((category) => category.toLowerCase().includes("wbitem"));
-  return [...regular, ...wbItems];
-}
-
 async function resolveFranchizeEditorAccess(actorUserId: string | undefined, crew: { id: string; owner_id?: string | null }): Promise<boolean> {
   if (!actorUserId) {
     return false;
@@ -1312,116 +950,12 @@ async function resolveFranchizeEditorAccess(actorUserId: string | undefined, cre
 }
 
 async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promise<FranchizeConfigInput> {
-  const metadata = (crew.metadata ?? {}) as UnknownRecord;
-  const franchize = (metadata.franchize ?? {}) as UnknownRecord;
-  const themePalette = resolvePaletteByMode(franchize);
-  const lightPalette = {
-    bgBase: readPath(franchize, ["theme", "palettes", "light", "bgBase"], readPath(franchize, ["theme", "palette", "light", "bgBase"], defaultFranchizeConfig.lightBgBase)),
-    bgCard: readPath(franchize, ["theme", "palettes", "light", "bgCard"], readPath(franchize, ["theme", "palette", "light", "bgCard"], defaultFranchizeConfig.lightBgCard)),
-    accentMain: readPath(franchize, ["theme", "palettes", "light", "accentMain"], readPath(franchize, ["theme", "palette", "light", "accentMain"], defaultFranchizeConfig.lightAccentMain)),
-    accentMainHover: readPath(franchize, ["theme", "palettes", "light", "accentMainHover"], readPath(franchize, ["theme", "palette", "light", "accentMainHover"], defaultFranchizeConfig.lightAccentMainHover)),
-    textPrimary: readPath(franchize, ["theme", "palettes", "light", "textPrimary"], readPath(franchize, ["theme", "palette", "light", "textPrimary"], defaultFranchizeConfig.lightTextPrimary)),
-    textSecondary: readPath(franchize, ["theme", "palettes", "light", "textSecondary"], readPath(franchize, ["theme", "palette", "light", "textSecondary"], defaultFranchizeConfig.lightTextSecondary)),
-    borderSoft: readPath(franchize, ["theme", "palettes", "light", "borderSoft"], readPath(franchize, ["theme", "palette", "light", "borderSoft"], defaultFranchizeConfig.lightBorderSoft)),
-  };
-  const menuLinks = readArrayPath<UnknownRecord>(franchize, ["header", "menuLinks"], fallbackMenuLinks(slug)).map((link) => ({
-    label: readPath(link, ["label"], "Ссылка"),
-    href: withSlug(readPath(link, ["href"], `/franchize/${slug}`), slug),
-  }));
-
   const crewSecrets = await getCrewSensitiveDataOrDefault(slug, { source: "toFranchizeConfigInput" });
-  const contractDefaults = (crewSecrets.contractDefaults ?? {}) as UnknownRecord;
-  const defaults = (readPath(contractDefaults, ["defaults"], {}) ?? {}) as UnknownRecord;
-  const docTemplates = (crewSecrets.docTemplates ?? {}) as UnknownRecord;
-
-  return {
-    ...defaultFranchizeConfig,
-    slug,
-    brandName: readPath(franchize, ["branding", "name"], (crew.name as string) ?? defaultFranchizeConfig.brandName),
-    tagline: readPath(franchize, ["branding", "tagline"], defaultFranchizeConfig.tagline),
-    logoUrl: readPath(franchize, ["branding", "logoUrl"], (crew.logo_url as string) ?? "") ?? "",
-    themeMode: readPath(franchize, ["theme", "mode"], defaultTheme.mode),
-    bgBase: readPath(themePalette, ["bgBase"], defaultTheme.palette.bgBase),
-    bgCard: readPath(themePalette, ["bgCard"], defaultTheme.palette.bgCard),
-    accentMain: readPath(themePalette, ["accentMain"], defaultTheme.palette.accentMain),
-    accentMainHover: readPath(themePalette, ["accentMainHover"], defaultTheme.palette.accentMainHover),
-    textPrimary: readPath(themePalette, ["textPrimary"], defaultTheme.palette.textPrimary),
-    textSecondary: readPath(themePalette, ["textSecondary"], defaultTheme.palette.textSecondary),
-    borderSoft: readPath(themePalette, ["borderSoft"], defaultTheme.palette.borderSoft),
-    lightBgBase: lightPalette.bgBase,
-    lightBgCard: lightPalette.bgCard,
-    lightAccentMain: lightPalette.accentMain,
-    lightAccentMainHover: lightPalette.accentMainHover,
-    lightTextPrimary: lightPalette.textPrimary,
-    lightTextSecondary: lightPalette.textSecondary,
-    lightBorderSoft: lightPalette.borderSoft,
-    phone: readPath(franchize, ["contacts", "phone"], readPath(franchize, ["footer", "phone"], "")),
-    email: readPath(franchize, ["contacts", "email"], readPath(franchize, ["footer", "email"], "")),
-    address: readPath(franchize, ["contacts", "address"], readPath(franchize, ["footer", "address"], "")),
-    telegram: readPath(franchize, ["contacts", "telegram"], ""),
-    mapGps: readPath(franchize, ["contacts", "map", "gps"], ""),
-    mapImageUrl: readPath(franchize, ["contacts", "map", "imageUrl"], ""),
-    mapBoundsTop: String(readPath(franchize, ["contacts", "map", "bounds", "top"], DEFAULT_MAP_BOUNDS.top)),
-    mapBoundsBottom: String(readPath(franchize, ["contacts", "map", "bounds", "bottom"], DEFAULT_MAP_BOUNDS.bottom)),
-    mapBoundsLeft: String(readPath(franchize, ["contacts", "map", "bounds", "left"], DEFAULT_MAP_BOUNDS.left)),
-    mapBoundsRight: String(readPath(franchize, ["contacts", "map", "bounds", "right"], DEFAULT_MAP_BOUNDS.right)),
-    socialLinksText: extractFooterSocialLinks(franchize, readPath(franchize, ["contacts", "telegram"], ""))
-      .map((entry) => `${entry.label}|${entry.href}`)
-      .join("\n"),
-    menuLinksText: menuLinks
-      .map((entry) => `${readPath(entry, ["label"], "Ссылка")}|${readPath(entry, ["href"], `/franchize/${slug}`)}`)
-      .join("\n"),
-    categoryOrderText: readArrayPath<string>(franchize, ["catalog", "groupOrder"]).join(", "),
-    promoBannersText: readArrayPath<unknown>(franchize, ["catalog", "promoBanners"])
-      .map((entry: unknown, index: number) => {
-        const row = (entry ?? {}) as UnknownRecord;
-        return [
-          readPath(row, ["id"], `promo-${index + 1}`),
-          readPath(row, ["title"], ""),
-          readPath(row, ["subtitle"], ""),
-          readPath(row, ["code"], ""),
-          readPath(row, ["href"], ""),
-          readPath(row, ["imageUrl"], ""),
-          readPath(row, ["activeFrom"], ""),
-          readPath(row, ["activeTo"], ""),
-          String(readPath(row, ["priority"], 50)),
-          readPath(row, ["ctaLabel"], ""),
-        ].join("|");
-      })
-      .join("\n"),
-    adCardsText: readArrayPath<unknown>(franchize, ["catalog", "adCards"])
-      .map((entry: unknown, index: number) => {
-        const row = (entry ?? {}) as UnknownRecord;
-        return [
-          readPath(row, ["id"], `ad-${index + 1}`),
-          readPath(row, ["title"], ""),
-          readPath(row, ["subtitle"], ""),
-          readPath(row, ["href"], ""),
-          readPath(row, ["imageUrl"], ""),
-          readPath(row, ["badge"], ""),
-          readPath(row, ["activeFrom"], ""),
-          readPath(row, ["activeTo"], ""),
-          String(readPath(row, ["priority"], 40)),
-          readPath(row, ["ctaLabel"], ""),
-        ].join("|");
-      })
-      .join("\n"),
-    allowPromo: readPath(franchize, ["order", "allowPromo"], true),
-    deliveryModesText: readArrayPath<string>(franchize, ["order", "deliveryModes"], DEFAULT_DELIVERY_MODES_TEXT.split(", ")).join(", "),
-    paymentOptionsText: readArrayPath<string>(franchize, ["order", "paymentOptions"], DEFAULT_PAYMENT_OPTIONS_TEXT.split(", ")).join(", "),
-    defaultMode: readPath(franchize, ["order", "defaultMode"], "pickup"),
-    issuerName: readPath(defaults, ["issuerName"], ""),
-    issuerRepresentative: readPath(defaults, ["issuer_representative"], ""),
-    includedMileage: String(readPath(defaults, ["included_mileage"], defaultFranchizeConfig.includedMileage)),
-    overageRateRub: String(readPath(defaults, ["overage_rate"], defaultFranchizeConfig.overageRateRub)),
-    bikeValueRub: String(readPath(defaults, ["bike_value_rub"], defaultFranchizeConfig.bikeValueRub)),
-    bikeValueWords: readPath(defaults, ["bike_value_words"], defaultFranchizeConfig.bikeValueWords),
-    lateReturnPenaltyRub: String(readPath(defaults, ["late_return_penalty_rub"], defaultFranchizeConfig.lateReturnPenaltyRub)),
-    returnAddress: readPath(defaults, ["return_address"], defaultFranchizeConfig.returnAddress),
-    contractDefaultsJson: JSON.stringify(contractDefaults, null, 2),
-    docTemplatesJson: JSON.stringify(docTemplates, null, 2),
-    advancedJson: JSON.stringify(franchize, null, 2),
-  };
+  return metadataToConfig(
+    (crew.metadata ?? {}) as UnknownRecord,
+    { ...crew, slug },
+    { contractDefaults: crewSecrets.contractDefaults ?? {}, docTemplates: crewSecrets.docTemplates ?? {} },
+  );
 }
 
 export async function loadFranchizeConfigBySlug(slug: string, actorUserId?: string): Promise<FranchizeConfigState> {
@@ -1472,143 +1006,30 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput, actorUser
     return { ok: false, message: "Недостаточно прав: сохранять может только owner экипажа или all-admin.", data: payload, canEdit: false };
   }
 
-  let advancedOverrides: UnknownRecord = {};
-  if (payload.advancedJson.trim()) {
-    try {
-      const parsedJson = JSON.parse(payload.advancedJson) as unknown;
-      if (parsedJson && typeof parsedJson === "object") {
-        advancedOverrides = parsedJson as UnknownRecord;
-      }
-    } catch {
-      return { ok: false, message: "Advanced JSON должен быть валидным JSON-объектом.", data: payload };
-    }
+  const advancedOverrides = parseJsonObject(payload.advancedJson);
+  if (payload.advancedJson.trim() && !advancedOverrides) {
+    return { ok: false, message: "Advanced JSON должен быть валидным JSON-объектом.", data: payload };
   }
 
-  let contractDefaultsOverrides: UnknownRecord = {};
-  if (payload.contractDefaultsJson.trim()) {
-    try {
-      const parsedJson = JSON.parse(payload.contractDefaultsJson) as unknown;
-      if (parsedJson && typeof parsedJson === "object" && !Array.isArray(parsedJson)) {
-        contractDefaultsOverrides = parsedJson as UnknownRecord;
-      }
-    } catch {
-      return { ok: false, message: "Contract defaults JSON должен быть валидным JSON-объектом.", data: payload };
-    }
+  const contractDefaultsOverrides = parseJsonObject(payload.contractDefaultsJson);
+  if (payload.contractDefaultsJson.trim() && !contractDefaultsOverrides) {
+    return { ok: false, message: "Contract defaults JSON должен быть валидным JSON-объектом.", data: payload };
   }
 
-  let docTemplatesOverrides: UnknownRecord = {};
-  if (payload.docTemplatesJson.trim()) {
-    try {
-      const parsedJson = JSON.parse(payload.docTemplatesJson) as unknown;
-      if (parsedJson && typeof parsedJson === "object" && !Array.isArray(parsedJson)) {
-        docTemplatesOverrides = parsedJson as UnknownRecord;
-      }
-    } catch {
-      return { ok: false, message: "Doc templates JSON должен быть валидным JSON-объектом.", data: payload };
-    }
+  const docTemplatesOverrides = parseJsonObject(payload.docTemplatesJson);
+  if (payload.docTemplatesJson.trim() && !docTemplatesOverrides) {
+    return { ok: false, message: "Doc templates JSON должен быть валидным JSON-объектом.", data: payload };
   }
 
   const baseMetadata = ((crew as UnknownRecord).metadata ?? {}) as UnknownRecord;
   const existingFranchize = (readPath(baseMetadata, ["franchize"], {}) ?? {}) as UnknownRecord;
-  const menuLinks = parseMenuLinks(payload.menuLinksText, payload.slug);
 
   const sourceFranchize: UnknownRecord = {
     ...existingFranchize,
-    ...advancedOverrides,
+    ...(advancedOverrides ?? {}),
   };
 
-  const franchizeMetadata: UnknownRecord = {
-    ...sourceFranchize,
-    version: readPath(sourceFranchize, ["version"], "2026-02-19-editor-v2"),
-    enabled: readPath(sourceFranchize, ["enabled"], true),
-    slug: payload.slug,
-    branding: {
-      ...(readPath(sourceFranchize, ["branding"], {}) as UnknownRecord),
-      name: payload.brandName,
-      tagline: payload.tagline,
-      logoUrl: payload.logoUrl,
-    },
-    theme: {
-      ...(readPath(sourceFranchize, ["theme"], {}) as UnknownRecord),
-      mode: payload.themeMode,
-      palette: {
-        ...(readPath(sourceFranchize, ["theme", "palette"], {}) as UnknownRecord),
-        bgBase: payload.themeMode.toLowerCase().includes("light") ? payload.lightBgBase : payload.bgBase,
-        bgCard: payload.themeMode.toLowerCase().includes("light") ? payload.lightBgCard : payload.bgCard,
-        accentMain: payload.themeMode.toLowerCase().includes("light") ? payload.lightAccentMain : payload.accentMain,
-        accentMainHover: payload.themeMode.toLowerCase().includes("light") ? payload.lightAccentMainHover : payload.accentMainHover,
-        textPrimary: payload.themeMode.toLowerCase().includes("light") ? payload.lightTextPrimary : payload.textPrimary,
-        textSecondary: payload.themeMode.toLowerCase().includes("light") ? payload.lightTextSecondary : payload.textSecondary,
-        borderSoft: payload.themeMode.toLowerCase().includes("light") ? payload.lightBorderSoft : payload.borderSoft,
-      },
-      palettes: {
-        ...(readPath(sourceFranchize, ["theme", "palettes"], {}) as UnknownRecord),
-        dark: {
-          ...(readPath(sourceFranchize, ["theme", "palettes", "dark"], {}) as UnknownRecord),
-          bgBase: payload.bgBase,
-          bgCard: payload.bgCard,
-          accentMain: payload.accentMain,
-          accentMainHover: payload.accentMainHover,
-          textPrimary: payload.textPrimary,
-          textSecondary: payload.textSecondary,
-          borderSoft: payload.borderSoft,
-        },
-        light: {
-          ...(readPath(sourceFranchize, ["theme", "palettes", "light"], {}) as UnknownRecord),
-          bgBase: payload.lightBgBase,
-          bgCard: payload.lightBgCard,
-          accentMain: payload.lightAccentMain,
-          accentMainHover: payload.lightAccentMainHover,
-          textPrimary: payload.lightTextPrimary,
-          textSecondary: payload.lightTextSecondary,
-          borderSoft: payload.lightBorderSoft,
-        },
-      },
-    },
-    header: {
-      ...(readPath(sourceFranchize, ["header"], {}) as UnknownRecord),
-      menuLinks,
-    },
-    footer: {
-      ...(readPath(sourceFranchize, ["footer"], {}) as UnknownRecord),
-      phone: payload.phone,
-      email: payload.email,
-      address: payload.address,
-      socialLinks: parseSocialLinks(payload.socialLinksText),
-    },
-    contacts: {
-      ...(readPath(sourceFranchize, ["contacts"], {}) as UnknownRecord),
-      phone: payload.phone,
-      email: payload.email,
-      address: payload.address,
-      telegram: payload.telegram,
-      map: {
-        ...(readPath(sourceFranchize, ["contacts", "map"], {}) as UnknownRecord),
-        gps: payload.mapGps,
-        imageUrl: payload.mapImageUrl,
-        bounds: {
-          ...(readPath(sourceFranchize, ["contacts", "map", "bounds"], {}) as UnknownRecord),
-          top: Number(payload.mapBoundsTop),
-          bottom: Number(payload.mapBoundsBottom),
-          left: Number(payload.mapBoundsLeft),
-          right: Number(payload.mapBoundsRight),
-        },
-      },
-    },
-    catalog: {
-      ...(readPath(sourceFranchize, ["catalog"], {}) as UnknownRecord),
-      groupOrder: splitCsv(payload.categoryOrderText),
-      promoBanners: parsePromoBanners(payload.promoBannersText, payload.slug),
-      adCards: parseAdCards(payload.adCardsText, payload.slug),
-    },
-    order: {
-      ...(readPath(sourceFranchize, ["order"], {}) as UnknownRecord),
-      allowPromo: payload.allowPromo,
-      deliveryModes: splitCsv(payload.deliveryModesText),
-      paymentOptions: splitCsv(payload.paymentOptionsText),
-      defaultMode: payload.defaultMode,
-    },
-  };
+  const franchizeMetadata = configToMetadata(payload, sourceFranchize);
 
   const mergedMetadata: UnknownRecord = {
     ...baseMetadata,
@@ -1622,9 +1043,9 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput, actorUser
   }
 
   const mergedContractDefaults: UnknownRecord = {
-    ...contractDefaultsOverrides,
+    ...(contractDefaultsOverrides ?? {}),
     defaults: {
-      ...(readPath(contractDefaultsOverrides, ["defaults"], {}) as UnknownRecord),
+      ...(readPath(contractDefaultsOverrides ?? {}, ["defaults"], {}) as UnknownRecord),
       issuerName: payload.issuerName || defaultFranchizeConfig.issuerName,
       issuer_representative: payload.issuerRepresentative || defaultFranchizeConfig.issuerRepresentative,
       included_mileage: Number(payload.includedMileage) || Number(defaultFranchizeConfig.includedMileage),
@@ -1638,7 +1059,7 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput, actorUser
 
   await saveCrewSensitiveData(payload.slug, {
     contractDefaults: mergedContractDefaults,
-    docTemplates: docTemplatesOverrides,
+    docTemplates: docTemplatesOverrides ?? {},
   });
 
   return {

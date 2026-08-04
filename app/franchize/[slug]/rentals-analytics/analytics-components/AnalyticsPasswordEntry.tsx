@@ -10,7 +10,7 @@ import { toast } from "sonner";
 interface AnalyticsPasswordEntryProps {
   crewName: string;
   slug: string;
-  onAuthenticated: (ownerId: string) => void;
+  onAuthenticated: (ownerId: string | null) => void;
 }
 
 export function AnalyticsPasswordEntry({ crewName, slug, onAuthenticated }: AnalyticsPasswordEntryProps) {
