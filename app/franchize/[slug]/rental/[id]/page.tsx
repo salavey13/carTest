@@ -444,7 +444,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
-            crewId={rental.crewId || crew.id}
+            crewId={crew.id}
             crewSlug={resolvedSlug}
             fallback={
               <div className="text-xs opacity-60 py-2" style={{ color: textSecondary }}>
@@ -454,7 +454,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           >
             <RentalReturnChecklist
               rentalId={rental.rentalId}
-              crewId={rental.crewId || crew.id}
+              crewId={crew.id}
               crewSlug={resolvedSlug}
               accentColor={accent}
               borderColor={borderSoft}
@@ -465,31 +465,39 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           </FranchizeRentalRoleGuard>
         )}
 
-        {/* Message input — sends notification to crew owner via TG bot */}
-        <div id="rental-message-input">
-          <RentalMessageInput
-            rentalId={rental.rentalId}
-            accentColor={accent}
-            borderColor={borderSoft}
-            textPrimary={textPrimary}
-            textSecondary={textSecondary}
-          />
-        </div>
+        {/* Message input — only show when renter has a real TG chat_id
+            (QR claimed). If QR not scanned, message will fail silently.
+            Also hide for completed/cancelled — no point messaging a closed rental. */}
+        {rental.found && status !== "completed" && status !== "cancelled" && rental.renterTelegramChatId && /^\d+$/.test(rental.renterTelegramChatId) && (
+          <div id="rental-message-input">
+            <RentalMessageInput
+              rentalId={rental.rentalId}
+              accentColor={accent}
+              borderColor={borderSoft}
+              textPrimary={textPrimary}
+              textSecondary={textSecondary}
+            />
+          </div>
+        )}
 
-        {/* Documents panel — OPERATOR ONLY */}
+        {/* Documents panel — OPERATOR ONLY.
+            Only show for non-completed/cancelled rentals.
+            For completed rentals, damage reports are no longer actionable —
+            closure data is already saved in metadata.closure_data. */}
+        {rental.found && status !== "completed" && status !== "cancelled" && (
         <FranchizeRentalRoleGuard
           allowedRoles={["operator", "admin", "owner"]}
           ownerId={rental.ownerId}
           renterId={rental.renterId}
           renterTelegramChatId={rental.renterTelegramChatId}
-          crewId={rental.crewId || crew.id}
+          crewId={crew.id}
           crewSlug={resolvedSlug}
         >
           <FranchizeErrorBoundary fallbackTitle="Документы временно недоступны" fallbackMessage="Попробуйте перезагрузить.">
             <FranchizeRentalDocumentsPanel
               rentalId={rental.rentalId}
               ownerId={rental.ownerId}
-              crewId={rental.crewId || crew.id}
+              crewId={crew.id}
               crewSlug={resolvedSlug}
               status={status}
               metadata={rental.metadata}
@@ -498,6 +506,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             />
           </FranchizeErrorBoundary>
         </FranchizeRentalRoleGuard>
+        )}
 
         {/* Single "Продлить" button — operator-only. Opens ExtendModal with date picker.
             Was 2 duplicate buttons (sidebar + action row); now just one. */}
@@ -507,7 +516,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
-            crewId={rental.crewId || crew.id}
+            crewId={crew.id}
             crewSlug={resolvedSlug}
           >
             <RentalExtendModal
@@ -534,7 +543,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           ownerId={rental.ownerId}
           renterId={rental.renterId}
           renterTelegramChatId={rental.renterTelegramChatId}
-          crewId={rental.crewId || crew.id}
+          crewId={crew.id}
           crewSlug={resolvedSlug}
         >
           <div id="lifecycle-actions">
@@ -543,7 +552,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                 rentalId={rental.rentalId}
                 ownerId={rental.ownerId}
                 renterId={rental.renterId}
-                crewId={rental.crewId || crew.id}
+                crewId={crew.id}
                 crewSlug={resolvedSlug}
                 status={status}
                 paymentStatus={rental.paymentStatus}
@@ -562,7 +571,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
-            crewId={rental.crewId || crew.id}
+            crewId={crew.id}
             crewSlug={resolvedSlug}
             contractVerified={isVerified}
             contractDownloadUrl={rental.contractDownloadUrl || null}
@@ -583,7 +592,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
-            crewId={rental.crewId || crew.id}
+            crewId={crew.id}
             crewSlug={resolvedSlug}
             bikeTitle={rental.vehicleTitle}
             statusLabel={statusLabel[status]}
@@ -618,7 +627,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           ownerId={rental.ownerId}
           renterId={rental.renterId}
           renterTelegramChatId={rental.renterTelegramChatId}
-          crewId={rental.crewId || crew.id}
+          crewId={crew.id}
           crewSlug={resolvedSlug}
           accentColor={accent}
           accentTextOn={accentTextOn}
