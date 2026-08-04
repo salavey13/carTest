@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { FranchizeAdminClient } from "@/app/franchize/components/FranchizeAdminClient";
+import { FranchizeErrorBoundary } from "../../components/ErrorBoundary";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { FranchizePageShell } from "../../components/FranchizePageShell";
@@ -45,11 +46,20 @@ export default async function FranchizeSlugAdminPage({
         groupLinks={items.map((item) => item.category)}
       />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4">
-        <FranchizeAdminClient
-          initialSlug={resolvedSlug}
-          editId={edit}
-          initialCrew={crew}
-        />
+        {/* M4: wrap admin client in error boundary so a crash doesn't take down the whole page */}
+        <FranchizeErrorBoundary
+          resetKey={resolvedSlug}
+          fallbackTitle="Админ-панель временно недоступна"
+          fallbackMessage="Что-то пошло не так. Попробуйте перезагрузить страницу."
+          fallbackHref={activePath}
+          fallbackLinkLabel="Перезагрузить"
+        >
+          <FranchizeAdminClient
+            initialSlug={resolvedSlug}
+            editId={edit}
+            initialCrew={crew}
+          />
+        </FranchizeErrorBoundary>
       </FranchizePageShell>
       <CrewFooter crew={crew} />
     </main>

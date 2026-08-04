@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Lock, X, Loader2, Sparkles, ShieldCheck } from "lucide-react";
 import { validateAnalyticsPassword } from "@/app/franchize/server-actions/rentals-dashboard";
-import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { withAlpha } from "@/app/franchize/lib/theme";
 import { toast } from "sonner";
 
@@ -14,32 +13,22 @@ interface AnalyticsPasswordEntryProps {
 }
 
 export function AnalyticsPasswordEntry({ crewName, slug, onAuthenticated }: AnalyticsPasswordEntryProps) {
-  const theme = useFranchizeTheme({});
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [isPasswordValidating, setIsPasswordValidating] = useState(false);
 
-  const accentMain = theme.isAuto
-    ? "var(--franchize-accent-main)"
-    : theme.palette.accentMain;
-  const accentHover = theme.isAuto
-    ? "var(--franchize-accent-hover)"
-    : `${accentMain}CC`;
-  const bgBase = theme.isAuto
-    ? "var(--franchize-bg-base)"
-    : theme.palette.bgBase;
-  const bgCard = theme.isAuto
-    ? "var(--franchize-bg-card)"
-    : theme.palette.bgCard;
-  const textPrimary = theme.isAuto
-    ? "var(--franchize-text-primary)"
-    : theme.palette.textPrimary;
-  const textSecondary = theme.isAuto
-    ? "var(--franchize-text-secondary)"
-    : theme.palette.textSecondary;
-  const borderSoft = theme.isAuto
-    ? "var(--franchize-border-soft)"
-    : theme.palette.borderSoft;
+  // Theme colors come from the --franchize-* CSS variables, which are set
+  // on :root by the CrewHeader/useFranchizeTheme hook with the real crew theme.
+  // Using var() directly avoids the previous crash: `useFranchizeTheme({})`
+  // returns `{ cssVars }`, NOT a theme object, so accessing
+  // `theme.palette.accentMain` threw "Cannot read properties of undefined".
+  const accentMain = "var(--franchize-accent-main)";
+  const accentHover = "var(--franchize-accent-hover)";
+  const bgBase = "var(--franchize-bg-base)";
+  const bgCard = "var(--franchize-bg-card)";
+  const textPrimary = "var(--franchize-text-primary)";
+  const textSecondary = "var(--franchize-text-secondary)";
+  const borderSoft = "var(--franchize-border-soft)";
 
   const handleSubmit = async () => {
     if (!passwordInput.trim()) return;

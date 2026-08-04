@@ -1,7 +1,6 @@
 "use client";
 
 import { Car, DollarSign, FileText, TrendingUp, QrCode, Calendar, Users } from "lucide-react";
-import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { withAlpha } from "@/app/franchize/lib/theme";
 import { formatRubles, formatRussianDateOnly } from "@/app/franchize/[slug]/leads/leads-utils";
 
@@ -35,8 +34,6 @@ export function AnalyticsCrossNav({
   textPrimary,
   textSecondary,
 }: AnalyticsCrossNavProps) {
-  const theme = useFranchizeTheme({});
-
   return (
     <nav className="mb-4 md:mb-6" style={{ backgroundColor: bgCard, borderColor: borderSoft }}>
       <div className="overflow-x-auto pb-2">
