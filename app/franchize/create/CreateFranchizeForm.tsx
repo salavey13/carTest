@@ -381,10 +381,13 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
       mapBoundsBottom: String(readPath(source, ["contacts", "map", "bounds", "bottom"], prev.mapBoundsBottom)),
       mapBoundsLeft: String(readPath(source, ["contacts", "map", "bounds", "left"], prev.mapBoundsLeft)),
       mapBoundsRight: String(readPath(source, ["contacts", "map", "bounds", "right"], prev.mapBoundsRight)),
-      socialLinksText: readPath(source, ["footer", "socialLinks"], [])
-        .map((entry: { label?: string; href?: string }) => `${entry.label ?? ""}|${entry.href ?? ""}`)
-        .filter(Boolean)
-        .join("\n") || prev.socialLinksText,
+      // B2 fix: guard against non-array socialLinks (object, string, null) — was crashing
+      socialLinksText: (Array.isArray(readPath(source, ["footer", "socialLinks"], []))
+        ? (readPath(source, ["footer", "socialLinks"], []) as Array<{ label?: string; href?: string }>)
+            .map((entry) => `${entry.label ?? ""}|${entry.href ?? ""}`)
+            .filter(Boolean)
+            .join("\n")
+        : "") || prev.socialLinksText,
     }));
     setMessage("JSON применён локально для предпросмотра. Если всё ок — нажимайте сохранить.");
   };
