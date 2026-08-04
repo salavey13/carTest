@@ -29,6 +29,7 @@ import { FranchizeRentalRoleGuard } from "../../../components/FranchizeRentalRol
 import { RentalExtendModal } from "../../../components/RentalExtendModal";
 import { RenterActionsPanel } from "../../../components/RenterActionsPanel";
 import { GuestRentalCta } from "../../../components/GuestRentalCta";
+import { RentalQrCode } from "../../../components/RentalQrCode";
 
 interface FranchizeRentalPageProps {
   params: Promise<{ slug: string; id: string }>;
@@ -543,28 +544,18 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               ownerId={rental.ownerId}
               renterId={rental.renterId}
               renterTelegramChatId={rental.renterTelegramChatId}
-              crewId={rental.crewId || crew.id}
+              crewId={crew.id}
               crewSlug={resolvedSlug}
             >
-              <div className="rounded-xl border p-3 flex items-center gap-3" style={{ borderColor: borderSoft }}>
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`https://t.me/${process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}/app?startapp=rent_${rental.vehicleId}_${rental.docSha256}`)}&color=000000&bgcolor=ffffff`}
-                  alt="QR код для арендатора"
-                  className="h-24 w-24 shrink-0 rounded-lg"
-                  loading="lazy"
-                />
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold" style={{ color: textPrimary }}>
-                    📲 QR-код для арендатора
-                  </p>
-                  <p className="text-[11px] mt-0.5" style={{ color: textSecondary }}>
-                    Покажите этот код арендатору — он отсканирует его камерой Telegram для привязки аккаунта.
-                  </p>
-                  <p className="text-[10px] mt-1 font-mono break-all" style={{ color: textSecondary }}>
-                    {`rent_${rental.vehicleId}_${rental.docSha256.slice(0, 12)}…`}
-                  </p>
-                </div>
-              </div>
+              <RentalQrCode
+                vehicleId={rental.vehicleId}
+                docSha256={rental.docSha256}
+                botUsername={process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}
+                accentColor={accent}
+                borderColor={borderSoft}
+                textPrimary={textPrimary}
+                textSecondary={textSecondary}
+              />
             </FranchizeRentalRoleGuard>
           )}
 
