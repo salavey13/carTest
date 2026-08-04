@@ -253,7 +253,27 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
 
   const isDark = useMemo(() => form.themeMode.toLowerCase().includes("dark"), [form.themeMode]);
 
+  // styling-fix: use CSS vars from parent FranchizePageShell (crew theme) for the container
+  // shell, so the form blends with the admin page. The form's OWN palette (form.bgBase etc.)
+  // is still used for the live preview sections (palette contrast checks, etc.) but the
+  // outer container, inputs, and buttons now inherit the crew's theme.
   const ui = useMemo(
+    () => ({
+      pageBg: "var(--franchize-bg-base, var(--fr-admin-bg, #0B0C10))",
+      cardBg: "var(--franchize-bg-card, var(--fr-admin-bg, #111217))",
+      sectionBg: "color-mix(in srgb, var(--franchize-bg-card, var(--fr-admin-bg, #111217)) 85%, transparent)",
+      border: "var(--franchize-border-soft, var(--fr-admin-border, #24262E))",
+      text: "var(--franchize-text-primary, var(--fr-admin-text, #F2F2F3))",
+      muted: "var(--franchize-text-secondary, var(--fr-admin-muted, #A7ABB4))",
+      accent: "var(--franchize-accent-main, var(--fr-admin-accent, #D99A00))",
+      accentText: "var(--franchize-accent-contrast, #16130A)",
+      inputBg: "var(--franchize-bg-card, var(--fr-admin-bg, #0B0C10))",
+    }),
+    [], // CSS vars are static — they resolve at render time from the parent
+  );
+
+  // Keep the form's own palette for the live preview sections (contrast checks, color swatches)
+  const formPalette = useMemo(
     () => ({
       pageBg: isDark ? form.bgBase : "#F6F8FC",
       cardBg: isDark ? form.bgCard : "#FFFFFF",
@@ -595,7 +615,9 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 rounded-3xl border p-4 md:p-6" style={{ backgroundColor: ui.cardBg, borderColor: ui.border, color: ui.text }}>
+    // styling-fix: removed self-contained card wrapper — form now blends into the parent
+    // FranchizePageShell. No rounded-3xl border card; just a flat flex column.
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
       <div className="rounded-2xl border p-4" style={{ borderColor: ui.border, background: `linear-gradient(120deg, ${ui.pageBg}, ${ui.cardBg})` }}>
         <p className="text-xs uppercase tracking-[0.14em]" style={{ color: ui.accent }}>{form.brandName || "Franchize"}</p>
         <h1 className="mt-1 text-2xl font-semibold" style={{ color: ui.text }}>Брендинг-редактор франшизы</h1>
