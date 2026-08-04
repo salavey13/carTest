@@ -1,69 +1,41 @@
-```
-# Dependencies
-node_modules/
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Build artifacts
-dist/
-build/
-target/
+# dependencies
+/node_modules
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv/
-.ENV
-.python-version
+# next.js
+/.next/
+/out/
 
-# Logs
-*.log
+# production
+/build
 
-# Environment variables
-.env
-.env.local
-.env.*
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
+# env files
+.env*
 
-# OS
-.DS_Store
-Thumbs.db
+# vercel
+.vercel
 
-# Coverage
-coverage/
-htmlcov/
-.coverage
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+/version.ini
+version.ini
+/Configame/build
+/Configame/dist/Configame.exe
+/Configame/dist/ConfigameDemo.exe
+/Configame/__pycache__/
 
-# Compressed files
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
-```
+#python
+claude_telegram.py
+
+# nnvolt standalone project (deployed to Beget separately)
+nnvolt-static/node_modules/
+nnvolt-static/dist/
+nnvolt-static/.env*
