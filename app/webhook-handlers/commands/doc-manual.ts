@@ -1770,6 +1770,32 @@ ${qrDeepLink}`);
     { removeKeyboard: true, parseMode: "HTML" },
   );
 
+  // ── Auto-shame operator if they skipped phone input ──
+  // Phone is needed for QR claim flow — without it, renter can't be linked.
+  // Send a friendly "атата" directly to the operator who ran /doc.
+  if (isRent && !context.clientPhone) {
+    try {
+      const shameMessage =
+        `🚨 <b>Атата! Вы не указали телефон клиента</b>\n\n` +
+        `🏍 ${escapeHtml(bikeTitleForMsg)}\n` +
+        `👤 ${escapeHtml(context.mpFullName || "Клиент")}\n` +
+        `🔑 Аренда: ${rentalId ? escapeHtml((rentalId as string).slice(0, 8)) : "?"}\n\n` +
+        `Без телефона клиент не получит QR-код и не сможет привязать свой Telegram.\n` +
+        `QR-код сейчас можно показывать только визуально с экрана.\n\n` +
+        `💡 <b>Совет:</b> введите телефон на следующей аренде — клиент сможет получить QR-код в личные сообщения и сам привязать аккаунт.`;
+      await sendComplexMessage(
+        chatId, // same chat as the operator who ran /doc
+        shameMessage,
+        [[
+          { text: "📋 Открыть аренду", url: tgDeepLink },
+        ]],
+        { parseMode: "HTML" },
+      );
+    } catch (shameErr) {
+      console.warn("[/doc] Shame message failed (non-fatal):", shameErr);
+    }
+  }
+
   // ── Notify boss/admin (v3 polish: Russian-ized keys, no English "User:/Bike:/Client:") ──
   // Polish: send with inline buttons (rental link) + phone skip warning.
   // Was: notifyAdmin(auditText) — plain text, no buttons, no phone warning.
