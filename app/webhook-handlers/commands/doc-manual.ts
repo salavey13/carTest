@@ -1771,6 +1771,9 @@ ${qrDeepLink}`);
   );
 
   // ── Notify boss/admin (v3 polish: Russian-ized keys, no English "User:/Bike:/Client:") ──
+  // Polish: send with inline buttons (rental link) + phone skip warning.
+  // Was: notifyAdmin(auditText) — plain text, no buttons, no phone warning.
+  const phoneSkipped = isRent && !context.clientPhone;
   const auditText = buildDocAdminAuditMessage({
     isRent,
     bikeTitle: bikeTitleForMsg,
@@ -1782,7 +1785,39 @@ ${qrDeepLink}`);
     shortRentalId: rentalId || undefined ? (rentalId as string).slice(0, 8) : undefined,
     crewSlug: resolvedSlug,
   });
-  await notifyAdmin(auditText);
+
+  // Build admin message with phone status + warning
+  let adminMessage = auditText;
+  if (isRent) {
+    adminMessage += `\n📞 Телефон: ${context.clientPhone ? escapeHtml(context.clientPhone) : "⚠️ НЕ УКАЗАН"}`;
+    if (phoneSkipped) {
+      adminMessage += `\n\n🚨 <b>Атата!</b> Оператор пропустил ввод телефона. Без телефона клиент не получит QR-код и не сможет привязать свой Telegram. Напомните оператору, что телефон — это важно!`;
+    }
+  }
+
+  // Send with inline button linking to the rental page
+  try {
+    const adminChatId = "413553377"; // salavey13
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
+    const rentalWebUrl = rentalId ? `${siteUrl}/franchize/${resolvedSlug}/rental/${rentalId}` : "";
+    const botLink = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
+    const rentalTgLink = rentalId ? `${botLink}?startapp=rental_${rentalId}` : "";
+
+    const adminButtons = [];
+    if (rentalTgLink) adminButtons.push({ text: "📋 Открыть аренду", url: rentalTgLink });
+    if (rentalWebUrl) adminButtons.push({ text: "🌐 В браузере", url: rentalWebUrl });
+
+    await sendComplexMessage(
+      adminChatId,
+      adminMessage,
+      adminButtons.length > 0 ? [adminButtons] : [],
+      { parseMode: "HTML" },
+    );
+  } catch (adminErr) {
+    // Fallback: plain text notifyAdmin if sendComplexMessage fails
+    console.warn("[/doc] Admin notify with buttons failed, falling back to plain text:", adminErr);
+    await notifyAdmin(adminMessage);
+  }
 
   // --- Create/update lead in franchize_intents ---
   // This ensures the client appears on the leads page with proper state
