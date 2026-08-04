@@ -133,6 +133,11 @@ export function FranchizeAdminClient({
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [filterType, setFilterType] = useState<"all" | "bike" | "car">("all");
   const [loadingFleet, setLoadingFleet] = useState(false);
+  // U1: track last refresh time for "обновлено Xс назад" display
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(Date.now());
+  // U2: track whether fleet load has completed (for empty state)
+  const [fleetLoaded, setFleetLoaded] = useState(false);
   // M4: debounced fleet search
   const [fleetSearch, setFleetSearch] = useState("");
   const [debouncedFleetSearch, setDebouncedFleetSearch] = useState("");
@@ -188,6 +193,7 @@ export function FranchizeAdminClient({
     );
 
     setFleet(scoped);
+    setFleetLoaded(true); // U2: fleet load complete, can show empty state if 0
 
     if (editId) {
       const found = scoped.find((item) => item.id === editId) || null;
@@ -253,6 +259,7 @@ export function FranchizeAdminClient({
       return;
     }
     setSuccessfulRentals(result.items || []);
+    setLastRefreshedAt(Date.now()); // U1: track refresh time
   }, [dbUser?.user_id, slug]);
 
   const loadReviews = useCallback(async () => {
@@ -305,7 +312,12 @@ export function FranchizeAdminClient({
     const intervalId = window.setInterval(() => {
       void loadSuccessfulRentals();
     }, 60_000);
-    return () => window.clearInterval(intervalId);
+    // U1: tick every 15s so "обновлено Xс назад" stays fresh
+    const tickId = window.setInterval(() => setNowTick(Date.now()), 15_000);
+    return () => {
+      window.clearInterval(intervalId);
+      window.clearInterval(tickId);
+    };
   }, [loadSuccessfulRentals]);
 
   const visible = useMemo(
@@ -341,9 +353,21 @@ export function FranchizeAdminClient({
 
   const handleBulkFillVin = useCallback(async () => {
     if (!vinAudit.missing.length) return;
+    // L4 fix: confirm before generating synthetic VINs — these are NOT real VINs
+    // and should not be used in legal documents. Warn the operator.
+    const confirmed = window.confirm(
+      `Внимание! Будут сгенерированы ${vinAudit.missing.length} синтетических VIN-номеров.\n\n` +
+      `Это НЕ настоящие VIN — они созданы из марки/модели/ID техники и помечены ` +
+      `"CARTESTVIN" в конце.\n\n` +
+      `Используйте только для внутреннего учёта. Не указывайте эти VIN в договорах ` +
+      `купли-продажи или страховых документах.\n\n` +
+      `Продолжить?`
+    );
+    if (!confirmed) return;
     setIsBulkFillingVin(true);
     try {
       for (const vehicle of vinAudit.missing) {
+        const syntheticVin = buildSyntheticVin(vehicle);
         const response = await fetch("/api/cars", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -351,7 +375,8 @@ export function FranchizeAdminClient({
             ...vehicle,
             specs: {
               ...readVehicleSpecs(vehicle),
-              vin: buildSyntheticVin(vehicle),
+              vin: syntheticVin,
+              vin_is_synthetic: true, // L4: flag as synthetic for future audit
             },
           }),
         });
@@ -360,7 +385,9 @@ export function FranchizeAdminClient({
             `VIN bulk-fill failed for ${vehicle.make} ${vehicle.model}`,
           );
       }
-      toast.success(`VIN заполнен для ${vinAudit.missing.length} карточек`);
+      toast.success(
+        `Сгенерировано ${vinAudit.missing.length} синтетических VIN (помечены как ненастоящие)`,
+      );
       await loadFleet();
     } catch (error) {
       toast.error(
@@ -488,6 +515,43 @@ export function FranchizeAdminClient({
           value={fleet.filter((v) => v.type === "car").length}
         />
       </div>
+
+      {/* U1: "Last refreshed" + manual refresh button */}
+      {lastRefreshedAt && (
+        <div className="mt-1 flex items-center gap-2 text-[11px]" style={{ color: "var(--fr-admin-muted)" }}>
+          <span>
+            {(() => {
+              const secs = Math.floor((nowTick - lastRefreshedAt) / 1000);
+              if (secs < 60) return `Обновлено ${secs}с назад`;
+              const mins = Math.floor(secs / 60);
+              return `Обновлено ${mins}м назад`;
+            })()}
+          </span>
+          <button
+            type="button"
+            onClick={() => { void loadSuccessfulRentals(); void loadFleet(); }}
+            className="underline-offset-2 hover:underline"
+            style={{ color: "var(--fr-admin-accent)" }}
+          >
+            Обновить сейчас
+          </button>
+        </div>
+      )}
+
+      {/* U2: Empty state when fleet is loaded but empty */}
+      {fleetLoaded && fleet.length === 0 && !loadingFleet && (
+        <div className="mt-4 rounded-2xl border-2 border-dashed p-8 text-center"
+          style={{ borderColor: "var(--fr-admin-border)" }}>
+          <p className="text-2xl mb-2">🏍️</p>
+          <p className="text-sm font-semibold" style={{ color: "var(--fr-admin-text)" }}>
+            В каталоге пока нет техники
+          </p>
+          <p className="mt-1 text-xs" style={{ color: "var(--fr-admin-muted)" }}>
+            Добавьте первый байк или автомобиль — он сразу появится здесь
+          </p>
+        </div>
+      )}
+
       <FranchizeOperatorPanel className="mt-4 text-sm leading-relaxed">
         <p className="break-words text-[var(--fr-admin-text)]">
           Для шаблона документов используй характеристики: <code>vin</code>,{" "}
