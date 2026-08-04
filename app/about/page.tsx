@@ -56,9 +56,12 @@ export default function AboutPage() {
         <motion.header variants={stagger} initial="hidden" animate="show" className="mb-16">
           <motion.div variants={fadeUp} className="mb-8 flex flex-col items-start gap-6 sm:flex-row sm:items-center">
             <div className="relative shrink-0">
-              <div className="flex h-24 w-24 items-center justify-center rounded-3xl border border-primary/40 bg-gradient-to-br from-card to-muted shadow-[0_0_50px_-12px_hsl(var(--primary)/0.5)] sm:h-28 sm:w-28">
-                <span className="bg-clip-text text-3xl font-black tracking-tight text-transparent sm:text-4xl" style={{ backgroundImage: "linear-gradient(120deg, hsl(var(--primary)), hsl(45 25% 88%))" }}>ПС</span>
-              </div>
+              {/* Restore actual photo (was replaced with "ПС" monogram in bed06c45) */}
+              <img
+                src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix//135398606.png"
+                alt="Павел Соловьёв"
+                className="h-24 w-24 rounded-2xl border border-primary/40 object-cover shadow-[0_0_50px_-12px_hsl(var(--primary)/0.5)] sm:h-28 sm:w-28"
+              />
               <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[hsl(150_78%_48%)] opacity-60" /><span className="relative inline-flex h-3.5 w-3.5 rounded-full border-2 border-background bg-[hsl(150_78%_48%)]" /></span>
             </div>
             <div>
