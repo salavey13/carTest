@@ -4915,12 +4915,16 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   try {
     const { data: artefact } = await privateSchema()
       .from("rental_contract_artifacts")
-      .select("renter_full_name, telegram_chat_id, storage_path, renter_phone, original_sha256")
+      .select("renter_full_name, telegram_chat_id, storage_path, renter_phone, original_sha256, created_by_operator_chat_id")
       .eq("rental_id", safeRentalId)
       .maybeSingle();
     if (artefact) {
       renterFullName = typeof artefact.renter_full_name === "string" ? artefact.renter_full_name : "";
-      renterTelegramChatId = typeof artefact.telegram_chat_id === "string" ? artefact.telegram_chat_id : "";
+      // QR fix: if telegram_chat_id === created_by_operator_chat_id, QR not claimed yet —
+      // renterTelegramChatId should be empty so the page hides message input.
+      const rawChatId = typeof artefact.telegram_chat_id === "string" ? artefact.telegram_chat_id : "";
+      const operatorChatId = typeof artefact.created_by_operator_chat_id === "string" ? artefact.created_by_operator_chat_id : "";
+      renterTelegramChatId = (rawChatId && rawChatId !== operatorChatId) ? rawChatId : "";
       // QR fix: fetch renter_phone + original_sha256 for QR code display on rental page
       renterPhone = typeof artefact.renter_phone === "string" ? artefact.renter_phone : "";
       docSha256 = typeof artefact.original_sha256 === "string" ? artefact.original_sha256 : "";
