@@ -415,6 +415,22 @@ export function FranchizeAdminClient({
 
   if (isLoading) return <Loading text="Загружаем гараж экипажа..." />;
 
+  // U6: "Login required" state when dbUser is null (not authed via TG WebApp)
+  if (!dbUser?.user_id) {
+    return (
+      <div className="rounded-2xl border-2 border-dashed p-8 text-center"
+        style={{ borderColor: "var(--fr-admin-border, #333)" }}>
+        <p className="text-2xl mb-2">🔐</p>
+        <p className="text-sm font-semibold" style={{ color: "var(--fr-admin-text, #fff)" }}>
+          Нужна авторизация
+        </p>
+        <p className="mt-1 text-xs" style={{ color: "var(--fr-admin-muted, #999)" }}>
+          Откройте эту страницу через Telegram WebApp — панель управления доступна только авторизованным участникам экипажа.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div
       className="space-y-4"
