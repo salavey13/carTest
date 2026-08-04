@@ -85,6 +85,11 @@ function done(payload) {
 }
 
 // ── Supabase access ──────────────────────────────────────────────────────
+// L10 fix: auth check for write operations. The skill uses service-role key
+// which bypasses RLS. Before any write, verify the --actorUserId is either:
+//   1. The crew owner (crew.owner_id)
+//   2. A crew_members row with role=owner/admin/co_owner
+//   3. A global admin (users.metadata.role=admin)
 async function loadCrew(slugToLoad) {
   const { data, error } = await supabase
     .from('crews')
@@ -94,6 +99,32 @@ async function loadCrew(slugToLoad) {
   if (error) fail({ stage: 'load_crew', reason: 'db_error', details: { slug: slugToLoad, message: error.message } });
   if (!data) fail({ stage: 'load_crew', reason: 'crew_not_found', details: { slug: slugToLoad } });
   return data;
+}
+
+async function checkWriteAccess(crew, actorUserId) {
+  if (!actorUserId) {
+    fail({ stage: 'auth', reason: 'missing_actor', details: { hint: 'Pass --actorUserId <telegram_chat_id> for write operations' } });
+  }
+  // 1. Crew owner?
+  if (crew.owner_id === actorUserId) return;
+  // 2. Crew member with owner/admin/co_owner role?
+  const { data: membership } = await supabase
+    .from('crew_members')
+    .select('role')
+    .eq('crew_id', crew.id)
+    .eq('user_id', actorUserId)
+    .maybeSingle();
+  if (membership && ['owner', 'admin', 'co_owner'].includes(membership.role)) return;
+  // 3. Global admin?
+  const { data: user } = await supabase
+    .from('users')
+    .select('metadata')
+    .eq('user_id', actorUserId)
+    .maybeSingle();
+  const meta = user?.metadata;
+  if (meta?.role === 'admin' || meta?.status === 'admin') return;
+  // Denied
+  fail({ stage: 'auth', reason: 'not_authorized', details: { actorUserId, crewSlug: crew.slug, hint: 'Only crew owner/admin/co_owner or global admin can write' } });
 }
 
 async function loadSecrets(crewSlug) {
@@ -310,6 +341,8 @@ async function cmdSetField() {
   const raw = arg('value');
   if (raw === '' && !hasFlag('value')) fail({ stage: 'set_field', reason: 'missing_value', details: { expected: '--value <raw>' } });
   const { crew, secrets, input, parsed } = await resolveConfig(slug);
+  // L10: auth check before write
+  if (!dryRun) await checkWriteAccess(crew, arg('actorUserId'));
   const prev = parsed.success ? input : null;
 
   if (field.startsWith('input.')) {
@@ -380,6 +413,8 @@ async function cmdSetContractDefault() {
 // shared setter used by set-field and set-contract-default
 async function cmdSetFieldImpl(crewSlug, field, raw, dryRunFlag) {
   const { crew, secrets, input, parsed } = await resolveConfig(crewSlug);
+  // L10: auth check before write
+  if (!dryRunFlag) await checkWriteAccess(crew, arg('actorUserId'));
   const prev = parsed.success ? input : null;
 
   if (field.startsWith('contractDefaults.')) {
