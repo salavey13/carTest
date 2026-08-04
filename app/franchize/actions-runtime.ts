@@ -225,6 +225,9 @@ export interface FranchizeCrewVM {
   contentBlocks: FranchizeContentBlocks;
   reviewsLink?: string;
   cta: CtaBlock;
+  ui: {
+    showCreateButton: boolean;
+  };
 }
 
 export interface CtaBlock {
@@ -399,6 +402,11 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     description: "",
     buttonLabel: "Записаться",
     buttonHref: "",
+  },
+  ui: {
+    // Crews that want to hide the "Создать франшизу" entries set
+    // metadata.franchize.ui.showCreateButton=false in SQL hydration.
+    showCreateButton: true,
   },
 });
 
@@ -678,6 +686,21 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         description: readPath(franchize, ["cta", "description"], ""),
         buttonLabel: readPath(franchize, ["cta", "buttonLabel"], "Записаться"),
         buttonHref: readPath(franchize, ["cta", "buttonHref"], ""),
+      },
+      // Reviews CTA is shown only when the crew hydration provides a link
+      // (metadata.franchize.catalog.reviewsLink). Read both spellings —
+      // the legacy docs/sql/vip-bike-franchize-hydration.sql still has the
+      // old "rewiewsLink" typo; crewDocs version uses the correct one.
+      reviewsLink: readPath(
+        franchize,
+        ["catalog", "reviewsLink"],
+        readPath(franchize, ["catalog", "rewiewsLink"], ""),
+      ),
+      ui: {
+        // metadata.franchize.ui.showCreateButton=false (e.g. vip-bike via
+        // SQL hydration) hides the "Создать франшизу" entries in the header
+        // profile dropdown. Default: true (sly13 and any new crew).
+        showCreateButton: readPath(franchize, ["ui", "showCreateButton"], true) !== false,
       },
     };
 
