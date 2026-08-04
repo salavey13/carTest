@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check, ExternalLink } from "lucide-react";
+import { Copy, Check, AlertTriangle } from "lucide-react";
 
 /**
  * RentalQrCode
@@ -9,11 +9,12 @@ import { Copy, Check, ExternalLink } from "lucide-react";
  * Shows the QR code for a rental on the rental page (operator-only).
  * Includes a copyable deep link so the operator can send it via DM or SMS.
  *
+ * IMPORTANT: The deep link is single-use (triggers QR claim on open).
+ * There is NO "open" button — opening the link accidentally would consume
+ * the QR claim and break the renter's onboarding flow. Only copy is allowed.
+ *
  * QR deep link format (matches doc-manual.ts):
  *   https://t.me/<bot>/app?startapp=rent_<vehicleId>_<docSha256>
- *
- * The QR image is generated via api.qrserver.com (same as /doc command).
- * The full deep link is shown as copyable text below the QR image.
  */
 interface RentalQrCodeProps {
   vehicleId: string;
@@ -65,7 +66,13 @@ export function RentalQrCode({
           Покажите код арендатору или отправьте ссылку ниже в личное сообщение / SMS.
         </p>
 
-        {/* Copyable deep link */}
+        {/* Warning: link is single-use */}
+        <p className="mt-1.5 flex items-center gap-1 text-[10px] font-medium" style={{ color: "#f59e0b" }}>
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          Ссылка одноразовая — не открывайте сами, только копируйте!
+        </p>
+
+        {/* Copyable deep link (NO open button — link is single-use) */}
         <div className="mt-2 flex items-center gap-1.5">
           <input
             type="text"
@@ -91,22 +98,12 @@ export function RentalQrCode({
           >
             {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
           </button>
-          <a
-            href={deepLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Открыть ссылку"
-            className="shrink-0 rounded-lg p-1.5 transition hover:opacity-80"
-            style={{ color: textSecondary }}
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
         </div>
 
         {/* Copy confirmation */}
         {copied && (
           <p className="mt-1 text-[10px] font-semibold" style={{ color: "#22c55e" }}>
-            ✓ Ссылка скопирована — вставьте в чат или SMS
+            ✓ Ссылка скопирована — вставьте в чат или SMS арендатору
           </p>
         )}
       </div>
