@@ -4777,6 +4777,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   paymentStatus: string;
   totalCost: number;
   vehicleTitle: string;
+  vehicleImageUrl: string;     // from cars.image_url or specs.gallery[0]
   renterId: string;
   ownerId: string;
   agreedStartDate: string | null;
@@ -4809,6 +4810,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       paymentStatus: "interest_paid",
       totalCost: 0,
       vehicleTitle: "—",
+      vehicleImageUrl: "",
       renterId: "",
       ownerId: "",
       agreedStartDate: null,
@@ -4847,6 +4849,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       paymentStatus: "interest_paid",
       totalCost: 0,
       vehicleTitle: "—",
+      vehicleImageUrl: "",
       renterId: "",
       ownerId: "",
       agreedStartDate: null,
@@ -4870,7 +4873,17 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     };
   }
 
-  const vehicle = data.vehicle as { make?: string; model?: string } | null;
+  const vehicle = data.vehicle as { make?: string; model?: string; image_url?: string; specs?: { gallery?: string[]; image_urls?: string[] } } | null;
+  // Restore vehicleImageUrl extraction (was lost in a push regression)
+  const vehicleImageUrl = (() => {
+    if (!vehicle) return "";
+    if (vehicle.image_url) return vehicle.image_url;
+    const gallery = vehicle.specs?.gallery;
+    if (Array.isArray(gallery) && gallery.length > 0 && typeof gallery[0] === "string") return gallery[0];
+    const imageUrls = vehicle.specs?.image_urls;
+    if (Array.isArray(imageUrls) && imageUrls.length > 0 && typeof imageUrls[0] === "string") return imageUrls[0];
+    return "";
+  })();
 
   const metadata = (data.metadata as Record<string, unknown> | null) ?? null;
   const verifier = metadata && typeof metadata.contract_verifier === "object" ? (metadata.contract_verifier as Record<string, unknown>) : null;
@@ -4934,6 +4947,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     paymentStatus: data.payment_status ?? "interest_paid",
     totalCost: Number(data.total_cost ?? 0),
     vehicleTitle: `${vehicle?.make ?? "Vehicle"} ${vehicle?.model ?? ""}`.trim(),
+    vehicleImageUrl,
     renterId: data.user_id ?? "",
     ownerId: data.owner_id ?? "",
     agreedStartDate: (data as any).agreed_start_date || null,
