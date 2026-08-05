@@ -46,6 +46,17 @@ const PART_ICONS: Record<string, typeof Zap> = {
   wheels: CircleDot,     // was Gauge (same as performance)
 }
 
+// CR2-003: Absolute motor upgrade prices from the 3000W reference motor.
+// Used to compute DIFFERENCES: for a bike with base power_w = X, upgrading to Y costs
+// MOTOR_UPGRADE_PRICES[Y] - MOTOR_UPGRADE_PRICES[X].
+// This prevents double-charging when the bike's daily_price already includes a non-3000W motor.
+const MOTOR_UPGRADE_PRICES: Record<number, number> = {
+  3000: 0,
+  5000: 79000,
+  8000: 90000,
+  10000: 167000,
+}
+
 
 const buildBikeImageFallback = (label: string) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#101014"/><stop offset="0.55" stop-color="#182526"/><stop offset="1" stop-color="#00ffea" stop-opacity="0.35"/></linearGradient></defs><rect width="800" height="560" fill="url(#g)"/><path d="M126 362h548" stroke="#00ffea" stroke-opacity="0.24" stroke-width="8" stroke-linecap="round"/><circle cx="230" cy="362" r="70" fill="none" stroke="#f8fafc" stroke-opacity="0.72" stroke-width="18"/><circle cx="570" cy="362" r="70" fill="none" stroke="#f8fafc" stroke-opacity="0.72" stroke-width="18"/><path d="M240 348l98-120h104l98 120m-202-120l56 120m48-120l-80 120" fill="none" stroke="#00ffea" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/><text x="400" y="132" fill="#f8fafc" font-family="Inter,Arial,sans-serif" font-size="42" font-weight="800" text-anchor="middle">${label.replace(/[<>&]/g, '')}</text><text x="400" y="184" fill="#99f6e4" font-family="Inter,Arial,sans-serif" font-size="22" text-anchor="middle">image fallback / spec visible</text></svg>`
@@ -74,7 +85,9 @@ function StepBar({ current, goTo, disabled }: {
 }) {
   const idx = STEPS.findIndex((s) => s.key === current)
   return (
-    <nav className="mb-8 flex items-center gap-1 overflow-x-auto pb-2" aria-label="Шаги конфигурации">
+    <nav className="mb-8 flex items-center gap-1 overflow-x-auto py-3 px-1" aria-label="Шаги конфигурации">
+      {/* py-3 + px-1: padding prevents the active button's scale-105 + shadow-lg from being
+          clipped by the overflow-x-auto container (was pb-2 only → top shadow was cut off) */}
       {STEPS.map((step, i) => {
         const active = step.key === current
         const done = i < idx
@@ -283,23 +296,41 @@ export function ConfiguratorClient({ crew, slug }: Props) {
     setDeliveryApplied(false)
   }, [selectedBike, isBatteryIncluded, regularBatteries])
 
-  // CR2-003: availableMotors — the bike's own power_w is always the free base option.
-  // Was: hardcoded list where 5000W/8000W always had extra=79000/90000, even if the bike's
-  // base power was 5000W (the user was charged 79k for the motor they already have).
-  // Now: any option matching the bike's power_w gets extra=0 (marked as base).
+  // CR2-003: availableMotors — upgrade prices are DIFFERENCES from the bike's base motor,
+  // not absolute values from 3000W. Was double-charging: a 5000W-base bike's daily_price
+  // already includes the 5000W motor (79k value), but selecting 8000W charged the full
+  // 90k (3000W→8000W) instead of 11k (5000W→8000W difference).
+  //
+  // MOTOR_UPGRADE_PRICES defines the absolute upgrade cost from the 3000W reference motor.
+  // For a bike with base power_w = X, the extra for selecting motor Y is:
+  //   MOTOR_UPGRADE_PRICES[Y] - MOTOR_UPGRADE_PRICES[X]
   const availableMotors = useMemo(() => {
     const powerW = selectedBike?.specs.power_w ?? 3000
-    if (powerW >= 10000) return [{ value: String(powerW), extra: 0, label: `${powerW}W (база)` }]
-    const baseValue = String(powerW)
-    return [
-      { value: '3000', extra: 0, label: powerW === 3000 ? '3000W (база)' : '3000W' },
-      { value: '5000', extra: powerW === 5000 ? 0 : 79000, label: powerW === 5000 ? '5000W (база)' : '5000W (+79 000 ₽)' },
-      { value: '8000', extra: powerW === 8000 ? 0 : 90000, label: powerW === 8000 ? '8000W (база)' : '8000W (+90 000 ₽)' },
-      { value: '10000', extra: 167000, label: '10000W (+167 000 ₽)' },
-    ].filter((m) => {
-      // Hide options below the bike's base power (downgrade doesn't make sense)
-      const v = parseInt(m.value, 10)
-      return v >= powerW || m.value === baseValue
+    const baseUpgradePrice = MOTOR_UPGRADE_PRICES[powerW] ?? 0
+
+    // Always include the bike's own power as the base option, plus all known upgrades above it
+    const allPowers = Array.from(new Set([powerW, ...Object.keys(MOTOR_UPGRADE_PRICES).map(Number)]))
+      .sort((a, b) => a - b)
+      .filter((w) => w >= powerW) // hide downgrades (selecting a weaker motor makes no sense)
+
+    if (allPowers.length === 0) {
+      // Bike has a non-standard power above 10000W — show just the base
+      return [{ value: String(powerW), extra: 0, label: `${powerW}W (база)` }]
+    }
+
+    return allPowers.map((w) => {
+      const upgradePrice = MOTOR_UPGRADE_PRICES[w] ?? baseUpgradePrice
+      const extra = Math.max(0, upgradePrice - baseUpgradePrice)
+      const isBase = w === powerW
+      return {
+        value: String(w),
+        extra,
+        label: isBase
+          ? `${w}W (база)`
+          : extra === 0
+            ? `${w}W`
+            : `${w}W (+${formatPrice(extra)})`,
+      }
     })
   }, [selectedBike])
 
