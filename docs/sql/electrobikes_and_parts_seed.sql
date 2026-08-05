@@ -340,6 +340,38 @@ ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.cars (id, make, model, description, daily_price, image_url, rent_link, is_test_result, specs, type, quantity)
 VALUES (
+    'vipbike-battery-120ah-lithium',
+    'VipBike',
+    'Литиевая батарея 120Ah',
+    'Литиевая аккумуляторная батарея емкостью 120Ah. Большой запас хода для дальних поездок.',
+    106000,
+    'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/battery_li_120ah.jpg',
+    NULL,
+    false,
+    '{"type": "Battery", "capacity": "120Ah", "battery_type": "lithium", "range_km": "120-220", "category": "battery", "compatible_models": ["G8", "G8-2", "DMG", "DK", "R1", "R2", "R3", "R6", "RZ", "V6", "JY", "XF", "Z1000", "DN"]}'::jsonb,
+    'parts',
+    20
+)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.cars (id, make, model, description, daily_price, image_url, rent_link, is_test_result, specs, type, quantity)
+VALUES (
+    'vipbike-battery-160ah-lithium',
+    'VipBike',
+    'Литиевая батарея 160Ah',
+    'Литиевая аккумуляторная батарея емкостью 160Ah. Максимальный запас хода — до 260 км.',
+    134000,
+    'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/parts/battery_li_160ah.jpg',
+    NULL,
+    false,
+    '{"type": "Battery", "capacity": "160Ah", "battery_type": "lithium", "range_km": "160-260", "category": "battery", "compatible_models": ["G8", "G8-2", "DMG", "DK", "R1", "R2", "R3", "R6", "RZ", "V6", "JY", "XF", "Z1000", "DN"]}'::jsonb,
+    'parts',
+    10
+)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.cars (id, make, model, description, daily_price, image_url, rent_link, is_test_result, specs, type, quantity)
+VALUES (
     'vipbike-front-shock',
     'VipBike',
     'Амортизатор передний',
