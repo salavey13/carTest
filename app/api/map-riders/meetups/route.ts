@@ -37,6 +37,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Unauthorized", reason: "subject_mismatch" }, { status: 403 });
   }
 
+  // MR-013: Add crew membership check — was missing on POST (DELETE had it).
+  // Without this, any authenticated user could create meetups in any crew's map.
+  const isCrewMember = await assertCrewMembership(parsed.data.userId, parsed.data.crewSlug);
+  if (!isCrewMember) {
+    return NextResponse.json({ success: false, error: "Join crew to create meetups", code: "join_required", reason: "membership_required" }, { status: 403 });
+  }
+
   const limit = enforceRateLimit(`map-riders:meetups:create:${guard.subject}`, 5, 60_000);
   if (!limit.allowed) {
     const response = NextResponse.json({ success: false, error: "Too Many Requests" }, { status: 429 });
