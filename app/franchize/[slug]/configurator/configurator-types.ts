@@ -109,6 +109,7 @@ export interface ConfiguratorLeadInput {
   bikeLabel: string
   motorLabel: string
   batteryLabel: string
+  batteryRange: string
   selectedColorId: string
   selectedColorFactoryId: string
   selectedAccessories: Array<{ name: string; price: number }>
