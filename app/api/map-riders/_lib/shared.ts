@@ -98,9 +98,10 @@ function computeWeeklyLeaderboardFromSessions(sessions: SessionRow[]): WeeklyLea
     weeklyMap.set(session.user_id, current);
   }
 
+  // MR-023: removed the dead `rank: index + 1` from the first .map — it was assigned
+  // based on Map iteration order, then immediately overwritten by the second .map after sort.
   return Array.from(weeklyMap.values())
-    .map((row, index) => ({
-      rank: index + 1,
+    .map((row) => ({
       userId: row.userId,
       riderName: row.riderName,
       distanceKm: Number(row.distanceKm.toFixed(1)),
