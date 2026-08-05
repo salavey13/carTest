@@ -1,0 +1,81 @@
+<style>
+  @page { size: A4; margin: 20mm 20mm 25mm 25mm; }
+  .doc-container { max-width: 17cm; margin: 0 auto; }
+  .doc-container p { max-width: 100%; overflow-wrap: break-word; }
+  .spec-table td { padding: 4pt 8pt; }
+  .spec-table tr:nth-child(even) td { background: #f8f8f8; }
+  .price-table td { padding: 4pt 8pt; }
+  .price-table .total td { font-weight: bold; font-size: 14pt; border-top: 2px solid #333; }
+  .config-header { background: linear-gradient(135deg, #0a0a0a 0%, #1a2a2a 100%); color: #fff; padding: 20pt; border-radius: 8pt; margin-bottom: 16pt; }
+  .config-header h1 { margin: 0; font-size: 18pt; }
+  .config-header .subtitle { font-size: 11pt; opacity: 0.8; margin-top: 4pt; }
+  .config-id { font-family: monospace; font-size: 10pt; opacity: 0.6; margin-top: 8pt; }
+  .section-title { font-size: 13pt; font-weight: bold; margin: 16pt 0 8pt 0; padding-bottom: 4pt; border-bottom: 1px solid #ccc; }
+  .accent { color: #00b894; }
+  .accessory-row td { padding: 3pt 8pt; }
+</style>
+<div class="doc-container" style="font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000;">
+
+<!-- Header with branding -->
+<div class="config-header">
+  <h1>⚡ Конфигурация электробайка {{brand_name}}</h1>
+  <div class="subtitle">Спецификация и расчёт стоимости</div>
+  <div class="config-id">№ {{config_id}} · {{config_date}} · {{config_timestamp}}</div>
+</div>
+
+<!-- Quick info box -->
+<table style="width: 100%; border: 2px solid #333; margin-top: 12pt; margin-bottom: 12pt; font-size: 11pt;" class="spec-table">
+<tr><td style="border: 1px solid #999; padding: 4pt 8pt; font-weight: bold; background: #f0f0f0;" colspan="2">📋 КРАТКАЯ ИНФОРМАЦИЯ</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; width: 40%; font-weight: bold;">Компания:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{brand_name}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Адрес:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{issuer_address}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Контактное лицо:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{issuer_representative}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Телефон:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{issuer_phone}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Telegram:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{issuer_telegram}}</td></tr>
+</table>
+
+<!-- Client info -->
+<div class="section-title">👤 Клиент</div>
+<table style="width: 100%; border: 1px solid #ccc; font-size: 11pt;" class="spec-table">
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; width: 40%; font-weight: bold;">Имя:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{client_name}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Telegram ID:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{client_telegram_id}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">ID пользователя:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{client_user_id}}</td></tr>
+</table>
+
+<!-- Selected model -->
+<div class="section-title">🏍️ Выбранная модель</div>
+<table style="width: 100%; border: 1px solid #ccc; font-size: 11pt;" class="spec-table">
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; width: 40%; font-weight: bold;">Модель:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{bike_make_model}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Мощность мотора:</td><td style="border: 1px solid #999; padding: 3pt 8pt;"><span class="accent">{{motor_power}}</span></td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Тип батареи:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{battery_type}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Ёмкость батареи:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{battery_capacity}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Запас хода:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{battery_range}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Цвет:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{bike_color_label}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Factory ID (цвет):</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-family: monospace; font-size: 10pt;">{{bike_color_factory_id}}</td></tr>
+</table>
+
+<!-- Accessories -->
+<div class="section-title">🔧 Дополнительные опции ({{accessories_count}} шт.)</div>
+<table style="width: 100%; border: 1px solid #ccc; font-size: 11pt;" class="accessory-row">
+<tr style="background: #f0f0f0;"><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Наименование</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold; text-align: center;">Кол-во</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold; text-align: right;">Цена</td></tr>
+{{accessories_table}}
+</table>
+
+<!-- Price breakdown -->
+<div class="section-title">💰 Расчёт стоимости</div>
+<table style="width: 100%; border: 1px solid #ccc; font-size: 12pt;" class="price-table">
+<tr><td style="border: 1px solid #999; padding: 4pt 8pt;">Базовая цена (без АКБ)</td><td style="border: 1px solid #999; padding: 4pt 8pt; text-align: right;">{{base_price}} ₽</td></tr>
+<tr><td style="border: 1px solid #999; padding: 4pt 8pt;">Мотор (апгрейд)</td><td style="border: 1px solid #999; padding: 4pt 8pt; text-align: right;">{{motor_price}} ₽</td></tr>
+<tr><td style="border: 1px solid #999; padding: 4pt 8pt;">Батарея</td><td style="border: 1px solid #999; padding: 4pt 8pt; text-align: right;">{{battery_price}} ₽</td></tr>
+<tr><td style="border: 1px solid #999; padding: 4pt 8pt;">Дополнительные опции ({{accessories_count}} шт.)</td><td style="border: 1px solid #999; padding: 4pt 8pt; text-align: right;">{{accessories_total}} ₽</td></tr>
+<tr><td style="border: 1px solid #999; padding: 4pt 8pt;">Доставка</td><td style="border: 1px solid #999; padding: 4pt 8pt; text-align: right;">{{delivery_price}} ₽</td></tr>
+<tr class="total"><td style="border: 2px solid #333; padding: 6pt 8pt;">ИТОГО</td><td style="border: 2px solid #333; padding: 6pt 8pt; text-align: right;" class="accent">{{total_price}} ₽</td></tr>
+</table>
+
+<!-- Footer -->
+<p style="margin-top: 24pt; font-size: 10pt; color: #666; border-top: 1px solid #ccc; padding-top: 8pt;">
+Документ сгенерирован автоматически конфигуратором {{brand_name}}.<br>
+{{config_timestamp}}<br>
+Конфигурация № {{config_id}}
+</p>
+
+</div>
