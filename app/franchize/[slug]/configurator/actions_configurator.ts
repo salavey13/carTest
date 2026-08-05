@@ -25,12 +25,37 @@ import { DEFAULT_FACTORY_COLOR, FACTORY_COLORS, getFactoryColorById, getFactoryC
 // Catalog loader
 // ─────────────────────────────────────────────
 
-export async function loadConfiguratorCatalog(): Promise<{
+export async function loadConfiguratorCatalog(crewSlug?: string): Promise<{
   ebikes: ConfiguratorBike[];
   parts: ConfiguratorPart[];
   hasLiveEbikeData: boolean;
   hasLivePartsData: boolean;
+  purchaseUrl: string;
 }> {
+  // CR-045: Resolve crew-specific purchase URL from crew-sensitive defaults.
+  // Falls back to the original hardcoded @I_O_S_NN if no crew context or no override.
+  let purchaseUrl = "https://t.me/I_O_S_NN";
+  if (crewSlug) {
+    try {
+      const crewSensitive = await getCrewSensitiveDataOrDefault(crewSlug, { source: "loadConfiguratorCatalog" });
+      const defaults = ((crewSensitive.contractDefaults ?? {}) as Record<string, unknown>).defaults as Record<string, unknown> | undefined;
+      const fromDefaults =
+        (typeof defaults?.purchase_url === "string" && defaults.purchase_url.trim()) ||
+        (typeof defaults?.purchaseUrl === "string" && defaults.purchaseUrl.trim()) ||
+        (typeof defaults?.purchase_telegram === "string" && defaults.purchase_telegram.trim()) ||
+        (typeof defaults?.purchaseTelegram === "string" && defaults.purchaseTelegram.trim()) ||
+        "";
+      if (fromDefaults) {
+        // If it's just a Telegram username (no protocol), normalise to t.me URL
+        purchaseUrl = fromDefaults.startsWith("http") || fromDefaults.startsWith("@")
+          ? (fromDefaults.startsWith("@") ? `https://t.me/${fromDefaults.slice(1)}` : fromDefaults)
+          : (fromDefaults.startsWith("t.me/") ? `https://${fromDefaults}` : `https://t.me/${fromDefaults}`);
+      }
+    } catch (err) {
+      logger.warn(`[configurator] failed to load purchase URL for crew ${crewSlug}`, err);
+    }
+  }
+
   try {
     const { data: ebikes, error: eErr } = await supabaseAdmin
       .from("cars")
@@ -52,6 +77,7 @@ export async function loadConfiguratorCatalog(): Promise<{
       parts: (parts as ConfiguratorPart[])?.length ? (parts as ConfiguratorPart[]) : fallbackParts,
       hasLiveEbikeData: Boolean(ebikes?.length),
       hasLivePartsData: Boolean(parts?.length),
+      purchaseUrl,
     };
   } catch (err) {
     logger.warn("[configurator] loadCatalog fell back", err);
@@ -60,6 +86,7 @@ export async function loadConfiguratorCatalog(): Promise<{
       parts: fallbackParts,
       hasLiveEbikeData: false,
       hasLivePartsData: false,
+      purchaseUrl,
     };
   }
 }
@@ -78,29 +105,29 @@ export async function loadConfiguratorCatalog(): Promise<{
 
 const CONFIGURATOR_DOC_FALLBACK = `<style>
   @page { size: A4; margin: 18mm 18mm 22mm 22mm; }
-  .doc-container { max-width: 17cm; margin: 0 auto; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #18181b; }
+  .doc-container { max-width: 17cm; margin: 0 auto; font-family: Arial, 'Helvetica Neue', sans-serif; font-size: 11pt; line-height: 1.5; color: #18181b; }
   .doc-container p { max-width: 100%; overflow-wrap: break-word; }
   .config-hero { background: #0a0a0a; color: #fff; padding: 22pt 24pt; margin-bottom: 16pt; border-left: 4pt solid #00ffea; }
   .config-hero h1 { margin: 0; font-size: 20pt; font-weight: 900; }
   .config-hero .subtitle { font-size: 11pt; opacity: 0.78; margin-top: 6pt; }
-  .config-hero .config-id { font-family: monospace; font-size: 9.5pt; opacity: 0.55; margin-top: 12pt; padding-top: 8pt; border-top: 1pt solid rgba(255,255,255,0.1); }
+  .config-hero .config-id { font-family: 'Courier New', monospace; font-size: 9.5pt; opacity: 0.55; margin-top: 12pt; padding-top: 8pt; border-top: 1pt solid #333333; }
   .section-title { font-size: 11pt; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; margin: 16pt 0 8pt 0; padding-bottom: 4pt; border-bottom: 1.5pt solid #0a0a0a; color: #0a0a0a; }
   table.spec-table { width: 100%; border-collapse: collapse; font-size: 10.5pt; }
   table.spec-table td { padding: 5pt 9pt; border: 0.5pt solid #d4d4d8; vertical-align: top; }
   table.spec-table tr:nth-child(even) td { background: #f7f7f8; }
-  table.spec-table td.label { font-weight: 700; background: #f0f0f2 !important; width: 38%; color: #18181b; }
+  table.spec-table td.label { font-weight: 700; background: #f0f0f2; width: 38%; color: #18181b; }
   table.accessory-table { width: 100%; border-collapse: collapse; font-size: 10.5pt; }
   table.accessory-table th { background: #0a0a0a; color: #fff; padding: 6pt 9pt; text-align: left; font-weight: 700; font-size: 9.5pt; }
   table.accessory-table th.num-col { text-align: center; width: 14%; }
   table.accessory-table th.price-col { text-align: right; width: 22%; }
   table.accessory-table td { padding: 5pt 9pt; border: 0.5pt solid #d4d4d8; vertical-align: middle; }
-  table.accessory-table td.num-cell { text-align: center; font-family: monospace; font-size: 10pt; color: #52525b; }
-  table.accessory-table td.price-cell { text-align: right; font-family: monospace; font-weight: 600; color: #18181b; }
+  table.accessory-table td.num-cell { text-align: center; font-family: 'Courier New', monospace; font-size: 10pt; color: #52525b; }
+  table.accessory-table td.price-cell { text-align: right; font-family: 'Courier New', monospace; font-weight: 600; color: #18181b; }
   table.accessory-table tr.empty-row td { text-align: center; font-style: italic; color: #71717a; padding: 10pt; }
   table.price-table { width: 100%; border-collapse: collapse; font-size: 11pt; }
   table.price-table td { padding: 6pt 10pt; border: 0.5pt solid #d4d4d8; }
   table.price-table td.price-label { color: #3f3f46; }
-  table.price-table td.price-value { text-align: right; font-family: monospace; font-weight: 600; color: #18181b; }
+  table.price-table td.price-value { text-align: right; font-family: 'Courier New', monospace; font-weight: 600; color: #18181b; }
   table.price-table tr.delivery-row td { color: #6b7280; font-style: italic; }
   table.price-table tr.total-row td { background: #0a0a0a; color: #fff; font-weight: 800; font-size: 14pt; padding: 10pt; border-top: 2pt solid #0a0a0a; border-bottom: 2pt solid #0a0a0a; }
   table.price-table tr.total-row td.price-value { color: #00ffea; font-size: 16pt; }
@@ -189,7 +216,14 @@ async function loadConfiguratorTemplate(crewSlug: string, secureTemplate: string
       return fileTemplate
     }
   } catch (err) {
-    logger.info(`[configurator] no crew template at ${crewDocPath}, using inline fallback`)
+    // CR-002: Distinguish "file not found" (expected, info-level) from real errors
+    // (permission denied, disk error, encoding error — warn-level so we see them).
+    const code = (err as NodeJS.ErrnoException)?.code
+    if (code === "ENOENT") {
+      logger.info(`[configurator] no crew template at ${crewDocPath}, using inline fallback`)
+    } else {
+      logger.warn(`[configurator] failed to read crew template ${crewDocPath}: ${code ?? "unknown"} — using inline fallback`, err)
+    }
   }
   // 3. inline fallback (always available, never throws)
   return CONFIGURATOR_DOC_FALLBACK
@@ -291,7 +325,8 @@ async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
     config_date: now.toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" }),
     config_id: configId,
     config_timestamp: now.toLocaleString("ru-RU", { timeZone: "Europe/Moscow" }),
-    issuer_name: escapeHtml(pickStr(["issuerName", "issuer_name"], `Franchize ${crewDisplayName}`)),
+    // CR-004: issuer_name removed — was computed but never referenced in any template.
+    // issuer_representative already carries the human-readable contact name.
     issuer_address: escapeHtml(pickStr(["return_address", "returnAddress", "address"], "г. Нижний Новгород, Комсомольская пл. 2")),
     issuer_representative: escapeHtml(pickStr(["issuer_representative", "issuerRepresentative", "representative"], "Сидоров Илья")),
     issuer_phone: escapeHtml(pickStr(["phone", "issuerPhone"], "не указан")),
@@ -418,7 +453,13 @@ async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
         sentTo: sendResults.map((r) => ({ tgId: r.id, ok: r.ok })),
         persistedAt: now.toISOString(),
       },
-      send_status: failures.length === sendResults.length ? "failed" : "sent",
+      // CR-006: Distinguish "no recipients at all" from "all failed" from "some sent".
+      // Was: 0 recipients → 0===0 false → "sent" (misleading — DOCX generated but delivered to nobody).
+      send_status: recipientSet.size === 0
+        ? "no_recipients"
+        : failures.length === sendResults.length
+          ? "failed"
+          : "sent",
       attempts: 1,
       doc_file_name: docFileName,
     });
