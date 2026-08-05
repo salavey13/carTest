@@ -10,6 +10,7 @@ import { useEffect, useState, useCallback, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAppContext } from "@/contexts/AppContext";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
+import { QuickSetWebhookButton } from "@/components/QuickSetWebhookButton";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
@@ -620,6 +621,11 @@ function AdminPageContent() {
                     </motion.div>
                   </Link>
                 ))}
+                {isTrulyAdmin && (
+                  <div className="pt-2 border-t border-white/10 mt-2">
+                    <QuickSetWebhookButton />
+                  </div>
+                )}
               </CardContent>
             </Card>
 
