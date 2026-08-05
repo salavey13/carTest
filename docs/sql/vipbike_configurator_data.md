@@ -36,7 +36,7 @@ Premium lithium batteries with higher capacity and better performance:
 | 80Ah | 98,000 ₽ | 90-150 km |
 | 120Ah | 106,000 ₽ | 120-220 km |
 | 150Ah | ~98,000 ₽ | 150-240 km |
-| 160Ah | 106,000 ₽ | 160-260 km |
+| 160Ah | 134,000 ₽ | 160-260 km |
 
 **Note:** Lithium batteries are lighter, have longer lifespan, and better cold-weather performance compared to regular batteries.
 
@@ -302,7 +302,7 @@ Based on the PDF, these could be added as type "parts":
 | Lithium Battery 60Ah | parts | 90,000 ₽ |
 | Lithium Battery 80Ah | parts | 98,000 ₽ |
 | Lithium Battery 120Ah | parts | 106,000 ₽ |
-| Lithium Battery 160Ah | parts | 106,000 ₽ |
+| Lithium Battery 160Ah | parts | 134,000 ₽ |
 
 ---
 
