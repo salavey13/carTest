@@ -1,9 +1,8 @@
 -- MapRiders default meetup POIs for vip-bike:
--- 1) VIP BIKE base moved to HQ coordinates (пл. Комсомольская 2: 56.297017, 43.946070)
---    Moved ~100m south-west from 56.297654, 43.947218 so the dot aligns with the
---    actual service entrance (not the middle of the square).
--- 2) second meetup moved near HQ for realistic visualization
--- 3) third meetup at nearby location
+-- 1) VIP BIKE HQ at exact address coordinates: 56°17'47.2"N 43°56'47.0"E
+--    = [56.296444, 43.946389] (пл. Комсомольская 2, Нижний Новгород)
+-- 2) Demo riders placed at realistic distances around HQ:
+--    A (12 км/ч) ~300m NE, B (14 км/ч) ~350m SW, C (16 км/ч) ~450m SE
 
 with target_map as (
   select id
@@ -36,7 +35,7 @@ default_meet_points as (
       'type', 'point',
       'icon', '::FaLocationDot::',
       'color', '#f97316',
-      'coords', jsonb_build_array(jsonb_build_array(56.297017, 43.946070))
+      'coords', jsonb_build_array(jsonb_build_array(56.296444, 43.946389))
     ),
     jsonb_build_object(
       'id', 'vip-demo-rider-a',
@@ -44,7 +43,7 @@ default_meet_points as (
       'type', 'point',
       'icon', '::FaLocationDot::',
       'color', '#fb923c',
-      'coords', jsonb_build_array(jsonb_build_array(56.301, 43.952))
+      'coords', jsonb_build_array(jsonb_build_array(56.298356, 43.949833))
     ),
     jsonb_build_object(
       'id', 'vip-demo-rider-b',
@@ -52,7 +51,7 @@ default_meet_points as (
       'type', 'point',
       'icon', '::FaLocationDot::',
       'color', '#fdba74',
-      'coords', jsonb_build_array(jsonb_build_array(56.296, 43.935))
+      'coords', jsonb_build_array(jsonb_build_array(56.294215, 43.942371))
     ),
     jsonb_build_object(
       'id', 'vip-demo-rider-c',
@@ -60,7 +59,7 @@ default_meet_points as (
       'type', 'point',
       'icon', '::FaLocationDot::',
       'color', '#fed7aa',
-      'coords', jsonb_build_array(jsonb_build_array(56.294, 43.96))
+      'coords', jsonb_build_array(jsonb_build_array(56.293578, 43.951555))
     )
   ) as points
 )
