@@ -74,7 +74,7 @@ function StepBar({ current, goTo, disabled }: {
 }) {
   const idx = STEPS.findIndex((s) => s.key === current)
   return (
-    <nav className="mb-8 flex items-center gap-1 overflow-x-auto pb-2">
+    <nav className="mb-8 flex items-center gap-1 overflow-x-auto pb-2" aria-label="Шаги конфигурации">
       {STEPS.map((step, i) => {
         const active = step.key === current
         const done = i < idx
@@ -84,6 +84,10 @@ function StepBar({ current, goTo, disabled }: {
             key={step.key}
             disabled={dis}
             onClick={() => goTo(step.key)}
+            // CR2-011: aria-current="step" tells screen readers which step is active.
+            // Simpler than full tablist/tab/tabpanel pattern (this is a wizard, not a tabbed panel).
+            aria-current={active ? 'step' : undefined}
+            aria-disabled={dis || undefined}
             className={[
               'group relative flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold tracking-wide transition-all duration-300 sm:text-sm',
               active
@@ -98,12 +102,14 @@ function StepBar({ current, goTo, disabled }: {
             <span className={[
               'flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold transition-colors shrink-0',
               active ? 'bg-black text-white' : done ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10 text-white/30',
-            ].join(' ')}>
+            ].join(' ')}
+            aria-hidden="true"
+            >
               {done ? <Check className="h-3.5 w-3.5" /> : step.num}
             </span>
             <span className="hidden sm:inline">{step.label}</span>
             {i < STEPS.length - 1 && (
-              <ChevronRight className="ml-1 h-3 w-3 text-white/20 hidden sm:block" />
+              <ChevronRight className="ml-1 h-3 w-3 text-white/20 hidden sm:block" aria-hidden="true" />
             )}
           </button>
         )
@@ -137,7 +143,13 @@ function LivePrice({ value, label }: { value: number; label?: string }) {
   return (
     <div className="flex flex-col items-end">
       {label && <span className="text-xs uppercase tracking-widest text-[var(--cfg-text-muted)]">{label}</span>}
-      <span className="font-mono text-2xl font-bold tracking-tight text-white sm:text-3xl transition-all duration-300">
+      {/* CR2-010: aria-live announces price changes to screen-reader users.
+          polite = don't interrupt, announce when idle. aria-atomic = read full value each time. */}
+      <span
+        className="font-mono text-2xl font-bold tracking-tight text-white sm:text-3xl transition-all duration-300"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         {formatPrice(display)}
       </span>
     </div>
@@ -159,7 +171,9 @@ export function ConfiguratorClient({ crew, slug }: Props) {
 
   const [bikes, setBikes] = useState(fallbackBikes)
   const [parts, setParts] = useState(fallbackParts)
-  const [selectedBikeId, setSelectedBikeId] = useState(fallbackBikes[0]?.id ?? '')
+  // CR2-008: no pre-selection — sticky bar/step nav shouldn't show a price before the user picks a bike.
+  // Was: fallbackBikes[0]?.id (always truthy → sticky bar showed 'VipBike G8 · 120 800 ₽' on the model step).
+  const [selectedBikeId, setSelectedBikeId] = useState('')
   const [motorPower, setMotorPower] = useState('3000')
   const [batteryMode, setBatteryMode] = useState<'regular' | 'lithium'>('regular')
   const [batteryCapacity, setBatteryCapacity] = useState('')
@@ -173,9 +187,16 @@ export function ConfiguratorClient({ crew, slug }: Props) {
   useEffect(() => {
     startTransition(async () => {
       const data = await loadConfiguratorCatalog(crew.slug || slug)
+      // CR2-004: capture the user's current selection BEFORE the await resolves.
+      // If they already picked a bike that exists in the live catalog, keep it.
+      // Only fall back to the cheapest bike if the current selection is empty or missing.
+      const currentSelectedBikeId = selectedBikeIdRef.current
       if (data.hasLiveEbikeData) {
         setBikes(data.ebikes)
-        setSelectedBikeId(data.ebikes[0]?.id ?? '')
+        const stillExists = currentSelectedBikeId && data.ebikes.some((b) => b.id === currentSelectedBikeId)
+        if (!stillExists) {
+          setSelectedBikeId(data.ebikes[0]?.id ?? '')
+        }
       }
       if (data.hasLivePartsData) setParts(data.parts)
       if (data.purchaseUrl) setPurchaseUrl(data.purchaseUrl)
@@ -184,6 +205,11 @@ export function ConfiguratorClient({ crew, slug }: Props) {
       }
     })
   }, [toast, crew.slug, slug])
+
+  // CR2-004: ref mirror of selectedBikeId so the catalog-load effect can read the latest value
+  // without adding selectedBikeId to the deps array (which would re-fetch on every selection change).
+  const selectedBikeIdRef = useRef('')
+  useEffect(() => { selectedBikeIdRef.current = selectedBikeId }, [selectedBikeId])
 
   const userTelegramId = useMemo(() => {
     if (tgUser?.id) return String(tgUser.id)
@@ -227,13 +253,14 @@ export function ConfiguratorClient({ crew, slug }: Props) {
     return opts.length === 1 && opts[0].type === 'lithium' && (opts[0].battery_price ?? 0) === 0
   }, [selectedBike])
 
-  // CR-009: Preserve batteryMode across bike switches of the same kind.
-  // Only force-flip when crossing the included/non-included boundary.
-  const prevBikeIdRef = useRef<string | null>(null)
+  // CR2-001: Removed the prevBikeIdRef early-return guard. It was causing stale motor/battery
+  // state when the DB catalog loaded a bike with the SAME id as the fallback (the seed SQL
+  // uses identical IDs). The effect would fire (selectedBike reference changed) but skip
+  // setMotorPower/setBatteryMode because the id matched. The deps array already gates correctly
+  // — selectedBike only changes when bikes[] or selectedBikeId changes, both of which are
+  // intentional state updates.
   useEffect(() => {
     if (!selectedBike) return
-    if (prevBikeIdRef.current === selectedBike.id) return // avoid re-running on re-render
-    prevBikeIdRef.current = selectedBike.id
 
     setMotorPower(String(selectedBike.specs.power_w ?? 3000))
 
@@ -243,24 +270,37 @@ export function ConfiguratorClient({ crew, slug }: Props) {
       setBatteryMode('lithium')
       setBatteryCapacity(includedBattery?.capacity ?? 'Included')
     } else {
-      // Non-included bike: preserve previous mode if it was lithium, otherwise regular
-      setBatteryMode((prev) => (prev === 'lithium' ? 'lithium' : 'regular'))
+      // CR2-002: If the bike has no regular batteries (empty/missing battery_options),
+      // default to lithium mode so the user sees options instead of an empty list.
+      const hasRegularBatteries = regularBatteries.length > 0
+      setBatteryMode((prev) => {
+        if (!hasRegularBatteries) return 'lithium'
+        return prev === 'lithium' ? 'lithium' : 'regular'
+      })
       setBatteryCapacity((regularBatteries[0] ?? lithiumBatteries[0])?.capacity ?? '')
     }
     setAccessoryQuantities({})
     setDeliveryApplied(false)
   }, [selectedBike, isBatteryIncluded, regularBatteries])
 
-  // CR-042: Use the bike's actual power_w for high-power bikes, not a hardcoded 10000
+  // CR2-003: availableMotors — the bike's own power_w is always the free base option.
+  // Was: hardcoded list where 5000W/8000W always had extra=79000/90000, even if the bike's
+  // base power was 5000W (the user was charged 79k for the motor they already have).
+  // Now: any option matching the bike's power_w gets extra=0 (marked as base).
   const availableMotors = useMemo(() => {
     const powerW = selectedBike?.specs.power_w ?? 3000
     if (powerW >= 10000) return [{ value: String(powerW), extra: 0, label: `${powerW}W (база)` }]
+    const baseValue = String(powerW)
     return [
-      { value: '3000', extra: 0, label: '3000W (база)' },
-      { value: '5000', extra: 79000, label: '5000W (+79 000 ₽)' },
-      { value: '8000', extra: 90000, label: '8000W (+90 000 ₽)' },
+      { value: '3000', extra: 0, label: powerW === 3000 ? '3000W (база)' : '3000W' },
+      { value: '5000', extra: powerW === 5000 ? 0 : 79000, label: powerW === 5000 ? '5000W (база)' : '5000W (+79 000 ₽)' },
+      { value: '8000', extra: powerW === 8000 ? 0 : 90000, label: powerW === 8000 ? '8000W (база)' : '8000W (+90 000 ₽)' },
       { value: '10000', extra: 167000, label: '10000W (+167 000 ₽)' },
-    ]
+    ].filter((m) => {
+      // Hide options below the bike's base power (downgrade doesn't make sense)
+      const v = parseInt(m.value, 10)
+      return v >= powerW || m.value === baseValue
+    })
   }, [selectedBike])
 
   const selectedMotor = useMemo(() => availableMotors.find((m) => m.value === motorPower) ?? availableMotors[0], [availableMotors, motorPower])
@@ -545,7 +585,15 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                   <Label className="text-xs font-medium uppercase tracking-widest text-[var(--cfg-text-dim)]">Диапазон цены</Label>
                   <span className="cfg-mono text-sm font-bold text-[var(--cfg-accent)]">{formatPrice(priceRange[0])} — {formatPrice(priceRange[1])}</span>
                 </div>
-                <Slider value={priceRange} onValueChange={setPriceRange} min={100000} max={500000} step={10000} className="cfg-slider mt-4" />
+                {/* CR2-006: clamp thumb values so min <= max (Radix Slider allows crossover) */}
+                <Slider
+                  value={priceRange}
+                  onValueChange={(v) => setPriceRange([Math.min(v[0], v[1]), Math.max(v[0], v[1])])}
+                  min={100000}
+                  max={500000}
+                  step={10000}
+                  className="cfg-slider mt-4"
+                />
                 <div className="mt-2 flex justify-between text-[10px] text-[var(--cfg-text-dim)]"><span>100 000 ₽</span><span>500 000 ₽</span></div>
               </div>
               <p className="cfg-mono text-xs text-[var(--cfg-text-dim)]">Найдено: <span className="font-bold text-white">{filteredBikes.length}</span> моделей</p>
@@ -557,7 +605,9 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                     <article key={bike.id} className={['group relative overflow-hidden rounded-2xl border bg-[var(--cfg-surface)] cfg-card-hover', isSelected ? 'cfg-selected-ring border-[var(--cfg-accent)]' : 'border-[var(--cfg-border)]'].join(' ')}>
                       <button type="button" className="block w-full text-left" onClick={() => selectBike(bike.id)}>
                         <div className="cfg-img-wrap relative aspect-[4/3] w-full overflow-hidden lg:aspect-square">
-                          <ConfiguratorBikeImage src={bike.image_url} alt={`${bike.make} ${bike.model}`} sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 25vw" className="group-hover:scale-105" />
+                          {/* CR2-015: sizes matches the grid: 1col/2col/3col/4col at sm/xl/2xl breakpoints.
+                              Was 25vw at xl (1280px+) but grid is 3-col there → each card is ~33vw. */}
+                          <ConfiguratorBikeImage src={bike.image_url} alt={`${bike.make} ${bike.model}`} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1536px) 33vw, 25vw" className="group-hover:scale-105" />
                           <div className="absolute inset-0 bg-gradient-to-t from-[var(--cfg-bg)] via-transparent to-transparent opacity-60" />
                           <div className="absolute left-3 top-3"><TierBadge tier={bike.specs.tier} /></div>
                           {isSelected && <div className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--cfg-accent)] shadow-lg shadow-[var(--cfg-accent)]/30"><Check className="h-4 w-4 text-black" /></div>}
@@ -601,8 +651,8 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                 </div>
                 {selectedBike.specs.gallery && selectedBike.specs.gallery.length > 0 && (
                   <div className="flex gap-2 overflow-x-auto border-t border-[var(--cfg-border)] p-3">
-                    {/* CR-039: dedup — DB-loaded bikes may include image_0 in gallery, fallback doesn't */}
-                    {Array.from(new Set([selectedBike.image_url, ...selectedBike.specs.gallery])).map((img, i) => (
+                    {/* CR2-014: filter falsy entries (image_url may be undefined for some DB rows) */}
+                    {Array.from(new Set([selectedBike.image_url, ...(selectedBike.specs.gallery ?? [])])).filter(Boolean).map((img, i) => (
                       <div key={img + i} className="relative h-16 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-[var(--cfg-border)]"><ConfiguratorBikeImage src={img} alt={`${selectedBike.make} ${selectedBike.model} фото ${i + 1}`} sizes="96px" /></div>
                     ))}
                   </div>
@@ -686,7 +736,8 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                             <input type="radio" name="battery" className="cfg-radio-dot" value={battery.capacity} checked={active} onChange={() => setBatteryCapacity(battery.capacity)} aria-label={`Аккумулятор ${battery.capacity}`} />
                             <span><span className="block text-sm font-semibold">{battery.capacity}</span><span className="block text-[11px] text-[var(--cfg-text-dim)]">Запас хода: {battery.range_km} км</span></span>
                           </span>
-                          <span className="cfg-mono text-xs font-medium text-[var(--cfg-text-muted)]">{battery.battery_price === 0 ? 'Вкл.' : `+${formatPrice(battery.battery_price)}`}</span>
+                          {/* CR2-007: "Вкл." collides with the isBatteryIncluded badge — use "Бесплатно" for zero-price selectable batteries */}
+                          <span className="cfg-mono text-xs font-medium text-[var(--cfg-text-muted)]">{battery.battery_price === 0 ? 'Бесплатно' : `+${formatPrice(battery.battery_price)}`}</span>
                         </label>
                       )
                     })}
@@ -694,21 +745,48 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                 </div>
               )}
 
-              {/* CR-019: color selection uses radiogroup semantics for screen readers */}
+              {/* CR-019: color selection uses radiogroup semantics for screen readers.
+                  CR2-005: arrow-key navigation (Left/Right/Up/Down) per WAI-ARIA radiogroup pattern.
+                  Only the active radio is in the tab order (tabIndex=0); others are tabIndex=-1. */}
               <div className="rounded-2xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-5 sm:p-6">
                 <div className="mb-4 flex items-center gap-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--cfg-accent)]/10"><Sparkles className="h-4 w-4 text-[var(--cfg-accent)]" /></div>
                   <div><h3 className="text-sm font-bold">Цвет</h3><p className="text-xs text-[var(--cfg-text-dim)]">Цвет попадёт в заказ и DOCX с factory ID</p></div>
                 </div>
-                <div role="radiogroup" aria-label="Цвет рамы" className="grid gap-2 sm:grid-cols-2">
+                <div
+                  role="radiogroup"
+                  aria-label="Цвет рамы"
+                  className="grid gap-2 sm:grid-cols-2"
+                  onKeyDown={(e) => {
+                    // CR2-005: arrow keys move focus between radios
+                    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return
+                    e.preventDefault()
+                    const idx = FACTORY_COLORS.findIndex((c) => c.id === selectedColorId)
+                    let nextIdx = idx
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextIdx = (idx + 1) % FACTORY_COLORS.length
+                    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') nextIdx = (idx - 1 + FACTORY_COLORS.length) % FACTORY_COLORS.length
+                    else if (e.key === 'Home') nextIdx = 0
+                    else if (e.key === 'End') nextIdx = FACTORY_COLORS.length - 1
+                    const nextColor = FACTORY_COLORS[nextIdx]
+                    if (nextColor) {
+                      setSelectedColorId(nextColor.id)
+                      // Move focus to the newly-selected radio
+                      const btn = e.currentTarget.querySelector<HTMLButtonElement>(`[data-color-id="${nextColor.id}"]`)
+                      btn?.focus()
+                    }
+                  }}
+                >
                   {FACTORY_COLORS.map((color) => {
                     const active = selectedColorId === color.id
                     return (
                       <button
                         key={color.id}
+                        data-color-id={color.id}
                         type="button"
                         role="radio"
                         aria-checked={active}
+                        // CR2-005: only the active radio is tabbable; others get -1 (focus moves via arrows)
+                        tabIndex={active ? 0 : -1}
                         onClick={() => setSelectedColorId(color.id)}
                         aria-label={`Цвет рамы ${color.label}${color.availability === 'out_of_stock' ? ' (нет в наличии)' : color.availability === 'made_to_order' ? ' (под заказ)' : ''}`}
                         className={[
@@ -812,21 +890,26 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                           >
                             {/* Top-right: recommended badge (decorative) + check indicator (part of the card button) */}
                             {isRecommended && !checked && (
-                              <span className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400 pointer-events-none">
+                              <span
+                                className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400 pointer-events-none"
+                                aria-hidden="true"
+                              >
                                 <Star className="h-3 w-3 fill-amber-400" />Топ
                               </span>
                             )}
                             {checked && (
-                              <span className="absolute right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--cfg-accent)] pointer-events-none">
+                              <span className="absolute right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--cfg-accent)] pointer-events-none" aria-hidden="true">
                                 <Check className="h-3.5 w-3.5 text-black" />
                               </span>
                             )}
                             {/* CR-018: single button = single tab stop. Whole card toggles selection. */}
+                            {/* CR2-009: aria-label includes "рекомендуем" for recommended items so the
+                                signal isn't lost for screen-reader users (the visual "Топ" badge is aria-hidden). */}
                             <button
                               type="button"
                               onClick={() => toggleAccessory(part.id)}
                               aria-pressed={checked}
-                              aria-label={`${checked ? 'Убрать' : 'Добавить'}: ${part.model}, ${formatPrice(part.daily_price)}`}
+                              aria-label={`${checked ? 'Убрать' : 'Добавить'}: ${part.model}, ${formatPrice(part.daily_price)}${isRecommended ? ' · рекомендуем' : ''}`}
                               className="flex flex-1 flex-col gap-2 text-left pr-8"
                             >
                               {/* CR-023: use next/image with fill for part thumbnails */}
@@ -984,7 +1067,9 @@ export function ConfiguratorClient({ crew, slug }: Props) {
         {/* ── MOBILE STICKY BAR ──
             CR-035: hide on summary step (button was redundant — user already on summary).
             CR-036: spacer is inside this conditional so it doesn't add dead space when bar is hidden. */}
-        {selectedBike && tab !== 'summary' && (
+        {/* CR2-008: also hide on model step — no bike is selected yet on first visit,
+            and even after selection the user is still browsing, not configuring. */}
+        {selectedBike && tab !== 'summary' && tab !== 'model' && (
           <>
             <div className="cfg-sticky-bar fixed inset-x-0 bottom-0 z-50 border-t border-[var(--cfg-border)] bg-[var(--cfg-bg)]/90 px-4 py-3 sm:hidden">
               <div className="flex items-center justify-between">
