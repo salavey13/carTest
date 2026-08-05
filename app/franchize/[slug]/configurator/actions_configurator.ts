@@ -345,7 +345,8 @@ async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
     // CR-038: section title shows POSITION count ("3 шт." = 3 distinct items),
     // not total quantity (which could be 7 if user picked 3+2+2 of three items).
     accessories_count: String(input.selectedAccessories.length),
-    accessories_total_qty: String(input.selectedAccessories.reduce((s, a) => s + (a.quantity > 0 ? a.quantity : 1), 0)),
+    // CR2-012: accessories_total_qty removed — was computed but never referenced in any
+    // template. The admin notification recomputes the same value locally as totalAccessoriesQty.
     base_price: fmtRub(input.basePrice),
     motor_price: input.motorExtra > 0 ? `+${fmtRub(input.motorExtra)}` : "включена в базу",
     battery_price: input.batteryPrice > 0 ? `+${fmtRub(input.batteryPrice)}` : (isIncluded ? "включена в базу" : "—"),
@@ -380,11 +381,19 @@ async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
   // 3. Crew owner — reuses the crewRow fetched earlier for brand_name resolution
   const ownerId = typeof crewRow?.owner_id === "string" ? crewRow.owner_id : "";
   if (ownerId) {
-    const { data: ownerUser } = await supabaseAdmin
+    // CR2-013: destructure error and log it — was silently swallowed (owner wouldn't
+    // receive the DOCX and there'd be no trace in logs).
+    const { data: ownerUser, error: ownerErr } = await supabaseAdmin
       .from("users")
       .select("metadata")
       .eq("user_id", ownerId)
       .maybeSingle();
+    if (ownerErr) {
+      logger.warn("[configurator] owner lookup failed — owner will not receive the DOCX", {
+        ownerId,
+        error: ownerErr.message,
+      });
+    }
     const ownerMeta = (ownerUser?.metadata ?? {}) as Record<string, unknown>;
     const ownerTgId = String(
       ownerMeta.telegram_id ?? ownerMeta.telegramId ?? ""
