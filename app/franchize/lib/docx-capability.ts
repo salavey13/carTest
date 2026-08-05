@@ -1,3 +1,4 @@
+// /app/franchize/lib/docx-capability.ts
 "use server";
 
 import { createHash } from "crypto";
@@ -88,11 +89,14 @@ export async function buildFranchizeDocxFromTemplate(input: BuildFranchizeDocxIn
         sections: [{
           properties: {
             page: {
+              // CR-040: Aligned with the HTML @page margins in the deal templates
+              // (18mm top/right, 22mm bottom/left). 1mm = 56.693 twips.
+              // Was: 1134/1134/1134/1701 (2cm/2cm/2cm/3cm) — didn't match HTML.
               margin: {
-                top: 1134,
-                right: 1134,
-                bottom: 1134,
-                left: 1701,
+                top: 1021,    // 18mm
+                right: 1021,   // 18mm
+                bottom: 1247,  // 22mm
+                left: 1247,    // 22mm
               },
             },
           },
