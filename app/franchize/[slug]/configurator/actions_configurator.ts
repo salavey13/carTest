@@ -185,7 +185,7 @@ async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
     battery_capacity: input.batteryLabel.split(" ")[0] || "—",
     bike_color_label: resolvedColor.label || 'Не указан',
     bike_color_factory_id: resolvedColorFactoryId,
-    battery_range: "—",
+    battery_range: input.batteryRange || "—",
     accessories_table: accessoriesTable,
     accessories_count: String(input.selectedAccessories.length),
     base_price: fmt(input.basePrice),
