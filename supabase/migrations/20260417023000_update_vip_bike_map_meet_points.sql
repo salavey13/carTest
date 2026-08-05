@@ -63,10 +63,15 @@ default_meet_points as (
     )
   ) as points
 )
+-- MR-027: Idempotency guard — only run if the map doesn't already have the vip-base-point
+-- POI. This prevents re-running the migration from destroying user-added point POIs
+-- (custom meet points, landmarks) that were created after the last migration run.
+-- The WHERE clause checks that 'vip-base-point' is NOT in the existing points_of_interest.
 update public.maps m
 set points_of_interest = enp.routes_and_shapes || dmp.points,
     metadata = coalesce(m.metadata, '{}'::jsonb) || jsonb_build_object('crew_slug', coalesce(m.metadata->>'crew_slug', m.metadata->>'crewSlug', m.metadata->>'slug', 'vip-bike'))
 from target_map tm
 join existing_non_points enp on enp.id = tm.id
 cross join default_meet_points dmp
-where m.id = tm.id;
+where m.id = tm.id
+  and not (coalesce(m.points_of_interest, '[]'::jsonb) @> '[{"id":"vip-base-point"}]'::jsonb);
