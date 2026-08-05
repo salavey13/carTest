@@ -33,7 +33,7 @@ values (
   '',
   '413553377',
   'sly13',
-  '56.2954, 43.9446',
+  '56.296444, 43.946389',
   '{}'::jsonb,
   now(),
   now()
@@ -165,7 +165,7 @@ set
           'map', jsonb_build_object(
             'imageUrl', '',
             'bounds', jsonb_build_object('top', 56.42, 'bottom', 56.08, 'left', 43.66, 'right', 44.12),
-            'gps', '56.2954, 43.9446'
+            'gps', '56.296444, 43.946389'
           )
         ),
         'cta', jsonb_build_object(
