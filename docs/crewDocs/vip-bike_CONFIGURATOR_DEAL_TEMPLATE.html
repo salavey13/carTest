@@ -1,40 +1,33 @@
 <style>
+  /* CR-040: margins match the DOCX Document constructor (docx-capability.ts).
+     18mm top/right, 22mm bottom/left → 1021/1021/1247/1247 twips. */
   @page { size: A4; margin: 18mm 18mm 22mm 22mm; }
   .doc-container { max-width: 17cm; margin: 0 auto; }
   .doc-container p { max-width: 100%; overflow-wrap: break-word; }
 
-  /* Hero header — premium dark gradient */
+  /* CR-028/CR-029: DOCX pipeline (htmlToDocxElements) strips CSS gradients,
+     box-shadow, border-radius, pseudo-elements (::after), and position:relative.
+     Use solid background colors on table cells instead — these DO survive DOCX conversion. */
+
+  /* Hero header — solid dark background (no gradient) with left accent border */
   .config-hero {
-    background: linear-gradient(135deg, #050507 0%, #0c1418 55%, #001f1c 100%);
+    background: #0a0a0a;
     color: #ffffff;
-    padding: 26pt 28pt;
-    border-radius: 12pt;
-    margin-bottom: 18pt;
-    border: 1pt solid #1f2937;
-    position: relative;
-    overflow: hidden;
-  }
-  .config-hero::after {
-    content: '';
-    position: absolute;
-    top: -40pt;
-    right: -40pt;
-    width: 180pt;
-    height: 180pt;
-    background: radial-gradient(circle, rgba(0,255,234,0.18) 0%, transparent 65%);
-    pointer-events: none;
+    padding: 22pt 24pt;
+    margin-bottom: 16pt;
+    border-left: 4pt solid #00ffea;
   }
   .config-hero .eyebrow {
-    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-family: 'Courier New', monospace;
     font-size: 9pt;
-    letter-spacing: 0.25em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     color: #00ffea;
     margin: 0 0 6pt 0;
   }
   .config-hero h1 {
     margin: 0;
-    font-size: 22pt;
+    font-size: 20pt;
     font-weight: 900;
     letter-spacing: -0.01em;
     line-height: 1.15;
@@ -46,22 +39,22 @@
     font-weight: 400;
   }
   .config-hero .config-id {
-    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-family: 'Courier New', monospace;
     font-size: 9.5pt;
     opacity: 0.55;
-    margin-top: 14pt;
-    padding-top: 10pt;
-    border-top: 1pt solid rgba(255,255,255,0.1);
+    margin-top: 12pt;
+    padding-top: 8pt;
+    border-top: 1pt solid #333333;
   }
 
-  /* Section title */
+  /* Section title — solid border bottom (no pseudo-element badge) */
   .section-title {
     font-size: 11pt;
     font-weight: 800;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    margin: 18pt 0 8pt 0;
-    padding-bottom: 5pt;
+    margin: 16pt 0 8pt 0;
+    padding-bottom: 4pt;
     border-bottom: 1.5pt solid #0a0a0a;
     color: #0a0a0a;
   }
@@ -69,19 +62,17 @@
     display: inline-block;
     background: #0a0a0a;
     color: #00ffea;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Courier New', monospace;
     font-size: 9pt;
     padding: 2pt 6pt;
-    border-radius: 3pt;
     margin-right: 8pt;
-    vertical-align: 1pt;
   }
 
-  /* Tables */
+  /* Spec tables */
   table.spec-table { width: 100%; border-collapse: collapse; font-size: 10.5pt; }
   table.spec-table td { padding: 5pt 9pt; border: 0.5pt solid #d4d4d8; vertical-align: top; }
   table.spec-table tr:nth-child(even) td { background: #f7f7f8; }
-  table.spec-table td.label { font-weight: 700; background: #f0f0f2 !important; width: 38%; color: #18181b; }
+  table.spec-table td.label { font-weight: 700; background: #f0f0f2; width: 38%; color: #18181b; }
   table.spec-table td.value { color: #27272a; }
   table.spec-table td.value.accent { color: #00917a; font-weight: 700; }
 
@@ -100,8 +91,8 @@
   table.accessory-table th.num-col { text-align: center; width: 14%; }
   table.accessory-table th.price-col { text-align: right; width: 22%; }
   table.accessory-table td { padding: 5pt 9pt; border: 0.5pt solid #d4d4d8; vertical-align: middle; }
-  table.accessory-table td.num-cell { text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 10pt; color: #52525b; }
-  table.accessory-table td.price-cell { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #18181b; }
+  table.accessory-table td.num-cell { text-align: center; font-family: 'Courier New', monospace; font-size: 10pt; color: #52525b; }
+  table.accessory-table td.price-cell { text-align: right; font-family: 'Courier New', monospace; font-weight: 600; color: #18181b; }
   table.accessory-table tr:nth-child(even) td { background: #f7f7f8; }
   table.accessory-table tr.empty-row td { text-align: center; font-style: italic; color: #71717a; padding: 10pt; }
 
@@ -109,7 +100,7 @@
   table.price-table { width: 100%; border-collapse: collapse; font-size: 11pt; }
   table.price-table td { padding: 6pt 10pt; border: 0.5pt solid #d4d4d8; }
   table.price-table td.price-label { color: #3f3f46; }
-  table.price-table td.price-value { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #18181b; }
+  table.price-table td.price-value { text-align: right; font-family: 'Courier New', monospace; font-weight: 600; color: #18181b; }
   table.price-table tr.total-row td {
     background: #0a0a0a;
     color: #ffffff;
@@ -122,20 +113,19 @@
   table.price-table tr.total-row td.price-value { color: #00ffea; font-size: 16pt; }
   table.price-table tr.delivery-row td { color: #6b7280; font-style: italic; }
 
-  /* Validity note box */
+  /* Validity note box — solid background (no gradient) */
   .validity-box {
     background: #fffbeb;
     border: 1pt solid #fcd34d;
     border-left: 4pt solid #f59e0b;
     padding: 9pt 12pt;
     margin-top: 14pt;
-    border-radius: 4pt;
     font-size: 10pt;
     color: #78350f;
   }
   .validity-box strong { color: #92400e; }
 
-  /* Signature row — real <table> for DOCX compatibility (display:table breaks htmlToDocxElements) */
+  /* Signature row — real <table> for DOCX compatibility */
   table.signature-table { width: 100%; border-collapse: collapse; margin-top: 26pt; table-layout: fixed; }
   table.signature-table td { width: 50%; padding: 0 14pt; vertical-align: bottom; }
   table.signature-table td .sig-line {
@@ -159,14 +149,17 @@
     line-height: 1.5;
   }
   .doc-footer .brand { color: #00917a; font-weight: 700; }
-  .doc-footer .config-meta { font-family: 'JetBrains Mono', monospace; font-size: 8.5pt; margin-top: 3pt; }
+  .doc-footer .config-meta { font-family: 'Courier New', monospace; font-size: 8.5pt; margin-top: 3pt; }
 </style>
 
-<div class="doc-container" style="font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #18181b;">
+<!-- CR-028: Use Arial as the base font — it's universally available in Word/LibreOffice
+     and renders Cyrillic correctly. Inter/JetBrains Mono aren't embedded in the DOCX
+     and fall back unpredictably on different machines. -->
+<div class="doc-container" style="font-family: Arial, 'Helvetica Neue', sans-serif; font-size: 11pt; line-height: 1.5; color: #18181b;">
 
   <!-- ════ HERO HEADER ════ -->
   <div class="config-hero">
-    <p class="eyebrow">⚡ Конфигуратор · {{brand_name}}</p>
+    <p class="eyebrow">Конфигуратор · {{brand_name}}</p>
     <h1>Спецификация электробайка</h1>
     <p class="subtitle">Коммерческое предложение и расчёт стоимости</p>
     <p class="config-id">№ {{config_id}} · {{config_date}} · {{config_timestamp}}</p>
@@ -187,7 +180,7 @@
   <table class="spec-table">
     <tr><td class="label">Имя</td><td class="value">{{client_name}}</td></tr>
     <tr><td class="label">Telegram ID</td><td class="value">{{client_telegram_id}}</td></tr>
-    <tr><td class="label">ID пользователя</td><td class="value" style="font-family: 'JetBrains Mono', monospace; font-size: 10pt;">{{client_user_id}}</td></tr>
+    <tr><td class="label">ID пользователя</td><td class="value" style="font-family: 'Courier New', monospace; font-size: 10pt;">{{client_user_id}}</td></tr>
   </table>
 
   <!-- ════ МОДЕЛЬ ════ -->
@@ -199,7 +192,7 @@
     <tr><td class="label">Ёмкость батареи</td><td class="value">{{battery_capacity}}</td></tr>
     <tr><td class="label">Запас хода</td><td class="value accent">{{battery_range}} км</td></tr>
     <tr><td class="label">Цвет рамы</td><td class="value">{{bike_color_label}}</td></tr>
-    <tr><td class="label">Factory ID (код краски)</td><td class="value" style="font-family: 'JetBrains Mono', monospace; font-size: 10pt;">{{bike_color_factory_id}}</td></tr>
+    <tr><td class="label">Factory ID (код краски)</td><td class="value" style="font-family: 'Courier New', monospace; font-size: 10pt;">{{bike_color_factory_id}}</td></tr>
   </table>
 
   <!-- ════ ОПЦИИ ════ -->
@@ -226,7 +219,7 @@
 
   <!-- Validity note -->
   <div class="validity-box">
-    <strong>⏱ Срок действия предложения:</strong> 7 календарных дней с даты формирования (до {{valid_until}}).
+    <strong>Срок действия предложения:</strong> 7 календарных дней с даты формирования (до {{valid_until}}).
     Финальная цена фиксируется в договоре купли-продажи и зависит от подтверждения наличия комплектации на складе.
   </div>
 
