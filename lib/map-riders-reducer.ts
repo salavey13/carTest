@@ -213,9 +213,21 @@ export function mapRidersReducer(state: MapRidersState, action: MapRidersAction)
       const { payload, selfUserId } = action;
       const nextRiders = new Map(state.liveRiders);
 
-      // Merge live_locations into riders map
+      // Merge live_locations into riders map.
+      // MR-007: Compare timestamps — don't let a stale snapshot overwrite a newer rider/moved
+      // position. Without this guard, a snapshot fetched at T=0.5s but arriving at T=1.2s would
+      // overwrite the real (un-blurred) position from a rider/moved at T=1.0s, causing the
+      // rider's own marker to visibly snap backward to the blurred DB position.
       for (const loc of payload.liveLocations || []) {
         const existing = nextRiders.get(loc.user_id);
+        const snapTs = new Date(loc.updated_at).getTime();
+        if (existing) {
+          const existingTs = new Date(existing.updated_at).getTime();
+          if (Number.isFinite(snapTs) && Number.isFinite(existingTs) && snapTs < existingTs) {
+            // Local state is newer — keep it, don't regress.
+            continue;
+          }
+        }
         nextRiders.set(loc.user_id, {
           user_id: loc.user_id,
           crew_slug: loc.crew_slug,
@@ -229,7 +241,7 @@ export function mapRidersReducer(state: MapRidersState, action: MapRidersAction)
         });
       }
 
-      // Also merge from active sessions (as fallback coords)
+      // Also merge from active sessions (as fallback coords) — same timestamp guard
       for (const session of payload.activeSessions || []) {
         if (typeof session.latest_lat === "number" && typeof session.latest_lon === "number") {
           if (!nextRiders.has(session.user_id)) {
