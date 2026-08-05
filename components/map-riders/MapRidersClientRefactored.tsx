@@ -57,6 +57,64 @@ const DEMO_RIDER_OFFSETS: [number, number][] = [
   [56.294215, 43.942371],  // Demo B • 14 км/ч — ~350m SW of HQ
   [56.293578, 43.951555],  // Demo C • 16 км/ч — ~450m SE of HQ
 ];
+
+// Default riding routes around HQ — scenic/interesting paths for the map.
+// Synced with supabase/migrations/20260418000000_add_vip_bike_map_routes.sql.
+// Rendered as <Polyline> by RacingMap.tsx (type='path' = open, type='loop' = closed).
+const DEFAULT_ROUTES = [
+  {
+    id: "vip-route-city-cruise",
+    name: "Городской круиз • центр",
+    type: "loop" as const,
+    icon: "::FaRoute::",
+    color: "#22c55e",
+    coords: [
+      [56.296444, 43.946389], [56.299565, 43.949636], [56.300048, 43.957637],
+      [56.296444, 43.965872], [56.289543, 43.956825], [56.291365, 43.943057],
+      [56.296444, 43.946389],
+    ] as [number, number][],
+    roadHighlight: { weight: 5, glow: true },
+  },
+  {
+    id: "vip-route-river-sprint",
+    name: "Набережный спринт • Ока",
+    type: "path" as const,
+    icon: "::FaRoute::",
+    color: "#3b82f6",
+    coords: [
+      [56.294670, 43.945825], [56.291223, 43.943868],
+      [56.287978, 43.940836], [56.285013, 43.936783],
+    ] as [number, number][],
+    roadHighlight: { weight: 6, glow: true },
+  },
+  {
+    id: "vip-route-bridge-loop",
+    name: "Мостовой кольцевой • Метромост + Молитовский",
+    type: "loop" as const,
+    icon: "::FaBridge::",
+    color: "#f59e0b",
+    coords: [
+      [56.296444, 43.946389], [56.290518, 43.950276], [56.284592, 43.954163],
+      [56.277813, 43.952309], [56.277819, 43.934173], [56.280840, 43.930154],
+      [56.287472, 43.932822], [56.301125, 43.951260], [56.296444, 43.946389],
+    ] as [number, number][],
+    roadHighlight: { weight: 5, glow: true },
+  },
+  {
+    id: "vip-route-offroad-between-bridges",
+    name: "Оффроуд между мостами • Мещерский парк",
+    type: "loop" as const,
+    icon: "::FaMountain::",
+    color: "#ef4444",
+    coords: [
+      [56.289671, 43.941947], [56.285797, 43.943006], [56.282030, 43.946389],
+      [56.280780, 43.953953], [56.284741, 43.958566], [56.286685, 43.943288],
+      [56.289671, 43.941947],
+    ] as [number, number][],
+    roadHighlight: { weight: 4, dashArray: "8, 6", glow: false },
+  },
+];
+
 const MEETUP_ACTION_DEBOUNCE_MS = 2000;
 
 // Snap labels for the 3-button control (matching vaul snapPoints)
@@ -247,12 +305,15 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
   // DEMO_RIDER_OFFSETS below). Only filter by EXACT ID matches — the old .includes("rider •")
   // substring check was too broad and could hide admin-created POIs like "Stunt rider • training".
   // MR-018: Do NOT filter out "vip-base-point" — the HQ dot should be visible on the map.
+  // Also filter out DEFAULT_ROUTES IDs — they're injected client-side below to avoid
+  // duplication when the migration has also seeded them into the DB.
   const STALE_DEMO_POI_IDS = new Set([
     "demo-rider-beta",
     "vip-demo-rider-a",
     "vip-demo-rider-b",
     "vip-demo-rider-c",
     "vip-riverside-safe-point",
+    ...DEFAULT_ROUTES.map((r) => r.id),
   ]);
   const staticMapPoints = useMemo(() => {
     return (mapData?.points || []).filter((point) => {
@@ -310,7 +371,9 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
           ]
         : [];
 
-    return [hqPoint, ...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints];
+    // DEFAULT_ROUTES are always present (scenic routes around HQ) — they're filtered
+    // out of staticMapPoints above to avoid duplication if the migration also seeded them.
+    return [hqPoint, ...DEFAULT_ROUTES, ...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints];
   }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail]);
 
   const riderStatusCounts = useMemo(() => {
