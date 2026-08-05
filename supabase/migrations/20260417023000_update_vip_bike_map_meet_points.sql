@@ -1,5 +1,7 @@
 -- MapRiders default meetup POIs for vip-bike:
--- 1) VIP BIKE base moved to HQ coordinates (пл. Комсомольская 2: 56.297654, 43.947218)
+-- 1) VIP BIKE base moved to HQ coordinates (пл. Комсомольская 2: 56.297017, 43.946070)
+--    Moved ~100m south-west from 56.297654, 43.947218 so the dot aligns with the
+--    actual service entrance (not the middle of the square).
 -- 2) second meetup moved near HQ for realistic visualization
 -- 3) third meetup at nearby location
 
@@ -34,7 +36,7 @@ default_meet_points as (
       'type', 'point',
       'icon', '::FaLocationDot::',
       'color', '#f97316',
-      'coords', jsonb_build_array(jsonb_build_array(56.297654, 43.947218))
+      'coords', jsonb_build_array(jsonb_build_array(56.297017, 43.946070))
     ),
     jsonb_build_object(
       'id', 'vip-demo-rider-a',
