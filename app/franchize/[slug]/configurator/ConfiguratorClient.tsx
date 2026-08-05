@@ -578,18 +578,41 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                     <div className="mb-4 flex items-center gap-2">
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5"><Icon className="h-4 w-4 text-[var(--cfg-text-muted)]" /></div>
                       <h3 className="text-sm font-bold">{CATEGORY_LABELS[category] ?? category}</h3>
+                      <span className="ml-auto text-[10px] text-[var(--cfg-text-dim)]">{categoryParts.length} поз.</span>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    {/* Polish: card-style accessories instead of plain checkboxes */}
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {categoryParts.map((part) => {
                         const checked = selectedAccessories.includes(part.id)
                         return (
-                          <label key={part.id} className={['cfg-option flex items-start justify-between gap-3 rounded-xl border p-4', checked ? 'cfg-option-active' : 'border-[var(--cfg-border)]'].join(' ')}>
-                            <span className="flex items-start gap-3">
-                              <input type="checkbox" className="cfg-check mt-0.5" checked={checked} onChange={() => setSelectedAccessories((prev) => prev.includes(part.id) ? prev.filter((id) => id !== part.id) : [...prev, part.id])} aria-label={`Аксессуар ${part.model}`} />
-                              <span><span className="block text-sm font-semibold">{part.model}</span><span className="mt-0.5 block text-[11px] leading-relaxed text-[var(--cfg-text-dim)]">{part.description}</span></span>
-                            </span>
-                            <span className="cfg-mono whitespace-nowrap text-xs font-medium text-[var(--cfg-text-muted)]">+{formatPrice(part.daily_price)}</span>
-                          </label>
+                          <button
+                            key={part.id}
+                            type="button"
+                            onClick={() => setSelectedAccessories((prev) => prev.includes(part.id) ? prev.filter((id) => id !== part.id) : [...prev, part.id])}
+                            className={[
+                              'group relative flex flex-col gap-2 rounded-xl border p-4 text-left transition-all duration-200',
+                              checked
+                                ? 'border-[var(--cfg-accent)] bg-[var(--cfg-accent)]/8 shadow-[0_0_20px_-4px_var(--cfg-accent)]'
+                                : 'border-[var(--cfg-border)] hover:border-[var(--cfg-text-dim)] hover:bg-white/3',
+                            ].join(' ')}
+                          >
+                            {/* Check indicator */}
+                            <div className={[
+                              'absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all',
+                              checked ? 'border-[var(--cfg-accent)] bg-[var(--cfg-accent)]' : 'border-[var(--cfg-border)] opacity-30 group-hover:opacity-60',
+                            ].join(' ')}>
+                              {checked && <Check className="h-3 w-3 text-black" />}
+                            </div>
+                            {/* Part image if available */}
+                            {part.image_url && (
+                              <div className="mb-1 h-16 w-full overflow-hidden rounded-lg bg-white/5">
+                                <img src={part.image_url} alt={part.model} className="h-full w-full object-cover" loading="lazy" />
+                              </div>
+                            )}
+                            <span className="block text-sm font-semibold pr-6">{part.model}</span>
+                            <span className="block text-[11px] leading-relaxed text-[var(--cfg-text-dim)] line-clamp-2">{part.description}</span>
+                            <span className="cfg-mono mt-auto text-sm font-bold text-[var(--cfg-accent)]">+{formatPrice(part.daily_price)}</span>
+                          </button>
                         )
                       })}
                     </div>
