@@ -167,20 +167,23 @@ export function ConfiguratorClient({ crew, slug }: Props) {
   const [accessoryQuantities, setAccessoryQuantities] = useState<Record<string, number>>({})
   const [selectedColorId, setSelectedColorId] = useState(DEFAULT_FACTORY_COLOR?.id ?? '')
   const [deliveryApplied, setDeliveryApplied] = useState(false)
+  // CR-045: crew-specific purchase URL (falls back to hardcoded @I_O_S_NN if no override)
+  const [purchaseUrl, setPurchaseUrl] = useState('https://t.me/I_O_S_NN')
 
   useEffect(() => {
     startTransition(async () => {
-      const data = await loadConfiguratorCatalog()
+      const data = await loadConfiguratorCatalog(crew.slug || slug)
       if (data.hasLiveEbikeData) {
         setBikes(data.ebikes)
         setSelectedBikeId(data.ebikes[0]?.id ?? '')
       }
       if (data.hasLivePartsData) setParts(data.parts)
+      if (data.purchaseUrl) setPurchaseUrl(data.purchaseUrl)
       if (!data.hasLiveEbikeData) {
         toast({ title: 'Используется fallback-каталог', description: 'Показываем полный локальный прайс из хардкода.' })
       }
     })
-  }, [toast])
+  }, [toast, crew.slug, slug])
 
   const userTelegramId = useMemo(() => {
     if (tgUser?.id) return String(tgUser.id)
@@ -421,9 +424,15 @@ export function ConfiguratorClient({ crew, slug }: Props) {
       {/* ── Configurator-scoped styles ── */}
       <style jsx>{`
         .cfg-root {
-          font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--cfg-bg); color: var(--cfg-text); -webkit-font-smoothing: antialiased;
+          /* CR-025: Use Geist font variables from root layout (next/font/google) instead of
+             importing Inter via render-blocking @import. Falls back to system fonts if not loaded. */
+          font-family: var(--font-geist-sans, 'Inter', system-ui, -apple-system, sans-serif);
+          background: var(--cfg-bg); color: var(--cfg-text); -webkit-font-smoothing: antialiased;
         }
-        .cfg-mono { font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace; font-variant-numeric: tabular-nums; }
+        .cfg-mono {
+          font-family: var(--font-geist-mono, 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace);
+          font-variant-numeric: tabular-nums;
+        }
         .cfg-fade-in { animation: cfgFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes cfgFadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
         .cfg-card-hover { transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease, border-color 0.3s ease; }
@@ -962,7 +971,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                     </div>
                     <div className="space-y-2">
                       <Button onClick={submitLead} disabled={isPending} className="cfg-glow-btn w-full bg-[var(--cfg-accent)] py-6 text-sm font-bold text-black hover:bg-[var(--cfg-accent-hover)]"><MessageCircle className="mr-2 h-4 w-4" />Отправить в Telegram</Button>
-                      <Button asChild variant="outline" className="w-full border-[var(--cfg-border)] bg-transparent py-6 text-sm font-semibold text-white hover:bg-white/5 hover:text-white"><a href="https://t.me/I_O_S_NN" target="_blank" rel="noopener noreferrer">Оформить покупку</a></Button>
+                      <Button asChild variant="outline" className="w-full border-[var(--cfg-border)] bg-transparent py-6 text-sm font-semibold text-white hover:bg-white/5 hover:text-white"><a href={purchaseUrl} target="_blank" rel="noopener noreferrer">Оформить покупку</a></Button>
                     </div>
                     <Button variant="ghost" onClick={() => setTab('addons')} className="w-full text-[var(--cfg-text-dim)] hover:text-white">← Вернуться к опциям</Button>
                   </div>
