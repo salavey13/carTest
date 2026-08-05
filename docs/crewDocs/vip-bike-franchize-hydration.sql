@@ -34,7 +34,7 @@ values (
   'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/1000033868-a2e57b7e-5ed8-4440-9304-f3f54f63cc46.jpg',
   '356282674',
   'vip-bike',
-  '56.2954, 43.9446',
+  '56.296444, 43.946389',
   '{}'::jsonb,
   now(),
   now()
@@ -219,7 +219,7 @@ set
           'map', jsonb_build_object(
             'imageUrl', 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/nnmap.jpg',
             'bounds', jsonb_build_object('top', 56.42, 'bottom', 56.08, 'left', 43.66, 'right', 44.12),
-            'gps', '56.2954, 43.9446',
+            'gps', '56.296444, 43.946389',
             'publicTransport', 'Ближайшие остановки и маршруты уточняйте по телефону',
             'carDirections', 'Подъезд к новой локации — см. указатели на месте'
           )
