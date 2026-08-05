@@ -43,9 +43,13 @@ import { useSessionManager } from "@/app/franchize/hooks/useSessionManager";
 const RacingMap = dynamic(() => import("@/components/maps/RacingMap").then((mod) => mod.RacingMap), { ssr: false });
 
 const DEFAULT_BOUNDS = { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 };
-// HQ coordinates: пл. Комсомольская 2 (56.2963, 43.9462)
+// HQ coordinates: пл. Комсомольская 2 — moved ~100m south-west from the original
+// 56.2963, 43.9462 to 56.2954, 43.9446 so the map dot aligns with the actual
+// service entrance (not the middle of the square). Kept in sync with the GPS
+// values in docs/crewDocs/vip-bike-franchize-hydration.sql (crews.hq_location +
+// metadata.map.gps) — update both when this changes.
 // Demo riders placed near HQ for realistic visualization
-const HOME_BASE: [number, number] = [56.2963, 43.9462];
+const HOME_BASE: [number, number] = [56.2954, 43.9446];
 const DEMO_RIDER_OFFSETS: [number, number][] = [
   [56.301, 43.952],  // North-east of HQ
   [56.296, 43.935],  // South-west of HQ
