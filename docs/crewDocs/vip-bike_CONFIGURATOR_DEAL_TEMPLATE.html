@@ -1,81 +1,257 @@
 <style>
-  @page { size: A4; margin: 20mm 20mm 25mm 25mm; }
+  @page { size: A4; margin: 18mm 18mm 22mm 22mm; }
   .doc-container { max-width: 17cm; margin: 0 auto; }
   .doc-container p { max-width: 100%; overflow-wrap: break-word; }
-  .spec-table td { padding: 4pt 8pt; }
-  .spec-table tr:nth-child(even) td { background: #f8f8f8; }
-  .price-table td { padding: 4pt 8pt; }
-  .price-table .total td { font-weight: bold; font-size: 14pt; border-top: 2px solid #333; }
-  .config-header { background: linear-gradient(135deg, #0a0a0a 0%, #1a2a2a 100%); color: #fff; padding: 20pt; border-radius: 8pt; margin-bottom: 16pt; }
-  .config-header h1 { margin: 0; font-size: 18pt; }
-  .config-header .subtitle { font-size: 11pt; opacity: 0.8; margin-top: 4pt; }
-  .config-id { font-family: monospace; font-size: 10pt; opacity: 0.6; margin-top: 8pt; }
-  .section-title { font-size: 13pt; font-weight: bold; margin: 16pt 0 8pt 0; padding-bottom: 4pt; border-bottom: 1px solid #ccc; }
-  .accent { color: #00b894; }
-  .accessory-row td { padding: 3pt 8pt; }
+
+  /* Hero header — premium dark gradient */
+  .config-hero {
+    background: linear-gradient(135deg, #050507 0%, #0c1418 55%, #001f1c 100%);
+    color: #ffffff;
+    padding: 26pt 28pt;
+    border-radius: 12pt;
+    margin-bottom: 18pt;
+    border: 1pt solid #1f2937;
+    position: relative;
+    overflow: hidden;
+  }
+  .config-hero::after {
+    content: '';
+    position: absolute;
+    top: -40pt;
+    right: -40pt;
+    width: 180pt;
+    height: 180pt;
+    background: radial-gradient(circle, rgba(0,255,234,0.18) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  .config-hero .eyebrow {
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 9pt;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: #00ffea;
+    margin: 0 0 6pt 0;
+  }
+  .config-hero h1 {
+    margin: 0;
+    font-size: 22pt;
+    font-weight: 900;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+  }
+  .config-hero .subtitle {
+    font-size: 11pt;
+    opacity: 0.78;
+    margin-top: 6pt;
+    font-weight: 400;
+  }
+  .config-hero .config-id {
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 9.5pt;
+    opacity: 0.55;
+    margin-top: 14pt;
+    padding-top: 10pt;
+    border-top: 1pt solid rgba(255,255,255,0.1);
+  }
+
+  /* Section title */
+  .section-title {
+    font-size: 11pt;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin: 18pt 0 8pt 0;
+    padding-bottom: 5pt;
+    border-bottom: 1.5pt solid #0a0a0a;
+    color: #0a0a0a;
+  }
+  .section-title .num {
+    display: inline-block;
+    background: #0a0a0a;
+    color: #00ffea;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9pt;
+    padding: 2pt 6pt;
+    border-radius: 3pt;
+    margin-right: 8pt;
+    vertical-align: 1pt;
+  }
+
+  /* Tables */
+  table.spec-table { width: 100%; border-collapse: collapse; font-size: 10.5pt; }
+  table.spec-table td { padding: 5pt 9pt; border: 0.5pt solid #d4d4d8; vertical-align: top; }
+  table.spec-table tr:nth-child(even) td { background: #f7f7f8; }
+  table.spec-table td.label { font-weight: 700; background: #f0f0f2 !important; width: 38%; color: #18181b; }
+  table.spec-table td.value { color: #27272a; }
+  table.spec-table td.value.accent { color: #00917a; font-weight: 700; }
+
+  /* Accessories table */
+  table.accessory-table { width: 100%; border-collapse: collapse; font-size: 10.5pt; }
+  table.accessory-table th {
+    background: #0a0a0a;
+    color: #ffffff;
+    padding: 6pt 9pt;
+    text-align: left;
+    font-weight: 700;
+    font-size: 9.5pt;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  table.accessory-table th.num-col { text-align: center; width: 14%; }
+  table.accessory-table th.price-col { text-align: right; width: 22%; }
+  table.accessory-table td { padding: 5pt 9pt; border: 0.5pt solid #d4d4d8; vertical-align: middle; }
+  table.accessory-table td.num-cell { text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 10pt; color: #52525b; }
+  table.accessory-table td.price-cell { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #18181b; }
+  table.accessory-table tr:nth-child(even) td { background: #f7f7f8; }
+  table.accessory-table tr.empty-row td { text-align: center; font-style: italic; color: #71717a; padding: 10pt; }
+
+  /* Price breakdown */
+  table.price-table { width: 100%; border-collapse: collapse; font-size: 11pt; }
+  table.price-table td { padding: 6pt 10pt; border: 0.5pt solid #d4d4d8; }
+  table.price-table td.price-label { color: #3f3f46; }
+  table.price-table td.price-value { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #18181b; }
+  table.price-table tr.total-row td {
+    background: #0a0a0a;
+    color: #ffffff;
+    font-weight: 800;
+    font-size: 14pt;
+    border-top: 2pt solid #0a0a0a;
+    border-bottom: 2pt solid #0a0a0a;
+    padding: 10pt;
+  }
+  table.price-table tr.total-row td.price-value { color: #00ffea; font-size: 16pt; }
+  table.price-table tr.delivery-row td { color: #6b7280; font-style: italic; }
+
+  /* Validity note box */
+  .validity-box {
+    background: #fffbeb;
+    border: 1pt solid #fcd34d;
+    border-left: 4pt solid #f59e0b;
+    padding: 9pt 12pt;
+    margin-top: 14pt;
+    border-radius: 4pt;
+    font-size: 10pt;
+    color: #78350f;
+  }
+  .validity-box strong { color: #92400e; }
+
+  /* Signature row */
+  .signature-row { display: table; width: 100%; margin-top: 26pt; table-layout: fixed; }
+  .signature-cell { display: table-cell; width: 50%; padding: 0 14pt 0 0; }
+  .signature-cell:last-child { padding: 0 0 0 14pt; }
+  .signature-line {
+    border-top: 1pt solid #18181b;
+    padding-top: 5pt;
+    margin-top: 30pt;
+    font-size: 9pt;
+    color: #52525b;
+    text-align: center;
+  }
+  .signature-role { font-weight: 700; color: #18181b; }
+
+  /* Footer */
+  .doc-footer {
+    margin-top: 22pt;
+    padding-top: 9pt;
+    border-top: 1pt solid #e4e4e7;
+    font-size: 9pt;
+    color: #71717a;
+    text-align: center;
+    line-height: 1.5;
+  }
+  .doc-footer .brand { color: #00917a; font-weight: 700; }
+  .doc-footer .config-meta { font-family: 'JetBrains Mono', monospace; font-size: 8.5pt; margin-top: 3pt; }
 </style>
-<div class="doc-container" style="font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000;">
 
-<!-- Header with branding -->
-<div class="config-header">
-  <h1>⚡ Конфигурация электробайка {{brand_name}}</h1>
-  <div class="subtitle">Спецификация и расчёт стоимости</div>
-  <div class="config-id">№ {{config_id}} · {{config_date}} · {{config_timestamp}}</div>
-</div>
+<div class="doc-container" style="font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #18181b;">
 
-<!-- Quick info box -->
-<table style="width: 100%; border: 2px solid #333; margin-top: 12pt; margin-bottom: 12pt; font-size: 11pt;" class="spec-table">
-<tr><td style="border: 1px solid #999; padding: 4pt 8pt; font-weight: bold; background: #f0f0f0;" colspan="2">📋 КРАТКАЯ ИНФОРМАЦИЯ</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; width: 40%; font-weight: bold;">Компания:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{brand_name}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Адрес:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{issuer_address}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Контактное лицо:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{issuer_representative}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Телефон:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{issuer_phone}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Telegram:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{issuer_telegram}}</td></tr>
-</table>
+  <!-- ════ HERO HEADER ════ -->
+  <div class="config-hero">
+    <p class="eyebrow">⚡ Конфигуратор · {{brand_name}}</p>
+    <h1>Спецификация электробайка</h1>
+    <p class="subtitle">Коммерческое предложение и расчёт стоимости</p>
+    <p class="config-id">№ {{config_id}} · {{config_date}} · {{config_timestamp}}</p>
+  </div>
 
-<!-- Client info -->
-<div class="section-title">👤 Клиент</div>
-<table style="width: 100%; border: 1px solid #ccc; font-size: 11pt;" class="spec-table">
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; width: 40%; font-weight: bold;">Имя:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{client_name}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Telegram ID:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{client_telegram_id}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">ID пользователя:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{client_user_id}}</td></tr>
-</table>
+  <!-- ════ ИНФОРМАЦИЯ О ПРОДАВЦЕ ════ -->
+  <div class="section-title"><span class="num">01</span>Продавец</div>
+  <table class="spec-table">
+    <tr><td class="label">Компания</td><td class="value">{{brand_name}}</td></tr>
+    <tr><td class="label">Адрес выдачи</td><td class="value">{{issuer_address}}</td></tr>
+    <tr><td class="label">Контактное лицо</td><td class="value">{{issuer_representative}}</td></tr>
+    <tr><td class="label">Телефон</td><td class="value">{{issuer_phone}}</td></tr>
+    <tr><td class="label">Telegram</td><td class="value">{{issuer_telegram}}</td></tr>
+  </table>
 
-<!-- Selected model -->
-<div class="section-title">🏍️ Выбранная модель</div>
-<table style="width: 100%; border: 1px solid #ccc; font-size: 11pt;" class="spec-table">
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; width: 40%; font-weight: bold;">Модель:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{bike_make_model}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Мощность мотора:</td><td style="border: 1px solid #999; padding: 3pt 8pt;"><span class="accent">{{motor_power}}</span></td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Тип батареи:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{battery_type}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Ёмкость батареи:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{battery_capacity}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Запас хода:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{battery_range}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Цвет:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{bike_color_label}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Factory ID (цвет):</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-family: monospace; font-size: 10pt;">{{bike_color_factory_id}}</td></tr>
-</table>
+  <!-- ════ КЛИЕНТ ════ -->
+  <div class="section-title"><span class="num">02</span>Покупатель</div>
+  <table class="spec-table">
+    <tr><td class="label">Имя</td><td class="value">{{client_name}}</td></tr>
+    <tr><td class="label">Telegram ID</td><td class="value">{{client_telegram_id}}</td></tr>
+    <tr><td class="label">ID пользователя</td><td class="value" style="font-family: 'JetBrains Mono', monospace; font-size: 10pt;">{{client_user_id}}</td></tr>
+  </table>
 
-<!-- Accessories -->
-<div class="section-title">🔧 Дополнительные опции ({{accessories_count}} шт.)</div>
-<table style="width: 100%; border: 1px solid #ccc; font-size: 11pt;" class="accessory-row">
-<tr style="background: #f0f0f0;"><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">Наименование</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold; text-align: center;">Кол-во</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold; text-align: right;">Цена</td></tr>
-{{accessories_table}}
-</table>
+  <!-- ════ МОДЕЛЬ ════ -->
+  <div class="section-title"><span class="num">03</span>Выбранная модель</div>
+  <table class="spec-table">
+    <tr><td class="label">Модель</td><td class="value"><strong>{{bike_make_model}}</strong></td></tr>
+    <tr><td class="label">Мощность мотора</td><td class="value accent">{{motor_power}}</td></tr>
+    <tr><td class="label">Тип батареи</td><td class="value">{{battery_type}}</td></tr>
+    <tr><td class="label">Ёмкость батареи</td><td class="value">{{battery_capacity}}</td></tr>
+    <tr><td class="label">Запас хода</td><td class="value accent">{{battery_range}} км</td></tr>
+    <tr><td class="label">Цвет рамы</td><td class="value">{{bike_color_label}}</td></tr>
+    <tr><td class="label">Factory ID (код краски)</td><td class="value" style="font-family: 'JetBrains Mono', monospace; font-size: 10pt;">{{bike_color_factory_id}}</td></tr>
+  </table>
 
-<!-- Price breakdown -->
-<div class="section-title">💰 Расчёт стоимости</div>
-<table style="width: 100%; border: 1px solid #ccc; font-size: 12pt;" class="price-table">
-<tr><td style="border: 1px solid #999; padding: 4pt 8pt;">Базовая цена (без АКБ)</td><td style="border: 1px solid #999; padding: 4pt 8pt; text-align: right;">{{base_price}} ₽</td></tr>
-<tr><td style="border: 1px solid #999; padding: 4pt 8pt;">Мотор (апгрейд)</td><td style="border: 1px solid #999; padding: 4pt 8pt; text-align: right;">{{motor_price}} ₽</td></tr>
-<tr><td style="border: 1px solid #999; padding: 4pt 8pt;">Батарея</td><td style="border: 1px solid #999; padding: 4pt 8pt; text-align: right;">{{battery_price}} ₽</td></tr>
-<tr><td style="border: 1px solid #999; padding: 4pt 8pt;">Дополнительные опции ({{accessories_count}} шт.)</td><td style="border: 1px solid #999; padding: 4pt 8pt; text-align: right;">{{accessories_total}} ₽</td></tr>
-<tr><td style="border: 1px solid #999; padding: 4pt 8pt;">Доставка</td><td style="border: 1px solid #999; padding: 4pt 8pt; text-align: right;">{{delivery_price}} ₽</td></tr>
-<tr class="total"><td style="border: 2px solid #333; padding: 6pt 8pt;">ИТОГО</td><td style="border: 2px solid #333; padding: 6pt 8pt; text-align: right;" class="accent">{{total_price}} ₽</td></tr>
-</table>
+  <!-- ════ ОПЦИИ ════ -->
+  <div class="section-title"><span class="num">04</span>Дополнительные опции ({{accessories_count}} шт.)</div>
+  <table class="accessory-table">
+    <tr>
+      <th>Наименование</th>
+      <th class="num-col">Кол-во</th>
+      <th class="price-col">Цена</th>
+    </tr>
+    {{accessories_table}}
+  </table>
 
-<!-- Footer -->
-<p style="margin-top: 24pt; font-size: 10pt; color: #666; border-top: 1px solid #ccc; padding-top: 8pt;">
-Документ сгенерирован автоматически конфигуратором {{brand_name}}.<br>
-{{config_timestamp}}<br>
-Конфигурация № {{config_id}}
-</p>
+  <!-- ════ РАСЧЁТ СТОИМОСТИ ════ -->
+  <div class="section-title"><span class="num">05</span>Расчёт стоимости</div>
+  <table class="price-table">
+    <tr><td class="price-label">Базовая цена (без АКБ)</td><td class="price-value">{{base_price}} ₽</td></tr>
+    <tr><td class="price-label">Мотор (апгрейд)</td><td class="price-value">{{motor_price}} ₽</td></tr>
+    <tr><td class="price-label">Батарея</td><td class="price-value">{{battery_price}} ₽</td></tr>
+    <tr><td class="price-label">Дополнительные опции ({{accessories_count}} шт.)</td><td class="price-value">{{accessories_total}} ₽</td></tr>
+    <tr class="delivery-row"><td class="price-label">Доставка</td><td class="price-value">{{delivery_price}}</td></tr>
+    <tr class="total-row"><td>ИТОГО</td><td class="price-value">{{total_price}} ₽</td></tr>
+  </table>
+
+  <!-- Validity note -->
+  <div class="validity-box">
+    <strong>⏱ Срок действия предложения:</strong> 7 календарных дней с даты формирования (до {{valid_until}}).
+    Финальная цена фиксируется в договоре купли-продажи и зависит от подтверждения наличия комплектации на складе.
+  </div>
+
+  <!-- ════ ПОДПИСИ ════ -->
+  <div class="signature-row">
+    <div class="signature-cell">
+      <div class="signature-line">
+        <div class="signature-role">Продавец</div>
+        {{issuer_representative}} · {{brand_name}}
+      </div>
+    </div>
+    <div class="signature-cell">
+      <div class="signature-line">
+        <div class="signature-role">Покупатель</div>
+        {{client_name}}
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ FOOTER ════ -->
+  <div class="doc-footer">
+    Документ сгенерирован автоматически конфигуратором <span class="brand">{{brand_name}}</span>.<br>
+    Не является публичной офертой. Финальные условия определяются договором.<br>
+    <span class="config-meta">config #{{config_id}} · {{config_timestamp}}</span>
+  </div>
 
 </div>
