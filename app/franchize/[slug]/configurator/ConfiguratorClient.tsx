@@ -1,9 +1,8 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
-import { useEffect, useMemo, useState, useTransition } from 'react'
-import { MessageCircle, Truck, ChevronRight, Check, Zap, Battery, Shield, Gauge, Sparkles, Star, Plus, Minus } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { MessageCircle, Truck, ChevronRight, Check, Zap, Battery, Shield, Gauge, Sparkles, Star, Plus, Minus, MapPin, Disc3, Anchor, CircleDot } from 'lucide-react'
 
 import { type FranchizeCrewVM } from '../../actions'
 import { useAppContext } from '@/contexts/AppContext'
@@ -35,16 +34,16 @@ import {
   type ConfigStep,
 } from './configurator-types'
 
-// ── Part category icons (must reference imported icon components) ──
-const _PART_ICONS: Record<string, typeof Zap> = {
+// ── Part category icons — distinct per category (CR-048) ──
+const PART_ICONS: Record<string, typeof Zap> = {
   battery: Battery,
   safety: Shield,
-  brakes: Shield,
+  brakes: Disc3,        // was Shield (same as safety)
   performance: Gauge,
   electronics: Zap,
   accessories: Sparkles,
-  suspension: Gauge,
-  wheels: Gauge,
+  suspension: Anchor,    // was Gauge (same as performance)
+  wheels: CircleDot,     // was Gauge (same as performance)
 }
 
 
@@ -137,7 +136,7 @@ function LivePrice({ value, label }: { value: number; label?: string }) {
   }, [value])
   return (
     <div className="flex flex-col items-end">
-      {label && <span className="text-[10px] uppercase tracking-widest text-white/40">{label}</span>}
+      {label && <span className="text-xs uppercase tracking-widest text-[var(--cfg-text-muted)]">{label}</span>}
       <span className="font-mono text-2xl font-bold tracking-tight text-white sm:text-3xl transition-all duration-300">
         {formatPrice(display)}
       </span>
@@ -217,17 +216,42 @@ export function ConfiguratorClient({ crew, slug }: Props) {
   const selectedBike = useMemo(() => bikes.find((b) => b.id === selectedBikeId) ?? null, [bikes, selectedBikeId])
   const regularBatteries = useMemo(() => selectedBike?.specs.battery_options?.batteries ?? [], [selectedBike])
 
+  // CR-013: Detect "battery included" bikes by spec, not by model name string.
+  // A bike is "included" if its battery_options has a single battery with type 'lithium'
+  // and battery_price 0 (the A4 pattern). This survives model renames.
+  const isBatteryIncluded = useMemo(() => {
+    const opts = selectedBike?.specs.battery_options?.batteries ?? []
+    return opts.length === 1 && opts[0].type === 'lithium' && (opts[0].battery_price ?? 0) === 0
+  }, [selectedBike])
+
+  // CR-009: Preserve batteryMode across bike switches of the same kind.
+  // Only force-flip when crossing the included/non-included boundary.
+  const prevBikeIdRef = useRef<string | null>(null)
   useEffect(() => {
     if (!selectedBike) return
+    if (prevBikeIdRef.current === selectedBike.id) return // avoid re-running on re-render
+    prevBikeIdRef.current = selectedBike.id
+
     setMotorPower(String(selectedBike.specs.power_w ?? 3000))
-    setBatteryMode(selectedBike.model === 'A4' ? 'lithium' : 'regular')
-    setBatteryCapacity((selectedBike.model === 'A4' ? lithiumBatteries[0] : regularBatteries[0])?.capacity ?? '')
+
+    if (isBatteryIncluded) {
+      // Battery-included bike: force lithium, use the bike's own battery spec
+      const includedBattery = selectedBike.specs.battery_options?.batteries?.[0]
+      setBatteryMode('lithium')
+      setBatteryCapacity(includedBattery?.capacity ?? 'Included')
+    } else {
+      // Non-included bike: preserve previous mode if it was lithium, otherwise regular
+      setBatteryMode((prev) => (prev === 'lithium' ? 'lithium' : 'regular'))
+      setBatteryCapacity((regularBatteries[0] ?? lithiumBatteries[0])?.capacity ?? '')
+    }
     setAccessoryQuantities({})
     setDeliveryApplied(false)
-  }, [selectedBike, regularBatteries])
+  }, [selectedBike, isBatteryIncluded, regularBatteries])
 
+  // CR-042: Use the bike's actual power_w for high-power bikes, not a hardcoded 10000
   const availableMotors = useMemo(() => {
-    if ((selectedBike?.specs.power_w ?? 3000) >= 10000) return [{ value: '10000', extra: 0, label: '10000W (база)' }]
+    const powerW = selectedBike?.specs.power_w ?? 3000
+    if (powerW >= 10000) return [{ value: String(powerW), extra: 0, label: `${powerW}W (база)` }]
     return [
       { value: '3000', extra: 0, label: '3000W (база)' },
       { value: '5000', extra: 79000, label: '5000W (+79 000 ₽)' },
@@ -237,10 +261,13 @@ export function ConfiguratorClient({ crew, slug }: Props) {
   }, [selectedBike])
 
   const selectedMotor = useMemo(() => availableMotors.find((m) => m.value === motorPower) ?? availableMotors[0], [availableMotors, motorPower])
-  const activeBattery = useMemo(
-    () => (batteryMode === 'regular' ? regularBatteries.find((b) => b.capacity === batteryCapacity) : lithiumBatteries.find((b) => b.capacity === batteryCapacity)) ?? null,
-    [batteryCapacity, batteryMode, regularBatteries],
-  )
+  const activeBattery = useMemo(() => {
+    // CR-008: For battery-included bikes, resolve from the bike's own spec (not the global lithiumBatteries array)
+    if (isBatteryIncluded) {
+      return selectedBike?.specs.battery_options?.batteries?.[0] ?? null
+    }
+    return (batteryMode === 'regular' ? regularBatteries.find((b) => b.capacity === batteryCapacity) : lithiumBatteries.find((b) => b.capacity === batteryCapacity)) ?? null
+  }, [batteryCapacity, batteryMode, regularBatteries, isBatteryIncluded, selectedBike])
 
   const selectedColor = useMemo(() => getFactoryColorById(selectedColorId) ?? DEFAULT_FACTORY_COLOR, [selectedColorId])
 
@@ -296,7 +323,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
 
   const basePrice = selectedBike?.daily_price ?? 0
   const motorExtra = selectedMotor?.extra ?? 0
-  const batteryPrice = selectedBike?.model === 'A4' ? 0 : (activeBattery?.battery_price ?? 0)
+  const batteryPrice = isBatteryIncluded ? 0 : (activeBattery?.battery_price ?? 0)
   const subtotal = basePrice + motorExtra + batteryPrice + accessoriesTotal
   const total = subtotal + (deliveryApplied ? DELIVERY_AVERAGE : 0)
 
@@ -313,7 +340,13 @@ export function ConfiguratorClient({ crew, slug }: Props) {
         bikeId: selectedBike.id,
         bikeLabel: `${selectedBike.make} ${selectedBike.model}`,
         motorLabel: selectedMotor?.value ? `${selectedMotor.value}W` : '—',
-        batteryLabel: activeBattery ? `${activeBattery.capacity} (${batteryMode})` : 'без батареи',
+        // CR-008: For battery-included bikes, send "Included (lithium)" so the server action
+        // can detect it and render "в комплекте" instead of the wrong "50Ah" capacity.
+        batteryLabel: activeBattery
+          ? (isBatteryIncluded
+              ? `Included (${activeBattery.type ?? 'lithium'})`
+              : `${activeBattery.capacity} (${batteryMode})`)
+          : 'без батареи',
         batteryRange: activeBattery?.range_km ?? '',
         selectedColorId: selectedColor?.id ?? DEFAULT_FACTORY_COLOR?.id ?? 'unknown',
         selectedColorFactoryId: selectedColor?.factoryId ?? DEFAULT_FACTORY_COLOR?.factoryId ?? 'UNKNOWN-FACTORY-COLOR',
@@ -387,18 +420,19 @@ export function ConfiguratorClient({ crew, slug }: Props) {
 
       {/* ── Configurator-scoped styles ── */}
       <style jsx>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
         .cfg-root {
-          font-family: 'Inter', system-ui, sans-serif; background: var(--cfg-bg); color: var(--cfg-text); -webkit-font-smoothing: antialiased;
+          font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--cfg-bg); color: var(--cfg-text); -webkit-font-smoothing: antialiased;
         }
-        .cfg-mono { font-family: 'JetBrains Mono', monospace; }
+        .cfg-mono { font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace; font-variant-numeric: tabular-nums; }
         .cfg-fade-in { animation: cfgFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes cfgFadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
         .cfg-card-hover { transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease, border-color 0.3s ease; }
         .cfg-card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 60px -15px rgba(0,0,0,0.5); border-color: var(--cfg-border-hover); }
+        .cfg-card-hover:active { transform: scale(0.98); } /* CR-037: touch feedback */
         .cfg-selected-ring { box-shadow: 0 0 0 2px var(--cfg-accent), 0 0 30px var(--cfg-accent-dim); border-color: var(--cfg-accent) !important; }
         .cfg-option { transition: all 0.2s ease; cursor: pointer; }
         .cfg-option:hover { background: var(--cfg-surface-raised); border-color: var(--cfg-border-hover); }
+        .cfg-option:active { transform: scale(0.98); } /* CR-037: touch feedback */
         .cfg-option-active { background: var(--cfg-accent-glow) !important; border-color: var(--cfg-accent) !important; box-shadow: 0 0 20px var(--cfg-accent-dim); }
         .cfg-radio-dot { appearance: none; width: 18px; height: 18px; border: 2px solid var(--cfg-border-hover); border-radius: 50%; position: relative; transition: all 0.2s ease; flex-shrink: 0; }
         .cfg-radio-dot:checked { border-color: var(--cfg-accent); background: var(--cfg-accent); box-shadow: inset 0 0 0 3px var(--cfg-bg); }
@@ -426,7 +460,44 @@ export function ConfiguratorClient({ crew, slug }: Props) {
         .cfg-glow-btn { position: relative; overflow: hidden; transition: all 0.3s ease; }
         .cfg-glow-btn::before { content: ''; position: absolute; inset: -2px; background: conic-gradient(from 0deg, var(--cfg-accent), transparent, var(--cfg-accent)); border-radius: inherit; animation: spin 3s linear infinite; opacity: 0; transition: opacity 0.3s; z-index: -1; }
         .cfg-glow-btn:hover::before { opacity: 1; }
+        .cfg-glow-btn:active { transform: scale(0.97); } /* CR-037: touch feedback */
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* CR-020: visible focus indicator for keyboard users */
+        .cfg-root :focus-visible {
+          outline: 2px solid var(--cfg-accent);
+          outline-offset: 2px;
+          border-radius: 4px;
+        }
+        .cfg-root button:focus-visible,
+        .cfg-root [role="checkbox"]:focus-visible,
+        .cfg-root [role="radio"]:focus-visible,
+        .cfg-root a:focus-visible {
+          outline: 2px solid var(--cfg-accent);
+          outline-offset: 2px;
+        }
+
+        /* CR-015/CR-016: respect prefers-reduced-motion */
+        @media (prefers-reduced-motion: reduce) {
+          .cfg-root *,
+          .cfg-root *::before,
+          .cfg-root *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+          }
+          /* Make staggered children visible immediately (animation: none leaves them at opacity:0) */
+          .cfg-stagger > * { opacity: 1 !important; animation: none !important; transform: none !important; }
+          .cfg-fade-in { opacity: 1 !important; animation: none !important; transform: none !important; }
+          .cfg-glow-btn::before { display: none !important; }
+        }
+
+        /* CR-033: ensure small text remains legible — bump tiny labels on mobile */
+        @media (max-width: 640px) {
+          .cfg-root .text-\\[10px\\] { font-size: 11px !important; }
+          .cfg-root .text-\\[11px\\] { font-size: 12px !important; }
+        }
       `}</style>
 
       <section className="cfg-root cfg-grain relative min-h-screen">
@@ -509,7 +580,8 @@ export function ConfiguratorClient({ crew, slug }: Props) {
           {tab === 'config' && selectedBike && (
             <div className="cfg-fade-in space-y-6">
               <div className="overflow-hidden rounded-2xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)]">
-                <div className="relative aspect-[21/9] w-full overflow-hidden sm:aspect-[3/1]">
+                {/* CR-032: 16/9 on mobile, 2/1 on desktop — avoids over-cropping the bike */}
+                <div className="relative aspect-[16/9] w-full overflow-hidden sm:aspect-[2/1]">
                   <ConfiguratorBikeImage src={selectedBike.image_url} alt={`${selectedBike.make} ${selectedBike.model}`} sizes="(max-width: 1024px) 100vw, 66vw" />
                   <div className="absolute inset-0 bg-gradient-to-r from-[var(--cfg-bg)] via-[var(--cfg-bg)]/60 to-transparent" />
                   <div className="absolute bottom-0 left-0 p-6 sm:p-8">
@@ -520,7 +592,8 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                 </div>
                 {selectedBike.specs.gallery && selectedBike.specs.gallery.length > 0 && (
                   <div className="flex gap-2 overflow-x-auto border-t border-[var(--cfg-border)] p-3">
-                    {[selectedBike.image_url, ...selectedBike.specs.gallery].map((img, i) => (
+                    {/* CR-039: dedup — DB-loaded bikes may include image_0 in gallery, fallback doesn't */}
+                    {Array.from(new Set([selectedBike.image_url, ...selectedBike.specs.gallery])).map((img, i) => (
                       <div key={img + i} className="relative h-16 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-[var(--cfg-border)]"><ConfiguratorBikeImage src={img} alt={`${selectedBike.make} ${selectedBike.model} фото ${i + 1}`} sizes="96px" /></div>
                     ))}
                   </div>
@@ -549,8 +622,38 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                 </div>
               </div>
 
-              {/* Battery */}
-              {selectedBike.model !== 'A4' && (
+              {/* Battery — included (A4-style: lithium built-in, no choice) */}
+              {isBatteryIncluded && activeBattery && (
+                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5 sm:p-6">
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15"><Battery className="h-4 w-4 text-emerald-400" /></div>
+                    <div>
+                      <h3 className="text-sm font-bold">Аккумулятор в комплекте</h3>
+                      <p className="text-xs text-[var(--cfg-text-dim)]">Литиевая батарея уже входит в стоимость</p>
+                    </div>
+                    <span className="ml-auto rounded-full bg-emerald-500/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                      включено
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-3">
+                      <p className="text-[10px] uppercase tracking-widest text-[var(--cfg-text-dim)]">Тип</p>
+                      <p className="mt-1 text-sm font-semibold text-emerald-400">Lithium</p>
+                    </div>
+                    <div className="rounded-xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-3">
+                      <p className="text-[10px] uppercase tracking-widest text-[var(--cfg-text-dim)]">Ёмкость</p>
+                      <p className="mt-1 text-sm font-semibold">{activeBattery.capacity}</p>
+                    </div>
+                    <div className="rounded-xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-3 sm:col-span-1 col-span-2">
+                      <p className="text-[10px] uppercase tracking-widest text-[var(--cfg-text-dim)]">Запас хода</p>
+                      <p className="mt-1 text-sm font-semibold text-emerald-400">{activeBattery.range_km} км</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Battery — selectable (regular / lithium toggle) */}
+              {!isBatteryIncluded && (
                 <div className="rounded-2xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-5 sm:p-6">
                   <div className="mb-4 flex items-center gap-2">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10"><Battery className="h-4 w-4 text-emerald-400" /></div>
@@ -582,30 +685,41 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                 </div>
               )}
 
+              {/* CR-019: color selection uses radiogroup semantics for screen readers */}
               <div className="rounded-2xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-5 sm:p-6">
                 <div className="mb-4 flex items-center gap-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--cfg-accent)]/10"><Sparkles className="h-4 w-4 text-[var(--cfg-accent)]" /></div>
-                  <div><h3 className="text-sm font-bold">Цвет</h3><p className="text-[11px] text-[var(--cfg-text-dim)]">Цвет попадёт в заказ и DOCX с factory ID</p></div>
+                  <div><h3 className="text-sm font-bold">Цвет</h3><p className="text-xs text-[var(--cfg-text-dim)]">Цвет попадёт в заказ и DOCX с factory ID</p></div>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div role="radiogroup" aria-label="Цвет рамы" className="grid gap-2 sm:grid-cols-2">
                   {FACTORY_COLORS.map((color) => {
                     const active = selectedColorId === color.id
                     return (
                       <button
                         key={color.id}
                         type="button"
+                        role="radio"
+                        aria-checked={active}
                         onClick={() => setSelectedColorId(color.id)}
-                        aria-label={`Цвет рамы ${color.label}`}
+                        aria-label={`Цвет рамы ${color.label}${color.availability === 'out_of_stock' ? ' (нет в наличии)' : color.availability === 'made_to_order' ? ' (под заказ)' : ''}`}
                         className={[
                           'cfg-option flex items-center justify-between rounded-xl border p-4 text-left',
                           active ? 'cfg-option-active' : 'border-[var(--cfg-border)]',
                         ].join(' ')}
                       >
                         <span className="flex items-center gap-3">
-                          <span className="h-5 w-5 rounded-full border border-white/20" style={{ backgroundColor: color.hex ?? '#6b7280' }} />
+                          <span
+                            className="h-6 w-6 rounded-full border-2 border-white/20 shadow-inner"
+                            style={{ backgroundColor: color.hex ?? '#6b7280' }}
+                            aria-hidden="true"
+                          />
                           <span>
                             <span className="block text-sm font-semibold">{color.label}</span>
-                            <span className="block text-[11px] text-[var(--cfg-text-dim)]">Factory ID: {color.factoryId}</span>
+                            <span className="block text-xs text-[var(--cfg-text-dim)]">
+                              <span className="cfg-mono">{color.factoryId}</span>
+                              {color.availability === 'out_of_stock' && <span className="ml-2 text-rose-400">нет в наличии</span>}
+                              {color.availability === 'made_to_order' && <span className="ml-2 text-amber-400">под заказ</span>}
+                            </span>
                           </span>
                         </span>
                       </button>
@@ -626,7 +740,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
           {tab === 'addons' && selectedBike && (
             <div className="cfg-fade-in space-y-6">
               {Object.entries(partsByCategory).map(([category, categoryParts]) => {
-                const Icon = _PART_ICONS[category] || Sparkles
+                const Icon = PART_ICONS[category] || Sparkles
                 const selectedInCat = categoryParts.filter((p) => (accessoryQuantities[p.id] ?? 0) > 0).length
                 const allSelected = selectedInCat === categoryParts.length && categoryParts.length > 0
                 return (
@@ -634,19 +748,20 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                     <div className="mb-4 flex flex-wrap items-center gap-2">
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5"><Icon className="h-4 w-4 text-[var(--cfg-text-muted)]" /></div>
                       <h3 className="text-sm font-bold">{CATEGORY_LABELS[category] ?? category}</h3>
-                      <span className="text-[10px] text-[var(--cfg-text-dim)]">{categoryParts.length} поз.</span>
+                      <span className="text-xs text-[var(--cfg-text-dim)]">{categoryParts.length} поз.</span>
                       {selectedInCat > 0 && (
-                        <span className="rounded-full bg-[var(--cfg-accent)]/15 px-2 py-0.5 text-[10px] font-bold text-[var(--cfg-accent)]">
+                        <span className="rounded-full bg-[var(--cfg-accent)]/15 px-2 py-0.5 text-xs font-bold text-[var(--cfg-accent)]">
                           {selectedInCat} выбрано
                         </span>
                       )}
                       <div className="ml-auto flex gap-1">
+                        {/* CR-017: bigger touch targets (py-1.5 text-xs = ~32px) */}
                         <button
                           type="button"
                           onClick={() => selectAllInCategory(categoryParts)}
                           disabled={allSelected}
                           className={[
-                            'rounded-md border px-2 py-1 text-[10px] font-semibold transition-all',
+                            'rounded-md border px-3 py-1.5 text-xs font-semibold transition-all',
                             allSelected
                               ? 'border-[var(--cfg-border)] text-[var(--cfg-text-dim)] opacity-50 cursor-not-allowed'
                               : 'border-[var(--cfg-border)] text-[var(--cfg-text-muted)] hover:border-[var(--cfg-accent)]/40 hover:text-[var(--cfg-accent)]',
@@ -659,7 +774,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                           onClick={() => clearCategory(categoryParts)}
                           disabled={selectedInCat === 0}
                           className={[
-                            'rounded-md border px-2 py-1 text-[10px] font-semibold transition-all',
+                            'rounded-md border px-3 py-1.5 text-xs font-semibold transition-all',
                             selectedInCat === 0
                               ? 'border-[var(--cfg-border)] text-[var(--cfg-text-dim)] opacity-50 cursor-not-allowed'
                               : 'border-[var(--cfg-border)] text-[var(--cfg-text-muted)] hover:border-rose-400/40 hover:text-rose-400',
@@ -669,7 +784,8 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                         </button>
                       </div>
                     </div>
-                    {/* Polish: card-style accessories with image, recommended badge, and quantity stepper */}
+                    {/* CR-018: single tab stop per card — the whole card is a button.
+                        The qty stepper is a separate tab stop group (only visible when selected). */}
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {categoryParts.map((part) => {
                         const qty = accessoryQuantities[part.id] ?? 0
@@ -685,75 +801,71 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                                 : 'border-[var(--cfg-border)] hover:border-[var(--cfg-text-dim)] hover:bg-white/3',
                             ].join(' ')}
                           >
-                            {/* Top-right controls: recommended badge + check indicator */}
-                            <div className="absolute right-3 top-3 flex items-center gap-1.5">
-                              {isRecommended && !checked && (
-                                <span className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400">
-                                  <Star className="h-2.5 w-2.5 fill-amber-400" />Топ
-                                </span>
-                              )}
-                              <div
-                                role="checkbox"
-                                aria-checked={checked}
-                                aria-label={`Выбрать ${part.model}`}
-                                tabIndex={0}
-                                onClick={() => toggleAccessory(part.id)}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleAccessory(part.id) } }}
-                                className={[
-                                  'flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-2 transition-all',
-                                  checked ? 'border-[var(--cfg-accent)] bg-[var(--cfg-accent)]' : 'border-[var(--cfg-border)] opacity-50 group-hover:opacity-100',
-                                ].join(' ')}
-                              >
-                                {checked && <Check className="h-3 w-3 text-black" />}
-                              </div>
-                            </div>
-                            {/* Part image if available */}
-                            {part.image_url && (
-                              <button
-                                type="button"
-                                onClick={() => toggleAccessory(part.id)}
-                                className="mb-1 h-16 w-full overflow-hidden rounded-lg bg-white/5"
-                                aria-label={`Переключить ${part.model}`}
-                              >
-                                <img src={part.image_url} alt={part.model} className="h-full w-full object-cover" loading="lazy" />
-                              </button>
+                            {/* Top-right: recommended badge (decorative) + check indicator (part of the card button) */}
+                            {isRecommended && !checked && (
+                              <span className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400 pointer-events-none">
+                                <Star className="h-3 w-3 fill-amber-400" />Топ
+                              </span>
                             )}
+                            {checked && (
+                              <span className="absolute right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--cfg-accent)] pointer-events-none">
+                                <Check className="h-3.5 w-3.5 text-black" />
+                              </span>
+                            )}
+                            {/* CR-018: single button = single tab stop. Whole card toggles selection. */}
                             <button
                               type="button"
                               onClick={() => toggleAccessory(part.id)}
-                              className="block pr-6 text-left"
+                              aria-pressed={checked}
+                              aria-label={`${checked ? 'Убрать' : 'Добавить'}: ${part.model}, ${formatPrice(part.daily_price)}`}
+                              className="flex flex-1 flex-col gap-2 text-left pr-8"
                             >
-                              <span className="block text-sm font-semibold pr-6">{part.model}</span>
-                              <span className="block text-[11px] leading-relaxed text-[var(--cfg-text-dim)] line-clamp-2">{part.description}</span>
-                            </button>
-                            <div className="mt-auto flex items-center justify-between gap-2">
-                              <span className="cfg-mono text-sm font-bold text-[var(--cfg-accent)]">
-                                +{formatPrice(part.daily_price)}
-                              </span>
-                              {/* Quantity stepper — only visible when selected */}
-                              {checked && (
-                                <div className="flex items-center gap-1 rounded-lg border border-[var(--cfg-border)] bg-[var(--cfg-bg)] p-0.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => setAccessoryQty(part.id, qty - 1)}
-                                    aria-label={`Уменьшить количество ${part.model}`}
-                                    className="flex h-6 w-6 items-center justify-center rounded text-[var(--cfg-text-muted)] hover:bg-white/5 hover:text-white transition-colors"
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </button>
-                                  <span className="cfg-mono w-5 text-center text-xs font-bold text-white">{qty}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setAccessoryQty(part.id, qty + 1)}
-                                    disabled={qty >= 9}
-                                    aria-label={`Увеличить количество ${part.model}`}
-                                    className="flex h-6 w-6 items-center justify-center rounded text-[var(--cfg-text-muted)] hover:bg-white/5 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </button>
+                              {/* CR-023: use next/image with fill for part thumbnails */}
+                              {part.image_url && (
+                                <div className="relative h-16 w-full overflow-hidden rounded-lg bg-white/5">
+                                  <Image
+                                    src={part.image_url}
+                                    alt={part.model}
+                                    fill
+                                    sizes="200px"
+                                    className="object-cover"
+                                    loading="lazy"
+                                  />
                                 </div>
                               )}
-                            </div>
+                              <span className="block text-sm font-semibold leading-tight">{part.model}</span>
+                              <span className="block text-xs leading-relaxed text-[var(--cfg-text-dim)] line-clamp-2">{part.description}</span>
+                              <span className="cfg-mono mt-1 text-sm font-bold text-[var(--cfg-accent)]">
+                                +{formatPrice(part.daily_price)}
+                              </span>
+                            </button>
+                            {/* CR-017: qty stepper with bigger touch targets (h-9 w-9 = 36px).
+                                stopPropagation so tapping +/- doesn't toggle the card. */}
+                            {checked && (
+                              <div
+                                className="flex items-center gap-1 self-end rounded-lg border border-[var(--cfg-border)] bg-[var(--cfg-bg)] p-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setAccessoryQty(part.id, qty - 1) }}
+                                  aria-label={`Уменьшить количество: ${part.model}`}
+                                  className="flex h-9 w-9 items-center justify-center rounded text-[var(--cfg-text-muted)] hover:bg-white/5 hover:text-white transition-colors"
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </button>
+                                <span className="cfg-mono w-7 text-center text-sm font-bold text-white" aria-live="polite">{qty}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setAccessoryQty(part.id, qty + 1) }}
+                                  disabled={qty >= 9}
+                                  aria-label={`Увеличить количество: ${part.model}`}
+                                  className="flex h-9 w-9 items-center justify-center rounded text-[var(--cfg-text-muted)] hover:bg-white/5 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -788,15 +900,21 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                     <div className="relative aspect-[16/7] w-full overflow-hidden"><ConfiguratorBikeImage src={selectedBike.image_url} alt={`${selectedBike.make} ${selectedBike.model}`} sizes="(max-width: 1280px) 100vw, 60vw" /><div className="absolute inset-0 bg-gradient-to-t from-[var(--cfg-surface)] via-transparent to-transparent" /></div>
                     <div className="p-5"><TierBadge tier={selectedBike.specs.tier} /><h2 className="mt-2 text-xl font-black">{selectedBike.make} {selectedBike.model}</h2></div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {/* CR-031: 6 spec cards in 3-col grid (was 5 in 4-col — orphan on 2nd row) */}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {[
                       { icon: Zap, label: 'Мотор', value: `${selectedMotor?.value ?? '3000'}W` },
                       { icon: Battery, label: 'Батарея', value: activeBattery ? activeBattery.capacity : '—' },
                       { icon: Gauge, label: 'Скорость', value: `${selectedBike.specs.max_speed_kmh} км/ч` },
+                      { icon: MapPin, label: 'Запас хода', value: activeBattery ? `${activeBattery.range_km} км` : '—' }, /* CR-022: MapPin for range */
                       { icon: Sparkles, label: 'Цвет', value: selectedColor?.label ?? '—' },
-                      { icon: Shield, label: 'Запас хода', value: activeBattery ? `${activeBattery.range_km} км` : '—' },
+                      { icon: Shield, label: 'Тип батареи', value: isBatteryIncluded ? 'Lithium' : (batteryMode === 'lithium' ? 'Lithium' : 'Regular') },
                     ].map(({ icon: Icon, label, value }) => (
-                      <div key={label} className="rounded-xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-3"><Icon className="mb-1.5 h-4 w-4 text-[var(--cfg-text-dim)]" /><p className="cfg-mono text-lg font-bold">{value}</p><p className="text-[10px] uppercase tracking-widest text-[var(--cfg-text-dim)]">{label}</p></div>
+                      <div key={label} className="rounded-xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-3">
+                        <Icon className="mb-1.5 h-4 w-4 text-[var(--cfg-text-dim)]" aria-hidden="true" />
+                        <p className="cfg-mono text-base font-bold leading-tight">{value}</p>
+                        <p className="text-xs uppercase tracking-widest text-[var(--cfg-text-dim)]">{label}</p>
+                      </div>
                     ))}
                   </div>
                   {selectedAccessoryIds.length > 0 && (
@@ -854,16 +972,24 @@ export function ConfiguratorClient({ crew, slug }: Props) {
           )}
         </div>
 
-        {/* ── MOBILE STICKY BAR ── */}
-        {selectedBike && (
-          <div className="cfg-sticky-bar fixed inset-x-0 bottom-0 z-50 border-t border-[var(--cfg-border)] bg-[var(--cfg-bg)]/90 px-4 py-3 sm:hidden">
-            <div className="flex items-center justify-between">
-              <div><p className="text-[10px] uppercase tracking-widest text-[var(--cfg-text-dim)]">{selectedBike.make} {selectedBike.model}</p><p className="cfg-mono text-xl font-black text-[var(--cfg-accent)]">{formatPrice(total)}</p></div>
-              <Button onClick={() => setTab('summary')} size="sm" className="bg-[var(--cfg-accent)] font-bold text-black">Итог<ChevronRight className="ml-1 h-4 w-4" /></Button>
+        {/* ── MOBILE STICKY BAR ──
+            CR-035: hide on summary step (button was redundant — user already on summary).
+            CR-036: spacer is inside this conditional so it doesn't add dead space when bar is hidden. */}
+        {selectedBike && tab !== 'summary' && (
+          <>
+            <div className="cfg-sticky-bar fixed inset-x-0 bottom-0 z-50 border-t border-[var(--cfg-border)] bg-[var(--cfg-bg)]/90 px-4 py-3 sm:hidden">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-widest text-[var(--cfg-text-muted)]">{selectedBike.make} {selectedBike.model}</p>
+                  <p className="cfg-mono text-xl font-black text-[var(--cfg-accent)]">{formatPrice(total)}</p>
+                </div>
+                <Button onClick={() => setTab('summary')} size="sm" className="bg-[var(--cfg-accent)] font-bold text-black h-10 px-4">Итог<ChevronRight className="ml-1 h-4 w-4" /></Button>
+              </div>
             </div>
-          </div>
+            {/* Spacer so content isn't hidden behind the sticky bar on mobile */}
+            <div className="h-20 sm:h-0" aria-hidden="true" />
+          </>
         )}
-        <div className="h-20 sm:h-0" />
       </section>
     </>
   )
