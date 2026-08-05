@@ -292,19 +292,20 @@ set
           'reviewsLink', 'https://yandex.ru/maps/org/vip_bike_electro/81589395232/reviews/',
           'promoBanners', jsonb_build_array(
             jsonb_build_object(
-              'id', 'electro-2026',
-              'title', '79bike Falcon PRO - Электро без категории А',
-              'subtitle', 'Законно по правам B. Запас хода до 120 км. Разгон 0-50 км/ч за 3.5 с.',
-              'code', 'ELECTRO2026',
-              'activeFrom', '2026-01-01',
+              'id', 'harley-livewire',
+              'title', 'Harley-Davidson LiveWire ONE — ноль до сотни за 3 секунды',
+              'subtitle', 'Полностью электрический. Категория А. Запас хода 235 км по городу. Быстрая зарядка DC за 40 минут.',
+              'code', 'LIVEWIRE2026',
+              'activeFrom', '2026-08-01',
               'activeTo', '2026-12-31',
               'priority', 95,
-              'ctaLabel', 'Протестировать'
+              'ctaLabel', 'Подробнее'
             )
           ),
           'adCards', jsonb_build_array(
-            jsonb_build_object('id', 'falcon-pro', 'title', '79bike Falcon PRO', 'subtitle', '310 000 ₽ - Электромотоцикл премиум класса', 'href', '/franchize/vip-bike/configurator', 'imageUrl', '', 'badge', 'Bestseller', 'activeFrom', '2026-01-01', 'activeTo', '2026-12-31', 'priority', 90, 'ctaLabel', 'Подробнее'),
-            jsonb_build_object('id', 'test-drive-shuffle', 'title', 'Тест-драйв', 'subtitle', 'Протестируйте электромотоцикл в шоуруме Нижнего Новгорода', 'href', '/franchize/vip-bike#test-drive', 'imageUrl', '', 'badge', 'Popular', 'activeFrom', '2026-01-01', 'activeTo', '2026-12-31', 'priority', 85, 'ctaLabel', 'Записаться')
+            jsonb_build_object('id', 'harley-livewire-card', 'title', 'Harley-Davidson LiveWire ONE', 'subtitle', 'Электрический спортбайк премиум-класса. 105 л.с. Запас хода 235 км.', 'href', '/franchize/vip-bike/configurator', 'imageUrl', '', 'badge', 'Новинка', 'activeFrom', '2026-08-01', 'activeTo', '2026-12-31', 'priority', 95, 'ctaLabel', 'Конфигуратор'),
+            jsonb_build_object('id', 'map-riders-card', 'title', 'Карта райдеров', 'subtitle', 'Найдите попутчиков и маршруты для электропоездок по Нижнему Новгороду', 'href', '/franchize/vip-bike/map-riders', 'imageUrl', '', 'badge', 'Сообщество', 'activeFrom', '2026-08-01', 'activeTo', '2026-12-31', 'priority', 85, 'ctaLabel', 'Открыть карту'),
+            jsonb_build_object('id', 'configurator-card', 'title', 'Конфигуратор электробайка', 'subtitle', 'Соберите свой VipBike: мотор, батарея, цвет, аксессуары — мгновенный расчёт цены', 'href', '/franchize/vip-bike/configurator', 'imageUrl', '', 'badge', 'Популярное', 'activeFrom', '2026-08-01', 'activeTo', '2026-12-31', 'priority', 90, 'ctaLabel', 'Собрать байк')
           ),
           'floatingCart', jsonb_build_object('showOn', jsonb_build_array('catalog', 'about', 'contacts', 'order'), 'showScrollTopButton', true)
         ),
