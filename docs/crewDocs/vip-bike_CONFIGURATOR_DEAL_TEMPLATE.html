@@ -135,11 +135,10 @@
   }
   .validity-box strong { color: #92400e; }
 
-  /* Signature row */
-  .signature-row { display: table; width: 100%; margin-top: 26pt; table-layout: fixed; }
-  .signature-cell { display: table-cell; width: 50%; padding: 0 14pt 0 0; }
-  .signature-cell:last-child { padding: 0 0 0 14pt; }
-  .signature-line {
+  /* Signature row — real <table> for DOCX compatibility (display:table breaks htmlToDocxElements) */
+  table.signature-table { width: 100%; border-collapse: collapse; margin-top: 26pt; table-layout: fixed; }
+  table.signature-table td { width: 50%; padding: 0 14pt; vertical-align: bottom; }
+  table.signature-table td .sig-line {
     border-top: 1pt solid #18181b;
     padding-top: 5pt;
     margin-top: 30pt;
@@ -217,12 +216,12 @@
   <!-- ════ РАСЧЁТ СТОИМОСТИ ════ -->
   <div class="section-title"><span class="num">05</span>Расчёт стоимости</div>
   <table class="price-table">
-    <tr><td class="price-label">Базовая цена (без АКБ)</td><td class="price-value">{{base_price}} ₽</td></tr>
-    <tr><td class="price-label">Мотор (апгрейд)</td><td class="price-value">{{motor_price}} ₽</td></tr>
-    <tr><td class="price-label">Батарея</td><td class="price-value">{{battery_price}} ₽</td></tr>
-    <tr><td class="price-label">Дополнительные опции ({{accessories_count}} шт.)</td><td class="price-value">{{accessories_total}} ₽</td></tr>
+    <tr><td class="price-label">Базовая цена (без АКБ)</td><td class="price-value">{{base_price}}</td></tr>
+    <tr><td class="price-label">Мотор (апгрейд)</td><td class="price-value">{{motor_price}}</td></tr>
+    <tr><td class="price-label">Батарея</td><td class="price-value">{{battery_price}}</td></tr>
+    <tr><td class="price-label">Дополнительные опции ({{accessories_count}} шт.)</td><td class="price-value">{{accessories_total}}</td></tr>
     <tr class="delivery-row"><td class="price-label">Доставка</td><td class="price-value">{{delivery_price}}</td></tr>
-    <tr class="total-row"><td>ИТОГО</td><td class="price-value">{{total_price}} ₽</td></tr>
+    <tr class="total-row"><td>ИТОГО</td><td class="price-value">{{total_price}}</td></tr>
   </table>
 
   <!-- Validity note -->
@@ -232,20 +231,22 @@
   </div>
 
   <!-- ════ ПОДПИСИ ════ -->
-  <div class="signature-row">
-    <div class="signature-cell">
-      <div class="signature-line">
-        <div class="signature-role">Продавец</div>
-        {{issuer_representative}} · {{brand_name}}
-      </div>
-    </div>
-    <div class="signature-cell">
-      <div class="signature-line">
-        <div class="signature-role">Покупатель</div>
-        {{client_name}}
-      </div>
-    </div>
-  </div>
+  <table class="signature-table">
+    <tr>
+      <td>
+        <div class="sig-line">
+          <div class="signature-role">Продавец</div>
+          {{issuer_representative}} · {{brand_name}}
+        </div>
+      </td>
+      <td>
+        <div class="sig-line">
+          <div class="signature-role">Покупатель</div>
+          {{client_name}}
+        </div>
+      </td>
+    </tr>
+  </table>
 
   <!-- ════ FOOTER ════ -->
   <div class="doc-footer">
