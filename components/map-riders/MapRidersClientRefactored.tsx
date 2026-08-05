@@ -43,17 +43,19 @@ import { useSessionManager } from "@/app/franchize/hooks/useSessionManager";
 const RacingMap = dynamic(() => import("@/components/maps/RacingMap").then((mod) => mod.RacingMap), { ssr: false });
 
 const DEFAULT_BOUNDS = { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 };
-// HQ coordinates: пл. Комсомольская 2 — moved ~100m south-west from the original
-// 56.2963, 43.9462 to 56.2954, 43.9446 so the map dot aligns with the actual
-// service entrance (not the middle of the square). Kept in sync with the GPS
-// values in docs/crewDocs/vip-bike-franchize-hydration.sql (crews.hq_location +
-// metadata.map.gps) — update both when this changes.
-// Demo riders placed near HQ for realistic visualization
-const HOME_BASE: [number, number] = [56.2954, 43.9446];
+// HQ coordinates: 56°17'47.2"N 43°56'47.0"E = [56.296444, 43.946389]
+// Exact GPS for пл. Комсомольская 2, Нижний Новгород.
+// Kept in sync with:
+//   - supabase/migrations/20260417023000_update_vip_bike_map_meet_points.sql (map POI dot)
+//   - docs/crewDocs/vip-bike-franchize-hydration.sql (crews.hq_location + metadata.map.gps)
+//   - docs/sql/vip-bike-franchize-hydration.sql (older copy)
+// Update all 4 when this changes.
+const HOME_BASE: [number, number] = [56.296444, 43.946389];
+// Demo riders at realistic distances from HQ (300-450m, different directions + speeds)
 const DEMO_RIDER_OFFSETS: [number, number][] = [
-  [56.301, 43.952],  // North-east of HQ
-  [56.296, 43.935],  // South-west of HQ
-  [56.294, 43.960],  // South-east of HQ
+  [56.298356, 43.949833],  // Demo A • 12 км/ч — ~300m NE of HQ
+  [56.294215, 43.942371],  // Demo B • 14 км/ч — ~350m SW of HQ
+  [56.293578, 43.951555],  // Demo C • 16 км/ч — ~450m SE of HQ
 ];
 const MEETUP_ACTION_DEBOUNCE_MS = 2000;
 
