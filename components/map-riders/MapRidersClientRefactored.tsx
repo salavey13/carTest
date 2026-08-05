@@ -243,30 +243,42 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
   );
   const showDemo = riderPoints.length === 0 && !state.shareEnabled;
 
+  // MR-012: Filter out stale demo-rider POIs from the DB (they're replaced by client-side
+  // DEMO_RIDER_OFFSETS below). Only filter by EXACT ID matches — the old .includes("rider •")
+  // substring check was too broad and could hide admin-created POIs like "Stunt rider • training".
+  // MR-018: Do NOT filter out "vip-base-point" — the HQ dot should be visible on the map.
+  const STALE_DEMO_POI_IDS = new Set([
+    "demo-rider-beta",
+    "vip-demo-rider-a",
+    "vip-demo-rider-b",
+    "vip-demo-rider-c",
+    "vip-riverside-safe-point",
+  ]);
   const staticMapPoints = useMemo(() => {
     return (mapData?.points || []).filter((point) => {
       const normalizedId = String(point.id || "").toLowerCase();
-      const normalizedName = String(point.name || "").toLowerCase();
-      // Filter out demo rider points from old locations
-      return (
-        normalizedId !== "demo-rider-beta" &&
-        !normalizedName.includes("demo rider beta") &&
-        normalizedId !== "vip-base-point" &&
-        normalizedId !== "vip-riverside-safe-point" &&
-        normalizedId !== "vip-demo-rider-a" &&
-        normalizedId !== "vip-demo-rider-b" &&
-        normalizedId !== "vip-demo-rider-c" &&
-        !normalizedName.includes("demo rider") &&
-        !normalizedName.includes("rider •")
-      );
+      return !STALE_DEMO_POI_IDS.has(normalizedId);
     });
-  }, [mapData?.points, mapData?.bounds]);
+    // MR-022: removed mapData?.bounds from deps — the filter body doesn't read it
+  }, [mapData?.points]);
 
   const mapPoints = useMemo(() => {
+    // MR-018: Always add the HQ point so it's visible even if the migration hasn't been
+    // re-run or the DB POI is missing. Uses HOME_BASE constant (single source of truth).
+    const hqPoint = {
+      id: "vip-base-point",
+      name: "VIP BIKE HQ • пл. Комсомольская 2",
+      type: "point" as const,
+      icon: "::FaLocationDot::",
+      color: "#f97316",
+      coords: [[HOME_BASE[0], HOME_BASE[1]]] as [number, number][],
+    };
+
     const demoPoints = showDemo
       ? DEMO_RIDER_OFFSETS.map((coords, index) => ({
           id: `demo-rider-${String.fromCharCode(65 + index)}`,
-          name: `Demo Rider ${String.fromCharCode(65 + index)} • ${12 + index * 2} км/ч`,
+          // MR-020: Russian labels (was "Demo Rider A" — inconsistent with the rest of the UI)
+          name: `Демо-райдер ${String.fromCharCode(65 + index)} • ${12 + index * 2} км/ч`,
           type: "point" as const,
           icon: `image:https://placehold.co/56x56/111827/ffffff?text=${String.fromCharCode(65 + index)}`,
           color: "#60a5fa",
@@ -298,7 +310,7 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
           ]
         : [];
 
-    return [...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints];
+    return [hqPoint, ...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints];
   }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail]);
 
   const riderStatusCounts = useMemo(() => {
