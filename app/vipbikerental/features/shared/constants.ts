@@ -80,6 +80,51 @@ export const fallbackMeetups = [
   { lat: 56.272, lng: 43.948, title: "Старт у речной точки", comment: "легкий темп" },
 ];
 
+// Scenic riding routes around HQ for the landing page map preview.
+// Synced with DEFAULT_ROUTES in components/map-riders/MapRidersClientRefactored.tsx
+// and supabase/migrations/20260418000000_add_vip_bike_map_routes.sql.
+export const fallbackRoutes = [
+  {
+    id: "vip-route-city-cruise",
+    name: "Городской круиз • центр",
+    color: "#22c55e",
+    coords: [
+      [56.296444, 43.946389], [56.299565, 43.949636], [56.300048, 43.957637],
+      [56.296444, 43.965872], [56.289543, 43.956825], [56.291365, 43.943057],
+      [56.296444, 43.946389],
+    ] as [number, number][],
+  },
+  {
+    id: "vip-route-river-sprint",
+    name: "Набережный спринт • Ока",
+    color: "#3b82f6",
+    coords: [
+      [56.294670, 43.945825], [56.291223, 43.943868],
+      [56.287978, 43.940836], [56.285013, 43.936783],
+    ] as [number, number][],
+  },
+  {
+    id: "vip-route-bridge-loop",
+    name: "Мостовой кольцевой • Метромост + Молитовский",
+    color: "#f59e0b",
+    coords: [
+      [56.296444, 43.946389], [56.290518, 43.950276], [56.284592, 43.954163],
+      [56.277813, 43.952309], [56.277819, 43.934173], [56.280840, 43.930154],
+      [56.287472, 43.932822], [56.301125, 43.951260], [56.296444, 43.946389],
+    ] as [number, number][],
+  },
+  {
+    id: "vip-route-offroad-between-bridges",
+    name: "Оффроуд между мостами • Мещерский парк",
+    color: "#ef4444",
+    coords: [
+      [56.289671, 43.941947], [56.285797, 43.943006], [56.282030, 43.946389],
+      [56.280780, 43.953953], [56.284741, 43.958566], [56.286685, 43.943288],
+      [56.289671, 43.941947],
+    ] as [number, number][],
+  },
+];
+
 export const fallbackElectroItems: ElectroPreviewItem[] = [
   {
     id: "falcon-gt-2025",
