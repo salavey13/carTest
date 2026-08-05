@@ -65,15 +65,18 @@ export const normalizeMapPoint = (lat: number | undefined, lng: number | undefin
 // Fallback data
 // ─────────────────────────────────────────────────────
 
-// Demo rider locations near HQ: пл. Комсомольская 2 (56.297654, 43.947218)
+// Demo rider locations near HQ: 56°17'47.2"N 43°56'47.0"E = [56.296444, 43.946389]
+// (пл. Комсомольская 2, Нижний Новгород). Kept in sync with HOME_BASE + DEMO_RIDER_OFFSETS
+// in components/map-riders/MapRidersClientRefactored.tsx and the GPS values in
+// docs/crewDocs/vip-bike-franchize-hydration.sql.
 export const fallbackMapLocations = [
-  { lat: 56.301, lng: 43.952, speed_kmh: 22, user_id: "fallback-rider-1" },
-  { lat: 56.296, lng: 43.935, speed_kmh: 31, user_id: "fallback-rider-2" },
-  { lat: 56.294, lng: 43.960, speed_kmh: 18, user_id: "fallback-rider-3" },
+  { lat: 56.298356, lng: 43.949833, speed_kmh: 12, user_id: "fallback-rider-1" },  // ~300m NE
+  { lat: 56.294215, lng: 43.942371, speed_kmh: 14, user_id: "fallback-rider-2" },  // ~350m SW
+  { lat: 56.293578, lng: 43.951555, speed_kmh: 16, user_id: "fallback-rider-3" },  // ~450m SE
 ];
 
 export const fallbackMeetups = [
-  { lat: 56.2975, lng: 43.947, title: "Сбор у базы", comment: "пл. Комсомольская 2" },
+  { lat: 56.296444, lng: 43.946389, title: "Сбор у базы", comment: "пл. Комсомольская 2" },
   { lat: 56.272, lng: 43.948, title: "Старт у речной точки", comment: "легкий темп" },
 ];
 
