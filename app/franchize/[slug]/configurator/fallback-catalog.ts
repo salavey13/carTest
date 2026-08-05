@@ -43,7 +43,7 @@ export const lithiumBatteries: ConfiguratorBatteryOption[] = [
   { capacity: '60Ah', type: 'lithium', battery_price: 90000, total_price: 0, range_km: '80-120' },
   { capacity: '80Ah', type: 'lithium', battery_price: 98000, total_price: 0, range_km: '90-150' },
   { capacity: '120Ah', type: 'lithium', battery_price: 106000, total_price: 0, range_km: '120-220' },
-  { capacity: '160Ah', type: 'lithium', battery_price: 106000, total_price: 0, range_km: '160-260' },
+  { capacity: '160Ah', type: 'lithium', battery_price: 134000, total_price: 0, range_km: '160-260' },
 ]
 
 export const TIER_META: Record<string, { label: string; color: string }> = {
