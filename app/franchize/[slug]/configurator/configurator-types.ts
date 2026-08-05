@@ -112,7 +112,7 @@ export interface ConfiguratorLeadInput {
   batteryRange: string
   selectedColorId: string
   selectedColorFactoryId: string
-  selectedAccessories: Array<{ name: string; price: number }>
+  selectedAccessories: Array<{ name: string; price: number; quantity: number }>
   withDelivery: boolean
   deliveryPrice: number
   total: number
@@ -126,3 +126,13 @@ export interface ConfiguratorLeadInput {
   userId: string
   crewSlug: string
 }
+
+// ── Recommended accessories (shown with badge in UI) ──
+// Curated list — these are the items most riders add. Update when catalog changes.
+export const RECOMMENDED_PART_IDS: ReadonlySet<string> = new Set([
+  'vipbike-helmet-e4',         // Tensun E4 — most popular helmet
+  'vipbike-motorcycle-helmet', // basic helmet — budget pick
+  'vipbike-abs-system',        // ABS — safety critical
+  'vipbike-brembo-brakes',     // Brembo — most-requested upgrade
+  'vipbike-bluetooth-alarm',   // anti-theft — high-value
+])
