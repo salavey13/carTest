@@ -1,4 +1,10 @@
-export const CARPIX_BASE = 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix'
+import type { ConfiguratorBike, ConfiguratorPart, ConfiguratorBatteryOption } from './configurator-types'
+import { CARPIX_BASE } from './configurator-types'
+
+// Re-export CARPIX_BASE and TIER_META for backwards compatibility — the canonical
+// definitions live in configurator-types.ts; we re-export here so existing imports
+// (`import { CARPIX_BASE } from './fallback-catalog'`) keep working.
+export { CARPIX_BASE, TIER_META } from './configurator-types'
 
 export const fallbackBikes: ConfiguratorBike[] = [
   { id: 'vipbike-g8', make: 'VipBike', model: 'G8', description: 'Электромотоцикл VipBike G8 с мощным двигателем 3000 Вт и максимальной скоростью до 150 км/ч.', daily_price: 120800, image_url: `${CARPIX_BASE}/vipbike-g8/image_0.jpg`, rent_link: '/rent/vipbike-g8', specs: { power_w: 3000, power_kw: 3, max_speed_kmh: '90-150', subtitle: 'Электромотоцикл VipBike G8', tier: 'standard', gallery: [`${CARPIX_BASE}/vipbike-g8/image_1.jpg`, `${CARPIX_BASE}/vipbike-g8/image_2.jpg`, `${CARPIX_BASE}/vipbike-g8/image_3.jpg`], battery_options: { base_price: 120800, batteries: [{ capacity: '50Ah', type: 'regular', battery_price: 44500, total_price: 165300, range_km: '70-110' }, { capacity: '60Ah', type: 'regular', battery_price: 55000, total_price: 175800, range_km: '80-120' }, { capacity: '80Ah', type: 'regular', battery_price: 59000, total_price: 179800, range_km: '90-150' }] } }, type: 'bike', quantity: 1 },
@@ -45,12 +51,3 @@ export const lithiumBatteries: ConfiguratorBatteryOption[] = [
   { capacity: '120Ah', type: 'lithium', battery_price: 106000, total_price: 0, range_km: '120-220' },
   { capacity: '160Ah', type: 'lithium', battery_price: 134000, total_price: 0, range_km: '160-260' },
 ]
-
-export const TIER_META: Record<string, { label: string; color: string }> = {
-  budget: { label: 'Бюджет', color: '#6ee7b7' },
-  standard: { label: 'Стандарт', color: '#60a5fa' },
-  'mid-range': { label: 'Оптимум', color: '#a78bfa' },
-  premium: { label: 'Премиум', color: '#fbbf24' },
-  sport: { label: 'Спорт', color: '#f87171' },
-  'high-performance': { label: 'Флагман', color: '#fb923c' },
-}
