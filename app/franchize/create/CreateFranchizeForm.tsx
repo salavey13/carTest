@@ -736,7 +736,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
                 style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }}
                 value={createHqLocation}
                 onChange={(e) => setCreateHqLocation(e.target.value)}
-                placeholder="56.2954,43.9446"
+                placeholder="56.2964,43.9464"
                 disabled={isCreating}
               />
             </label>
