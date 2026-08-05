@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { MessageCircle, Truck, ChevronRight, Check, Zap, Battery, Shield, Gauge, Sparkles } from 'lucide-react'
+import { MessageCircle, Truck, ChevronRight, Check, Zap, Battery, Shield, Gauge, Sparkles, Star, Plus, Minus } from 'lucide-react'
 
 import { type FranchizeCrewVM } from '../../actions'
 import { useAppContext } from '@/contexts/AppContext'
@@ -31,6 +31,7 @@ import {
   TIER_META,
   CATEGORY_LABELS,
   STEPS,
+  RECOMMENDED_PART_IDS,
   type ConfigStep,
 } from './configurator-types'
 
@@ -163,7 +164,8 @@ export function ConfiguratorClient({ crew, slug }: Props) {
   const [motorPower, setMotorPower] = useState('3000')
   const [batteryMode, setBatteryMode] = useState<'regular' | 'lithium'>('regular')
   const [batteryCapacity, setBatteryCapacity] = useState('')
-  const [selectedAccessories, setSelectedAccessories] = useState<string[]>([])
+  // Accessories state: id -> quantity (0 = not selected, 1+ = selected with qty)
+  const [accessoryQuantities, setAccessoryQuantities] = useState<Record<string, number>>({})
   const [selectedColorId, setSelectedColorId] = useState(DEFAULT_FACTORY_COLOR?.id ?? '')
   const [deliveryApplied, setDeliveryApplied] = useState(false)
 
@@ -220,7 +222,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
     setMotorPower(String(selectedBike.specs.power_w ?? 3000))
     setBatteryMode(selectedBike.model === 'A4' ? 'lithium' : 'regular')
     setBatteryCapacity((selectedBike.model === 'A4' ? lithiumBatteries[0] : regularBatteries[0])?.capacity ?? '')
-    setSelectedAccessories([])
+    setAccessoryQuantities({})
     setDeliveryApplied(false)
   }, [selectedBike, regularBatteries])
 
@@ -243,7 +245,54 @@ export function ConfiguratorClient({ crew, slug }: Props) {
   const selectedColor = useMemo(() => getFactoryColorById(selectedColorId) ?? DEFAULT_FACTORY_COLOR, [selectedColorId])
 
   const filteredBikes = useMemo(() => bikes.filter((b) => b.daily_price >= priceRange[0] && b.daily_price <= priceRange[1]), [bikes, priceRange])
-  const accessoriesTotal = useMemo(() => selectedAccessories.reduce((sum, id) => sum + (parts.find((p) => p.id === id)?.daily_price ?? 0), 0), [selectedAccessories, parts])
+
+  // ── Accessory helpers (qty map → derived list + total) ──
+  const selectedAccessoryIds = useMemo(
+    () => Object.keys(accessoryQuantities).filter((id) => (accessoryQuantities[id] ?? 0) > 0),
+    [accessoryQuantities],
+  )
+  const selectedAccessoriesCount = useMemo(
+    () => selectedAccessoryIds.reduce((sum, id) => sum + (accessoryQuantities[id] ?? 0), 0),
+    [selectedAccessoryIds, accessoryQuantities],
+  )
+  const accessoriesTotal = useMemo(
+    () => selectedAccessoryIds.reduce((sum, id) => {
+      const part = parts.find((p) => p.id === id)
+      return sum + (part?.daily_price ?? 0) * (accessoryQuantities[id] ?? 0)
+    }, 0),
+    [selectedAccessoryIds, accessoryQuantities, parts],
+  )
+
+  const setAccessoryQty = (id: string, qty: number) => {
+    setAccessoryQuantities((prev) => {
+      const next = { ...prev }
+      if (qty <= 0) delete next[id]
+      else next[id] = Math.min(qty, 9) // cap at 9 to keep DOCX layout sane
+      return next
+    })
+  }
+  const toggleAccessory = (id: string) => {
+    setAccessoryQuantities((prev) => {
+      const next = { ...prev }
+      if ((prev[id] ?? 0) > 0) delete next[id]
+      else next[id] = 1
+      return next
+    })
+  }
+  const selectAllInCategory = (categoryParts: ConfiguratorPart[]) => {
+    setAccessoryQuantities((prev) => {
+      const next = { ...prev }
+      for (const p of categoryParts) if (!(p.id in next)) next[p.id] = 1
+      return next
+    })
+  }
+  const clearCategory = (categoryParts: ConfiguratorPart[]) => {
+    setAccessoryQuantities((prev) => {
+      const next = { ...prev }
+      for (const p of categoryParts) delete next[p.id]
+      return next
+    })
+  }
 
   const basePrice = selectedBike?.daily_price ?? 0
   const motorExtra = selectedMotor?.extra ?? 0
@@ -268,9 +317,14 @@ export function ConfiguratorClient({ crew, slug }: Props) {
         batteryRange: activeBattery?.range_km ?? '',
         selectedColorId: selectedColor?.id ?? DEFAULT_FACTORY_COLOR?.id ?? 'unknown',
         selectedColorFactoryId: selectedColor?.factoryId ?? DEFAULT_FACTORY_COLOR?.factoryId ?? 'UNKNOWN-FACTORY-COLOR',
-        selectedAccessories: selectedAccessories.map((id) => {
+        selectedAccessories: selectedAccessoryIds.map((id) => {
           const part = parts.find((p) => p.id === id)
-          return { name: part?.model ?? id, price: part?.daily_price ?? 0 }
+          const qty = accessoryQuantities[id] ?? 1
+          return {
+            name: part?.model ?? id,
+            price: (part?.daily_price ?? 0) * qty, // total price for this line (unit × qty)
+            quantity: qty,
+          }
         }),
         withDelivery: deliveryApplied,
         deliveryPrice: DELIVERY_AVERAGE,
@@ -573,22 +627,57 @@ export function ConfiguratorClient({ crew, slug }: Props) {
             <div className="cfg-fade-in space-y-6">
               {Object.entries(partsByCategory).map(([category, categoryParts]) => {
                 const Icon = _PART_ICONS[category] || Sparkles
+                const selectedInCat = categoryParts.filter((p) => (accessoryQuantities[p.id] ?? 0) > 0).length
+                const allSelected = selectedInCat === categoryParts.length && categoryParts.length > 0
                 return (
                   <div key={category} className="rounded-2xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-5 sm:p-6">
-                    <div className="mb-4 flex items-center gap-2">
+                    <div className="mb-4 flex flex-wrap items-center gap-2">
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5"><Icon className="h-4 w-4 text-[var(--cfg-text-muted)]" /></div>
                       <h3 className="text-sm font-bold">{CATEGORY_LABELS[category] ?? category}</h3>
-                      <span className="ml-auto text-[10px] text-[var(--cfg-text-dim)]">{categoryParts.length} поз.</span>
+                      <span className="text-[10px] text-[var(--cfg-text-dim)]">{categoryParts.length} поз.</span>
+                      {selectedInCat > 0 && (
+                        <span className="rounded-full bg-[var(--cfg-accent)]/15 px-2 py-0.5 text-[10px] font-bold text-[var(--cfg-accent)]">
+                          {selectedInCat} выбрано
+                        </span>
+                      )}
+                      <div className="ml-auto flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => selectAllInCategory(categoryParts)}
+                          disabled={allSelected}
+                          className={[
+                            'rounded-md border px-2 py-1 text-[10px] font-semibold transition-all',
+                            allSelected
+                              ? 'border-[var(--cfg-border)] text-[var(--cfg-text-dim)] opacity-50 cursor-not-allowed'
+                              : 'border-[var(--cfg-border)] text-[var(--cfg-text-muted)] hover:border-[var(--cfg-accent)]/40 hover:text-[var(--cfg-accent)]',
+                          ].join(' ')}
+                        >
+                          Все
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => clearCategory(categoryParts)}
+                          disabled={selectedInCat === 0}
+                          className={[
+                            'rounded-md border px-2 py-1 text-[10px] font-semibold transition-all',
+                            selectedInCat === 0
+                              ? 'border-[var(--cfg-border)] text-[var(--cfg-text-dim)] opacity-50 cursor-not-allowed'
+                              : 'border-[var(--cfg-border)] text-[var(--cfg-text-muted)] hover:border-rose-400/40 hover:text-rose-400',
+                          ].join(' ')}
+                        >
+                          Очистить
+                        </button>
+                      </div>
                     </div>
-                    {/* Polish: card-style accessories instead of plain checkboxes */}
+                    {/* Polish: card-style accessories with image, recommended badge, and quantity stepper */}
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {categoryParts.map((part) => {
-                        const checked = selectedAccessories.includes(part.id)
+                        const qty = accessoryQuantities[part.id] ?? 0
+                        const checked = qty > 0
+                        const isRecommended = RECOMMENDED_PART_IDS.has(part.id)
                         return (
-                          <button
+                          <div
                             key={part.id}
-                            type="button"
-                            onClick={() => setSelectedAccessories((prev) => prev.includes(part.id) ? prev.filter((id) => id !== part.id) : [...prev, part.id])}
                             className={[
                               'group relative flex flex-col gap-2 rounded-xl border p-4 text-left transition-all duration-200',
                               checked
@@ -596,32 +685,90 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                                 : 'border-[var(--cfg-border)] hover:border-[var(--cfg-text-dim)] hover:bg-white/3',
                             ].join(' ')}
                           >
-                            {/* Check indicator */}
-                            <div className={[
-                              'absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all',
-                              checked ? 'border-[var(--cfg-accent)] bg-[var(--cfg-accent)]' : 'border-[var(--cfg-border)] opacity-30 group-hover:opacity-60',
-                            ].join(' ')}>
-                              {checked && <Check className="h-3 w-3 text-black" />}
+                            {/* Top-right controls: recommended badge + check indicator */}
+                            <div className="absolute right-3 top-3 flex items-center gap-1.5">
+                              {isRecommended && !checked && (
+                                <span className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400">
+                                  <Star className="h-2.5 w-2.5 fill-amber-400" />Топ
+                                </span>
+                              )}
+                              <div
+                                role="checkbox"
+                                aria-checked={checked}
+                                aria-label={`Выбрать ${part.model}`}
+                                tabIndex={0}
+                                onClick={() => toggleAccessory(part.id)}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleAccessory(part.id) } }}
+                                className={[
+                                  'flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-2 transition-all',
+                                  checked ? 'border-[var(--cfg-accent)] bg-[var(--cfg-accent)]' : 'border-[var(--cfg-border)] opacity-50 group-hover:opacity-100',
+                                ].join(' ')}
+                              >
+                                {checked && <Check className="h-3 w-3 text-black" />}
+                              </div>
                             </div>
                             {/* Part image if available */}
                             {part.image_url && (
-                              <div className="mb-1 h-16 w-full overflow-hidden rounded-lg bg-white/5">
+                              <button
+                                type="button"
+                                onClick={() => toggleAccessory(part.id)}
+                                className="mb-1 h-16 w-full overflow-hidden rounded-lg bg-white/5"
+                                aria-label={`Переключить ${part.model}`}
+                              >
                                 <img src={part.image_url} alt={part.model} className="h-full w-full object-cover" loading="lazy" />
-                              </div>
+                              </button>
                             )}
-                            <span className="block text-sm font-semibold pr-6">{part.model}</span>
-                            <span className="block text-[11px] leading-relaxed text-[var(--cfg-text-dim)] line-clamp-2">{part.description}</span>
-                            <span className="cfg-mono mt-auto text-sm font-bold text-[var(--cfg-accent)]">+{formatPrice(part.daily_price)}</span>
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleAccessory(part.id)}
+                              className="block pr-6 text-left"
+                            >
+                              <span className="block text-sm font-semibold pr-6">{part.model}</span>
+                              <span className="block text-[11px] leading-relaxed text-[var(--cfg-text-dim)] line-clamp-2">{part.description}</span>
+                            </button>
+                            <div className="mt-auto flex items-center justify-between gap-2">
+                              <span className="cfg-mono text-sm font-bold text-[var(--cfg-accent)]">
+                                +{formatPrice(part.daily_price)}
+                              </span>
+                              {/* Quantity stepper — only visible when selected */}
+                              {checked && (
+                                <div className="flex items-center gap-1 rounded-lg border border-[var(--cfg-border)] bg-[var(--cfg-bg)] p-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setAccessoryQty(part.id, qty - 1)}
+                                    aria-label={`Уменьшить количество ${part.model}`}
+                                    className="flex h-6 w-6 items-center justify-center rounded text-[var(--cfg-text-muted)] hover:bg-white/5 hover:text-white transition-colors"
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </button>
+                                  <span className="cfg-mono w-5 text-center text-xs font-bold text-white">{qty}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setAccessoryQty(part.id, qty + 1)}
+                                    disabled={qty >= 9}
+                                    aria-label={`Увеличить количество ${part.model}`}
+                                    className="flex h-6 w-6 items-center justify-center rounded text-[var(--cfg-text-muted)] hover:bg-white/5 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         )
                       })}
                     </div>
                   </div>
                 )
               })}
-              {selectedAccessories.length > 0 && (
+              {selectedAccessoryIds.length > 0 && (
                 <div className="flex items-center justify-between rounded-xl border border-[var(--cfg-accent)]/20 bg-[var(--cfg-accent)]/5 px-4 py-3">
-                  <span className="text-sm text-[var(--cfg-text-muted)]">Выбрано опций: <span className="font-bold text-white">{selectedAccessories.length}</span></span>
+                  <span className="text-sm text-[var(--cfg-text-muted)]">
+                    Выбрано позиций: <span className="font-bold text-white">{selectedAccessoryIds.length}</span>
+                    {selectedAccessoriesCount !== selectedAccessoryIds.length && (
+                      <span className="text-[var(--cfg-text-dim)]"> · {selectedAccessoriesCount} шт. всего</span>
+                    )}
+                  </span>
                   <span className="cfg-mono text-sm font-bold text-[var(--cfg-accent)]">+{formatPrice(accessoriesTotal)}</span>
                 </div>
               )}
@@ -652,14 +799,25 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                       <div key={label} className="rounded-xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-3"><Icon className="mb-1.5 h-4 w-4 text-[var(--cfg-text-dim)]" /><p className="cfg-mono text-lg font-bold">{value}</p><p className="text-[10px] uppercase tracking-widest text-[var(--cfg-text-dim)]">{label}</p></div>
                     ))}
                   </div>
-                  {selectedAccessories.length > 0 && (
+                  {selectedAccessoryIds.length > 0 && (
                     <div className="rounded-xl border border-[var(--cfg-border)] bg-[var(--cfg-surface)] p-4">
                       <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-[var(--cfg-text-dim)]">Доп. опции</h4>
                       <div className="space-y-2">
-                        {selectedAccessories.map((id) => {
+                        {selectedAccessoryIds.map((id) => {
                           const part = parts.find((p) => p.id === id)
                           if (!part) return null
-                          return <div key={id} className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 text-[var(--cfg-text-muted)]"><Check className="h-3.5 w-3.5 text-[var(--cfg-accent)]" />{part.model}</span><span className="cfg-mono text-xs">+{formatPrice(part.daily_price)}</span></div>
+                          const qty = accessoryQuantities[id] ?? 1
+                          const lineTotal = part.daily_price * qty
+                          return (
+                            <div key={id} className="flex items-center justify-between text-sm">
+                              <span className="flex items-center gap-2 text-[var(--cfg-text-muted)]">
+                                <Check className="h-3.5 w-3.5 text-[var(--cfg-accent)]" />
+                                {part.model}
+                                {qty > 1 && <span className="cfg-mono text-[10px] text-[var(--cfg-text-dim)]">×{qty}</span>}
+                              </span>
+                              <span className="cfg-mono text-xs">+{formatPrice(lineTotal)}</span>
+                            </div>
+                          )
                         })}
                       </div>
                     </div>
@@ -675,7 +833,7 @@ export function ConfiguratorClient({ crew, slug }: Props) {
                         <div className="flex justify-between"><span className="text-[var(--cfg-text-muted)]">Цвет (Factory ID)</span><span className="cfg-mono text-xs font-medium">{selectedColor?.factoryId ?? 'UNKNOWN-FACTORY-COLOR'}</span></div>
                         {motorExtra > 0 && <div className="flex justify-between"><span className="text-[var(--cfg-text-muted)]">Мотор {selectedMotor?.value}W</span><span className="cfg-mono font-medium">+{formatPrice(motorExtra)}</span></div>}
                         {batteryPrice > 0 && <div className="flex justify-between"><span className="text-[var(--cfg-text-muted)]">Батарея {activeBattery?.capacity}</span><span className="cfg-mono font-medium">+{formatPrice(batteryPrice)}</span></div>}
-                        {accessoriesTotal > 0 && <div className="flex justify-between"><span className="text-[var(--cfg-text-muted)]">Опции ({selectedAccessories.length})</span><span className="cfg-mono font-medium">+{formatPrice(accessoriesTotal)}</span></div>}
+                        {accessoriesTotal > 0 && <div className="flex justify-between"><span className="text-[var(--cfg-text-muted)]">Опции ({selectedAccessoriesCount} шт.)</span><span className="cfg-mono font-medium">+{formatPrice(accessoriesTotal)}</span></div>}
                         {deliveryApplied && <div className="flex justify-between"><span className="text-[var(--cfg-text-muted)]">Доставка</span><span className="cfg-mono font-medium">+{formatPrice(DELIVERY_AVERAGE)}</span></div>}
                       </div>
                       <Separator className="my-4 bg-[var(--cfg-border)]" />
