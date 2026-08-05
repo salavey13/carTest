@@ -303,7 +303,6 @@ set
             )
           ),
           'adCards', jsonb_build_array(
-            jsonb_build_object('id', 'harley-livewire-card', 'title', 'Harley-Davidson LiveWire ONE', 'subtitle', 'Электрический спортбайк премиум-класса. 105 л.с. Запас хода 235 км.', 'href', '/franchize/vip-bike/configurator', 'imageUrl', '', 'badge', 'Новинка', 'activeFrom', '2026-08-01', 'activeTo', '2026-12-31', 'priority', 95, 'ctaLabel', 'Конфигуратор'),
             jsonb_build_object('id', 'map-riders-card', 'title', 'Карта райдеров', 'subtitle', 'Найдите попутчиков и маршруты для электропоездок по Нижнему Новгороду', 'href', '/franchize/vip-bike/map-riders', 'imageUrl', '', 'badge', 'Сообщество', 'activeFrom', '2026-08-01', 'activeTo', '2026-12-31', 'priority', 85, 'ctaLabel', 'Открыть карту'),
             jsonb_build_object('id', 'configurator-card', 'title', 'Конфигуратор электробайка', 'subtitle', 'Соберите свой VipBike: мотор, батарея, цвет, аксессуары — мгновенный расчёт цены', 'href', '/franchize/vip-bike/configurator', 'imageUrl', '', 'badge', 'Популярное', 'activeFrom', '2026-08-01', 'activeTo', '2026-12-31', 'priority', 90, 'ctaLabel', 'Собрать байк')
           ),
