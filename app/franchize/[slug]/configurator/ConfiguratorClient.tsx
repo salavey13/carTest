@@ -96,10 +96,10 @@ function StepBar({ current, goTo, disabled }: {
             ].join(' ')}
           >
             <span className={[
-              'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold transition-colors',
+              'flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold transition-colors shrink-0',
               active ? 'bg-black text-white' : done ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10 text-white/30',
             ].join(' ')}>
-              {done ? <Check className="h-3 w-3" /> : step.num}
+              {done ? <Check className="h-3.5 w-3.5" /> : step.num}
             </span>
             <span className="hidden sm:inline">{step.label}</span>
             {i < STEPS.length - 1 && (
@@ -263,8 +263,9 @@ export function ConfiguratorClient({ crew, slug }: Props) {
       const response = await sendConfiguratorLead({
         bikeId: selectedBike.id,
         bikeLabel: `${selectedBike.make} ${selectedBike.model}`,
-        motorLabel: selectedMotor?.label ?? '—',
+        motorLabel: selectedMotor?.value ? `${selectedMotor.value}W` : '—',
         batteryLabel: activeBattery ? `${activeBattery.capacity} (${batteryMode})` : 'без батареи',
+        batteryRange: activeBattery?.range_km ?? '',
         selectedColorId: selectedColor?.id ?? DEFAULT_FACTORY_COLOR?.id ?? 'unknown',
         selectedColorFactoryId: selectedColor?.factoryId ?? DEFAULT_FACTORY_COLOR?.factoryId ?? 'UNKNOWN-FACTORY-COLOR',
         selectedAccessories: selectedAccessories.map((id) => {
