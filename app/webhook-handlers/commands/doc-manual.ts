@@ -1758,37 +1758,48 @@ ${qrDeepLink}`);
   const leadsWebUrl = `${siteUrl}/franchize/${resolvedSlug}/leads`;
   const analyticsWebUrl = `${siteUrl}/franchize/${resolvedSlug}/rentals-analytics`;
 
+  // FIX: embed links as HTML <a> tags in the message body instead of inline buttons.
+  // Inline buttons trigger the default message handler when clicked, which derails
+  // the conversation ("Некорректный ввод. Пожалуйста, выбери вариант из меню").
+  const successLinks: string[] = [];
+  if (tgDeepLink) successLinks.push(`<a href="${escapeHtml(tgDeepLink)}">📋 Открыть аренду</a>`);
+  if (webUrl) successLinks.push(`<a href="${escapeHtml(webUrl)}">🌐 В браузере</a>`);
+  if (isRent) successLinks.push(`<a href="${escapeHtml(leadsWebUrl)}">👥 Лиды</a>`);
+  if (isRent) successLinks.push(`<a href="${escapeHtml(analyticsWebUrl)}">📈 Аналитика</a>`);
+  const successTextWithLinks = successLinks.length > 0
+    ? `${successText}\n\n${successLinks.join("  ")}`
+    : successText;
+
   await sendComplexMessage(
     chatId,
-    successText,
-    [[
-      { text: "📋 Открыть аренду", url: tgDeepLink },
-      ...(webUrl ? [{ text: "🌐 В браузере", url: webUrl }] : []),
-      ...(isRent ? [{ text: "👥 Лиды", url: leadsWebUrl }] : []),
-      ...(isRent ? [{ text: "📈 Аналитика", url: analyticsWebUrl }] : []),
-    ]],
+    successTextWithLinks,
+    [], // NO inline buttons — plain text links in message body
     { removeKeyboard: true, parseMode: "HTML" },
   );
 
   // ── Auto-shame operator if they skipped phone input ──
   // Phone is needed for QR claim flow — without it, renter can't be linked.
   // Send a friendly "атата" directly to the operator who ran /doc.
+  // FIX: use a plain text link (not an inline button) — inline buttons trigger the
+  // default message handler when clicked, which derails the conversation.
+  // The link is embedded directly in the message body as an HTML <a> tag.
   if (isRent && !context.clientPhone) {
     try {
+      const rentalShortId = rentalId ? escapeHtml((rentalId as string).slice(0, 8)) : "?";
+      const rentalLinkHtml = tgDeepLink ? `<a href="${escapeHtml(tgDeepLink)}">📋 Открыть аренду</a>` : "";
       const shameMessage =
-        `🚨 <b>Атата! Вы не указали телефон клиента</b>\n\n` +
+        `🚨 <b>Атата! Ты пропустил ввод телефона клиента</b>\n\n` +
         `🏍 ${escapeHtml(bikeTitleForMsg)}\n` +
         `👤 ${escapeHtml(context.mpFullName || "Клиент")}\n` +
-        `🔑 Аренда: ${rentalId ? escapeHtml((rentalId as string).slice(0, 8)) : "?"}\n\n` +
+        `🔑 Аренда: ${rentalShortId}\n\n` +
         `Без телефона клиент не получит QR-код и не сможет привязать свой Telegram.\n` +
         `QR-код сейчас можно показывать только визуально с экрана.\n\n` +
-        `💡 <b>Совет:</b> введите телефон на следующей аренде — клиент сможет получить QR-код в личные сообщения и сам привязать аккаунт.`;
+        `💡 <b>Совет:</b> введите телефон на следующей аренде — клиент сможет получить QR-код в личные сообщения и сам привязать аккаунт.` +
+        (rentalLinkHtml ? `\n\n${rentalLinkHtml}` : "");
       await sendComplexMessage(
         chatId, // same chat as the operator who ran /doc
         shameMessage,
-        [[
-          { text: "📋 Открыть аренду", url: tgDeepLink },
-        ]],
+        [], // NO inline buttons — plain text link in message body instead
         { parseMode: "HTML" },
       );
     } catch (shameErr) {
@@ -1821,7 +1832,7 @@ ${qrDeepLink}`);
     }
   }
 
-  // Send with inline button linking to the rental page
+  // Send with plain text link (not inline button — buttons trigger default handler when clicked)
   try {
     const adminChatId = "413553377"; // salavey13
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
@@ -1829,19 +1840,23 @@ ${qrDeepLink}`);
     const botLink = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
     const rentalTgLink = rentalId ? `${botLink}?startapp=rental_${rentalId}` : "";
 
-    const adminButtons = [];
-    if (rentalTgLink) adminButtons.push({ text: "📋 Открыть аренду", url: rentalTgLink });
-    if (rentalWebUrl) adminButtons.push({ text: "🌐 В браузере", url: rentalWebUrl });
+    // FIX: embed links as HTML <a> tags in the message body instead of inline buttons.
+    // Inline buttons trigger the default message handler when clicked, which derails
+    // the conversation ("Некорректный ввод. Пожалуйста, выбери вариант из меню").
+    const links: string[] = [];
+    if (rentalTgLink) links.push(`<a href="${escapeHtml(rentalTgLink)}">📋 Открыть аренду</a>`);
+    if (rentalWebUrl) links.push(`<a href="${escapeHtml(rentalWebUrl)}">🌐 В браузере</a>`);
+    if (links.length > 0) adminMessage += `\n\n${links.join("  ")}`;
 
     await sendComplexMessage(
       adminChatId,
       adminMessage,
-      adminButtons.length > 0 ? [adminButtons] : [],
+      [], // NO inline buttons — plain text links in message body
       { parseMode: "HTML" },
     );
   } catch (adminErr) {
     // Fallback: plain text notifyAdmin if sendComplexMessage fails
-    console.warn("[/doc] Admin notify with buttons failed, falling back to plain text:", adminErr);
+    console.warn("[/doc] Admin notify with links failed, falling back to plain text:", adminErr);
     await notifyAdmin(adminMessage);
   }
 
