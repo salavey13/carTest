@@ -51,12 +51,14 @@ async function verifyCrewAccess(
     if (crewErr) logger.warn("[verifyCrewAccess] crews query failed:", crewErr.message);
     const isOwner = crew?.owner_id === cookieUserId;
 
-    // Check crew member
+    // Check crew member (LR3-006 FIX: filter by membership_status='active' — was missing,
+    // so removed/inactive members retained access indefinitely)
     const { data: crewMember, error: memberErr } = await supabaseAdmin
       .from("crew_members")
       .select("user_id")
       .eq("crew_id", crewId)
       .eq("user_id", cookieUserId)
+      .eq("membership_status", "active")
       .maybeSingle();
 
     if (memberErr) logger.warn("[verifyCrewAccess] crew_members query failed:", memberErr.message);
