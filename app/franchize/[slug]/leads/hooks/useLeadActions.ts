@@ -51,7 +51,12 @@ export function useLeadActions({
   // ── Fetch KPIs ──
   const fetchKpis = useCallback(async (mode: string) => {
     try {
-      const result = await getLeadsKpis(slug, mode);
+      const result = await getLeadsKpis(
+        slug,
+        mode,
+        dbUser?.user_id || passwordAuthOwnerId || "",
+        !!passwordAuthOwnerId,
+      );
       setKpis(result);
     } catch (e) {
       console.error("[useLeadActions] KPI fetch failed:", e);
