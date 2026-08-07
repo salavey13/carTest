@@ -7,9 +7,11 @@ interface UseDocumentVerificationProps {
   rental: { rentalId: string | null; passportMainpagePhoto?: string | null; passportRegistrationPhoto?: string | null; driversLicenceFrontalPhoto?: string | null };
   slug: string;
   T: any;
+  actorUserId?: string;
+  isPasswordAuth?: boolean;
 }
 
-export function useDocumentVerification({ rental, slug, T }: UseDocumentVerificationProps) {
+export function useDocumentVerification({ rental, slug, T, actorUserId, isPasswordAuth }: UseDocumentVerificationProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DocVerificationData | null>(null);
@@ -25,7 +27,7 @@ export function useDocumentVerification({ rental, slug, T }: UseDocumentVerifica
     let cancelled = false;
     (async () => {
       try {
-        const result = await getRentalDocVerification(rentalId);
+        const result = await getRentalDocVerification(rentalId, actorUserId, isPasswordAuth);
         if (cancelled) return;
         if (result.success && result.data) {
           setData(result.data);
@@ -61,7 +63,7 @@ export function useDocumentVerification({ rental, slug, T }: UseDocumentVerifica
       const result = await resp.json();
       if (result.success) {
         setVerifyMsg({ ok: true, text: docType === "passport" ? "Паспорт верифицирован" : "Права верифицированы" });
-        const refreshed = await getRentalDocVerification(rental.rentalId);
+        const refreshed = await getRentalDocVerification(rental.rentalId, actorUserId, isPasswordAuth);
         if (refreshed.success && refreshed.data) setData(refreshed.data);
       } else {
         setVerifyMsg({ ok: false, text: result.error || "Ошибка верификации" });
