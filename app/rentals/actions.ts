@@ -1363,10 +1363,20 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
 
   // ── Caller authentication (CRITICAL — was missing in v1) ──
   // Without this, anyone could extend anyone's rental by guessing the UUID.
+  // FIX: use the signed TELEGRAM_ACTOR_COOKIE (not the non-existent 'tg_user_id').
+  // The cookie is set by /api/validate-telegram-auth and verified via HMAC-SHA256.
+  // Same pattern as setRentalPhone + app/franchize/server-actions/intents.ts.
   const cookieStore = await cookies();
-  const callerUserId = cookieStore.get("tg_user_id")?.value;
+  let callerUserId = verifyTelegramActorCookieValue(
+    cookieStore.get(TELEGRAM_ACTOR_COOKIE)?.value,
+  );
   if (!callerUserId) {
-    return { success: false, error: "Требуется авторизация." };
+    // Dev fallback for mock user
+    if (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_USE_MOCK_USER === "true") {
+      callerUserId = process.env.NEXT_PUBLIC_MOCK_USER_ID || "413553377";
+    } else {
+      return { success: false, error: "Требуется авторизация." };
+    }
   }
 
   const supabase = supabaseAdmin;
