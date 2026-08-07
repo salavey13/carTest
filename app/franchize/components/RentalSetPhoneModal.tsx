@@ -63,6 +63,24 @@ export function RentalSetPhoneModal({
   }, [open, currentPhone]);
 
   // a11y: Escape closes modal, focus returns to trigger button.
+  // SP-009 FIX: split into two effects — scroll lock + autofocus only depend on [open],
+  // keydown handler depends on [open, isPending]. Was: single effect with [open, isPending]
+  // that re-ran on every pending change, re-locking scroll + re-firing autofocus mid-save.
+  useEffect(() => {
+    if (!open) return;
+    // Lock body scroll while modal open
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const timer = setTimeout(() => {
+      const telInput = dialogRef.current?.querySelector<HTMLInputElement>("input[type='tel']");
+      telInput?.focus();
+    }, 0);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      clearTimeout(timer);
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -72,17 +90,7 @@ export function RentalSetPhoneModal({
       }
     };
     document.addEventListener("keydown", handleKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const timer = setTimeout(() => {
-      const telInput = dialogRef.current?.querySelector<HTMLInputElement>("input[type='tel']");
-      telInput?.focus();
-    }, 0);
-    return () => {
-      document.removeEventListener("keydown", handleKey);
-      document.body.style.overflow = prevOverflow;
-      clearTimeout(timer);
-    };
+    return () => document.removeEventListener("keydown", handleKey);
   }, [open, isPending]);
 
   const handleSubmit = () => {
@@ -135,7 +143,7 @@ export function RentalSetPhoneModal({
         ) : (
           <>
             <Phone className="h-3 w-3 shrink-0" />
-            📞 Указать телефон
+            Указать телефон
           </>
         )}
       </button>
