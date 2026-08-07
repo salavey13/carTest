@@ -144,10 +144,11 @@ function MapToolsPanel({ crewSlug }: { crewSlug: string }) {
     },
     {
       title: "POI Editor",
-      description: "Редактировать точки интереса на карте",
-      href: `/franchize/${crewSlug}/map-riders`,
+      description: "Редактировать точки интереса и маршруты на карте",
+      href: "/admin/map-routes",
       icon: "::FaLocationDot::",
       color: "from-amber-400 to-orange-500",
+      badge: "NEW",
     },
   ];
 
