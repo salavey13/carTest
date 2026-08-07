@@ -30,6 +30,7 @@ import { RentalOdometerDelta } from "../../../components/RentalOdometerDelta";
 import { FranchizeRentalRoleGuard } from "../../../components/FranchizeRentalRoleGuard";
 // Polish v3 components (Phase 3: extend modal, Phase 5: renter + guest views)
 import { RentalExtendModal } from "../../../components/RentalExtendModal";
+import { RentalSetPhoneModal } from "../../../components/RentalSetPhoneModal";
 import { RenterActionsPanel } from "../../../components/RenterActionsPanel";
 import { GuestRentalCta } from "../../../components/GuestRentalCta";
 import { RentalBikePhoto } from "../../../components/RentalBikePhoto";
@@ -368,12 +369,34 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                 <span className="font-semibold">{rental.renterFullName}</span>
               </p>
             )}
-            {/* QR fix: show renter phone + link to leads page */}
-            {rental.renterPhone && (
-              <p>
-                <span style={{ color: textSecondary }}>Телефон:</span>{" "}
-                <span className="font-mono">{rental.renterPhone}</span>
-                {" "}
+            {/* Phone display + operator edit button (Set Phone modal) */}
+            <p className="flex items-center gap-2 flex-wrap">
+              <span style={{ color: textSecondary }}>Телефон:</span>{" "}
+              <span className="font-mono">{rental.renterPhone || "—"}</span>
+              {/* Operator/admin/owner can set or edit phone */}
+              <FranchizeRentalRoleGuard
+                allowedRoles={["operator", "admin", "owner"]}
+                ownerId={rental.ownerId}
+                renterId={rental.renterId}
+                renterTelegramChatId={rental.renterTelegramChatId}
+                crewId={crew.id}
+                crewSlug={resolvedSlug}
+              >
+                <RentalSetPhoneModal
+                  rentalId={rental.rentalId}
+                  currentPhone={rental.renterPhone}
+                  bikeTitle={rental.vehicleTitle}
+                  renterName={rental.renterFullName}
+                  accentColor={accent}
+                  accentTextOn={accentTextOn}
+                  borderColor={borderSoft}
+                  textPrimary={textPrimary}
+                  textSecondary={textSecondary}
+                  triggerClassName="text-xs underline-offset-2 hover:underline"
+                  triggerStyle={{ color: accent }}
+                />
+              </FranchizeRentalRoleGuard>
+              {rental.renterPhone && (
                 <RentalLink
                   href={`/franchize/${resolvedSlug}/leads?phone=${encodeURIComponent(rental.renterPhone)}`}
                   className="text-xs underline-offset-2 hover:underline"
@@ -381,8 +404,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                 >
                   → в лидах
                 </RentalLink>
-              </p>
-            )}
+              )}
+            </p>
           </div>
 
           {/* QR fix: show QR code for operator (to re-show to renter).
