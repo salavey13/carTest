@@ -216,7 +216,7 @@ export function useLeadActions({
       }
       return null;
     },
-    [selectedLead, slug]
+    [selectedLead, slug, crewId, dbUser, passwordAuthOwnerId]
   );
 
   // ── Drawer action handler ──
