@@ -1698,13 +1698,23 @@ export async function setRentalPhone(input: SetRentalPhoneInput): Promise<SetRen
       isCrewOperator = ["owner", "admin", "co_owner"].includes(crewMember?.role || "");
     }
 
+    // SP-002 FIX: admin auth check must match extendRental pattern — check metadata,
+    // not just top-level columns. The FranchizeRentalRoleGuard (client) checks metadata,
+    // so the server must too to avoid button-visible-but-server-rejects mismatch.
     let isGlobalAdmin = false;
     const { data: callerUser } = await supabaseAdmin
       .from("users")
       .select("role, status, metadata")
       .eq("user_id", callerUserId)
       .maybeSingle();
-    if (callerUser?.status === "admin" || callerUser?.role === "admin" || callerUser?.role === "vprAdmin") {
+    const callerMeta = (callerUser?.metadata as Record<string, unknown> | null) ?? null;
+    if (
+      callerMeta?.role === "admin" ||
+      callerMeta?.status === "admin" ||
+      callerUser?.status === "admin" ||
+      callerUser?.role === "admin" ||
+      callerUser?.role === "vprAdmin"
+    ) {
       isGlobalAdmin = true;
     }
 
@@ -1715,14 +1725,26 @@ export async function setRentalPhone(input: SetRentalPhoneInput): Promise<SetRen
     // 6. UPDATE private.rental_contract_artifacts — this is what the rental page reads
     // Use the privateSchema() helper to access the private schema
     const privateSchema = (supabaseAdmin as unknown as { schema: (s: string) => typeof supabaseAdmin }).schema("private");
-    const { error: artifactErr } = await privateSchema
+    // SP-003 FIX: use .select() to verify the update actually affected a row.
+    // Was: .update() without .select() — 0-row update (no artifact for this rentalId)
+    // silently returned success, misleading the operator.
+    const { data: updatedArtifacts, error: artifactErr } = await privateSchema
       .from("rental_contract_artifacts")
       .update({ renter_phone: normalizedPhone })
-      .eq("rental_id", rentalId);
+      .eq("rental_id", rentalId)
+      .select("rental_id");
 
     if (artifactErr) {
       logger.error("[setRentalPhone] artifact update failed", artifactErr);
       return { success: false, error: "Не удалось обновить телефон в договоре" };
+    }
+    if (!updatedArtifacts || updatedArtifacts.length === 0) {
+      // No artifact row exists for this rental — can happen if /doc failed to create one
+      // or the rental was created via a different flow. Don't silently succeed.
+      return {
+        success: false,
+        error: "Не найден договор аренды для этой аренды. Создайте договор через /doc сначала.",
+      };
     }
 
     // 7. Best-effort: sync to private.user_rental_secrets (next-rent prefill)
@@ -1750,16 +1772,30 @@ export async function setRentalPhone(input: SetRentalPhoneInput): Promise<SetRen
     }
 
     // 8. Best-effort: patch rentals.metadata for leads/todos pipeline
+    // SP-001 FIX: must read-modify-write to preserve existing metadata.
+    // Was: .update({ metadata: { renter_phone: ... } }) — REPLACES entire JSONB,
+    // wiping extended_from, archived_by, damage_reports, pickup_freeze, etc.
     try {
+      const { data: rentalRow } = await supabaseAdmin
+        .from("rentals")
+        .select("metadata")
+        .eq("rental_id", rentalId)
+        .maybeSingle();
+      const currentMeta = (rentalRow?.metadata as Record<string, unknown>) ?? {};
       await supabaseAdmin
         .from("rentals")
-        .update({ metadata: { renter_phone: normalizedPhone } })
+        .update({
+          metadata: { ...currentMeta, renter_phone: normalizedPhone },
+          updated_at: new Date().toISOString(),
+        })
         .eq("rental_id", rentalId);
     } catch (metaErr) {
       logger.warn("[setRentalPhone] metadata patch failed (non-fatal)", metaErr);
     }
 
-    logger.info("[setRentalPhone] phone updated", { rentalId, normalizedPhone, callerUserId });
+    // SP-005: mask phone in logs to avoid PII leak
+    const maskedPhone = normalizedPhone.replace(/(\d{4})$/, "****$1");
+    logger.info("[setRentalPhone] phone updated", { rentalId, maskedPhone, callerUserId });
     return { success: true };
   } catch (err) {
     logger.error("[setRentalPhone] unexpected error", err);
