@@ -9,9 +9,11 @@ interface DocumentVerificationPanelProps {
   rental: LeadRentalRow;
   slug: string;
   T: any;
+  actorUserId?: string;
+  isPasswordAuth?: boolean;
 }
 
-export function DocumentVerificationPanel({ rental, slug, T }: DocumentVerificationPanelProps) {
+export function DocumentVerificationPanel({ rental, slug, T, actorUserId, isPasswordAuth }: DocumentVerificationPanelProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DocVerificationData | null>(null);
@@ -26,7 +28,7 @@ export function DocumentVerificationPanel({ rental, slug, T }: DocumentVerificat
     let cancelled = false;
     (async () => {
       try {
-        const result = await getRentalDocVerification(rental.rentalId);
+        const result = await getRentalDocVerification(rental.rentalId, actorUserId, isPasswordAuth);
         if (cancelled) return;
         if (result.success && result.data) {
           setData(result.data);
@@ -62,7 +64,7 @@ export function DocumentVerificationPanel({ rental, slug, T }: DocumentVerificat
       const result = await resp.json();
       if (result.success) {
         setVerifyMsg({ ok: true, text: docType === "passport" ? "Паспорт верифицирован" : "Права верифицированы" });
-        const refreshed = await getRentalDocVerification(rental.rentalId);
+        const refreshed = await getRentalDocVerification(rental.rentalId, actorUserId, isPasswordAuth);
         if (refreshed.success && refreshed.data) {
           setData(refreshed.data);
         }
