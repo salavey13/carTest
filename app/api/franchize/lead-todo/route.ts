@@ -72,10 +72,11 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { todoId, status } = body;
+    const { todoId, status, crewId } = body;
 
-    // Auth check: only crew members can update todos
-    const auth = await verifyCrewAccess(request);
+    // LR3-004 FIX: pass crewId to verifyCrewAccess (was missing → non-strict mode)
+    // and add crew_id filter to the UPDATE query.
+    const auth = await verifyCrewAccess(request, crewId);
     if (auth.ok === false) return auth.response;
 
     if (!todoId || !status) {
@@ -92,10 +93,13 @@ export async function PATCH(request: NextRequest) {
       updateData.completed_at = null;
     }
 
-    const { error } = await supabaseAdmin
+    // LR3-004 FIX: add crew_id filter to prevent cross-crew todo toggling
+    let query = supabaseAdmin
       .from("crew_todos")
       .update(updateData)
       .eq("id", todoId);
+    if (crewId) query = query.eq("crew_id", crewId);
+    const { error } = await query;
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -119,6 +123,10 @@ export async function DELETE(request: NextRequest) {
 
     // Dismiss a lead entirely (mark franchize_intents as dismissed)
     if (dismissLead && leadId) {
+      // LR3-005 FIX: require slug explicitly (was defaulting to "vip-bike")
+      if (!body.slug) {
+        return NextResponse.json({ success: false, error: "Missing slug for dismiss" }, { status: 400 });
+      }
       // Also dismiss the user (mark as not a lead) so they disappear from all lead sources
       await supabaseAdmin.from("users").update({
         metadata: { is_dismissed_lead: true, dismissed_at: new Date().toISOString() },
@@ -127,7 +135,7 @@ export async function DELETE(request: NextRequest) {
       const { error } = await supabaseAdmin.from("franchize_intents").update({
         stage: "dismissed",
         updated_at: new Date().toISOString(),
-      }).eq("telegram_user_id", leadId).eq("slug", body.slug || "vip-bike");
+      }).eq("telegram_user_id", leadId).eq("slug", body.slug);
 
       if (error) {
         logger.error("[lead-todo] dismiss lead failed", error);
@@ -140,10 +148,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Missing todoId" }, { status: 400 });
     }
 
-    const { error } = await supabaseAdmin
+    // LR3-005 FIX: add crew_id filter to prevent cross-crew todo deletion
+    let deleteQuery = supabaseAdmin
       .from("crew_todos")
       .delete()
       .eq("id", todoId);
+    if (crewId) deleteQuery = deleteQuery.eq("crew_id", crewId);
+    const { error } = await deleteQuery;
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
