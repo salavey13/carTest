@@ -316,9 +316,12 @@ export function LeadsClient({
   );
 
   // ── Fetch KPIs when mode changes ──
+  // LR3-012 FIX: guard with auth check so KPIs don't flash 0→real on initial load.
+  // Was: fired immediately before auth resolved, got zeros, then re-fired after auth.
   useEffect(() => {
+    if (!isAuthed || authLoading || shouldShowPassword) return;
     void fetchKpis(mode);
-  }, [mode, fetchKpis]);
+  }, [mode, fetchKpis, isAuthed, authLoading, shouldShowPassword]);
 
   // ── NEW (polish 2026-07-30): fetch leads AFTER auth passes ──
   // The page now passes empty leads/todos arrays (security fix — see page.tsx
