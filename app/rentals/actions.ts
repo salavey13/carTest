@@ -1623,6 +1623,150 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
   return { success: true, newRentalId };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// setRentalPhone — set or update the renter's phone number on a rental
+// Used by the "📞 Указать телефон" button on the rental page when /doc skipped phone.
+// Updates private.rental_contract_artifacts (what the page reads) + best-effort sync
+// to private.user_rental_secrets (next-rent prefill) + public.rentals.metadata (leads pipeline).
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface SetRentalPhoneInput {
+  rentalId: string;
+  phone: string;  // raw user input
+}
+
+interface SetRentalPhoneResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Normalize a Russian phone number to E.164 format (+7XXXXXXXXXX).
+ * Handles: +7 999 123-45-67, 89991234567, 79991234567, 99991234567, etc.
+ * Returns null if the number is invalid.
+ */
+function normalizePhoneToE164(raw: string): string | null {
+  let digits = raw.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("8")) digits = "7" + digits.slice(1);
+  if (digits.length === 10) digits = "7" + digits;
+  if (digits.length === 11 && digits.startsWith("7")) return "+" + digits;
+  return null;
+}
+
+export async function setRentalPhone(input: SetRentalPhoneInput): Promise<SetRentalPhoneResult> {
+  try {
+    // 1. Validate rentalId (UUID)
+    const rentalId = input?.rentalId?.trim();
+    if (!rentalId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rentalId)) {
+      return { success: false, error: "Неверный ID аренды" };
+    }
+
+    // 2. Normalize phone to E.164
+    const normalizedPhone = normalizePhoneToE164(input.phone || "");
+    if (!normalizedPhone) {
+      return { success: false, error: "Неверный формат телефона. Введите 10-11 цифр (например, +7 999 123-45-67)" };
+    }
+
+    // 3. Caller auth
+    const callerUserId = (await cookies()).get("tg_user_id")?.value;
+    if (!callerUserId) {
+      return { success: false, error: "Не авторизован" };
+    }
+
+    // 4. Fetch rental
+    const { data: rental, error: rentalErr } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id, owner_id, crew_id, crew_slug")
+      .eq("rental_id", rentalId)
+      .maybeSingle();
+
+    if (rentalErr || !rental) {
+      return { success: false, error: "Аренда не найдена" };
+    }
+
+    // 5. Authorization: owner OR crew operator OR global admin
+    const isOwner = rental.owner_id === callerUserId;
+
+    let isCrewOperator = false;
+    if (rental.crew_id) {
+      const { data: crewMember } = await supabaseAdmin
+        .from("crew_members")
+        .select("role")
+        .eq("crew_id", rental.crew_id)
+        .eq("user_id", callerUserId)
+        .maybeSingle();
+      isCrewOperator = ["owner", "admin", "co_owner"].includes(crewMember?.role || "");
+    }
+
+    let isGlobalAdmin = false;
+    const { data: callerUser } = await supabaseAdmin
+      .from("users")
+      .select("role, status, metadata")
+      .eq("user_id", callerUserId)
+      .maybeSingle();
+    if (callerUser?.status === "admin" || callerUser?.role === "admin" || callerUser?.role === "vprAdmin") {
+      isGlobalAdmin = true;
+    }
+
+    if (!isOwner && !isCrewOperator && !isGlobalAdmin) {
+      return { success: false, error: "Нет прав на изменение этой аренды" };
+    }
+
+    // 6. UPDATE private.rental_contract_artifacts — this is what the rental page reads
+    // Use the privateSchema() helper to access the private schema
+    const privateSchema = (supabaseAdmin as unknown as { schema: (s: string) => typeof supabaseAdmin }).schema("private");
+    const { error: artifactErr } = await privateSchema
+      .from("rental_contract_artifacts")
+      .update({ renter_phone: normalizedPhone })
+      .eq("rental_id", rentalId);
+
+    if (artifactErr) {
+      logger.error("[setRentalPhone] artifact update failed", artifactErr);
+      return { success: false, error: "Не удалось обновить телефон в договоре" };
+    }
+
+    // 7. Best-effort: sync to private.user_rental_secrets (next-rent prefill)
+    try {
+      // Find the artifact's original_sha256 to match secrets
+      const { data: artifact } = await privateSchema
+        .from("rental_contract_artifacts")
+        .select("original_sha256")
+        .eq("rental_id", rentalId)
+        .maybeSingle();
+
+      if (artifact?.original_sha256) {
+        await privateSchema
+          .from("user_rental_secrets")
+          .update({ renter_phone: normalizedPhone, updated_at: new Date().toISOString() })
+          .eq("doc_sha256", artifact.original_sha256);
+      }
+      // Also try by source_rental_id
+      await privateSchema
+        .from("user_rental_secrets")
+        .update({ renter_phone: normalizedPhone, updated_at: new Date().toISOString() })
+        .eq("source_rental_id", rentalId);
+    } catch (secretsErr) {
+      logger.warn("[setRentalPhone] secrets sync failed (non-fatal)", secretsErr);
+    }
+
+    // 8. Best-effort: patch rentals.metadata for leads/todos pipeline
+    try {
+      await supabaseAdmin
+        .from("rentals")
+        .update({ metadata: { renter_phone: normalizedPhone } })
+        .eq("rental_id", rentalId);
+    } catch (metaErr) {
+      logger.warn("[setRentalPhone] metadata patch failed (non-fatal)", metaErr);
+    }
+
+    logger.info("[setRentalPhone] phone updated", { rentalId, normalizedPhone, callerUserId });
+    return { success: true };
+  } catch (err) {
+    logger.error("[setRentalPhone] unexpected error", err);
+    return { success: false, error: "Внутренняя ошибка" };
+  }
+}
+
 // ── Local escapeHtml (server-side, mirrors notification-templates.ts) ──
 // Defined locally to avoid circular import (notification-templates.ts is client-importable)
 function escapeHtml(s: unknown): string {
