@@ -1263,11 +1263,23 @@ export async function getRentalDocVerification(
       } else if (!isRentalOwner && !isRenter) {
         return { success: false, error: "Недостаточно прав." };
       }
-    } else if (actorUserId && isPasswordAuth && rental.crew_id) {
-      // Password auth — verify actorUserId is the crew owner (server-side)
-      const ownerAccess = await verifyCrewOwnerAccess(actorUserId, rental.crew_id);
-      if (!ownerAccess.allowed) {
-        return { success: false, error: ownerAccess.error || "Недостаточно прав." };
+    } else if (actorUserId && isPasswordAuth) {
+      // LR3-008 FIX: check rental ownership FIRST (handles null crew_id case).
+      // Was: only checked crew_id, so rentals with null crew_id always failed
+      // even for the legitimate owner.
+      const isRentalOwner = rental.owner_id === actorUserId;
+      const isRenter = rental.user_id === actorUserId;
+
+      if (isRentalOwner || isRenter) {
+        // Owner/renter always has access — proceed
+      } else if (rental.crew_id) {
+        // Not the owner — verify crew ownership
+        const ownerAccess = await verifyCrewOwnerAccess(actorUserId, rental.crew_id);
+        if (!ownerAccess.allowed) {
+          return { success: false, error: ownerAccess.error || "Недостаточно прав." };
+        }
+      } else {
+        return { success: false, error: "Недостаточно прав." };
       }
     } else {
       // No valid auth
