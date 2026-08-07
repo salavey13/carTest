@@ -338,9 +338,13 @@ export function LeadsClient({
   // HIGH FIX #8: reset the fetch ref when slug changes so navigating from
   // crew A to crew B actually fetches crew B's leads (was stuck on crew A
   // because the ref was never cleared)
+  // LR3-019 FIX: also reset on auth-source change (dbUser ↔ passwordAuthOwnerId).
+  // Was: only reset on slug change — if cookie expired mid-session and user
+  // entered password, leadsFetchedRef stayed true and leads were never re-fetched.
+  const authSource = dbUser?.user_id || passwordAuthOwnerId || "";
   useEffect(() => {
     leadsFetchedRef.current = false;
-  }, [slug]);
+  }, [slug, authSource]);
   useEffect(() => {
     // goodmorning-fixes: auth guard with isAuthed in deps so effect re-fires when auth completes.
     // Previously removed the guard entirely → fetch fired during authLoading, succeeded,
