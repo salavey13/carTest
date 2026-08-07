@@ -12,6 +12,7 @@ import { CrewWithCounts, CrewDetails, CommandDeckData, MapPreset, VehicleWithSta
 import type { BookingInput, BookingResult } from './types';
 import { cookies } from "next/headers";
 import { notifyAdmin } from "@/app/actions";
+import { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } from "@/lib/telegram-actor-cookie";
 
 type Vehicle = Database['public']['Tables']['cars']['Row'];
 
@@ -1667,11 +1668,22 @@ export async function setRentalPhone(input: SetRentalPhoneInput): Promise<SetRen
       return { success: false, error: "Неверный формат телефона. Введите 10-11 цифр (например, +7 999 123-45-67)" };
     }
 
-    // 3. Caller auth
-    const callerUserId = (await cookies()).get("tg_user_id")?.value;
+    // 3. Caller auth — use the signed TELEGRAM_ACTOR_COOKIE (not the non-existent tg_user_id)
+    // The cookie is set by /api/validate-telegram-auth and verified via HMAC-SHA256.
+    // Pattern matches app/franchize/server-actions/intents.ts.
+    const callerUserId = verifyTelegramActorCookieValue(
+      (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
+    );
     if (!callerUserId) {
-      return { success: false, error: "Не авторизован" };
+      // Dev fallback for mock user
+      if (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_USE_MOCK_USER === "true") {
+        const mockUserId = process.env.NEXT_PUBLIC_MOCK_USER_ID || "413553377";
+        // continue with mock user
+      } else {
+        return { success: false, error: "Не авторизован" };
+      }
     }
+    const authedUserId = callerUserId || process.env.NEXT_PUBLIC_MOCK_USER_ID || "413553377";
 
     // 4. Fetch rental
     const { data: rental, error: rentalErr } = await supabaseAdmin
@@ -1685,7 +1697,7 @@ export async function setRentalPhone(input: SetRentalPhoneInput): Promise<SetRen
     }
 
     // 5. Authorization: owner OR crew operator OR global admin
-    const isOwner = rental.owner_id === callerUserId;
+    const isOwner = rental.owner_id === authedUserId;
 
     let isCrewOperator = false;
     if (rental.crew_id) {
@@ -1693,7 +1705,7 @@ export async function setRentalPhone(input: SetRentalPhoneInput): Promise<SetRen
         .from("crew_members")
         .select("role")
         .eq("crew_id", rental.crew_id)
-        .eq("user_id", callerUserId)
+        .eq("user_id", authedUserId)
         .maybeSingle();
       isCrewOperator = ["owner", "admin", "co_owner"].includes(crewMember?.role || "");
     }
@@ -1705,7 +1717,7 @@ export async function setRentalPhone(input: SetRentalPhoneInput): Promise<SetRen
     const { data: callerUser } = await supabaseAdmin
       .from("users")
       .select("role, status, metadata")
-      .eq("user_id", callerUserId)
+      .eq("user_id", authedUserId)
       .maybeSingle();
     const callerMeta = (callerUser?.metadata as Record<string, unknown> | null) ?? null;
     if (
@@ -1795,7 +1807,7 @@ export async function setRentalPhone(input: SetRentalPhoneInput): Promise<SetRen
 
     // SP-005: mask phone in logs to avoid PII leak
     const maskedPhone = normalizedPhone.replace(/(\d{4})$/, "****$1");
-    logger.info("[setRentalPhone] phone updated", { rentalId, maskedPhone, callerUserId });
+    logger.info("[setRentalPhone] phone updated", { rentalId, maskedPhone, authedUserId });
     return { success: true };
   } catch (err) {
     logger.error("[setRentalPhone] unexpected error", err);
