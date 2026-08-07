@@ -350,7 +350,11 @@ export function LeadsClient({
     let cancelled = false;
     (async () => {
       try {
-        const result = await getFranchizeLeads(slug);
+        const result = await getFranchizeLeads(
+          slug,
+          dbUser?.user_id || passwordAuthOwnerId || "",
+          !!passwordAuthOwnerId,
+        );
         if (cancelled) return;
         if (result.success) {
           leadsFetchedRef.current = true;
