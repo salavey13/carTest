@@ -893,7 +893,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
         />
       </div>
 
-      <div className="relative z-10 h-screen flex flex-col">
+      <div className="relative z-10 min-h-screen flex flex-col">
         {/* HEADER */}
         <header className="flex-shrink-0 px-2 md:px-4 py-2 md:py-3 border-b relative z-10" style={{ borderColor: withAlpha(borderSoft, 0.5), backgroundColor: withAlpha(bgCard, 0.5) }}>
           <div className="flex items-center justify-between gap-2 md:gap-4">
