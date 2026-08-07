@@ -49,6 +49,8 @@ export function useLeadActions({
   const [kpis, setKpis] = useState<LeadsKpis | null>(null);
 
   // ── Fetch KPIs ──
+  // LA-004 FIX: added dbUser, passwordAuthOwnerId to deps so KPIs re-fetch after auth resolves.
+  // Was: deps only [slug] — fetchKpis captured null dbUser on initial render and never re-fired.
   const fetchKpis = useCallback(async (mode: string) => {
     try {
       const result = await getLeadsKpis(
@@ -61,7 +63,7 @@ export function useLeadActions({
     } catch (e) {
       console.error("[useLeadActions] KPI fetch failed:", e);
     }
-  }, [slug]);
+  }, [slug, dbUser, passwordAuthOwnerId]);
 
   // ── Dismiss lead ──
   const handleDismissLeadRequest = useCallback((leadId: string) => {
@@ -198,7 +200,14 @@ export function useLeadActions({
     async (text: string) => {
       if (!selectedLead || !text.trim()) return;
       try {
-        const result = await createLeadNote(selectedLead.user_id, text.trim(), slug);
+        // LA-003 FIX: createLeadNote expects an object, not 3 positional args.
+        // Was: createLeadNote(selectedLead.user_id, text.trim(), slug) — silently failed.
+        const result = await createLeadNote({
+          leadId: selectedLead.user_id,
+          crewId,
+          text: text.trim(),
+          createdBy: dbUser?.user_id || passwordAuthOwnerId || undefined,
+        });
         if (result.success && result.data) {
           return result.data;
         }
