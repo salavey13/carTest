@@ -14,8 +14,13 @@ export interface LeadsKpis {
   revenueDelta?: number;
 }
 
-export async function getLeadsKpis(slug: string, mode: Mode): Promise<LeadsKpis> {
-  const result = await getFranchizeLeads(slug);
+export async function getLeadsKpis(
+  slug: string,
+  mode: Mode,
+  actorUserId?: string,
+  isPasswordAuth?: boolean,
+): Promise<LeadsKpis> {
+  const result = await getFranchizeLeads(slug, actorUserId, isPasswordAuth);
   if (!result.success || !result.leads) {
     return { totalLeads: 0, hotLeads: 0, conversionRate: 0, monthlyRevenue: 0 };
   }
