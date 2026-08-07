@@ -369,8 +369,10 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                 <span className="font-semibold">{rental.renterFullName}</span>
               </p>
             )}
-            {/* Phone display + operator edit button (Set Phone modal) */}
-            <p className="flex items-center gap-2 flex-wrap">
+            {/* Phone display + operator edit button (Set Phone modal)
+                SP-013 FIX: using <div> not <p> — the modal renders a <div> overlay which
+                is flow content and cannot be nested inside <p> (invalid HTML, DOM corruption). */}
+            <div className="flex items-center gap-2 flex-wrap">
               <span style={{ color: textSecondary }}>Телефон:</span>{" "}
               <span className="font-mono">{rental.renterPhone || "—"}</span>
               {/* Operator/admin/owner can set or edit phone */}
@@ -405,7 +407,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                   → в лидах
                 </RentalLink>
               )}
-            </p>
+            </div>
           </div>
 
           {/* QR fix: show QR code for operator (to re-show to renter).
