@@ -7,6 +7,57 @@ import { unstable_noStore as noStore } from "next/cache";
 import { computeLeadStage, computeQrStatus, computeAssignee, STAGE_NEXT_ACTION, matchTodosToLead } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 
+// ── Auth helper (Pattern B — mirrors rentals-dashboard.ts) ──────────────────
+// Verifies that actorUserId has access to the given crew.
+// When isPasswordAuth=true, skips verification (password was already validated
+// via validateAnalyticsPassword → analytics_passwords table).
+// When isPasswordAuth=false, checks: crew owner OR global admin OR active crew member.
+async function verifyCrewAccess(
+  actorUserId: string,
+  crewId: string,
+  isPasswordAuth: boolean,
+): Promise<{ allowed: boolean; error?: string }> {
+  if (isPasswordAuth) {
+    // Password auth grants full access — skip checks
+    return { allowed: true };
+  }
+
+  // Fetch user data for permission checks
+  const { data: user } = await supabaseAdmin
+    .from("users")
+    .select("metadata, username")
+    .eq("user_id", actorUserId)
+    .maybeSingle();
+
+  const userMetadata = user?.metadata as Record<string, unknown> | null;
+  const isAdmin = userMetadata?.role === "admin" || userMetadata?.status === "admin";
+
+  // Check if user is the crew owner
+  const { data: crew } = await supabaseAdmin
+    .from("crews")
+    .select("owner_id")
+    .eq("id", crewId)
+    .maybeSingle();
+
+  const isOwner = crew?.owner_id === actorUserId;
+
+  // Check if user is a crew member
+  const { data: crewMember } = await supabaseAdmin
+    .from("crew_members")
+    .select("user_id")
+    .eq("crew_id", crewId)
+    .eq("user_id", actorUserId)
+    .maybeSingle();
+
+  const isCrewMember = !!crewMember;
+
+  if (!isOwner && !isAdmin && !isCrewMember) {
+    return { allowed: false, error: "Недостаточно прав для просмотра данных этого экипажа." };
+  }
+
+  return { allowed: true };
+}
+
 export interface LeadRentalRow {
   rentalId: string;
   status: string;
@@ -241,10 +292,22 @@ function classifyIdentityState(
   return 'operator_placeholder';
 }
 
-export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeadsResult> {
+export async function getFranchizeLeads(
+  slug: string,
+  actorUserId?: string,
+  isPasswordAuth?: boolean,
+): Promise<GetFranchizeLeadsResult> {
   noStore();
   const safeSlug = slug.trim();
   try {
+    // ── Auth check (Pattern B) ──
+    // Previously: NO auth — anyone with a crew slug could fetch all leads.
+    // Now: verifies actorUserId has access to this crew (owner / admin / crew member)
+    // or was authenticated via analytics password.
+    if (!actorUserId) {
+      return { success: false, error: "Не авторизован." };
+    }
+
     // Fetch dynamic operator IDs for this crew (owner + active members).
     // This now also returns crewId, so we skip the duplicate crews lookup below.
     // BUG FIX (previously): getCrewOperatorIds only returned the owner because it
@@ -253,6 +316,12 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
 
     if (!crewId) {
       return { success: false, error: "Экипаж не найден" };
+    }
+
+    // Verify crew access
+    const access = await verifyCrewAccess(actorUserId, crewId, !!isPasswordAuth);
+    if (!access.allowed) {
+      return { success: false, error: access.error || "Недостаточно прав." };
     }
 
     /** Check if a chat ID is a crew operator (not a real renter). */
@@ -1091,22 +1160,48 @@ export interface GetRentalDocVerificationResult {
 /**
  * Get document verification data for a rental.
  * Returns signed URLs for photos, OCR data from user_rental_secrets, and checklist status.
+ * Auth: actorUserId must be the rental owner, a crew operator, or a global admin
+ * (or authenticated via analytics password).
  */
-export async function getRentalDocVerification(rentalId: string): Promise<GetRentalDocVerificationResult> {
+export async function getRentalDocVerification(
+  rentalId: string,
+  actorUserId?: string,
+  isPasswordAuth?: boolean,
+): Promise<GetRentalDocVerificationResult> {
   if (!rentalId) {
     return { success: false, error: "rentalId is required" };
+  }
+  if (!actorUserId) {
+    return { success: false, error: "Не авторизован." };
   }
 
   try {
     // 1. Fetch rental with photo paths and metadata
     const { data: rental, error: rentalError } = await supabaseAdmin
       .from("rentals")
-      .select("rental_id, user_id, metadata, passport_mainpage_photo, passport_registration_photo, drivers_licence_frontal_photo")
+      .select("rental_id, user_id, crew_id, owner_id, metadata, passport_mainpage_photo, passport_registration_photo, drivers_licence_frontal_photo")
       .eq("rental_id", rentalId)
       .single();
 
     if (rentalError || !rental) {
       return { success: false, error: "Rental not found" };
+    }
+
+    // ── Auth check (Pattern B) ──
+    // Previously: NO auth — anyone with a rental UUID could fetch passport photos + OCR data.
+    // Now: verifies actorUserId owns the rental OR has crew access.
+    if (!isPasswordAuth) {
+      const isRentalOwner = rental.owner_id === actorUserId;
+      const isRenter = rental.user_id === actorUserId;
+
+      if (!isRentalOwner && !isRenter && rental.crew_id) {
+        const access = await verifyCrewAccess(actorUserId, rental.crew_id, false);
+        if (!access.allowed) {
+          return { success: false, error: access.error || "Недостаточно прав." };
+        }
+      } else if (!isRentalOwner && !isRenter) {
+        return { success: false, error: "Недостаточно прав." };
+      }
     }
 
     // 2. Generate signed URLs for photos (5 min expiry)
