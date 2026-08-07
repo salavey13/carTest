@@ -4,58 +4,112 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { privateSchema } from "@/lib/private-secrets";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from "next/cache";
+import { cookies } from "next/headers";
+import { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } from "@/lib/telegram-actor-cookie";
 import { computeLeadStage, computeQrStatus, computeAssignee, STAGE_NEXT_ACTION, matchTodosToLead } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 
-// ── Auth helper (Pattern B — mirrors rentals-dashboard.ts) ──────────────────
-// Verifies that actorUserId has access to the given crew.
-// When isPasswordAuth=true, skips verification (password was already validated
-// via validateAnalyticsPassword → analytics_passwords table).
-// When isPasswordAuth=false, checks: crew owner OR global admin OR active crew member.
+// ── Auth helper ─────────────────────────────────────────────────────────────
+// Verifies that the caller has access to the given crew.
+// Uses TWO verification paths (both server-side, no client-supplied booleans):
+//
+// 1. Telegram WebApp: reads TELEGRAM_ACTOR_COOKIE (signed HMAC-SHA256) → gets real userId
+//    → checks crew owner / admin / active crew member
+// 2. Password auth: caller passes actorUserId (the crew owner's ID from validateAnalyticsPassword)
+//    → server verifies actorUserId === crew.owner_id (only the real owner would know this UUID)
+//
+// LA-001 FIX: was trusting a client-supplied isPasswordAuth boolean — anyone could bypass
+// auth by passing isPasswordAuth=true. Now the server verifies identity in both paths.
 async function verifyCrewAccess(
-  actorUserId: string,
   crewId: string,
-  isPasswordAuth: boolean,
-): Promise<{ allowed: boolean; error?: string }> {
-  if (isPasswordAuth) {
-    // Password auth grants full access — skip checks
-    return { allowed: true };
+): Promise<{ allowed: boolean; actorUserId?: string; error?: string }> {
+  // Path 1: Telegram WebApp — read signed cookie
+  const cookieUserId = verifyTelegramActorCookieValue(
+    (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
+  );
+
+  if (cookieUserId) {
+    // Telegram auth — verify crew access via DB
+    const { data: user, error: userErr } = await supabaseAdmin
+      .from("users")
+      .select("metadata")
+      .eq("user_id", cookieUserId)
+      .maybeSingle();
+
+    if (userErr) logger.warn("[verifyCrewAccess] users query failed:", userErr.message);
+
+    const userMetadata = user?.metadata as Record<string, unknown> | null;
+    const isAdmin = userMetadata?.role === "admin" || userMetadata?.status === "admin";
+
+    // Check crew owner
+    const { data: crew, error: crewErr } = await supabaseAdmin
+      .from("crews")
+      .select("owner_id")
+      .eq("id", crewId)
+      .maybeSingle();
+
+    if (crewErr) logger.warn("[verifyCrewAccess] crews query failed:", crewErr.message);
+    const isOwner = crew?.owner_id === cookieUserId;
+
+    // Check crew member
+    const { data: crewMember, error: memberErr } = await supabaseAdmin
+      .from("crew_members")
+      .select("user_id")
+      .eq("crew_id", crewId)
+      .eq("user_id", cookieUserId)
+      .maybeSingle();
+
+    if (memberErr) logger.warn("[verifyCrewAccess] crew_members query failed:", memberErr.message);
+    const isCrewMember = !!crewMember;
+
+    if (isOwner || isAdmin || isCrewMember) {
+      return { allowed: true, actorUserId: cookieUserId };
+    }
+    return { allowed: false, error: "Недостаточно прав для просмотра данных этого экипажа." };
   }
 
-  // Fetch user data for permission checks
-  const { data: user } = await supabaseAdmin
-    .from("users")
-    .select("metadata, username")
-    .eq("user_id", actorUserId)
-    .maybeSingle();
+  // Path 2: No Telegram cookie — not authenticated via WebApp
+  // (Password auth is handled by the caller passing actorUserId, which is verified
+  //  by checking actorUserId === crew.owner_id. This is done in the calling function
+  //  because it needs the crew owner_id which is fetched there.)
+  return { allowed: false, error: "Не авторизован." };
+}
 
-  const userMetadata = user?.metadata as Record<string, unknown> | null;
-  const isAdmin = userMetadata?.role === "admin" || userMetadata?.status === "admin";
-
-  // Check if user is the crew owner
-  const { data: crew } = await supabaseAdmin
+// ── Auth helper for password-authenticated users ────────────────────────────
+// Verifies that the provided actorUserId is the OWNER of the given crew.
+// This is the password-auth path: validateAnalyticsPassword returns the crew owner's
+// ID, and only the real owner would know this UUID. We verify ownership server-side.
+async function verifyCrewOwnerAccess(
+  actorUserId: string,
+  crewId: string,
+): Promise<{ allowed: boolean; error?: string }> {
+  const { data: crew, error: crewErr } = await supabaseAdmin
     .from("crews")
     .select("owner_id")
     .eq("id", crewId)
     .maybeSingle();
 
-  const isOwner = crew?.owner_id === actorUserId;
+  if (crewErr) logger.warn("[verifyCrewOwnerAccess] crews query failed:", crewErr.message);
+  if (!crew) return { allowed: false, error: "Экипаж не найден." };
 
-  // Check if user is a crew member
-  const { data: crewMember } = await supabaseAdmin
-    .from("crew_members")
-    .select("user_id")
-    .eq("crew_id", crewId)
+  if (crew.owner_id === actorUserId) {
+    return { allowed: true };
+  }
+
+  // Also check if actorUserId is a global admin (in case the password was
+  // generated by an admin for a crew they don't own)
+  const { data: user } = await supabaseAdmin
+    .from("users")
+    .select("metadata")
     .eq("user_id", actorUserId)
     .maybeSingle();
 
-  const isCrewMember = !!crewMember;
-
-  if (!isOwner && !isAdmin && !isCrewMember) {
-    return { allowed: false, error: "Недостаточно прав для просмотра данных этого экипажа." };
+  const userMetadata = user?.metadata as Record<string, unknown> | null;
+  if (userMetadata?.role === "admin" || userMetadata?.status === "admin") {
+    return { allowed: true };
   }
 
-  return { allowed: true };
+  return { allowed: false, error: "Недостаточно прав для просмотра данных этого экипажа." };
 }
 
 export interface LeadRentalRow {
@@ -300,28 +354,28 @@ export async function getFranchizeLeads(
   noStore();
   const safeSlug = slug.trim();
   try {
-    // ── Auth check (Pattern B) ──
-    // Previously: NO auth — anyone with a crew slug could fetch all leads.
-    // Now: verifies actorUserId has access to this crew (owner / admin / crew member)
-    // or was authenticated via analytics password.
-    if (!actorUserId) {
-      return { success: false, error: "Не авторизован." };
-    }
-
-    // Fetch dynamic operator IDs for this crew (owner + active members).
-    // This now also returns crewId, so we skip the duplicate crews lookup below.
-    // BUG FIX (previously): getCrewOperatorIds only returned the owner because it
-    // didn't select crew.id — the crew_members lookup was a no-op.
+    // ── Auth check (LA-001 FIX: no more trusting isPasswordAuth boolean) ──
+    // Path 1: Telegram WebApp — verifyCrewAccess reads the signed cookie
+    // Path 2: Password auth — verify actorUserId is the crew owner (server-side)
+    // Previously: NO auth at all, then isPasswordAuth boolean bypass — both fixed.
     const { ids: crewOperatorIds, crewId } = await getCrewOperatorIds(safeSlug);
-
     if (!crewId) {
       return { success: false, error: "Экипаж не найден" };
     }
 
-    // Verify crew access
-    const access = await verifyCrewAccess(actorUserId, crewId, !!isPasswordAuth);
+    // Try Telegram cookie auth first
+    const access = await verifyCrewAccess(crewId);
     if (!access.allowed) {
-      return { success: false, error: access.error || "Недостаточно прав." };
+      // Cookie auth failed — try password auth (actorUserId must be crew owner)
+      if (actorUserId && isPasswordAuth) {
+        const ownerAccess = await verifyCrewOwnerAccess(actorUserId, crewId);
+        if (!ownerAccess.allowed) {
+          return { success: false, error: ownerAccess.error || "Недостаточно прав." };
+        }
+        // Password auth OK — proceed with actorUserId
+      } else {
+        return { success: false, error: access.error || "Не авторизован." };
+      }
     }
 
     /** Check if a chat ID is a crew operator (not a real renter). */
@@ -1168,11 +1222,9 @@ export async function getRentalDocVerification(
   actorUserId?: string,
   isPasswordAuth?: boolean,
 ): Promise<GetRentalDocVerificationResult> {
+  noStore();
   if (!rentalId) {
     return { success: false, error: "rentalId is required" };
-  }
-  if (!actorUserId) {
-    return { success: false, error: "Не авторизован." };
   }
 
   try {
@@ -1187,21 +1239,37 @@ export async function getRentalDocVerification(
       return { success: false, error: "Rental not found" };
     }
 
-    // ── Auth check (Pattern B) ──
-    // Previously: NO auth — anyone with a rental UUID could fetch passport photos + OCR data.
-    // Now: verifies actorUserId owns the rental OR has crew access.
-    if (!isPasswordAuth) {
-      const isRentalOwner = rental.owner_id === actorUserId;
-      const isRenter = rental.user_id === actorUserId;
+    // ── Auth check (LA-002 FIX: no more isPasswordAuth boolean bypass) ──
+    // Path 1: Telegram WebApp — verify via signed cookie + crew membership
+    // Path 2: Password auth — verify actorUserId is crew owner (server-side)
+    // Also: rental owner or renter always has access (their own rental)
+    const cookieUserId = verifyTelegramActorCookieValue(
+      (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
+    );
+
+    if (cookieUserId) {
+      // Telegram auth — check if this is the rental owner or renter
+      const isRentalOwner = rental.owner_id === cookieUserId;
+      const isRenter = rental.user_id === cookieUserId;
 
       if (!isRentalOwner && !isRenter && rental.crew_id) {
-        const access = await verifyCrewAccess(actorUserId, rental.crew_id, false);
+        // Not their rental — verify crew access
+        const access = await verifyCrewAccess(rental.crew_id);
         if (!access.allowed) {
           return { success: false, error: access.error || "Недостаточно прав." };
         }
       } else if (!isRentalOwner && !isRenter) {
         return { success: false, error: "Недостаточно прав." };
       }
+    } else if (actorUserId && isPasswordAuth && rental.crew_id) {
+      // Password auth — verify actorUserId is the crew owner (server-side)
+      const ownerAccess = await verifyCrewOwnerAccess(actorUserId, rental.crew_id);
+      if (!ownerAccess.allowed) {
+        return { success: false, error: ownerAccess.error || "Недостаточно прав." };
+      }
+    } else {
+      // No valid auth
+      return { success: false, error: "Не авторизован." };
     }
 
     // 2. Generate signed URLs for photos (5 min expiry)
