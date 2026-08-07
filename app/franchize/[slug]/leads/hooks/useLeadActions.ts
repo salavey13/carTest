@@ -132,7 +132,7 @@ export function useLeadActions({
       try {
         const res = await fetch("/api/franchize/lead-todo", {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...(dbUser?.user_id ? { "x-telegram-user-id": dbUser.user_id } : {}) },
+          headers: { "Content-Type": "application/json", ...(dbUser?.user_id || passwordAuthOwnerId ? { "x-telegram-user-id": dbUser?.user_id || passwordAuthOwnerId } : {}) },
           body: JSON.stringify({ title: title.trim(), slug, crewId, leadId: selectedLead.user_id, phone: selectedLead.phone }),
         });
         if (res.ok) {
@@ -166,7 +166,7 @@ export function useLeadActions({
       try {
         await fetch("/api/franchize/lead-todo", {
           method: "PATCH",
-          headers: { "Content-Type": "application/json", ...(dbUser?.user_id ? { "x-telegram-user-id": dbUser.user_id } : {}) },
+          headers: { "Content-Type": "application/json", ...(dbUser?.user_id || passwordAuthOwnerId ? { "x-telegram-user-id": dbUser?.user_id || passwordAuthOwnerId } : {}) },
           body: JSON.stringify({ todoId, slug, crewId, action: "toggle" }),
         });
       } catch (e) {
@@ -185,7 +185,7 @@ export function useLeadActions({
       try {
         await fetch("/api/franchize/lead-todo", {
           method: "DELETE",
-          headers: { "Content-Type": "application/json", ...(dbUser?.user_id ? { "x-telegram-user-id": dbUser.user_id } : {}) },
+          headers: { "Content-Type": "application/json", ...(dbUser?.user_id || passwordAuthOwnerId ? { "x-telegram-user-id": dbUser?.user_id || passwordAuthOwnerId } : {}) },
           body: JSON.stringify({ todoId, slug, crewId }),
         });
       } catch (e) {
