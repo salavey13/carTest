@@ -5,14 +5,7 @@ import { cookies } from "next/headers";
 import { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } from "@/lib/telegram-actor-cookie";
 import { DISMISS_REASONS } from "@/app/franchize/[slug]/leads/lib/dismiss-reasons";
 
-export interface DismissLeadInput {
-  slug: string;
-  leadId: string;
-  reason: string;
-  note?: string;
-  actorUserId?: string;
-  isPasswordAuth?: boolean;
-}
+export type { DismissLeadInput } from "@/app/franchize/[slug]/leads/leads-types";
 
 // ── Auth helper (same secure pattern as leads.ts) ────────────────────────────
 // LR3-001 FIX: was NO auth at all — anyone could dismiss any lead in any crew.
