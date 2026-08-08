@@ -443,7 +443,7 @@ BEGIN
             ELSE 'medium'
           END,
           v_rental.metadata->>'created_by_operator_chat_id',
-          'system',
+          NULL,
           v_rental.agreed_end_date
         );
       END IF;
