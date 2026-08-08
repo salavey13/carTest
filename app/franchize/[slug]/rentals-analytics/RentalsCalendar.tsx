@@ -501,7 +501,7 @@ export function RentalsCalendar({ slug, crewId, crewTheme, isPasswordAuth, passw
 
       {/* Selected rental detail modal */}
       {selectedRental && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           {/* Backdrop */}
           <div
             className="absolute inset-0 backdrop-blur-sm"
@@ -511,7 +511,7 @@ export function RentalsCalendar({ slug, crewId, crewTheme, isPasswordAuth, passw
 
           {/* Modal */}
           <div
-            className="relative rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto"
+            className="relative rounded-t-2xl sm:rounded-2xl p-6 max-w-md w-full max-h-[90vh] sm:max-h-[85vh] overflow-y-auto"
             style={{
               backgroundColor: theme.bgCard,
               borderColor: theme.borderSoft,
