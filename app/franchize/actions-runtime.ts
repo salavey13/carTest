@@ -934,6 +934,11 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         showcaseGroups,
       },
       ratingSummary: { average: crewRatingSummary.average, count: crewRatingSummary.count },
+      reviewsLink: readPath(
+        franchize,
+        ["catalog", "reviewsLink"],
+        readPath(franchize, ["reviewsLink"], ""),
+      ),
       footer: {
         socialLinks: extractFooterSocialLinks(franchize, readPath(franchize, ["contacts", "telegram"], "")),
         columns: extractFooterColumns(franchize, crew.slug ?? safeSlug),
