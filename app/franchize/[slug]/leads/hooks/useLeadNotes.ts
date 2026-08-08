@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { LeadNote } from "@/app/franchize/server-actions/lead-notes";
+import type {LeadNote} from "../leads-types";
 // FIX: server action value imports converted to dynamic imports to avoid
 // `import "server-only"` poisoning the client bundle.
 
