@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { Loader2, AlertCircle, FileText, ShieldCheck, Check, X, Eye, ImageOff, RotateCcw, Camera, CheckCircle } from "lucide-react";
-import type { DocVerificationData } from "@/app/franchize/server-actions/leads";
+import type {DocVerificationData} from "../leads-types";
 // FIX: getRentalDocVerification import converted to dynamic to avoid server-only bundle poisoning
-import type { LeadRentalRow } from "@/app/franchize/server-actions/leads";
+import type {LeadRentalRow} from "../leads-types";
 
 interface DocumentVerificationPanelProps {
   rental: LeadRentalRow;
