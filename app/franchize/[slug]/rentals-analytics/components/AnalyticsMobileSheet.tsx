@@ -77,7 +77,7 @@ export function AnalyticsMobileSheet({
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 280 }}
             onClick={(e) => e.stopPropagation()}
-            className="relative flex max-h-[88vh] w-full flex-col rounded-t-3xl"
+            className="relative flex max-h-[90vh] w-full flex-col rounded-t-3xl"
             style={{
               backgroundColor: T.bg,
               borderTop: `1px solid ${T.border}`,
