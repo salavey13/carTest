@@ -316,3 +316,28 @@ export function getHandoffStatus(rental: AnalyticsRentalRow): { done: boolean; l
 export function isServiceRental(rental: AnalyticsRentalRow): boolean {
   return !!rental.vehicle_id && rental.vehicle_id.startsWith("vip-bike-svc-");
 }
+
+// ── Service sign: client (+revenue) vs crew/internal (−expense) ──────────────
+// A service rental carries a "sign" in the money math:
+//   - metadata.client present  → client work (+). Counts toward day/week TOTAL.
+//   - metadata.client absent   → internal/crew work (−) = mechanic salary.
+//     Reported separately ("Внутр. работы / зарплата"), NOT added to totals.
+// Mirrors the jq rule in boss-commands/evening-summary.sh & weekly-revenue.sh
+// and the input convention in skills/service-work-text ("... для <client>").
+export function getServiceClient(
+  rental: AnalyticsRentalRow,
+): string | null {
+  const md = (rental.metadata || {}) as Record<string, unknown>;
+  const client = md["client"];
+  return typeof client === "string" && client.trim().length > 0
+    ? client.trim()
+    : null;
+}
+
+export function isClientServiceRental(rental: AnalyticsRentalRow): boolean {
+  return isServiceRental(rental) && getServiceClient(rental) !== null;
+}
+
+export function isCrewServiceRental(rental: AnalyticsRentalRow): boolean {
+  return isServiceRental(rental) && getServiceClient(rental) === null;
+}
