@@ -68,7 +68,7 @@ export function LeadsClient({
   const [filterSource, setFilterSource] = useState<string>("all");
   const [segment, setSegment] = useState<Segment>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [hidePlaceholders, setHidePlaceholders] = useState(true); // Hide operator placeholders by default
+  const [hidePlaceholders, setHidePlaceholders] = useState(false); // Show all leads by default — hiding placeholders was hiding everything when identityState wasn't set
 
   const router = useRouter();
   const { dbUser } = useAppContext();
@@ -112,15 +112,18 @@ export function LeadsClient({
   useEffect(() => {
     if (!isAuthed || shouldShowPassword) return;
     if (leadsFetchedRef.current) return;
+    // Wait for dbUser to be fully resolved (not just "authed" flag)
+    // In Telegram WebApp, dbUser may be null briefly during initial load
+    const actorUserId = dbUser?.user_id || (passwordAuthed ? storedPassword : "") || "";
+    if (!actorUserId) return;
+
     let cancelled = false;
     (async () => {
       try {
-        // Static import is safe now — leads.ts has NO module-level server-only imports
-        // (cookies + telegram-actor-cookie are dynamically imported inside functions)
         const { getFranchizeLeads } = await import("@/app/franchize/server-actions/leads");
         const result = await getFranchizeLeads(
           slug,
-          dbUser?.user_id || storedPassword || "",
+          actorUserId,
           !!storedPassword,
         );
         if (cancelled) return;
@@ -136,7 +139,7 @@ export function LeadsClient({
       }
     })();
     return () => { cancelled = true; };
-  }, [isAuthed, shouldShowPassword, slug, dbUser?.user_id, storedPassword]);
+  }, [isAuthed, shouldShowPassword, slug, dbUser?.user_id, storedPassword, passwordAuthed]);
 
   // Todo mapping — use writable state so TodoList callbacks sync the parent array
   const { getTodosForLead } = useTodosMapping(todosState);
@@ -228,8 +231,8 @@ export function LeadsClient({
     } catch { alert("Ошибка сети."); }
   };
 
-  // Password gate render
-  if (showPasswordEntry && !passwordAuthed) {
+  // Password gate render — only show if NOT in Telegram AND no dbUser AND not password-authed
+  if (shouldShowPassword && !passwordAuthed) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-4">
         <div className="w-full max-w-sm space-y-4 rounded-2xl border p-6" style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: T.shadow }}>
@@ -277,7 +280,7 @@ export function LeadsClient({
         filterSource={filterSource} setFilterSource={setFilterSource}
         availableSources={availableSources}
         segment={segment} setSegment={setSegment}
-        viewMode={viewMode} setViewMode={setViewMode}
+        viewMode={viewMode} onViewModeChange={setViewMode}
         segmentCounts={segmentCounts}
         hidePlaceholders={hidePlaceholders} setHidePlaceholders={setHidePlaceholders}
         filterFlags={defaultFilterFlags}
