@@ -1,7 +1,8 @@
+// /app/franchize/[slug]/leads/hooks/useLeadTodos.ts
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { LeadTodoRow } from "@/app/franchize/server-actions/leads";
+import type {LeadTodoRow} from "../leads-types";
 
 export interface UseLeadTodosReturn {
   todos: LeadTodoRow[];
