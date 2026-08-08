@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { CheckCircle2, ChevronRight, Phone, Clock, MoreVertical } from "lucide-react";
-import type { LeadRow } from "@/app/franchize/server-actions/leads";
+import type {LeadRow} from "../leads-types";
 import type { LeadSignal, StageKey } from "../leads-constants";
 import type { ThemeTokens } from "../hooks/useTheme";
 import {
