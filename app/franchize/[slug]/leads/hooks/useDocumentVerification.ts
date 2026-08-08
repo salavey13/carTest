@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getRentalDocVerification, type DocVerificationData } from "@/app/franchize/server-actions/leads";
+import type { DocVerificationData } from "@/app/franchize/server-actions/leads";
+// FIX: getRentalDocVerification import converted to dynamic to avoid server-only bundle poisoning
 
 interface UseDocumentVerificationProps {
   rental: { rentalId: string | null; passportMainpagePhoto?: string | null; passportRegistrationPhoto?: string | null; driversLicenceFrontalPhoto?: string | null };
@@ -27,6 +28,7 @@ export function useDocumentVerification({ rental, slug, T, actorUserId, isPasswo
     let cancelled = false;
     (async () => {
       try {
+        const { getRentalDocVerification } = await import("@/app/franchize/server-actions/leads");
         const result = await getRentalDocVerification(rentalId, actorUserId, isPasswordAuth);
         if (cancelled) return;
         if (result.success && result.data) {
@@ -63,6 +65,7 @@ export function useDocumentVerification({ rental, slug, T, actorUserId, isPasswo
       const result = await resp.json();
       if (result.success) {
         setVerifyMsg({ ok: true, text: docType === "passport" ? "Паспорт верифицирован" : "Права верифицированы" });
+        const { getRentalDocVerification } = await import("@/app/franchize/server-actions/leads");
         const refreshed = await getRentalDocVerification(rental.rentalId, actorUserId, isPasswordAuth);
         if (refreshed.success && refreshed.data) setData(refreshed.data);
       } else {
