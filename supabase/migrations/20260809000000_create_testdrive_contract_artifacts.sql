@@ -168,34 +168,25 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Grant execute to service role
 GRANT EXECUTE ON FUNCTION private.claim_testdrive_by_qr(TEXT, TEXT) TO service_role;
 
--- ─── 5. Backfill existing testdrive artifacts from rental_contract_artifacts ─
--- testdrive-manual.ts previously wrote to rental_contract_artifacts with
--- flow_type: "testdrive" in metadata. Backfill those into the new table so
--- they're not lost. This is idempotent (WHERE NOT EXISTS on contract_key).
-INSERT INTO private.testdrive_contract_artifacts (
-  contract_key, requested_bike_id, resolved_bike_id, telegram_chat_id,
-  telegram_message_id, customer_full_name, customer_passport,
-  customer_passport_issued_by, customer_passport_issue_date,
-  customer_registration, customer_driver_license, customer_birth_date,
-  license_categories, testdrive_date, total_sum, original_sha256,
-  template_version, created_at, storage_path, crew_slug, customer_phone,
-  created_by_operator_chat_id
-)
-SELECT
-  rca.contract_key, rca.requested_bike_id, rca.resolved_bike_id, rca.telegram_chat_id,
-  rca.telegram_message_id, rca.renter_full_name, rca.renter_passport,
-  rca.renter_passport_issued_by, rca.renter_passport_issue_date,
-  rca.renter_registration, rca.renter_driver_license, rca.renter_birth_date,
-  rca.license_categories, rca.created_at::text, rca.total_sum, rca.original_sha256,
-  rca.template_version, rca.created_at, rca.storage_path, rca.crew_slug, rca.renter_phone,
-  rca.created_by_operator_chat_id
-FROM private.rental_contract_artifacts rca
-WHERE rca.metadata->>'flow_type' = 'testdrive'
-  AND NOT EXISTS (
-    SELECT 1 FROM private.testdrive_contract_artifacts tca
-    WHERE tca.contract_key = rca.contract_key
-  );
-
--- Note: we do NOT delete the backfilled rows from rental_contract_artifacts.
--- They can be cleaned up manually later with:
---   DELETE FROM private.rental_contract_artifacts WHERE metadata->>'flow_type' = 'testdrive';
+-- ─── 5. Backfill note (NO BACKFILL PERFORMED) ───────────────────────────────
+-- The old testdrive-manual.ts wrote to rental_contract_artifacts, but it did
+-- NOT store any 'flow_type' or 'metadata' column — the testdrive rows are
+-- indistinguishable from rental rows in that table. The rental_contract_artifacts
+-- table has NO metadata column (confirmed in 20260612000000_fix_rental_contract_artifacts.sql),
+-- so we cannot filter by flow_type='testdrive'.
+--
+-- Additionally, the old testdrive-manual.ts set total_sum=5000 (TESTDRIVE_PRICE)
+-- and left rent_start_date/rent_end_date NULL — but some real rentals might also
+-- have NULL dates, so filtering by that is unreliable.
+--
+-- Decision: do NOT backfill. Old testdrive rows will remain in rental_contract_artifacts
+-- and will continue to appear as rental leads on the /leads page. This is acceptable
+-- because:
+--   1. The number of testdrives done before this migration is small
+--   2. They don't break anything — they just show up as rental leads
+--   3. New testdrives (after this migration) will correctly go to testdrive_contract_artifacts
+--
+-- If you want to manually identify and clean up old testdrive rows, you can run:
+--   SELECT * FROM private.rental_contract_artifacts
+--   WHERE rent_start_date IS NULL AND total_sum = 5000;
+-- (Use with caution — verify these are actually testdrives before deleting.)
