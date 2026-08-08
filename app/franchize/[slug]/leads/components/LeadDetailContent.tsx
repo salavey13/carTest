@@ -168,31 +168,45 @@ export function LeadDetailContent({
 }
 
 /**
- * Build a 5-row document checklist from the first rental's photo fields.
- * Each row gets a status (missing/pending/verified/sent) based on field presence.
+ * Build a 5-row document checklist from the first rental's photo fields + checklist metadata.
+ * Each row gets a status (missing/pending/verified/sent) based on:
+ * 1. metadata.checklist.passport_verified / license_verified (set by /api/verify-rental-checklist)
+ * 2. photo field presence (rental.passportMainpagePhoto etc.)
+ *
+ * FIX: was only checking photo paths — but verification deletes photos (152-ФЗ compliance),
+ * so verified docs showed as "missing". Now checks checklist flags first.
  */
 function buildDocuments(lead: LeadRow): DocumentItem[] {
   const rental = lead.rentals[0];
   if (!rental) return [];
 
+  // Read verification checklist from rental metadata (set by /api/verify-rental-checklist)
+  const meta = (rental as Record<string, unknown>).metadata as Record<string, unknown> | null;
+  const checklist = (meta?.checklist as Record<string, unknown>) || {};
+  const passportVerified = !!checklist.passport_verified;
+  const licenseVerified = !!checklist.license_verified;
+
+  // Active/completed rentals are always verified (activation requires verification todos done)
+  const isActivated = rental.status === "active" || rental.status === "completed";
+
   const items: DocumentItem[] = [
     {
       key: "passport_main",
       name: "Паспорт — основная страница",
-      status: rental.passportMainpagePhoto ? "verified" : "missing",
-      actionLabel: rental.passportMainpagePhoto ? "Открыть" : "Запросить",
+      status: (passportVerified || isActivated || rental.passportMainpagePhoto) ? "verified" : "missing",
+      actionLabel: rental.passportMainpagePhoto ? "Открыть" : (passportVerified || isActivated ? "" : "Запросить"),
     },
     {
       key: "passport_registration",
       name: "Паспорт — прописка",
-      status: rental.passportRegistrationPhoto ? "verified" : "missing",
-      actionLabel: rental.passportRegistrationPhoto ? "Открыть" : "Запросить",
+      status: (passportVerified || isActivated || rental.passportRegistrationPhoto) ? "verified" : "missing",
+      actionLabel: rental.passportRegistrationPhoto ? "Открыть" : (passportVerified || isActivated ? "" : "Запросить"),
     },
     {
       key: "licence_front",
       name: "Водительское удостоверение",
-      status: rental.driversLicenceFrontalPhoto ? "verified" : "missing",
-      actionLabel: rental.driversLicenceFrontalPhoto ? "Открыть" : "Запросить",
+      status: (licenseVerified || isActivated || rental.driversLicenceFrontalPhoto) ? "verified" : "missing",
+      actionLabel: rental.driversLicenceFrontalPhoto ? "Открыть" : (licenseVerified || isActivated ? "" : "Запросить"),
     },
   ];
 
