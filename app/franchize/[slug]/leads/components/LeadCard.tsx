@@ -124,12 +124,13 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
         {/* Body */}
         <div className="min-w-0 flex-1 space-y-2">
           {/* Name + stage badge */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              {/* FIX: name row — name gets flex-1 + min-w-0 so it truncates instead of
+                  being squeezed by badges/buttons on mobile */}
               <div className="flex items-center gap-2">
-                {/* Name: 14px mobile / 16px desktop */}
                 <h3
-                  className="truncate text-sm font-semibold md:text-base"
+                  className="min-w-0 flex-1 truncate text-sm font-semibold md:text-base"
                   style={{ color: T.text }}
                 >
                   {displayName}
@@ -143,26 +144,13 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
                 )}
                 {pending > 0 && (
                   <span
-                    className="grid h-5 min-w-[20px] place-items-center rounded-full px-1 text-[10px] font-bold"
+                    className="grid h-5 min-w-[20px] shrink-0 place-items-center rounded-full px-1 text-[10px] font-bold"
                     style={{ background: "#f59e0b26", color: "#f59e0b" }}
                     aria-label={`${pending} активных сигналов`}
                   >
                     {pending}
                   </span>
                 )}
-                {/* Dismiss button — compact, after name */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDismiss(lead.user_id);
-                  }}
-                  className="ml-auto flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition"
-                  style={{ color: T.textFaint, minHeight: "28px", minWidth: "28px" }}
-                  aria-label="Закрыть лид"
-                >
-                  <MoreVertical className="h-3.5 w-3.5" />
-                </button>
               </div>
               {/* Metadata: 11px mobile / 13px desktop */}
               <div
@@ -190,6 +178,19 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
             >
               {stageLabel}
             </span>
+            {/* Dismiss button — separate from name row so it doesn't squeeze the name on mobile */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDismiss(lead.user_id);
+              }}
+              className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition"
+              style={{ color: T.textFaint, minHeight: "28px", minWidth: "28px" }}
+              aria-label="Закрыть лид"
+            >
+              <MoreVertical className="h-3.5 w-3.5" />
+            </button>
           </div>
 
           {/* Source + temperature tags */}
