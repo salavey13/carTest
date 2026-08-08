@@ -25,6 +25,7 @@ import {
   type Segment,
   type ViewMode,
   type SortMode,
+  type FilterFlags,
 } from "./leads-constants";
 import { relativeTime } from "./leads-utils";
 
@@ -104,6 +105,19 @@ export function LeadsClient({
   // Todo mapping — use writable state so TodoList callbacks sync the parent array
   const [todosState, setTodosState] = useState(todos);
   const { getTodosForLead } = useTodosMapping(todosState);
+
+  // Default filter flags — LeadsToolbar expects these props but root LeadsClient
+  // doesn't use useLeadFilters (it uses useFilteredSortedLeads instead).
+  // Pass all-false defaults so the toolbar renders without crashing.
+  const defaultFilterFlags: FilterFlags = {
+    overdueOnly: false,
+    unclaimedQrOnly: false,
+    documentsMissingOnly: false,
+    activeRentalOnly: false,
+    returnDueOnly: false,
+    dismissedOnly: false,
+    hideOperatorPlaceholders: false,
+  };
 
   /** Called by TodoList after toggle/add/delete — keeps todosState in sync */
   const handleTodoUpdate = useCallback((action: 'toggle' | 'delete' | 'add', todoId: string, todo?: LeadTodoRow) => {
@@ -231,6 +245,8 @@ export function LeadsClient({
         viewMode={viewMode} setViewMode={setViewMode}
         segmentCounts={segmentCounts}
         hidePlaceholders={hidePlaceholders} setHidePlaceholders={setHidePlaceholders}
+        filterFlags={defaultFilterFlags}
+        onFilterFlagsChange={() => {}}
         T={T} isAuto={isAuto}
       />
 
