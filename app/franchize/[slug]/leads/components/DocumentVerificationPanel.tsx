@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { Loader2, AlertCircle, FileText, ShieldCheck, Check, X, Eye, ImageOff, RotateCcw, Camera, CheckCircle } from "lucide-react";
 import type {DocVerificationData} from "../leads-types";
-// FIX: getRentalDocVerification import converted to dynamic to avoid server-only bundle poisoning
 import type {LeadRentalRow} from "../leads-types";
+import { getRentalDocVerification } from "@/app/franchize/server-actions/leads";
 
 interface DocumentVerificationPanelProps {
   rental: LeadRentalRow;
@@ -29,7 +29,6 @@ export function DocumentVerificationPanel({ rental, slug, T, actorUserId, isPass
     let cancelled = false;
     (async () => {
       try {
-        const { getRentalDocVerification } = await import("@/app/franchize/server-actions/leads");
         const result = await getRentalDocVerification(rental.rentalId, actorUserId, isPasswordAuth);
         if (cancelled) return;
         if (result.success && result.data) {
@@ -66,7 +65,6 @@ export function DocumentVerificationPanel({ rental, slug, T, actorUserId, isPass
       const result = await resp.json();
       if (result.success) {
         setVerifyMsg({ ok: true, text: docType === "passport" ? "Паспорт верифицирован" : "Права верифицированы" });
-        const { getRentalDocVerification } = await import("@/app/franchize/server-actions/leads");
         const refreshed = await getRentalDocVerification(rental.rentalId, actorUserId, isPasswordAuth);
         if (refreshed.success && refreshed.data) {
           setData(refreshed.data);
