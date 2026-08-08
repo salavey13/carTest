@@ -11,9 +11,9 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
-import type { LeadsKpis } from "@/app/franchize/server-actions/leads-kpis";
-import type { LeadNote } from "@/app/franchize/server-actions/lead-notes";
+import type {LeadRow, LeadTodoRow} from "../leads-types";
+import type {LeadsKpis} from "../leads-types";
+import type {LeadNote} from "../leads-types";
 // FIX: all server action VALUE imports converted to dynamic imports inside callbacks.
 // Was: static imports of dismissLeadWithReason, getLeadsKpis, createLeadNote — but these
 // files now import telegram-actor-cookie.ts which has `import "server-only"`. Static
