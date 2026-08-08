@@ -1,15 +1,13 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-server";
-import { privateSchema } from "@/lib/private-secrets";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from "next/cache";
 import { computeLeadStage, computeQrStatus, computeAssignee, STAGE_NEXT_ACTION, matchTodosToLead } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
-// NOTE: cookies + telegram-actor-cookie are imported DYNAMICALLY inside functions
-// (not at module top-level) to avoid `import "server-only"` poisoning the client
-// bundle. The "use server" directive creates RPC stubs for client imports, but
-// transitive `server-only` imports at module level still leak into the client chunk.
+// NOTE: privateSchema (from @/lib/private-secrets) + cookies + telegram-actor-cookie
+// are ALL imported DYNAMICALLY inside functions to avoid `import "server-only"`
+// poisoning the client bundle. private-secrets.ts has `import "server-only"` too.
 
 // ── Auth helper ─────────────────────────────────────────────────────────────
 // Verifies that the caller has access to the given crew.
@@ -269,6 +267,7 @@ export async function getFranchizeLeads(
   noStore();
   const safeSlug = slug.trim();
   try {
+    const { privateSchema } = await import("@/lib/private-secrets");
     // ── Auth check (LA-001 FIX: no more trusting isPasswordAuth boolean) ──
     // Path 1: Telegram WebApp — verifyCrewAccess reads the signed cookie
     // Path 2: Password auth — verify actorUserId is the crew owner (server-side)
@@ -813,6 +812,9 @@ export async function getFranchizeLeads(
     const allUserIds = Array.from(leadMap.keys()).filter((id) => /^\d+$/.test(id));
     const leadPhones = Array.from(leadMap.values()).map((l) => l.phone).filter(Boolean) as string[];
 
+    // Dynamic import for privateSchema (avoids module-level server-only chain)
+    const { privateSchema } = await import("@/lib/private-secrets");
+
     const [tgUsersResult, secretByPhoneResult, troubledUsersResult, todosResult] = await Promise.all([
       // 7. Enrich from public.users — drop the non-existent `phone` column; phone is in metadata.
       allUserIds.length > 0
@@ -1107,6 +1109,7 @@ export async function getRentalDocVerification(
   actorUserId?: string,
   isPasswordAuth?: boolean,
 ): Promise<GetRentalDocVerificationResult> {
+  const { privateSchema } = await import("@/lib/private-secrets");
   noStore();
   if (!rentalId) {
     return { success: false, error: "rentalId is required" };
