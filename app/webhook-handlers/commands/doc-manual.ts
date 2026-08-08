@@ -64,6 +64,17 @@ import { createLeadFollowupTodos } from "@/app/franchize/server-actions/crew-tod
 import { createRentalVerificationTodos } from "@/app/franchize/server-actions/rental-verification-todos";
 import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrew } from "../lib/crew-access";
 
+// ── escapeHtml: HTML-escape user-provided strings for safe embedding in Telegram HTML messages ──
+function escapeHtml(s: unknown): string {
+  if (s == null) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026; // 👍 Fixed current year
 const DOC_STATE_EXPIRY_MINUTES = 30;
