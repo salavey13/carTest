@@ -1,38 +1,29 @@
+// /app/franchize/[slug]/leads/components/MobileLeadSheet.tsx
 "use client";
 
-import { useEffect, type ReactNode } from "react";
-import { motion, AnimatePresence, useDragControls, type PanInfo } from "framer-motion";
+import { useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
-import type { ThemeTokens } from "../hooks/useTheme";
 
-interface Props {
+interface MobileLeadSheetProps {
   open: boolean;
   onClose: () => void;
-  children: ReactNode;
+  children: React.ReactNode;
   title?: string;
-  T: ThemeTokens;
+  T: any;
 }
 
-// 55vh — "peek" style sheet that leaves the top ~45% of the screen visible
-// so operators can still see the pipeline funnel + lead count above the sheet.
-// Previously 0.68 which covered 2/3 of the viewport and hid too much context.
-// The sheet content scrolls internally, so 55vh is enough for the key info
-// (header + primary actions + SLA + info grid) without overwhelming the screen.
-const SHEET_HEIGHT_VH = 0.55;
-const DRAG_DISMISS_THRESHOLD = 100; // px — drag past this to dismiss (lowered from 120 for snappier feel)
+const SHEET_HEIGHT = 0.85; // 85% of viewport — leaves gap at top for TG native button
 
-// Spring is tuned for a snappy-but-smooth open (270ms-feeling) and a slightly
-// firmer close. damping/stiffness/mass are chosen so the sheet decelerates
-// naturally without bouncing past y:0.
 const sheetVariants = {
   hidden: { y: "100%" },
   visible: {
     y: 0,
-    transition: { type: "spring" as const, damping: 32, stiffness: 340, mass: 0.8 },
+    transition: { type: "spring", damping: 28, stiffness: 300, mass: 0.8 },
   },
   exit: {
     y: "100%",
-    transition: { type: "spring" as const, damping: 36, stiffness: 420, mass: 0.8 },
+    transition: { type: "spring", damping: 28, stiffness: 400, mass: 0.8 },
   },
 };
 
@@ -42,167 +33,92 @@ const backdropVariants = {
   exit: { opacity: 0, transition: { duration: 0.15 } },
 };
 
-/**
- * Bottom sheet that slides up on mobile (hidden on lg+).
- *
- * - Drag handle at the top — drag down past 120px to dismiss.
- *   Drag is started ONLY from the header handle (via useDragControls) so that
- *   scrolling the inner content never triggers the close gesture.
- * - Backdrop click also dismisses.
- * - Escape key dismisses.
- * - Safe-area padding bottom (80px reserved for home indicator + nav bar).
- * - Sheet body scrolls independently of the drag gesture.
- */
-export function MobileLeadSheet({ open, onClose, children, title, T }: Props) {
-  const dragControls = useDragControls();
-
-  // Close on Escape + lock body scroll while sheet is open
+export function MobileLeadSheet({ open, onClose, children, title, T }: MobileLeadSheetProps) {
+  // Close on Escape
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", handler);
-      document.body.style.overflow = prev;
-    };
+    return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
-
-  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (info.offset.y > DRAG_DISMISS_THRESHOLD) onClose();
-  };
 
   return (
     <AnimatePresence>
       {open && (
-        // z-50 sits above page chrome (z-40 backdrop / drawer) but below the
-        // dismiss dialog (z-[60]) and toasts (z-[70]). lg:hidden so the sheet
-        // only renders on mobile — desktop uses the right-side drawer.
-        <div className="fixed inset-0 z-50 flex items-end lg:hidden">
-          {/* Backdrop — dim layer. pointer-events:auto so clicking the scrim
-              closes the sheet (the onClick is wired through). The scrim uses
-              a dark tint that works on both light + dark themes; backdrop-blur
-              softens the underlying content. */}
+        <div className="fixed inset-0 z-40 flex items-end lg:hidden" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+          {/* Backdrop */}
           <motion.div
-            key="mobile-sheet-backdrop"
-            className="absolute inset-0 cursor-pointer"
-            style={{
-              background: "color-mix(in srgb, #000000 55%, transparent)",
-              backdropFilter: "blur(3px)",
-              WebkitBackdropFilter: "blur(3px)",
-            }}
+            key="sheet-backdrop"
+            className="absolute inset-0"
+            style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
             variants={backdropVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
             onClick={onClose}
-            aria-hidden
           />
 
-          {/* Sheet — drag is started ONLY from the header handle so inner scroll works */}
+          {/* Sheet — drag="y" on the outer shell, content scrolls independently */}
           <motion.div
-            key="mobile-lead-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-label={title || "Детали лида"}
-            className="relative flex w-full flex-col rounded-t-[28px] border-t shadow-2xl"
+            key="lead-sheet"
+            className="relative w-full rounded-t-3xl border-t shadow-2xl flex flex-col"
             style={{
-              maxHeight: `${SHEET_HEIGHT_VH * 100}vh`,
-              // Use theme bgElevated → bg gradient so the sheet visually relates
-              // to the rest of the surface. Previously this hardcoded #111113 →
-              // #09090b which broke on light themes and on crew theme overrides.
-              background: `linear-gradient(180deg, ${T.bgElevated} 0%, ${T.bg} 100%)`,
+              maxHeight: `${SHEET_HEIGHT * 100}vh`,
+              backgroundColor: T.bgCard,
               borderColor: T.border,
-              boxShadow: "0 -20px 60px rgba(0,0,0,0.55)",
-              // Subtle top accent line so the sheet feels connected to the crew theme
-              borderTopWidth: "1px",
             }}
             variants={sheetVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
             drag="y"
-            // Disable the default drag listener — drag is started manually from
-            // the header via dragControls.start(e). This is what stops the inner
-            // content scroll from triggering the swipe-to-close gesture.
-            dragListener={false}
-            dragControls={dragControls}
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0, bottom: 0.4 }}
-            dragMomentum={false}
-            onDragEnd={handleDragEnd}
+            dragConstraints={{ top: 0, bottom: 80 }}
+            dragElastic={{ top: 0, bottom: 0.3 }}
+            onDragEnd={(_event, info) => {
+              if (info.offset.y > 80) onClose();
+            }}
           >
-            {/* Drag handle header — sticky, with title + close button.
-                pointerDown starts the drag so the gesture only fires here, not on
-                the scrollable body. */}
+            {/* Drag handle header — sticky, clickable X */}
             <div
-              className="sticky top-0 z-10 flex shrink-0 cursor-grab items-center justify-between gap-3 rounded-t-[28px] px-4 pb-2 pt-2.5 active:cursor-grabbing"
-              style={{
-                background: `linear-gradient(180deg, ${T.bgElevated} 85%, transparent)`,
-                touchAction: "none",
-              }}
-              onPointerDown={(e) => dragControls.start(e)}
+              className="sticky top-0 z-10 shrink-0 flex items-center justify-between pt-3 pb-2 px-4"
+              style={{ backgroundColor: T.bgCard }}
             >
-              <div className="flex min-w-0 items-center gap-3">
-                {/* Visible drag handle pill — centered above the title, 36px wide.
-                    Slightly more prominent (h-1.5 vs h-1) for better grab affordance. */}
+              <div className="flex items-center gap-3 min-w-0">
                 <motion.div
-                  className="h-1.5 w-9 shrink-0 rounded-full"
-                  style={{ background: T.textFaint }}
+                  className="h-1.5 w-10 rounded-full shrink-0"
+                  style={{ backgroundColor: T.borderSoft }}
                   whileTap={{ scale: 0.85 }}
-                  transition={{ type: "spring", damping: 22, stiffness: 320 }}
-                  aria-hidden
                 />
                 {title && (
-                  <p
-                    className="truncate text-sm font-semibold leading-tight"
-                    style={{ color: T.text }}
-                  >
+                  <p className="truncate text-xs font-semibold leading-tight" style={{ color: T.textMuted }}>
                     {title}
                   </p>
                 )}
               </div>
               <button
-                type="button"
                 onClick={onClose}
-                className="shrink-0 rounded-xl p-2.5 transition focus:outline-none focus-visible:ring-2"
-                style={{ color: T.textFaint, minHeight: "44px", minWidth: "44px" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = T.bgCard;
-                  e.currentTarget.style.color = T.text;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.color = T.textFaint;
-                }}
+                className="rounded-xl p-2 transition hover:bg-black/10 shrink-0"
+                style={{ color: T.textFaint }}
                 aria-label="Закрыть"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Scrollable content area — separate from drag.
-                overscrollBehavior:contain prevents scroll chaining so swiping up
-                at the top of the content never propagates to the sheet drag.
-                Bottom padding reduced from 80px to 40px since the sheet is now
-                shorter (55vh) — the extra space was for the home indicator + nav
-                bar, but 40px is enough on modern devices. */}
+            {/* Scrollable content area — separate from drag */}
             <div
               className="overflow-y-auto px-4"
               style={{
-                maxHeight: `calc(${SHEET_HEIGHT_VH * 100}vh - 52px)`,
+                maxHeight: `calc(${SHEET_HEIGHT * 100}vh - 48px)`,
                 WebkitOverflowScrolling: "touch",
                 overscrollBehavior: "contain",
-                // Safe-area padding at bottom (iOS home indicator) + breathing
-                // room above the bottom of the sheet.
-                paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 40px)",
-                scrollbarWidth: "thin",
               }}
             >
-              {children}
+              <div className="pb-[calc(env(safe-area-inset-bottom,_16px)+16px)]">
+                {children}
+              </div>
             </div>
           </motion.div>
         </div>
