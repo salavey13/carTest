@@ -6,6 +6,8 @@ import { motion } from "framer-motion";
 import { useVirtualList } from "../hooks/useVirtualList";
 import { LeadCard } from "./LeadCard";
 import type {LeadRow, LeadTodoRow} from "../leads-types";
+import { computeLeadSignals } from "../lib/sla-signals";
+import type { LeadSignal } from "../lib/sla-signals";
 
 interface LeadListProps {
   leads: LeadRow[];
@@ -99,10 +101,10 @@ export function LeadList({
               <LeadCard
                 lead={lead}
                 T={T}
-                isSelected={isThisSelected}
+                selected={isThisSelected}
                 onSelect={() => handleSelect(lead)}
                 onDismiss={onDismiss}
-                todos={getTodosForLead(lead)}
+                signals={getTodosForLead ? computeLeadSignals(lead, getTodosForLead(lead)) : []}
               />
             </motion.div>
           );
