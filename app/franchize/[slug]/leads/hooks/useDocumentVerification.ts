@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { DocVerificationData } from "@/app/franchize/server-actions/leads";
+import type {DocVerificationData} from "../leads-types";
 // FIX: getRentalDocVerification import converted to dynamic to avoid server-only bundle poisoning
 
 interface UseDocumentVerificationProps {
