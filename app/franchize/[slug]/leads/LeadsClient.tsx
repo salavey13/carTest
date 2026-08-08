@@ -67,6 +67,8 @@ export function LeadsClient({
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [filterSource, setFilterSource] = useState<string>("all");
+  const [filterStage, setFilterStage] = useState<string>("all");
+  const [filterOwner, setFilterOwner] = useState<string>("all");
   const [segment, setSegment] = useState<Segment>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [hidePlaceholders, setHidePlaceholders] = useState(false); // Show all leads by default — hiding placeholders was hiding everything when identityState wasn't set
@@ -172,16 +174,46 @@ export function LeadsClient({
     });
   }, []);
 
-  // Filtered, sorted, categorized leads
+  // Filtered, sorted, categorized leads (source + segment + search + sort)
   const {
-    sortedLeads,
+    sortedLeads: baseSortedLeads,
     hot,
     verified,
     warm,
     availableSources,
-    hasFilters,
+    hasFilters: baseHasFilters,
     boardColumns,
   } = useFilteredSortedLeads(leadsState, debouncedSearchQuery, filterSource, segment, getTodosForLead, sortMode, hidePlaceholders);
+
+  // ── Stage + Owner filters (applied AFTER useFilteredSortedLeads) ──
+  // These are new filters that the v2-style toolbar exposes. They narrow
+  // the already-sorted leads list without re-running the full pipeline.
+  const sortedLeads = useMemo(() => {
+    let result = baseSortedLeads;
+    if (filterStage !== "all") {
+      result = result.filter((l) => (l.intentStage || "new") === filterStage);
+    }
+    if (filterOwner !== "all") {
+      result = result.filter((l) => {
+        const owner = l.assigneeName || l.ownerName || "—";
+        return owner === filterOwner;
+      });
+    }
+    return result;
+  }, [baseSortedLeads, filterStage, filterOwner]);
+
+  // Available owners — computed from ALL leads (not filtered) so the dropdown
+  // always shows every possible owner even if the current filter hides them.
+  const availableOwners = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of leadsState) {
+      const owner = l.assigneeName || l.ownerName;
+      if (owner) set.add(owner);
+    }
+    return Array.from(set).sort();
+  }, [leadsState]);
+
+  const hasFilters = baseHasFilters || filterStage !== "all" || filterOwner !== "all";
 
   // Filter out operator placeholders from segment counts for cleaner metrics
   const activeLeads = useMemo(() => 
@@ -280,6 +312,9 @@ export function LeadsClient({
         sortMode={sortMode} setSortMode={setSortMode}
         filterSource={filterSource} setFilterSource={setFilterSource}
         availableSources={availableSources}
+        filterStage={filterStage} setFilterStage={setFilterStage}
+        filterOwner={filterOwner} setFilterOwner={setFilterOwner}
+        availableOwners={availableOwners}
         segment={segment} setSegment={setSegment}
         viewMode={viewMode} onViewModeChange={setViewMode}
         segmentCounts={segmentCounts}
