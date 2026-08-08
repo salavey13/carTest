@@ -1,8 +1,8 @@
+// /app/franchize/[slug]/leads/leads-utils.tsx
 "use client";
 
 import { SOURCE_META } from "./leads-constants";
-import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
-import { normalizePhone } from "@/app/franchize/lib/phone-utils";
+import type {LeadRow, LeadTodoRow} from "./leads-types";
 
 export function getInitials(name: string | null): string {
   if (!name) return "?";
@@ -70,7 +70,20 @@ export function fmtMoney(n: number | undefined): string {
  * Accepts +7/7/8 prefix, spaces, dashes, parentheses.
  * Returns null if input is empty or unparseable.
  *
+ * MUST mirror the server-side normalizePhone() in server-actions/leads.ts and
+ * crew-todos.ts so client-side matching stays consistent with server-side filtering.
  */
+function normalizePhone(input: string | null | undefined): string | null {
+  if (!input) return null;
+  let s = input.trim().replace(/[\s\-\(\)]/g, "");
+  if (!s) return null;
+  if (/^8\d{10}$/.test(s)) s = "+7" + s.slice(1);
+  else if (/^7\d{10}$/.test(s)) s = "+" + s;
+  else if (/^\d{10}$/.test(s)) s = "+7" + s;
+  else if (!s.startsWith("+")) s = "+" + s;
+  return s;
+}
+
 export function getTodoLeadId(todo: LeadTodoRow): string | null {
   // 1. user_id column — canonical Telegram chat_id
   // Note: Telegram IDs can be up to 10 digits today; allow up to 12 for future-proofing.
