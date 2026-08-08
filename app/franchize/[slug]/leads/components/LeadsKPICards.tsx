@@ -1,139 +1,93 @@
+// /app/franchize/[slug]/leads/components/LeadsKPICards.tsx
 "use client";
 
 import { motion } from "framer-motion";
-import { Users, Flame, TrendingUp, Wallet, ArrowUp, ArrowDown } from "lucide-react";
-import type { ThemeTokens } from "../hooks/useTheme";
+import { Users, Star, Flame, CheckCircle, Clock, Banknote } from "lucide-react";
+import type {LeadRow, LeadTodoRow} from "../leads-types";
+import { fmtMoney } from "../leads-utils";
 
-export interface LeadsKpis {
-  totalLeads: number;
-  hotLeads: number;
-  conversionRate: number;
-  monthlyRevenue: number;
+interface LeadsKPICardsProps {
+  leads: LeadRow[];
+  hot: LeadRow[];
+  verified: LeadRow[];
+  todos: LeadTodoRow[];
+  T: any;
 }
 
-interface Props {
-  kpis: LeadsKpis;
-  T: ThemeTokens;
+function isToday(dateStr: string | null): boolean {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
 }
 
-/**
- * 4-card KPI row (Всего лиды, Горячие, Конверсия, Выручка).
- *
- * Each card has:
- *   - A subtle hover lift (y: -2px) for affordance.
- *   - Large bold numbers (text-2xl mobile / text-3xl desktop).
- *   - A tiny colored delta indicator (green up / red down / muted neutral)
- *     that uses semantic tone colors so the direction is glanceable.
- *
- * Responsive: 2col mobile / 2col tablet / 4col desktop.
- *
- * Polish 2026-07-30: was `grid-cols-1 sm:grid-cols-2 xl:grid-cols-4` — on
- * mobile the 4 cards stacked vertically, taking too much height. Now 2 columns
- * on mobile so the row is more compact and the lead list is visible without
- * scrolling past stats.
- */
-export function LeadsKPICards({ kpis, T }: Props) {
-  const cards: Array<{
-    label: string;
-    value: string;
-    icon: typeof Users;
-    color: string;
-    delta: string | null;
-    deltaDir: "up" | "down" | "neutral";
-  }> = [
-    {
-      label: "Всего лидов",
-      value: String(kpis.totalLeads),
-      icon: Users,
-      color: "#eab308",
-      delta: "за 7 дней",
-      deltaDir: "neutral",
-    },
-    {
-      label: "Горячие",
-      value: String(kpis.hotLeads),
-      icon: Flame,
-      color: "#ef4444",
-      delta: kpis.hotLeads > 0 ? "требуют внимания" : "всё под контролем",
-      deltaDir: kpis.hotLeads > 0 ? "up" : "neutral",
-    },
-    {
-      label: "Конверсия",
-      value: `${kpis.conversionRate}%`,
-      icon: TrendingUp,
-      color: "#22c55e",
-      delta: kpis.conversionRate >= 30 ? "+тренд" : "по пайплайну",
-      deltaDir: kpis.conversionRate >= 30 ? "up" : "neutral",
-    },
-    {
-      label: "Выручка (мес.)",
-      value: fmtMoney(kpis.monthlyRevenue),
-      icon: Wallet,
-      color: "#eab308",
-      delta: "активные аренды",
-      deltaDir: "neutral",
-    },
+const cardVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", damping: 22, stiffness: 240, delay: i * 0.04 },
+  }),
+};
+
+export function LeadsKPICards({ leads, hot, verified, todos, T }: LeadsKPICardsProps) {
+  const today = leads.filter((l) => isToday(l.createdAt) || isToday(l.lastSeenAt)).length;
+  const pending = todos.filter((t) => t.status !== "done").length;
+  const totalSpent = leads.reduce((s, l) => s + (l.totalSpent || 0), 0);
+
+  const cards = [
+    { label: "Всего лидов", value: leads.length, icon: Users, color: T.textMuted },
+    { label: "Активность сегодня", value: today, icon: Star, color: T.accent },
+    { label: "Горячие", value: hot.length, icon: Flame, color: "#ef4444" },
+    { label: "Клиенты", value: verified.length, icon: CheckCircle, color: "#10b981" },
+    { label: "Задач в работе", value: pending, icon: Clock, color: "#f59e0b" },
+    { label: "Выручка", value: fmtMoney(totalSpent), icon: Banknote, color: "#10b981" },
   ];
 
   return (
-    <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {cards.map((c, i) => {
         const Icon = c.icon;
-        const deltaColor =
-          c.deltaDir === "up" ? "#22c55e" : c.deltaDir === "down" ? "#ef4444" : T.textFaint;
-        const DeltaIcon = c.deltaDir === "up" ? ArrowUp : c.deltaDir === "down" ? ArrowDown : null;
         return (
-          <motion.article
+          <motion.div
             key={c.label}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ type: "spring", damping: 22, stiffness: 240, delay: i * 0.04 }}
-            whileHover={{ y: -2 }}
-            className="glass-panel rounded-[20px] p-3 sm:rounded-[24px] sm:p-5"
+            custom={i}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            className="relative overflow-hidden rounded-2xl border p-3 transition-shadow hover:shadow-lg"
+            style={{ borderColor: T.border, backgroundColor: T.bgCard }}
           >
-            <div className="mb-2 flex items-center gap-2 sm:mb-4 sm:gap-3">
-              <div
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl sm:h-11 sm:w-11 sm:rounded-2xl"
-                style={{ background: `${c.color}1a` }}
-                aria-hidden
-              >
-                <Icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: c.color }} />
+            {/* Subtle glow on accent */}
+            <div
+              className="absolute -right-4 -top-4 h-16 w-16 rounded-full opacity-[0.04]"
+              style={{ backgroundColor: c.color }}
+            />
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: T.textFaint }}>
+                  {c.label}
+                </p>
+                <motion.p
+                  className="mt-1 text-xl font-black tracking-tight"
+                  style={{ color: T.text }}
+                  key={typeof c.value === "string" ? c.value : `val-${c.value}`}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, delay: i * 0.04 + 0.1 }}
+                >
+                  {c.value}
+                </motion.p>
               </div>
-              <p className="text-xs leading-tight sm:text-sm" style={{ color: T.textMuted }}>
-                {c.label}
-              </p>
+              <div className="rounded-lg p-1.5" style={{ backgroundColor: T.borderSoft }}>
+                <Icon className="h-4 w-4" style={{ color: c.color }} />
+              </div>
             </div>
-
-            <motion.div
-              key={c.value}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2, delay: i * 0.04 + 0.1 }}
-              // Large bold number: text-xl mobile / text-3xl desktop
-              className="truncate text-xl font-bold tracking-tight sm:text-3xl"
-              style={{ color: T.text }}
-            >
-              {c.value}
-            </motion.div>
-
-            {/* Tiny colored delta indicator — hidden on mobile to save space */}
-            {c.delta && (
-              <div
-                className="mt-1.5 hidden items-center gap-1 text-[11px] font-medium sm:mt-2 sm:inline-flex"
-                style={{ color: deltaColor }}
-              >
-                {DeltaIcon && <DeltaIcon className="h-3 w-3" aria-hidden />}
-                <span>{c.delta}</span>
-              </div>
-            )}
-          </motion.article>
+          </motion.div>
         );
       })}
-    </section>
+    </div>
   );
-}
-
-function fmtMoney(n: number): string {
-  if (!Number.isFinite(n)) return "0 ₽";
-  return new Intl.NumberFormat("ru-RU").format(Math.round(n)) + " ₽";
 }
