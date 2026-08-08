@@ -93,10 +93,11 @@ permission:
 2. `rental-analytics-text returns-due` — возвраты сегодня
 3. `rental-analytics-text rentals-awaiting-return` — аренды к возврату
 
-**"Полная сводка за день"** → 3 аналитических навыка (зеркало v2 KPI row):
+**"Полная сводка за день"** → 4 аналитических навыка (зеркало v2 KPI row):
 1. `rental-analytics-text rental-kpis --date <today>` — 4 KPI по арендам
 2. `sale-analytics-text sale-kpis --date <today>` — 4 KPI по продажам
 3. `service-analytics-text service-kpis --date <today>` — 4 KPI по сервису
+4. `testdrive-analytics-text testdrive-kpis --date <today>` — 4 KPI по тест-драйвам
 
 **"Статус по экипажу"** → 2 навыка:
 1. `crew-management-text crew-stats` — участники + задачи
@@ -106,10 +107,11 @@ permission:
 1. `leads-crm-text list-leads --search Рудометов` — в лидax
 2. `rental-card-text list-rentals` — в арендах
 
-**"Сколько заработали за месяц?"** → 3 навыка параллельно (аренды + продажи + сервис):
+**"Сколько заработали за месяц?"** → 4 навыка параллельно (аренды + продажи + сервис + конверсия тест-драйвов):
 1. `rental-analytics-text rentals-day --date <30d-ago>` (агрегируй по дню)
 2. `sale-analytics-text sale-stats --from <30d-ago> --to <today>`
 3. `service-analytics-text service-stats --from <30d-ago> --to <today>`
+4. `testdrive-analytics-text testdrive-conversion --from <30d-ago> --to <today>` — конверсия тест-драйвов в аренды
 
 **"Что с договорами?"** → 1 навык:
 1. `sale-analytics-text sale-contract-status <saleId>` — статус конкретного договора
@@ -141,7 +143,7 @@ permission:
 | Schema | Table | Used by |
 |---|---|---|
 | public | crews, crew_members, users, cars, rentals, crew_todos, lead_notes, franchize_intents, orders, rental_reviews | Most skills |
-| private | rental_contract_artifacts, sale_contract_artifacts, user_rental_secrets, subrent_contract_artifacts | rental-card, contract-draft, rental-analytics |
+| private | rental_contract_artifacts, sale_contract_artifacts, testdrive_contract_artifacts, user_rental_secrets, subrent_contract_artifacts | rental-card, contract-draft, rental-analytics, testdrive-analytics |
 
 ## 🐙 GitHub Access
 

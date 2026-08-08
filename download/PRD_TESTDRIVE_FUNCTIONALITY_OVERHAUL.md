@@ -749,21 +749,56 @@ startapp param →
 | Testdrive leads flood the /leads page | Add `intentType` filter to /leads page (already exists as "segment" filter — just add `test_drive` segment) |
 | Email SMTP timeout blocks the bot | Fire-and-forget pattern (no `await`); 8s socket timeout; logger.warn on failure |
 | Existing testdrive artifacts in `rental_contract_artifacts` | Migration includes data backfill: `INSERT INTO testdrive_contract_artifacts SELECT ... FROM rental_contract_artifacts WHERE metadata->>'flow_type' = 'testdrive'` |
+| Skills/digests don't show testdrive KPIs | ✅ Implemented: evening-summary.sh updated + new testdrive-analytics-text skill (see §9) |
 
 ---
 
-## 9. Out of Scope (Future PRDs)
+## 9. Skills & Digest Updates (✅ Implemented)
+
+The testdrive flow must appear in the same places rentals/sales/services appear — otherwise operators won't know testdrives happened. The following have been updated:
+
+### 9.1 Evening Digest (`boss-commands/evening-summary.sh`)
+- **Added**: Testdrive KPI query from `private.testdrive_contract_artifacts`
+- **Added**: "🛵 Тест-драйвы" section in the daily digest message (after Сервис, before Итого)
+- Shows: count of testdrives today
+- Links to: leads page (where testdrive leads appear with purple badge)
+
+### 9.2 New Skill: `testdrive-analytics-text`
+- **Created**: `skills/testdrive-analytics-text/SKILL.md`
+- Mirrors `rental-analytics-text`, `sale-analytics-text`, `service-analytics-text` pattern
+- Commands: `testdrives-list`, `testdrive-kpis`, `testdrive-detail`, `testdrive-conversion`, `testdrive-stats`
+- Trigger phrases: "тест-драйвы", "кто тест-драйвил", "kpi тест-драйвов", "конверсия тест-драйвов", "testdrives today", "testdrive kpis", etc.
+- KPI row (4 cards): Тест-драйвов сегодня / Уникальных клиентов / С QR (claimed) / Без QR (pending)
+- Conversion tracking: how many testdrive customers later did a real rental
+
+### 9.3 `vip-bike-ops` Skill Updated
+- **"Полная сводка за день"** now calls 4 skills (was 3): added `testdrive-analytics-text testdrive-kpis`
+- **"Сколько заработали за месяц?"** now calls 4 skills (was 3): added `testdrive-analytics-text testdrive-conversion`
+- Table reference updated: `testdrive_contract_artifacts` added to private schema tables list
+
+### 9.4 Composite Query Examples (from vip-bike-ops)
+```
+"Полная сводка за день" → 4 навыка:
+1. rental-analytics-text rental-kpis --date <today>
+2. sale-analytics-text sale-kpis --date <today>
+3. service-analytics-text service-kpis --date <today>
+4. testdrive-analytics-text testdrive-kpis --date <today>  ← NEW
+```
+
+---
+
+## 10. Out of Scope (Future PRDs)
 
 - Sale flow QR linking (`sale_` prefix) — separate PRD
 - Testdrive-to-rental conversion flow (button on testdrive lead to start `/doc` pre-filled)
-- Testdrive analytics dashboard (conversion rate, popular bikes)
+- Testdrive analytics dashboard on web (conversion rate chart, popular bikes) — text skill exists, web page doesn't
 - Testdrive duration tracking (actual vs. 10-minute limit)
 - Testdrive damage report photo upload
 - Multi-bike testdrive (customer test-drives 2+ bikes in one session)
 
 ---
 
-## 10. Acceptance Criteria
+## 11. Acceptance Criteria
 
 - [ ] `/testdrive` generates DOCX, saves to `testdrive_contract_artifacts` (not `rental_contract_artifacts`)
 - [ ] `/testdrive` saves customer data to `user_rental_secrets` with `chat_id = NULL` for crew operators
@@ -776,3 +811,6 @@ startapp param →
 - [ ] Lead detail drawer shows testdrive info + pre-fill section
 - [ ] `/doc` pre-fills from `user_rental_secrets` when renter has a prior testdrive
 - [ ] No regression in existing rental/sale flows
+- [ ] Evening digest (`evening-summary.sh`) includes "🛵 Тест-драйвы" section with count
+- [ ] `testdrive-analytics-text` skill responds to "тест-драйвы" / "testdrive kpis" triggers
+- [ ] `vip-bike-ops` "Полная сводка за день" includes testdrive KPIs (4 skills, not 3)

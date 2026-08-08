@@ -373,6 +373,7 @@ export async function getFranchizeLeads(
       secretUsersResult,
       rentalsResult,
       saleArtifactsResult,
+      testdriveArtifactsResult,
     ] = await Promise.all([
       // 1. franchize_intents (the canonical lead ledger — crew-filtered by slug)
       // NOTE: franchize_intents does NOT have a created_by_operator_chat_id column —
@@ -423,6 +424,17 @@ export async function getFranchizeLeads(
         .eq("crew_slug", safeSlug)
         .order("created_at", { ascending: false })
         .limit(200),
+      // 6. Testdrive contract artifacts (crew-filtered by crew_slug).
+      // Schema columns: id (uuid PK), telegram_chat_id, customer_phone, customer_full_name,
+      //   requested_bike_id, resolved_bike_id, testdrive_date, total_sum (numeric),
+      //   created_at, created_by_operator_chat_id, license_categories.
+      // Used to show testdrive leads on the /leads page + pre-fill data for future rentals.
+      privateSchema()
+        .from("testdrive_contract_artifacts")
+        .select("id, telegram_chat_id, customer_phone, customer_full_name, requested_bike_id, resolved_bike_id, testdrive_date, total_sum, created_at, created_by_operator_chat_id, license_categories, customer_passport, customer_driver_license")
+        .eq("crew_slug", safeSlug)
+        .order("created_at", { ascending: false })
+        .limit(200),
     ]);
 
     // Surface query errors so future bugs are visible (previously: silent failures
@@ -432,12 +444,14 @@ export async function getFranchizeLeads(
     if (secretUsersResult.error) logger.error("[getFranchizeLeads] user_rental_secrets query failed:", secretUsersResult.error);
     if (rentalsResult.error) logger.error("[getFranchizeLeads] rentals query failed:", rentalsResult.error);
     if (saleArtifactsResult.error) logger.error("[getFranchizeLeads] sale_contract_artifacts query failed:", saleArtifactsResult.error);
+    if (testdriveArtifactsResult.error) logger.error("[getFranchizeLeads] testdrive_contract_artifacts query failed:", testdriveArtifactsResult.error);
 
     const intentLeads = intentLeadsResult.data;
     const artifactUsers = artifactUsersResult.data;
     const secretUsers = secretUsersResult.data;
     const rentals = rentalsResult.data;
     const saleArtifacts = saleArtifactsResult.data;
+    const testdriveArtifacts = testdriveArtifactsResult.data;
 
     // Pre-fetch bike titles for artifacts + sales so we can build human-readable bikeTitle.
     // The rentals step already joins cars via vehicle:cars(make, model), so it doesn't need this.
@@ -455,6 +469,10 @@ export async function getFranchizeLeads(
     }
     for (const s of saleArtifacts ?? []) {
       const bid = s.resolved_bike_id || s.requested_bike_id;
+      if (bid) artifactBikeIds.add(bid);
+    }
+    for (const t of testdriveArtifacts ?? []) {
+      const bid = t.resolved_bike_id || t.requested_bike_id;
       if (bid) artifactBikeIds.add(bid);
     }
     if (artifactBikeIds.size > 0) {
@@ -796,6 +814,46 @@ export async function getFranchizeLeads(
           telegramChatId: s.telegram_chat_id || null,
           rentals: [],
           sales: [saleRow],
+        });
+      }
+    }
+
+    // 6. Testdrive contract artifacts (crew-filtered)
+    // Testdrive artifacts use customer_* field naming (not renter_*).
+    // telegram_chat_id starts as the operator's chat_id and is updated to the
+    // renter's chat_id when they scan the QR (via claim_testdrive_by_qr RPC).
+    // The lead appears on /leads with intentType "test_drive" and a bikeTitle
+    // so operators can see who test-drove what.
+    if (testdriveArtifacts) {
+      for (const t of testdriveArtifacts) {
+        if (!t.telegram_chat_id && !t.customer_phone) continue;
+        const normalizedCustomerPhone = normalizePhone(t.customer_phone);
+        // Prefer customer_phone as the lead identity key when the artifact is
+        // still in pre-claim state (telegram_chat_id is the operator).
+        const isOperator = t.created_by_operator_chat_id && t.telegram_chat_id === t.created_by_operator_chat_id;
+        const preferPhone = !!normalizedCustomerPhone && isOperator;
+        const id = preferPhone
+          ? normalizedCustomerPhone!
+          : (t.telegram_chat_id || normalizedCustomerPhone || "");
+        if (!id) continue;
+        const bikeId = t.resolved_bike_id || t.requested_bike_id;
+        const bikeTitle = (bikeId && bikeTitleMap.get(bikeId)) || null;
+        addOrMerge({
+          user_id: id,
+          full_name: t.customer_full_name || null,
+          username: null,
+          phone: normalizedCustomerPhone,
+          source: "testdrive_contract",
+          bikeTitle,
+          createdAt: t.created_at,
+          lastSeenAt: t.created_at,
+          verified: true,
+          intentType: "test_drive",
+          intentStage: "contract_generated",
+          telegramChatId: t.telegram_chat_id || null,
+          originalOperatorChatId: t.created_by_operator_chat_id || null,
+          rentals: [],
+          sales: [],
         });
       }
     }

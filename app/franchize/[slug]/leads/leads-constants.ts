@@ -15,6 +15,7 @@ export const SOURCE_META: Record<string, { label: string; icon: typeof Flame; co
   rental_contract: { label: "Аренда",       icon: CheckCircle,  color: "#10b981", bg: "#10b98120" },
   sale_contract:   { label: "Покупка",      icon: TrendingUp,   color: "#f59e0b", bg: "#f59e0b20" },
   test_drive:      { label: "Тест-драйв",   icon: Bike,         color: "#8b5cf6", bg: "#8b5cf620" },
+  testdrive_contract: { label: "Тест-драйв", icon: Bike,       color: "#8b5cf6", bg: "#8b5cf620" },
   app_open:        { label: "Открыл приложение", icon: Users,   color: "#64748b", bg: "#64748b20" },
   rent:            { label: "Аренда",       icon: Bike,         color: "#10b981", bg: "#10b98120" },
   sale:            { label: "Покупка",      icon: TrendingUp,   color: "#f59e0b", bg: "#f59e0b20" },

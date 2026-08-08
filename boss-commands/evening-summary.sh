@@ -79,6 +79,21 @@ SERVICE_KPIS=$(echo "$SERVICES_DATA" | jq -r '
   "Сервисов сегодня: \(.total)\nВыручка: \(.revenue) ₽\nАктивных: \(.active)\nЗавершено: \(.completed)\(.completed == 0 ? " — день открыт" : "")"
 ')
 
+# ─── Testdrive KPIs ──────────────────────────────────────────────────────────
+# Testdrives are stored in private.testdrive_contract_artifacts (separate from
+# rentals). They're free (total_sum=0) but tracking the count helps operators
+# see how many people test-drove today and might convert to rentals.
+TESTDRIVE_DATA=$(supabase_query "testdrive_contract_artifacts" \
+  "select=id,customer_full_name,customer_phone,resolved_bike_id,created_at&crew_slug=eq.${CREW_SLUG}&created_at=gte.${START_UTC}&created_at=lte.${END_UTC}" \
+  "private")
+
+TESTDRIVE_KPIS=$(echo "$TESTDRIVE_DATA" | jq -r '
+  {
+    total: length
+  } |
+  "Тест-драйвов сегодня: \(.total)"
+')
+
 # ─── Total revenue ───────────────────────────────────────────────────────────
 # Same defensive number coercion as above.
 TOTAL_REVENUE=$(jq -s -r '
@@ -140,6 +155,7 @@ fi
 RENTALS_LINK="$(analytics_link "rentals" "$TODAY")"
 SALES_LINK="$(analytics_link "sales" "$TODAY")"
 SERVICES_LINK="$(analytics_link "services" "$TODAY")"
+LEADS_LINK="$(analytics_link "leads" "$TODAY")"
 
 MESSAGE="📊 <b>Итоги дня</b> — ${TODAY}, ${NOW_DISPLAY} МСК
 
@@ -151,6 +167,9 @@ ${SALE_KPIS}
 
 <b>🔧 <a href=\"${SERVICES_LINK}\">Сервис</a></b>
 ${SERVICE_KPIS}
+
+<b>🛵 <a href=\"${LEADS_LINK}\">Тест-драйвы</a></b>
+${TESTDRIVE_KPIS}
 
 ━━━━━━━━━━━━━━━━━━
 ${ACTIVE_SECTION}<b>Итого выручка за день: ${TOTAL_REVENUE} ₽</b>
