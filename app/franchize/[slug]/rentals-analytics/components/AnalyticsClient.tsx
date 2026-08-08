@@ -189,7 +189,9 @@ export function AnalyticsClient({
   const handleRentalAction = (action: DrawerAction) => {
     // Phase 2: wire to server actions
     if (action === "open_rental" && selectedRentalId) {
-      router.push(`/franchize/${initialSlug}?vehicle=${selectedRentalId}`);
+      // FIX: was pushing to /franchize/{slug}?vehicle={rentalId} which opens the
+      // catalog page, not the rental detail page. Correct URL is /franchize/{slug}/rental/{rentalId}
+      router.push(`/franchize/${initialSlug}/rental/${selectedRentalId}`);
       return;
     }
     if (action === "open_rental" && selectedSaleId) {
