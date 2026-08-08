@@ -1,4 +1,4 @@
-import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
+import type {LeadRow, LeadTodoRow} from "../leads-types";
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 
 export const PIPELINE_STAGES = [
