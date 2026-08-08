@@ -12,11 +12,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
-// FIX: leads-dismiss lives in app/franchize/server-actions/, NOT in leads/lib/.
-// Was `../lib/leads-dismiss` which caused "Module not found" build error.
-import { dismissLeadWithReason } from "@/app/franchize/server-actions/leads-dismiss";
-import { getLeadsKpis, type LeadsKpis } from "@/app/franchize/server-actions/leads-kpis";
-import { createLeadNote } from "@/app/franchize/server-actions/lead-notes";
+import type { LeadsKpis } from "@/app/franchize/server-actions/leads-kpis";
+import type { LeadNote } from "@/app/franchize/server-actions/lead-notes";
+// FIX: all server action VALUE imports converted to dynamic imports inside callbacks.
+// Was: static imports of dismissLeadWithReason, getLeadsKpis, createLeadNote — but these
+// files now import telegram-actor-cookie.ts which has `import "server-only"`. Static
+// imports pull server-only code into the client bundle → "Cannot access 'eK' before
+// initialization" runtime crash. Dynamic imports keep server-only code server-side.
 import { DISMISS_REASONS } from "../lib/dismiss-reasons";
 
 interface UseLeadActionsProps {
@@ -53,6 +55,7 @@ export function useLeadActions({
   // Was: deps only [slug] — fetchKpis captured null dbUser on initial render and never re-fired.
   const fetchKpis = useCallback(async (mode: string) => {
     try {
+      const { getLeadsKpis } = await import("@/app/franchize/server-actions/leads-kpis");
       const result = await getLeadsKpis(
         slug,
         mode,
@@ -79,6 +82,7 @@ export function useLeadActions({
       try {
         // Use the server action directly — it accepts the slug/leadId/reason/note payload
         // and resolves auth from the current request context (cookie or password header)
+        const { dismissLeadWithReason } = await import("@/app/franchize/server-actions/leads-dismiss");
         await dismissLeadWithReason({
           slug,
           leadId: targetId,
@@ -202,6 +206,7 @@ export function useLeadActions({
       try {
         // LA-003 FIX: createLeadNote expects an object, not 3 positional args.
         // Was: createLeadNote(selectedLead.user_id, text.trim(), slug) — silently failed.
+        const { createLeadNote } = await import("@/app/franchize/server-actions/lead-notes");
         const result = await createLeadNote({
           leadId: selectedLead.user_id,
           crewId,
