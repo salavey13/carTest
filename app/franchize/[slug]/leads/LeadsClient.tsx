@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Lock, X, Bike } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import type {LeadRow, LeadTodoRow} from "./leads-types";
+import { getFranchizeLeads } from "@/app/franchize/server-actions/leads";
 
 // Import extracted components
 import { LeadsKPICards } from "./components/LeadsKPICards";
@@ -116,14 +117,15 @@ export function LeadsClient({
     let cancelled = false;
     (async () => {
       try {
-        const { getFranchizeLeads } = await import("@/app/franchize/server-actions/leads");
-        // For Telegram WebApp: the server action reads the signed TELEGRAM_ACTOR_COOKIE
-        // to verify identity. Pass dbUser?.user_id as a fallback for password auth.
-        // The server tries cookie auth FIRST, then falls back to actorUserId + isPasswordAuth.
+        // STATIC import — safe now because leads.ts has NO module-level server-only imports.
+        // Dynamic import() of server actions breaks Next.js server action registration
+        // ("Failed to find Server Action" error). The fix was to move cookies +
+        // telegram-actor-cookie + privateSchema to dynamic imports INSIDE the functions
+        // in leads.ts, so the module-level imports are clean for the client RPC stub.
         const result = await getFranchizeLeads(
           slug,
           dbUser?.user_id || "",
-          false, // isPasswordAuth=false — let the server try the cookie first
+          false, // isPasswordAuth=false — server tries cookie auth first
         );
         if (cancelled) return;
         if (result.success) {
