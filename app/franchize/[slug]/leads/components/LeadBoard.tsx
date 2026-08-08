@@ -28,7 +28,7 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
   }, [leads]);
 
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 overflow-x-auto">
       {BOARD_COLUMNS.map(({ key, label, color }) => {
         const colLeads = columns[key] || [];
         return (
