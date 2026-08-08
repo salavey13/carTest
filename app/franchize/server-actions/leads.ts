@@ -114,103 +114,10 @@ async function verifyCrewOwnerAccess(
   return { allowed: false, error: "Недостаточно прав для просмотра данных этого экипажа." };
 }
 
-export interface LeadRentalRow {
-  rentalId: string;
-  status: string;
-  paymentStatus: string;
-  startDate: string | null;
-  endDate: string | null;
-  bikeTitle: string | null;
-  totalCost: number;
-  metadata?: Record<string, unknown> | null; // Status change history, etc.
-  passportMainpagePhoto?: string | null;
-  passportRegistrationPhoto?: string | null;
-  driversLicenceFrontalPhoto?: string | null;
-}
-
-export interface LeadSaleRow {
-  saleId: string;
-  bikeTitle: string | null;
-  salePrice: number;
-  createdAt: string;
-}
-
-export interface LeadRow {
-  user_id: string;
-  full_name: string | null;
-  username: string | null;
-  phone: string | null;
-  source: string;
-  bikeTitle: string | null;
-  createdAt: string | null;
-  lastSeenAt: string | null;
-  verified: boolean;
-  intentType?: string | null;
-  intentStage?: string | null;
-  urgencyScore?: number | null;
-  telegramChatId?: string | null;
-  troubled?: boolean;
-  troubledReason?: string | null;
-  contractCount?: number;
-  saleCount?: number;
-  lastRentalDate?: string | null;
-  totalSpent?: number;
-  contractRef?: string | null;
-  rentals: LeadRentalRow[];
-  sales: LeadSaleRow[];
-  sourceRoute?: string | null;
-  contactChannel?: string | null;
-  /** Identity state for UI classification */
-  identityState?: 'claimed_user' | 'phone_only' | 'operator_placeholder' | 'merged';
-  /** Count of source records merged into this lead */
-  sourceCount?: number;
-  /** Original operator chat id that created this lead (preserved across QR claim).
-   *  Sourced from:
-   *    - rentals.created_by_operator_chat_id (FK column, set by /doc-manual L1193)
-   *    - rental_contract_artifacts.created_by_operator_chat_id (set by /doc-manual L1615)
-   *    - franchize_intents.metadata.operatorId (set by /doc-manual L1765 via upsertFranchizeLead)
-   *  Lets classifyIdentityState detect an operator-placeholder lead even after the
-   *  renter's chat id has replaced the operator in telegram_user_id / user_id. */
-  originalOperatorChatId?: string | null;
-  /** Pipeline stage key — derived by computeLeadStage(). */
-  stageKey?: string;
-  /** Assignee — derived from most recent todo's assigned_to. */
-  assigneeId?: string | null;
-  /** Assignee display name. */
-  assigneeName?: string | null;
-  /** Owner — the operator who created the lead. */
-  ownerId?: string | null;
-  /** Owner display name. */
-  ownerName?: string | null;
-  /** Next action label, derived from stageKey. */
-  nextAction?: string | null;
-  /** QR claim status. */
-  qrStatus?: "unclaimed" | "sent" | "claimed" | "expired";
-}
-
-export interface LeadTodoRow {
-  id: string;
-  lead_id: string | null;
-  user_id: string | null;
-  phone: string | null;
-  rental_id: string | null;
-  title: string;
-  description: string | null;
-  status: string;
-  priority: string;
-  category: string;
-  created_at: string;
-  completed_at: string | null;
-  assigned_to: string | null;
-  due_date: string | null;
-}
-
-export interface GetFranchizeLeadsResult {
-  success: boolean;
-  leads?: LeadRow[];
-  todos?: LeadTodoRow[];
-  error?: string;
-}
+// Re-export types from the shared leads-types.ts (no server-only imports).
+// Client components should import types from leads-types.ts directly to avoid
+// pulling in server-only code. Server code can still import from here.
+export type { LeadRentalRow, LeadSaleRow, LeadRow, LeadTodoRow, GetFranchizeLeadsResult, DocVerificationData, GetRentalDocVerificationResult } from "@/app/franchize/[slug]/leads/leads-types";
 
 /**
  * Fetch the set of operator Telegram IDs for a crew (owner + active members),
@@ -1180,38 +1087,8 @@ export async function getFranchizeLeads(
 }
 
 // ── Document Verification ──────────────────────────────────────────────────────
-
-export interface DocVerificationData {
-  rentalId: string;
-  photos: {
-    passportMainpage: { path: string | null; signedUrl: string | null };
-    passportRegistration: { path: string | null; signedUrl: string | null };
-    driversLicence: { path: string | null; signedUrl: string | null };
-  };
-  ocrData: {
-    fullName: string | null;
-    passport: string | null;
-    passportIssuedBy: string | null;
-    passportIssueDate: string | null;
-    birthDate: string | null;
-    registration: string | null;
-    driverLicense: string | null;
-  };
-  checklist: {
-    passportVerified: boolean;
-    licenseVerified: boolean;
-    equipmentHandover: boolean;
-    odometerBefore: boolean;
-    datesConfirmed: boolean;
-    paymentVerified: boolean;
-  };
-}
-
-export interface GetRentalDocVerificationResult {
-  success: boolean;
-  data?: DocVerificationData;
-  error?: string;
-}
+// Types (DocVerificationData, GetRentalDocVerificationResult) are re-exported
+// from leads-types.ts at the top of this file.
 
 /**
  * Get document verification data for a rental.
