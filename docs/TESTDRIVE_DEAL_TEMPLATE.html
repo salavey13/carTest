@@ -1,9 +1,10 @@
 <!-- /docs/TESTDRIVE_DEAL_TEMPLATE.html -->
-<!-- 2026-07-05: Test-drive contract template, rebuilt to match the VIP Bike SOP. -->
-<!-- Engine: buildFranchizeDocxFromTemplate() supports {{placeholder}} vars     -->
-<!--         and {{#if var}}...{{else}}...{{/if}} conditional blocks.           -->
-<!-- If a passport or license field is empty (not provided by operator),        -->
-<!-- the corresponding block is omitted from the contract.                      -->
+<!-- Aligned to the real VIP Bike testdrive contract (OCR'd from physical doc).
+     Structure matches: Договор № / на прохождение тест-драйва в мотосалоне.
+     Engine: buildFranchizeDocxFromTemplate() supports {{placeholder}} vars
+             and {{#if var}}...{{else}}...{{/if}} conditional blocks.
+     If a passport or license field is empty (not provided by operator),
+     the corresponding block is omitted from the contract. -->
 <style>
   @page { size: A4; margin: 20mm 20mm 25mm 25mm; }
   .doc-container { max-width: 17cm; margin: 0 auto; font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.4; color: #000; }
@@ -12,141 +13,167 @@
 <div class="doc-container">
 
 <p style="text-align: center; font-weight: bold; font-size: 12pt; margin-top: 14pt;">ДОГОВОР № {{contract_number}}</p>
-<p style="text-align: center; font-weight: bold; font-size: 12pt;">на проведение тест-драйва</p>
+<p style="text-align: center; font-weight: bold; font-size: 12pt;">на прохождение тест-драйва в мотосалоне</p>
 
 <table style="width: 100%; border: none; margin-top: 11pt;">
 <tr><td style="border: none; width: 50%;">г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">«{{day}}» {{month}} {{year}} г.</td></tr>
 </table>
 
-<!-- Quick-info box for fast verification -->
+<!-- Quick-info box for fast verification — includes driver's license -->
 <table style="width: 100%; border: 2px solid #333; margin-top: 12pt; margin-bottom: 12pt; font-size: 10pt;">
 <tr><td style="border: 1px solid #999; padding: 4pt 8pt; font-weight: bold; background: #f0f0f0;" colspan="2">КРАТКАЯ ИНФОРМАЦИЯ</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt; width: 40%;">Заказчик:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{customer_full_name}}</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">ТС:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{bike_make}} {{bike_model}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Период:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{rent_start_date}} {{rent_start_time}} — {{rent_end_date}} {{rent_end_time}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Обеспечение:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{deposit_rub}} ₽ (штрафы ГИБДД)</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Категории ВУ:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{license_categories}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Год выпуска:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{bike_year}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Цвет:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{bike_color}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Период:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">Бесплатное время тест-драйва — 10 минут</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Телефон:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{customer_phone}}</td></tr>
+{{#if license_series}}<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Вод. удостоверение:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">серия {{license_series}} № {{license_number}}</td></tr>{{/if}}
+{{#if license_category}}<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Категории ВУ:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{license_category}}</td></tr>{{/if}}
 </table>
 
-<p style="text-align: justify;">Индивидуальный предприниматель, именуемый в дальнейшем «Исполнитель», в лице {{issuer_signatory}}, действующий на основании ОГРНИП: {{ogrnip}}, и {{customer_full_name}}, именуемый в дальнейшем «Заказчик», с другой стороны, совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:</p>
+<p style="text-align: justify;">{{organization_name}}, именуем в дальнейшем «Мотосалон», в лице {{issuer_signatory}}, действующий на основании ОГРНИП: {{ogrnip}}, с одной стороны и {{customer_full_name}}, именуемый в дальнейшем «Пользователь», действующий на основании паспорта, прав (нужное подчеркнуть), с другой стороны, совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:</p>
 
 <p style="text-align: center; font-weight: bold;">1. Предмет Договора</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">1.1. Исполнитель предоставляет Заказчику возможность проведения тест-драйва Транспортного Средства (далее — Тест-Драйв ТС) на условиях настоящего Договора. Тест-драйв проводится на площадке, прилегающей к шоуруму, по адресу: {{return_address}}.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">1.1. Мотосалон предоставляет Пользователю во временное пользование транспортное средство (далее — Транспортное средство) без оказания иных услуг.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">1.2. Характеристики предоставляемого Транспортного Средства:</p>
-<p style="text-indent: 1.25cm; text-align: justify;">- марка, модель ТС: {{bike_make}} {{bike_model}};</p>
+<p style="text-indent: 1.25cm; text-align: justify;">1.2. Основные характеристики Транспортного средства: серийная модель оформлена как демонстрационный экземпляр; наименование (тип): электро-мотоцикл</p>
+<p style="text-indent: 1.25cm; text-align: justify;">- модель, тип двигателя: {{bike_make}} {{bike_model}};</p>
 <p style="text-indent: 1.25cm; text-align: justify;">- год выпуска: {{bike_year}};</p>
 <p style="text-indent: 1.25cm; text-align: justify;">- цвет: {{bike_color}}.</p>
-<p style="text-indent: 1.25cm; text-align: justify;">Транспортное Средство передается в технически исправном состоянии. Транспортное Средство передается в комплектации, соответствующей заводской комплектации, и все его недостатки оговорены в Акте приема-передачи.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">Транспортное средство является собственностью Мотосалона.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">Транспортное средство исправно и заправлено-заряжено в соответствии с рекомендациями изготовителя, и без повреждений на момент тест-драйва.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">1.3. Продолжительность тест-драйва не более 10 (десяти) минут.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">1.3. Бесплатное время тест-драйва 10 минут.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">1.4. Заказчик обязуется возвратить ТС в течение установленного срока, не позднее (окончание тест-драйва или момент требования).</p>
+<p style="text-indent: 1.25cm; text-align: justify;">1.4. Допускается прохождение тест-драйва в границах Мотосалона, на автопарковке (административная граница или территория района).</p>
 
-{{#if license_category}}<p style="text-indent: 1.25cm; text-align: justify;">1.5. Заказчик подтверждает, что имеет Водительское удостоверение категории: {{license_category}}.</p>{{/if}}
+{{#if license_series}}<p style="text-indent: 1.25cm; text-align: justify;">1.5. Пользователь гарантирует на время тест-драйва: наличие у него действующего удостоверения водителя серия: {{license_series}} № {{license_number}}, на право управления транспортными средствами данной категории {{license_category}} (нужное подчеркнуть);</p>{{/if}}
 
-<p style="text-indent: 1.25cm; text-align: justify;">1.6. Заказчик подтверждает{{#if license_category}}, что имеет водительский стаж не менее 1 (одного) года с момента получения ВУ{{/if}}, что ознакомлен с характеристиками и правилами эксплуатации ТС, и не имеет медицинских противопоказаний к управлению ТС.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">отсутствие у него состояния алкогольного или наркотического опьянения, приема сильнодействующих препаратов или лекарственных средств.</p>
 
 <p style="text-align: center; font-weight: bold;">2. Права и обязанности Сторон</p>
 
-<p style="text-indent: 1.25cm; text-align: justify; font-weight: bold;">2.1. Исполнитель обязан:</p>
+<p style="text-indent: 1.25cm; text-align: justify; font-weight: bold;">2.1. Мотосалон обязан:</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">2.1.1. Предоставить в согласованное время Транспортное Средство в исправном и технически-безопасном состоянии с полным комплектом документов.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">2.1.1. Подготовить и передать Пользователю Транспортное средство в исправном и заправленном-заряженном в соответствии с рекомендациями изготовителя.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify; font-weight: bold;">2.2. Заказчик обязуется:</p>
+<p style="text-indent: 1.25cm; text-align: justify; font-weight: bold;">2.2. Пользователь обязан:</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">2.2.1. Лично присутствовать при проведении тест-драйва и управлять Транспортным Средством в пределах разрешенной территории.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">2.2.1. Перед подписанием акта приема-передачи осмотреть Транспортное средство и внешним осмотром проверить его состояние.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">2.2.2. Провести тест-драйв в указанное время и в сроки, оговоренные Договором.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">2.2.2. Вносить плату за пользование дольше бесплатного времени тест-драйва в размере, сроки и в порядке, предусмотренные Договором.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">2.2.3. Соблюдать: Правила дорожного движения, правила эксплуатации ТС, правила пожарной безопасности при эксплуатации и заправке ТС, рекомендации Исполнителя.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">2.2.3. Ответственность: Пользователь несет материальную ответственность за ущерб, причинённый мотоциклу, третьим лицам или оборудованию в процессе езды, пропорционально причинённому ущербу.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">2.2.4. В случае утери или повреждения ТС во время тест-драйва Заказчик обязуется возместить Исполнителю стоимость:</p>
-<ul style="margin: 0 0 0 2.5cm; padding: 0; text-align: justify; list-style-type: '- ';">
-<li>утраты Транспортного Средства (хищение и угон), либо его угона/хищения;</li>
-<li>повреждения ТС, кузова, лакокрасочного покрытия, остекления, ходовой части/подвески, электроники, мотора/двигателя, аккумулятора/батареи, шин/колесных дисков (при повреждении подвески/дисков), — равной среднерыночной стоимости восстановительного ремонта, установленной дилером/экспертом.</li>
-</ul>
+<p style="text-indent: 1.25cm; text-align: justify;">2.2.4. При любом повреждении ТС в период тест-драйва Пользователь обязан по требованию Мотосалона возместить: стоимость восстановительного ремонта (работы и запчасти), стоимость диагностик, расходных материалов, эвакуацию/транспортировку, хранение, расходы на экспертизу/оценку, расходы на поиск и возврат ТС (если применимо), утрату товарной стоимости (при наличии и подтверждении расчетом экспертизой), иные документально подтвержденные расходы Арендодателя, вызванные повреждением/утратой.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">2.2.5. В случае наступления обстоятельств, предусмотренных п. 2.2.4, Заказчик обязуется возместить Исполнителю убытки в полном объеме.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">2.2.5. Размер подлежащих оплате сумм определяется по выбору Мотосалона: по счету/заказ-наряду СТО и кассовым/товарным документам; или по калькуляции независимого эксперта, или по прайсу типовых повреждений в Приложении № 3 (если повреждение прямо охватывается прайсом). Арендатор обязуется оплатить расчет в срок 3 (трех) календарных дней с даты получения требования и расчетных документов.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">2.2.6. При наличии у ТС повреждений (сколов, царапин, потертостей и т.п.), полученных ранее, а также при наличии неисправностей, влияющих на безопасность ТС, уведомить об этом Исполнителя до начала тест-драйва, в противном случае считается, что данные повреждения получены Заказчиком.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">2.2.6. При утрате ТС, его тотальной гибели (когда ремонт экономически нецелесообразен), а также при краже/грабеже/разбое, Пользователь обязан возместить стоимость ТС, указанную рыночную стоимость на дату утраты, а также иные расходы.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">2.2.7. Компенсировать стоимость штрафов ГИБДД, зафиксированных техническими средствами, работающими в автоматическом режиме, наложенных на ТС во время проведения тест-драйва.</p>
+<p style="text-align: center; font-weight: bold;">3. Случаи внесения платы</p>
 
-<p style="text-align: center; font-weight: bold;">3. Цена (Стоимость) и порядок расчетов</p>
+<p style="text-indent: 1.25cm; text-align: justify;">3.1. При пользовании Транспортным средством свыше бесплатного времени тест-драйва Пользователь вносит плату за всё время тест-драйва.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">3.1. Тест-драйв проводится БЕСПЛАТНО. При подготовке ТС к выезду взимается обеспечительный платеж в размере {{deposit_rub}} ({{deposit_words}}) рублей, в обеспечение оплаты возможных штрафов ГИБДД, зафиксированных работающими в автоматическом режиме специальными техническими средствами, имеющими функции фото- и киносъемки, видеозаписи, или средствами фото- и киносъемки, видеозаписи.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">3.2. Плата вносится после завершения тест-драйва.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">3.2. При наличии на момент возврата ТС неоплаченных штрафов ГИБДД, вынесенных в период тест-драйва, Заказчик обязан компенсировать их стоимость в полном объеме.</p>
+<p style="text-align: center; font-weight: bold;">4. Возврат транспортного средства Мотосалону</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">3.3. При отсутствии штрафов ГИБДД по итогам тест-драйва обеспечительный платеж подлежит возврату Заказчику в полном объеме в момент возврата ТС.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">4.1. Пользователь обязан вернуть Мотосалону Транспортное средство в том состоянии, в котором он его получил, с учетом нормального износа.</p>
 
-<p style="text-align: center; font-weight: bold;">4. Порядок возврата Транспортного Средства</p>
+<p style="text-indent: 1.25cm; text-align: justify;">4.2. В случае возврата Транспортного средства свыше 10 минут Мотосалон вправе потребовать от Пользователя внесения платы за все время тест-драйва.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">4.1. Заказчик обязуется вернуть ТС Исполнителю после тест-драйва, в том же состоянии, в котором он его получил, с учетом нормального износа.</p>
+<p style="text-align: center; font-weight: bold;">5. Ответственность Сторон</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">4.2. В случае невозврата ТС в течение 10 минут Исполнитель вправе потребовать от Заказчика полную стоимость ТС или его аналога.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">5.1. Сторона, не исполнившая или ненадлежащим образом исполнившая обязательства по Договору, обязана возместить другой Стороне причиненные убытки.</p>
 
-<p style="text-align: center; font-weight: bold;">5. Обеспечительный платеж</p>
+<p style="text-indent: 1.25cm; text-align: justify;">5.2. За несвоевременное перечисление платы Мотосалон вправе требовать с Пользователя уплаты неустойки (пени) в размере 3% процентов от неуплаченной суммы за каждый день просрочки.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">5.1. Обеспечительный платеж по настоящему Договору вносится Заказчиком в качестве обеспечения исполнения обязательств по оплате штрафов ГИБДД, указанных в п. 3.1 настоящего Договора.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">5.3. Взыскание неустоек и процентов не освобождает Сторону, нарушившую Договор, от исполнения обязательств в натуре.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">5.2. Заказчик не вправе требовать возврата обеспечительного платежа до момента получения Исполнителем подтверждения об отсутствии неоплаченных штрафов ГИБДД за период тест-драйва.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">5.4. Во всех других случаях неисполнения обязательств по Договору Стороны несут ответственность в соответствии с действующим законодательством Российской Федерации.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">5.3. Обеспечительный платеж не засчитывается в счет оплаты тест-драйва.</p>
+<p style="text-align: center; font-weight: bold;">6. Заключительные положения</p>
 
-<p style="text-align: center; font-weight: bold;">6. Ответственность Сторон</p>
+<p style="text-indent: 1.25cm; text-align: justify;">6.1. Во всем остальном, что не предусмотрено настоящим Договором, Стороны руководствуются действующим законодательством Российской Федерации.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">6.1. Стороны, на основании ст. 421 ГК РФ, самостоятельно несут ответственность за неисполнение своих обязательств.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">6.2. Договор составлен в двух экземплярах, имеющих равную юридическую силу, по одному для каждой из Сторон.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">6.2. За нарушение сроков возврата ТС, Заказчик уплачивает штраф в размере 5% стоимости тест-драйва за каждый день просрочки.</p>
-
-<p style="text-indent: 1.25cm; text-align: justify;">6.3. Споры и претензии разрешаются путем переговоров, при недостижении согласия — в судебном порядке в соответствии с законодательством РФ.</p>
-
-<p style="text-indent: 1.25cm; text-align: justify;">6.4. По всем остальным вопросам Стороны руководствуются действующим законодательством Российской Федерации.</p>
-
-<p style="text-align: center; font-weight: bold;">7. Реквизиты Сторон</p>
+<p style="text-align: center; font-weight: bold;">7. Адреса и реквизиты Сторон</p>
 
 <table style="width: 100%; border: none; margin-top: 12pt;">
 <tr>
 <td style="border: none; width: 50%; vertical-align: top; text-align: justify;">
-<b>Исполнитель:</b><br>
+<b>Мотосалон:</b><br>
 {{organization_name}}<br>
 {{organization_short}}<br>
 Адрес: {{legal_address}}<br>
 ОГРНИП: {{ogrnip}}<br>
 ИНН: {{inn}}<br>
 Телефон: {{phone}}<br>
-Email: {{email}}<br>
 <br>
 ____________________ /{{issuer_signatory}}/<br>
-<span style="font-size: 9pt;">(подпись)&emsp;(Ф.И.О.)</span>
+<span style="font-size: 9pt;">(подпись) (Ф.И.О.)</span>
+<br><br>
+<b>Мотосалон</b><br>
+транспортное средство передал.
 </td>
 <td style="border: none; width: 50%; vertical-align: top; text-align: justify;">
-<b>Заказчик:</b><br>
+<b>Пользователь:</b><br>
 <br>
 {{customer_full_name}}<br>
+(Ф., И., О. полностью)<br>
+«{{day}}» {{month}} {{year}} г.<br>
+Телефон: {{customer_phone}}<br>
 {{#if customer_birth_date}}Дата рождения: {{customer_birth_date}}<br>{{/if}}
 {{#if customer_passport_number}}Паспорт: № {{customer_passport_number}}<br>{{/if}}
 {{#if customer_passport_issued_by}}Выдан: {{customer_passport_issued_by}}<br>{{/if}}
 {{#if customer_passport_issue_date}}Дата выдачи: {{customer_passport_issue_date}}<br>{{/if}}
 {{#if customer_registration}}Прописка: {{customer_registration}}<br>{{/if}}
 {{#if license_series}}В/У: серия {{license_series}} № {{license_number}}<br>{{/if}}
-{{#if license_issue_date}}Выдано: {{license_issue_date}}<br>{{/if}}
 {{#if license_expiry_date}}Действительно до: {{license_expiry_date}}<br>{{/if}}
 {{#if license_category}}Категория: {{license_category}}<br>{{/if}}
-Телефон: {{customer_phone}}<br>
 <br>
 ____________________ /{{customer_short_name}}/<br>
-<span style="font-size: 9pt;">(подпись)&emsp;(Ф.И.О.)</span>
+<span style="font-size: 9pt;">(подпись) (Ф.И.О.)</span>
+<br><br>
+<b>Пользователь</b><br>
+транспортное средство получил.
 </td>
 </tr>
 </table>
 
-<p style="margin-top: 12pt; text-align: justify;">Заказчик лично провел тест-драйв и подтверждает.</p>
-<p style="text-align: justify;">Ознакомлен и согласен с условиями проведения тест-драйва и обработкой персональных данных:</p>
-<p style="text-align: center;">_______________________________________________________</p>
+<p style="margin-top: 16pt; text-align: center; font-weight: bold;">После прохождения тест-драйва мототехника проверена.</p>
+<p style="text-align: justify;">Повреждения выявлены и перечислены и зафиксированы фото фиксацией.</p>
+<p style="text-align: justify;">Повреждения: (отсутствуют или имеются) ______________________________</p>
+
+<table style="width: 100%; border: none; margin-top: 12pt;">
+<tr>
+<td style="border: none; width: 50%; vertical-align: top; text-align: justify;">
+<b>Мотосалон</b><br>
+транспортное средство принял<br>
+<br>
+____________________<br>
+<span style="font-size: 9pt;">(подпись)</span><br>
+<br>
+____________________<br>
+<span style="font-size: 9pt;">(Ф., И., О. полностью)</span><br>
+«{{day}}» {{month}} {{year}} г.
+</td>
+<td style="border: none; width: 50%; vertical-align: top; text-align: justify;">
+<b>Пользователь</b><br>
+транспортное средство передал<br>
+<br>
+____________________<br>
+<span style="font-size: 9pt;">(подпись)</span><br>
+<br>
+____________________<br>
+<span style="font-size: 9pt;">(Ф., И., О. полностью)</span><br>
+«{{day}}» {{month}} {{year}} г.
+</td>
+</tr>
+</table>
 
 </div>

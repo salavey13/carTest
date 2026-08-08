@@ -16,6 +16,22 @@ interface LeadBoardProps {
   T: any;
 }
 
+/**
+ * Kanban board — horizontal column layout on ALL viewport sizes.
+ *
+ * Old behavior: `grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5`
+ * On mobile (<640px) this fell back to `grid-cols-1` → all 5 stages stacked
+ * vertically as a long list. The user said "previously it was columns even on
+ * mobile" — the intent has always been a side-by-side kanban.
+ *
+ * New behavior: `flex overflow-x-auto` with each column `min-w-[260px]` on
+ * mobile (sm: `min-w-[280px]`, lg: `min-w-[260px]`). All 5 stages are
+ * side-by-side horizontally and the user swipes left/right to navigate
+ * between them. Each column scrolls vertically independently.
+ *
+ * This is the standard kanban UX (Trello, Linear, Notion) — narrow columns
+ * with horizontal swipe, not a vertical list of stages.
+ */
 export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForLead, T }: LeadBoardProps) {
   const columns = useMemo(() => {
     const map: Record<string, LeadRow[]> = { new: [], contacted: [], configured: [], contract_generated: [], completed: [] };
@@ -28,19 +44,61 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
   }, [leads]);
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 overflow-x-auto">
+    <div
+      className="pb-2"
+      style={{
+        display: "flex",
+        gap: "12px",
+        overflowX: "auto",
+        overflowY: "hidden",
+        scrollbarWidth: "thin",
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
       {BOARD_COLUMNS.map(({ key, label, color }) => {
         const colLeads = columns[key] || [];
         return (
-          <div key={key} className="flex max-h-[calc(100vh-280px)] flex-col rounded-2xl border" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
-            <div className="flex items-center justify-between border-b p-3" style={{ borderColor: T.border }}>
-              <div className="flex items-center gap-2">
-                <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-                <span className="text-xs font-bold" style={{ color: T.text }}>{label}</span>
+          <div
+            key={key}
+            className="rounded-2xl border"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flexShrink: 0,
+              width: "260px",
+              maxHeight: "calc(100vh - 280px)",
+              minHeight: "320px",
+              borderColor: T.border,
+              backgroundColor: T.bgElevated,
+            }}
+          >
+            {/* Column header — sticky at top of column */}
+            <div
+              className="flex shrink-0 items-center justify-between border-b p-3"
+              style={{ borderColor: T.border }}
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                <span className="truncate text-xs font-bold" style={{ color: T.text }}>{label}</span>
               </div>
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: T.borderSoft, color: T.text }}>{colLeads.length}</span>
+              <span
+                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                style={{ backgroundColor: T.borderSoft, color: T.text }}
+              >
+                {colLeads.length}
+              </span>
             </div>
+
+            {/* Column body — scrolls independently */}
             <div className="flex-1 space-y-2 overflow-y-auto p-2">
+              {colLeads.length === 0 && (
+                <div
+                  className="rounded-xl border border-dashed p-4 text-center text-[11px]"
+                  style={{ borderColor: T.borderSoft, color: T.textFaint }}
+                >
+                  Пусто
+                </div>
+              )}
               {colLeads.map((lead) => {
                 const pending = getTodosForLead(lead).filter((t) => t.status !== "done").length;
                 const meta = metaFor(lead.source);
@@ -49,18 +107,33 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
                     key={lead.user_id}
                     onClick={() => onSelect(selectedId === lead.user_id ? null : lead.user_id)}
                     className="cursor-pointer rounded-xl border p-2.5 transition hover:shadow-sm"
-                    style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: selectedId === lead.user_id ? `0 0 0 2px ${T.borderActive}33` : undefined }}
+                    style={{
+                      borderColor: T.border,
+                      backgroundColor: T.bgCard,
+                      boxShadow: selectedId === lead.user_id ? `0 0 0 2px ${T.borderActive}33` : undefined,
+                    }}
                   >
                     <div className="flex items-center gap-2">
                       <Avatar name={lead.full_name} source={lead.source} size={32} />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-bold" style={{ color: T.text }}>{lead.full_name || "Без имени"}</p>
-                        <p className="truncate text-[10px]" style={{ color: T.textMuted }}>{lead.phone || lead.username || relativeTime(lead.createdAt)}</p>
+                        <p className="truncate text-xs font-bold" style={{ color: T.text }}>
+                          {lead.full_name || "Без имени"}
+                        </p>
+                        <p className="truncate text-[10px]" style={{ color: T.textMuted }}>
+                          {lead.phone || lead.username || relativeTime(lead.createdAt)}
+                        </p>
                       </div>
-                      {pending > 0 && <span className="rounded-full bg-amber-500/15 px-1.5 text-[9px] font-bold text-amber-400">{pending}</span>}
+                      {pending > 0 && (
+                        <span className="shrink-0 rounded-full bg-amber-500/15 px-1.5 text-[9px] font-bold text-amber-400">
+                          {pending}
+                        </span>
+                      )}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1">
-                      <span className="rounded px-1.5 py-0.5 text-[9px] font-medium" style={{ backgroundColor: meta.bg, color: meta.color }}>
+                      <span
+                        className="rounded px-1.5 py-0.5 text-[9px] font-medium"
+                        style={{ backgroundColor: meta.bg, color: meta.color }}
+                      >
                         {meta.label}
                       </span>
                     </div>
