@@ -214,7 +214,12 @@ export function computeLeadStage(lead: LeadRow): StageKey {
     if (r.status === "confirmed" || r.status === "pending_confirmation") {
       const qrClaimed = lead.identityState === "claimed_user" || lead.identityState === "merged";
       const hasUnclaimed = !!lead.originalOperatorChatId && !qrClaimed;
-      const docsMissing = !(r as any).passportMainpagePhoto || !(r as any).passportRegistrationPhoto || !(r as any).driversLicenceFrontalPhoto;
+      // FIX: was only checking photo paths — but verification deletes photos (152-ФЗ).
+      // Now also checks metadata.checklist flags + active/completed status.
+      const meta = (r as any).metadata as Record<string, unknown> | null;
+      const checklist = (meta?.checklist as Record<string, unknown>) || {};
+      const docsVerified = !!checklist.passport_verified || !!checklist.license_verified;
+      const docsMissing = !docsVerified && (!(r as any).passportMainpagePhoto || !(r as any).passportRegistrationPhoto || !(r as any).driversLicenceFrontalPhoto);
       if (hasUnclaimed) return r.status === "confirmed" ? "awaiting_qr_claim" : "contract_sent";
       if (docsMissing && qrClaimed) return "documents_missing";
       return "awaiting_qr_claim";
