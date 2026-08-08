@@ -115,6 +115,8 @@ export function LeadsClient({
     let cancelled = false;
     (async () => {
       try {
+        // Static import is safe now — leads.ts has NO module-level server-only imports
+        // (cookies + telegram-actor-cookie are dynamically imported inside functions)
         const { getFranchizeLeads } = await import("@/app/franchize/server-actions/leads");
         const result = await getFranchizeLeads(
           slug,
