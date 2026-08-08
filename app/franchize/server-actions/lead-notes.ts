@@ -2,9 +2,9 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { z } from "zod";
-import { cookies } from "next/headers";
 import { logger } from "@/lib/logger";
-import { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } from "@/lib/telegram-actor-cookie";
+// NOTE: cookies + telegram-actor-cookie imported DYNAMICALLY inside functions
+// to avoid `import "server-only"` poisoning the client bundle.
 
 export type { LeadNote } from "@/app/franchize/[slug]/leads/leads-types";
 
@@ -16,6 +16,10 @@ async function verifyNoteAccess(
   actorUserId?: string,
   isPasswordAuth?: boolean,
 ): Promise<{ allowed: boolean; error?: string }> {
+  // Dynamic imports to avoid module-level server-only chain
+  const { cookies } = await import("next/headers");
+  const { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } = await import("@/lib/telegram-actor-cookie");
+
   // Path 1: Telegram WebApp — read signed cookie
   const cookieUserId = verifyTelegramActorCookieValue(
     (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
