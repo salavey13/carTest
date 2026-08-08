@@ -112,19 +112,18 @@ export function LeadsClient({
   useEffect(() => {
     if (!isAuthed || shouldShowPassword) return;
     if (leadsFetchedRef.current) return;
-    // Wait for dbUser to be fully resolved (not just "authed" flag)
-    // In Telegram WebApp, dbUser may be null briefly during initial load
-    const actorUserId = dbUser?.user_id || (passwordAuthed ? storedPassword : "") || "";
-    if (!actorUserId) return;
 
     let cancelled = false;
     (async () => {
       try {
         const { getFranchizeLeads } = await import("@/app/franchize/server-actions/leads");
+        // For Telegram WebApp: the server action reads the signed TELEGRAM_ACTOR_COOKIE
+        // to verify identity. Pass dbUser?.user_id as a fallback for password auth.
+        // The server tries cookie auth FIRST, then falls back to actorUserId + isPasswordAuth.
         const result = await getFranchizeLeads(
           slug,
-          actorUserId,
-          !!storedPassword,
+          dbUser?.user_id || "",
+          false, // isPasswordAuth=false — let the server try the cookie first
         );
         if (cancelled) return;
         if (result.success) {
