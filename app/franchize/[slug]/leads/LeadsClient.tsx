@@ -74,8 +74,10 @@ export function LeadsClient({
   const { dbUser } = useAppContext();
   const T = useTheme({ isAuto, isLightTheme, textColor, bgColor, accentColor });
 
-  // Writable leads state — dismiss removes optimistically, router.refresh() re-syncs
+  // Writable leads state — starts empty (page.tsx passes []), fetched client-side after auth
   const [leadsState, setLeadsState] = useState(leads);
+  const [todosState, setTodosState] = useState(todos);
+  const leadsFetchedRef = useRef(false);
 
   // Debounce search query
   useEffect(() => {
@@ -102,8 +104,39 @@ export function LeadsClient({
     handlePasswordSubmit,
   } = usePasswordGate(slug, isInTelegram, dbUser?.user_id);
 
+  // Auth check: user is authed via Telegram WebApp OR password
+  const isAuthed = !!(dbUser?.user_id || passwordAuthed);
+  const shouldShowPassword = !isInTelegram && !dbUser?.user_id && !passwordAuthed;
+
+  // Fetch leads client-side after auth passes (page.tsx passes empty arrays for security)
+  useEffect(() => {
+    if (!isAuthed || shouldShowPassword) return;
+    if (leadsFetchedRef.current) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { getFranchizeLeads } = await import("@/app/franchize/server-actions/leads");
+        const result = await getFranchizeLeads(
+          slug,
+          dbUser?.user_id || storedPassword || "",
+          !!storedPassword,
+        );
+        if (cancelled) return;
+        if (result.success) {
+          leadsFetchedRef.current = true;
+          setLeadsState((result.leads || []).filter(Boolean) as LeadRow[]);
+          setTodosState((result.todos || []).filter(Boolean) as LeadTodoRow[]);
+        } else {
+          console.error("[LeadsClient] getFranchizeLeads failed:", result.error);
+        }
+      } catch (e) {
+        if (!cancelled) console.error("[LeadsClient] getFranchizeLeads error:", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthed, shouldShowPassword, slug, dbUser?.user_id, storedPassword]);
+
   // Todo mapping — use writable state so TodoList callbacks sync the parent array
-  const [todosState, setTodosState] = useState(todos);
   const { getTodosForLead } = useTodosMapping(todosState);
 
   // Default filter flags — LeadsToolbar expects these props but root LeadsClient
