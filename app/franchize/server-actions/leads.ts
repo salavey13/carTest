@@ -4,10 +4,12 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { privateSchema } from "@/lib/private-secrets";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from "next/cache";
-import { cookies } from "next/headers";
-import { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } from "@/lib/telegram-actor-cookie";
 import { computeLeadStage, computeQrStatus, computeAssignee, STAGE_NEXT_ACTION, matchTodosToLead } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
+// NOTE: cookies + telegram-actor-cookie are imported DYNAMICALLY inside functions
+// (not at module top-level) to avoid `import "server-only"` poisoning the client
+// bundle. The "use server" directive creates RPC stubs for client imports, but
+// transitive `server-only` imports at module level still leak into the client chunk.
 
 // ── Auth helper ─────────────────────────────────────────────────────────────
 // Verifies that the caller has access to the given crew.
@@ -23,6 +25,10 @@ import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 async function verifyCrewAccess(
   crewId: string,
 ): Promise<{ allowed: boolean; actorUserId?: string; error?: string }> {
+  // Dynamic imports to avoid module-level server-only chain
+  const { cookies } = await import("next/headers");
+  const { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } = await import("@/lib/telegram-actor-cookie");
+
   // Path 1: Telegram WebApp — read signed cookie
   const cookieUserId = verifyTelegramActorCookieValue(
     (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
@@ -1119,9 +1125,9 @@ export async function getRentalDocVerification(
     }
 
     // ── Auth check (LA-002 FIX: no more isPasswordAuth boolean bypass) ──
-    // Path 1: Telegram WebApp — verify via signed cookie + crew membership
-    // Path 2: Password auth — verify actorUserId is crew owner (server-side)
-    // Also: rental owner or renter always has access (their own rental)
+    // Dynamic imports to avoid module-level server-only chain
+    const { cookies } = await import("next/headers");
+    const { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } = await import("@/lib/telegram-actor-cookie");
     const cookieUserId = verifyTelegramActorCookieValue(
       (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
     );
