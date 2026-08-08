@@ -16,7 +16,7 @@ import {
   EyeOff,
   type LucideIcon,
 } from "lucide-react";
-import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
+import type { LeadRow, LeadTodoRow } from "../leads-types";
 import type { ThemeTokens } from "../hooks/useTheme";
 import type {
   Mode,
