@@ -3,16 +3,7 @@ import { getFranchizeLeads } from "./leads";
 import { isHotLead } from "@/app/franchize/[slug]/leads/lib/sla-signals";
 import type { Mode } from "@/app/franchize/[slug]/leads/leads-constants";
 
-export interface LeadsKpis {
-  totalLeads: number;
-  hotLeads: number;
-  conversionRate: number;
-  monthlyRevenue: number;
-  totalLeadsDelta?: number;
-  hotLeadsDelta?: number;
-  conversionDelta?: number;
-  revenueDelta?: number;
-}
+export type { LeadsKpis } from "@/app/franchize/[slug]/leads/leads-types";
 
 export async function getLeadsKpis(
   slug: string,
