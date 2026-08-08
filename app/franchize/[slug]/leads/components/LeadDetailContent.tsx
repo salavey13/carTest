@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { LeadRow, LeadTodoRow } from "@/app/franchize/server-actions/leads";
+import type {LeadRow, LeadTodoRow} from "../leads-types";
 import type {
   LeadSignal,
   LeadHistoryEvent,
