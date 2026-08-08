@@ -68,7 +68,7 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
   const topSignal = signals[0];
   const slaColor = topSignal ? TONE_COLOR[topSignal.tone] : T.textFaint;
 
-  const rental = lead.rentals[0];
+  const rental = lead.rentals[0] ?? null; // safe — may be undefined for leads with no rentals
   const rentalCount = lead.rentals.length;
   const revenue = lead.totalSpent || (rental?.totalCost ?? 0);
   const returnDate = rental?.endDate ? formatDate(rental.endDate) : null;
