@@ -6,15 +6,7 @@ import { cookies } from "next/headers";
 import { logger } from "@/lib/logger";
 import { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } from "@/lib/telegram-actor-cookie";
 
-export interface LeadNote {
-  id: string;
-  lead_id: string;
-  crew_id: string;
-  text: string;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-}
+export type { LeadNote } from "@/app/franchize/[slug]/leads/leads-types";
 
 // ── Auth helper (LR3-002 FIX: was NO auth on any note CRUD) ──────────────────
 // Verifies caller has access to the given crew via signed cookie or password auth.
