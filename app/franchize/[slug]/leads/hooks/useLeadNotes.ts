@@ -1,7 +1,10 @@
+// /app/franchize/[slug]/leads/hooks/useLeadNotes.ts
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getLeadNotes, createLeadNote, deleteLeadNote, type LeadNote } from "@/app/franchize/server-actions/lead-notes";
+import type { LeadNote } from "@/app/franchize/server-actions/lead-notes";
+// FIX: server action value imports converted to dynamic imports to avoid
+// `import "server-only"` poisoning the client bundle.
 
 export interface UseLeadNotesReturn {
   notes: LeadNote[];
@@ -23,6 +26,7 @@ export function useLeadNotes(leadId: string, crewId: string): UseLeadNotesReturn
     let cancelled = false;
     (async () => {
       try {
+        const { getLeadNotes } = await import("@/app/franchize/server-actions/lead-notes");
         const result = await getLeadNotes(leadId, crewId);
         if (!cancelled && result.success && result.data) {
           setNotes(result.data);
@@ -40,6 +44,7 @@ export function useLeadNotes(leadId: string, crewId: string): UseLeadNotesReturn
     if (!draft.trim() || saving) return;
     setSaving(true);
     try {
+      const { createLeadNote } = await import("@/app/franchize/server-actions/lead-notes");
       const result = await createLeadNote({ leadId, crewId, text: draft.trim() });
       if (result.success && result.data) {
         setNotes([result.data, ...notes]);
@@ -55,6 +60,7 @@ export function useLeadNotes(leadId: string, crewId: string): UseLeadNotesReturn
   const deleteNote = useCallback(async (noteId: string) => {
     if (!confirm("Удалить заметку?")) return;
     try {
+      const { deleteLeadNote } = await import("@/app/franchize/server-actions/lead-notes");
       const result = await deleteLeadNote(noteId);
       if (result.success) {
         setNotes(notes.filter((n) => n.id !== noteId));
