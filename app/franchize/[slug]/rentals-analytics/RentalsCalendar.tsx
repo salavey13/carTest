@@ -511,7 +511,7 @@ export function RentalsCalendar({ slug, crewId, crewTheme, isPasswordAuth, passw
 
           {/* Modal */}
           <div
-            className="relative rounded-2xl p-6 max-w-md w-full"
+            className="relative rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto"
             style={{
               backgroundColor: theme.bgCard,
               borderColor: theme.borderSoft,
@@ -574,16 +574,28 @@ export function RentalsCalendar({ slug, crewId, crewTheme, isPasswordAuth, passw
               </div>
             </div>
 
-            <button
-              onClick={() => setSelectedRental(null)}
-              className="w-full mt-4 px-4 py-2 rounded-lg text-sm font-bold transition-all"
-              style={{
-                backgroundColor: withAlpha(theme.borderSoft, 0.2),
-                color: theme.textSecondary,
-              }}
-            >
-              Закрыть
-            </button>
+            <div className="flex gap-2 mt-4">
+              <a
+                href={`/franchize/${slug}/rental/${selectedRental.rental_id}`}
+                className="flex-1 text-center px-4 py-2 rounded-lg text-sm font-bold transition-all"
+                style={{
+                  backgroundColor: theme.accentMain,
+                  color: "#000",
+                }}
+              >
+                Открыть аренду
+              </a>
+              <button
+                onClick={() => setSelectedRental(null)}
+                className="px-4 py-2 rounded-lg text-sm font-bold transition-all"
+                style={{
+                  backgroundColor: withAlpha(theme.borderSoft, 0.2),
+                  color: theme.textSecondary,
+                }}
+              >
+                Закрыть
+              </button>
+            </div>
           </div>
         </div>
       )}
