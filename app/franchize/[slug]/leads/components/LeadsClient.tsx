@@ -42,7 +42,10 @@ import { useLeadActions } from "../hooks/useLeadActions";
 // would resolve to app/franchize/[slug]/server-actions/leads (WRONG — that dir
 // doesn't exist). Build was failing with "Module not found: Can't resolve
 // '../../server-actions/leads'".
-import { getFranchizeLeads } from "@/app/franchize/server-actions/leads";
+// FIX: was statically importing getFranchizeLeads — but leads.ts now imports
+// telegram-actor-cookie.ts which has `import "server-only"`. This causes
+// "Cannot access 'eW' before initialization" runtime error on the client.
+// Dynamic import keeps server-only code out of the client bundle.
 
 // Lib
 // All pipeline / SLA / dismiss / KPI / note logic now lives in the
@@ -357,6 +360,7 @@ export function LeadsClient({
     let cancelled = false;
     (async () => {
       try {
+        const { getFranchizeLeads } = await import("@/app/franchize/server-actions/leads");
         const result = await getFranchizeLeads(
           slug,
           dbUser?.user_id || passwordAuthOwnerId || "",
