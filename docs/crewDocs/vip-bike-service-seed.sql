@@ -243,3 +243,27 @@ on conflict (id) do update set
   type = excluded.type,
   specs = excluded.specs,
   crew_id = excluded.crew_id;
+
+insert into public.cars (id, make, model, description, daily_price, image_url, rent_link, type, specs, crew_id)
+values (
+  'vip-bike-svc-011',
+  'VIP_BIKE',
+  'Сборка байка',
+  'Сборка байка — комплектация и финальная сборка мотоцикла из компонентов. Учётная позиция сервисных работ.',
+  1250,
+  '',
+  'https://t.me/I_O_S_NN',
+  'service',
+  '{"service": true, "dailyPrice": 1250, "subtype": "service"}'::jsonb,
+  '2d5fde70-1dd3-4f0d-8d72-66ccf6908746'
+)
+on conflict (id) do update set
+  make = excluded.make,
+  model = excluded.model,
+  description = excluded.description,
+  daily_price = excluded.daily_price,
+  image_url = excluded.image_url,
+  rent_link = excluded.rent_link,
+  type = excluded.type,
+  specs = excluded.specs,
+  crew_id = excluded.crew_id;
