@@ -812,9 +812,7 @@ export async function getFranchizeLeads(
     const allUserIds = Array.from(leadMap.keys()).filter((id) => /^\d+$/.test(id));
     const leadPhones = Array.from(leadMap.values()).map((l) => l.phone).filter(Boolean) as string[];
 
-    // Dynamic import for privateSchema (avoids module-level server-only chain)
-    const { privateSchema } = await import("@/lib/private-secrets");
-
+    // privateSchema already dynamically imported at line 270 (same function scope)
     const [tgUsersResult, secretByPhoneResult, troubledUsersResult, todosResult] = await Promise.all([
       // 7. Enrich from public.users — drop the non-existent `phone` column; phone is in metadata.
       allUserIds.length > 0
