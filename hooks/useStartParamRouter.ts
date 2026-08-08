@@ -83,6 +83,32 @@ function parseRentDeepLink(param: string): { bikeId: string; docSha256: string |
 }
 
 /**
+ * Parse a testdrive_ deep-link parameter.
+ *
+ * Format:
+ *   testdrive_{bikeId}_{docSha256}  → QR deep-link from /testdrive command
+ *
+ * Returns null if the param doesn't start with "testdrive_".
+ * Mirrors parseRentDeepLink but for the testdrive flow (separate table +
+ * separate claim RPC).
+ */
+function parseTestdriveDeepLink(param: string): { bikeId: string; docSha256: string | null } | null {
+  if (!param.startsWith("testdrive_")) return null;
+
+  const afterPrefix = param.slice(10); // everything after "testdrive_"
+  if (!afterPrefix) return null;
+
+  // Split on "_" — bike IDs use hyphens, sha256 is hex; neither contains "_"
+  const parts = afterPrefix.split("_");
+  const bikeId = parts[0].trim().toLowerCase();
+  if (!bikeId) return null;
+
+  const docSha256 = parts.length > 1 && parts[1].trim() ? parts[1].trim() : null;
+
+  return { bikeId, docSha256 };
+}
+
+/**
  * Parse a lead_ deep-link parameter.
  *
  * Formats:
@@ -342,6 +368,60 @@ export function useStartParamRouter() {
     [],
   );
 
+  /**
+   * Claim testdrive secrets from a QR deep-link.
+   *
+   * When a renter scans their testdrive contract QR, the startParam contains
+   * testdrive_{bikeId}_{docSha256}. We atomically link chat_id to this
+   * testdrive artifact so the pre-filled data is available for future rentals.
+   *
+   * Returns crewSlug from the claimed artifact (for routing) or null on failure.
+   */
+  const claimQrTestdriveSecrets = useCallback(
+    async (docSha256: string): Promise<{ crewSlug: string | null; claimedNow: boolean }> => {
+      if (!dbUser?.user_id) {
+        logger.warn("[ClientLayout] Cannot claim testdrive secrets: no dbUser.user_id");
+        return { crewSlug: null, claimedNow: false };
+      }
+
+      try {
+        const { claimTestdriveSecretsAction } = await import(
+          "@/app/franchize/server-actions/testdrive-secrets-claim"
+        );
+        const result = await claimTestdriveSecretsAction(dbUser.user_id, docSha256);
+
+        if (result.ok) {
+          logger.info(`[ClientLayout] Successfully claimed testdrive secrets for doc ${docSha256.slice(0, 12)}...`);
+          showToast("✅ Ваши данные с тест-драйва привязаны! При следующей аренде форма заполнится автоматически.", { duration: 5000 });
+          return {
+            crewSlug: result.crewSlug ?? null,
+            claimedNow: true,
+          };
+        }
+
+        // Handle specific failure reasons
+        switch (result.status) {
+          case "already_claimed_by_other":
+            showToast("⚠️ Эта ссылка уже привязана к другому пользователю.", { duration: 5000 });
+            logger.warn(`[ClientLayout] Testdrive QR already claimed by other user: ${docSha256.slice(0, 12)}...`);
+            break;
+          case "not_found":
+            logger.info(`[ClientLayout] No testdrive artifact found for doc ${docSha256.slice(0, 12)}...`);
+            break;
+          default:
+            logger.warn(`[ClientLayout] Testdrive claim failed: ${result.status}`, { error: result.error });
+            break;
+        }
+
+        return { crewSlug: null, claimedNow: false };
+      } catch (error) {
+        logger.error("[ClientLayout] Error claiming testdrive secrets:", error);
+        return { crewSlug: null, claimedNow: false };
+      }
+    },
+    [dbUser, showToast],
+  );
+
   useEffect(() => {
     const processStartParam = async () => {
       const urlStartParam = searchParams.get("tgWebAppStartParam") || searchParams.get("startapp");
@@ -522,6 +602,25 @@ export function useStartParamRouter() {
             // Fallback: couldn't parse, try old behavior
             targetPath = await resolveFranchizeVehicleLink(paramToProcess, "rent") ?? undefined;
           }
+        } else if (paramToProcess.startsWith("testdrive_")) {
+          // ── Testdrive QR deep-link: testdrive_{bikeId}_{docSha256} ──
+          // Claims testdrive secrets (links renter's chat_id to the artifact +
+          // user_rental_secrets + franchize_intents) then routes to the bike
+          // page so the renter can start a real rental with pre-filled data.
+          const parsed = parseTestdriveDeepLink(paramToProcess);
+          if (parsed) {
+            // Step 1: If QR includes docSha256, claim testdrive secrets BEFORE routing
+            if (parsed.docSha256 && dbUser?.user_id) {
+              await claimQrTestdriveSecrets(parsed.docSha256);
+            }
+
+            // Step 2: Route to the bike page (renter can start a real rental)
+            // The bike page will check user_rental_secrets by chat_id and pre-fill
+            // the checkout form with the testdrive data.
+            const vehiclePath = await resolveFranchizeVehicleLink(`rent_${parsed.bikeId}`, "rent", parsed.docSha256);
+            targetPath = vehiclePath ?? undefined;
+            logger.info(`[ClientLayout] Routing testdrive QR to bike page: ${targetPath}`);
+          }
         } else if (START_PARAM_PAGE_MAP[paramToProcess]) {
           targetPath = START_PARAM_PAGE_MAP[paramToProcess];
         } else if (paramToProcess.startsWith("lead_") || paramToProcess.startsWith("leads_")) {
@@ -679,6 +778,7 @@ export function useStartParamRouter() {
     handleBio30Referral,
     handleSyndicateReferral,
     claimQrRentalSecrets,
+    claimQrTestdriveSecrets,
     resolveFranchizeVehicleLink,
   ]);
 }

@@ -27,6 +27,8 @@ import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessag
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
 import { privateSchema } from "@/lib/private-secrets";
+import { isCrewMember } from "@/app/lib/user-rental-secrets";
+import { createLeadFollowupTodos } from "@/app/franchize/server-actions/crew-todos";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrew } from "../lib/crew-access";
@@ -630,6 +632,40 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       logger.error("[/testdrive] sendTelegramDocument failed:", e);
     }
 
+    // ── Generate QR code with testdrive_ prefix ──────────────────────────────
+    // Deep link: testdrive_{bikeId}_{docSha256}
+    // The renter scans this QR → useStartParamRouter parses it → calls
+    // claimTestdriveSecretsAction → claim_testdrive_by_qr RPC links their
+    // chat_id to the artifact + user_rental_secrets + franchize_intents.
+    const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=testdrive_${bike.id}_${docSha256}`;
+    const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff`;
+
+    let qrPngBuffer: Buffer | null = null;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const qrRes = await fetch(qrPngUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (qrRes.ok) qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
+    } catch (qrErr) {
+      logger.warn("[/testdrive] QR failed:", qrErr);
+    }
+
+    // Send QR as separate photo (if available)
+    if (qrPngBuffer) {
+      try {
+        const formData = new FormData();
+        formData.append("chat_id", String(chatId));
+        formData.append("photo", new Blob([new Uint8Array(qrPngBuffer)], { type: "image/png" }), "qr.png");
+        formData.append("caption", `📲 QR для тест-драйва\nПокажите клиенту — он отсканирует и данные привяжутся к его аккаунту для быстрой аренды.\n${qrDeepLink}`);
+        formData.append("parse_mode", "HTML");
+        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN}/sendPhoto`, { method: "POST", body: formData });
+        logger.info("[/testdrive] QR photo sent");
+      } catch (qrSendErr) {
+        logger.warn("[/testdrive] QR photo send failed:", qrSendErr);
+      }
+    }
+
     // Build confirmation message showing what was collected
     const docList: string[] = [];
     if (context.needPassport && context.customerSeries) docList.push("🪪 паспорт");
@@ -644,7 +680,8 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       `👤 ${context.customerFullName}\n` +
       `📱 ${context.customerPhone || "—"}\n` +
       `📄 ${docStr}\n` +
-      `💰 ${price.toLocaleString("ru-RU")} ₽`,
+      `💰 ${price.toLocaleString("ru-RU")} ₽\n` +
+      (qrPngBuffer ? `📲 QR-код отправлен отдельно — покажите клиенту` : ``),
       [[{ text: "🚀 Открыть", url: process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app" }]],
       { removeKeyboard: true, parseMode: "Markdown" },
     );
@@ -660,12 +697,17 @@ async function generateContract(chatId: number, userId: string, context: TestDri
     );
 
     // ── Save to private tables (like /doc and /subrent do) ──
-    // 1. user_rental_secrets — for 1-click reuse
+    // 1. user_rental_secrets — for 1-click reuse + QR claim
+    // If the caller is a crew member (operator creating contract for a renter),
+    // leave chat_id NULL so the operator does not accidentally load the renter's
+    // personal data in their own profile/order. The renter claims it via QR.
     try {
+      const creatorIsCrewMember = await isCrewMember(String(userId), crewSlug);
+      const secretChatId = creatorIsCrewMember ? null : String(userId);
       const { error: secretsError } = await privateSchema()
         .from("user_rental_secrets")
         .insert({
-          chat_id: String(userId),
+          chat_id: secretChatId,
           crew_slug: crewSlug,
           doc_sha256: docSha256,
           renter_full_name: context.customerFullName || null,
@@ -684,18 +726,23 @@ async function generateContract(chatId: number, userId: string, context: TestDri
         });
       if (secretsError) {
         logger.error("[/testdrive] Failed to save user_rental_secrets:", secretsError);
+      } else {
+        logger.info(`[/testdrive] user_rental_secrets saved (chat_id=${secretChatId === null ? "NULL — renter can claim via QR" : "operator"})`);
       }
     } catch (secretsErr) {
       logger.warn("[/testdrive] user_rental_secrets save failed (non-fatal):", secretsErr);
     }
 
-    // 2. rental_contract_artifacts (private schema) — dedup by renter+bike (scoped to crew)
+    // 2. testdrive_contract_artifacts (private schema) — dedup by customer+bike (scoped to crew)
+    // Uses customer_* field naming (NOT renter_*) to match the template variables.
+    // The telegram_chat_id starts as the operator's chat_id and is updated to
+    // the renter's chat_id when they scan the QR (via claim_testdrive_by_qr RPC).
     try {
-      const { data: existingRental } = await privateSchema()
-        .from("rental_contract_artifacts")
+      const { data: existingArtifact } = await privateSchema()
+        .from("testdrive_contract_artifacts")
         .select("id, storage_path")
         .eq("crew_slug", crewSlug)
-        .eq("renter_full_name", context.customerFullName || "")
+        .eq("customer_full_name", context.customerFullName || "")
         .eq("requested_bike_id", bike.id)
         .maybeSingle();
 
@@ -707,14 +754,14 @@ async function generateContract(chatId: number, userId: string, context: TestDri
         ? `${context.licenseSeries} ${context.licenseNumber || ""}`.trim()
         : null;
 
-      if (existingRental) {
-        logger.info("[/testdrive] Duplicate artifact detected (same renter+bike), skipping. id:", existingRental.id);
-        if (!existingRental.storage_path && docStoragePath) {
-          await privateSchema().from("rental_contract_artifacts").update({ storage_path: docStoragePath }).eq("id", existingRental.id);
+      if (existingArtifact) {
+        logger.info("[/testdrive] Duplicate artifact detected (same customer+bike), skipping. id:", existingArtifact.id);
+        if (!existingArtifact.storage_path && docStoragePath) {
+          await privateSchema().from("testdrive_contract_artifacts").update({ storage_path: docStoragePath }).eq("id", existingArtifact.id);
         }
       } else {
-        const { error: rentError } = await privateSchema()
-          .from("rental_contract_artifacts")
+        const { error: artifactError } = await privateSchema()
+          .from("testdrive_contract_artifacts")
           .insert({
             contract_key: vars.document_key,
             crew_slug: crewSlug,
@@ -725,29 +772,40 @@ async function generateContract(chatId: number, userId: string, context: TestDri
             telegram_chat_id: String(userId),
             created_by_operator_chat_id: String(userId),
             telegram_message_id: null,
-            renter_full_name: context.customerFullName || null,
-            renter_passport: passportNumber,
-            renter_passport_issued_by: context.customerIssuedBy || null,
-            renter_passport_issue_date: context.customerIssueDate || null,
-            renter_registration: context.customerRegistration || null,
-            renter_driver_license: driverLicense,
-            renter_birth_date: context.customerBirthDate || null,
+            customer_full_name: context.customerFullName || null,
+            customer_passport: passportNumber,
+            customer_passport_issued_by: context.customerIssuedBy || null,
+            customer_passport_issue_date: context.customerIssueDate || null,
+            customer_registration: context.customerRegistration || null,
+            customer_driver_license: driverLicense,
+            customer_birth_date: context.customerBirthDate || null,
             license_categories: context.licenseCategory || null,
+            testdrive_date: now.toISOString(),
             total_sum: price,
             template_version: 1,
+            customer_phone: context.customerPhone || null,
           });
-        if (rentError) {
-          logger.error("[/testdrive] Failed to save rental_contract_artifacts:", rentError);
+        if (artifactError) {
+          logger.error("[/testdrive] Failed to save testdrive_contract_artifacts:", artifactError);
+        } else {
+          logger.info("[/testdrive] testdrive_contract_artifacts saved");
         }
       }
     } catch (dbErr) {
-      logger.warn("[/testdrive] rental_contract_artifacts save failed (non-fatal):", dbErr);
+      logger.warn("[/testdrive] testdrive_contract_artifacts save failed (non-fatal):", dbErr);
     }
 
     // 3. Lead pipeline: upsert to users + franchize_intents for the dashboard
+    // BUG FIX: always use operator's Telegram chat ID as leadUserId, NEVER the phone.
+    // Was: leadUserId = leadPhone || String(userId) → phone stored as user_id in
+    // franchize_intents.telegram_user_id, crew_todos.lead_id, and potentially users.user_id.
+    // Phone is NOT a Telegram chat ID — storing it as user_id pollutes the users table
+    // and breaks lead matching. Phone goes in the separate `phone` field.
+    // Also: store docSha256 in metadata so the claim_testdrive_by_qr RPC can find
+    // this lead and update telegram_user_id when the renter scans the QR.
     try {
       const leadPhone = context.customerPhone || "";
-      const leadUserId = leadPhone || String(userId);
+      const leadUserId = String(userId);
       const { upsertFranchizeLead } = await import("@/app/franchize/lib/leads");
       await upsertFranchizeLead({
         slug: crewSlug,
@@ -764,16 +822,55 @@ async function generateContract(chatId: number, userId: string, context: TestDri
         metadata: {
           dealType: "test_drive",
           operatorId: String(userId),
+          docSha256: docSha256,  // ← needed for claim_testdrive_by_qr RPC to find this lead
           hasPassport: !!(context.needPassport && context.customerSeries),
           hasLicense: !!(context.needLicense && context.licenseSeries),
         },
         ensureUser: true,
       });
+
+      // ── Create crew_todos for testdrive follow-up ──────────────────────────
+      // Mirrors the /doc pattern: after lead creation, create follow-up todos
+      // so the testdrive lead has actionable items on the /leads page.
+      const testdriveTodos: Array<{ title: string; priority: "low" | "medium" | "high" }> = [
+        { title: `🔍 Проверить ТС после тест-драйва: ${bike.make} ${bike.model}`, priority: "high" },
+        { title: `📝 Подтвердить возврат ТС после тест-драйва`, priority: "medium" },
+        { title: `📞 Связаться с клиентом для повторной аренды: ${context.customerFullName || "—"}`, priority: "low" },
+      ];
+
+      if (!bike.crew_id) {
+        logger.error("[/testdrive] Bike has no crew_id, cannot create follow-up todos", { bikeId: bike.id });
+      } else {
+        const crewId = bike.crew_id;
+        const leadId = String(userId);
+
+        const result = await createLeadFollowupTodos({
+          crewId,
+          leadId,
+          leadPhone: context.customerPhone || "",
+          leadName: context.customerFullName || "",
+          bikeId: bike.id,
+          todos: testdriveTodos,
+          assignedTo: String(userId),
+          metadata: {
+            deal_type: "test_drive",
+            doc_sha256: docSha256,
+          },
+        });
+
+        if (result.success) {
+          logger.info(`[/testdrive] Created ${result.created} crew_todos for testdrive follow-up (${result.skipped} skipped)`);
+        } else {
+          logger.warn("[/testdrive] Failed to create crew_todos:", result.error);
+        }
+      }
     } catch (leadErr) {
       logger.warn("[/testdrive] Failed to create lead:", leadErr);
     }
 
-    // Send email notification
+    // Send email notification — fire-and-forget (no await) to avoid Vercel timeout
+    // Matches the /doc command pattern: connectionTimeout 5s, greetingTimeout 5s,
+    // socketTimeout 8s. The promise resolves/rejects in the background.
     try {
       const smtpHost = process.env.SMTP_HOST || process.env.SMTP_YANDEX_HOST;
       const smtpPort = Number(process.env.SMTP_PORT || process.env.SMTP_YANDEX_PORT || 465);
@@ -789,9 +886,13 @@ async function generateContract(chatId: number, userId: string, context: TestDri
           port: smtpPort,
           secure: smtpPort === 465,
           auth: { user: smtpUser, pass: smtpPass },
+          connectionTimeout: 5000,
+          greetingTimeout: 5000,
+          socketTimeout: 8000,
         });
 
-        await transporter.sendMail({
+        // Fire-and-forget — don't block the command on email
+        transporter.sendMail({
           from: emailFrom,
           to: emailTo,
           subject: `Договор тест-драйва — ${bike.make} ${bike.model}`,
@@ -811,11 +912,14 @@ async function generateContract(chatId: number, userId: string, context: TestDri
             content: docxBuf,
             contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           }],
+        }).then(() => {
+          logger.info(`[/testdrive] Email with DOCX sent to ${emailTo}`);
+        }).catch((emailErr: unknown) => {
+          logger.warn("[/testdrive] Email send failed (non-fatal):", emailErr);
         });
-        logger.info(`[/testdrive] Email with DOCX sent to ${emailTo}`);
       }
     } catch (emailErr) {
-      logger.warn("[/testdrive] Email send failed (non-fatal):", emailErr);
+      logger.warn("[/testdrive] Email setup failed (non-fatal):", emailErr);
     }
 
     return true;
