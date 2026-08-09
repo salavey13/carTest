@@ -651,77 +651,21 @@ LIMIT 1;
 - No new `service_operations` table needed
 - Service work is logged via `service-work-text` skill: INSERT into `rentals` with `metadata.source='service_work'`, `metadata.service_name`, `metadata.performed_at`, `created_by_operator_chat_id`
 
-### 6.6 Deposit Tracking Enhancement
+### 6.6 Deposit & Payment Tracking Enhancement
 
-**Current state:** `deposit_log` table exists with `method` column that only has `cash` in production (14 rows). The `method` CHECK constraint allows `cash, bank_transfer, telegram_stars, none` but doesn't distinguish WHICH card.
+**See separate PRD:** `docs/DEPOSIT_TRACKING_PRD.md` for full details.
 
-**Enhancement:** Add card-specific deposit tracking:
+**Summary:** New `deposit_entries` table (FK to `rentals`) tracks WHERE money went:
+- `destination` column: `cash` | `tbank` (card 1, default) | `sber` (card 2) | `stars`
+- Replaces narrow `deposit_log` (which only had `method='cash'` in production)
+- Both deposit collection AND rental payment create entries
+- Tied into doc-manual deposit + payment_split steps
+- Admin debug page at `/franchize/[slug]/admin/deposits`
+- New skill: `deposit-tracer-text`
 
-```sql
--- Migration: 20260810000009_enhance_deposit_log_methods.sql
+**Note on method CHECK:** `card` and `sbp` are the same as `bank_transfer` — we don't need separate method values. The `destination` column (cash/tbank/sber/stars) is the important distinction. `deposit_log` stays as-is for backward compat; `deposit_entries` is the new unified table.
 
--- Add card_type column to distinguish which card was used
-ALTER TABLE public.deposit_log
-ADD COLUMN IF NOT EXISTS card_type TEXT CHECK (card_type IN (
-  'tbank',    -- Card 1 (default): Тинькофф/T-Bank
-  'sber'      -- Card 2 (default): Сбербанк
-));
-
--- Update method CHECK to include 'card' (generic) alongside existing values
--- card_type specifies WHICH card
-ALTER TABLE public.deposit_log
-DROP CONSTRAINT IF EXISTS deposit_log_method_check;
-ALTER TABLE public.deposit_log
-ADD CONSTRAINT deposit_log_method_check CHECK (method IN (
-  'cash',
-  'card',           -- Card payment (use card_type to specify which)
-  'bank_transfer',
-  'telegram_stars',
-  'sbp',            -- СБП (Fast Payment System)
-  'none'
-));
-
--- Backfill: existing 'cash' rows stay as-is (card_type = NULL)
--- Future deposits with method='card' must also set card_type
-```
-
-**UI:** When collecting a deposit (in `/doc` flow or admin), show:
-- 💵 Наличные (cash)
-- 💳 Карта Тинькофф (card + card_type='tbank')
-- 💳 Карта Сбербанк (card + card_type='sber')
-- 📱 СБП (sbp)
-- ⭐ Telegram Stars (telegram_stars)
-
-**New skill:** `deposit-tracer-text` — trace deposit states visually:
-
-```
-Trigger phrases: "где депозиты", "статус депозитов", "депозиты на картах",
-"cash or card", "deposit trace", "deposit states"
-
-Commands:
-1. deposit-list [--date YYYY-MM-DD] [--method cash|card|tbank|sber|sbp]
-   Lists all deposits for a date, filtered by method.
-   Shows: rental_id, amount, method, card_type, action (collected/returned), operator
-
-2. deposit-balance [--from YYYY-MM-DD] [--to YYYY-MM-DD]
-   Summary: total collected vs returned, broken down by method:
-   - Cash: collected X, returned Y, net = X-Y
-   - T-Bank card: collected X, returned Y, net = X-Y
-   - Sber card: collected X, returned Y, net = X-Y
-   - SBP: collected X, returned Y, net = X-Y
-
-3. deposit-rental <rentalId>
-   Shows deposit history for a specific rental:
-   - Collected: 20000₽ cash by operator 7813830016 on 2026-07-26 12:11
-   - Returned: 20000₽ cash on 2026-07-27 10:30 (auto-return on completion)
-```
-
-**Debug page:** `/franchize/[slug]/admin/deposits` — visual deposit tracker:
-- Date picker
-- Filter by method/card_type
-- Table: rental, amount, method, card, action, operator, time
-- Summary cards: cash total, T-Bank total, Sber total, SBP total
-- Color-coded: green=collected, blue=returned, red=overdue (not returned after rental completion)
+**Also:** Apply the never-applied `rental_handoffs` migration (`20260623000003_rental_handoffs.sql`) — the code (`rental-handoffs.ts` + `RentalHandoffModal.tsx`) already exists and expects this table. Without it, the handoff modal crashes.
 
 ---
 
@@ -733,7 +677,8 @@ Commands:
 4. **Equipment deposit** — separate deposit for equipment rentals?
 5. **Cross-schema FK** — should `cash_transactions.sale_contract_id` have an actual FK to `private.sale_contract_artifacts(id)`? (Postgres supports this but RLS may complicate)
 6. **Deposit card defaults** — confirm T-Bank (tbank) = card 1, Sber (sber) = card 2? Any other cards?
-7. **Deposit auto-return** — currently auto-returns on rental completion. Should this also auto-create a `cash_transactions` row for the return?
+7. **Deposit auto-return** — should auto-return copy the `destination` from the original collection? (Yes — if deposit was collected on T-Bank, return to T-Bank)
+8. **rental_handoffs migration** — should we apply `20260623000003_rental_handoffs.sql`? Code already expects it (`rental-handoffs.ts` + `RentalHandoffModal.tsx`). Recommendation: YES, apply it.
 
 ---
 
