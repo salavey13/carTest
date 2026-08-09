@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # catalog-add.sh — Add bikes/services/sale-items to VIP Bike catalog (public.cars)
-# Usage: see SKILL.md. Commands: add-bike | add-service | add-sale-item | list-catalog | get-reference
+# Usage: see SKILL.md. Commands: add-bike | add-service | add-sale-item | list-catalog | get-reference | find-reference
 set -euo pipefail
 
 # --- resolve env ---
@@ -27,7 +27,7 @@ round100() { # round to nearest 100
   echo $(( (n + 50) / 100 * 100 ))
 }
 
-calc_tiers() { # base price → JSON fragment with all 11 tiers + rent_price_label
+calc_tiers() { # base price → JSON fragment with all 11 tiers + dailyPrice
   local base=$1
   local h2h h3h h6h h12h wd wh we weh r24 r510 r1130
   h2h=$(round100 $((base * 60 / 100)))
@@ -61,22 +61,33 @@ calc_tiers() { # base price → JSON fragment with all 11 tiers + rent_price_lab
     }'
 }
 
-upload_images() { # bikeId, imageDir → populates gallery + sets image_url
+upload_images() { # bikeId, imageDir → returns gallery URLs (JSON array); also returns image_1 URL on fd 3
   local bikeId=$1 imgdir=$2
   [ -d "$imgdir" ] || die "image-dir not found: $imgdir"
   local tmp; tmp=$(mktemp -d)
   local i=0
   shopt -s nullglob nocaseglob
-  for f in "$imgdir"/*.jpg "$imgdir"/*.jpeg "$imgdir"/*.png; do
+  for f in "$imgdir"/*.jpg "$imgdir"/*.jpeg "$imgdir"/*.png "$imgdir"/*.webp; do
     i=$((i+1))
     cp "$f" "$tmp/image_${i}.jpg"
   done
   shopt -u nullglob nocaseglob
   [ "$i" -gt 0 ] || die "no images in $imgdir"
 
-  # image_1_4x3.jpg (Avito cover) — use ImageMagick if available
+  # image_1_4x3.jpg (Avito cover) — ImageMagick first, then Python/Pillow fallback, then skip
   if command -v convert >/dev/null 2>&1; then
     convert "$tmp/image_1.jpg" -resize 1200x900^ -gravity center -extent 1200x900 "$tmp/image_1_4x3.jpg" 2>/dev/null || true
+  elif command -v python3 >/dev/null 2>&1 && python3 -c "import PIL" 2>/dev/null; then
+    python3 - "$tmp/image_1.jpg" "$tmp/image_1_4x3.jpg" <<'PYEOF' 2>/dev/null || true
+import sys
+from PIL import Image
+src, dst = sys.argv[1], sys.argv[2]
+im = Image.open(src).convert("RGB")
+im = im.resize((1200, 900), Image.LANCZOS)  # naive squash; for proper crop use ImageOps.fit
+left = max(0, (im.width - 1200) // 2)
+top  = max(0, (im.height - 900) // 2)
+im.crop((left, top, left + 1200, top + 900)).save(dst, "JPEG", quality=88)
+PYEOF
   fi
 
   # upload each
@@ -105,12 +116,15 @@ upload_images() { # bikeId, imageDir → populates gallery + sets image_url
 
 slugify() { # make+model+year → kebab-case id
   local s="$1"
-  echo "$s" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]\+/-g; s/^-//; s/-$//'
+  echo "$s" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-g; s/^-//; s/-$//'
 }
 
 # --- commands ---
 cmd_add_bike() {
-  local id="" make="" model="" price="" sale=0 year="" color="" owner="$DEFAULT_OWNER" imgdir="" features=""
+  local id="" make="" model="" price="" sale=0 sale_only=0 sale_price=""
+  local year="" color="" owner="$DEFAULT_OWNER" imgdir="" features=""
+  local description="" source_url="" specs_file=""
+
   while [ $# -gt 0 ]; do
     case "$1" in
       --id) id="$2"; shift 2;;
@@ -118,18 +132,34 @@ cmd_add_bike() {
       --model) model="$2"; shift 2;;
       --price) price="$2"; shift 2;;
       --sale) sale=1; shift;;
+      --sale-only) sale_only=1; sale=1; shift;;
+      --sale-price) sale_price="$2"; sale=1; shift 2;;
       --year) year="$2"; shift 2;;
       --color) color="$2"; shift 2;;
       --owner) owner="$2"; shift 2;;
       --image-dir) imgdir="$2"; shift 2;;
       --features) features="$2"; shift 2;;
+      --description) description="$2"; shift 2;;
+      --source-url) source_url="$2"; shift 2;;
+      --specs-file) specs_file="$2"; shift 2;;
       *) die "unknown arg: $1";;
     esac
   done
 
-  [ -n "$make" ] && [ -n "$model" ] && [ -n "$price" ] || die "--make --model --price required"
+  [ -n "$make" ] && [ -n "$model" ] || die "--make --model required"
+  if [ "$sale_only" = 1 ]; then
+    # sale-only bikes have no rent tiers; daily_price = 0
+    price="${price:-0}"
+  else
+    [ -n "$price" ] || die "--price required (or use --sale-only for sale-only bike)"
+  fi
   [ -n "$id" ] || id=$(slugify "${make}-${model}${year:+-$year}")
   [[ "$price" =~ ^[0-9]+$ ]] || die "--price must be integer"
+
+  # if --sale-only without explicit --sale-price, error out (need sale price)
+  if [ "$sale_only" = 1 ] && [ -z "$sale_price" ]; then
+    die "--sale-only requires --sale-price <rub>"
+  fi
 
   # check duplicates
   local exists; exists=$(curl -s "$SUPABASE_URL/rest/v1/cars?select=id&id=eq.$id" "${HDR[@]}" | jq '. | length')
@@ -143,30 +173,48 @@ cmd_add_bike() {
     image_url=$(echo "$gallery" | jq -r '.[0] // empty')
   fi
 
-  # build specs
-  local tiers; tiers=$(calc_tiers "$price")
+  # build specs — start from defaults, then optionally merge --specs-file
   local features_json="[]"
   [ -n "$features" ] && features_json=$(echo "$features" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; ""))')
 
+  local effective_sale_price
+  if [ -n "$sale_price" ]; then effective_sale_price="$sale_price"; else effective_sale_price="$price"; fi
+
   local specs
   specs=$(jq -nc --arg make "$make" --arg model "$model" --arg year "$year" --arg color "$color" \
-    --argjson features "$features_json" --argjson gallery "$gallery" --argjson tiers "$tiers" \
-    --arg sale_price $([ $sale = 1 ] && echo "$price" || echo "0") \
+    --argjson features "$features_json" --argjson gallery "$gallery" \
+    --argjson sale_flag "$([ $sale = 1 ] && echo true || echo false)" \
+    --argjson rent_flag "$([ $sale_only = 1 ] && echo 0 || echo 1)" \
+    --arg source_url "$source_url" \
+    --argjson sale_price_num "${effective_sale_price:-0}" \
     '{
       make: $make, model: $model, year: $year, color: $color,
-      rent: true,
-      sale: (if $sale_price > 0 then true else false end),
-      sale_price: (if $sale_price > 0 then $sale_price else null end),
+      rent: $rent_flag,
+      sale: $sale_flag,
+      sale_price: (if $sale_price_num > 0 then $sale_price_num else null end),
       features: $features,
       gallery: $gallery,
       hidden: false
-    } * $tiers')
+    } + (if $source_url != "" then {source: $source_url} else {} end)')
+
+  # if --specs-file provided, deep-merge it on top (rich electrobike specs: spec_labels, buy_colors, etc.)
+  if [ -n "$specs_file" ]; then
+    [ -f "$specs_file" ] || die "--specs-file not found: $specs_file"
+    specs=$(jq -Ss '.[0] * .[1]' <(echo "$specs") "$specs_file")
+  fi
+
+  # add price tiers unless sale-only
+  if [ "$sale_only" != 1 ] && [ "$price" -gt 0 ]; then
+    local tiers; tiers=$(calc_tiers "$price")
+    specs=$(jq -Ss '.[0] * .[1]' <(echo "$specs") <(echo "$tiers"))
+  fi
 
   local row
   row=$(jq -nc --arg id "$id" --arg make "$make" --arg model "$model" --argjson price "$price" \
     --arg image_url "$image_url" --arg owner "$owner" --arg crew "$CREW_ID" \
-    --argjson specs "$specs" '{
+    --arg description "$description" --argjson specs "$specs" '{
       id: $id, make: $make, model: $model,
+      description: (if $description == "" then null else $description end),
       daily_price: $price,
       image_url: (if $image_url == "null" or $image_url == "" then null else $image_url end),
       specs: $specs,
@@ -190,9 +238,12 @@ cmd_add_bike() {
     exit 1
   fi
   echo "✅ bike added: $inserted_id"
-  echo "   make=$make model=$model price=${price}₽/day sale=$([ $sale = 1 ] && echo yes || echo no)"
+  echo "   make=$make model=$model"
+  echo "   rent=$([ $sale_only = 1 ] && echo NO || echo "yes ${price}₽/day")  sale=$([ $sale = 1 ] && echo "yes ${effective_sale_price}₽" || echo no)"
   echo "   images: $(echo "$gallery" | jq 'length')"
-  echo "   URL: $SUPABASE_URL/storage/v1/object/public/$STORAGE_BUCKET/$id/image_1.jpg"
+  if [ -n "$image_url" ] && [ "$image_url" != "null" ]; then
+    echo "   cover: $image_url"
+  fi
 }
 
 cmd_add_service() {
@@ -233,6 +284,7 @@ cmd_add_service() {
 
 cmd_add_sale_item() {
   local id="" make="" model="" price="" year="" color="" imgdir=""
+  local description="" source_url="" specs_file=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --id) id="$2"; shift 2;;
@@ -242,6 +294,9 @@ cmd_add_sale_item() {
       --year) year="$2"; shift 2;;
       --color) color="$2"; shift 2;;
       --image-dir) imgdir="$2"; shift 2;;
+      --description) description="$2"; shift 2;;
+      --source-url) source_url="$2"; shift 2;;
+      --specs-file) specs_file="$2"; shift 2;;
       *) die "unknown arg: $1";;
     esac
   done
@@ -256,15 +311,23 @@ cmd_add_sale_item() {
   fi
   local specs
   specs=$(jq -nc --arg make "$make" --arg model "$model" --arg year "$year" --arg color "$color" \
-    --argjson price "$price" --argjson gallery "$gallery" '{
+    --argjson price "$price" --argjson gallery "$gallery" --arg source_url "$source_url" '{
       make: $make, model: $model, year: $year, color: $color,
-      rent: false, sale: true, sale_price: $price,
+      rent: 0, sale: true, sale_price: $price, price_rub: $price,
       gallery: $gallery, hidden: false
-    }')
+    } + (if $source_url != "" then {source: $source_url} else {} end)')
+
+  if [ -n "$specs_file" ]; then
+    [ -f "$specs_file" ] || die "--specs-file not found: $specs_file"
+    specs=$(jq -Ss '.[0] * .[1]' <(echo "$specs") "$specs_file")
+  fi
+
   local row
   row=$(jq -nc --arg id "$id" --arg make "$make" --arg model "$model" --argjson price "$price" \
-    --arg image_url "$image_url" --arg crew "$CREW_ID" --argjson specs "$specs" '{
+    --arg image_url "$image_url" --arg crew "$CREW_ID" --arg description "$description" \
+    --argjson specs "$specs" '{
       id: $id, make: $make, model: $model,
+      description: (if $description == "" then null else $description end),
       daily_price: $price,
       image_url: (if $image_url == "null" or $image_url == "" then null else $image_url end),
       specs: $specs,
@@ -291,18 +354,36 @@ cmd_list_catalog() {
       *) die "unknown arg: $1";;
     esac
   done
-  local q="$SUPABASE_URL/rest/v1/cars?select=id,make,model,type,daily_price,quantity&crew_id=eq.$CREW_ID&is_test_result=eq.false&order=type.asc,make.asc"
+  local q="$SUPABASE_URL/rest/v1/cars?select=id,make,model,type,daily_price,quantity,specs&crew_id=eq.$CREW_ID&is_test_result=eq.false&order=type.asc,make.asc"
   if [ "$type_filter" != "all" ]; then
     q="$q&type=eq.$type_filter"
   fi
   echo "=== Catalog ($type_filter) — vip-bike ==="
-  curl -s "$q" "${HDR[@]}" | jq -r '.[] | "- [\(.type)] \(.id) | \(.make) \(.model) | \(.daily_price)₽ | qty=\(.quantity)"'
+  curl -s "$q" "${HDR[@]}" | jq -r '.[] | "- [\(.type)] \(.id) | \(.make) \(.model) | day=\(.daily_price)₽ | rent=\(.specs.rent // "n/a") sale=\(.specs.sale // false) | qty=\(.quantity)"'
 }
 
 cmd_get_reference() {
   local bikeId="${1:-}"
   [ -n "$bikeId" ] || die "usage: get-reference <bikeId>"
-  curl -s "$SUPABASE_URL/rest/v1/cars?select=id,make,model,daily_price,specs&type=eq.bike&crew_id=eq.$CREW_ID&id=eq.$bikeId" "${HDR[@]}" | jq '.[0]'
+  curl -s "$SUPABASE_URL/rest/v1/cars?select=id,make,model,daily_price,description,specs&type=eq.bike&crew_id=eq.$CREW_ID&id=eq.$bikeId" "${HDR[@]}" | jq '.[0]'
+}
+
+cmd_find_reference() {
+  # search by partial id, make, or model (case-insensitive)
+  local query=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --query|-q) query="$2"; shift 2;;
+      *) query="$1"; shift;;
+    esac
+  done
+  [ -n "$query" ] || die "usage: find-reference <partial-id-or-make-or-model>"
+  local pat; pat=$(echo "$query" | sed 's/[^a-zA-Z0-9_-]//g')
+  echo "=== searching bikes matching '$query' (type=bike, crew=vip-bike) ==="
+  curl -s "$SUPABASE_URL/rest/v1/cars?select=id,make,model,daily_price,specs&id=ilike.*${pat}*&type=eq.bike&crew_id=eq.$CREW_ID" "${HDR[@]}" | jq -r '.[] | "- \(.id) | \(.make) \(.model) | day=\(.daily_price)₽ | rent=\(.specs.rent) sale=\(.specs.sale // false)"'
+  echo ""
+  echo "=== also by make/model ilike ==="
+  curl -s "$SUPABASE_URL/rest/v1/cars?select=id,make,model,daily_price&make=ilike.*${pat}*&type=eq.bike&crew_id=eq.$CREW_ID" "${HDR[@]}" | jq -r '.[] | "- \(.id) | \(.make) \(.model)"'
 }
 
 # --- main ---
@@ -313,10 +394,11 @@ case "$cmd" in
   add-sale-item) cmd_add_sale_item "$@";;
   list-catalog) cmd_list_catalog "$@";;
   get-reference) cmd_get_reference "$@";;
+  find-reference) cmd_find_reference "$@";;
   help|--help|-h|"")
     sed -n '1,30p' "$0"
     echo ""
-    echo "Commands: add-bike | add-service | add-sale-item | list-catalog | get-reference"
+    echo "Commands: add-bike | add-service | add-sale-item | list-catalog | get-reference | find-reference"
     echo "See SKILL.md for full options."
     ;;
   *) die "unknown command: $cmd (try: help)";;
