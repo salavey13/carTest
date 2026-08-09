@@ -1,6 +1,6 @@
-# DEPOSIT & PAYMENT TRACKING ENHANCEMENT PRD
+# DEPOSIT TRACKING ENHANCEMENT PRD
 
-**Version:** 1.0
+**Version:** 2.0 (Simplified — deposits only, no payment types)
 **Date:** 2026-08-10
 **Status:** Ready for Implementation
 **Related:** `docs/FRANCHIZE_SERVICE_OPERATIONS_PRD.md` §6.6, `docs/DOC_MANUAL_STEP_CORRECTION_PRD.md`
@@ -11,18 +11,16 @@
 
 ### 1.1 Current State
 - `deposit_log` table exists with `method` column (only `cash` in production — 14 rows)
-- `doc-manual.ts` has a `payment_split` step: "Всё наличными" / "Всё безнал" / split
-- "Безнал" (bank transfer) does NOT specify WHICH card — T-Bank or Sber
-- No way to track where money actually went
-- `deposit_log.method` CHECK allows `cash, bank_transfer, telegram_stars, none` — but `bank_transfer` doesn't distinguish cards
+- `doc-manual.ts` collects deposit via `deposit_choice` step but doesn't track WHERE money went
+- No way to know if deposit was collected as cash, on T-Bank card, or on Sber card
+- No way to support split deposits (partially cash, partially card)
 
 ### 1.2 What's Needed
-- When operator collects deposit or rental payment, they choose:
-  - 💵 **Наличные** (cash)
-  - 💳 **Карта Тинькофф** (card1 / tbank — DEFAULT)
-  - 💳 **Карта Сбербанк** (card2 / sber)
-- Each money movement creates a `deposit_entry` row linked to the rental
-- Both deposit collection AND rental payment are tracked
+- Track deposit collection and return with `destination` (cash/tbank/sber)
+- Support split deposits: e.g., 5000₽ cash + 15000₽ on T-Bank
+- Show deposit info on rental card (analytics page)
+- Accessible via skill (`deposit-tracer-text`)
+- Admin debug page for visual tracking
 
 ---
 
@@ -30,7 +28,7 @@
 
 ### 2.1 New Table: `public.deposit_entries`
 
-Replaces the narrow `deposit_log` (which stays for backward compat). Each row = one money movement (deposit collected, deposit returned, rental payment, equipment payment).
+Each row = one deposit money movement. A single rental can have multiple entries (split deposit = 2 rows).
 
 ```sql
 -- Migration: 20260810000010_create_deposit_entries.sql
@@ -39,40 +37,32 @@ CREATE TABLE IF NOT EXISTS public.deposit_entries (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   rental_id       UUID NOT NULL REFERENCES public.rentals(rental_id) ON DELETE CASCADE,
 
-  -- What kind of money movement
+  -- What kind of deposit movement
   entry_type      TEXT NOT NULL CHECK (entry_type IN (
-    'deposit_collected',    -- Депозит получен
-    'deposit_returned',     -- Депозит возвращён
-    'rental_payment',       -- Оплата аренды
-    'equipment_payment',    -- Оплата оборудования
-    'sale_payment',         -- Оплата покупки
-    'service_payment',      -- Оплата сервиса
-    'penalty',              -- Штраф/удержание из депозита
-    'adjustment'            -- Ручная корректировка
+    'deposit_collected',    -- Депозит получен (at handout)
+    'deposit_returned',     -- Депозит возвращён (at return)
+    'penalty'               -- Удержание из депозита (damage, missing fuel, etc.)
   )),
 
   -- Amount and direction
   amount          NUMERIC NOT NULL CHECK (amount >= 0),
   direction       TEXT NOT NULL CHECK (direction IN ('in', 'out')),
-  -- 'in' = money came TO the business (deposit collected, rental paid)
-  -- 'out' = money left the business (deposit returned, refund)
+  -- 'in' = money came TO the business (deposit collected)
+  -- 'out' = money left the business (deposit returned, penalty withheld)
 
   -- WHERE the money went (THE KEY ENHANCEMENT)
   destination     TEXT NOT NULL CHECK (destination IN (
     'cash',     -- Наличные
     'tbank',    -- Карта Тинькофф (card 1, default)
-    'sber',     -- Карта Сбербанк (card 2)
-    'stars'     -- Telegram Stars
+    'sber'      -- Карта Сбербанк (card 2)
   )),
 
   -- Who and when
-  operator_chat_id TEXT NOT NULL, -- who collected/returned (FK to users.user_id conceptually)
-  rental_id_at_time TEXT, -- rental_id as string (for audit if rental is deleted)
+  operator_chat_id TEXT NOT NULL,
 
-  -- Notes
+  -- Notes (e.g., "Partial: 5000 cash + 15000 T-Bank" or "Withheld for scratched fairing")
   notes           TEXT,
 
-  -- Timestamps
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -83,23 +73,38 @@ CREATE INDEX idx_deposit_entries_type ON public.deposit_entries(entry_type);
 CREATE INDEX idx_deposit_entries_date ON public.deposit_entries(created_at);
 CREATE INDEX idx_deposit_entries_operator ON public.deposit_entries(operator_chat_id);
 
--- RLS
+-- RLS: crew members can read, crew owners can manage
 ALTER TABLE public.deposit_entries ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Crew members can read deposit entries"
   ON public.deposit_entries FOR SELECT
   TO authenticated USING (
     EXISTS (SELECT 1 FROM public.rentals r
-            JOIN public.crew_members cm ON cm.crew_id = r.crew_id
+            JOIN public.cars c ON c.id = r.vehicle_id
+            JOIN public.crews crew ON crew.id = c.crew_id
             WHERE r.rental_id = deposit_entries.rental_id
-              AND cm.user_id = auth.jwt() ->> 'chat_id')
+              AND (
+                crew.owner_id = auth.jwt() ->> 'chat_id'
+                OR EXISTS (SELECT 1 FROM public.crew_members cm
+                           WHERE cm.crew_id = crew.id
+                             AND cm.user_id = auth.jwt() ->> 'chat_id'
+                             AND cm.membership_status = 'active')
+              ))
   );
-CREATE POLICY "Crew owners can manage deposit entries"
+CREATE POLICY "Crew owners/managers can manage deposit entries"
   ON public.deposit_entries FOR ALL
   TO authenticated USING (
     EXISTS (SELECT 1 FROM public.rentals r
-            JOIN public.crews c ON c.id = r.crew_id
+            JOIN public.cars c ON c.id = r.vehicle_id
+            JOIN public.crews crew ON crew.id = c.crew_id
             WHERE r.rental_id = deposit_entries.rental_id
-              AND c.owner_id = auth.jwt() ->> 'chat_id')
+              AND (
+                crew.owner_id = auth.jwt() ->> 'chat_id'
+                OR EXISTS (SELECT 1 FROM public.crew_members cm
+                           WHERE cm.crew_id = crew.id
+                             AND cm.user_id = auth.jwt() ->> 'chat_id'
+                             AND cm.role IN ('admin', 'co_owner')
+                             AND cm.membership_status = 'active')
+              ))
   );
 
 -- View: daily deposit summary by destination
@@ -120,7 +125,6 @@ ORDER BY flow_date DESC, destination;
 ### 2.2 Backfill from `deposit_log`
 
 ```sql
--- Migrate existing deposit_log rows to deposit_entries
 INSERT INTO public.deposit_entries (rental_id, entry_type, amount, direction, destination, operator_chat_id, notes, created_at)
 SELECT
   dl.rental_id::UUID,
@@ -141,7 +145,7 @@ WHERE NOT EXISTS (
 
 ### 2.3 Keep `deposit_log` for backward compat
 
-Don't drop `deposit_log` — existing code writes to it. New code writes to BOTH tables during transition, then eventually only to `deposit_entries`.
+Don't drop `deposit_log` — existing code writes to it. New code writes to `deposit_entries` (and optionally also to `deposit_log` during transition).
 
 ---
 
@@ -149,208 +153,277 @@ Don't drop `deposit_log` — existing code writes to it. New code writes to BOTH
 
 ### 3.1 Deposit Collection Step Enhancement
 
-**Current** `buildDepositChoiceKeyboard` (line 341):
+**Current** `deposit_choice` state (line 341):
 ```
-[✅ Депозит 20 000 ₽]  [✏️ Своя сумма]  [🪪 СТС вместо депозита]  [❌ Отменить]
+[✅ Депозит 20 000 ₽]  [✏️ Своя сумма]  [🪪 СТС]  [❌ Отменить]
 ```
 
 **Enhanced** — after choosing deposit amount, ask WHERE it was collected:
-```
-Step 1: [✅ Депозит 20 000 ₽]  [✏️ Своя сумма]  [🪪 СТС]  [❌ Отменить]
-Step 2: Где получен депозит?
-        [💵 Наличные]  [💳 Тинькофф]  [💳 Сбербанк]  [⭐ Stars]
-```
 
 **New state:** `deposit_destination` (between `deposit_choice` and `equipment`)
 
-**New DocFlowContext fields:**
-```typescript
-depositDestination?: 'cash' | 'tbank' | 'sber' | 'stars';
+```
+Депозит: 20 000 ₽
+Где получен?
+
+[💵 Всё наличными]
+[💳 Всё на Тинькофф]
+[💳 Всё на Сбербанк]
+[🔀 Смешанный]
 ```
 
-**On confirm:** Insert into `deposit_entries`:
-```sql
-INSERT INTO public.deposit_entries (
-  rental_id, entry_type, amount, direction, destination, operator_chat_id, notes
-) VALUES (
-  $rentalId, 'deposit_collected', $depositAmount, 'in', $destination, $userId, 'Deposit collected via /doc'
-);
+**If "Смешанный" (split):**
 ```
+Смешанный депозит: 20 000 ₽
+Сколько наличными?
 
-### 3.2 Payment Split Step Enhancement
+(operator types: 5000)
 
-**Current** `buildPaymentSplitKeyboard` (line 405):
-```
-[💰 Итого: 15 000 ₽]
-[💵 Ввести сумму наличными]
-[✅ Всё наличными]
-[💳 Всё безнал]
-[❌ Отменить]
-```
+Остаток: 15 000 ₽
+Куда?
 
-**Enhanced** — "безнал" now asks which card:
-```
-Step 1: [💰 Итого: 15 000 ₽]
-        [💵 Ввести сумму наличными]
-        [✅ Всё наличными]
-        [💳 Всё на Тинькофф]
-        [💳 Всё на Сбербанк]
-        [🔀 Смешанная оплата]
-        [❌ Отменить]
-
-Step 2 (if mixed): "Сколько наличными?"
-Step 3 (if mixed): "Остаток (5 000₽) — куда?"
-                   [💳 Тинькофф]  [💳 Сбербанк]
+[💳 Тинькофф]  [💳 Сбербанк]
 ```
 
 **New DocFlowContext fields:**
 ```typescript
-paymentDestination?: 'cash' | 'tbank' | 'sber' | 'stars';
-// For mixed payments:
-cashAmount?: number;
-bankDestination?: 'tbank' | 'sber';
-bankAmount?: number;
+// Deposit destination(s) — supports split
+depositCashAmount?: number;      // cash portion (0 if all card)
+depositCardDestination?: 'tbank' | 'sber';  // which card for the card portion
+depositCardAmount?: number;      // card portion (0 if all cash)
 ```
 
-**On confirm:** Insert into `deposit_entries`:
+**On confirm:** Insert ONE OR TWO rows into `deposit_entries`:
 ```sql
--- Cash portion
-INSERT INTO public.deposit_entries (
-  rental_id, entry_type, amount, direction, destination, operator_chat_id, notes
-) VALUES (
-  $rentalId, 'rental_payment', $cashAmount, 'in', 'cash', $userId, 'Rental payment (cash)'
-);
+-- If all cash:
+INSERT INTO deposit_entries (rental_id, entry_type, amount, direction, destination, operator_chat_id, notes)
+VALUES ($rentalId, 'deposit_collected', 20000, 'in', 'cash', $userId, 'Deposit collected via /doc');
 
--- Bank portion (if any)
-IF $bankAmount > 0 THEN
-  INSERT INTO public.deposit_entries (
-    rental_id, entry_type, amount, direction, destination, operator_chat_id, notes
-  ) VALUES (
-    $rentalId, 'rental_payment', $bankAmount, 'in', $bankDestination, $userId, 'Rental payment (card)'
-  );
-END IF;
+-- If split (5000 cash + 15000 T-Bank):
+INSERT INTO deposit_entries (rental_id, entry_type, amount, direction, destination, operator_chat_id, notes)
+VALUES ($rentalId, 'deposit_collected', 5000, 'in', 'cash', $userId, 'Deposit (cash portion)');
+
+INSERT INTO deposit_entries (rental_id, entry_type, amount, direction, destination, operator_chat_id, notes)
+VALUES ($rentalId, 'deposit_collected', 15000, 'in', 'tbank', $userId, 'Deposit (T-Bank portion)');
 ```
 
-### 3.3 Deposit Return on Rental Completion
+### 3.2 Deposit Return on Rental Completion
 
-**Current:** `deposit_log` auto-creates a `returned` row when rental status → `completed`.
+Auto-create `deposit_returned` entries — copies destinations from the original collection:
 
-**Enhanced:** Auto-create `deposit_entries` row with the SAME destination as collection:
 ```sql
--- In the trigger that fires on rental completion:
-INSERT INTO public.deposit_entries (
-  rental_id, entry_type, amount, direction, destination, operator_chat_id, notes
-)
+-- Trigger on rentals.status → 'completed':
+-- For each deposit_collected entry, create a matching deposit_returned entry
+-- with the SAME destination and proportional amount
+INSERT INTO public.deposit_entries (rental_id, entry_type, amount, direction, destination, operator_chat_id, notes)
 SELECT
-  rental_id, 'deposit_returned', amount, 'out', destination, operator_chat_id, 'Auto-returned on rental completion'
-FROM public.deposit_entries
-WHERE rental_id = NEW.rental_id AND entry_type = 'deposit_collected'
-ORDER BY created_at DESC LIMIT 1;
--- Copies the destination from the original collection
+  NEW.rental_id, 'deposit_returned', de.amount, 'out', de.destination,
+  NEW.created_by_operator_chat_id || '', 'Auto-returned on rental completion'
+FROM public.deposit_entries de
+WHERE de.rental_id = NEW.rental_id AND de.entry_type = 'deposit_collected';
+```
+
+This returns each portion to its original destination — if 5000 was cash and 15000 was on T-Bank, the return creates two entries: 5000 cash out + 15000 T-Bank out.
+
+### 3.3 Penalty Withholding
+
+If the operator deducts from the deposit (damage, missing fuel, etc.):
+
+```
+Возврат депозита: 20 000 ₽
+Удержать за повреждения?
+
+[✅ Без удержаний]  [✏️ Указать сумму]
+
+(operator types: 3000)
+
+Удержание: 3 000 ₽
+Возврат: 17 000 ₽
+Куда вернуть остаток?
+
+[💵 Наличные]  [💳 Тинькофф]  [💳 Сбербанк]
+```
+
+Creates TWO entries:
+- `penalty` 3000₽ direction=out destination=cash/tbank/sber (withheld)
+- `deposit_returned` 17000₽ direction=out destination=cash/tbank/sber (returned)
+
+---
+
+## 4. RENTAL CARD INTEGRATION
+
+### 4.1 Show Deposit Info on Rental Card
+
+**File:** `app/franchize/[slug]/rentals-analytics/components/AnalyticsRentalCard.tsx` (or equivalent)
+
+Add deposit badge to each rental card:
+```tsx
+{/* Deposit status badge */}
+{depositSummary && (
+  <div className="flex items-center gap-2">
+    {depositSummary.totalCollected > 0 && (
+      <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+            style={{ backgroundColor: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
+        Депозит: {depositSummary.totalCollected.toLocaleString('ru-RU')}₽
+      </span>
+    )}
+    {depositSummary.destinations.map(d => (
+      <span key={d.destination} className="text-[10px]" style={{ color: textSecondary }}>
+        {d.destination === 'cash' ? '💵' : d.destination === 'tbank' ? '💳Т' : '💳С'}
+        {d.amount.toLocaleString('ru-RU')}₽
+      </span>
+    ))}
+    {depositSummary.totalReturned > 0 && (
+      <span className="text-xs" style={{ color: textSecondary }}>
+        → возвращено {depositSummary.totalReturned.toLocaleString('ru-RU')}₽
+      </span>
+    )}
+    {depositSummary.totalPenalty > 0 && (
+      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
+        Удержание: {depositSummary.totalPenalty.toLocaleString('ru-RU')}₽
+      </span>
+    )}
+  </div>
+)}
+```
+
+**Example display:**
+```
+Депозит: 20 000₽  💵5 000₽ 💳Т15 000₽  → возвращено 20 000₽
+```
+
+### 4.2 New Server Action: `getDepositSummary(rentalId)`
+
+```typescript
+export async function getDepositSummary(rentalId: string): Promise<{
+  totalCollected: number;
+  totalReturned: number;
+  totalPenalty: number;
+  balance: number; // collected - returned - penalty
+  destinations: Array<{ destination: string; amount: number; direction: string }>;
+  entries: Array<{ entryType: string; amount: number; destination: string; direction: string; notes: string; createdAt: string }>;
+}> {
+  const { data } = await supabaseAdmin
+    .from('deposit_entries')
+    .select('*')
+    .eq('rental_id', rentalId)
+    .order('created_at', { ascending: true });
+
+  // Aggregate by destination and type
+  // ...
+}
 ```
 
 ---
 
-## 4. ADMIN DEBUG PAGE
+## 5. ADMIN DEBUG PAGE
 
-### 4.1 `/franchize/[slug]/admin/deposits`
-
-Visual deposit tracker:
+### 5.1 `/franchize/[slug]/admin/deposits`
 
 **Filters:**
 - Date picker (default: today)
-- Destination filter: All / Cash / T-Bank / Sber / Stars
-- Entry type filter: All / Collected / Returned / Payments
+- Destination filter: All / 💵 Cash / 💳 T-Bank / 💳 Sber
+- Entry type filter: All / Collected / Returned / Penalty
 
-**Summary cards (top):**
+**Summary cards:**
 ```
-┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-│ 💵 Наличные   │ │ 💳 Тинькофф   │ │ 💳 Сбербанк   │ │ ⭐ Stars     │
-│              │ │              │ │              │ │              │
-│ +15 000₽    │ │ +40 000₽    │ │ +0₽         │ │ +0₽         │
-│ -5 000₽     │ │ -0₽         │ │ -0₽         │ │ -0₽         │
-│ ─────────   │ │ ─────────   │ │ ─────────   │ │ ─────────   │
-│ Итого: 10к  │ │ Итого: 40к  │ │ Итого: 0    │ │ Итого: 0    │
-└──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│ 💵 Наличные   │ │ 💳 Тинькофф   │ │ 💳 Сбербанк   │
+│              │ │              │ │              │
+│ +15 000₽    │ │ +40 000₽    │ │ +0₽         │
+│ -5 000₽     │ │ -0₽         │ │ -0₽         │
+│ ─────────   │ │ ─────────   │ │ ─────────   │
+│ Итого: 10к  │ │ Итого: 40к  │ │ Итого: 0    │
+└──────────────┘ └──────────────┘ └──────────────┘
 ```
 
 **Table:**
 | Time | Rental | Type | Amount | Destination | Operator |
 |------|--------|------|--------|-------------|----------|
-| 12:11 | kawasaki-ex650k | deposit_collected | +20 000₽ | 💵 Cash | DJORUDJOV |
-| 12:15 | kawasaki-ex650k | rental_payment | +9 000₽ | 💳 T-Bank | DJORUDJOV |
-| 14:30 | ducati-panigale | deposit_collected | +20 000₽ | 💳 Sber | Roman |
-| 16:00 | kawasaki-ex650k | deposit_returned | -20 000₽ | 💵 Cash | system |
+| 12:11 | kawasaki-ex650k | 💰 Collected | +5 000₽ | 💵 Cash | DJORUDJOV |
+| 12:11 | kawasaki-ex650k | 💰 Collected | +15 000₽ | 💳 T-Bank | DJORUDJOV |
+| 16:00 | kawasaki-ex650k | ↩️ Returned | -5 000₽ | 💵 Cash | system |
+| 16:00 | kawasaki-ex650k | ↩️ Returned | -15 000₽ | 💳 T-Bank | system |
 
 Color-coded: green = `in`, red = `out`.
 
 ---
 
-## 5. NEW SKILL: `deposit-tracer-text`
+## 6. SKILL: `deposit-tracer-text`
 
 ```
 Trigger phrases: "где депозиты", "статус депозитов", "депозиты на картах",
-"cash or card", "deposit trace", "депозиты сегодня", "куда пришли деньги"
+"cash or card", "deposit trace", "депозиты сегодня", "куда пришли деньги",
+"сколько на картах"
 
 Commands:
-1. deposit-list [--date YYYY-MM-DD] [--destination cash|tbank|sber|stars]
+1. deposit-list [--date YYYY-MM-DD] [--destination cash|tbank|sber]
    Lists all deposit_entries for a date, filtered by destination.
-   Shows: time, rental, type, amount, destination, operator
+   Shows: time, rental (bike title), type, amount, destination, operator
+   Example output:
+   12:11 kawasaki-ex650k 💰 Collected +5 000₽ 💵 Cash by DJORUDJOV
+   12:11 kawasaki-ex650k 💰 Collected +15 000₽ 💳 T-Bank by DJORUDJOV
+   14:30 ducati-panigale 💰 Collected +20 000₽ 💳 Sber by Roman
+   16:00 kawasaki-ex650k ↩️ Returned -20 000₽ (split: 5k cash + 15k T-Bank)
 
 2. deposit-balance [--from YYYY-MM-DD] [--to YYYY-MM-DD]
    Summary per destination:
-   - Cash: +X collected, -Y returned, net = X-Y
-   - T-Bank: +X collected, -Y returned, net = X-Y
-   - Sber: +X collected, -Y returned, net = X-Y
-   - Stars: +X collected, -Y returned, net = X-Y
+   💵 Cash:     +45 000 collected, -30 000 returned, -3 000 penalty, net: 12 000
+   💳 T-Bank:   +55 000 collected, -15 000 returned, net: 40 000
+   💳 Sber:     +20 000 collected, -0 returned, net: 20 000
+   ─────────
+   Total:       +120 000 collected, -45 000 returned, -3 000 penalty, net: 72 000
 
 3. deposit-rental <rentalId>
    Shows all deposit_entries for a specific rental:
-   - 12:11 deposit_collected +20 000₽ cash by DJORUDJOV
-   - 12:15 rental_payment +9 000₽ tbank by DJORUDJOV
-   - 16:00 deposit_returned -20 000₽ cash (auto-return)
+   12:11 deposit_collected +5 000₽ cash by DJORUDJOV (cash portion)
+   12:11 deposit_collected +15 000₽ tbank by DJORUDJOV (T-Bank portion)
+   16:00 deposit_returned -5 000₽ cash (auto-return)
+   16:00 deposit_returned -15 000₽ tbank (auto-return)
+   ─────────
+   Total collected: 20 000₽ (split: 5k cash + 15k T-Bank)
+   Total returned: 20 000₽
+   Penalty: 0₽
 
 4. deposit-card <tbank|sber> [--date YYYY-MM-DD]
    Shows all money that went to a specific card today:
-   - 12:15 rental_payment +9 000₽ (kawasaki-ex650k)
-   - 14:30 deposit_collected +20 000₽ (ducati-panigale)
-   Total on T-Bank today: 29 000₽
+   12:11 deposit_collected +15 000₽ (kawasaki-ex650k)
+   14:30 deposit_collected +40 000₽ (ducati-panigale)
+   ─────────
+   Total on T-Bank today: +55 000₽
+   Returned today: -15 000₽
+   Net on T-Bank: +40 000₽
 ```
 
 ---
 
-## 6. RELATIONSHIP TO `rental_handoffs`
+## 7. RELATIONSHIP TO `rental_handoffs`
 
-The `rental_handoffs` migration (`20260623000003_rental_handoffs.sql`) was NEVER APPLIED to production. It tracks:
-- Odometer start/end
-- Fuel/battery levels
-- Equipment checklist (helmets, jacket, keys, charger, etc.)
-- Damage notes
-- Handout/return phases
+The `rental_handoffs` migration (`20260623000003_rental_handoffs.sql`) tracks the **physical** handout/return checklist (odometer, equipment, damage notes). The `deposit_entries` table tracks the **financial** movements (where money went).
 
-**Recommendation:** APPLY this migration — the code (`rental-handoffs.ts` server action + `RentalHandoffModal.tsx` UI) already exists and expects this table. Without it, the handoff modal crashes silently.
+Both link to `rentals.rental_id` via FK. They are complementary:
+- `rental_handoffs` = "Did we check the passport? What was the odometer? Was there damage?"
+- `deposit_entries` = "How much deposit was collected? Was it cash or card? Which card? Was it returned?"
 
-The `deposit_entries` table is SEPARATE from `rental_handoffs`:
-- `rental_handoffs` = physical handout/return checklist (odometer, equipment, damage)
-- `deposit_entries` = financial movements (where money went)
-
-Both link to `rentals.rental_id` via FK.
+**Apply `rental_handoffs` migration first** (fixed version with `auth.jwt() ->> 'chat_id'` instead of `auth.uid()`).
 
 ---
 
-## 7. IMPLEMENTATION PLAN
+## 8. IMPLEMENTATION PLAN
 
-1. **Migration:** `20260810000010_create_deposit_entries.sql` (table + view + RLS + backfill from deposit_log)
-2. **Migration:** Apply `20260623000003_rental_handoffs.sql` (if not already applied — it wasn't!)
+1. **Fix + apply** `rental_handoffs` migration (auth.uid() → auth.jwt() ->> 'chat_id')
+2. **Migration:** `create_deposit_entries.sql` (table + view + RLS + backfill from deposit_log)
 3. **doc-manual.ts:** Add `deposit_destination` state after `deposit_choice`
-4. **doc-manual.ts:** Enhance `buildPaymentSplitKeyboard` with card-specific buttons
-5. **doc-manual.ts:** Insert into `deposit_entries` on deposit collection + rental payment
-6. **Trigger:** Auto-create `deposit_returned` entry on rental completion (copies destination from collection)
-7. **Admin page:** `/franchize/[slug]/admin/deposits` visual tracker
-8. **Skill:** `deposit-tracer-text` for text-based deposit queries
-9. **Evening digest:** Add deposit summary per card to `evening-summary.sh`
+4. **doc-manual.ts:** Support split deposits (cash + card)
+5. **doc-manual.ts:** Insert into `deposit_entries` on deposit collection
+6. **Trigger:** Auto-create `deposit_returned` entries on rental completion (copies destinations)
+7. **Rental card:** Show deposit badge with destination breakdown
+8. **Admin page:** `/franchize/[slug]/admin/deposits` visual tracker
+9. **Skill:** `deposit-tracer-text` for text-based deposit queries
+10. **Evening digest:** Add deposit summary per card to `evening-summary.sh`
 
 ---
 
 **Document History:**
-- v1.0 (2026-08-10): Initial draft — separates deposit tracking from the service operations PRD, creates `deposit_entries` table with `destination` column (cash/tbank/sber/stars), ties into doc-manual deposit + payment steps
+- v1.0 (2026-08-10): Initial draft — too many entry_types (rental_payment, sale_payment, etc.)
+- v2.0 (2026-08-10): Simplified — deposits ONLY (collected/returned/penalty). Removed Stars. Added split deposit support. Added rental card integration. Added skill access.

@@ -75,7 +75,9 @@ CREATE TABLE IF NOT EXISTS public.rental_handoffs (
 -- Enable RLS
 ALTER TABLE public.rental_handoffs ENABLE ROW LEVEL SECURITY;
 
--- Policy: Crew members can read/write handoffs for their crew's rentals
+-- Policy: Crew members can read handoffs for their crew's rentals
+-- Uses auth.jwt() ->> 'chat_id' (TEXT) to match users.user_id (TEXT)
+-- auth.uid() returns UUID which doesn't match TEXT user_id — causes "operator does not exist: text = uuid"
 CREATE POLICY "Crew can read handoffs for their rentals" ON public.rental_handoffs
   FOR SELECT
   USING (
@@ -84,9 +86,17 @@ CREATE POLICY "Crew can read handoffs for their rentals" ON public.rental_handof
       JOIN cars c ON c.id = r.vehicle_id
       JOIN crews crew ON crew.id = c.crew_id
       WHERE r.rental_id = rental_handoffs.rental_id
-        AND crew.owner_id = (SELECT user_id FROM users WHERE user_id = auth.uid() LIMIT 1)
+        AND (
+          crew.owner_id = auth.jwt() ->> 'chat_id'
+          OR EXISTS (
+            SELECT 1 FROM public.crew_members cm
+            WHERE cm.crew_id = crew.id
+              AND cm.user_id = auth.jwt() ->> 'chat_id'
+              AND cm.membership_status = 'active'
+          )
+        )
     )
-    OR (SELECT metadata->>'role' FROM users WHERE user_id = auth.uid() LIMIT 1) = 'admin'
+    OR (SELECT metadata->>'role' FROM users WHERE user_id = auth.jwt() ->> 'chat_id' LIMIT 1) = 'admin'
   );
 
 CREATE POLICY "Crew can insert handoffs for their rentals" ON public.rental_handoffs
@@ -97,9 +107,17 @@ CREATE POLICY "Crew can insert handoffs for their rentals" ON public.rental_hand
       JOIN cars c ON c.id = r.vehicle_id
       JOIN crews crew ON crew.id = c.crew_id
       WHERE r.rental_id = rental_handoffs.rental_id
-        AND crew.owner_id = (SELECT user_id FROM users WHERE user_id = auth.uid() LIMIT 1)
+        AND (
+          crew.owner_id = auth.jwt() ->> 'chat_id'
+          OR EXISTS (
+            SELECT 1 FROM public.crew_members cm
+            WHERE cm.crew_id = crew.id
+              AND cm.user_id = auth.jwt() ->> 'chat_id'
+              AND cm.membership_status = 'active'
+          )
+        )
     )
-    OR (SELECT metadata->>'role' FROM users WHERE user_id = auth.uid() LIMIT 1) = 'admin'
+    OR (SELECT metadata->>'role' FROM users WHERE user_id = auth.jwt() ->> 'chat_id' LIMIT 1) = 'admin'
   );
 
 CREATE POLICY "Crew can update handoffs for their rentals" ON public.rental_handoffs
@@ -110,9 +128,17 @@ CREATE POLICY "Crew can update handoffs for their rentals" ON public.rental_hand
       JOIN cars c ON c.id = r.vehicle_id
       JOIN crews crew ON crew.id = c.crew_id
       WHERE r.rental_id = rental_handoffs.rental_id
-        AND crew.owner_id = (SELECT user_id FROM users WHERE user_id = auth.uid() LIMIT 1)
+        AND (
+          crew.owner_id = auth.jwt() ->> 'chat_id'
+          OR EXISTS (
+            SELECT 1 FROM public.crew_members cm
+            WHERE cm.crew_id = crew.id
+              AND cm.user_id = auth.jwt() ->> 'chat_id'
+              AND cm.membership_status = 'active'
+          )
+        )
     )
-    OR (SELECT metadata->>'role' FROM users WHERE user_id = auth.uid() LIMIT 1) = 'admin'
+    OR (SELECT metadata->>'role' FROM users WHERE user_id = auth.jwt() ->> 'chat_id' LIMIT 1) = 'admin'
   );
 
 -- Indexes for performance
