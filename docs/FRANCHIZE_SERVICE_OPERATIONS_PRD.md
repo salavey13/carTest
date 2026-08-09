@@ -653,19 +653,19 @@ LIMIT 1;
 
 ### 6.6 Deposit & Payment Tracking Enhancement
 
-**See separate PRD:** `docs/DEPOSIT_TRACKING_PRD.md` for full details.
+**See separate PRD:** `docs/DEPOSIT_TRACKING_PRD.md` v2.0 for full details.
 
-**Summary:** New `deposit_entries` table (FK to `rentals`) tracks WHERE money went:
-- `destination` column: `cash` | `tbank` (card 1, default) | `sber` (card 2) | `stars`
-- Replaces narrow `deposit_log` (which only had `method='cash'` in production)
-- Both deposit collection AND rental payment create entries
-- Tied into doc-manual deposit + payment_split steps
+**Summary:** New `deposit_entries` table (FK to `rentals`) tracks WHERE deposit money went:
+- `destination` column: `cash` | `tbank` (card 1, default) | `sber` (card 2) — NO Stars
+- `entry_type`: `deposit_collected` | `deposit_returned` | `penalty` — deposits ONLY, not rental payments
+- Supports **split deposits**: 5000₽ cash + 15000₽ T-Bank = 2 rows
+- Auto-return copies destinations from original collection (split return = 2 rows)
+- Penalty withholding: deduct from deposit for damage, return the rest
+- Shown on **rental card** in analytics (badge with destination breakdown)
+- Accessible via **skill** (`deposit-tracer-text`)
 - Admin debug page at `/franchize/[slug]/admin/deposits`
-- New skill: `deposit-tracer-text`
 
-**Note on method CHECK:** `card` and `sbp` are the same as `bank_transfer` — we don't need separate method values. The `destination` column (cash/tbank/sber/stars) is the important distinction. `deposit_log` stays as-is for backward compat; `deposit_entries` is the new unified table.
-
-**Also:** Apply the never-applied `rental_handoffs` migration (`20260623000003_rental_handoffs.sql`) — the code (`rental-handoffs.ts` + `RentalHandoffModal.tsx`) already exists and expects this table. Without it, the handoff modal crashes.
+**Also:** Apply the fixed `rental_handoffs` migration (`20260623000003_rental_handoffs.sql`) — fixed `auth.uid()` → `auth.jwt() ->> 'chat_id'` (was causing "operator does not exist: text = uuid" error). Code (`rental-handoffs.ts` + `RentalHandoffModal.tsx`) already expects this table.
 
 ---
 
@@ -676,9 +676,9 @@ LIMIT 1;
 3. **Payout schedule** — confirm 10th and 25th of each month?
 4. **Equipment deposit** — separate deposit for equipment rentals?
 5. **Cross-schema FK** — should `cash_transactions.sale_contract_id` have an actual FK to `private.sale_contract_artifacts(id)`? (Postgres supports this but RLS may complicate)
-6. **Deposit card defaults** — confirm T-Bank (tbank) = card 1, Sber (sber) = card 2? Any other cards?
-7. **Deposit auto-return** — should auto-return copy the `destination` from the original collection? (Yes — if deposit was collected on T-Bank, return to T-Bank)
-8. **rental_handoffs migration** — should we apply `20260623000003_rental_handoffs.sql`? Code already expects it (`rental-handoffs.ts` + `RentalHandoffModal.tsx`). Recommendation: YES, apply it.
+6. **Deposit card defaults** — confirm T-Bank (tbank) = card 1, Sber (sber) = card 2? Any other cards? (Stars removed per user request — deposits are cash/card only)
+7. **Deposit auto-return** — auto-return copies `destination` from original collection. If split (cash + card), creates 2 return entries. ✅ Confirmed in PRD v2.0.
+8. **rental_handoffs migration** — ✅ FIXED (auth.uid() → auth.jwt() ->> 'chat_id'). Ready to apply.
 
 ---
 
