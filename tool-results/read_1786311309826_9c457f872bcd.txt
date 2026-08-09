@@ -1,0 +1,1267 @@
+     1→     1→# FRANCHIZE-WIDE SERVICE OPERATIONS & PAYROLL SYSTEM PRD
+     2→     2→
+     3→     3→**Version:** 2.1  
+     4→     4→**Date:** 2026-08-09  
+     5→     5→**Status:** Draft for Review  
+     6→     6→**Applies to:** All crews (vip-bike, nnvolt, etc.) via `[slug]` dynamic routing  
+     7→     7→**Related Files:** `app/franchize/[slug]/dashboard/`, `app/franchize/[slug]/analytics/`, `app/franchize/[slug]/sales-analytics/`
+     8→     8→
+     9→     9→---
+    10→    10→
+    11→    11→## 1. EXECUTIVE SUMMARY
+    12→    12→
+    13→    13→### 1.1 Problem Statement
+    14→    14→
+    15→    15→Сервисы экипажей (VIP BIKE, NNVolt, и др.) нуждаются в унифицированной системе учета:
+    16→    16→
+    17→    17→- **Доходы:** аренда байков, продажа услуг сервиса, аренда оборудования (шлемы)
+    18→    18→- **Расходы:** зарплата сотрудников (механики, менеджеры), переводы из кассы
+    19→    19→- **Зарплата:** расчет ЗП с бонусами от аренды/продаж/услуг сервиса с выплатами 10 и 25 числа
+    20→    20→- **Ежедневная отчетность:** для ассистента и владельца экипажа
+    21→    21→- **Оборудование:** учет выдачи шлемов и экипировки (требуется новая таблица `equipment_rentals`, т.к. `rental_handoffs` не существует)
+    22→    22→
+    23→    23→### 1.2 Current Architecture Analysis
+    24→    24→
+    25→    25→#### ✅ Existing Tables (from `supabase.txt` snapshot 2026-07-23):
+    26→    26→
+    27→    27→**Public Schema:**
+    28→    28→```sql
+    29→    29→-- Crews & Members
+    30→    30→public.crews                    -- id, slug, name, owner_id, theme
+    31→    31→public.crew_members             -- id, crew_id, user_id, role (owner|co_owner|admin|mechanic|member)
+    32→    32→public.users                    -- user_id, username, full_name, metadata->role
+    33→    33→
+    34→    34→-- Catalog & Rentals
+    35→    35→public.cars                     -- id, make, model, type ('bike'|'accessories'), specs->sale_price, specs->rent_weekday_hour
+    36→    36→public.rentals                  -- rental_id, crew_id, vehicle_id, user_id, status, total_cost, metadata->service_description
+    37→    37→
+    38→    38→-- Private Schema (PII & Contracts)
+    39→    39→private.user_rental_secrets     -- chat_id, crew_slug, passport data, STS pledge
+    40→    40→private.rental_contract_artifacts -- contract_key, rental_id, crew_slug, PDF storage_path
+    41→    41→private.sale_contract_artifacts   -- contract_key, buyer_*, sale_price, warranty_months, crew_slug
+    42→    42→```
+    43→    43→
+    44→    44→#### ❌ Identified Gaps:
+    45→    45→
+    46→    46→1. **NO `service_operations` table** — услуги сервиса (сборка, настройка, ремонт) хранятся только в `rentals.metadata->service_description` без структуризации
+    47→    47→2. **NO `equipment_rentals` table** — шлемы и оборудование не имеют отдельного финансового учета аренды
+    48→    48→3. **NO `cash_transactions` ledger** — доходы/расходы разрознены по таблицам, нет единого cash flow
+    49→    49→4. **NO `commission_rates` configuration** — ставки комиссий менеджерам не настраиваются гибко
+    50→    50→5. **NO `salary_plans` with payout schedule** — нет плана ЗП с привязкой к 10 и 25 числам
+    51→    51→6. **NO `rental_handoffs` table** — выдача/возврат оборудования (шлемов) не отслеживается явно в БД
+    52→    52→7. **NO `document_drafts` table** — состояние черновиков документов не сохраняется между сессиями
+    53→    53→
+    54→    54→#### ⚠️ Important Findings from Deep Investigation:
+    55→    55→
+    56→    56→- **`rental_handoffs` does NOT exist** in current schema (supabase.txt 2026-07-23) — выдача шлемов НЕ отслеживается на уровне БД
+    57→    57→  - **Solution:** Create `public.equipment_rentals` table as single source of truth for equipment tracking
+    58→    58→  - No need to create `rental_handoffs` — equipment rentals table is cleaner approach
+    59→    59→  
+    60→    60→- **`crew_member_shifts` FULLY EXISTS AND WORKS** ✅
+    61→    61→  - Table structure confirmed: id, member_id, crew_id, clock_in_time, clock_out_time, duration_minutes (generated), hourly_rate, salary_amount, checkpoint (jsonb), actions (jsonb)
+    62→    62→  - Trigger `trg_calc_shift_salary` auto-calculates salary on clock_out (BEFORE INSERT OR UPDATE OF clock_out_time)
+    63→    63→  - Migration file: `app/wb/sql/shift_checkpoint.sql` adds checkpoint/actions JSONB columns
+    64→    64→  - Bot command `/shift` implemented in `app/webhook-handlers/commands/shift.ts`
+    65→    65→  - API endpoint `/api/crew/shifts` for CRUD operations (POST start, DELETE end, GET active)
+    66→    66→  - **Integration:** Use existing `crew_member_shifts` table for base salary calculation in `salary_plans` via foreign key relationship
+    67→    67→  
+    68→    68→- **`document_drafts` does NOT exist** — doc-manual.ts state persistence needs new table (PRD #2 proposes this)
+    69→    69→
+    70→    70→- **"vip-bike" is a crew slug** — NEVER hardcoded; all paths use `[slug]` parameter ✅
+    71→    71→
+    72→    72→- **Existing sales-analytics** (`app/franchize/[slug]/sales-analytics/SalesAnalyticsClient.tsx`) shows `SaleDashboardItem` without delivery method field — needs update
+    73→    73→
+    74→    74→### 1.3 Franchise Architecture Alignment
+    75→    75→
+    76→    76→All new features MUST work for ANY crew via dynamic routing:
+    77→    77→
+    78→    78→```
+    79→    79→app/franchize/[slug]/
+    80→    80→├── dashboard/              -- Crew-specific dashboard (already exists)
+    81→    81→├── analytics/              -- Rental analytics (already exists)
+    82→    82→├── sales-analytics/        -- Sales analytics (already exists)
+    83→    83→├── service-operations/     -- NEW: Service operations tracking
+    84→    84→├── equipment/              -- NEW: Equipment rentals management
+    85→    85→├── finance/                -- NEW: Cash flow & transactions
+    86→    86→└── salary/                 -- NEW: Employee salary plans & calculations
+    87→    87→
+    88→    88→api/franchize/[slug]/
+    89→    89→├── service-operations/     -- POST/GET service operations
+    90→    90→├── equipment-rentals/      -- POST/GET equipment rentals
+    91→    91→├── cash-transactions/      -- POST/GET cash transactions
+    92→    92→└── salary/                 -- GET salary calculations, POST plans
+    93→    93→```
+    94→    94→
+    95→    95→---
+    96→    96→
+    97→    97→## 2. PROPOSED DATABASE SCHEMA
+    98→    98→
+    99→    99→### 2.1 Migration Strategy
+   100→   100→
+   101→   101→All new tables follow naming conventions from existing migrations:
+   102→   102→- Prefix: `YYYYMMDDHHMMSS_` timestamp
+   103→   103→- Suffix: descriptive name
+   104→   104→- Location: `supabase/migrations/` (to be created)
+   105→   105→- Update `supabase.txt` after migration
+   106→   106→
+   107→   107→### 2.2 Table: `public.service_operations`
+   108→   108→
+   109→   109→**Purpose:** Учет операций сервиса для любого экипажа
+   110→   110→
+   111→   111→```sql
+   112→   112→-- Migration: 20260809000001_create_service_operations.sql
+   113→   113→
+   114→   114→CREATE TABLE public.service_operations (
+   115→   115→  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+   116→   116→  crew_id UUID NOT NULL REFERENCES public.crews(id) ON DELETE CASCADE,
+   117→   117→  
+   118→   118→  -- Operation details
+   119→   119→  operation_type TEXT NOT NULL CHECK (operation_type IN (
+   120→   120→    'assembly',      -- Сборка (например Folkon GT)
+   121→   121→    'tuning',        -- Настройка (ослабление цепи, регулировка)
+   122→   122→    'repair',        -- Ремонт
+   123→   123→    'maintenance',   -- ТО
+   124→   124→    'installation',  -- Установка (колеса, суппорты)
+   125→   125→    'removal',       -- Снятие
+   126→   126→    'inspection'     -- Диагностика
+   127→   127→  )),
+   128→   128→  
+   129→   129→  -- Link to bike/equipment
+   130→   130→  vehicle_id TEXT REFERENCES public.cars(id),
+   131→   131→  equipment_ids TEXT[],  -- Array of equipment IDs (helmets, wheels)
+   132→   132→  
+   133→   133→  -- Link to rental (if service is part of rental)
+   134→   134→  rental_id UUID REFERENCES public.rentals(rental_id) ON DELETE SET NULL,
+   135→   135→  
+   136→   136→  -- Financials
+   137→   137→  customer_price NUMERIC NOT NULL CHECK (customer_price > 0),
+   138→   138→  technician_cost NUMERIC NOT NULL CHECK (technician_cost >= 0),
+   139→   139→  -- Constraint: customer_price should be >= technician_cost * 2 (enforced in app logic)
+   140→   140→  
+   141→   141→  -- Technician assignment
+   142→   142→  technician_id TEXT REFERENCES public.users(user_id),
+   143→   143→  technician_commission_pct NUMERIC DEFAULT 0.50,  -- 50% by default
+   144→   144→  
+   145→   145→  -- Description
+   146→   146→  description TEXT NOT NULL,
+   147→   147→  detailed_notes TEXT,
+   148→   148→  time_spent_minutes INTEGER,
+   149→   149→  
+   150→   150→  -- Status
+   151→   151→  status TEXT NOT NULL DEFAULT 'completed' CHECK (status IN (
+   152→   152→    'scheduled', 'in_progress', 'completed', 'cancelled', 'billed'
+   153→   153→  )),
+   154→   154→  
+   155→   155→  -- Dates
+   156→   156→  scheduled_at TIMESTAMPTZ,
+   157→   157→  started_at TIMESTAMPTZ,
+   158→   158→  completed_at TIMESTAMPTZ DEFAULT now(),
+   159→   159→  billed_at TIMESTAMPTZ,
+   160→   160→  
+   161→   161→  -- Payment
+   162→   162→  payment_method TEXT CHECK (payment_method IN ('cash', 'bank_transfer', 'included_in_rental', 'deferred')),
+   163→   163→  payment_status TEXT DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'paid', 'partial', 'waived')),
+   164→   164→  paid_at TIMESTAMPTZ,
+   165→   165→  
+   166→   166→  -- Audit
+   167→   167→  created_by TEXT NOT NULL,
+   168→   168→  created_at TIMESTAMPTZ DEFAULT now(),
+   169→   169→  updated_at TIMESTAMPTZ DEFAULT now()
+   170→   170→);
+   171→   171→
+   172→   172→-- Indexes
+   173→   173→CREATE INDEX idx_service_operations_crew ON public.service_operations(crew_id);
+   174→   174→CREATE INDEX idx_service_operations_vehicle ON public.service_operations(vehicle_id);
+   175→   175→CREATE INDEX idx_service_operations_rental ON public.service_operations(rental_id);
+   176→   176→CREATE INDEX idx_service_operations_technician ON public.service_operations(technician_id);
+   177→   177→CREATE INDEX idx_service_operations_completed_at ON public.service_operations(completed_at DESC);
+   178→   178→
+   179→   179→-- RLS Policies
+   180→   180→ALTER TABLE public.service_operations ENABLE ROW LEVEL SECURITY;
+   181→   181→
+   182→   182→-- Crew members can read their crew's operations
+   183→   183→CREATE POLICY "Crew members can read service operations" 
+   184→   184→  ON public.service_operations FOR SELECT
+   185→   185→  USING (
+   186→   186→    crew_id IN (
+   187→   187→      SELECT crew_id FROM public.crew_members
+   188→   188→      WHERE user_id = auth.uid()
+   189→   189→    )
+   190→   190→    OR EXISTS (
+   191→   191→      SELECT 1 FROM public.users
+   192→   192→      WHERE users.user_id = auth.uid()
+   193→   193→      AND (users.metadata->>'role')::text = 'admin'
+   194→   194→    )
+   195→   195→  );
+   196→   196→
+   197→   197→-- Crew owners and admins can manage
+   198→   198→CREATE POLICY "Crew owners can manage service operations"
+   199→   199→  ON public.service_operations FOR ALL
+   200→   200→  USING (
+   201→   201→    EXISTS (
+   202→   202→      SELECT 1 FROM public.crews
+   203→   203→      WHERE crews.id = service_operations.crew_id
+   204→   204→      AND crews.owner_id = auth.uid()
+   205→   205→    )
+   206→   206→    OR EXISTS (
+   207→   207→      SELECT 1 FROM public.users
+   208→   208→      WHERE users.user_id = auth.uid()
+   209→   209→      AND (users.metadata->>'role')::text = 'admin'
+   210→   210→    )
+   211→   211→  );
+   212→   212→
+   213→   213→COMMENT ON TABLE public.service_operations IS 'Service operations tracking for all crews. Customer price typically = 2x technician cost.';
+   214→   214→```
+   215→   215→
+   216→   216→### 2.3 Table: `public.equipment_rentals`
+   217→   217→
+   218→   218→**Purpose:** Аренда оборудования (шлемы, экипировка) отдельно от аренды байка
+   219→   219→
+   220→   220→```sql
+   221→   221→-- Migration: 20260809000002_create_equipment_rentals.sql
+   222→   222→
+   223→   223→CREATE TABLE public.equipment_rentals (
+   224→   224→  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+   225→   225→  crew_id UUID NOT NULL REFERENCES public.crews(id) ON DELETE CASCADE,
+   226→   226→  
+   227→   227→  -- Equipment being rented
+   228→   228→  equipment_id TEXT NOT NULL REFERENCES public.cars(id),
+   229→   229→  
+   230→   230→  -- Renter info
+   231→   231→  renter_user_id TEXT REFERENCES public.users(user_id),
+   232→   232→  renter_name TEXT NOT NULL,
+   233→   233→  renter_phone TEXT,
+   234→   234→  renter_email TEXT,
+   235→   235→  
+   236→   236→  -- Link to primary rental (optional)
+   237→   237→  primary_rental_id UUID REFERENCES public.rentals(rental_id) ON DELETE SET NULL,
+   238→   238→  
+   239→   239→  -- Financials
+   240→   240→  rental_price NUMERIC NOT NULL CHECK (rental_price >= 0),
+   241→   241→  deposit_amount NUMERIC DEFAULT 0,
+   242→   242→  
+   243→   243→  -- Rental period
+   244→   244→  rented_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+   245→   245→  expected_return_at TIMESTAMPTZ,
+   246→   246→  actually_returned_at TIMESTAMPTZ,
+   247→   247→  
+   248→   248→  -- Condition tracking
+   249→   249→  condition_at_rent TEXT DEFAULT 'good' CHECK (condition_at_rent IN ('excellent', 'good', 'fair', 'damaged')),
+   250→   250→  condition_at_return TEXT,
+   251→   251→  damage_notes TEXT,
+   252→   252→  
+   253→   253→  -- Issued/received by crew members
+   254→   254→  issued_by TEXT REFERENCES public.users(user_id),
+   255→   255→  received_by TEXT REFERENCES public.users(user_id),
+   256→   256→  
+   257→   257→  -- Status
+   258→   258→  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN (
+   259→   259→    'active', 'returned', 'lost', 'damaged', 'overdue'
+   260→   260→  )),
+   261→   261→  
+   262→   262→  -- Payment
+   263→   263→  payment_method TEXT,
+   264→   264→  payment_status TEXT DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'paid', 'partial', 'waived')),
+   265→   265→  paid_at TIMESTAMPTZ,
+   266→   266→  
+   267→   267→  -- Notes
+   268→   268→  notes TEXT,
+   269→   269→  
+   270→   270→  -- Audit
+   271→   271→  created_at TIMESTAMPTZ DEFAULT now(),
+   272→   272→  updated_at TIMESTAMPTZ DEFAULT now()
+   273→   273→);
+   274→   274→
+   275→   275→-- Indexes
+   276→   276→CREATE INDEX idx_equipment_rentals_crew ON public.equipment_rentals(crew_id);
+   277→   277→CREATE INDEX idx_equipment_rentals_equipment ON public.equipment_rentals(equipment_id);
+   278→   278→CREATE INDEX idx_equipment_rentals_renter ON public.equipment_rentals(renter_user_id);
+   279→   279→CREATE INDEX idx_equipment_rentals_status ON public.equipment_rentals(status);
+   280→   280→CREATE INDEX idx_equipment_rentals_rented_at ON public.equipment_rentals(rented_at DESC);
+   281→   281→
+   282→   282→-- RLS
+   283→   283→ALTER TABLE public.equipment_rentals ENABLE ROW LEVEL SECURITY;
+   284→   284→
+   285→   285→CREATE POLICY "Crew members can read equipment rentals"
+   286→   286→  ON public.equipment_rentals FOR SELECT
+   287→   287→  USING (
+   288→   288→    crew_id IN (
+   289→   289→      SELECT crew_id FROM public.crew_members
+   290→   290→      WHERE user_id = auth.uid()
+   291→   291→    )
+   292→   292→    OR EXISTS (
+   293→   293→      SELECT 1 FROM public.users
+   294→   294→      WHERE users.user_id = auth.uid()
+   295→   295→      AND (users.metadata->>'role')::text = 'admin'
+   296→   296→    )
+   297→   297→  );
+   298→   298→
+   299→   299→COMMENT ON TABLE public.equipment_rentals IS 'Equipment rentals (helmets, gear) tracking for all crews';
+   300→   300→```
+   301→   301→
+   302→   302→### 2.4 Table: `public.cash_transactions`
+   303→   303→
+   304→   304→**Purpose:** Единый реестр всех денежных движений для экипажа
+   305→   305→
+   306→   306→```sql
+   307→   307→-- Migration: 20260809000003_create_cash_transactions.sql
+   308→   308→
+   309→   309→CREATE TABLE public.cash_transactions (
+   310→   310→  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+   311→   311→  crew_id UUID NOT NULL REFERENCES public.crews(id) ON DELETE CASCADE,
+   312→   312→  
+   313→   313→  -- Transaction type
+   314→   314→  transaction_type TEXT NOT NULL CHECK (transaction_type IN (
+   315→   315→    'income_rental',       -- Доход от аренды
+   316→   316→    'income_sale',         -- Доход от продажи
+   317→   317→    'income_service',      -- Доход от услуг сервиса
+   318→   318→    'income_equipment',    -- Доход от аренды оборудования
+   319→   319→    'expense_salary',      -- Расход на зарплату
+   320→   320→    'expense_commission',  -- Комиссия менеджеру
+   321→   321→    'expense_tech_work',   -- Оплата техники
+   322→   322→    'expense_cashout',     -- Расход из кассы (перевод)
+   323→   323→    'expense_other',       -- Другие расходы
+   324→   324→    'transfer_in',         -- Входящий перевод
+   325→   325→    'transfer_out'         -- Исходящий перевод
+   326→   326→  )),
+   327→   327→  
+   328→   328→  -- Amount
+   329→   329→  amount NUMERIC NOT NULL,
+   330→   330→  currency TEXT DEFAULT 'RUB',
+   331→   331→  
+   332→   332→  -- Payment method
+   333→   333→  payment_method TEXT NOT NULL CHECK (payment_method IN (
+   334→   334→    'cash', 'bank_transfer', 'telegram_stars', 'sbp'
+   335→   335→  )),
+   336→   336→  
+   337→   337→  -- Flow direction
+   338→   338→  flow_direction TEXT NOT NULL CHECK (flow_direction IN ('in', 'out')),
+   339→   339→  
+   340→   340→  -- Links to entities
+   341→   341→  rental_id UUID REFERENCES public.rentals(rental_id) ON DELETE SET NULL,
+   342→   342→  sale_contract_id UUID,  -- References private.sale_contract_artifacts(id)
+   343→   343→  service_operation_id UUID REFERENCES public.service_operations(id) ON DELETE SET NULL,
+   344→   344→  equipment_rental_id UUID REFERENCES public.equipment_rentals(id) ON DELETE SET NULL,
+   345→   345→  
+   346→   346→  -- Counterparties
+   347→   347→  from_user_id TEXT REFERENCES public.users(user_id),
+   348→   348→  to_user_id TEXT REFERENCES public.users(user_id),
+   349→   349→  recipient_name TEXT,  -- For external recipients
+   350→   350→  recipient_bank TEXT,
+   351→   351→  
+   352→   352→  -- Categorization
+   353→   353→  category TEXT,
+   354→   354→  subcategory TEXT,
+   355→   355→  tags TEXT[],
+   356→   356→  
+   357→   357→  -- Status
+   358→   358→  status TEXT DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'cancelled', 'reversed')),
+   359→   359→  
+   360→   360→  -- Dates
+   361→   361→  transaction_date TIMESTAMPTZ NOT NULL DEFAULT now(),
+   362→   362→  value_date TIMESTAMPTZ,
+   363→   363→  
+   364→   364→  -- Documents
+   365→   365→  document_url TEXT,
+   366→   366→  receipt_number TEXT,
+   367→   367→  
+   368→   368→  -- Description
+   369→   369→  description TEXT NOT NULL,
+   370→   370→  notes TEXT,
+   371→   371→  
+   372→   372→  -- Balance snapshots (optional)
+   373→   373→  cash_balance_before NUMERIC,
+   374→   374→  cash_balance_after NUMERIC,
+   375→   375→  bank_balance_before NUMERIC,
+   376→   376→  bank_balance_after NUMERIC,
+   377→   377→  
+   378→   378→  -- Audit
+   379→   379→  created_by TEXT NOT NULL,
+   380→   380→  created_at TIMESTAMPTZ DEFAULT now(),
+   381→   381→  updated_at TIMESTAMPTZ DEFAULT now()
+   382→   382→);
+   383→   383→
+   384→   384→-- Indexes
+   385→   385→CREATE INDEX idx_cash_transactions_crew ON public.cash_transactions(crew_id);
+   386→   386→CREATE INDEX idx_cash_transactions_type ON public.cash_transactions(transaction_type);
+   387→   387→CREATE INDEX idx_cash_transactions_date ON public.cash_transactions(transaction_date DESC);
+   388→   388→CREATE INDEX idx_cash_transactions_rental ON public.cash_transactions(rental_id);
+   389→   389→CREATE INDEX idx_cash_transactions_flow ON public.cash_transactions(flow_direction);
+   390→   390→CREATE INDEX idx_cash_transactions_category ON public.cash_transactions(category);
+   391→   391→
+   392→   392→-- RLS
+   393→   393→ALTER TABLE public.cash_transactions ENABLE ROW LEVEL SECURITY;
+   394→   394→
+   395→   395→CREATE POLICY "Crew members can read transactions"
+   396→   396→  ON public.cash_transactions FOR SELECT
+   397→   397→  USING (
+   398→   398→    crew_id IN (
+   399→   399→      SELECT crew_id FROM public.crew_members
+   400→   400→      WHERE user_id = auth.uid()
+   401→   401→    )
+   402→   402→    OR EXISTS (
+   403→   403→      SELECT 1 FROM public.users
+   404→   404→      WHERE users.user_id = auth.uid()
+   405→   405→      AND (users.metadata->>'role')::text = 'admin'
+   406→   406→    )
+   407→   407→  );
+   408→   408→
+   409→   409→-- View: Daily Cash Flow Summary per Crew
+   410→   410→CREATE OR REPLACE VIEW public.daily_cash_flow AS
+   411→   411→SELECT
+   412→   412→  crew_id,
+   413→   413→  DATE(transaction_date) as date,
+   414→   414→  transaction_type,
+   415→   415→  flow_direction,
+   416→   416→  SUM(amount) as total_amount,
+   417→   417→  COUNT(*) as transaction_count,
+   418→   418→  payment_method
+   419→   419→FROM public.cash_transactions
+   420→   420→WHERE status = 'completed'
+   421→   421→GROUP BY crew_id, DATE(transaction_date), transaction_type, flow_direction, payment_method;
+   422→   422→
+   423→   423→COMMENT ON TABLE public.cash_transactions IS 'Unified cash flow ledger for all crews';
+   424→   424→```
+   425→   425→
+   426→   426→### 2.5 Table: `public.commission_rates`
+   427→   427→
+   428→   428→**Purpose:** Гибкие настройки комиссионных ставок для менеджеров любого экипажа
+   429→   429→
+   430→   430→```sql
+   431→   431→-- Migration: 20260809000004_create_commission_rates.sql
+   432→   432→
+   433→   433→CREATE TABLE public.commission_rates (
+   434→   434→  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+   435→   435→  crew_id UUID NOT NULL REFERENCES public.crews(id) ON DELETE CASCADE,
+   436→   436→  
+   437→   437→  -- Operation type
+   438→   438→  operation_type TEXT NOT NULL CHECK (operation_type IN (
+   439→   439→    'rental_hourly',
+   440→   440→    'rental_daily',
+   441→   441→    'rental_weekly',
+   442→   442→    'sale_bike',
+   443→   443→    'sale_accessories',
+   444→   444→    'service_assembly',
+   445→   445→    'service_tuning',
+   446→   446→    'equipment_rental'
+   447→   447→  )),
+   448→   448→  
+   449→   449→  -- Commission type
+   450→   450→  commission_type TEXT NOT NULL CHECK (commission_type IN (
+   451→   451→    'percentage',
+   452→   452→    'fixed_amount',
+   453→   453→    'tiered'
+   454→   454→  )),
+   455→   455→  
+   456→   456→  commission_value NUMERIC NOT NULL,  -- 0.15 = 15% or 500 RUB
+   457→   457→  
+   458→   458→  -- Tiered commission bounds
+   459→   459→  tier_min_amount NUMERIC,
+   460→   460→  tier_max_amount NUMERIC,
+   461→   461→  
+   462→   462→  -- Validity period
+   463→   463→  valid_from DATE NOT NULL DEFAULT CURRENT_DATE,
+   464→   464→  valid_until DATE,
+   465→   465→  
+   466→   466→  -- Priority (if multiple rules match)
+   467→   467→  priority INTEGER DEFAULT 0,
+   468→   468→  
+   469→   469→  -- Metadata
+   470→   470→  description TEXT,
+   471→   471→  created_by TEXT NOT NULL,
+   472→   472→  created_at TIMESTAMPTZ DEFAULT now(),
+   473→   473→  updated_at TIMESTAMPTZ DEFAULT now(),
+   474→   474→  
+   475→   475→  CONSTRAINT unique_commission_rule UNIQUE (crew_id, operation_type, priority)
+   476→   476→);
+   477→   477→
+   478→   478→-- Indexes
+   479→   479→CREATE INDEX idx_commission_rates_crew ON public.commission_rates(crew_id);
+   480→   480→CREATE INDEX idx_commission_rates_operation ON public.commission_rates(operation_type);
+   481→   481→CREATE INDEX idx_commission_rates_validity ON public.commission_rates(valid_from, valid_until);
+   482→   482→
+   483→   483→-- RLS
+   484→   484→ALTER TABLE public.commission_rates ENABLE ROW LEVEL SECURITY;
+   485→   485→
+   486→   486→CREATE POLICY "Crew owners can manage commission rates"
+   487→   487→  ON public.commission_rates FOR ALL
+   488→   488→  USING (
+   489→   489→    EXISTS (
+   490→   490→      SELECT 1 FROM public.crews
+   491→   491→      WHERE crews.id = commission_rates.crew_id
+   492→   492→      AND crews.owner_id = auth.uid()
+   493→   493→    )
+   494→   494→    OR EXISTS (
+   495→   495→      SELECT 1 FROM public.users
+   496→   496→      WHERE users.user_id = auth.uid()
+   497→   497→      AND (users.metadata->>'role')::text = 'admin'
+   498→   498→    )
+   499→   499→  );
+   500→   500→
+   501→   501→COMMENT ON TABLE public.commission_rates IS 'Flexible commission rates configuration per crew';
+   502→   502→```
+   503→   503→
+   504→   504→### 2.6 Table: `public.salary_plans`
+   505→   505→
+   506→   506→**Purpose:** Планы зарплаты сотрудников с выплатами 10 и 25 числа
+   507→   507→
+   508→   508→```sql
+   509→   509→-- Migration: 20260809000005_create_salary_plans.sql
+   510→   510→
+   511→   511→CREATE TABLE public.salary_plans (
+   512→   512→  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+   513→   513→  crew_member_id UUID NOT NULL REFERENCES public.crew_members(id) ON DELETE CASCADE,
+   514→   514→  
+   515→   515→  -- Plan period
+   516→   516→  period_start DATE NOT NULL,
+   517→   517→  period_end DATE NOT NULL,
+   518→   518→  
+   519→   519→  -- Base rates
+   520→   520→  base_salary NUMERIC DEFAULT 0,
+   521→   521→  hourly_rate NUMERIC DEFAULT 500,
+   522→   522→  
+   523→   523→  -- Commission percentages
+   524→   524→  rental_commission_pct NUMERIC DEFAULT 0.10,
+   525→   525→  sale_commission_pct NUMERIC DEFAULT 0.05,
+   526→   526→  service_commission_pct NUMERIC DEFAULT 0.25,
+   527→   527→  
+   528→   528→  -- Targets & bonuses
+   529→   529→  rental_target NUMERIC,
+   530→   530→  sale_target NUMERIC,
+   531→   531→  bonus_if_target_met NUMERIC,
+   532→   532→  
+   533→   533→  -- Payout schedule
+   534→   534→  payout_schedule TEXT[] DEFAULT ARRAY['10', '25'],  -- Days of month
+   535→   535→  last_payout_date DATE,
+   536→   536→  next_payout_date DATE,
+   537→   537→  
+   538→   538→  -- Status
+   539→   539→  status TEXT DEFAULT 'active' CHECK (status IN ('draft', 'active', 'completed', 'archived')),
+   540→   540→  
+   541→   541→  -- Calculated totals (updated by trigger)
+   542→   542→  calculated_base_salary NUMERIC DEFAULT 0,
+   543→   543→  calculated_commissions NUMERIC DEFAULT 0,
+   544→   544→  calculated_bonus NUMERIC DEFAULT 0,
+   545→   545→  total_accrued NUMERIC GENERATED ALWAYS AS (
+   546→   546→    calculated_base_salary + calculated_commissions + calculated_bonus
+   547→   547→  ) STORED,
+   548→   548→  total_paid NUMERIC DEFAULT 0,
+   549→   549→  balance_due NUMERIC GENERATED ALWAYS AS (total_accrued - total_paid) STORED,
+   550→   550→  
+   551→   551→  -- Audit
+   552→   552→  approved_by TEXT,
+   553→   553→  approved_at TIMESTAMPTZ,
+   554→   554→  created_at TIMESTAMPTZ DEFAULT now(),
+   555→   555→  updated_at TIMESTAMPTZ DEFAULT now(),
+   556→   556→  
+   557→   557→  CONSTRAINT valid_period CHECK (period_end >= period_start)
+   558→   558→);
+   559→   559→
+   560→   560→-- Indexes
+   561→   561→CREATE INDEX idx_salary_plans_member ON public.salary_plans(crew_member_id);
+   562→   562→CREATE INDEX idx_salary_plans_period ON public.salary_plans(period_start, period_end);
+   563→   563→CREATE INDEX idx_salary_plans_status ON public.salary_plans(status);
+   564→   564→
+   565→   565→-- RLS
+   566→   566→ALTER TABLE public.salary_plans ENABLE ROW LEVEL SECURITY;
+   567→   567→
+   568→   568→CREATE POLICY "Crew owners can manage salary plans"
+   569→   569→  ON public.salary_plans FOR ALL
+   570→   570→  USING (
+   571→   571→    EXISTS (
+   572→   572→      SELECT 1 FROM public.crew_members cm
+   573→   573→      JOIN public.crews c ON cm.crew_id = c.id
+   574→   574→      WHERE cm.id = salary_plans.crew_member_id
+   575→   575→      AND c.owner_id = auth.uid()
+   576→   576→    )
+   577→   577→    OR EXISTS (
+   578→   578→      SELECT 1 FROM public.users
+   579→   579→      WHERE users.user_id = auth.uid()
+   580→   580→      AND (users.metadata->>'role')::text = 'admin'
+   581→   581→    )
+   582→   582→  );
+   583→   583→
+   584→   584→-- View: Active Salary Plans Summary
+   585→   585→CREATE OR REPLACE VIEW public.active_salary_plans_summary AS
+   586→   586→SELECT
+   587→   587→  cm.id as crew_member_id,
+   588→   588→  cm.user_id,
+   589→   589→  u.full_name as employee_name,
+   590→   590→  c.name as crew_name,
+   591→   591→  c.slug as crew_slug,
+   592→   592→  sp.period_start,
+   593→   593→  sp.period_end,
+   594→   594→  sp.base_salary,
+   595→   595→  sp.calculated_commissions,
+   596→   596→  sp.total_accrued,
+   597→   597→  sp.total_paid,
+   598→   598→  sp.balance_due,
+   599→   599→  sp.next_payout_date,
+   600→   600→  sp.status
+   601→   601→FROM public.crew_members cm
+   602→   602→JOIN public.users u ON cm.user_id = u.user_id
+   603→   603→JOIN public.crews c ON cm.crew_id = c.id
+   604→   604→JOIN public.salary_plans sp ON cm.id = sp.crew_member_id
+   605→   605→WHERE sp.status = 'active'
+   606→   606→  AND CURRENT_DATE BETWEEN sp.period_start AND sp.period_end;
+   607→   607→
+   608→   608→COMMENT ON TABLE public.salary_plans IS 'Employee salary plans with commissions and 10th/25th payout schedule';
+   609→   609→```
+   610→   610→
+   611→   611→### 2.7 Table: `public.salary_calculations`
+   612→   612→
+   613→   613→**Purpose:** Детальный расчет зарплаты за период с разбивкой по источникам
+   614→   614→
+   615→   615→```sql
+   616→   616→-- Migration: 20260809000006_create_salary_calculations.sql
+   617→   617→
+   618→   618→CREATE TABLE public.salary_calculations (
+   619→   619→  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+   620→   620→  salary_plan_id UUID NOT NULL REFERENCES public.salary_plans(id) ON DELETE CASCADE,
+   621→   621→  crew_member_id UUID NOT NULL REFERENCES public.crew_members(id),
+   622→   622→  
+   623→   623→  -- Calculation period
+   624→   624→  calculation_period_start DATE NOT NULL,
+   625→   625→  calculation_period_end DATE NOT NULL,
+   626→   626→  
+   627→   627→  -- Hours worked
+   628→   628→  total_hours_worked NUMERIC DEFAULT 0,
+   629→   629→  total_shifts INTEGER DEFAULT 0,
+   630→   630→  
+   631→   631→  -- Volume by source
+   632→   632→  rental_volume NUMERIC DEFAULT 0,
+   633→   633→  sale_volume NUMERIC DEFAULT 0,
+   634→   634→  service_volume NUMERIC DEFAULT 0,
+   635→   635→  
+   636→   636→  -- Commissions
+   637→   637→  rental_commission NUMERIC DEFAULT 0,
+   638→   638→  sale_commission NUMERIC DEFAULT 0,
+   639→   639→  service_commission NUMERIC DEFAULT 0,
+   640→   640→  total_commission NUMERIC GENERATED ALWAYS AS (
+   641→   641→    rental_commission + sale_commission + service_commission
+   642→   642→  ) STORED,
+   643→   643→  
+   644→   644→  -- Bonuses
+   645→   645→  target_met_bonus NUMERIC DEFAULT 0,
+   646→   646→  other_bonus NUMERIC DEFAULT 0,
+   647→   647→  
+   648→   648→  -- Totals
+   649→   649→  base_pay NUMERIC DEFAULT 0,
+   650→   650→  gross_total NUMERIC GENERATED ALWAYS AS (
+   651→   651→    base_pay + total_commission + target_met_bonus + other_bonus
+   652→   652→  ) STORED,
+   653→   653→  
+   654→   654→  -- Deductions
+   655→   655→  deductions NUMERIC DEFAULT 0,
+   656→   656→  deduction_reason TEXT,
+   657→   657→  
+   658→   658→  -- Net pay
+   659→   659→  net_pay NUMERIC GENERATED ALWAYS AS (gross_total - deductions) STORED,
+   660→   660→  
+   661→   661→  -- Payout
+   662→   662→  payout_date DATE,
+   663→   663→  payout_status TEXT DEFAULT 'pending' CHECK (payout_status IN (
+   664→   664→    'pending', 'approved', 'paid', 'cancelled'
+   665→   665→  )),
+   666→   666→  payout_method TEXT,
+   667→   667→  payout_reference TEXT,
+   668→   668→  
+   669→   669→  -- Breakdown (JSONB array)
+   670→   670→  breakdown JSONB,  -- [{type: 'rental', amount: 5000, commission: 500, date: '2026-08-08'}, ...]
+   671→   671→  
+   672→   672→  -- Audit
+   673→   673→  calculated_by TEXT NOT NULL,
+   674→   674→  calculated_at TIMESTAMPTZ DEFAULT now(),
+   675→   675→  approved_by TEXT,
+   676→   676→  approved_at TIMESTAMPTZ,
+   677→   677→  paid_by TEXT,
+   678→   678→  paid_at TIMESTAMPTZ,
+   679→   679→  notes TEXT
+   680→   680→);
+   681→   681→
+   682→   682→-- Indexes
+   683→   683→CREATE INDEX idx_salary_calculations_plan ON public.salary_calculations(salary_plan_id);
+   684→   684→CREATE INDEX idx_salary_calculations_member ON public.salary_calculations(crew_member_id);
+   685→   685→CREATE INDEX idx_salary_calculations_period ON public.salary_calculations(calculation_period_start, calculation_period_end);
+   686→   686→CREATE INDEX idx_salary_calculations_payout ON public.salary_calculations(payout_status, payout_date);
+   687→   687→
+   688→   688→-- RLS
+   689→   689→ALTER TABLE public.salary_calculations ENABLE ROW LEVEL SECURITY;
+   690→   690→
+   691→   691→CREATE POLICY "Employees can read own calculations"
+   692→   692→  ON public.salary_calculations FOR SELECT
+   693→   693→  USING (
+   694→   694→    crew_member_id IN (
+   695→   695→      SELECT id FROM public.crew_members
+   696→   696→      WHERE user_id = auth.uid()
+   697→   697→    )
+   698→   698→    OR EXISTS (
+   699→   699→      SELECT 1 FROM public.crew_members cm
+   700→   700→      JOIN public.crews c ON cm.crew_id = c.id
+   701→   701→      WHERE cm.id = salary_calculations.crew_member_id
+   702→   702→      AND c.owner_id = auth.uid()
+   703→   703→    )
+   704→   704→  );
+   705→   705→
+   706→   706→COMMENT ON TABLE public.salary_calculations IS 'Detailed salary calculations per period with breakdown by source';
+   707→   707→```
+   708→   708→
+   709→   709→### 2.8 Table: `public.document_drafts`
+   710→   710→
+   711→   711→**Purpose:** Сохранение состояния черновиков для `/doc` команды (step correction feature)
+   712→   712→
+   713→   713→```sql
+   714→   714→-- Migration: 20260809000007_create_document_drafts.sql
+   715→   715→
+   716→   716→CREATE TABLE public.document_drafts (
+   717→   717→  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+   718→   718→  user_id TEXT NOT NULL REFERENCES public.users(user_id),
+   719→   719→  crew_slug TEXT NOT NULL,
+   720→   720→  
+   721→   721→  -- Document type
+   722→   722→  doc_type TEXT NOT NULL CHECK (doc_type IN ('rent', 'sale')),
+   723→   723→  
+   724→   724→  -- Current step
+   725→   725→  current_step INTEGER DEFAULT 1,
+   726→   726→  total_steps INTEGER DEFAULT 10,
+   727→   727→  
+   728→   728→  -- Collected data (JSONB)
+   729→   729→  draft_data JSONB NOT NULL DEFAULT '{}',
+   730→   730→  /*
+   731→   731→   Example structure:
+   732→   732→   {
+   733→   733→     "full_name": "Иванов Иван Иванович",
+   734→   734→     "passport": "4509 123456 15.03.2020 ОМВД",
+   735→   735→     "birth_date": "15.03.1990",
+   736→   736→     "address": "г. Москва, ул. Ленина 1",
+   737→   737→     "has_license": true,
+   738→   738→     "license": "99 76 123456 15.03 15.03",
+   739→   739→     "categories": ["A", "B"],
+   740→   740→     "start_date": "2026-08-09T18:00:00Z",
+   741→   741→     "end_date": "2026-08-10T10:00:00Z",
+   742→   742→     "deposit_choice": "confirm",
+   743→   743→     "bike_id": "vivolt-dual-color",
+   744→   744→     "deal_type": "rent",
+   745→   745→     "delivery_method": "pickup",  // For sale only
+   746→   746→     "transport_company": "Деловые Линии"  // For sale only
+   747→   747→   }
+   748→   748→  */
+   749→   749→  
+   750→   750→  -- Step correction tracking
+   751→   751→  corrected_steps INTEGER[],  -- Array of step numbers that were corrected
+   752→   752→  
+   753→   753→  -- Status
+   754→   754→  status TEXT DEFAULT 'in_progress' CHECK (status IN ('in_progress', 'completed', 'abandoned', 'expired')),
+   755→   755→  
+   756→   756→  -- Expiry
+   757→   757→  expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '30 minutes'),
+   758→   758→  
+   759→   759→  -- Audit
+   760→   760→  created_at TIMESTAMPTZ DEFAULT now(),
+   761→   761→  updated_at TIMESTAMPTZ DEFAULT now(),
+   762→   762→  completed_at TIMESTAMPTZ,
+   763→   763→  
+   764→   764→  CONSTRAINT valid_steps CHECK (current_step >= 1 AND current_step <= total_steps)
+   765→   765→);
+   766→   766→
+   767→   767→-- Indexes
+   768→   768→CREATE INDEX idx_document_drafts_user ON public.document_drafts(user_id);
+   769→   769→CREATE INDEX idx_document_drafts_crew ON public.document_drafts(crew_slug);
+   770→   770→CREATE INDEX idx_document_drafts_status ON public.document_drafts(status);
+   771→   771→CREATE INDEX idx_document_drafts_expires ON public.document_drafts(expires_at);
+   772→   772→
+   773→   773→-- RLS
+   774→   774→ALTER TABLE public.document_drafts ENABLE ROW LEVEL SECURITY;
+   775→   775→
+   776→   776→CREATE POLICY "Users can read own drafts"
+   777→   777→  ON public.document_drafts FOR ALL
+   778→   778→  USING (user_id = auth.uid());
+   779→   779→
+   780→   780→-- Function: Auto-cleanup expired drafts
+   781→   781→CREATE OR REPLACE FUNCTION public.cleanup_expired_drafts()
+   782→   782→RETURNS TRIGGER AS $$
+   783→   783→BEGIN
+   784→   784→  DELETE FROM public.document_drafts
+   785→   785→  WHERE expires_at < now();
+   786→   786→  RETURN NULL;
+   787→   787→END;
+   788→   788→$$ LANGUAGE plpgsql;
+   789→   789→
+   790→   790→-- Trigger: Run cleanup daily
+   791→   791→-- (Requires pg_cron extension or scheduled Edge Function)
+   792→   792→
+   793→   793→COMMENT ON TABLE public.document_drafts IS 'Document draft state persistence for /doc command with step correction support';
+   794→   794→```
+   795→   795→
+   796→   796→---
+   797→   797→
+   798→   798→## 3. INTEGRATION PATTERNS
+   799→   799→
+   800→   800→### 3.1 Sync Rentals with Service Operations
+   801→   801→
+   802→   802→**Trigger:** When rental includes service work in metadata
+   803→   803→
+   804→   804→```sql
+   805→   805→-- Migration: 20260809000008_trigger_sync_rental_service.sql
+   806→   806→
+   807→   807→CREATE OR REPLACE FUNCTION public.sync_rental_service_operation()
+   808→   808→RETURNS TRIGGER AS $$
+   809→   809→BEGIN
+   810→   810→  -- If rental has service_description in metadata, create service_operation
+   811→   811→  IF NEW.metadata->>'service_description' IS NOT NULL THEN
+   812→   812→    INSERT INTO public.service_operations (
+   813→   813→      operation_type,
+   814→   814→      rental_id,
+   815→   815→      vehicle_id,
+   816→   816→      customer_price,
+   817→   817→      technician_cost,
+   818→   818→      description,
+   819→   819→      technician_id,
+   820→   820→      crew_id,
+   821→   821→      status,
+   822→   822→      completed_at,
+   823→   823→      created_by
+   824→   824→    )
+   825→   825→    VALUES (
+   826→   826→      'tuning',  -- Default for rental-related service
+   827→   827→      NEW.rental_id,
+   828→   828→      NEW.vehicle_id,
+   829→   829→      (NEW.metadata->>'service_price')::NUMERIC,
+   830→   830→      (NEW.metadata->>'service_price')::NUMERIC * 0.5,  -- 50% to technician
+   831→   831→      NEW.metadata->>'service_description',
+   832→   832→      NULL,  -- Assign technician later
+   833→   833→      NEW.crew_id,
+   834→   834→      'completed',
+   835→   835→      NEW.updated_at,
+   836→   836→      auth.jwt() ->> 'chat_id'
+   837→   837→    );
+   838→   838→    
+   839→   839→    -- Create income transaction
+   840→   840→    INSERT INTO public.cash_transactions (
+   841→   841→      transaction_type,
+   842→   842→      amount,
+   843→   843→      flow_direction,
+   844→   844→      payment_method,
+   845→   845→      rental_id,
+   846→   846→      category,
+   847→   847→      description,
+   848→   848→      crew_id,
+   849→   849→      created_by
+   850→   850→    )
+   851→   851→    VALUES (
+   852→   852→      'income_service',
+   853→   853→      (NEW.metadata->>'service_price')::NUMERIC,
+   854→   854→      'in',
+   855→   855→      COALESCE(NEW.metadata->>'payment_method', 'cash'),
+   856→   856→      NEW.rental_id,
+   857→   857→      'Сервис',
+   858→   858→      NEW.metadata->>'service_description',
+   859→   859→      NEW.crew_id,
+   860→   860→      auth.jwt() ->> 'chat_id'
+   861→   861→    );
+   862→   862→  END IF;
+   863→   863→  
+   864→   864→  RETURN NEW;
+   865→   865→END;
+   866→   866→$$ LANGUAGE plpgsql;
+   867→   867→
+   868→   868→DROP TRIGGER IF EXISTS trg_sync_rental_service ON public.rentals;
+   869→   869→CREATE TRIGGER trg_sync_rental_service
+   870→   870→  AFTER INSERT ON public.rentals
+   871→   871→  FOR EACH ROW
+   872→   872→  EXECUTE FUNCTION public.sync_rental_service_operation();
+   873→   873→```
+   874→   874→
+   875→   875→### 3.2 Auto-create Cash Transactions on Service Operation Completion
+   876→   876→
+   877→   877→```sql
+   878→   878→-- Migration: 20260809000009_trigger_auto_service_transaction.sql
+   879→   879→
+   880→   880→CREATE OR REPLACE FUNCTION public.auto_create_service_transaction()
+   881→   881→RETURNS TRIGGER AS $$
+   882→   882→BEGIN
+   883→   883→  IF NEW.status = 'completed' AND OLD.status != 'completed' THEN
+   884→   884→    -- Income transaction
+   885→   885→    INSERT INTO public.cash_transactions (
+   886→   886→      transaction_type,
+   887→   887→      amount,
+   888→   888→      flow_direction,
+   889→   889→      payment_method,
+   890→   890→      service_operation_id,
+   891→   891→      category,
+   892→   892→      subcategory,
+   893→   893→      description,
+   894→   894→      crew_id,
+   895→   895→      created_by
+   896→   896→    )
+   897→   897→    VALUES (
+   898→   898→      'income_service',
+   899→   899→      NEW.customer_price,
+   900→   900→      'in',
+   901→   901→      COALESCE(NEW.payment_method, 'cash'),
+   902→   902→      NEW.id,
+   903→   903→      'Сервис',
+   904→   904→      NEW.operation_type,
+   905→   905→      NEW.description,
+   906→   906→      NEW.crew_id,
+   907→   907→      NEW.created_by
+   908→   908→    );
+   909→   909→    
+   910→   910→    -- Technician expense transaction
+   911→   911→    INSERT INTO public.cash_transactions (
+   912→   912→      transaction_type,
+   913→   913→      amount,
+   914→   914→      flow_direction,
+   915→   915→      payment_method,
+   916→   916→      to_user_id,
+   917→   917→      category,
+   918→   918→      description,
+   919→   919→      crew_id,
+   920→   920→      created_by
+   921→   921→    )
+   922→   922→    VALUES (
+   923→   923→      'expense_tech_work',
+   924→   924→      NEW.technician_cost,
+   925→   925→      'out',
+   926→   926→      'cash',
+   927→   927→      NEW.technician_id,
+   928→   928→      'Зарплата',
+   929→   929→      'Оплата техники: ' || NEW.description,
+   930→   930→      NEW.crew_id,
+   931→   931→      NEW.created_by
+   932→   932→    );
+   933→   933→  END IF;
+   934→   934→  
+   935→   935→  RETURN NEW;
+   936→   936→END;
+   937→   937→$$ LANGUAGE plpgsql;
+   938→   938→
+   939→   939→DROP TRIGGER IF EXISTS trg_auto_service_transaction ON public.service_operations;
+   940→   940→CREATE TRIGGER trg_auto_service_transaction
+   941→   941→  AFTER UPDATE OF status ON public.service_operations
+   942→   942→  FOR EACH ROW
+   943→   943→  EXECUTE FUNCTION public.auto_create_service_transaction();
+   944→   944→```
+   945→   945→
+   946→   946→### 3.3 Calculate Manager Commission on Rental Completion
+   947→   947→
+   948→   948→```sql
+   949→   949→-- Migration: 20260809000010_trigger_rental_commission.sql
+   950→   950→
+   951→   951→CREATE OR REPLACE FUNCTION public.calculate_rental_commission()
+   952→   952→RETURNS TRIGGER AS $$
+   953→   953→DECLARE
+   954→   954→  v_commission_pct NUMERIC;
+   955→   955→  v_commission_amount NUMERIC;
+   956→   956→  v_manager_id TEXT;
+   957→   957→BEGIN
+   958→   958→  IF NEW.status = 'completed' AND OLD.status != 'completed' THEN
+   959→   959→    -- Get commission rate for this crew
+   960→   960→    SELECT commission_value INTO v_commission_pct
+   961→   961→    FROM public.commission_rates
+   962→   962→    WHERE crew_id = NEW.crew_id
+   963→   963→      AND operation_type = 'rental_hourly'
+   964→   964→      AND CURRENT_DATE BETWEEN valid_from AND COALESCE(valid_until, CURRENT_DATE)
+   965→   965→    ORDER BY priority DESC
+   966→   966→    LIMIT 1;
+   967→   967→    
+   968→   968→    v_commission_pct := COALESCE(v_commission_pct, 0.10);  -- Default 10%
+   969→   969→    v_commission_amount := NEW.total_cost * v_commission_pct;
+   970→   970→    
+   971→   971→    -- Get crew owner (manager)
+   972→   972→    SELECT owner_id INTO v_manager_id
+   973→   973→    FROM public.crews
+   974→   974→    WHERE id = NEW.crew_id;
+   975→   975→    
+   976→   976→    -- Create commission transaction
+   977→   977→    INSERT INTO public.cash_transactions (
+   978→   978→      transaction_type,
+   979→   979→      amount,
+   980→   980→      flow_direction,
+   981→   981→      category,
+   982→   982→      description,
+   983→   983→      rental_id,
+   984→   984→      to_user_id,
+   985→   985→      crew_id,
+   986→   986→      created_by
+   987→   987→    )
+   988→   988→    VALUES (
+   989→   989→      'expense_commission',
+   990→   990→      v_commission_amount,
+   991→   991→      'out',
+   992→   992→      'Комиссия',
+   993→   993→      'Комиссия с аренды #' || SUBSTRING(NEW.rental_id::TEXT FROM 1 FOR 8),
+   994→   994→      NEW.rental_id,
+   995→   995→      v_manager_id,
+   996→   996→      NEW.crew_id,
+   997→   997→      auth.jwt() ->> 'chat_id'
+   998→   998→    );
+   999→   999→  END IF;
+  1000→  1000→  
+  1001→  1001→  RETURN NEW;
+  1002→  1002→END;
+  1003→  1003→$$ LANGUAGE plpgsql;
+  1004→  1004→
+  1005→  1005→DROP TRIGGER IF EXISTS trg_rental_commission ON public.rentals;
+  1006→  1006→CREATE TRIGGER trg_rental_commission
+  1007→  1007→  AFTER UPDATE OF status ON public.rentals
+  1008→  1008→  FOR EACH ROW
+  1009→  1009→  EXECUTE FUNCTION public.calculate_rental_commission();
+  1010→  1010→```
+  1011→  1011→
+  1012→  1012→---
+  1013→  1013→
+  1014→  1014→## 4. API SPECIFICATION
+  1015→  1015→
+  1016→  1016→All endpoints are crew-scoped via `[slug]` parameter.
+  1017→  1017→
+  1018→  1018→### 4.1 POST `/api/franchize/[slug]/service-operations`
+  1019→  1019→
+  1020→  1020→**Purpose:** Create service operation record
+  1021→  1021→
+  1022→  1022→```typescript
+  1023→  1023→// Request
+  1024→  1024→{
+  1025→  1025→  operation_type: "assembly",
+  1026→  1026→  vehicle_id: "folkon-gt-125",
+  1027→  1027→  rental_id?: "uuid",
+  1028→  1028→  customer_price: 1250,
+  1029→  1029→  technician_id: "vlad-user-id",
+  1030→  1030→  technician_commission_pct: 0.50,
+  1031→  1031→  description: "Сборка Folkon GT",
+  1032→  1032→  detailed_notes: "Снятие/установка пер. колеса, с суппортами",
+  1033→  1033→  time_spent_minutes: 90,
+  1034→  1034→  payment_method: "cash"
+  1035→  1035→}
+  1036→  1036→
+  1037→  1037→// Response
+  1038→  1038→{
+  1039→  1039→  id: "uuid",
+  1040→  1040→  operation_type: "assembly",
+  1041→  1041→  customer_price: 1250,
+  1042→  1042→  technician_cost: 625,
+  1043→  1043→  profit_margin: 625,
+  1044→  1044→  status: "completed",
+  1045→  1045→  created_at: "2026-08-09T16:56:00Z"
+  1046→  1046→}
+  1047→  1047→```
+  1048→  1048→
+  1049→  1049→### 4.2 POST `/api/franchize/[slug]/equipment-rentals`
+  1050→  1050→
+  1051→  1051→**Purpose:** Rent out equipment (helmets)
+  1052→  1052→
+  1053→  1053→```typescript
+  1054→  1054→// Request
+  1055→  1055→{
+  1056→  1056→  equipment_id: "vivolt-helmet-black",
+  1057→  1057→  renter_name: "Клиент",
+  1058→  1058→  renter_phone: "+7...",
+  1059→  1059→  primary_rental_id?: "uuid",
+  1060→  1060→  rental_price: 500,
+  1061→  1061→  deposit_amount: 3000,
+  1062→  1062→  expected_return_at: "2026-08-10T20:00:00Z",
+  1063→  1063→  issued_by: "user-id"
+  1064→  1064→}
+  1065→  1065→```
+  1066→  1066→
+  1067→  1067→### 4.3 POST `/api/franchize/[slug]/cash-transactions`
+  1068→  1068→
+  1069→  1069→**Purpose:** Record cash transaction
+  1070→  1070→
+  1071→  1071→```typescript
+  1072→  1072→// Request
+  1073→  1073→{
+  1074→  1074→  transaction_type: "expense_cashout",
+  1075→  1075→  amount: 2000,
+  1076→  1076→  payment_method: "bank_transfer",
+  1077→  1077→  flow_direction: "out",
+  1078→  1078→  recipient_name: "Илья Т Банк",
+  1079→  1079→  category: "Расход",
+  1080→  1080→  description: "Перевод Илья Т Банк"
+  1081→  1081→}
+  1082→  1082→```
+  1083→  1083→
+  1084→  1084→### 4.4 GET `/api/franchize/[slug]/dashboard/daily-report`
+  1085→  1085→
+  1086→  1086→**Purpose:** Generate daily report for assistant
+  1087→  1087→
+  1088→  1088→```typescript
+  1089→  1089→// Response
+  1090→  1090→{
+  1091→  1091→  date: "2026-08-09",
+  1092→  1092→  crew_slug: "vip-bike",
+  1093→  1093→  summary: {
+  1094→  1094→    total_income: 15500,
+  1095→  1095→    total_expenses: 5200,
+  1096→  1096→    net_cashflow: 10300,
+  1097→  1097→    by_category: {
+  1098→  1098→      rental_income: 12000,
+  1099→  1099→      service_income: 2000,
+  1100→  1100→      equipment_income: 1500,
+  1101→  1101→      salary_expenses: 3200,
+  1102→  1102→      tech_work_expenses: 1000
+  1103→  1103→    }
+  1104→  1104→  },
+  1105→  1105→  service_operations: [...],
+  1106→  1106→  equipment_rentals: [...],
+  1107→  1107→  pending_payouts: {
+  1108→  1108→    next_date: "2026-08-10",
+  1109→  1109→    total_due: 45000,
+  1110→  1110→    by_employee: [...]
+  1111→  1111→  }
+  1112→  1112→}
+  1113→  1113→```
+  1114→  1114→
+  1115→  1115→### 4.5 GET `/api/franchize/[slug]/salary/:employee-id`
+  1116→  1116→
+  1117→  1117→**Purpose:** Calculate employee salary
+  1118→  1118→
+  1119→  1119→```typescript
+  1120→  1120→// Response
+  1121→  1121→{
+  1122→  1122→  employee: {
+  1123→  1123→    name: "Влад",
+  1124→  1124→    role: "mechanic",
+  1125→  1125→    crew: "vip-bike"
+  1126→  1126→  },
+  1127→  1127→  period: {
+  1128→  1128→    start: "2026-08-01",
+  1129→  1129→    end: "2026-08-15",
+  1130→  1130→    next_payout: "2026-08-25"
+  1131→  1131→  },
+  1132→  1132→  earnings: {
+  1133→  1133→    base_salary: 15000,
+  1134→  1134→    rental_commission: 3500,
+  1135→  1135→    service_commission: 6250,
+  1136→  1136→    total_accrued: 24750
+  1137→  1137→  },
+  1138→  1138→  payouts: {
+  1139→  1139→    paid_on_10th: 12000,
+  1140→  1140→    pending_on_25th: 12750
+  1141→  1141→  },
+  1142→  1142→  breakdown: [...]
+  1143→  1143→}
+  1144→  1144→```
+  1145→  1145→
+  1146→  1146→---
+  1147→  1147→
+  1148→  1148→## 5. DATA MIGRATION STRATEGY
+  1149→  1149→
+  1150→  1150→### 5.1 Backfill Service Operations from Rentals
+  1151→  1151→
+  1152→  1152→```sql
+  1153→  1153→-- Extract service operations from existing rentals with service metadata
+  1154→  1154→INSERT INTO public.service_operations (
+  1155→  1155→  operation_type,
+  1156→  1156→  rental_id,
+  1157→  1157→  vehicle_id,
+  1158→  1158→  customer_price,
+  1159→  1159→  technician_cost,
+  1160→  1160→  description,
+  1161→  1161→  crew_id,
+  1162→  1162→  status,
+  1163→  1163→  completed_at,
+  1164→  1164→  created_by
+  1165→  1165→)
+  1166→  1166→SELECT
+  1167→  1167→  'tuning' as operation_type,
+  1168→  1168→  r.rental_id,
+  1169→  1169→  r.vehicle_id,
+  1170→  1170→  (r.metadata->>'service_price')::NUMERIC,
+  1171→  1171→  (r.metadata->>'service_price')::NUMERIC * 0.5,
+  1172→  1172→  r.metadata->>'service_description',
+  1173→  1173→  r.crew_id,
+  1174→  1174→  'completed',
+  1175→  1175→  r.updated_at,
+  1176→  1176→  r.owner_id
+  1177→  1177→FROM public.rentals r
+  1178→  1178→WHERE r.metadata->>'service_description' IS NOT NULL
+  1179→  1179→  AND NOT EXISTS (
+  1180→  1180→    SELECT 1 FROM public.service_operations so
+  1181→  1181→    WHERE so.rental_id = r.rental_id
+  1182→  1182→  );
+  1183→  1183→```
+  1184→  1184→
+  1185→  1185→### 5.2 Backfill Cash Transactions from Rentals
+  1186→  1186→
+  1187→  1187→```sql
+  1188→  1188→-- Rental income transactions
+  1189→  1189→INSERT INTO public.cash_transactions (
+  1190→  1190→  transaction_type,
+  1191→  1191→  amount,
+  1192→  1192→  flow_direction,
+  1193→  1193→  payment_method,
+  1194→  1194→  rental_id,
+  1195→  1195→  category,
+  1196→  1196→  description,
+  1197→  1197→  crew_id,
+  1198→  1198→  transaction_date,
+  1199→  1199→  status,
+  1200→  1200→  created_by
+  1201→  1201→)
+  1202→  1202→SELECT
+  1203→  1203→  'income_rental',
+  1204→  1204→  r.total_cost,
+  1205→  1205→  'in',
+  1206→  1206→  COALESCE((r.metadata->>'payment_method'), 'cash'),
+  1207→  1207→  r.rental_id,
+  1208→  1208→  'Аренда',
+  1209→  1209→  'Аренда ' || (SELECT model FROM public.cars WHERE id = r.vehicle_id),
+  1210→  1210→  r.crew_id,
+  1211→  1211→  r.created_at,
+  1212→  1212→  'completed',
+  1213→  1213→  r.owner_id
+  1214→  1214→FROM public.rentals r
+  1215→  1215→WHERE r.status IN ('completed', 'active')
+  1216→  1216→  AND NOT EXISTS (
+  1217→  1217→    SELECT 1 FROM public.cash_transactions ct
+  1218→  1218→    WHERE ct.rental_id = r.rental_id
+  1219→  1219→      AND ct.transaction_type = 'income_rental'
+  1220→  1220→  );
+  1221→  1221→```
+  1222→  1222→
+  1223→  1223→---
+  1224→  1224→
+  1225→  1225→## 6. OPEN QUESTIONS
+  1226→  1226→
+  1227→  1227→### 6.1 Commission Rates (To Be Confirmed by Crew Owners)
+  1228→  1228→- Rental commission: __% (suggested 10%)
+  1229→  1229→- Sale commission: __% (suggested 5%)
+  1230→  1230→- Service commission to technician: __% (suggested 50%)
+  1231→  1231→- Service commission to manager: __% (suggested 25%)
+  1232→  1232→
+  1233→  1233→### 6.2 Salary Plan Parameters
+  1234→  1234→- Base hourly rate: 500₽ (default) or different?
+  1235→  1235→- Rental target for bonus: _____₽
+  1236→  1236→- Sale target for bonus: _____₽
+  1237→  1237→- Bonus amount: _____₽
+  1238→  1238→
+  1239→  1239→### 6.3 Historical Data Digitization
+  1240→  1240→- Period to backfill: Last month (August 2026) or longer?
+  1241→  1241→- Approach: Manual entry vs CSV import vs hybrid?
+  1242→  1242→
+  1243→  1243→---
+  1244→  1244→
+  1245→  1245→## 7. SUCCESS METRICS
+  1246→  1246→
+  1247→  1247→- ⏱️ Time to record service operation: < 30 seconds
+  1248→  1248→- 📊 Daily report generation: < 5 seconds
+  1249→  1249→- ✅ Data accuracy: 99%+ reconciliation rate
+  1250→  1250→- 💰 Real-time cash balance tracking
+  1251→  1251→- 👥 Zero salary disputes
+  1252→  1252→
+  1253→  1253→---
+  1254→  1254→
+  1255→  1255→## 8. IMPLEMENTATION PLAN
+  1256→  1256→
+  1257→  1257→**Phase 1 (Week 1):** Database migrations, RLS policies, indexes  
+  1258→  1258→**Phase 2 (Week 2):** Core API endpoints, service operations workflow  
+  1259→  1259→**Phase 3 (Week 3):** Salary system, commission calculations  
+  1260→  1260→**Phase 4 (Week 4):** Reporting, automation, Boss skill integration  
+  1261→  1261→**Phase 5 (Week 5):** Data backfill, testing, production deployment  
+  1262→  1262→
+  1263→  1263→---
+  1264→  1264→
+  1265→  1265→**Document History:**
+  1266→  1266→- v2.1 (2026-08-09): Generalized for all crews, aligned with existing supabase.txt schema, removed hardcoded "vip-bike"
+  1267→  1267→
