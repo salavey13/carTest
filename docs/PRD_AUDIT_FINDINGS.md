@@ -15,7 +15,7 @@
 | `rentals` | public | ✅ Equipment NOT stored in metadata (only `source`, `daily_price`, `doc_sha256`, `created_by`) |
 | `crew_members` | public | ✅ Columns: `id, crew_id, user_id, role, membership_status, live_status, joined_at, last_location` |
 | `crew_member_shifts` | public | ✅ Columns: `id, member_id, crew_id, clock_in_time, clock_out_time, duration_minutes (generated), hourly_rate, salary_amount (generated), shift_type, notes, checkpoint (jsonb), actions (jsonb)` |
-| `deposit_log` | public | ✅ Columns: `id, rental_id, action, amount, method, operator_chat_id, notes, created_at` |
+| `deposit_log` | public | ✅ Columns: `id, rental_id, action, amount, method, operator_chat_id, notes, created_at` — 14 rows in production, all `method='cash'` — NO card tracking |
 | `franchize_intents` | public | ✅ Has `metadata jsonb` column |
 | `crew_todos` | public | ✅ Has `lead_id`, `rental_id`, `description` (jsonb) |
 | `lead_notes` | public | ✅ |

@@ -539,12 +539,102 @@ WHERE NOT EXISTS (
 - `salary_calculations.shift_income` = same, per calculation date
 - No changes to existing shift tracking — just read from it
 
-### 6.2 Profile Page (`ProfileClient.tsx`)
-- Add "My Earnings" section showing:
-  - Current period salary plan (total_accrued, balance_due)
-  - Recent shift income
-  - Recent commissions
-  - Next payout date (10th or 25th)
+### 6.2 Profile Page — "My Earnings" + "My Work" Sections
+
+**File:** `app/franchize/[slug]/profile/ProfileClient.tsx` (945 lines)
+
+Add TWO new sections:
+
+#### 6.2.1 "My Earnings" Section
+Shows salary/commission data for the logged-in crew member:
+- Current period salary plan (total_accrued, balance_due)
+- Recent shift income (from `crew_member_shifts`)
+- Recent commissions (from `cash_transactions` where `to_user_id = userId`)
+- Next payout date (10th or 25th of month)
+
+#### 6.2.2 "My Work" Section (NEW — mirrors evening digest for this operator)
+Shows today's work performed by this operator — same data as evening-summary.sh but filtered to THIS operator only.
+
+**Data source:** `rentals` where `created_by_operator_chat_id = userId` AND created today, joined with `cars` for bike titles.
+
+**New server action:** `getMyWorkTodayAction({ userId, slug })`
+```typescript
+// Returns today's work for this operator:
+// - Rentals created today (rent flow)
+// - Sales created today (sale_contract_artifacts where created_by_operator_chat_id = userId)
+// - Service work logged today (rentals where metadata.source = 'service_work' AND created_by_operator_chat_id = userId)
+// - Active shift (if clocked in)
+// - Total earned today (shift salary + commissions)
+
+export type MyWorkToday = {
+  rentals: Array<{ rentalId: string; bikeTitle: string; status: string; totalCost: number }>;
+  sales: Array<{ saleId: string; bikeTitle: string; salePrice: number }>;
+  serviceWork: Array<{ rentalId: string; serviceName: string; totalCost: number; performedAt: string }>;
+  activeShift: { shiftId: string; clockInTime: string; hoursSoFar: number; shiftIncome: number } | null;
+  totalEarnedToday: number; // shift income + commissions
+  shiftIncomeToday: number;
+  commissionIncomeToday: number;
+};
+```
+
+**SQL query pattern:**
+```sql
+-- Today's rentals by this operator
+SELECT r.rental_id, r.status, r.total_cost, c.make, c.model, r.metadata
+FROM public.rentals r
+JOIN public.cars c ON r.vehicle_id = c.id
+WHERE r.created_by_operator_chat_id = $userId
+  AND r.metadata->>'source' != 'service_work'  -- exclude service work (shown separately)
+  AND DATE(r.created_at AT TIME ZONE 'Europe/Moscow') = DATE(now() AT TIME ZONE 'Europe/Moscow')
+ORDER BY r.created_at DESC;
+
+-- Today's service work by this operator
+SELECT r.rental_id, r.total_cost, r.metadata->>'service_name' as service_name, r.metadata->>'performed_at' as performed_at
+FROM public.rentals r
+WHERE r.created_by_operator_chat_id = $userId
+  AND r.metadata->>'source' = 'service_work'
+  AND DATE(r.created_at AT TIME ZONE 'Europe/Moscow') = DATE(now() AT TIME ZONE 'Europe/Moscow')
+ORDER BY r.created_at DESC;
+
+-- Today's sales by this operator
+SELECT s.id, s.sale_price, s.total_sum, c.make, c.model
+FROM private.sale_contract_artifacts s
+LEFT JOIN public.cars c ON s.resolved_bike_id = c.id
+WHERE s.created_by_operator_chat_id = $userId
+  AND DATE(s.created_at AT TIME ZONE 'Europe/Moscow') = DATE(now() AT TIME ZONE 'Europe/Moscow')
+ORDER BY s.created_at DESC;
+
+-- Active shift
+SELECT id, clock_in_time, salary_amount, hourly_rate
+FROM public.crew_member_shifts
+WHERE member_id = $userId
+  AND clock_out_time IS NULL
+LIMIT 1;
+```
+
+**UI layout:**
+```
+┌─────────────────────────────────────┐
+│ 📊 Моя работа сегодня               │
+│                                     │
+│ ⏱ Смена: 4ч 23м (500₽/час)        │
+│ 💰 Заработано: 3 500₽              │
+│   ├── Смена: 2 150₽                │
+│   └── Комиссии: 1 350₽             │
+│                                     │
+│ 🏍 Аренды (2):                      │
+│   • Kawasaki EX650K — 9 000₽      │
+│   • Ducati Panigale — 10 000₽     │
+│                                     │
+│ 💰 Продажи (1):                     │
+│   • Falcon Pro — 390 000₽          │
+│                                     │
+│ 🔧 Сервис (3):                      │
+│   • Замена масла — 1 500₽         │
+│   • Диагностика — 1 000₽          │
+│   • Шиномонтаж — 800₽             │
+└─────────────────────────────────────┘
+```
 
 ### 6.3 Crew Members Page (`CrewMembersClient.tsx`)
 - Add salary summary per member (for crew owners)
@@ -559,6 +649,79 @@ WHERE NOT EXISTS (
 - Services continue to work as `rentals` with `cars.type='service'`
 - `cash_transactions` auto-creates `income_service` when a service rental completes
 - No new `service_operations` table needed
+- Service work is logged via `service-work-text` skill: INSERT into `rentals` with `metadata.source='service_work'`, `metadata.service_name`, `metadata.performed_at`, `created_by_operator_chat_id`
+
+### 6.6 Deposit Tracking Enhancement
+
+**Current state:** `deposit_log` table exists with `method` column that only has `cash` in production (14 rows). The `method` CHECK constraint allows `cash, bank_transfer, telegram_stars, none` but doesn't distinguish WHICH card.
+
+**Enhancement:** Add card-specific deposit tracking:
+
+```sql
+-- Migration: 20260810000009_enhance_deposit_log_methods.sql
+
+-- Add card_type column to distinguish which card was used
+ALTER TABLE public.deposit_log
+ADD COLUMN IF NOT EXISTS card_type TEXT CHECK (card_type IN (
+  'tbank',    -- Card 1 (default): Тинькофф/T-Bank
+  'sber'      -- Card 2 (default): Сбербанк
+));
+
+-- Update method CHECK to include 'card' (generic) alongside existing values
+-- card_type specifies WHICH card
+ALTER TABLE public.deposit_log
+DROP CONSTRAINT IF EXISTS deposit_log_method_check;
+ALTER TABLE public.deposit_log
+ADD CONSTRAINT deposit_log_method_check CHECK (method IN (
+  'cash',
+  'card',           -- Card payment (use card_type to specify which)
+  'bank_transfer',
+  'telegram_stars',
+  'sbp',            -- СБП (Fast Payment System)
+  'none'
+));
+
+-- Backfill: existing 'cash' rows stay as-is (card_type = NULL)
+-- Future deposits with method='card' must also set card_type
+```
+
+**UI:** When collecting a deposit (in `/doc` flow or admin), show:
+- 💵 Наличные (cash)
+- 💳 Карта Тинькофф (card + card_type='tbank')
+- 💳 Карта Сбербанк (card + card_type='sber')
+- 📱 СБП (sbp)
+- ⭐ Telegram Stars (telegram_stars)
+
+**New skill:** `deposit-tracer-text` — trace deposit states visually:
+
+```
+Trigger phrases: "где депозиты", "статус депозитов", "депозиты на картах",
+"cash or card", "deposit trace", "deposit states"
+
+Commands:
+1. deposit-list [--date YYYY-MM-DD] [--method cash|card|tbank|sber|sbp]
+   Lists all deposits for a date, filtered by method.
+   Shows: rental_id, amount, method, card_type, action (collected/returned), operator
+
+2. deposit-balance [--from YYYY-MM-DD] [--to YYYY-MM-DD]
+   Summary: total collected vs returned, broken down by method:
+   - Cash: collected X, returned Y, net = X-Y
+   - T-Bank card: collected X, returned Y, net = X-Y
+   - Sber card: collected X, returned Y, net = X-Y
+   - SBP: collected X, returned Y, net = X-Y
+
+3. deposit-rental <rentalId>
+   Shows deposit history for a specific rental:
+   - Collected: 20000₽ cash by operator 7813830016 on 2026-07-26 12:11
+   - Returned: 20000₽ cash on 2026-07-27 10:30 (auto-return on completion)
+```
+
+**Debug page:** `/franchize/[slug]/admin/deposits` — visual deposit tracker:
+- Date picker
+- Filter by method/card_type
+- Table: rental, amount, method, card, action, operator, time
+- Summary cards: cash total, T-Bank total, Sber total, SBP total
+- Color-coded: green=collected, blue=returned, red=overdue (not returned after rental completion)
 
 ---
 
@@ -569,6 +732,8 @@ WHERE NOT EXISTS (
 3. **Payout schedule** — confirm 10th and 25th of each month?
 4. **Equipment deposit** — separate deposit for equipment rentals?
 5. **Cross-schema FK** — should `cash_transactions.sale_contract_id` have an actual FK to `private.sale_contract_artifacts(id)`? (Postgres supports this but RLS may complicate)
+6. **Deposit card defaults** — confirm T-Bank (tbank) = card 1, Sber (sber) = card 2? Any other cards?
+7. **Deposit auto-return** — currently auto-returns on rental completion. Should this also auto-create a `cash_transactions` row for the return?
 
 ---
 
