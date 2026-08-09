@@ -849,8 +849,13 @@ function parseStartDate(text: string): { date: string; time: string } | null {
 function parseEndDate(text: string, startDate?: string): { date: string; time: string } | null {
   const t = text.trim().toLowerCase();
   const today = new Date();
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  const dayAfter = new Date(today); dayAfter.setDate(today.getDate() + 2);
 
-  // Resolve start date for relative calculations
+  // startRef is used ONLY for "сегодня" — an alias for "same calendar day as start"
+  // (short hourly rentals like 18:00 → 21:00).
+  // "завтра" / "послезавтра" are relative to TODAY (calendar semantics), matching
+  // parseStartDate — otherwise a "завтра ... → завтра ..." rent reads as +1 day.
   let startRef = new Date(today);
   if (startDate) {
     const sp = startDate.split('.');
@@ -867,24 +872,20 @@ function parseEndDate(text: string, startDate?: string): { date: string; time: s
     return { date: formatDate(startRef), time: `${hour}:${min}` };
   }
 
-  // "завтра 10" or "завтра 10:00" — relative to start date
+  // "завтра 10" or "завтра 10:00" — relative to TODAY (consistent with parseStartDate)
   const tomorrowMatch = t.match(/завтра\s+(\d{1,2})(:(\d{2}))?/);
   if (tomorrowMatch) {
     const hour = tomorrowMatch[1].padStart(2, '0');
     const min = tomorrowMatch[3] || '00';
-    const d = new Date(startRef);
-    d.setDate(startRef.getDate() + 1);
-    return { date: formatDate(d), time: `${hour}:${min}` };
+    return { date: formatDate(tomorrow), time: `${hour}:${min}` };
   }
 
-  // "послезавтра 10"
+  // "послезавтра 10" — relative to TODAY
   const dayAfterMatch = t.match(/послезавтра\s+(\d{1,2})(:(\d{2}))?/);
   if (dayAfterMatch) {
     const hour = dayAfterMatch[1].padStart(2, '0');
     const min = dayAfterMatch[3] || '00';
-    const d = new Date(startRef);
-    d.setDate(startRef.getDate() + 2);
-    return { date: formatDate(d), time: `${hour}:${min}` };
+    return { date: formatDate(dayAfter), time: `${hour}:${min}` };
   }
 
   // "16.06 10" or "16.06.2026 10:00"
@@ -3010,7 +3011,9 @@ export async function handleDocCallback(
     const today = new Date();
     const fmt = (d: Date) => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
 
-    // Resolve start date for relative end calculation
+    // "today" button = same calendar day as start (short hourly alias).
+    // "tomorrow" / "2days" buttons are relative to TODAY (calendar semantics),
+    // NOT to start date — otherwise a tomorrow-start + tomorrow-end reads as +1d.
     let startRef = new Date(today);
     if (context.rentStartDate) {
       const sp = context.rentStartDate.split('.');
@@ -3030,13 +3033,13 @@ export async function handleDocCallback(
       context.rentEndDate = fmt(startRef);
       context.rentEndTime = timeStr;
     } else if (when === "tomorrow") {
-      const end = new Date(startRef);
-      end.setDate(startRef.getDate() + 1);
+      const end = new Date(today);
+      end.setDate(today.getDate() + 1);
       context.rentEndDate = fmt(end);
       context.rentEndTime = timeStr;
     } else if (when === "2days") {
-      const end = new Date(startRef);
-      end.setDate(startRef.getDate() + 2);
+      const end = new Date(today);
+      end.setDate(today.getDate() + 2);
       context.rentEndDate = fmt(end);
       context.rentEndTime = timeStr;
     } else {
