@@ -1,6 +1,6 @@
 // /components/CarSubmissionForm.tsx
 "use client";
-import React, { useEffect, useId, useState } from "react";
+import React, { useEffect, useId, useMemo, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -60,7 +60,13 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
   const [blogTags, setBlogTags] = useState<string>(((vehicleToEdit?.specs as any)?.tags ?? []).join(", "));
   const [streamTitle, setStreamTitle] = useState<string>((vehicleToEdit?.specs as any)?.title ?? "");
   const [streamSlug, setStreamSlug] = useState<string>(vehicleToEdit?.model ?? "");
-  const defaultStreamTemplate = JSON.stringify({
+  // Memoize defaultStreamTemplate so it's stable across renders.
+  // Previously this was a plain JSON.stringify(...) call that ran on EVERY render,
+  // and since RANDOM_UNSPLASH uses Date.now(), the string was different each time.
+  // This caused the useEffect below (deps: [defaultStreamTemplate, vehicleToEdit])
+  // to fire on every render, resetting vinValue/specs/gallery back to initial
+  // values — making the VIN input and specs fields impossible to type in.
+  const defaultStreamTemplate = useMemo(() => JSON.stringify({
     title: "Пример стрима",
     sections: [
       {
@@ -80,7 +86,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
         text: "Основная секция: сюда можно добавить ссылку на видос и т.d.",
       },
     ],
-  }, null, 2);
+  }, null, 2), []);
   const [streamSpecsRaw, setStreamSpecsRaw] = useState<string>(() => {
     if (vehicleToEdit?.specs) return JSON.stringify(vehicleToEdit.specs, null, 2);
     return defaultStreamTemplate;
