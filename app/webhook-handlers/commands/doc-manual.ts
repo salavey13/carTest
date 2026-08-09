@@ -1352,11 +1352,14 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         ? context.saleColor
         : (bike.specs?.color || "уточняется");
       const bikeCatalogVin = String(bike.specs?.vin || bike.specs?.frame || bike.specs?.vin_number || "").trim();
+      // VIN: leave BLANK (not "уточняется") when no VIN is available.
+      // The contract template will show an empty field — better to have no VIN
+      // than a fake "уточняется" placeholder that looks like data.
       const effectiveVin = context.saleVinSkipped
-        ? "уточняется"
+        ? ""
         : (context.saleVin != null && context.saleVin !== ""
             ? context.saleVin
-            : (bikeCatalogVin || "уточняется"));
+            : bikeCatalogVin);
       logger.info(`[/doc] SALE overrides: color=${effectiveColor} vin=${effectiveVin} (saleColor=${context.saleColor ?? "<unset>"} saleVin=${context.saleVin ?? "<unset>"} skipped=${!!context.saleVinSkipped})`);
       vars = {
         contract_number: `${now.getDate()}.${now.getMonth() + 1}/${bike.id}`,

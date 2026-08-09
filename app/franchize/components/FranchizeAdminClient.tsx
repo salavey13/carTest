@@ -100,22 +100,6 @@ const readVehicleSpecs = (vehicle: Vehicle): Record<string, unknown> =>
     ? (vehicle.specs as Record<string, unknown>)
     : {};
 
-const buildSyntheticVin = (vehicle: Vehicle) => {
-  const vehicleYear = "year" in vehicle ? String(vehicle.year ?? "") : "";
-  const raw =
-    `${vehicle.make ?? ""}${vehicle.model ?? ""}${vehicleYear}${vehicle.id ?? ""}`.toUpperCase();
-  const mapped = raw
-    .replace(/I/g, "1")
-    .replace(/O/g, "0")
-    .replace(/Q/g, "0")
-    .replace(/[^A-Z0-9]/g, "");
-  const normalized = mapped
-    .split("")
-    .map((char) => (VIN_ALLOWED.includes(char) ? char : "X"))
-    .join("");
-  return (normalized + "CARTESTVIN00000000").slice(0, 17);
-};
-
 interface FranchizeAdminClientProps {
   initialSlug: string;
   editId?: string;
@@ -156,7 +140,6 @@ export function FranchizeAdminClient({
   const [reviews, setReviews] = useState<RentalReviewVM[]>([]);
   const [successfulRentals, setSuccessfulRentals] = useState<FranchizeSuccessfulRentalVM[]>([]);
   const [retryingOrderId, setRetryingOrderId] = useState<string | null>(null);
-  const [isBulkFillingVin, setIsBulkFillingVin] = useState(false);
   const [moderatingReviewId, setModeratingReviewId] = useState<string | null>(
     null,
   );
@@ -351,54 +334,17 @@ export function FranchizeAdminClient({
     };
   }, [fleet]);
 
-  const handleBulkFillVin = useCallback(async () => {
-    if (!vinAudit.missing.length) return;
-    // L4 fix: confirm before generating synthetic VINs — these are NOT real VINs
-    // and should not be used in legal documents. Warn the operator.
-    const confirmed = window.confirm(
-      `Внимание! Будут сгенерированы ${vinAudit.missing.length} синтетических VIN-номеров.\n\n` +
-      `Это НЕ настоящие VIN — они созданы из марки/модели/ID техники и помечены ` +
-      `"CARTESTVIN" в конце.\n\n` +
-      `Используйте только для внутреннего учёта. Не указывайте эти VIN в договорах ` +
-      `купли-продажи или страховых документах.\n\n` +
-      `Продолжить?`
-    );
-    if (!confirmed) return;
-    setIsBulkFillingVin(true);
-    try {
-      for (const vehicle of vinAudit.missing) {
-        const syntheticVin = buildSyntheticVin(vehicle);
-        const response = await fetch("/api/cars", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...vehicle,
-            specs: {
-              ...readVehicleSpecs(vehicle),
-              vin: syntheticVin,
-              vin_is_synthetic: true, // L4: flag as synthetic for future audit
-            },
-          }),
-        });
-        if (!response.ok)
-          throw new Error(
-            `VIN bulk-fill failed for ${vehicle.make} ${vehicle.model}`,
-          );
-      }
-      toast.success(
-        `Сгенерировано ${vinAudit.missing.length} синтетических VIN (помечены как ненастоящие)`,
-      );
-      await loadFleet();
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Не удалось выполнить bulk-fill VIN",
-      );
-    } finally {
-      setIsBulkFillingVin(false);
-    }
-  }, [vinAudit.missing, loadFleet]);
+  // VIN quick-edit: clicking a bike in the missing-VIN list selects it for editing
+  // in the CarSubmissionForm below. No bogus VIN generation — the operator must
+  // enter the real VIN manually.
+  const handleQuickEditMissingVin = useCallback((vehicleId: string) => {
+    const vehicle = fleet.find((v) => v.id === vehicleId) ?? null;
+    setSelectedVehicle(vehicle);
+    // Scroll to the edit form
+    setTimeout(() => {
+      document.getElementById("vehicle-edit-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+  }, [fleet]);
 
   const { theme: globalTheme } = useTheme();
   const isLightMode = globalTheme === "light";
@@ -592,20 +538,35 @@ export function FranchizeAdminClient({
             / {vinAudit.total} заполнено
           </p>
           {vinAudit.missing.length > 0 && (
-            <p className="mt-1 text-xs text-amber-300">
-              Пустых VIN: {vinAudit.missing.length}
-            </p>
-          )}
-          {vinAudit.missing.length > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-2 h-8 text-xs"
-              onClick={() => void handleBulkFillVin()}
-              disabled={isBulkFillingVin}
-            >
-              {isBulkFillingVin ? "Заполняю VIN…" : "Заполнить VIN пачкой"}
-            </Button>
+            <>
+              <p className="mt-1 text-xs text-amber-300">
+                Пустых VIN: {vinAudit.missing.length} — нажмите на байк чтобы ввести VIN:
+              </p>
+              <div className="mt-2 space-y-1">
+                {vinAudit.missing.map((vehicle) => (
+                  <button
+                    key={vehicle.id}
+                    type="button"
+                    onClick={() => handleQuickEditMissingVin(vehicle.id)}
+                    className="flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left text-xs transition hover:opacity-80"
+                    style={{
+                      borderColor: "var(--fr-admin-border)",
+                      backgroundColor: withAlpha(resolvedPalette.accentMain, 0.06),
+                      color: "var(--fr-admin-text)",
+                    }}
+                  >
+                    <span className="shrink-0 text-amber-400">⚠</span>
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="font-medium">{vehicle.make} {vehicle.model}</span>
+                      <span className="ml-1 opacity-60">({vehicle.id})</span>
+                    </span>
+                    <span className="shrink-0 text-[10px] font-semibold" style={{ color: resolvedPalette.accentMain }}>
+                      Ввести VIN →
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </FranchizeOperatorPanel>
@@ -782,11 +743,13 @@ export function FranchizeAdminClient({
                 </button>
               ))}
             </div>
-            <CarSubmissionForm
-              ownerId={dbUser?.user_id}
-              vehicleToEdit={selectedVehicle}
-              onSuccess={() => loadFleet()}
-            />
+            <div id="vehicle-edit-form">
+              <CarSubmissionForm
+                ownerId={dbUser?.user_id}
+                vehicleToEdit={selectedVehicle}
+                onSuccess={() => loadFleet()}
+              />
+            </div>
           </>
         ) : (
           <div className="py-3 text-sm text-muted-foreground text-center">

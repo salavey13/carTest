@@ -631,8 +631,10 @@ export function buildRentalContractVariables(
     .join(" ")
     .trim();
 
-  // VIN resolution priority
-  const vin = bikeSpecs.vin || bikeSpecs.frame || bikeSpecs.vin_number || "уточняется";
+  // VIN resolution priority — leave BLANK (not "уточняется") when no VIN available.
+  // The contract template will show an empty field — better to have no VIN
+  // than a fake "уточняется" placeholder that looks like data.
+  const vin = bikeSpecs.vin || bikeSpecs.frame || bikeSpecs.vin_number || "";
 
   // Year resolution
   const year = String(bikeSpecs.year || bikeSpecs.production_year || "уточняется");
