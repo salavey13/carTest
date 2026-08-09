@@ -18,7 +18,7 @@
 - **Расходы:** зарплата сотрудников (механики, менеджеры), переводы из кассы
 - **Зарплата:** расчет ЗП с бонусами от аренды/продаж/услуг сервиса с выплатами 10 и 25 числа
 - **Ежедневная отчетность:** для ассистента и владельца экипажа
-- **Оборудование:** учет выдачи шлемов и экипировки (сейчас частично в `rental_handoffs`, но без финансов)
+- **Оборудование:** учет выдачи шлемов и экипировки (требуется новая таблица `equipment_rentals`, т.к. `rental_handoffs` не существует)
 
 ### 1.2 Current Architecture Analysis
 
@@ -44,21 +44,23 @@ private.sale_contract_artifacts   -- contract_key, buyer_*, sale_price, warranty
 #### ❌ Identified Gaps:
 
 1. **NO `service_operations` table** — услуги сервиса (сборка, настройка, ремонт) хранятся только в `rentals.metadata->service_description` без структуризации
-2. **NO `equipment_rentals` table** — шлемы выдаются через `rental_handoffs` (если существует), но нет отдельного финансового учета аренды оборудования
+2. **NO `equipment_rentals` table** — шлемы и оборудование не имеют отдельного финансового учета аренды
 3. **NO `cash_transactions` ledger** — доходы/расходы разрознены по таблицам, нет единого cash flow
 4. **NO `commission_rates` configuration** — ставки комиссий менеджерам не настраиваются гибко
 5. **NO `salary_plans` with payout schedule** — нет плана ЗП с привязкой к 10 и 25 числам
-6. **NO `crew_member_shifts` table** (not in supabase.txt!) — почасовой учет смен не реализован
-7. **NO `rental_handoffs` table** (not in supabase.txt!) — выдача/возврат оборудования не отслеживается явно
-8. **NO `document_drafts` table** — состояние черновиков документов не сохраняется
+6. **NO `rental_handoffs` table** — выдача/возврат оборудования (шлемов) не отслеживается явно в БД
+7. **NO `document_drafts` table** — состояние черновиков документов не сохраняется между сессиями
 
-#### ⚠️ Important Findings:
+#### ⚠️ Important Findings from Investigation:
 
-- **`rental_handoffs` does NOT exist** in current schema (supabase.txt) — need to create it or use alternative tracking
-- **`crew_member_shifts` does NOT exist** — salary calculation based on shifts is not implemented
-- **`document_drafts` does NOT exist** — doc-manual.ts state persistence needs new table
-- **"vip-bike" is a crew slug** — should NEVER be hardcoded; use `[slug]` parameter everywhere
-- **Existing sales-analytics** (`app/franchize/[slug]/sales-analytics/SalesAnalyticsClient.tsx`) shows `SaleDashboardItem` without delivery method field
+- **`rental_handoffs` does NOT exist** in current schema (supabase.txt 2026-07-23) — выдача шлемов НЕ отслеживается на уровне БД
+- **`crew_member_shifts` does NOT exist** in schema BUT `/shift` bot command IS implemented (`app/webhook-handlers/commands/shift.ts`)
+  - Shift tracking uses `crew_members.live_status` ('offline' | 'online' | 'riding')
+  - Clock-in/clock-out updates `live_status` but does NOT log hours for salary calculation
+  - **Decision needed:** Create `crew_member_shifts` table for hour-based salary OR use simplified flat-rate per shift
+- **`document_drafts` does NOT exist** — doc-manual.ts state persistence needs new table (PRD #2 proposes this)
+- **"vip-bike" is a crew slug** — NEVER hardcoded; all paths use `[slug]` parameter ✅
+- **Existing sales-analytics** (`app/franchize/[slug]/sales-analytics/SalesAnalyticsClient.tsx`) shows `SaleDashboardItem` without delivery method field — needs update
 
 ### 1.3 Franchise Architecture Alignment
 
