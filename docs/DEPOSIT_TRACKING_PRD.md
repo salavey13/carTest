@@ -405,13 +405,13 @@ Both link to `rentals.rental_id` via FK. They are complementary:
 - `rental_handoffs` = "Did we check the passport? What was the odometer? Was there damage?"
 - `deposit_entries` = "How much deposit was collected? Was it cash or card? Which card? Was it returned?"
 
-**Apply `rental_handoffs` migration first** (fixed version with `auth.jwt() ->> 'chat_id'` instead of `auth.uid()`).
+**Apply `rental_handoffs` migration first** — ✅ DONE (applied 2026-08-10, fixed `auth.jwt() ->> 'chat_id'`).
 
 ---
 
 ## 8. IMPLEMENTATION PLAN
 
-1. **Fix + apply** `rental_handoffs` migration (auth.uid() → auth.jwt() ->> 'chat_id')
+1. ✅ **DONE:** `rental_handoffs` migration applied (2026-08-10, fixed auth.jwt())
 2. **Migration:** `create_deposit_entries.sql` (table + view + RLS + backfill from deposit_log)
 3. **doc-manual.ts:** Add `deposit_destination` state after `deposit_choice`
 4. **doc-manual.ts:** Support split deposits (cash + card)

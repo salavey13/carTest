@@ -1,9 +1,9 @@
 # FRANCHIZE-WIDE SERVICE OPERATIONS & PAYROLL SYSTEM PRD
 
-**Version:** 3.0 (Polished — cross-referenced with production Supabase + actual code)
-**Date:** 2026-08-09
+**Version:** 4.0 (Final — cross-referenced with production Supabase + actual code)
+**Date:** 2026-08-10
 **Status:** Ready for Implementation
-**Related:** `docs/PRD_AUDIT_FINDINGS.md` (full audit), `docs/DOC_MANUAL_STEP_CORRECTION_PRD.md`
+**Related:** `docs/PRD_AUDIT_FINDINGS.md`, `docs/DOC_MANUAL_STEP_CORRECTION_PRD.md`, `docs/DEPOSIT_TRACKING_PRD.md`
 
 ---
 
@@ -18,7 +18,8 @@ Before reading this PRD, understand what ACTUALLY exists in production:
 | `rentals` | public | `rental_id UUID PK, user_id, vehicle_id→cars, owner_id, crew_id, status, total_cost, metadata JSONB` — equipment NOT stored in metadata |
 | `crew_members` | public | `id UUID PK, crew_id→crews, user_id→users, role(owner\|co_owner\|admin\|mechanic\|member), membership_status, live_status` |
 | `crew_member_shifts` | public | `id, member_id, crew_id, clock_in_time, clock_out_time, duration_minutes(generated), hourly_rate, salary_amount(generated), shift_type, notes, checkpoint JSONB, actions JSONB` — trigger `trg_calc_shift_salary` auto-calcs salary |
-| `deposit_log` | public | `id, rental_id→rentals, action(collected\|returned), amount, method(cash\|bank_transfer\|telegram_stars\|none), operator_chat_id, notes` |
+| `deposit_log` | public | `id, rental_id→rentals, action(collected\|returned), amount, method(cash\|bank_transfer\|telegram_stars\|none), operator_chat_id, notes` — 14 rows, all method='cash' |
+| `rental_handoffs` | public | ✅ **APPLIED 2026-08-10** — odometer, fuel/battery, equipment checklist, damage notes, handout/return phases |
 | `franchize_intents` | public | `id, slug, bike_id, intent_type, stage, metadata JSONB, telegram_user_id, phone` |
 | `crew_todos` | public | `id, crew_id, lead_id, user_id, rental_id→rentals, title, status, priority, category, description JSONB` |
 | `user_states` | public | `user_id, state, context JSONB, expires_at(30min)` — already used by doc-manual.ts for draft persistence |
@@ -29,7 +30,6 @@ Before reading this PRD, understand what ACTUALLY exists in production:
 ### Tables that DO NOT EXIST (despite migration files):
 | Table | Migration exists? | Applied? |
 |-------|-------------------|----------|
-| `rental_handoffs` | ✅ `20260623000003_rental_handoffs.sql` | ❌ NEVER APPLIED |
 | `subrent_contract_artifacts` | ✅ `20260624000000` | ❌ NEVER APPLIED |
 | `testdrive_contract_artifacts` | ✅ `20260809000000` | ❌ NOT YET APPLIED |
 | `commercial_proposal_artifacts` | ✅ `20260617000001` | ❌ NEVER APPLIED |
@@ -60,7 +60,7 @@ The franchise needs:
 |----------|---------|---------------|
 | `service_operations` table | Services already work as `rentals` with `cars.type='service'` | Extend `rentals.metadata` if needed |
 | `document_drafts` table | `user_states` already persists drafts (30-min TTL) | Extend `user_states` with step columns |
-| `rental_handoffs` table (from old migration) | Migration exists but never applied; equipment_rentals covers the gap | `equipment_rentals` (this PRD) |
+| `rental_handoffs` table | ✅ **APPLIED** (2026-08-10, fixed auth.jwt()) — tracks physical handout/return checklist | Use existing `rental_handoffs` for equipment checklist at handout/return; `equipment_rentals` for standalone equipment rental |
 
 ### 1.3 What We ARE Creating
 
@@ -665,7 +665,7 @@ LIMIT 1;
 - Accessible via **skill** (`deposit-tracer-text`)
 - Admin debug page at `/franchize/[slug]/admin/deposits`
 
-**Also:** Apply the fixed `rental_handoffs` migration (`20260623000003_rental_handoffs.sql`) — fixed `auth.uid()` → `auth.jwt() ->> 'chat_id'` (was causing "operator does not exist: text = uuid" error). Code (`rental-handoffs.ts` + `RentalHandoffModal.tsx`) already expects this table.
+**Also:** `rental_handoffs` migration was applied on 2026-08-10 (fixed `auth.uid()` → `auth.jwt() ->> 'chat_id'`). Table now exists in production. Code (`rental-handoffs.ts` + `RentalHandoffModal.tsx`) works.
 
 ---
 
