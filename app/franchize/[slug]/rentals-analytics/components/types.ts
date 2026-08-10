@@ -55,6 +55,9 @@ export interface AnalyticsSaleRow {
   created_at: string;
   resolved_bike_id: string | null;
   vehicle?: AnalyticsVehicle | null;
+  delivery_method?: string | null;
+  transport_company_name?: string | null;
+  transport_payment_type?: string | null;
 }
 
 export interface AnalyticsKpis {
