@@ -409,18 +409,62 @@ Both link to `rentals.rental_id` via FK. They are complementary:
 
 ---
 
-## 8. IMPLEMENTATION PLAN
+## 8. CORNER CASES
+
+| Scenario | What happens |
+|----------|-------------|
+| All cash deposit (20 000₽) | 1 row: `deposit_collected 20000 in cash` |
+| All T-Bank deposit (20 000₽) | 1 row: `deposit_collected 20000 in tbank` |
+| All Sber deposit (20 000₽) | 1 row: `deposit_collected 20000 in sber` |
+| Split: 5000 cash + 15000 T-Bank | 2 rows: `5000 in cash` + `15000 in tbank` |
+| Split: 5000 cash + 15000 Sber | 2 rows: `5000 in cash` + `15000 in sber` |
+| Split: 10000 T-Bank + 10000 Sber | **NOT SUPPORTED** — split is cash + ONE card only. If operator needs 2 cards, they collect one card, then manually add a second entry via admin page |
+| СТС instead of deposit | 0 rows — no cash deposit collected. `deposit_destination` step skipped entirely |
+| Deposit = 0 (free rental) | 0 rows — `deposit_destination` step skipped (nothing to track) |
+| Custom deposit amount (15000 instead of 20000) | `deposit_choice` → custom → `deposit_destination` → pick where |
+| Penalty: 3000 withheld for damage | `penalty 3000 out` + `deposit_returned 17000 out` (both to original destination(s)) |
+| Auto-return on completion | For each `deposit_collected` row, create matching `deposit_returned` row with SAME destination + amount |
+| Auto-return with split deposit | 2 return rows: `5000 out cash` + `15000 out tbank` |
+| Manual return (operator returns less than collected) | Operator specifies amount + destination. May differ from collection (e.g., collected 20k cash, return 17k on T-Bank — penalty scenario) |
+| Deposit returned partially, then rest later | 2 separate `deposit_returned` entries with different timestamps |
+| Rental cancelled before return | `deposit_returned` entries created with full amount, same destination(s) |
+| Multiple deposits on same rental (re-collect) | Allowed — multiple `deposit_collected` rows. Each return matches the most recent collection |
+
+---
+
+## 9. SKILLS & PAGES THAT BENEFIT
+
+| Skill/Page | Enhancement |
+|------------|------------|
+| `deposit-tracer-text` (NEW) | Full deposit querying: list, balance, per-rental, per-card |
+| `rental-card-text` | Show deposit destination breakdown: "Депозит: 20к (💵5к + 💳Т15к)" |
+| `rental-analytics-text` | `rental-detail` command shows deposit history for a rental |
+| `leads-crm-text` | Lead card shows if deposit was collected (green badge) or pending |
+| Evening digest (`evening-summary.sh`) | Add deposit summary section: "💵 Cash: +15к, 💳 T-Bank: +40к, 💳 Sber: +0" |
+| Morning standup (`morning-standup.sh`) | Show yesterday's deposit balance per card |
+| Profile page "My Work" | Show deposits collected today by this operator, per destination |
+| `/franchize/[slug]/admin/deposits` (NEW) | Visual deposit tracker with date/destination filters |
+| `/franchize/[slug]/rentals-analytics` | Rental card badge: 💰 20к (💵5к 💳Т15к) → returned |
+| `/franchize/[slug]/sales-analytics` | No deposit tracking (sales don't have deposits) |
+| `vip-bike-ops` skill | "Полная сводка за день" includes deposit per-card summary |
+| `analytics-text` | "Сколько на картах?" → deposit-balance command |
+
+---
+
+## 10. IMPLEMENTATION PLAN
 
 1. ✅ **DONE:** `rental_handoffs` migration applied (2026-08-10, fixed auth.jwt())
 2. **Migration:** `create_deposit_entries.sql` (table + view + RLS + backfill from deposit_log)
-3. **doc-manual.ts:** Add `deposit_destination` state after `deposit_choice`
-4. **doc-manual.ts:** Support split deposits (cash + card)
+3. **doc-manual.ts:** Add `deposit_destination` state after `deposit_choice` (see DOC_MANUAL_PRD §3.3)
+4. **doc-manual.ts:** Support split deposits (cash + one card)
 5. **doc-manual.ts:** Insert into `deposit_entries` on deposit collection
 6. **Trigger:** Auto-create `deposit_returned` entries on rental completion (copies destinations)
 7. **Rental card:** Show deposit badge with destination breakdown
 8. **Admin page:** `/franchize/[slug]/admin/deposits` visual tracker
 9. **Skill:** `deposit-tracer-text` for text-based deposit queries
 10. **Evening digest:** Add deposit summary per card to `evening-summary.sh`
+11. **Morning standup:** Add previous day's deposit balance
+12. **Profile page "My Work":** Show deposits collected today per destination
 
 ---
 

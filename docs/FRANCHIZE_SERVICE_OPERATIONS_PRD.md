@@ -693,7 +693,31 @@ LIMIT 1;
 
 ---
 
-## 9. IMPLEMENTATION PLAN
+## 9. SKILLS & PAGES THAT BENEFIT
+
+| Skill/Page | Enhancement |
+|------------|------------|
+| `rental-analytics-text` | Rental detail shows commission earned on this rental |
+| `sale-analytics-text` | Sale detail shows commission earned on this sale |
+| `service-analytics-text` | Service detail shows technician cost + commission |
+| `leads-crm-text` | Lead card shows total revenue generated (rentals + sales + services + equipment) |
+| Evening digest | Add commission + salary expense to daily summary; add "My Work" section per operator |
+| Morning standup | Show yesterday's cash flow: income by type, expenses (commissions + salaries), net |
+| Profile page "My Earnings" | Salary plan: accrued, paid, balance; next payout date; commission breakdown |
+| Profile page "My Work" | Today's rentals/sales/services by this operator + shift income + commissions = total earned today |
+| `/franchize/[slug]/crew/members` | Per-member salary summary (accrued, balance, last shift) |
+| `/franchize/[slug]/crew/shifts` | Show shift income + accumulated commission for active shift |
+| `/franchize/[slug]/admin` | Cash flow summary card: today's income vs expenses vs net |
+| `vip-bike-ops` skill | "Сколько заработали за месяц?" now includes commissions + salaries in the total |
+| `analytics-text` | "KPI экипажа" includes net cash flow (income - expenses) |
+| `leaderboard-text` | Rank crew members by total earnings (shifts + commissions), not just shift hours |
+| `shift-tracker-text` | Active shift shows real-time earnings: shift income + commissions earned during shift |
+| `rental-card-text` | Rental card shows: deposit status (from deposit_entries), commission earned, equipment issued |
+| `deposit-tracer-text` | Cross-references deposit_entries with cash_transactions for full financial picture |
+
+---
+
+## 10. IMPLEMENTATION PLAN
 
 **Phase 1 (Days 1-2):** DB migrations (equipment_rentals, cash_transactions, commission_rates, salary_plans, salary_calculations, seed equipment items)
 
@@ -703,13 +727,16 @@ LIMIT 1;
 
 **Phase 4 (Days 7-8):** API endpoints (equipment-rentals, cash-transactions, daily-report, salary)
 
-**Phase 5 (Days 9-10):** Profile page "My Earnings" section + crew members salary summary
+**Phase 5 (Days 9-10):** Profile page "My Earnings" + "My Work" sections + crew members salary summary
 
-**Phase 6 (Days 11-12):** Testing & deployment
+**Phase 6 (Days 11-12):** Skills updates (evening digest, morning standup, vip-bike-ops, analytics-text, leaderboard-text, shift-tracker-text)
+
+**Phase 7 (Days 13-14):** Testing & deployment
 
 ---
 
 **Document History:**
 - v1.0 (2026-08-09): Initial draft by other agent — contained many inaccuracies about existing schema
 - v2.0 (2026-08-09): First audit by Super Z — found 17 issues
-- v3.0 (2026-08-09): Polished by Super Z — direct Supabase queries confirmed production state, removed `service_operations` table (reuse rentals pattern), removed `document_drafts` (extend user_states), fixed all auth.uid() → auth.jwt() ->> 'chat_id', fixed all triggers to use SECURITY DEFINER + COALESCE for created_by
+- v3.0 (2026-08-09): Polished by Super Z — direct Supabase queries confirmed production state
+- v4.0 (2026-08-10): rental_handoffs applied; added §9 skills/pages extensions; added Phase 6 for skills updates
