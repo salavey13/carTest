@@ -337,20 +337,32 @@ export function FranchizeAdminClient({
   // VIN quick-edit: clicking a bike in the missing-VIN list selects it for editing
   // in the CarSubmissionForm below. No bogus VIN generation — the operator must
   // enter the real VIN manually.
-  // FIX: removed the auto-scrollIntoView() call — it scrolled too far down past the form,
-  // forcing operators to scroll back up. The form is rendered in the same panel below;
-  // a brief highlight pulse is enough to draw the eye without disorienting the user.
+  //
+  // FIX v2: User requested the scroll be brought back but more precise.
+  // Original bug: `block: "center"` forced a full scroll that put the form
+  // in the middle of the viewport — but the form was FAR down the page, so
+  // the user had to scroll back UP past the entire fleet table to find context.
+  // v1 fix removed the scroll entirely, but user missed the scroll.
+  //
+  // v2 strategy: use `block: "nearest"` so it only scrolls if the form is
+  // NOT already visible. Combined with a brief highlight ring so the eye is
+  // drawn to the right place after scroll settles.
   const handleQuickEditMissingVin = useCallback((vehicleId: string) => {
     const vehicle = fleet.find((v) => v.id === vehicleId) ?? null;
     setSelectedVehicle(vehicle);
-    // Briefly highlight the edit form (no scroll) so the user notices the change.
-    const formEl = document.getElementById("vehicle-edit-form");
-    if (formEl) {
-      formEl.classList.add("ring-2", "ring-amber-400/60", "ring-offset-2", "ring-offset-transparent");
-      setTimeout(() => {
-        formEl.classList.remove("ring-2", "ring-amber-400/60", "ring-offset-2", "ring-offset-transparent");
-      }, 1200);
-    }
+    setTimeout(() => {
+      const formEl = document.getElementById("vehicle-edit-form");
+      if (formEl) {
+        formEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        // Briefly highlight the form so the user notices it after scroll settles
+        setTimeout(() => {
+          formEl.classList.add("ring-2", "ring-amber-400/60", "ring-offset-2", "ring-offset-transparent");
+          setTimeout(() => {
+            formEl.classList.remove("ring-2", "ring-amber-400/60", "ring-offset-2", "ring-offset-transparent");
+          }, 1500);
+        }, 250);
+      }
+    }, 50);
   }, [fleet]);
 
   const { theme: globalTheme } = useTheme();
