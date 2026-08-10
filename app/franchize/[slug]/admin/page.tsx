@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { FranchizeAdminClient } from "@/app/franchize/components/FranchizeAdminClient";
 import { FranchizeErrorBoundary } from "../../components/ErrorBoundary";
-import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { FranchizePageShell } from "../../components/FranchizePageShell";
 import { getFranchizeBySlug } from "../../actions";
@@ -70,7 +69,7 @@ export default async function FranchizeSlugAdminPage({
           />
         </FranchizeErrorBoundary>
       </FranchizePageShell>
-      <CrewFooter crew={crew} />
+      {/* FIX: CrewFooter removed — admin page doesn't need footer (per user request). */}
     </main>
   );
 }
