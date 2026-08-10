@@ -760,10 +760,11 @@ interface DocFlowContext {
   depositCardAmount?: number;      // card portion of deposit (0 if all cash)
 
   // ── Step tracking (added 2026-08-10) ──────────────────────────────────────
-  // Used for step numbering ("Шаг 3/17") and step correction.
+  // Used for step numbering ("Шаг 3/16") and step correction.
   currentStep?: number;
   totalSteps?: number;
   correctedSteps?: number[];
+  correctingStepState?: string; // When set, step_correction handler routes input to this step's parser
 
   // ── Delivery method (added 2026-08-10 — sale only) ────────────────────────
   saleDeliveryMethod?: 'pickup' | 'transport_company';
@@ -3212,29 +3213,104 @@ export async function handleDocText(userId: string, chatId: number, text: string
   }
 
   // ── Step correction text handler ───────────────────────────────────────────
+  // Two modes:
+  // 1. No correctingStepState set → user is entering the step NUMBER to correct
+  // 2. correctingStepState set → user is entering the NEW VALUE for that step
   if (state === "step_correction") {
+    // Mode 2: User is entering the corrected value
+    if (context.correctingStepState) {
+      const targetState = context.correctingStepState;
+      const trimmedText = text.trim();
+
+      // Process the input based on which step we're correcting
+      let parseError = false;
+      switch (targetState) {
+        case 'name':
+          context.mpFullName = capitalizeFullName(trimmedText);
+          break;
+        case 'birth':
+          context.mpBirthDate = trimmedText;
+          break;
+        case 'address':
+          context.mpRegistration = trimmedText;
+          break;
+        case 'sale_color':
+          context.saleColor = trimmedText;
+          break;
+        case 'sale_vin':
+          if (trimmedText.length >= 5) {
+            context.saleVin = trimmedText.toUpperCase();
+            context.saleVinSkipped = false;
+          } else {
+            parseError = true;
+          }
+          break;
+        case 'sale_transport':
+          if (trimmedText.length >= 2) {
+            context.saleTransportCompany = trimmedText;
+          } else {
+            parseError = true;
+          }
+          break;
+        case 'passport': {
+          const p = parsePassport(trimmedText);
+          if (p) {
+            context.mpSeries = p.series;
+            context.mpNumber = p.number;
+            context.mpIssueDate = p.issueDate;
+            context.mpIssuedBy = p.issuedBy;
+          } else {
+            parseError = true;
+          }
+          break;
+        }
+        default:
+          // For callback-only steps (deal, has_license, categories, price,
+          // deposit_choice, deposit_destination, equipment, odometer,
+          // payment_split, schedule_start, schedule_end, sale_delivery):
+          // We can't process text input — user must use the inline keyboard.
+          // Re-show the correction list and tell them to use buttons.
+          await sendComplexMessage(chatId,
+            `⚠️ Этот шаг можно изменить только кнопками. Выберите другой шаг или нажмите «Всё верно» на проверке.`,
+            [], { removeKeyboard: true });
+          context.correctingStepState = undefined;
+          const summary = context.dealType === 'sale'
+            ? buildSaleSummary(context, context.salePrice || "")
+            : buildRentSummary(context);
+          await setState(userId, "confirm", context);
+          await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+          return true;
+      }
+
+      if (parseError) {
+        await sendComplexMessage(chatId,
+          `❌ Неверный формат. Попробуйте ещё раз:`,
+          [], { removeKeyboard: true });
+        return true;
+      }
+
+      // Success — clear correction flag and return to confirm
+      logger.info(`[/doc] step_correction: ${userId} → corrected ${targetState}`);
+      context.correctingStepState = undefined;
+      const summary = context.dealType === 'sale'
+        ? buildSaleSummary(context, context.salePrice || "")
+        : buildRentSummary(context);
+      await setState(userId, "confirm", context);
+      await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+      return true;
+    }
+
+    // Mode 1: User is entering the step NUMBER to correct
     const visibleSteps = getVisibleSteps(context);
     const stepNum = parseInt(text.trim());
-    if (isNaN(stepNum) || stepNum < 1) {
+    if (isNaN(stepNum) || stepNum < 1 || stepNum > visibleSteps.length) {
       await sendComplexMessage(chatId,
         `⚠️ Введите номер шага от 1 до ${visibleSteps.length}`,
         [], { removeKeyboard: true });
       return true;
     }
-    // Find by number (visibleSteps are 1-indexed by position, not by .num)
+
     const step = visibleSteps[stepNum - 1];
-    if (!step) {
-      await sendComplexMessage(chatId,
-        `⚠️ Нет такого шага. Введите число от 1 до ${visibleSteps.length}`,
-        [], { removeKeyboard: true });
-      return true;
-    }
-    // Track corrected step
-    const stepKey = typeof step.num === 'number' ? step.num : step.num;
-    context.correctedSteps = context.correctedSteps || [];
-    if (!context.correctedSteps.includes(stepKey as number)) {
-      context.correctedSteps.push(stepKey as number);
-    }
     logger.info(`[/doc] step_correction: ${userId} → correcting step ${step.num} (${step.state})`);
 
     // Special handling: correcting step 1 (deal type) resets everything
@@ -3245,12 +3321,29 @@ export async function handleDocText(userId: string, chatId: number, text: string
       return true;
     }
 
-    // Route to the step's question handler
-    // The state machine will re-ask the question; after answering, the flow
-    // continues normally (which may go to confirm if it's the last step,
-    // or to the next step if mid-flow).
-    await setState(userId, step.state, context);
-    await reAskStep(chatId, userId, context, step.state);
+    // Check if this is a text-input step or callback-only step
+    const textInputSteps = ['name', 'passport', 'birth', 'address', 'sale_color', 'sale_vin', 'sale_transport'];
+    if (textInputSteps.includes(step.state)) {
+      // Text-input step: store the target state, show "Было:" prompt
+      context.correctingStepState = step.state;
+      await setState(userId, "step_correction", context);
+      await reAskStep(chatId, userId, context, step.state);
+    } else {
+      // Callback-only step: re-show the inline keyboard for that step
+      // The user picks a new value via buttons, then the callback handler
+      // will advance normally. After the callback, the flow continues from
+      // that step (which may re-ask subsequent steps).
+      // For simplicity, we just tell the user to use the keyboard on the
+      // verification screen and return to confirm.
+      await sendComplexMessage(chatId,
+        `⚠️ Шаг "${step.label}" можно изменить только кнопками.\n\nВернитесь к проверке и начните заново для этого шага.`,
+        [], { removeKeyboard: true });
+      const summary = context.dealType === 'sale'
+        ? buildSaleSummary(context, context.salePrice || "")
+        : buildRentSummary(context);
+      await setState(userId, "confirm", context);
+      await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+    }
     return true;
   }
 
