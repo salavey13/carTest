@@ -1,9 +1,9 @@
 # DEPOSIT TRACKING ENHANCEMENT PRD
 
-**Version:** 2.0 (Simplified — deposits only, no payment types)
-**Date:** 2026-08-10
-**Status:** Ready for Implementation
-**Related:** `docs/FRANCHIZE_SERVICE_OPERATIONS_PRD.md` §6.6, `docs/DOC_MANUAL_STEP_CORRECTION_PRD.md`
+**Version:** 2.1 (Post-implementation audit — statuses synced, trigger idempotency gap specced, signature/placement fixes)
+**Date:** 2026-08-10 (audited 2026-08-11)
+**Status:** ⚠️ Partially Implemented — DB + collection + auto-return ✅ shipped (2026-08-10); penalty capture, admin page, skill, digest integration ⏳ pending. **One trigger bug must be fixed — see §3.2a.**
+**Related:** `docs/FRANCHIZE_SERVICE_OPERATIONS_PRD.md` §6.6, `docs/DOC_MANUAL_STEP_CORRECTION_PRD.md`, `docs/META_PRD_ITERATIVE_IMPLEMENTATION_PLAN.md`
 
 ---
 
@@ -160,7 +160,7 @@ Don't drop `deposit_log` — existing code writes to it. New code writes to `dep
 
 **Enhanced** — after choosing deposit amount, ask WHERE it was collected:
 
-**New state:** `deposit_destination` (between `deposit_choice` and `equipment`)
+**New state:** `deposit_destination` — placed **after `deposit_choice`, before `confirm`** (flow order: `equipment` → `payment_split` → `deposit_choice` → `deposit_destination` → `confirm`). ✅ IMPLEMENTED in `doc-manual.ts` as step 15/16 (2026-08-10). *v2.0 incorrectly said "between `deposit_choice` and `equipment`" — equipment comes much earlier in the flow.*
 
 ```
 Депозит: 20 000 ₽
@@ -209,6 +209,8 @@ VALUES ($rentalId, 'deposit_collected', 15000, 'in', 'tbank', $userId, 'Deposit 
 
 ### 3.2 Deposit Return on Rental Completion
 
+✅ **IMPLEMENTED** — `supabase/migrations/20260810000011_deposit_auto_return_trigger.sql` (2026-08-10). Covers both `completed` and `cancelled` transitions.
+
 Auto-create `deposit_returned` entries — copies destinations from the original collection:
 
 ```sql
@@ -226,7 +228,32 @@ WHERE de.rental_id = NEW.rental_id AND de.entry_type = 'deposit_collected';
 
 This returns each portion to its original destination — if 5000 was cash and 15000 was on T-Bank, the return creates two entries: 5000 cash out + 15000 T-Bank out.
 
+**Idempotency requirement (NEW in v2.1):** auto-return must fire AT MOST ONCE per collected entry. If a rental is re-opened (`completed` → `active`) and later re-completed, no duplicate `deposit_returned` rows may be created.
+
+### 3.2a 🔴 KNOWN BUG — completed-path trigger lacks the double-return guard
+
+`auto_return_deposit_entries()` (the `completed` path) inserts returns unconditionally. The code comment even says *"the insert above is idempotent only if we add a guard. Let's add a guard to prevent double-returns"* — **but no guard follows**. The cancellation-path function `auto_return_deposit_on_cancel()` DOES have the `NOT EXISTS` guard.
+
+**Impact:** rental re-opened then re-completed → duplicate `deposit_returned` rows → wrong balances in `daily_deposit_summary` and `getDepositSummary`.
+
+**Fix (apply as a follow-up migration):** add the same guard the cancel path already uses:
+
+```sql
+-- Inside auto_return_deposit_entries(), extend the SELECT with:
+AND NOT EXISTS (
+  SELECT 1 FROM public.deposit_entries ret
+  WHERE ret.rental_id = de.rental_id
+    AND ret.entry_type = 'deposit_returned'
+    AND ret.destination = de.destination
+    AND ret.amount = de.amount
+);
+```
+
+**Also required:** a one-time dedup query for production data if any rental was completed twice since 2026-08-10.
+
 ### 3.3 Penalty Withholding
+
+⏳ **NOT YET IMPLEMENTED (spec only, 2026-08-11 audit).** Aggregation support exists in `app/franchize/server-actions/deposit-entries.ts` (`totalPenalty`, per-destination `penalty`), and the `penalty` entry_type is in the schema CHECK — but **no insert path exists**: no doc-manual state, no operator UI, no API endpoint writes `penalty` rows. Tracked in the meta plan (Iteration I2).
 
 If the operator deducts from the deposit (damage, missing fuel, etc.):
 
@@ -295,24 +322,25 @@ Add deposit badge to each rental card:
 
 ### 4.2 New Server Action: `getDepositSummary(rentalId)`
 
+✅ **IMPLEMENTED** — `app/franchize/server-actions/deposit-entries.ts` (with `getDepositEntriesForDate`, `getDailyDepositSummary`; tests in `tests/franchize/deposit-entries.spec.ts`). Returns `null` for empty rentalId / no entries.
+
+**Actual shipped signature** (supersedes the v2.0 sketch — destinations carry full aggregates, not amount/direction pairs):
+
 ```typescript
 export async function getDepositSummary(rentalId: string): Promise<{
   totalCollected: number;
   totalReturned: number;
   totalPenalty: number;
   balance: number; // collected - returned - penalty
-  destinations: Array<{ destination: string; amount: number; direction: string }>;
+  destinations: Array<{
+    destination: string;   // 'cash' | 'tbank' | 'sber'
+    collected: number;
+    returned: number;
+    penalty: number;
+    net: number;           // collected - returned - penalty
+  }>;
   entries: Array<{ entryType: string; amount: number; destination: string; direction: string; notes: string; createdAt: string }>;
-}> {
-  const { data } = await supabaseAdmin
-    .from('deposit_entries')
-    .select('*')
-    .eq('rental_id', rentalId)
-    .order('created_at', { ascending: true });
-
-  // Aggregate by destination and type
-  // ...
-}
+} | null>
 ```
 
 ---
@@ -429,7 +457,7 @@ Both link to `rentals.rental_id` via FK. They are complementary:
 | Manual return (operator returns less than collected) | Operator specifies amount + destination. May differ from collection (e.g., collected 20k cash, return 17k on T-Bank — penalty scenario) |
 | Deposit returned partially, then rest later | 2 separate `deposit_returned` entries with different timestamps |
 | Rental cancelled before return | `deposit_returned` entries created with full amount, same destination(s) |
-| Multiple deposits on same rental (re-collect) | Allowed — multiple `deposit_collected` rows. Each return matches the most recent collection |
+| Multiple deposits on same rental (re-collect) | Allowed — multiple `deposit_collected` rows. ⚠️ **Corrected in v2.1:** the auto-return trigger creates a return for **EVERY** collected row (not "the most recent collection" as v2.0 said). Net effect is the same when amounts match; with differing amounts the return total = sum of ALL collections |
 
 ---
 
@@ -455,20 +483,22 @@ Both link to `rentals.rental_id` via FK. They are complementary:
 ## 10. IMPLEMENTATION PLAN
 
 1. ✅ **DONE:** `rental_handoffs` migration applied (2026-08-10, fixed auth.jwt())
-2. **Migration:** `create_deposit_entries.sql` (table + view + RLS + backfill from deposit_log)
-3. **doc-manual.ts:** Add `deposit_destination` state after `deposit_choice` (see DOC_MANUAL_PRD §3.3)
-4. **doc-manual.ts:** Support split deposits (cash + one card)
-5. **doc-manual.ts:** Insert into `deposit_entries` on deposit collection
-6. **Trigger:** Auto-create `deposit_returned` entries on rental completion (copies destinations)
-7. **Rental card:** Show deposit badge with destination breakdown
-8. **Admin page:** `/franchize/[slug]/admin/deposits` visual tracker
-9. **Skill:** `deposit-tracer-text` for text-based deposit queries
-10. **Evening digest:** Add deposit summary per card to `evening-summary.sh`
-11. **Morning standup:** Add previous day's deposit balance
-12. **Profile page "My Work":** Show deposits collected today per destination
+2. ✅ **DONE (2026-08-10):** Migration `20260810000010_create_deposit_entries.sql` (table + view + RLS + backfill from deposit_log)
+3. ✅ **DONE (2026-08-10):** `deposit_destination` state after `deposit_choice` — `doc-manual.ts:400` (step 15/16)
+4. ✅ **DONE (2026-08-10):** Split deposits (cash + one card) — `deposit_split_cash`/`deposit_split_card` states (`doc-manual.ts:3199/3228`)
+5. ✅ **DONE (2026-08-10):** Insert into `deposit_entries` on collection — `doc-manual.ts:432-495`
+6. ⚠️ **DONE WITH BUG (2026-08-10):** Auto-return trigger `20260810000011` — completed path missing double-return guard, **fix per §3.2a**
+7. ⏳ **Rental card:** Show deposit badge with destination breakdown
+8. ⏳ **Admin page:** `/franchize/[slug]/admin/deposits` visual tracker
+9. ⏳ **Skill:** `deposit-tracer-text` for text-based deposit queries
+10. ⏳ **Evening digest:** Add deposit summary per card to `evening-summary.sh`
+11. ⏳ **Morning standup:** Add previous day's deposit balance
+12. ⏳ **Profile page "My Work":** Show deposits collected today per destination
+13. ⏳ **NEW (v2.1):** Penalty capture flow (§3.3) — doc-manual state or admin UI insert path
 
 ---
 
 **Document History:**
 - v1.0 (2026-08-10): Initial draft — too many entry_types (rental_payment, sale_payment, etc.)
 - v2.0 (2026-08-10): Simplified — deposits ONLY (collected/returned/penalty). Removed Stars. Added split deposit support. Added rental card integration. Added skill access.
+- v2.1 (2026-08-11): Post-implementation audit. Status → Partially Implemented. Added §3.2a (completed-path trigger missing double-return guard — fix required). Fixed §3.1 placement (deposit_destination is after deposit_choice, before confirm — not "before equipment"). Fixed §4.2 to actual shipped signature (per-destination collected/returned/penalty/net). Fixed §8 re-collect corner case (trigger returns ALL collected rows). Marked §3.3 penalty as spec-only (no insert path). Implementation plan checkmarks synced to reality.

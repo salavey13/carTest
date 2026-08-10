@@ -48,6 +48,15 @@ This root file stays intentionally compact so operators and agents can load it q
 
 ## 2) Mini execution diary
 
+### 2026-08-11 — PRD audit wave: deposit/doc-manual fixes + meta iteration plan
+
+- `status`: done
+- `updated_at`: 2026-08-11T00:00:00Z
+- `owner`: codex
+- `notes`: Post-implementation audit of the 2026-08-10 deposit/doc-manual wave. Fixed `DOC_MANUAL_STEP_CORRECTION_PRD.md` v3.1 (step numbering synced to shipped code: rent 16 / sale 13, `license` state unnumbered by design) and `DEPOSIT_TRACKING_PRD.md` v2.1 (statuses synced; specced fix for completed-path auto-return trigger missing double-return guard, §3.2a). Enhanced `RENTAL_PHOTO_UPLOAD_PRD.md` v1.2 (codebase-verified upload inventory; bot already persists to public `rentals` bucket; sharp preinstalled) and `FRANCHIZE_SERVICE_OPERATIONS_PRD.md` v4.1 (shipped-status sync + §6.7 photo documentation). Created `docs/META_PRD_ITERATIVE_IMPLEMENTATION_PLAN.md` (iterations I1-I5).
+- `next_step`: Iteration I1 — deposit auto-return trigger idempotency guard + prod dedup check.
+- `risks`: Until I1 ships, a re-opened → re-completed rental duplicates `deposit_returned` rows (wrong balances in deposit summaries).
+
 ### 2026-05-31 — VIP Bike 1-click next rent Task D/M
 
 - `status`: ready_for_pr

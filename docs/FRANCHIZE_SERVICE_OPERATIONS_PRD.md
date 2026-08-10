@@ -1,9 +1,9 @@
 # FRANCHIZE-WIDE SERVICE OPERATIONS & PAYROLL SYSTEM PRD
 
-**Version:** 4.0 (Final — cross-referenced with production Supabase + actual code)
+**Version:** 4.1 (updated 2026-08-11 — shipped-status sync: deposit/step-tracking migrations + doc-manual implementation landed; added §6.7 photo documentation)
 **Date:** 2026-08-10
 **Status:** Ready for Implementation
-**Related:** `docs/PRD_AUDIT_FINDINGS.md`, `docs/DOC_MANUAL_STEP_CORRECTION_PRD.md`, `docs/DEPOSIT_TRACKING_PRD.md`
+**Related:** `docs/PRD_AUDIT_FINDINGS.md`, `docs/DOC_MANUAL_STEP_CORRECTION_PRD.md`, `docs/DEPOSIT_TRACKING_PRD.md`, `docs/RENTAL_PHOTO_UPLOAD_PRD.md`, `docs/META_PRD_ITERATIVE_IMPLEMENTATION_PLAN.md` (Iteration I5)
 
 ---
 
@@ -31,8 +31,17 @@ Before reading this PRD, understand what ACTUALLY exists in production:
 | Table | Migration exists? | Applied? |
 |-------|-------------------|----------|
 | `subrent_contract_artifacts` | ✅ `20260624000000` | ❌ NEVER APPLIED |
-| `testdrive_contract_artifacts` | ✅ `20260809000000` | ❌ NOT YET APPLIED |
+| `testdrive_contract_artifacts` | ✅ `20260809000000` (file landed in repo 2026-08-11) | ❌ NOT YET APPLIED — re-verify against prod |
 | `commercial_proposal_artifacts` | ✅ `20260617000001` | ❌ NEVER APPLIED |
+
+### Shipped since v4.0 (2026-08-10/11 — verified in repo):
+| What | Where | Notes |
+|------|-------|-------|
+| `deposit_entries` table + view + RLS + backfill | `supabase/migrations/20260810000010_create_deposit_entries.sql` | Matches DEPOSIT_TRACKING_PRD §2. See review note: auto-return trigger below has an idempotency gap |
+| Deposit auto-return triggers (completed + cancelled) | `supabase/migrations/20260810000011_deposit_auto_return_trigger.sql` | `auto_return_deposit_entries()` (completed path) **lacks the double-return guard** that the cancel path has — fix before relying on re-opened rentals |
+| `user_states` step columns + `sale_contract_artifacts` delivery columns | `supabase/migrations/20260810000020_doc_manual_step_tracking.sql` | `current_step`, `total_steps`, `corrected_steps`, `delivery_method`, `transport_company_name`, `transport_payment_type` |
+| doc-manual deposit destination + split + step correction + sale delivery | `app/webhook-handlers/commands/doc-manual.ts` (now 4208 lines) | `deposit_destination`, `deposit_split_cash/card`, `sale_delivery`, `sale_transport`, `step_correction` states implemented; step arrays differ from DOC_MANUAL PRD v3.0 (16 rent / 13 sale, no `license` step) |
+| Deposit server actions | `app/franchize/server-actions/deposit-entries.ts` | `getDepositSummary`, `getDepositEntriesForDate`, `getDailyDepositSummary` + tests (`tests/franchize/deposit-entries.spec.ts`, `deposit-scenarios.spec.ts`, `doc-manual-steps.spec.ts`) |
 
 ### Key Architecture Facts:
 1. **Services are `rentals` rows** where `vehicle_id IN (SELECT id FROM cars WHERE type='service')` — 20 service items exist (Нормо-час, Замена масла, etc.)
@@ -667,6 +676,25 @@ LIMIT 1;
 
 **Also:** `rental_handoffs` migration was applied on 2026-08-10 (fixed `auth.uid()` → `auth.jwt() ->> 'chat_id'`). Table now exists in production. Code (`rental-handoffs.ts` + `RentalHandoffModal.tsx`) works.
 
+### 6.7 Photo Documentation (rental + service operations)
+
+**See separate PRD:** `docs/RENTAL_PHOTO_UPLOAD_PRD.md` v1.2 (codebase-verified 2026-08-11).
+
+**Why it matters here:** service operations are `rentals` rows (`cars.type='service'`), so the proposed `rental_photos` table (`rental_id` FK + `photo_type`) works for service before/after documentation with zero schema changes — a service "rental" gets ДО/ПОСЛЕ photos the same way a bike rental does. Damage/доп-работы evidence for services becomes part of the same audit trail.
+
+**Verified upload infrastructure (do NOT build duplicates):**
+
+| Existing piece | Location | Reuse for |
+|---|---|---|
+| `uploadSingleImage(formData)` | `app/rentals/actions.ts:272` | What the bot uses today (public `rentals` bucket) — being superseded by `uploadRentalPhoto` |
+| `uploadImage` / `uploadBatchImages` | `hooks/supabase.ts:851`, `app/actions.ts:739` | Generic public-bucket uploads only — NOT for private photos |
+| Client-side canvas compression | `app/franchize/components/PhotoUploadButton.tsx` | Extract to shared util; reuse in operator UI photo upload |
+| Private bucket + SHA-256 + metadata row pattern | `app/doc-verifier/actions.ts` | Copy for `rental_photos` |
+| `sharp@^0.33.0` | already in `package.json` | Server-side compression — no install needed |
+| Bot auto-resolve of active rental | `gateway/telegram/webhook-handler.ts:207-258` | Already attaches photos to the right rental; only disambiguation keyboard is new |
+
+**Service-work photo hook (future):** when logging service work via `service-work-text` (`metadata.source='service_work'`), allow attaching ДО/ПОСЛЕ photos through the same `uploadRentalPhoto` action — the rental_id is the service-work rental row. Add `photo_type='service'` only if ДО/ПОСЛЕ semantics prove insufficient; prefer reusing `start`/`end` first.
+
 ---
 
 ## 7. OPEN QUESTIONS
@@ -740,3 +768,4 @@ LIMIT 1;
 - v2.0 (2026-08-09): First audit by Super Z — found 17 issues
 - v3.0 (2026-08-09): Polished by Super Z — direct Supabase queries confirmed production state
 - v4.0 (2026-08-10): rental_handoffs applied; added §9 skills/pages extensions; added Phase 6 for skills updates
+- v4.1 (2026-08-11): shipped-status sync (deposit_entries + triggers + step-tracking migrations + doc-manual implementation + deposit server actions landed); testdrive migration file now in repo; added §6.7 photo documentation with verified upload-infrastructure inventory; cross-linked RENTAL_PHOTO_UPLOAD_PRD v1.2
