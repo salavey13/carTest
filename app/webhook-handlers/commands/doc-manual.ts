@@ -555,7 +555,10 @@ function buildPaymentSplitKeyboard(totalAmount: number): KeyboardButton[][] {
     [{ text: `💰 Итого: ${formatted} ₽`, callback_data: "pay_info" }],
     [{ text: "💵 Ввести сумму наличными", callback_data: "pay_cash" }],
     [{ text: "✅ Всё наличными", callback_data: "pay_all_cash" }],
-    [{ text: "💳 Всё безнал", callback_data: "pay_all_bank" }],
+    [
+      { text: "💳 Тинькофф", callback_data: "pay_all_tbank" },
+      { text: "💳 Сбербанк", callback_data: "pay_all_sber" },
+    ],
     [{ text: "❌ Отменить", callback_data: "cancel" }],
   ];
 }
@@ -750,6 +753,8 @@ interface DocFlowContext {
   // How the total is split between cash and bank transfer.
   cashAmount?: number;     // amount paid in cash
   bankAmount?: number;     // amount paid by bank transfer
+  // Which card the bank portion went to (NEW — same as deposit destination)
+  paymentCardDestination?: 'tbank' | 'sber';
 
   // ── Deposit destination (added 2026-08-10) ────────────────────────────────
   // Tracks WHERE the deposit was collected: cash, T-Bank card, Sber card, or split.
@@ -1208,6 +1213,28 @@ function buildRentSummary(context: DocFlowContext): string {
     const deposit = context.depositOverride || "20000";
     const depositLabel = formatDepositDestination(context);
     lines.push("", `💰 Депозит: ${Number(deposit).toLocaleString("ru-RU")} ₽${depositLabel}`);
+  }
+
+  // ── Payment method line (NEW — shows which card for bank portion) ──
+  const totalPaid = (context.cashAmount || 0) + (context.bankAmount || 0);
+  if (totalPaid > 0) {
+    const cashPart = context.cashAmount || 0;
+    const bankPart = context.bankAmount || 0;
+    let payLine = `💳 Оплата: `;
+    if (cashPart > 0 && bankPart > 0 && context.paymentCardDestination) {
+      const cardName = context.paymentCardDestination === 'tbank' ? 'Тинькофф' : 'Сбербанк';
+      payLine += `💵${cashPart.toLocaleString('ru-RU')} + 💳${cardName} ${bankPart.toLocaleString('ru-RU')}`;
+    } else if (cashPart > 0 && bankPart === 0) {
+      payLine += `💵 наличными ${cashPart.toLocaleString('ru-RU')} ₽`;
+    } else if (cashPart === 0 && bankPart > 0 && context.paymentCardDestination) {
+      const cardName = context.paymentCardDestination === 'tbank' ? 'Тинькофф' : 'Сбербанк';
+      payLine += `💳 ${cardName} ${bankPart.toLocaleString('ru-RU')} ₽`;
+    } else if (bankPart > 0) {
+      payLine += `💳 безнал ${bankPart.toLocaleString('ru-RU')} ₽`;
+    } else {
+      payLine += `💵 наличными ${cashPart.toLocaleString('ru-RU')} ₽`;
+    }
+    lines.push("", payLine);
   }
 
   lines.push("", "Всё верно?");
@@ -3075,7 +3102,36 @@ export async function handleDocText(userId: string, chatId: number, text: string
     context.cashAmount = Math.min(cashAmount, totalAmount);
     context.bankAmount = Math.max(0, totalAmount - cashAmount);
     logger.info(`[/doc] payment_cash: ${userId} → cash=${context.cashAmount}, bank=${context.bankAmount}`);
+
+    // If there's a bank portion, ask which card (NEW)
+    if (context.bankAmount > 0) {
+      await setState(userId, "payment_card", context);
+      await sendComplexMessage(chatId,
+        `Остаток: ${context.bankAmount.toLocaleString("ru-RU")} ₽\n\nНа какую карту?`,
+        [
+          [{ text: "💳 Тинькофф", callback_data: "paycard_tbank" }],
+          [{ text: "💳 Сбербанк", callback_data: "paycard_sber" }],
+        ],
+        { keyboardType: 'inline', parseMode: 'Markdown' },
+      );
+      return true;
+    }
+
     await gotoDepositChoice(chatId, userId, context);
+    return true;
+  }
+
+  // ── Payment card selection text handler (NEW) ─────────────────────────────
+  if (state === "payment_card") {
+    // User typed instead of pressing a card button — re-prompt
+    await sendComplexMessage(chatId,
+      `На какую карту? (остаток: ${context.bankAmount?.toLocaleString("ru-RU") || "?"} ₽)`,
+      [
+        [{ text: "💳 Тинькофф", callback_data: "paycard_tbank" }],
+        [{ text: "💳 Сбербанк", callback_data: "paycard_sber" }],
+      ],
+      { keyboardType: 'inline' },
+    );
     return true;
   }
 
@@ -3316,11 +3372,16 @@ export async function handleDocText(userId: string, chatId: number, text: string
     const step = visibleSteps[stepNum - 1];
     logger.info(`[/doc] step_correction: ${userId} → correcting step ${step.num} (${step.state})`);
 
-    // Special handling: correcting step 1 (deal type) resets everything
+    // Disallow correcting step 1 (deal type) — changes the entire question set
     if (step.state === 'deal') {
-      await clearState(userId);
-      await sendComplexMessage(chatId, "🔄 Начнём заново с выбора типа сделки.", buildDealKeyboard(), { keyboardType: 'inline' });
-      await setState(userId, "deal", context);
+      await sendComplexMessage(chatId,
+        `⚠️ Тип сделки нельзя исправить — он меняет весь набор вопросов.\n\nИспользуйте «↩️ Начать заново» для смены типа.`,
+        [], { removeKeyboard: true });
+      const summary = context.dealType === 'sale'
+        ? buildSaleSummary(context, context.salePrice || "")
+        : buildRentSummary(context);
+      await setState(userId, "confirm", context);
+      await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
       return true;
     }
 
@@ -3727,7 +3788,7 @@ export async function handleDocCallback(
     return true;
   }
 
-  if (callbackData === "pay_all_bank") {
+  if (callbackData === "pay_all_bank" || callbackData === "pay_all_tbank" || callbackData === "pay_all_sber") {
     const bike = await resolveBikeById(context.bikeId);
     const specs = bike?.specs || {};
     const startDate = context.rentStartDate;
@@ -3768,7 +3829,19 @@ export async function handleDocCallback(
     const totalAmount = rentalCost + equipmentCost;
     context.cashAmount = 0;
     context.bankAmount = totalAmount;
-    logger.info(`[/doc] pay_all_bank: ${userId} → cash=0, bank=${totalAmount}`);
+    // Track which card (NEW)
+    context.paymentCardDestination = callbackData === "pay_all_tbank" ? "tbank" : callbackData === "pay_all_sber" ? "sber" : undefined;
+    const cardLabel = context.paymentCardDestination ? ` (${context.paymentCardDestination === 'tbank' ? 'Тинькофф' : 'Сбербанк'})` : "";
+    logger.info(`[/doc] ${callbackData}: ${userId} → cash=0, bank=${totalAmount}${cardLabel}`);
+    await gotoDepositChoice(chatId, userId, context);
+    return true;
+  }
+
+  // ── Payment card selection callbacks (paycard_*) — NEW ────────────────────
+  if (callbackData === "paycard_tbank" || callbackData === "paycard_sber") {
+    const dest = callbackData === "paycard_tbank" ? "tbank" : "sber";
+    context.paymentCardDestination = dest;
+    logger.info(`[/doc] ${callbackData}: ${userId} → payment card=${dest}`);
     await gotoDepositChoice(chatId, userId, context);
     return true;
   }
