@@ -8,6 +8,7 @@ import {
   confirmVehiclePickup,
   confirmVehicleReturn,
   initiateTelegramRentalPhotoUpload,
+  abortRental,
 } from "@/app/rentals/actions";
 
 interface FranchizeRentalLifecycleActionsProps {
@@ -123,6 +124,11 @@ export function FranchizeRentalLifecycleActions({
   const canConfirmReturn = (role === "owner" || role === "member") && status === "active";
   const canUploadStartPhoto = role === "renter" && ["pending_confirmation", "confirmed"].includes(status);
   const canUploadEndPhoto = role === "renter" && status === "active";
+  // NEW: Abort button — for pre-created rentals that never happened (customer no-show, cancelled, etc.)
+  // Sets status to 'cancelled' which is excluded from analytics KPIs.
+  // Only available for owner/member role on rentals that haven't started yet.
+  const canAbort = (role === "owner" || role === "member")
+    && ["pending_confirmation", "confirmed"].includes(status);
 
   // ── BUG G fix: closure-data modal state ──
   // Previously the "Подтвердить возврат" button called confirmVehicleReturn
@@ -135,6 +141,13 @@ export function FranchizeRentalLifecycleActions({
   const [closureDamageLevel, setClosureDamageLevel] = useState<"none" | "light" | "heavy">("none");
   const [closureDepositReturned, setClosureDepositReturned] = useState(true);
   const [closureReturnNotes, setClosureReturnNotes] = useState("");
+
+  // ── Abort modal state ──
+  // Confirm-before-abort: cancellation is irreversible (status flips to 'cancelled',
+  // excluded from analytics, renter gets a Telegram notification). Modal collects
+  // a brief reason so the operator has to type something — prevents misclicks.
+  const [abortModalOpen, setAbortModalOpen] = useState(false);
+  const [abortReason, setAbortReason] = useState("");
 
   // Themed CSS vars
   const lifecycleVars = useMemo(() => {
@@ -224,6 +237,20 @@ export function FranchizeRentalLifecycleActions({
             className="rounded-xl bg-[var(--lifecycle-accent-hover)] px-3 py-2 text-sm font-semibold text-[#16130A] transition-colors hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lifecycle-accent)]"
           >
             {pendingAction === "return" ? "Подтверждаем..." : "Подтвердить возврат"}
+          </button>
+        )}
+
+        {canAbort && (
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => {
+              setAbortReason("");
+              setAbortModalOpen(true);
+            }}
+            className="rounded-xl border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-200 transition-colors hover:bg-rose-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
+          >
+            {pendingAction === "abort" ? "Отменяем..." : "Отменить аренду"}
           </button>
         )}
 
@@ -464,6 +491,94 @@ export function FranchizeRentalLifecycleActions({
                 }}
               >
                 {pendingAction === "return" ? "Сохраняем…" : "Закрыть аренду"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Abort modal ── */}
+      {abortModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => !isPending && setAbortModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border p-5"
+            style={{
+              backgroundColor: "var(--lifecycle-bg)",
+              borderColor: "rgba(244, 63, 94, 0.5)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-rose-200">Отменить аренду?</h3>
+            <p className="mt-2 text-sm" style={{ color: "var(--lifecycle-text)" }}>
+              Аренда будет помечена как <span className="font-semibold text-rose-300">отменённая</span>:
+            </p>
+            <ul className="mt-2 list-disc pl-5 text-xs space-y-1" style={{ color: "var(--lifecycle-muted)" }}>
+              <li>Статус сменится на «Отменена»</li>
+              <li>Аренда перестанет учитываться в аналитике (KPI, выручка, конверсия)</li>
+              <li>Арендатор получит уведомление в Telegram</li>
+              <li>Действие необратимо — отмену нельзя будет «вернуть»</li>
+            </ul>
+            <label className="mt-3 block text-xs font-semibold" style={{ color: "var(--lifecycle-text)" }}>
+              Причина отмены (необязательно, но желательно):
+            </label>
+            <textarea
+              value={abortReason}
+              onChange={(e) => setAbortReason(e.target.value)}
+              placeholder="Например: клиент не приехал, передумал, ошибка создания..."
+              rows={2}
+              className="mt-1 w-full rounded-lg border p-2 text-sm"
+              style={{
+                backgroundColor: "var(--lifecycle-bg)",
+                borderColor: "var(--lifecycle-border)",
+                color: "var(--lifecycle-text)",
+              }}
+            />
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => !isPending && setAbortModalOpen(false)}
+                className="flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition-opacity hover:opacity-90"
+                style={{
+                  borderColor: "var(--lifecycle-border)",
+                  color: "var(--lifecycle-text)",
+                }}
+              >
+                Не отменять
+              </button>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() =>
+                  withAction("abort", async () => {
+                    if (!dbUser?.user_id) {
+                      toast.error("Нужна авторизация в Telegram WebApp.");
+                      return;
+                    }
+                    const result = await abortRental({
+                      rentalId,
+                      actorUserId: dbUser.user_id,
+                      reason: abortReason.trim() || undefined,
+                      crewSlug,
+                    });
+                    if (!result.success) {
+                      toast.error(result.error || "Не удалось отменить аренду.");
+                      return;
+                    }
+                    toast.success("Аренда отменена. Она больше не учитывается в аналитике.");
+                    setAbortModalOpen(false);
+                    router.refresh();
+                  })
+                }
+                className="flex-1 rounded-xl px-3 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: "#e11d48" }}
+              >
+                {pendingAction === "abort" ? "Отменяем…" : "Подтвердить отмену"}
               </button>
             </div>
           </div>
