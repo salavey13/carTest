@@ -438,15 +438,22 @@ export async function getRentalsDashboard(input: {
       });
     }
 
-    // Calculate summary statistics
+    // Calculate summary statistics.
+    // FIX: cancelled rentals (aborted pre-created) are excluded from KPIs
+    // (totalCount, totalRevenue, activeRentals, completedRentals) — they never
+    // physically happened so they shouldn't inflate counts or revenue.
+    // The cancelled rows are still returned in `items` so the operator can
+    // see them in the list for audit. byStatus still includes them so the
+    // status breakdown card shows accurate counts per status.
+    const nonCancelledItems = items.filter(r => r.status !== "cancelled");
     const summary: RentalDashboardSummary = {
-      totalCount: items.length,
-      totalRevenue: items.reduce((sum, r) => sum + (r.total_cost || 0), 0),
+      totalCount: nonCancelledItems.length,
+      totalRevenue: nonCancelledItems.reduce((sum, r) => sum + (r.total_cost || 0), 0),
       byStatus: {},
       byPaymentStatus: {},
     };
 
-    // Count by status
+    // Count by status (includes cancelled so the status panel is accurate)
     for (const item of items) {
       const status = item.status || "unknown";
       summary.byStatus[status] = (summary.byStatus[status] || 0) + 1;
@@ -457,6 +464,7 @@ export async function getRentalsDashboard(input: {
 
     console.log("[rentals-dashboard] Returning result:", {
       itemsCount: items.length,
+      nonCancelledCount: nonCancelledItems.length,
       summary: { totalCount: summary.totalCount, totalRevenue: summary.totalRevenue },
       selectedDate: date,
     });
