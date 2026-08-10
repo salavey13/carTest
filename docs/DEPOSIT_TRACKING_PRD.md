@@ -57,8 +57,8 @@ CREATE TABLE IF NOT EXISTS public.deposit_entries (
     'sber'      -- Карта Сбербанк (card 2)
   )),
 
-  -- Who and when
-  operator_chat_id TEXT NOT NULL,
+  -- Who and when (nullable — auto-returns by the system have no operator)
+  operator_chat_id TEXT,
 
   -- Notes (e.g., "Partial: 5000 cash + 15000 T-Bank" or "Withheld for scratched fairing")
   notes           TEXT,
@@ -214,11 +214,12 @@ Auto-create `deposit_returned` entries — copies destinations from the original
 ```sql
 -- Trigger on rentals.status → 'completed':
 -- For each deposit_collected entry, create a matching deposit_returned entry
--- with the SAME destination and proportional amount
+-- with the SAME destination and proportional amount.
+-- operator_chat_id is NULL for auto-returns (system-generated, no human operator).
 INSERT INTO public.deposit_entries (rental_id, entry_type, amount, direction, destination, operator_chat_id, notes)
 SELECT
   NEW.rental_id, 'deposit_returned', de.amount, 'out', de.destination,
-  NEW.created_by_operator_chat_id || '', 'Auto-returned on rental completion'
+  NULL, 'Auto-returned on rental completion'
 FROM public.deposit_entries de
 WHERE de.rental_id = NEW.rental_id AND de.entry_type = 'deposit_collected';
 ```

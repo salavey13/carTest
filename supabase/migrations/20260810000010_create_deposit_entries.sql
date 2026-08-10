@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS public.deposit_entries (
     'sber'      -- Карта Сбербанк (card 2)
   )),
 
-  -- Who and when
-  operator_chat_id TEXT NOT NULL,
+  -- Who and when (nullable — auto-returns by the system have no operator)
+  operator_chat_id TEXT,
 
   -- Notes (e.g., "Partial: 5000 cash + 15000 T-Bank" or "Withheld for scratched fairing")
   notes           TEXT,
