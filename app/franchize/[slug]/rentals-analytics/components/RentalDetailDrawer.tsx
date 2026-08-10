@@ -63,6 +63,7 @@ import {
   getRenterName,
   getRentalStatusMeta,
 } from "./lib/analytics-utils";
+import { DepositSection } from "./DepositSection";
 
 interface RentalDetailDrawerProps {
   rental: DrawerRentalRow;
@@ -89,6 +90,7 @@ export function RentalDetailDrawer({
   const [openDocs, setOpenDocs] = useState(true);
   const [openTasks, setOpenTasks] = useState(true);
   const [openHandoff, setOpenHandoff] = useState(true);
+  const [openDeposit, setOpenDeposit] = useState(true);
   const [openNotes, setOpenNotes] = useState(true);
   const [openHistory, setOpenHistory] = useState(false);
 
@@ -100,7 +102,7 @@ export function RentalDetailDrawer({
   const docs = computeDocStatus(rental);
   const sla = computeSlaSignals(rental);
   const phone = (rental.metadata as Record<string, unknown> | null)?.phone as string | undefined;
-  const deposit = (rental.metadata as Record<string, unknown> | null)?.deposit as number | undefined;
+  // deposit info now comes from deposit_entries table via DepositSection (not metadata.deposit)
   const handoff = rental.handoff;
 
   // Primary actions (Section 2)
@@ -121,7 +123,7 @@ export function RentalDetailDrawer({
     { label: "Начало",          value: formatDateTime(rental.agreed_start_date || rental.requested_start_date) },
     { label: "Конец",           value: formatDateTime(rental.agreed_end_date || rental.requested_end_date) },
     { label: "Стоимость",       value: formatRubles(cost) },
-    { label: "Депозит",         value: deposit != null ? formatRubles(deposit) : "—" },
+    // Deposit info moved to dedicated DepositSection below (reads from deposit_entries table, not metadata)
     { label: "Оператор",        value: rental.created_by_operator_chat_id || "—" },
     { label: "Экипаж",          value: rental.crew_id || "—" },
     { label: "Создана",         value: formatDateTime(rental.created_at) },
@@ -523,6 +525,17 @@ export function RentalDetailDrawer({
             {handoff?.handoff_at ? "Обновить акт передачи" : "Провести передачу"}
           </button>
         </DrawerSection>
+      </div>
+
+      {/* 7b. Deposit tracking + penalty withholding */}
+      <div className="mt-4">
+        <DepositSection
+          rentalId={rental.rental_id}
+          rentalStatus={rental.status}
+          T={T}
+          expanded={openDeposit}
+          onToggle={() => setOpenDeposit(!openDeposit)}
+        />
       </div>
 
       {/* 8. Notes */}
