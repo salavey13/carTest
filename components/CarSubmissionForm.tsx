@@ -326,15 +326,53 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       };
 
       if (isEdit && vehicleToEdit?.id) {
-        const { error } = await supabaseAnon.from("cars").update(payload).eq("id", vehicleToEdit.id);
-        if (error) throw error;
+        // FIX: Previously called supabaseAnon.from("cars").update() directly.
+        // The `cars` table has ONLY "Public read" RLS policy — INSERT/UPDATE/DELETE
+        // are silently blocked for anon users (Supabase returns no error but ZERO rows updated).
+        // This caused the "Успешно обновлено" toast to appear while VIN was never actually saved.
+        // Now we route through /api/cars PATCH which uses supabaseAdmin (bypasses RLS).
+        const response = await fetch(`/api/cars?id=${encodeURIComponent(vehicleToEdit.id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.success) {
+          throw new Error(result?.error || `HTTP ${response.status}: обновление не удалось`);
+        }
+        // Defensive: verify a row was actually updated
+        if (typeof result.updatedCount === "number" && result.updatedCount === 0) {
+          throw new Error("Обновление не применилось ни к одной строке — возможно, нет прав на эту технику.");
+        }
         toast.success("Успешно обновлено");
         onSuccess?.(payload);
       } else {
         // generate id if not provided
         const id = `${(payload.make || "item").toString().toLowerCase().replace(/\s+/g, "-")}-${(payload.model || "x").toString().toLowerCase().replace(/\s+/g, "-")}-${uuidv4().slice(0, 8)}`;
-        const { error } = await supabaseAnon.from("cars").insert([{ id, ...payload }]);
-        if (error) throw error;
+        // FIX: Same RLS issue — use /api/cars POST (uses supabaseAdmin) instead of supabaseAnon.insert()
+        const response = await fetch("/api/cars", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id,
+            type: payload.type,
+            title: payload.model, // API expects `title` (mapped to model column)
+            description: payload.description,
+            image_url: payload.image_url,
+            rent_link: payload.rent_link,
+            daily_price: payload.daily_price,
+            specs: payload.specs,
+            owner_id: payload.owner_id,
+            is_test_result: payload.is_test_result,
+            // Pass through make/model explicitly so the API can preserve them
+            make: payload.make,
+            model: payload.model,
+          }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.success) {
+          throw new Error(result?.error || `HTTP ${response.status}: не удалось создать запись`);
+        }
         toast.success("Успешно добавлено в public.cars");
         onSuccess?.({ id, ...payload });
       }
