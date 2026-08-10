@@ -99,9 +99,11 @@ export function AnalyticsClient({
     [rentals],
   );
 
-  // Display rentals (exclude services from rentals tab)
+  // Display rentals (exclude services from rentals tab + cancelled rentals from KPIs)
+  // FIX: cancelled rentals (aborted pre-created) should not pollute KPIs.
+  // They remain queryable in the rentals list (for audit) but are excluded here.
   const displayRentals = useMemo(
-    () => rentals.filter((r) => !isServiceRental(r)),
+    () => rentals.filter((r) => !isServiceRental(r) && r.status !== "cancelled"),
     [rentals],
   );
 
