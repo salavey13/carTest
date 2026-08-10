@@ -400,7 +400,7 @@ async function gotoDepositDestination(chatId: number, userId: string, context: D
   await setState(userId, "deposit_destination", context);
   await sendComplexMessage(
     chatId,
-    `💰 *Депозит: ${depositAmount.toLocaleString("ru-RU")} ₽*\n\nГде получен депозит?`,
+    withStep(`💰 *Депозит: ${depositAmount.toLocaleString("ru-RU")} ₽*\n\nГде получен депозит?`, "deposit_destination", context.dealType),
     buildDepositDestinationKeyboard(depositAmount),
     { keyboardType: 'inline', parseMode: 'Markdown' },
   );
@@ -821,7 +821,7 @@ const SALE_STEPS: StepDef[] = [
 
 /**
  * Get step label for the current state.
- * Returns "Шаг 3/17" for numbered steps, "СТС: серия" for СТС sub-flow,
+ * Returns "Шаг 3/16" for numbered steps, "СТС-1" for СТС sub-flow,
  * or "" if state not found.
  */
 function stepLabel(state: string, dealType?: string): string {
@@ -833,6 +833,15 @@ function stepLabel(state: string, dealType?: string): string {
   }
   const total = dealType === 'sale' ? 13 : 16;
   return `Шаг ${step.num}/${total}`;
+}
+
+/**
+ * Prepend step label to a message text.
+ * Returns "Шаг 3/16\n\n<message>" or just "<message>" if no step found.
+ */
+function withStep(message: string, state: string, dealType?: string): string {
+  const label = stepLabel(state, dealType);
+  return label ? `${label}\n\n${message}` : message;
 }
 
 /**
@@ -1681,6 +1690,13 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         })(),
         bike_battery: String(bike.specs?.battery || (isElectric ? "уточняется" : "")),
         buyer_phone: context.clientPhone || "",
+        // Delivery fields (NEW)
+        delivery_method: context.saleDeliveryMethod || "",
+        delivery_method_label: context.saleDeliveryMethod === 'pickup' ? "Самовывоз из шоурума"
+          : context.saleDeliveryMethod === 'transport_company' ? "Транспортная компания" : "",
+        transport_company_name: context.saleTransportCompany || "",
+        transport_payment_label: context.saleTransportPaymentType === 'buyer_pays' ? "за счёт покупателя"
+          : context.saleTransportPaymentType === 'seller_pays' ? "за счёт продавца" : "",
       };
     }
 
@@ -2575,7 +2591,7 @@ async function gotoSaleVin(chatId: number, userId: string, context: DocFlowConte
 async function gotoPrice(chatId: number, userId: string, context: DocFlowContext): Promise<void> {
   await setState(userId, "price", context);
   const priceKeyboard = await buildPriceKeyboard();
-  await sendComplexMessage(chatId, "💰 Цена:", priceKeyboard, { keyboardType: 'inline' });
+  await sendComplexMessage(chatId, withStep("💰 Цена:", "price", context.dealType), priceKeyboard, { keyboardType: 'inline' });
 }
 
 /**
@@ -2675,7 +2691,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     context.bikeModel = bike.model;
     await setState(userId, "deal", context);
     await sendComplexMessage(chatId, `🏍 ${bike.make} ${bike.model}`, [], { removeKeyboard: true });
-    await sendComplexMessage(chatId, "Тип договора:", buildDealKeyboard(), { keyboardType: 'inline' });
+    await sendComplexMessage(chatId, withStep("Тип договора:", "deal"), buildDealKeyboard(), { keyboardType: 'inline' });
     return true;
   }
 
@@ -2769,7 +2785,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
 
   if (state === "has_license") {
     // User typed instead of pressing button — re-prompt
-    await sendComplexMessage(chatId, "*Водительское удостоверение есть?*", buildHasLicenseKeyboard(), { keyboardType: 'inline', parseMode: "Markdown" });
+    await sendComplexMessage(chatId, withStep("*Водительское удостоверение есть?*", "has_license"), buildHasLicenseKeyboard(), { keyboardType: 'inline', parseMode: "Markdown" });
     return true;
   }
 
@@ -3294,7 +3310,7 @@ async function gotoSaleDelivery(chatId: number, userId: string, context: DocFlow
   await setState(userId, "sale_delivery", context);
   await sendComplexMessage(
     chatId,
-    `📦 *Способ получения*\n\nКак покупатель получит мотоцикл?`,
+    withStep(`📦 *Способ получения*\n\nКак покупатель получит мотоцикл?`, "sale_delivery", "sale"),
     [
       [{ text: "🏪 Самовывоз", callback_data: "delivery_pickup" }],
       [{ text: "🚚 ТК (покупатель)", callback_data: "delivery_tc_buyer" }],
@@ -3341,14 +3357,14 @@ export async function handleDocCallback(
   if (callbackData === "d_rent") {
     context.dealType = "rent";
     await setState(userId, "name", context);
-    await sendComplexMessage(chatId, "*Аренда - ФИО*", [], { removeKeyboard: true, parseMode: "Markdown" });
+    await sendComplexMessage(chatId, withStep("*Аренда - ФИО*", "name", "rent"), [], { removeKeyboard: true, parseMode: "Markdown" });
     return true;
   }
 
   if (callbackData === "d_sale") {
     context.dealType = "sale";
     await setState(userId, "name", context);
-    await sendComplexMessage(chatId, "*Продажа - ФИО*", [], { removeKeyboard: true, parseMode: "Markdown" });
+    await sendComplexMessage(chatId, withStep("*Продажа - ФИО*", "name", "sale"), [], { removeKeyboard: true, parseMode: "Markdown" });
     return true;
   }
 
@@ -3468,7 +3484,7 @@ export async function handleDocCallback(
       context.rentEndTime = timeStr;
     } else {
       // Unknown end callback — re-prompt
-      await sendComplexMessage(chatId, "*Когда заканчиваем?*", buildEndKeyboard(context.rentStartTime), { keyboardType: 'inline', parseMode: 'Markdown' });
+      await sendComplexMessage(chatId, withStep("*Когда заканчиваем?*", "schedule_end", context.dealType), buildEndKeyboard(context.rentStartTime), { keyboardType: 'inline', parseMode: 'Markdown' });
       return true;
     }
 
@@ -3485,7 +3501,7 @@ export async function handleDocCallback(
     context.helmets = current >= 2 ? 0 : current + 1;
     await setState(userId, "equipment", context);
     logger.info(`[/doc] eq_helmets: ${userId} → helmets=${context.helmets}`);
-    await sendComplexMessage(chatId, `🪖 Шлемы: ${context.helmets}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
+    await sendComplexMessage(chatId, withStep(`🪖 Шлемы: ${context.helmets}`, "equipment", context.dealType), buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
   }
 
@@ -3494,7 +3510,7 @@ export async function handleDocCallback(
     context.gloves = current >= 2 ? 0 : current + 1;
     await setState(userId, "equipment", context);
     logger.info(`[/doc] eq_gloves: ${userId} → gloves=${context.gloves}`);
-    await sendComplexMessage(chatId, `🧤 Перчатки: ${context.gloves}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
+    await sendComplexMessage(chatId, withStep(`🧤 Перчатки: ${context.gloves}`, "equipment", context.dealType), buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
   }
 
@@ -3885,7 +3901,7 @@ export async function handleDocCallback(
     const price = callbackData.slice(2);
     if (price === "custom") {
       await setState(userId, "price_custom", context);
-      await sendComplexMessage(chatId, "*Введите цену (руб)*", [], { removeKeyboard: true, parseMode: "Markdown" });
+      await sendComplexMessage(chatId, withStep("*Введите цену (руб)*", "price", "sale"), [], { removeKeyboard: true, parseMode: "Markdown" });
       return true;
     }
     context.salePrice = price;
@@ -4008,7 +4024,7 @@ export async function docCommand(
     };
     await setState(userIdStr, "deal", context);
     await sendComplexMessage(chatId, `🏍 ${bike.make} ${bike.model}`, [], { removeKeyboard: true });
-    await sendComplexMessage(chatId, "Тип договора:", buildDealKeyboard(), { keyboardType: 'inline' });
+    await sendComplexMessage(chatId, withStep("Тип договора:", "deal"), buildDealKeyboard(), { keyboardType: 'inline' });
     return;
   }
 

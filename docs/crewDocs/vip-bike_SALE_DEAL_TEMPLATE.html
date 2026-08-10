@@ -230,6 +230,7 @@
 <p style="text-indent: 1.25cm; text-align: justify;">2. Порядок оплаты – предварительный. Оплата Товара производится в рублях РФ в следующие сроки:</p>
 <p style="text-indent: 1.25cm; text-align: justify;">3.1. С даты подписания настоящего Договора Покупатель уплачивает Продавцу полную стоимость в размере {{price_digits}} ({{price_words}}), НДС – не облагается.</p>
 <p style="text-indent: 1.25cm; text-align: justify;">Доставка Товара со склада Продавца до места передачи осуществляется Продавцом путем отгрузки его транспортом. Выбор вида транспорта и определения условий доставки Товара принадлежит Продавцу.</p>
+{{#if delivery_method}}<p style="text-indent: 1.25cm; text-align: justify;">Способ получения Товара: {{delivery_method_label}}{{#if transport_company_name}} (ТК: {{transport_company_name}}, оплата: {{transport_payment_label}}){{/if}}</p>{{/if}}
 
 <table style="width: 100%; border-collapse: collapse; margin-top: 12pt;">
 <tr style="border: 1px solid #000;">
