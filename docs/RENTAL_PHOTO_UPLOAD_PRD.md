@@ -1,10 +1,10 @@
 # PRD: Rental Photo Upload (Before/After)
 
 **Feature**: Permanent photo storage for bike condition at handoff (ДО) and return (ПОСЛЕ)
-**Version**: 1.1 (revised 2026-08-10 — compression, freemium-friendly limits, bot auto-attach, NOT mandatory in v1)
-**Status**: Draft
+**Version**: 1.2 (revised 2026-08-11 — codebase-verified: corrected §3 (bot photos ARE already persisted), added upload-infrastructure inventory, `sharp` already installed, fixed webhook file paths)
+**Status**: Draft (not started — scheduled as Iteration I3/I4 in `docs/META_PRD_ITERATIVE_IMPLEMENTATION_PLAN.md`)
 **Author**: VIP Bike Engineering
-**Last updated**: 2026-08-10
+**Last updated**: 2026-08-11
 
 ---
 
@@ -20,6 +20,17 @@ This PRD defines a permanent, per-rental photo storage system in Supabase Storag
 - **Client-side + server-side compression.** All photos are compressed BEFORE upload to stay within Supabase freemium tier (1GB free, 8GB paid). Client-side resize to max 1600px on long edge + quality 80 JPEG before upload. Server-side re-compress to max 1280px + quality 75 for the persisted copy. Originals are NOT kept (unlike v1.0 which proposed `_originals/` subfolder — dropped to save space).
 - **Hard file size limit.** Upload rejected if compressed file > 500 KB. Pre-compression max input size: 10 MB (reject anything larger at the file picker).
 - **Telegram bot auto-attach in low resolution.** When a renter sends a photo to the bot AND has an active rental tied to their `user_id`, the bot automatically attaches the photo to that rental — no manual state machine needed. Bot downloads the Telegram thumbnail (320px wide, ~10-30 KB) instead of the full-res file, perfect for freemium storage. Renter gets a confirmation: "📸 Фото привязано к аренде #abc12345".
+
+### v1.2 revisions (codebase audit 2026-08-11)
+
+Corrections after verifying the actual code (see §3 for details):
+
+- **§3 was factually wrong about the bot path.** The Telegram bot does NOT store expiring Telegram file URLs. `handlePhotoMessage` in `gateway/telegram/webhook-handler.ts` already downloads the photo and re-uploads it to the **`rentals` bucket (public)** via `uploadSingleImage`, then writes the permanent public URL into the `events` row. The real gaps are elsewhere: public (not private) bucket, no per-rental folder layout, no metadata table, no hash, no compression, no operator upload path, no gallery UI.
+- **Rental auto-detection already exists.** The webhook has a fallback that auto-resolves the renter's rental + photo type from `rentals` status + `events` when no `awaiting_rental_photo` state is set (added 2026-02-21, see `docs/AGENT_DIARY_ARCHIVE_2026Q1.md`). What is genuinely new in §5.7: the multi-rental disambiguation keyboard, the private bucket, the `rental_photos` metadata row, and the SHA-256 hash — not the auto-detection itself.
+- **Bot currently downloads the LARGEST photo variant** (`message.photo[message.photo.length - 1]`, full resolution, often 1-3 MB) — the opposite of the v1.1 assumption. Switching to the smallest variant is a real change, not a description of current behavior.
+- **`sharp` is already installed** (`package.json` → `"sharp": "^0.33.0"`). Phase 1 does not need an install step.
+- **Client-side compression already exists** in `app/franchize/components/PhotoUploadButton.tsx` (canvas resize to 1920px, JPEG 0.85, 10 MB input limit) — reuse/generalize it instead of writing a new one.
+- **Webhook handler file path fixed.** The photo handler lives in `gateway/telegram/webhook-handler.ts` (not `app/webhook-handlers/index.ts` — that file does not exist). A second state-setting path exists in `app/webhook-handlers/commands/actions.ts` (the `/actions` menu).
 
 ---
 
@@ -58,11 +69,39 @@ The codebase already has two related but separate photo systems. This PRD adds a
 | user_rental_secrets (existing) | — | Renter's deep-link secrets | Per-rental | Private |
 | rental-photos (NEW) | rental-photos (private) | Bike condition ДО/ПОСЛЕ | 12 months, then cold archive | Crew-private |
 
-### Existing Code Hooks
+### Existing Code Hooks (verified 2026-08-11 against actual code)
 
-The existing `initiateTelegramRentalPhotoUpload(rentalId, userId, photoType)` server action in `app/rentals/actions.ts` already sets up a user state `'awaiting_rental_photo'` with a 15-minute TTL. The renter is redirected to Telegram, where they send a photo that the bot receives. The bot currently calls `addRentalPhoto(rentalId, userId, photoUrl, photoType)` which writes an event but does NOT persist the photo to a permanent bucket — the photo URL is just the Telegram file URL, which expires.
+**Bot photo pipeline (the main path) — `gateway/telegram/webhook-handler.ts::handlePhotoMessage`:**
 
-This PRD replaces `addRentalPhoto` with a new `uploadRentalPhoto` server action that downloads the Telegram file (or its thumbnail — see §5.7 bot auto-attach), compresses it, uploads it to `rental-photos` bucket under `<rental_id>/<photo_type>/<seq>-<timestamp>.jpg`, computes a SHA-256 hash, and records the event. The old event-based log is preserved for backward compatibility.
+1. Renter taps "Фото ДО/ПОСЛЕ" in the WebApp (`app/rentals/[id]/page.tsx`, `FranchizeRentalLifecycleActions.tsx`) → `initiateTelegramRentalPhotoUpload(rentalId, userId, photoType)` (`app/rentals/actions.ts:675`) sets `user_states.state='awaiting_rental_photo'` with a 15-minute TTL and context `{rental_id, photo_type}`. The `/actions` bot menu (`app/webhook-handlers/commands/actions.ts:135`) sets the same state.
+2. **If the state is missing/expired, the webhook already auto-resolves the rental**: it queries `rentals` by `user_id` with status IN (`pending_confirmation`, `confirmed`, `active`) and infers photo type from completed `photo_start`/`photo_end` events (`webhook-handler.ts:207-258`). Silent first-match — no disambiguation when several rentals qualify.
+3. The webhook downloads the **LARGEST** Telegram photo variant (`message.photo[message.photo.length - 1]`, full-res), uploads it to the **`rentals` bucket (public)** via `uploadSingleImage` (random UUID filename), and inserts an `events` row (`type='photo_start'|'photo_end'`, `status='completed'`, `payload.photo_url` = permanent public Supabase URL). State is cleared; renter gets a confirmation message.
+
+> ⚠️ v1.0/v1.1 claimed "the photo URL is just the Telegram file URL, which expires" — **this is not true for the bot path.** Photos are already persisted permanently, but in a **public** bucket with flat UUID names, no per-rental structure, no metadata table, no hash, and no compression.
+
+**WebApp page path — `addRentalPhoto(rentalId, userId, photoUrl, photoType)` (`app/rentals/actions.ts:949`):**
+
+Writes `rentals.metadata.start_photo_url|end_photo_url` (single URL per type — overwritten on re-upload) + the same `events` row. Only the renter may call it; no operator path exists.
+
+This PRD adds a new `uploadRentalPhoto` server action that downloads the Telegram file (or its thumbnail — see §5.7 bot auto-attach), compresses it, uploads it to the **private** `rental-photos` bucket under `<rental_id>/<photo_type>/<seq>-<timestamp>.jpg`, computes a SHA-256 hash, inserts a `rental_photos` metadata row, and records the event. The old event-based log and the public `rentals` bucket path are preserved for backward compatibility.
+
+### Existing Upload Server Actions (verified inventory)
+
+| # | Action / path | Location | Bucket | Privacy | Compression | Used by |
+|---|---|---|---|---|---|---|
+| 1 | `uploadImage(bucketName, file, fileName?)` | `hooks/supabase.ts:851` | caller-chosen | Public URL returned | none | `app/youtube_actions/actions.ts` (character images) |
+| 2 | `uploadSingleImage(formData{file, bucketName})` | `app/rentals/actions.ts:272` | caller-chosen (`rentals` for bot photos) | Public URL returned | none | Telegram bot photo handler, rental pages |
+| 3 | `uploadBatchImages(formData{files[], bucketName})` | `app/actions.ts:739` | caller-chosen | **Requires public bucket** (explicit check) | none | generic batch uploads |
+| 4 | `PhotoUploadButton` (client component, direct upload w/ anon client) | `app/franchize/components/PhotoUploadButton.tsx` | `docpix` | Private (RLS allows anon INSERT) | **canvas resize 1920px, JPEG 0.85, 10 MB cap** | passport/license OCR flow → `/api/docphotoocr` |
+| 5 | `verifyAndStoreDocument` (+ FormData wrapper) | `app/doc-verifier/actions.ts:91` | `DOC_BUCKET` | Private | none — but **computes SHA-256, stores metadata row, re-verifies by hash on download** | document integrity verification |
+
+**Takeaways for this PRD:**
+
+- #5 (`doc-verifier`) is the closest existing analog of the target design: private bucket + SHA-256 + metadata row. Copy its hash pattern.
+- #4 proves client-side canvas compression works in this codebase — extract `reduceImageResolution` into a shared util and parameterize max size/quality instead of writing a second implementation.
+- #2 is what the bot uses today; `uploadRentalPhoto` (§5.5) is its private-bucket, compressed, hashed successor. Keep #2 untouched for other callers.
+- All current actions return **public URLs** — none fit a private bucket with signed URLs. `listRentalPhotos` (§5.5) must use `supabaseAdmin.storage.from('rental-photos').createSignedUrl(path, 900)`.
+- Two admin clients exist: `@/hooks/supabase` and `@/lib/supabase-server`. New photo actions should use `@/lib/supabase-server` (the same one the OCR route and franchize server actions use).
 
 ---
 
@@ -91,7 +130,7 @@ This PRD replaces `addRentalPhoto` with a new `uploadRentalPhoto` server action 
 **As** a renter, **when** I receive the bike, **I want** to take a photo of any pre-existing damage and send it to the Telegram bot, **so that** I'm not held responsible for it at return — without needing to navigate any UI.
 
 **Acceptance criteria**:
-- The Telegram bot's photo handler (in `app/webhook-handlers/`) checks if the sender has an active rental (status `pending_confirmation`, `confirmed`, or `active`) tied to their `user_id`.
+- The Telegram bot's photo handler (`gateway/telegram/webhook-handler.ts::handlePhotoMessage`) checks if the sender has an active rental (status `pending_confirmation`, `confirmed`, or `active`) tied to their `user_id` — this check already exists; see §5.7 note.
 - If yes, the bot auto-detects the photo type based on rental status:
   - `pending_confirmation` or `confirmed` → photo_type = `start`
   - `active` → photo_type = `end`
@@ -258,7 +297,7 @@ Two-stage compression ensures we stay well within Supabase's 1GB free tier:
 
 3. **Pickup confirmation** in `FranchizeRentalLifecycleActions.tsx` — "Подтвердить выдачу" button opens a similar photo step for ДО photos. Also non-blocking.
 
-4. **Telegram bot handler** in `app/webhook-handlers/` — see §5.7 below for bot auto-attach logic.
+4. **Telegram bot handler** in `gateway/telegram/webhook-handler.ts` (+ state-setting menu in `app/webhook-handlers/commands/actions.ts`) — see §5.7 below for bot auto-attach logic.
 
 5. **Analytics drawer** in `app/franchize/[slug]/rentals-analytics/components/RentalDetailDrawer.tsx` — add a "Фото" section showing thumbnails (read-only, no upload).
 
@@ -266,7 +305,9 @@ Two-stage compression ensures we stay well within Supabase's 1GB free tier:
 
 The bot auto-attaches photos to the renter's active rental without requiring explicit UI flows. This is the lowest-friction path for renters — they just send a photo to the bot like they would any Telegram message.
 
-**Detection logic** (in `app/webhook-handlers/index.ts` photo handler):
+> **Already exists (verified 2026-08-11):** `handlePhotoMessage` in `gateway/telegram/webhook-handler.ts` already performs steps 1-4 below as a fallback when no `awaiting_rental_photo` state is set. The genuinely new work in this section is: step 5 (multi-rental disambiguation keyboard), writing the `rental_photos` metadata row + SHA-256 hash, uploading to the private `rental-photos` bucket instead of the public `rentals` bucket, and downloading the smallest photo variant instead of the largest.
+
+**Detection logic** (in `gateway/telegram/webhook-handler.ts::handlePhotoMessage` — NOT `app/webhook-handlers/index.ts`, which does not exist):
 
 1. On incoming photo message, extract `user_id` from `message.from.id`.
 2. Query Supabase: `SELECT rental_id, status, vehicle_id FROM rentals WHERE user_id = ? AND status IN ('pending_confirmation', 'confirmed', 'active') ORDER BY agreed_end_date ASC LIMIT 5`.
@@ -315,9 +356,10 @@ This is the explicit v1 decision — make photos preferable, not mandatory. Will
 ### Phase 1 — Backend (Week 1)
 
 - Create migration: `20260811000000_create_rental_photos.sql` (bucket + table + RLS + indexes + columns on rentals).
-- Implement `uploadRentalPhoto`, `listRentalPhotos`, `deleteRentalPhoto`, `getRentalPhotoStats` server actions in `app/rentals/photo-actions.ts`.
-- Install `sharp` npm package for server-side compression.
-- Add server-side compression + 500 KB hard limit + SHA-256 dedup logic.
+- Implement `uploadRentalPhoto`, `listRentalPhotos`, `deleteRentalPhoto`, `getRentalPhotoStats` server actions in `app/rentals/photo-actions.ts` (use `@/lib/supabase-server` admin client).
+- ~~Install `sharp` npm package~~ — ✅ already installed (`package.json` → `sharp@^0.33.0`). Verify it loads in the Vercel serverless runtime; no action needed otherwise.
+- Extract `reduceImageResolution` from `PhotoUploadButton.tsx` into a shared client util (parameterize max size + quality) for reuse in the rental photo UI.
+- Add server-side compression + 500 KB hard limit + SHA-256 dedup logic (hash pattern: copy from `app/doc-verifier/actions.ts`).
 - Add `photoWarning` field to `confirmVehiclePickup` and `confirmVehicleReturn` responses (soft warning, NOT blocking — v1 decision).
 - Write unit tests for: RLS policy (renter can SELECT own rental photos; non-crew user cannot), hash dedup, sharp compression, 500 KB limit enforcement.
 
@@ -332,11 +374,12 @@ This is the explicit v1 decision — make photos preferable, not mandatory. Will
 
 ### Phase 3 — Telegram Bot Auto-Attach (Week 2)
 
-- Update photo handler in `app/webhook-handlers/index.ts` to:
-  - Query rentals by `user_id` for active status.
-  - Auto-detect photo_type from rental status.
-  - Download Telegram thumbnail (smallest size variant).
-  - Call `uploadRentalPhoto` with `source: 'bot'`, `uploaderRole: 'renter'` (or `'bot'`).
+- Update photo handler in `gateway/telegram/webhook-handler.ts::handlePhotoMessage` to:
+  - ~~Query rentals by `user_id` for active status~~ — ✅ already exists (auto-resolve fallback, lines 207-258).
+  - ~~Auto-detect photo_type from rental status~~ — ✅ already exists.
+  - Switch from downloading the LARGEST photo variant (`photo[photo.length - 1]`) to the smallest (`photo[0]`).
+  - Add multi-rental disambiguation inline keyboard (currently silent first-match).
+  - Call `uploadRentalPhoto` with `source: 'bot'`, `uploaderRole: 'renter'` (or `'bot'`) instead of `uploadSingleImage` → public `rentals` bucket.
 - Send confirmation message with rental reference + thumbnail preview (Telegram `sendPhoto` with the persisted file's signed URL).
 - Handle multi-active-rental edge case with inline keyboard.
 - Keep existing `initiateTelegramRentalPhotoUpload` flow for WebApp-initiated uploads (backward compat).
@@ -419,8 +462,9 @@ Files that will be modified during implementation:
 - `app/franchize/components/FranchizeRentalLifecycleActions.tsx` — add photo step to closure/pickup modals (non-blocking)
 - `app/franchize/[slug]/rental/[id]/page.tsx` — render `RentalPhotoGallery`
 - `app/franchize/[slug]/rentals-analytics/components/RentalDetailDrawer.tsx` — add read-only photo section
-- `app/webhook-handlers/index.ts` — add bot auto-attach logic in photo handler
-- `package.json` — add `sharp` dependency
+- `gateway/telegram/webhook-handler.ts` — bot auto-attach: disambiguation keyboard, smallest-variant download, `uploadRentalPhoto` call (auto-resolve fallback already present)
+- `app/franchize/components/PhotoUploadButton.tsx` — extract `reduceImageResolution` into shared util
+- ~~`package.json` — add `sharp` dependency~~ — ✅ already present (`sharp@^0.33.0`)
 
 ### B. Glossary
 
@@ -433,10 +477,14 @@ Files that will be modified during implementation:
 ### C. References
 
 - Existing photo infrastructure: `supabase/migrations/20260113120000_create_docpix_storage_bucket.sql`
-- Existing renter-side upload flow: `app/rentals/actions.ts:initiateTelegramRentalPhotoUpload`
-- Existing event-only log: `app/rentals/actions.ts:addRentalPhoto`
+- Existing renter-side upload flow: `app/rentals/actions.ts:initiateTelegramRentalPhotoUpload` (line 675)
+- Existing event-only log: `app/rentals/actions.ts:addRentalPhoto` (line 949 — also writes `rentals.metadata.*_photo_url`)
+- Existing generic uploads: `hooks/supabase.ts:uploadImage` (851), `app/rentals/actions.ts:uploadSingleImage` (272), `app/actions.ts:uploadBatchImages` (739)
+- Existing private-bucket + SHA-256 pattern: `app/doc-verifier/actions.ts` (line 91)
+- Existing client-side compression: `app/franchize/components/PhotoUploadButton.tsx` (`reduceImageResolution`, 1920px/0.85)
 - Rental lifecycle actions: `app/franchize/components/FranchizeRentalLifecycleActions.tsx`
-- Telegram bot photo handler: `app/webhook-handlers/index.ts` (to be modified for auto-attach)
+- Telegram bot photo handler: `gateway/telegram/webhook-handler.ts::handlePhotoMessage` (line 181 — to be modified; auto-resolve fallback at 207-258 already exists)
+- Bot `/actions` menu (sets `awaiting_rental_photo` state): `app/webhook-handlers/commands/actions.ts` (line 135)
 
 ### D. Compression Pseudocode
 

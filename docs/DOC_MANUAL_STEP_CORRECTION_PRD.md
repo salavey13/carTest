@@ -1,11 +1,11 @@
 # DOC-MANUAL COMMAND ENHANCEMENTS PRD
 
-**Version:** 3.0 (Final — removed draft recovery, explicit step arrays, deposit integration)
-**Date:** 2026-08-10
-**Status:** Ready for Implementation
+**Version:** 3.1 (Post-implementation audit — step numbering synced to shipped code, statuses updated)
+**Date:** 2026-08-10 (audited 2026-08-11)
+**Status:** ✅ Mostly Implemented (2026-08-10) — step numbering, step correction, deposit destination + split, sale delivery all shipped in `doc-manual.ts` + migration `20260810000020`. Remaining: analytics badges (§5), see meta plan.
 **Applies to:** All crews via `/doc` command in Telegram bot
-**Related:** `docs/DEPOSIT_TRACKING_PRD.md` (deposit destination step), `docs/FRANCHIZE_SERVICE_OPERATIONS_PRD.md`
-**Related Files:** `app/webhook-handlers/commands/doc-manual.ts` (3531 lines), `app/webhook-handlers/actions/sendComplexMessage.ts`
+**Related:** `docs/DEPOSIT_TRACKING_PRD.md` (deposit destination step), `docs/FRANCHIZE_SERVICE_OPERATIONS_PRD.md`, `docs/META_PRD_ITERATIVE_IMPLEMENTATION_PLAN.md`
+**Related Files:** `app/webhook-handlers/commands/doc-manual.ts` (4208 lines as of 2026-08-11), `app/webhook-handlers/actions/sendComplexMessage.ts`, `tests/franchize/doc-manual-steps.spec.ts`
 
 ---
 
@@ -13,9 +13,9 @@
 
 ### 1.1 Current State (VERIFIED against actual code)
 
-**File:** `app/webhook-handlers/commands/doc-manual.ts` (3531 lines)
+**File:** `app/webhook-handlers/commands/doc-manual.ts` (4208 lines as of 2026-08-11)
 
-**Actual RENT flow** (15 steps + deposit destination + confirm + optional СТС sub-flow):
+**Actual RENT flow** — ✅ SHIPPED, 16 numbered steps (+ 2 conditional split sub-states + optional СТС sub-flow). Source of truth: `RENT_STEPS` array at `doc-manual.ts:793`:
 | # | State | What it asks |
 |---|-------|-------------|
 | 1 | `deal` | Rent or Sale? |
@@ -25,22 +25,23 @@
 | 5 | `birth` | Date of birth |
 | 6 | `address` | Registration address |
 | 7 | `has_license` | Has driver license? |
-| 8 | `license` | License series + number + dates |
-| 9 | `categories` | License categories (A, B, M) |
-| 10 | `schedule_start` | Start date + time |
-| 11 | `schedule_end` | End date + time |
-| 12 | `equipment` | Helmets, gloves, jacket, etc. |
-| 13 | `odometer` | Odometer reading |
-| 14 | `payment_split` | Cash / bank / split |
-| 15 | `deposit_choice` | Deposit amount or СТС |
-| 16 | `deposit_destination` | **NEW: Where collected? (cash/tbank/sber/split)** |
-| 16a | `deposit_split_cash` | **NEW (conditional): How much cash? (only if split chosen)** |
-| 16b | `deposit_split_card` | **NEW (conditional): Which card for remainder? (only if split)** |
-| 17 | `confirm` | Verify all data |
+| 8 | `categories` | License categories (A, B, M) |
+| 9 | `schedule_start` | Start date + time |
+| 10 | `schedule_end` | End date + time |
+| 11 | `equipment` | Helmets, gloves, jacket, etc. |
+| 12 | `odometer` | Odometer reading |
+| 13 | `payment_split` | Cash / bank / split |
+| 14 | `deposit_choice` | Deposit amount or СТС |
+| 15 | `deposit_destination` | Where collected? (cash/tbank/sber/split) |
+| 15a | `deposit_split_cash` | (conditional) How much cash? (only if split chosen) |
+| 15b | `deposit_split_card` | (conditional) Which card for remainder? (only if split) |
+| 16 | `confirm` | Verify all data |
 
-*If СТС chosen (step 15): skip steps 16/16a/16b, replaced by 6 СТС sub-steps: `sts_series` → `sts_plate` → `sts_owner` → `sts_relation` → `sts_vehicle` → `sts_vin` → `confirm`*
+> ⚠️ **v3.1 correction — the `license` state exists but is UNNUMBERED.** The runtime state machine still has a `license` state (`doc-manual.ts:2809`, reached `has_license` → `license` → `categories`), but it was deliberately excluded from `RENT_STEPS` during simplification (locked in by `doc-manual-steps.spec.ts:86`). Consequences: (a) no "Шаг X/16" label is shown while entering license data; (b) license data is **not correctable** via step correction. Known trade-off — re-add to the array (making rent 17 steps) if operators ask to fix license typos. v3.0 incorrectly listed `license` as numbered step 8.
 
-**Actual SALE flow** (10 steps + confirm):
+*If СТС chosen (step 14): skip steps 15/15a/15b, replaced by 6 СТС sub-steps: `sts_series` → `sts_plate` → `sts_owner` → `sts_relation` → `sts_vehicle` → `sts_vin` → `confirm`. СТС sub-steps are labelled `СТС-1`…`СТС-6` (bare label, no "Шаг" prefix — see §4).*
+
+**Actual SALE flow** — ✅ SHIPPED, 13 steps. Source of truth: `SALE_STEPS` array at `doc-manual.ts:821`:
 | # | State | What it asks |
 |---|-------|-------------|
 | 1 | `deal` | Rent or Sale? |
@@ -53,11 +54,11 @@
 | 8 | `sale_vin` | Confirm, enter, or skip VIN |
 | 9 | `price` | Sale price |
 | 10 | `client_phone` | Buyer phone |
-| — | `sale_delivery` | **NEW: Delivery method** |
-| — | `sale_transport` | **NEW: TC name (if TC selected)** |
-| 11 | `confirm` | Verify all data |
+| 11 | `sale_delivery` | Delivery method |
+| 12 | `sale_transport` | TC name (if TC selected) |
+| 13 | `confirm` | Verify all data |
 
-**Step counts differ:** RENT = 17 steps (15 questions + deposit_destination + confirm, or 19 with split sub-states), SALE = 12 steps (10 questions + delivery + transport). Step numbering MUST be flow-specific.
+**Step counts (verified against code 2026-08-11):** RENT = 16 numbered (+15a/15b when split), SALE = 13. Step numbering is flow-specific. v3.0 said "RENT 17 / SALE 12" and its own history said "16 / 12" — both were wrong.
 
 **State management (VERIFIED):**
 - States are bare strings (no prefix)
@@ -96,31 +97,31 @@ sendComplexMessage(chatId, text, buttons, { keyboardType: 'inline', parseMode: '
 
 ### 1.3 Proposed Enhancements (4 — draft recovery REMOVED per user feedback)
 
-#### Enhancement #1: Step Numbering (flow-specific)
-- RENT steps: 17 (15 questions + deposit_destination + confirm) — or 19 with split sub-states, or 22 with СТС sub-flow
-- SALE steps: 12 (10 questions + sale_delivery + sale_transport)
-- Show "Шаг 3/17" (rent) or "Шаг 3/12" (sale) in every question
-- Use explicit step arrays (not computed) to avoid off-by-one errors
+#### Enhancement #1: Step Numbering (flow-specific) — ✅ SHIPPED
+- RENT steps: 16 numbered (14 questions + deposit_destination + confirm) + 15a/15b split sub-states + `СТС-1..6` sub-flow labels
+- SALE steps: 13 (11 questions + sale_transport conditional + confirm)
+- Show "Шаг 3/16" (rent) or "Шаг 3/13" (sale) in every question
+- Use explicit step arrays (not computed) to avoid off-by-one errors — ✅ `RENT_STEPS`/`SALE_STEPS` at `doc-manual.ts:793/821`, locked by `tests/franchize/doc-manual-steps.spec.ts`
 
-#### Enhancement #2: Step Correction
-- On `confirm`: add 4th button `🔢 Исправить шаг`
-- Bot shows numbered list of steps (flow-specific)
-- User sends number → bot re-asks ONLY that step
+#### Enhancement #2: Step Correction — ✅ SHIPPED
+- On `confirm`: add 4th button `🔢 Исправить шаг` — ✅ `doc-manual.ts:295` (`correct_step` callback, handler at :4097)
+- Bot shows numbered list of steps (flow-specific) — ✅ `getVisibleSteps()` at `doc-manual.ts:865`
+- User sends number → bot re-asks ONLY that step — ✅ `step_correction` state at `doc-manual.ts:3298`
 - After correction → return to `confirm` (not next step)
 
 #### Enhancement #3: Verification Enhancement
 - `buildRentSummary`/`buildSaleSummary` already show data — enhance with HTML formatting
 
-#### Enhancement #4: Delivery Method Step (Sale only)
-- New states: `sale_delivery` + `sale_transport` (after `client_phone`, before `confirm`)
+#### Enhancement #4: Delivery Method Step (Sale only) — ✅ SHIPPED
+- New states: `sale_delivery` + `sale_transport` (after `client_phone`, before `confirm`) — ✅ `doc-manual.ts:3192/3341/3393`
 - 3 options: 🏪 Самовывоз / 🚚 ТК (покупатель) / 🚚 ТК (за наш счёт)
-- Store in `sale_contract_artifacts` (new columns)
+- Store in `sale_contract_artifacts` (new columns) — ✅ migration `20260810000020` (`delivery_method`, `transport_company_name`, `transport_payment_type` + CHECK constraints + index)
 
-#### Enhancement #5: Deposit Destination Step (Rent only)
-- New state: `deposit_destination` (after `deposit_choice`, before `confirm`)
+#### Enhancement #5: Deposit Destination Step (Rent only) — ✅ SHIPPED
+- New state: `deposit_destination` (after `deposit_choice`, before `confirm`) — ✅ `doc-manual.ts:400`, step 15/16
 - See `DEPOSIT_TRACKING_PRD.md` for full details
-- Supports: all cash / all T-Bank / all Sber / split (cash + one card)
-- СТС path: skip deposit_destination (no cash deposit collected)
+- Supports: all cash / all T-Bank / all Sber / split (cash + one card) — ✅ split sub-states `deposit_split_cash`/`deposit_split_card` (`doc-manual.ts:3199/3228`), inserts at `doc-manual.ts:432-495`
+- СТС path: skip deposit_destination (no cash deposit collected) — ✅ also skipped when deposit = 0 (`doc-manual.ts:394`)
 
 ---
 
@@ -150,8 +151,10 @@ ADD COLUMN IF NOT EXISTS transport_payment_type TEXT CHECK (transport_payment_ty
 
 ### 3.1 Step Numbering — Explicit Step Arrays
 
+✅ **SHIPPED** — below is the actual code (`doc-manual.ts:793-860`), supersedes the v3.0 sketch (which had a phantom `license` step, wrong numbering, and a `stepLabel(context)` signature that doesn't exist):
+
 ```typescript
-const RENT_STEPS = [
+const RENT_STEPS: StepDef[] = [
   { num: 1, state: 'deal', label: 'Тип сделки' },
   { num: 2, state: 'bike', label: 'Выбор байка' },
   { num: 3, state: 'name', label: 'ФИО' },
@@ -159,23 +162,23 @@ const RENT_STEPS = [
   { num: 5, state: 'birth', label: 'Дата рождения' },
   { num: 6, state: 'address', label: 'Адрес регистрации' },
   { num: 7, state: 'has_license', label: 'Наличие ВУ' },
-  { num: 8, state: 'license', label: 'Водительское удостоверение' },
-  { num: 9, state: 'categories', label: 'Категории ВУ' },
-  { num: 10, state: 'schedule_start', label: 'Дата и время начала' },
-  { num: 11, state: 'schedule_end', label: 'Дата и время окончания' },
-  { num: 12, state: 'equipment', label: 'Оборудование' },
-  { num: 13, state: 'odometer', label: 'Одометр' },
-  { num: 14, state: 'payment_split', label: 'Способ оплаты' },
-  { num: 15, state: 'deposit_choice', label: 'Депозит / СТС' },
-  { num: 16, state: 'deposit_destination', label: 'Где получен депозит' }, // NEW
-  // Conditional sub-states (only if split deposit chosen):
-  { num: '16a', state: 'deposit_split_cash', label: 'Смешанный: сколько наличными' }, // NEW (conditional)
-  { num: '16b', state: 'deposit_split_card', label: 'Смешанный: выбор карты' }, // NEW (conditional)
-  { num: 17, state: 'confirm', label: 'Проверка данных' },
-  // Note: if СТС chosen, steps 16/16a/16b are skipped, replaced by sts_* sub-flow
-] as const;
+  { num: 8, state: 'categories', label: 'Категории ВУ' },
+  { num: 9, state: 'schedule_start', label: 'Дата и время начала' },
+  { num: 10, state: 'schedule_end', label: 'Дата и время окончания' },
+  { num: 11, state: 'equipment', label: 'Оборудование' },
+  { num: 12, state: 'odometer', label: 'Одометр' },
+  { num: 13, state: 'payment_split', label: 'Способ оплаты' },
+  { num: 14, state: 'deposit_choice', label: 'Депозит / СТС' },
+  { num: 15, state: 'deposit_destination', label: 'Где получен депозит' },
+  { num: '15a', state: 'deposit_split_cash', label: 'Смешанный: сколько наличными' },
+  { num: '15b', state: 'deposit_split_card', label: 'Смешанный: выбор карты' },
+  { num: 16, state: 'confirm', label: 'Проверка данных' },
+  // СТС sub-flow states (not numbered — shown as "СТС-1" etc.)
+  { num: 'СТС-1', state: 'sts_series', label: 'СТС: серия и номер' },
+  // ... СТС-2..СТС-6 ...
+];
 
-const SALE_STEPS = [
+const SALE_STEPS: StepDef[] = [
   { num: 1, state: 'deal', label: 'Тип сделки' },
   { num: 2, state: 'bike', label: 'Выбор байка' },
   { num: 3, state: 'name', label: 'ФИО' },
@@ -186,18 +189,25 @@ const SALE_STEPS = [
   { num: 8, state: 'sale_vin', label: 'VIN' },
   { num: 9, state: 'price', label: 'Цена' },
   { num: 10, state: 'client_phone', label: 'Телефон покупателя' },
-  { num: 11, state: 'sale_delivery', label: 'Способ получения' }, // NEW
-  { num: 12, state: 'sale_transport', label: 'Транспортная компания' }, // NEW (conditional)
-] as const;
+  { num: 11, state: 'sale_delivery', label: 'Способ получения' },
+  { num: 12, state: 'sale_transport', label: 'Транспортная компания' },
+  { num: 13, state: 'confirm', label: 'Проверка данных' },
+];
 
-function stepLabel(context: DocFlowContext): string {
-  const steps = context.dealType === 'sale' ? SALE_STEPS : RENT_STEPS;
-  const step = steps.find(s => s.state === context.currentState);
+// Actual shipped signature — (state, dealType), NOT (context):
+function stepLabel(state: string, dealType?: string): string {
+  const steps = dealType === 'sale' ? SALE_STEPS : RENT_STEPS;
+  const step = steps.find(s => s.state === state);
   if (!step) return '';
-  const total = context.dealType === 'sale' ? SALE_STEPS.length : RENT_STEPS.length;
+  if (typeof step.num === 'string' && step.num.startsWith('СТС')) {
+    return String(step.num); // bare "СТС-1", no "Шаг" prefix
+  }
+  const total = dealType === 'sale' ? 13 : 16;
   return `Шаг ${step.num}/${total}`;
 }
 ```
+
+**Note on `corrected_steps`:** migration `20260810000020` adds `user_states.corrected_steps INTEGER[]`, but the shipped code tracks `context.correctedSteps` inside the state context JSONB instead (split sub-state nums like `'15a'` are strings and wouldn't fit INTEGER[] anyway). The DB column is currently unused — either wire a write-through on confirm or drop the column in a future cleanup.
 
 ### 3.2 Step Correction — Flow-Specific Step Lists
 
@@ -289,11 +299,12 @@ VIN shows blank (not "уточняется") when skipped — already fixed in c
 | Scenario | Handling |
 |----------|----------|
 | User corrects step 1 (deal type) | Switches from rent to sale or vice versa — all subsequent context cleared, restart from step 2 |
-| User corrects step 15 (deposit_choice) to СТС | `deposit_destination` step skipped, `sts_*` sub-flow activated |
-| User corrects step 15 (deposit_choice) from СТС to cash | `sts_*` data cleared, `deposit_destination` step shown |
+| User corrects step 14 (deposit_choice) to СТС | `deposit_destination` step skipped, `sts_*` sub-flow activated |
+| User corrects step 14 (deposit_choice) from СТС to cash | `sts_*` data cleared, `deposit_destination` step shown |
 | User corrects delivery (step 11) from TC to pickup | `sale_transport` data cleared (`saleTransportCompany = undefined`) |
 | СТС sub-flow active + user corrects to a non-deposit step | СТС data preserved, just re-ask the corrected step |
-| Step numbering with СТС | If СТС chosen, `deposit_destination` (step 16) is replaced by 6 СТС sub-steps. Show as "Шаг 16/16 (СТС: серия)" or similar |
+| Step numbering with СТС | If СТС chosen, `deposit_destination` (step 15) is replaced by 6 СТС sub-steps. ✅ Shipped behavior: `stepLabel()` returns the bare label `СТС-1`…`СТС-6` with **no "Шаг" prefix** (`doc-manual.ts:846-848`) — v3.0's "Шаг 16/16 (СТС: серия)" format was not implemented |
+| User corrects license data | ⚠️ **Not possible** — `license` state is excluded from `RENT_STEPS` (see §1.1 note). Operator must restart or fix post-generation |
 | All-cash deposit + rental payment also all cash | Two separate `deposit_entries` rows: one for deposit, one would be in `cash_transactions` (if that PRD is implemented) |
 
 ---
@@ -317,12 +328,14 @@ VIN shows blank (not "уточняется") when skipped — already fixed in c
 ## 6. TESTING SCENARIOS
 
 ### Scenario 1: Step Correction in Rent Flow
-1. Complete steps 1-15, make typo on step 8 (license)
+1. Complete steps 1-15, make typo on step 4 (passport)
 2. On `confirm`, tap "🔢 Исправить шаг"
-3. Bot shows: "1. Тип сделки\n2. Выбор байка\n...\n8. Водительское удостоверение\n...\n16. Где получен депозит"
-4. Send "8"
-5. Bot: "Было: 99 76 123456. Введите новое значение:"
+3. Bot shows: "1. Тип сделки\n2. Выбор байка\n...\n4. Паспорт\n...\n15. Где получен депозит" (16th step `confirm` is excluded from the list)
+4. Send "4"
+5. Bot: "Было: 45 09 123456. Введите новое значение:"
 6. User corrects → returns to `confirm`
+
+*Note: license data is NOT correctable this way (state excluded from the step array — see §1.1). v3.0's version of this scenario used "step 8 (license)" which no longer exists as a numbered step.*
 
 ### Scenario 2: Sale with TC Delivery
 1. Complete sale steps 1-10
@@ -347,13 +360,14 @@ VIN shows blank (not "уточняется") when skipped — already fixed in c
 
 ## 7. IMPLEMENTATION PLAN
 
-**Phase 1:** DB migration (extend `user_states`, add delivery columns to `sale_contract_artifacts`)
-**Phase 2:** Step arrays + `stepLabel()` helper + step numbering in all questions
-**Phase 3:** Step correction handler + `correct_step` callback + `step_correction` state
-**Phase 4:** Deposit destination step (integrated with DEPOSIT_TRACKING_PRD)
-**Phase 5:** Delivery method step for sales
-**Phase 6:** Sales analytics UI + rental card deposit badge
-**Phase 7:** Testing
+**Phase 1:** ✅ DONE (2026-08-10) — DB migration `20260810000020` (extend `user_states`, add delivery columns to `sale_contract_artifacts`)
+**Phase 2:** ✅ DONE — Step arrays + `stepLabel()` helper + step numbering in all questions (`doc-manual.ts:793-860`)
+**Phase 3:** ✅ DONE — Step correction handler + `correct_step` callback + `step_correction` state
+**Phase 4:** ✅ DONE — Deposit destination step (integrated with DEPOSIT_TRACKING_PRD)
+**Phase 5:** ✅ DONE — Delivery method step for sales
+**Phase 6:** ⏳ PENDING — Sales analytics UI + rental card deposit badge (see meta plan, Iteration I2)
+**Phase 7:** ⚠️ PARTIAL — unit tests shipped (`doc-manual-steps.spec.ts`, `deposit-scenarios.spec.ts`); manual end-to-end pass in production bot still recommended
+**Phase 8 (NEW, v3.1):** ⏳ Decide fate of unused `user_states.corrected_steps` column (wire write-through or drop) + optionally re-add `license` to `RENT_STEPS` if operators need license correction
 
 ---
 
@@ -361,3 +375,4 @@ VIN shows blank (not "уточняется") when skipped — already fixed in c
 - v1.0: Initial draft — many inaccuracies
 - v2.0: Cross-referenced with actual code
 - v3.0: Removed draft recovery (user: "not needed"). Added explicit step arrays for rent (16) vs sale (12). Added deposit destination integration. Added corner cases. Extended scope to skills/pages.
+- v3.1 (2026-08-11): Post-implementation audit. Status → Mostly Implemented. **Fixed step numbering to match shipped code: RENT = 16 (not 17), SALE = 13 (not 12)** — v3.0's arrays included a phantom numbered `license` step; the `license` STATE still exists at runtime (`doc-manual.ts:2809`) but is deliberately unnumbered (no step label, not correctable). Fixed `stepLabel` signature `(state, dealType)`, СТС labels (bare `СТС-N`, no "Шаг" prefix), Scenario 1 (license → passport). Noted unused `user_states.corrected_steps` column. Line count 3531 → 4208.
