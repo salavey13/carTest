@@ -15,7 +15,7 @@
 
 **File:** `app/webhook-handlers/commands/doc-manual.ts` (3531 lines)
 
-**Actual RENT flow** (15 steps + confirm + optional СТС sub-flow):
+**Actual RENT flow** (15 steps + deposit destination + confirm + optional СТС sub-flow):
 | # | State | What it asks |
 |---|-------|-------------|
 | 1 | `deal` | Rent or Sale? |
@@ -33,10 +33,12 @@
 | 13 | `odometer` | Odometer reading |
 | 14 | `payment_split` | Cash / bank / split |
 | 15 | `deposit_choice` | Deposit amount or СТС |
-| — | `deposit_destination` | **NEW: Where collected? (cash/tbank/sber/split)** |
-| 16 | `confirm` | Verify all data |
+| 16 | `deposit_destination` | **NEW: Where collected? (cash/tbank/sber/split)** |
+| 16a | `deposit_split_cash` | **NEW (conditional): How much cash? (only if split chosen)** |
+| 16b | `deposit_split_card` | **NEW (conditional): Which card for remainder? (only if split)** |
+| 17 | `confirm` | Verify all data |
 
-*If СТС chosen (step 15): 6 extra sub-steps: `sts_series` → `sts_plate` → `sts_owner` → `sts_relation` → `sts_vehicle` → `sts_vin` → `confirm`*
+*If СТС chosen (step 15): skip steps 16/16a/16b, replaced by 6 СТС sub-steps: `sts_series` → `sts_plate` → `sts_owner` → `sts_relation` → `sts_vehicle` → `sts_vin` → `confirm`*
 
 **Actual SALE flow** (10 steps + confirm):
 | # | State | What it asks |
@@ -55,7 +57,7 @@
 | — | `sale_transport` | **NEW: TC name (if TC selected)** |
 | 11 | `confirm` | Verify all data |
 
-**Step counts differ:** RENT = 15 steps (16 with deposit_destination), SALE = 10 steps (12 with delivery). Step numbering MUST be flow-specific.
+**Step counts differ:** RENT = 17 steps (15 questions + deposit_destination + confirm, or 19 with split sub-states), SALE = 12 steps (10 questions + delivery + transport). Step numbering MUST be flow-specific.
 
 **State management (VERIFIED):**
 - States are bare strings (no prefix)
@@ -95,9 +97,9 @@ sendComplexMessage(chatId, text, buttons, { keyboardType: 'inline', parseMode: '
 ### 1.3 Proposed Enhancements (4 — draft recovery REMOVED per user feedback)
 
 #### Enhancement #1: Step Numbering (flow-specific)
-- RENT steps: 16 (15 questions + deposit_destination) — or 22 with СТС sub-flow
+- RENT steps: 17 (15 questions + deposit_destination + confirm) — or 19 with split sub-states, or 22 with СТС sub-flow
 - SALE steps: 12 (10 questions + sale_delivery + sale_transport)
-- Show "Шаг 3/16" (rent) or "Шаг 3/12" (sale) in every question
+- Show "Шаг 3/17" (rent) or "Шаг 3/12" (sale) in every question
 - Use explicit step arrays (not computed) to avoid off-by-one errors
 
 #### Enhancement #2: Step Correction
@@ -166,7 +168,11 @@ const RENT_STEPS = [
   { num: 14, state: 'payment_split', label: 'Способ оплаты' },
   { num: 15, state: 'deposit_choice', label: 'Депозит / СТС' },
   { num: 16, state: 'deposit_destination', label: 'Где получен депозит' }, // NEW
-  // Note: if СТС chosen, steps 16 is skipped, replaced by sts_* sub-flow
+  // Conditional sub-states (only if split deposit chosen):
+  { num: '16a', state: 'deposit_split_cash', label: 'Смешанный: сколько наличными' }, // NEW (conditional)
+  { num: '16b', state: 'deposit_split_card', label: 'Смешанный: выбор карты' }, // NEW (conditional)
+  { num: 17, state: 'confirm', label: 'Проверка данных' },
+  // Note: if СТС chosen, steps 16/16a/16b are skipped, replaced by sts_* sub-flow
 ] as const;
 
 const SALE_STEPS = [
@@ -198,9 +204,11 @@ function stepLabel(context: DocFlowContext): string {
 When user taps "🔢 Исправить шаг":
 ```typescript
 const steps = context.dealType === 'sale' ? SALE_STEPS : RENT_STEPS;
-// Filter out conditional steps (deposit_destination if СТС, sale_transport if pickup)
+// Filter out conditional steps (deposit_destination if СТС, split sub-states if not split, sale_transport if pickup)
 const visibleSteps = steps.filter(s => {
   if (s.state === 'deposit_destination' && context.stsPledgeUsed) return false;
+  if (s.state === 'deposit_split_cash' && context.depositCardDestination === undefined) return false; // only show if split was chosen
+  if (s.state === 'deposit_split_card' && context.depositCardDestination === undefined) return false;
   if (s.state === 'sale_transport' && context.saleDeliveryMethod !== 'transport_company') return false;
   return true;
 });
@@ -244,9 +252,9 @@ await askStepQuestion(chatId, userId, context, step.state, true /* isCorrection 
 
 **New DocFlowContext fields:**
 ```typescript
-depositCashAmount?: number;      // cash portion
-depositCardDestination?: 'tbank' | 'sber';  // which card
-depositCardAmount?: number;      // card portion
+depositCashAmount?: number;      // cash portion (0 if all card)
+depositCardDestination?: 'tbank' | 'sber';  // which card (undefined if all cash or СТС)
+depositCardAmount?: number;      // card portion (0 if all cash)
 ```
 
 ### 3.4 Delivery Method Step (Sale only)
