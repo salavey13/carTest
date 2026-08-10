@@ -35,7 +35,7 @@ RENTAL_KPIS=$(echo "$RENTALS_DATA" | jq -r '
     completed: ([.[] | select(.status == "completed")] | length),
     revenue: ([.[] | select(.status == "active" or .status == "completed") | (.total_cost // 0)] | add // 0)
   } |
-  "Аренд сегодня: \(.total)\nВыручка: \(.revenue) ₽\nАктивных: \(.active)\nЗавершено: \(.completed)\(.completed == 0 ? " — день открыт" : "")"
+  "Аренд сегодня: \(.total)\nВыручка: \(.revenue) ₽\nАктивных: \(.active)\nЗавершено: \(.completed)\(if .completed == 0 then " — день открыт" else "" end)"
 ')
 
 # ─── Sales KPIs ──────────────────────────────────────────────────────────────
@@ -76,7 +76,7 @@ SERVICE_KPIS=$(echo "$SERVICES_DATA" | jq -r '
     completed: ([.[] | select(.status == "completed")] | length),
     revenue: ([.[] | select(.status == "active" or .status == "completed") | (.total_cost // 0)] | add // 0)
   } |
-  "Сервисов сегодня: \(.total)\nВыручка: \(.revenue) ₽\nАктивных: \(.active)\nЗавершено: \(.completed)\(.completed == 0 ? " — день открыт" : "")"
+  "Сервисов сегодня: \(.total)\nВыручка: \(.revenue) ₽\nАктивных: \(.active)\nЗавершено: \(.completed)\(if .completed == 0 then " — день открыт" else "" end)"
 ')
 
 # ─── Testdrive KPIs ──────────────────────────────────────────────────────────
@@ -121,11 +121,21 @@ DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
 # Build a "📋 Активные аренды" section so operators can tap straight into each
 # open rental's detail page (where the closure UI lives). Without this, the
 # digest only shows "Активных: N" with no way to drill into a specific rental.
+#
+# BUG FIX (user-reported): Previously used `.agreed_end_date[11:16]` which
+# gives RAW UTC time. Operator reading "до 18:00 UTC" thought it was MSK
+# (which matched the start time), making them think the script was showing
+# the wrong time. Now we convert to Moscow time via moscow_hhmm() and label
+# the time as МСК explicitly.
 ACTIVE_RENTALS_LIST=""
 ACTIVE_RENTALS_LIST=$(echo "$RENTALS_DATA" | jq -r '
   [.[] | select(.status == "active")] | .[0:5] |
-  map("• Аренда #\(.rental_id[0:8]) — до \(.agreed_end_date[11:16]) UTC — \(.total_cost // 0) ₽") | join("\n")
-')
+  map("RENTAL_ROW|\(.rental_id[0:8])|\(.agreed_end_date)|\(.total_cost // 0)") | join("\n")
+' | while IFS='|' read -r prefix rid_short end_iso cost; do
+  [[ "$prefix" != "RENTAL_ROW" ]] && continue
+  end_msk=$(moscow_hhmm "$end_iso")
+  printf '• Аренда #%s — до %s МСК — %s ₽' "$rid_short" "$end_msk" "$cost"
+done | paste -sd'\n' -)
 ACTIVE_RENTALS_LINKS=""
 if [[ -n "$ACTIVE_RENTALS_LIST" ]]; then
   # Build per-rental "📋 Открыть" links using rental_link() from _lib.sh.
@@ -135,7 +145,6 @@ if [[ -n "$ACTIVE_RENTALS_LIST" ]]; then
   ACTIVE_RENTALS_LINKS=$(echo "$RENTALS_DATA" | jq -r '
     [.[] | select(.status == "active")] | .[0:5] | .[] | .rental_id
   ' | while read -r rid; do
-    local rlink
     rlink=$(rental_link "$rid")
     printf '  📋 <a href="%s">Открыть %s</a>\n' "$rlink" "${rid:0:8}"
   done)
