@@ -800,6 +800,141 @@ export async function archivePendingRental(
     }
 }
 
+// ============================================================================
+// abortRental — operator-initiated cancellation of a pre-created rental.
+// ============================================================================
+// Sets status='cancelled' for rentals that never physically happened (customer
+// no-show, cancelled, mistake during creation, etc.). Cancelled rentals are
+// excluded from analytics KPIs (revenue, count, conversion) but remain in the
+// rentals list for audit.
+//
+// Unlike archivePendingRental (which is renter-side, only allows owner/user_id
+// matching), this is OPERATOR-side: crew owner / admin / co_owner / member can
+// trigger it from the franchize rental detail page.
+// ============================================================================
+
+export async function abortRental(input: {
+    rentalId: string;
+    actorUserId: string;
+    reason?: string;
+    crewSlug?: string;
+}): Promise<{ success: boolean; error?: string }> {
+    noStore();
+
+    const { rentalId, actorUserId, reason, crewSlug } = input;
+    if (!rentalId || !actorUserId) {
+        return { success: false, error: 'Missing rentalId or actorUserId.' };
+    }
+
+    try {
+        // Fetch rental + vehicle (to get crew_id for membership check)
+        const { data: rental, error: fetchError } = await supabaseAdmin
+            .from('rentals')
+            .select('rental_id, user_id, owner_id, status, payment_status, vehicle_id, metadata')
+            .eq('rental_id', rentalId)
+            .single();
+
+        if (fetchError || !rental) {
+            return { success: false, error: 'Аренда не найдена.' };
+        }
+
+        // Auth: must be owner OR a crew member (owner/admin/co_owner/member) of the crew that owns the bike.
+        // Resolve crew_id from the vehicle.
+        let isAuthorized = rental.owner_id === actorUserId || rental.user_id === actorUserId;
+
+        if (!isAuthorized && rental.vehicle_id) {
+            const { data: vehicle } = await supabaseAdmin
+                .from('cars')
+                .select('crew_id, owner_id')
+                .eq('id', rental.vehicle_id)
+                .maybeSingle();
+
+            if (vehicle?.crew_id) {
+                const { data: membership } = await supabaseAdmin
+                    .from('crew_members')
+                    .select('role, membership_status')
+                    .eq('crew_id', vehicle.crew_id)
+                    .eq('user_id', actorUserId)
+                    .eq('membership_status', 'active')
+                    .maybeSingle();
+
+                if (membership && ['owner', 'admin', 'co_owner', 'member'].includes(membership.role)) {
+                    isAuthorized = true;
+                }
+            }
+            // Also allow if actor is the vehicle owner
+            if (!isAuthorized && vehicle?.owner_id === actorUserId) {
+                isAuthorized = true;
+            }
+        }
+
+        if (!isAuthorized) {
+            return { success: false, error: 'Недостаточно прав для отмены аренды.' };
+        }
+
+        // Only allow aborting pre-active rentals (never started / not yet picked up)
+        if (!['pending_confirmation', 'confirmed'].includes(rental.status)) {
+            return { success: false, error: 'Отменить можно только аренду, которая ещё не началась (статус «Ожидает» или «Подтверждена»).' };
+        }
+
+        // Update rental: flip status + record abort metadata
+        const currentMetadata = (rental.metadata as Record<string, any>) || {};
+        const newMetadata = {
+            ...currentMetadata,
+            aborted_by: actorUserId,
+            aborted_at: new Date().toISOString(),
+            aborted_reason: reason || 'operator_cancelled',
+            aborted_from_status: rental.status,
+            aborted_from_payment_status: rental.payment_status,
+        };
+
+        const { error: updateError } = await supabaseAdmin
+            .from('rentals')
+            .update({
+                status: 'cancelled',
+                metadata: newMetadata,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('rental_id', rentalId);
+
+        if (updateError) throw updateError;
+
+        // Record event for audit trail
+        const { error: eventError } = await supabaseAdmin.from('events').insert({
+            rental_id: rentalId,
+            type: 'rental_cancelled',
+            status: 'completed',
+            created_by: actorUserId,
+            payload: {
+                reason: reason || 'operator_cancelled',
+                prev_status: rental.status,
+                prev_payment_status: rental.payment_status,
+                actor: 'operator',
+                crew_slug: crewSlug || null,
+            },
+        });
+
+        if (eventError) {
+            logger.error('[abortRental] Rental updated but failed to create event:', eventError);
+        }
+
+        // Notify renter + owner
+        await notifyRentalLifecycle(rentalId, 'rental_archived');
+
+        logger.info('[abortRental] Rental aborted successfully', {
+            rentalId,
+            actorUserId,
+            reason: reason || 'operator_cancelled',
+            prevStatus: rental.status,
+        });
+
+        return { success: true };
+    } catch (e: any) {
+        logger.error('[abortRental] Error:', e);
+        return { success: false, error: e.message || 'Unknown error' };
+    }
+}
+
 export async function addRentalPhoto(rentalId: string, userId: string, photoUrl: string, photoType: 'start' | 'end') {
     noStore();
     try {
