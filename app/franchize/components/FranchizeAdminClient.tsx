@@ -337,13 +337,20 @@ export function FranchizeAdminClient({
   // VIN quick-edit: clicking a bike in the missing-VIN list selects it for editing
   // in the CarSubmissionForm below. No bogus VIN generation — the operator must
   // enter the real VIN manually.
+  // FIX: removed the auto-scrollIntoView() call — it scrolled too far down past the form,
+  // forcing operators to scroll back up. The form is rendered in the same panel below;
+  // a brief highlight pulse is enough to draw the eye without disorienting the user.
   const handleQuickEditMissingVin = useCallback((vehicleId: string) => {
     const vehicle = fleet.find((v) => v.id === vehicleId) ?? null;
     setSelectedVehicle(vehicle);
-    // Scroll to the edit form
-    setTimeout(() => {
-      document.getElementById("vehicle-edit-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 100);
+    // Briefly highlight the edit form (no scroll) so the user notices the change.
+    const formEl = document.getElementById("vehicle-edit-form");
+    if (formEl) {
+      formEl.classList.add("ring-2", "ring-amber-400/60", "ring-offset-2", "ring-offset-transparent");
+      setTimeout(() => {
+        formEl.classList.remove("ring-2", "ring-amber-400/60", "ring-offset-2", "ring-offset-transparent");
+      }, 1200);
+    }
   }, [fleet]);
 
   const { theme: globalTheme } = useTheme();
@@ -743,7 +750,30 @@ export function FranchizeAdminClient({
                 </button>
               ))}
             </div>
-            <div id="vehicle-edit-form">
+            <div
+              id="vehicle-edit-form"
+              // FIX: Override Tailwind's CSS vars locally so CarSubmissionForm
+              // (which uses bg-card/border-border/text-foreground classes) picks
+              // up the crew's palette instead of the default dark theme.
+              // Without this, the form was rendered with default colors that
+              // clashed with the rest of the admin page.
+              style={{
+                ["--background" as string]: resolvedPalette.bgBase,
+                ["--foreground" as string]: resolvedPalette.textPrimary,
+                ["--card" as string]: resolvedPalette.bgCard ?? resolvedPalette.bgBase,
+                ["--card-foreground" as string]: resolvedPalette.textPrimary,
+                ["--border" as string]: resolvedPalette.borderSoft,
+                ["--input" as string]: resolvedPalette.borderSoft,
+                ["--primary" as string]: resolvedPalette.accentMain,
+                ["--primary-foreground" as string]: accentOn,
+                ["--muted" as string]: resolvedPalette.bgCard ?? resolvedPalette.bgBase,
+                ["--muted-foreground" as string]: resolvedPalette.textSecondary,
+                ["--accent" as string]: resolvedPalette.accentMain,
+                ["--accent-foreground" as string]: accentOn,
+                ["--ring" as string]: resolvedPalette.accentMain,
+                borderRadius: "0.75rem",
+              } as React.CSSProperties}
+            >
               <CarSubmissionForm
                 ownerId={dbUser?.user_id}
                 vehicleToEdit={selectedVehicle}
