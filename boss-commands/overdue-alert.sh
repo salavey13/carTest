@@ -42,17 +42,26 @@ fi
 record_alert "overdue_batch" "all"
 
 # ─── Format the alert ────────────────────────────────────────────────────────
+# BUG FIX (user-reported): The script was using `.agreed_end_date[11:16]` which
+# gives RAW UTC time. For example, rental with end=09:30 UTC (=12:30 MSK) was
+# displayed as "возврат был 09.08 в 09:30" — operator reading this in MSK
+# context interpreted "09:30" as the START time (which is 09:30 MSK = 06:30 UTC).
+# The actual end time is 12:30 MSK but never showed.
+#
+# FIX: Pass the full ISO timestamp through the `moscow_fmt` helper which
+# converts UTC → Moscow time. Display label now uses "МСК" suffix explicitly.
 OVERDUE_LIST=$(echo "$OVERDUE_DATA" | jq -r '
   map(
-    "\(.rental_id)\t\(.vehicle_id)\t\(.user_id[0:8])\t\(.agreed_end_date[0:10])\t\(.agreed_end_date[11:16])\t\(.total_cost // 0)"
+    "\(.rental_id)\t\(.vehicle_id)\t\(.user_id[0:8])\t\(.agreed_end_date)\t\(.total_cost // 0)"
   ) | join("\n")
 ')
 
 # Format with per-rental deep links
 FORMATTED=""
-while IFS=$'\t' read -r rid vid uid date time cost; do
+while IFS=$'\t' read -r rid vid uid end_iso cost; do
   rl=$(rental_link "$rid")
-  FORMATTED="${FORMATTED}• ${vid} → клиент ${uid}… | просрочен с ${date} ${time} | ${cost} ₽
+  end_msk=$(moscow_fmt "$end_iso")
+  FORMATTED="${FORMATTED}• ${vid} · ${uid}… | возврат был ${end_msk} | ${cost} ₽
   📋 <a href=\"${rl}\">Открыть</a>
 "
 done <<< "$OVERDUE_LIST"
