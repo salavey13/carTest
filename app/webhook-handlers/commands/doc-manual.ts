@@ -400,7 +400,7 @@ async function gotoDepositDestination(chatId: number, userId: string, context: D
   await setState(userId, "deposit_destination", context);
   await sendComplexMessage(
     chatId,
-    `💰 *Депозит: ${depositAmount.toLocaleString("ru-RU")} ₽*\n\nГде получен депозит?`,
+    withStep(`💰 *Депозит: ${depositAmount.toLocaleString("ru-RU")} ₽*\n\nГде получен депозит?`, "deposit_destination", context.dealType),
     buildDepositDestinationKeyboard(depositAmount),
     { keyboardType: 'inline', parseMode: 'Markdown' },
   );
@@ -554,10 +554,19 @@ function buildPaymentSplitKeyboard(totalAmount: number): KeyboardButton[][] {
   return [
     [{ text: `💰 Итого: ${formatted} ₽`, callback_data: "pay_info" }],
     [{ text: "💵 Ввести сумму наличными", callback_data: "pay_cash" }],
-    [{ text: "✅ Всё наличными", callback_data: "pay_all_cash" }],
     [
-      { text: "💳 Тинькофф", callback_data: "pay_all_tbank" },
-      { text: "💳 Сбербанк", callback_data: "pay_all_sber" },
+      { text: "✅ Всё наличными", callback_data: "pay_all_cash" },
+    ],
+    // FIX: Previously a single "💳 Всё безнал" button was used, but the operator
+    // had no way to specify WHICH bank card (Tbank vs Sber) the money went to.
+    // This caused tracking ambiguity in the deposit-tracker text skill. Now we
+    // expose two distinct buttons that mirror the deposit destination pattern.
+    [
+      { text: "💳 Всё на Тинькофф", callback_data: "paydest_tbank" },
+      { text: "💳 Всё на Сбербанк", callback_data: "paydest_sber" },
+    ],
+    [
+      { text: "🔀 Смешанный (часть наличными, часть безнал)", callback_data: "paydest_split" },
     ],
     [{ text: "❌ Отменить", callback_data: "cancel" }],
   ];
@@ -753,7 +762,8 @@ interface DocFlowContext {
   // How the total is split between cash and bank transfer.
   cashAmount?: number;     // amount paid in cash
   bankAmount?: number;     // amount paid by bank transfer
-  // Which card the bank portion went to (NEW — same as deposit destination)
+  // Which bank card the bank portion went to (mirrors depositCardDestination).
+  // Set by paydest_tbank / paydest_sber / paysplit_tbank / paysplit_sber callbacks.
   paymentCardDestination?: 'tbank' | 'sber';
 
   // ── Deposit destination (added 2026-08-10) ────────────────────────────────
@@ -765,11 +775,10 @@ interface DocFlowContext {
   depositCardAmount?: number;      // card portion of deposit (0 if all cash)
 
   // ── Step tracking (added 2026-08-10) ──────────────────────────────────────
-  // Used for step numbering ("Шаг 3/16") and step correction.
+  // Used for step numbering ("Шаг 3/17") and step correction.
   currentStep?: number;
   totalSteps?: number;
   correctedSteps?: number[];
-  correctingStepState?: string; // When set, step_correction handler routes input to this step's parser
 
   // ── Delivery method (added 2026-08-10 — sale only) ────────────────────────
   saleDeliveryMethod?: 'pickup' | 'transport_company';
@@ -844,9 +853,6 @@ function stepLabel(state: string, dealType?: string): string {
 /**
  * Prepend step label to a message text.
  * Returns "Шаг 3/16\n\n<message>" or just "<message>" if no step found.
- * NOTE: withStep is currently NOT used on question messages — step numbering
- * is only shown in the step correction list (correct_step callback).
- * Keeping the function for future use if step numbering is re-enabled.
  */
 function withStep(message: string, state: string, dealType?: string): string {
   const label = stepLabel(state, dealType);
@@ -1213,28 +1219,6 @@ function buildRentSummary(context: DocFlowContext): string {
     const deposit = context.depositOverride || "20000";
     const depositLabel = formatDepositDestination(context);
     lines.push("", `💰 Депозит: ${Number(deposit).toLocaleString("ru-RU")} ₽${depositLabel}`);
-  }
-
-  // ── Payment method line (NEW — shows which card for bank portion) ──
-  const totalPaid = (context.cashAmount || 0) + (context.bankAmount || 0);
-  if (totalPaid > 0) {
-    const cashPart = context.cashAmount || 0;
-    const bankPart = context.bankAmount || 0;
-    let payLine = `💳 Оплата: `;
-    if (cashPart > 0 && bankPart > 0 && context.paymentCardDestination) {
-      const cardName = context.paymentCardDestination === 'tbank' ? 'Тинькофф' : 'Сбербанк';
-      payLine += `💵${cashPart.toLocaleString('ru-RU')} + 💳${cardName} ${bankPart.toLocaleString('ru-RU')}`;
-    } else if (cashPart > 0 && bankPart === 0) {
-      payLine += `💵 наличными ${cashPart.toLocaleString('ru-RU')} ₽`;
-    } else if (cashPart === 0 && bankPart > 0 && context.paymentCardDestination) {
-      const cardName = context.paymentCardDestination === 'tbank' ? 'Тинькофф' : 'Сбербанк';
-      payLine += `💳 ${cardName} ${bankPart.toLocaleString('ru-RU')} ₽`;
-    } else if (bankPart > 0) {
-      payLine += `💳 безнал ${bankPart.toLocaleString('ru-RU')} ₽`;
-    } else {
-      payLine += `💵 наличными ${cashPart.toLocaleString('ru-RU')} ₽`;
-    }
-    lines.push("", payLine);
   }
 
   lines.push("", "Всё верно?");
@@ -2217,8 +2201,10 @@ ${qrDeepLink}`);
         { title: `🔧 Проверить ТС при возврате: ${bike.make} ${bike.model} (${context.rentEndDate} ${context.rentEndTime})`, priority: "high" },
         { title: `🔑 Принять ключи от ${bike.make} ${bike.model}`, priority: "high" },
         { title: `📄 Проверить документы при возврате ${bike.make} ${bike.model}`, priority: "medium" },
-        { title: `📊 Сравить одометр: было ${context.odometerBefore || 0} км`, priority: "medium" },
         { title: `🔍 Осмотр на повреждения: ${bike.make} ${bike.model}`, priority: "high" },
+        // NEW (per user request): photo reminder. Final odometer is captured by
+        // the closure modal — no longer in the todo list (was redundant).
+        { title: `📸 Сфотографировать байк при возврате: ${bike.make} ${bike.model}`, priority: "high" },
       ];
       if ((context.helmets || 0) > 0) todos.push({ title: `🪖 Принять ${context.helmets} шлем(а/ов)`, priority: "medium" });
       if ((context.gloves || 0) > 0) todos.push({ title: `🧤 Принять ${context.gloves} перчатки`, priority: "low" });
@@ -2622,7 +2608,7 @@ async function gotoSaleVin(chatId: number, userId: string, context: DocFlowConte
 async function gotoPrice(chatId: number, userId: string, context: DocFlowContext): Promise<void> {
   await setState(userId, "price", context);
   const priceKeyboard = await buildPriceKeyboard();
-  await sendComplexMessage(chatId, "💰 Цена:", priceKeyboard, { keyboardType: 'inline' });
+  await sendComplexMessage(chatId, withStep("💰 Цена:", "price", context.dealType), priceKeyboard, { keyboardType: 'inline' });
 }
 
 /**
@@ -2722,7 +2708,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     context.bikeModel = bike.model;
     await setState(userId, "deal", context);
     await sendComplexMessage(chatId, `🏍 ${bike.make} ${bike.model}`, [], { removeKeyboard: true });
-    await sendComplexMessage(chatId, "Тип договора:", buildDealKeyboard(), { keyboardType: 'inline' });
+    await sendComplexMessage(chatId, withStep("Тип договора:", "deal"), buildDealKeyboard(), { keyboardType: 'inline' });
     return true;
   }
 
@@ -2816,7 +2802,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
 
   if (state === "has_license") {
     // User typed instead of pressing button — re-prompt
-    await sendComplexMessage(chatId, "*Водительское удостоверение есть?*", buildHasLicenseKeyboard(), { keyboardType: 'inline', parseMode: "Markdown" });
+    await sendComplexMessage(chatId, withStep("*Водительское удостоверение есть?*", "has_license"), buildHasLicenseKeyboard(), { keyboardType: 'inline', parseMode: "Markdown" });
     return true;
   }
 
@@ -3102,35 +3088,72 @@ export async function handleDocText(userId: string, chatId: number, text: string
     context.cashAmount = Math.min(cashAmount, totalAmount);
     context.bankAmount = Math.max(0, totalAmount - cashAmount);
     logger.info(`[/doc] payment_cash: ${userId} → cash=${context.cashAmount}, bank=${context.bankAmount}`);
-
-    // If there's a bank portion, ask which card (NEW)
-    if (context.bankAmount > 0) {
-      await setState(userId, "payment_card", context);
-      await sendComplexMessage(chatId,
-        `Остаток: ${context.bankAmount.toLocaleString("ru-RU")} ₽\n\nНа какую карту?`,
-        [
-          [{ text: "💳 Тинькофф", callback_data: "paycard_tbank" }],
-          [{ text: "💳 Сбербанк", callback_data: "paycard_sber" }],
-        ],
-        { keyboardType: 'inline', parseMode: 'Markdown' },
-      );
-      return true;
-    }
-
     await gotoDepositChoice(chatId, userId, context);
     return true;
   }
 
-  // ── Payment card selection text handler (NEW) ─────────────────────────────
-  if (state === "payment_card") {
-    // User typed instead of pressing a card button — re-prompt
-    await sendComplexMessage(chatId,
-      `На какую карту? (остаток: ${context.bankAmount?.toLocaleString("ru-RU") || "?"} ₽)`,
+  if (state === "payment_split_cash") {
+    // User entered cash amount for split payment (came from paydest_split).
+    // After parsing, ask which card the bank portion went to.
+    const value = text.replace(/\D/g, '');
+    if (!value || parseInt(value) < 0) {
+      logger.info(`[/doc] payment_split_cash: ${userId} → invalid input "${text.slice(0,40)}"`);
+      await sendComplexMessage(chatId, "❌ Введите сумму наличными (руб)", [], { removeKeyboard: true });
+      return true;
+    }
+    const cashAmount = parseInt(value);
+    const bike = await resolveBikeById(context.bikeId);
+    const specs = bike?.specs || {};
+    const startDate = context.rentStartDate;
+    const startTime = context.rentStartTime || "10:00";
+    const endDate = context.rentEndDate;
+    const endTime = context.rentEndTime || "10:00";
+    const start = parseRuDateTime(startDate, startTime);
+    const end = parseRuDateTime(endDate, endTime);
+    const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
+    const specsForPricing = {
+      price_per_hour: specs.price_per_hour,
+      price_per_3h: specs.price_per_3h,
+      price_per_6h: specs.price_per_6h,
+      price_per_12h: specs.price_per_12h,
+      dailyPrice: specs.dailyPrice,
+      rent_weekday: specs.rent_weekday,
+      rent_weekend: specs.rent_weekend,
+      rent_2_4d: specs.rent_2_4d,
+      rent_5_10d: specs.rent_5_10d,
+      rent_11_30d: specs.rent_11_30d,
+    };
+    const startDateForCalc = (() => {
+      if (!startDate) return undefined;
+      const dmy = startDate.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+      return startDate;
+    })();
+    const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateForCalc);
+    const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
+    const helmets = context.helmets || 0;
+    const gloves = context.gloves || 0;
+    const jacket = context.jacket ? 1 : 0;
+    const boots = context.boots ? 1 : 0;
+    const net = context.net ? 1 : 0;
+    const backpack = context.backpack ? 1 : 0;
+    const bag = context.bag ? 1 : 0;
+    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
+    const totalAmount = rentalCost + equipmentCost;
+    context.cashAmount = Math.min(cashAmount, totalAmount);
+    context.bankAmount = Math.max(0, totalAmount - cashAmount);
+    logger.info(`[/doc] payment_split_cash: ${userId} → cash=${context.cashAmount}, bank=${context.bankAmount}, asking which card`);
+    // Show keyboard with two card options (mirrors depsplit_* pattern)
+    const bankFormatted = context.bankAmount.toLocaleString("ru-RU");
+    await sendComplexMessage(
+      chatId,
+      `💳 *Куда пойдёт безналичная часть (${bankFormatted} ₽)?*`,
       [
-        [{ text: "💳 Тинькофф", callback_data: "paycard_tbank" }],
-        [{ text: "💳 Сбербанк", callback_data: "paycard_sber" }],
+        [{ text: "💳 Тинькофф", callback_data: "paysplit_tbank" }],
+        [{ text: "💳 Сбербанк", callback_data: "paysplit_sber" }],
+        [{ text: "❌ Отменить", callback_data: "cancel" }],
       ],
-      { keyboardType: 'inline' },
+      { keyboardType: 'inline', parseMode: 'Markdown' },
     );
     return true;
   }
@@ -3272,142 +3295,45 @@ export async function handleDocText(userId: string, chatId: number, text: string
   }
 
   // ── Step correction text handler ───────────────────────────────────────────
-  // Two modes:
-  // 1. No correctingStepState set → user is entering the step NUMBER to correct
-  // 2. correctingStepState set → user is entering the NEW VALUE for that step
   if (state === "step_correction") {
-    // Mode 2: User is entering the corrected value
-    if (context.correctingStepState) {
-      const targetState = context.correctingStepState;
-      const trimmedText = text.trim();
-
-      // Process the input based on which step we're correcting
-      let parseError = false;
-      switch (targetState) {
-        case 'name':
-          context.mpFullName = capitalizeFullName(trimmedText);
-          break;
-        case 'birth':
-          context.mpBirthDate = trimmedText;
-          break;
-        case 'address':
-          context.mpRegistration = trimmedText;
-          break;
-        case 'sale_color':
-          context.saleColor = trimmedText;
-          break;
-        case 'sale_vin':
-          if (trimmedText.length >= 5) {
-            context.saleVin = trimmedText.toUpperCase();
-            context.saleVinSkipped = false;
-          } else {
-            parseError = true;
-          }
-          break;
-        case 'sale_transport':
-          if (trimmedText.length >= 2) {
-            context.saleTransportCompany = trimmedText;
-          } else {
-            parseError = true;
-          }
-          break;
-        case 'passport': {
-          const p = parsePassport(trimmedText);
-          if (p) {
-            context.mpSeries = p.series;
-            context.mpNumber = p.number;
-            context.mpIssueDate = p.issueDate;
-            context.mpIssuedBy = p.issuedBy;
-          } else {
-            parseError = true;
-          }
-          break;
-        }
-        default:
-          // For callback-only steps (deal, has_license, categories, price,
-          // deposit_choice, deposit_destination, equipment, odometer,
-          // payment_split, schedule_start, schedule_end, sale_delivery):
-          // We can't process text input — user must use the inline keyboard.
-          // Re-show the correction list and tell them to use buttons.
-          await sendComplexMessage(chatId,
-            `⚠️ Этот шаг можно изменить только кнопками. Выберите другой шаг или нажмите «Всё верно» на проверке.`,
-            [], { removeKeyboard: true });
-          context.correctingStepState = undefined;
-          const summary = context.dealType === 'sale'
-            ? buildSaleSummary(context, context.salePrice || "")
-            : buildRentSummary(context);
-          await setState(userId, "confirm", context);
-          await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
-          return true;
-      }
-
-      if (parseError) {
-        await sendComplexMessage(chatId,
-          `❌ Неверный формат. Попробуйте ещё раз:`,
-          [], { removeKeyboard: true });
-        return true;
-      }
-
-      // Success — clear correction flag and return to confirm
-      logger.info(`[/doc] step_correction: ${userId} → corrected ${targetState}`);
-      context.correctingStepState = undefined;
-      const summary = context.dealType === 'sale'
-        ? buildSaleSummary(context, context.salePrice || "")
-        : buildRentSummary(context);
-      await setState(userId, "confirm", context);
-      await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
-      return true;
-    }
-
-    // Mode 1: User is entering the step NUMBER to correct
     const visibleSteps = getVisibleSteps(context);
     const stepNum = parseInt(text.trim());
-    if (isNaN(stepNum) || stepNum < 1 || stepNum > visibleSteps.length) {
+    if (isNaN(stepNum) || stepNum < 1) {
       await sendComplexMessage(chatId,
         `⚠️ Введите номер шага от 1 до ${visibleSteps.length}`,
         [], { removeKeyboard: true });
       return true;
     }
-
+    // Find by number (visibleSteps are 1-indexed by position, not by .num)
     const step = visibleSteps[stepNum - 1];
+    if (!step) {
+      await sendComplexMessage(chatId,
+        `⚠️ Нет такого шага. Введите число от 1 до ${visibleSteps.length}`,
+        [], { removeKeyboard: true });
+      return true;
+    }
+    // Track corrected step
+    const stepKey = typeof step.num === 'number' ? step.num : step.num;
+    context.correctedSteps = context.correctedSteps || [];
+    if (!context.correctedSteps.includes(stepKey as number)) {
+      context.correctedSteps.push(stepKey as number);
+    }
     logger.info(`[/doc] step_correction: ${userId} → correcting step ${step.num} (${step.state})`);
 
-    // Disallow correcting step 1 (deal type) — changes the entire question set
+    // Special handling: correcting step 1 (deal type) resets everything
     if (step.state === 'deal') {
-      await sendComplexMessage(chatId,
-        `⚠️ Тип сделки нельзя исправить — он меняет весь набор вопросов.\n\nИспользуйте «↩️ Начать заново» для смены типа.`,
-        [], { removeKeyboard: true });
-      const summary = context.dealType === 'sale'
-        ? buildSaleSummary(context, context.salePrice || "")
-        : buildRentSummary(context);
-      await setState(userId, "confirm", context);
-      await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+      await clearState(userId);
+      await sendComplexMessage(chatId, "🔄 Начнём заново с выбора типа сделки.", buildDealKeyboard(), { keyboardType: 'inline' });
+      await setState(userId, "deal", context);
       return true;
     }
 
-    // Check if this is a text-input step or callback-only step
-    const textInputSteps = ['name', 'passport', 'birth', 'address', 'sale_color', 'sale_vin', 'sale_transport'];
-    if (textInputSteps.includes(step.state)) {
-      // Text-input step: store the target state, show "Было:" prompt
-      context.correctingStepState = step.state;
-      await setState(userId, "step_correction", context);
-      await reAskStep(chatId, userId, context, step.state);
-    } else {
-      // Callback-only step: re-show the inline keyboard for that step
-      // The user picks a new value via buttons, then the callback handler
-      // will advance normally. After the callback, the flow continues from
-      // that step (which may re-ask subsequent steps).
-      // For simplicity, we just tell the user to use the keyboard on the
-      // verification screen and return to confirm.
-      await sendComplexMessage(chatId,
-        `⚠️ Шаг "${step.label}" можно изменить только кнопками.\n\nВернитесь к проверке и начните заново для этого шага.`,
-        [], { removeKeyboard: true });
-      const summary = context.dealType === 'sale'
-        ? buildSaleSummary(context, context.salePrice || "")
-        : buildRentSummary(context);
-      await setState(userId, "confirm", context);
-      await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
-    }
+    // Route to the step's question handler
+    // The state machine will re-ask the question; after answering, the flow
+    // continues normally (which may go to confirm if it's the last step,
+    // or to the next step if mid-flow).
+    await setState(userId, step.state, context);
+    await reAskStep(chatId, userId, context, step.state);
     return true;
   }
 
@@ -3467,7 +3393,7 @@ async function gotoSaleDelivery(chatId: number, userId: string, context: DocFlow
   await setState(userId, "sale_delivery", context);
   await sendComplexMessage(
     chatId,
-    `📦 *Способ получения*\n\nКак покупатель получит мотоцикл?`,
+    withStep(`📦 *Способ получения*\n\nКак покупатель получит мотоцикл?`, "sale_delivery", "sale"),
     [
       [{ text: "🏪 Самовывоз", callback_data: "delivery_pickup" }],
       [{ text: "🚚 ТК (покупатель)", callback_data: "delivery_tc_buyer" }],
@@ -3514,14 +3440,14 @@ export async function handleDocCallback(
   if (callbackData === "d_rent") {
     context.dealType = "rent";
     await setState(userId, "name", context);
-    await sendComplexMessage(chatId, "*Аренда - ФИО*", [], { removeKeyboard: true, parseMode: "Markdown" });
+    await sendComplexMessage(chatId, withStep("*Аренда - ФИО*", "name", "rent"), [], { removeKeyboard: true, parseMode: "Markdown" });
     return true;
   }
 
   if (callbackData === "d_sale") {
     context.dealType = "sale";
     await setState(userId, "name", context);
-    await sendComplexMessage(chatId, "*Продажа - ФИО*", [], { removeKeyboard: true, parseMode: "Markdown" });
+    await sendComplexMessage(chatId, withStep("*Продажа - ФИО*", "name", "sale"), [], { removeKeyboard: true, parseMode: "Markdown" });
     return true;
   }
 
@@ -3641,7 +3567,7 @@ export async function handleDocCallback(
       context.rentEndTime = timeStr;
     } else {
       // Unknown end callback — re-prompt
-      await sendComplexMessage(chatId, "*Когда заканчиваем?*", buildEndKeyboard(context.rentStartTime), { keyboardType: 'inline', parseMode: 'Markdown' });
+      await sendComplexMessage(chatId, withStep("*Когда заканчиваем?*", "schedule_end", context.dealType), buildEndKeyboard(context.rentStartTime), { keyboardType: 'inline', parseMode: 'Markdown' });
       return true;
     }
 
@@ -3658,7 +3584,7 @@ export async function handleDocCallback(
     context.helmets = current >= 2 ? 0 : current + 1;
     await setState(userId, "equipment", context);
     logger.info(`[/doc] eq_helmets: ${userId} → helmets=${context.helmets}`);
-    await sendComplexMessage(chatId, `🪖 Шлемы: ${context.helmets}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
+    await sendComplexMessage(chatId, withStep(`🪖 Шлемы: ${context.helmets}`, "equipment", context.dealType), buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
   }
 
@@ -3667,7 +3593,7 @@ export async function handleDocCallback(
     context.gloves = current >= 2 ? 0 : current + 1;
     await setState(userId, "equipment", context);
     logger.info(`[/doc] eq_gloves: ${userId} → gloves=${context.gloves}`);
-    await sendComplexMessage(chatId, `🧤 Перчатки: ${context.gloves}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
+    await sendComplexMessage(chatId, withStep(`🧤 Перчатки: ${context.gloves}`, "equipment", context.dealType), buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
   }
 
@@ -3788,7 +3714,18 @@ export async function handleDocCallback(
     return true;
   }
 
-  if (callbackData === "pay_all_bank" || callbackData === "pay_all_tbank" || callbackData === "pay_all_sber") {
+  if (callbackData === "pay_all_bank") {
+    // Legacy button — kept as a fallback for older keyboards still in flight.
+    // Routes to the new paydest_tbank handler (T-Bank is the default card).
+    logger.warn(`[/doc] pay_all_bank: ${userId} → legacy button pressed, defaulting to tbank. Update keyboard to use paydest_* buttons.`);
+    callbackData = "paydest_tbank";
+  }
+
+  // ── Payment destination callbacks (paydest_*) — NEW ──────────────────────
+  // Mirrors the deposit destination pattern: operator picks which card the
+  // bank portion went to (or "split" to enter a mixed cash+card amount).
+  if (callbackData === "paydest_tbank" || callbackData === "paydest_sber") {
+    const dest = callbackData === "paydest_tbank" ? "tbank" : "sber";
     const bike = await resolveBikeById(context.bikeId);
     const specs = bike?.specs || {};
     const startDate = context.rentStartDate;
@@ -3829,19 +3766,71 @@ export async function handleDocCallback(
     const totalAmount = rentalCost + equipmentCost;
     context.cashAmount = 0;
     context.bankAmount = totalAmount;
-    // Track which card (NEW)
-    context.paymentCardDestination = callbackData === "pay_all_tbank" ? "tbank" : callbackData === "pay_all_sber" ? "sber" : undefined;
-    const cardLabel = context.paymentCardDestination ? ` (${context.paymentCardDestination === 'tbank' ? 'Тинькофф' : 'Сбербанк'})` : "";
-    logger.info(`[/doc] ${callbackData}: ${userId} → cash=0, bank=${totalAmount}${cardLabel}`);
+    context.paymentCardDestination = dest;
+    logger.info(`[/doc] ${callbackData}: ${userId} → all ${dest} bank=${totalAmount}`);
     await gotoDepositChoice(chatId, userId, context);
     return true;
   }
 
-  // ── Payment card selection callbacks (paycard_*) — NEW ────────────────────
-  if (callbackData === "paycard_tbank" || callbackData === "paycard_sber") {
-    const dest = callbackData === "paycard_tbank" ? "tbank" : "sber";
+  if (callbackData === "paydest_split") {
+    // Ask how much is cash; the rest goes to a card (chosen next)
+    const bike = await resolveBikeById(context.bikeId);
+    const specs = bike?.specs || {};
+    const startDate = context.rentStartDate;
+    const startTime = context.rentStartTime || "10:00";
+    const endDate = context.rentEndDate;
+    const endTime = context.rentEndTime || "10:00";
+    const start = parseRuDateTime(startDate, startTime);
+    const end = parseRuDateTime(endDate, endTime);
+    const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
+    const specsForPricing = {
+      price_per_hour: specs.price_per_hour,
+      price_per_3h: specs.price_per_3h,
+      price_per_6h: specs.price_per_6h,
+      price_per_12h: specs.price_per_12h,
+      dailyPrice: specs.dailyPrice,
+      rent_weekday: specs.rent_weekday,
+      rent_weekend: specs.rent_weekend,
+      rent_2_4d: specs.rent_2_4d,
+      rent_5_10d: specs.rent_5_10d,
+      rent_11_30d: specs.rent_11_30d,
+    };
+    const startDateForCalc = (() => {
+      if (!startDate) return undefined;
+      const dmy = startDate.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+      return startDate;
+    })();
+    const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateForCalc);
+    const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
+    const helmets = context.helmets || 0;
+    const gloves = context.gloves || 0;
+    const jacket = context.jacket ? 1 : 0;
+    const boots = context.boots ? 1 : 0;
+    const net = context.net ? 1 : 0;
+    const backpack = context.backpack ? 1 : 0;
+    const bag = context.bag ? 1 : 0;
+    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
+    const totalAmount = rentalCost + equipmentCost;
+    logger.info(`[/doc] paydest_split: ${userId} → asking for cash portion (total=${totalAmount})`);
+    // Use payment_split_cash state (separate from payment_cash) so we can ask
+    // which card the bank portion goes to after the cash amount is typed.
+    await setState(userId, "payment_split_cash", context);
+    await sendComplexMessage(
+      chatId,
+      `🔀 *Смешанная оплата: ${totalAmount.toLocaleString("ru-RU")} ₽*\n\nСколько наличными? Остальное пойдёт на карту (выберете следующей кнопкой).`,
+      [], { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  // ── Payment split card callbacks (paysplit_*) — NEW ──────────────────────
+  // After paydest_split + payment_cash (operator typed the cash amount),
+  // ask which card the bank portion went to.
+  if (callbackData === "paysplit_tbank" || callbackData === "paysplit_sber") {
+    const dest = callbackData === "paysplit_tbank" ? "tbank" : "sber";
     context.paymentCardDestination = dest;
-    logger.info(`[/doc] ${callbackData}: ${userId} → payment card=${dest}`);
+    logger.info(`[/doc] ${callbackData}: ${userId} → split: cash=${context.cashAmount} ${dest}=${context.bankAmount}`);
     await gotoDepositChoice(chatId, userId, context);
     return true;
   }
@@ -4070,7 +4059,7 @@ export async function handleDocCallback(
     const price = callbackData.slice(2);
     if (price === "custom") {
       await setState(userId, "price_custom", context);
-      await sendComplexMessage(chatId, "*Введите цену (руб)*", [], { removeKeyboard: true, parseMode: "Markdown" });
+      await sendComplexMessage(chatId, withStep("*Введите цену (руб)*", "price", "sale"), [], { removeKeyboard: true, parseMode: "Markdown" });
       return true;
     }
     context.salePrice = price;
@@ -4193,7 +4182,7 @@ export async function docCommand(
     };
     await setState(userIdStr, "deal", context);
     await sendComplexMessage(chatId, `🏍 ${bike.make} ${bike.model}`, [], { removeKeyboard: true });
-    await sendComplexMessage(chatId, "Тип договора:", buildDealKeyboard(), { keyboardType: 'inline' });
+    await sendComplexMessage(chatId, withStep("Тип договора:", "deal"), buildDealKeyboard(), { keyboardType: 'inline' });
     return;
   }
 
