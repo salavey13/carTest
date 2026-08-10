@@ -20,6 +20,7 @@ import {
   getRenterName,
   getRentalStatusMeta,
 } from "./lib/analytics-utils";
+import { DepositBadge } from "./DepositBadge";
 
 interface AnalyticsRentalCardProps {
   rental: AnalyticsRentalRow;
@@ -112,6 +113,7 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
             >
               {handoff.done ? "Передан" : handoff.label}
             </span>
+            <DepositBadge rentalId={rental.rental_id} T={T} />
           </div>
 
           {/* SLA countdown line */}
