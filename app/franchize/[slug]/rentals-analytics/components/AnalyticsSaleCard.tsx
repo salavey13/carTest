@@ -80,6 +80,16 @@ export function AnalyticsSaleCard({ sale, selected, onSelect, T }: AnalyticsSale
               <Banknote className="h-3 w-3" aria-hidden />
               {formatRubles(price)}
             </span>
+            {sale.delivery_method && (
+              <span
+                className="inline-flex items-center gap-1 text-[10px]"
+                style={{ color: T.textMuted }}
+              >
+                {sale.delivery_method === 'pickup'
+                  ? "🏪 Самовывоз"
+                  : `🚚 ${sale.transport_company_name || 'ТК'}${sale.transport_payment_type === 'buyer_pays' ? ' (пок.)' : ' (наш)'}`}
+              </span>
+            )}
           </div>
         </div>
 

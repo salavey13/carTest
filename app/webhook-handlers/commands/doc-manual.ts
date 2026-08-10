@@ -783,18 +783,17 @@ const RENT_STEPS: StepDef[] = [
   { num: 5, state: 'birth', label: 'Дата рождения' },
   { num: 6, state: 'address', label: 'Адрес регистрации' },
   { num: 7, state: 'has_license', label: 'Наличие ВУ' },
-  { num: 8, state: 'license', label: 'Водительское удостоверение' },
-  { num: 9, state: 'categories', label: 'Категории ВУ' },
-  { num: 10, state: 'schedule_start', label: 'Дата и время начала' },
-  { num: 11, state: 'schedule_end', label: 'Дата и время окончания' },
-  { num: 12, state: 'equipment', label: 'Оборудование' },
-  { num: 13, state: 'odometer', label: 'Одометр' },
-  { num: 14, state: 'payment_split', label: 'Способ оплаты' },
-  { num: 15, state: 'deposit_choice', label: 'Депозит / СТС' },
-  { num: 16, state: 'deposit_destination', label: 'Где получен депозит' },
-  { num: '16a', state: 'deposit_split_cash', label: 'Смешанный: сколько наличными' },
-  { num: '16b', state: 'deposit_split_card', label: 'Смешанный: выбор карты' },
-  { num: 17, state: 'confirm', label: 'Проверка данных' },
+  { num: 8, state: 'categories', label: 'Категории ВУ' },
+  { num: 9, state: 'schedule_start', label: 'Дата и время начала' },
+  { num: 10, state: 'schedule_end', label: 'Дата и время окончания' },
+  { num: 11, state: 'equipment', label: 'Оборудование' },
+  { num: 12, state: 'odometer', label: 'Одометр' },
+  { num: 13, state: 'payment_split', label: 'Способ оплаты' },
+  { num: 14, state: 'deposit_choice', label: 'Депозит / СТС' },
+  { num: 15, state: 'deposit_destination', label: 'Где получен депозит' },
+  { num: '15a', state: 'deposit_split_cash', label: 'Смешанный: сколько наличными' },
+  { num: '15b', state: 'deposit_split_card', label: 'Смешанный: выбор карты' },
+  { num: 16, state: 'confirm', label: 'Проверка данных' },
   // СТС sub-flow states (not numbered — shown as "СТС: серия" etc.)
   { num: 'СТС-1', state: 'sts_series', label: 'СТС: серия и номер' },
   { num: 'СТС-2', state: 'sts_plate', label: 'СТС: госномер' },
@@ -832,7 +831,7 @@ function stepLabel(state: string, dealType?: string): string {
   if (typeof step.num === 'string' && step.num.startsWith('СТС')) {
     return String(step.num);
   }
-  const total = dealType === 'sale' ? 13 : 17;
+  const total = dealType === 'sale' ? 13 : 16;
   return `Шаг ${step.num}/${total}`;
 }
 
@@ -1166,7 +1165,7 @@ function parseEndDate(text: string, startDate?: string): { date: string; time: s
  * context.stsPledgeUsed.
  */
 function buildRentSummary(context: DocFlowContext): string {
-  const hasLicense = context.mlSeries && context.mlNumber;
+  const hasLicense = (context.mlCategories || []).length > 0 && context.mlCategories[0] !== "нет";
   const lines = [
     "*📋 Проверьте: *",
     "",
@@ -1175,7 +1174,7 @@ function buildRentSummary(context: DocFlowContext): string {
     `📅 ${context.mpBirthDate}`,
   ];
   if (hasLicense) {
-    lines.push("", `🚗 ВУ: ${context.mlSeries} ${context.mlNumber} (${(context.mlCategories || []).join(", ")})`);
+    lines.push("", `🚗 ВУ: категории ${(context.mlCategories || []).join(", ")}`);
   }
   lines.push(
     "",
@@ -3091,6 +3090,13 @@ export async function handleDocText(userId: string, chatId: number, text: string
     return true;
   }
 
+  if (state === "sale_delivery") {
+    // User typed instead of pressing a delivery button — re-prompt
+    logger.info(`[/doc] sale_delivery: ${userId} → typed instead of clicking, re-prompting`);
+    await gotoSaleDelivery(chatId, userId, context);
+    return true;
+  }
+
   if (state === "deposit_split_cash") {
     // User entered the cash portion for a split deposit
     const cashAmount = parseInt(text.replace(/\D/g, ''));
@@ -3268,7 +3274,7 @@ async function reAskStep(chatId: number, userId: string, context: DocFlowContext
     case 'passport': oldValue = context.mpSeries ? `${context.mpSeries} ${context.mpNumber}` : ""; break;
     case 'birth': oldValue = context.mpBirthDate || ""; break;
     case 'address': oldValue = context.mpRegistration || ""; break;
-    case 'license': oldValue = context.mlSeries ? `${context.mlSeries} ${context.mlNumber}` : ""; break;
+    case 'categories': oldValue = (context.mlCategories || []).join(", "); break;
     case 'sale_color': oldValue = context.saleColor || ""; break;
     case 'sale_vin': oldValue = context.saleVin || (context.saleVinSkipped ? "(пропущен)" : ""); break;
     case 'sale_transport': oldValue = context.saleTransportCompany || ""; break;
@@ -3348,12 +3354,13 @@ export async function handleDocCallback(
 
   // ── Has license? Yes/No ──
   if (callbackData === "hl_yes") {
-    await setState(userId, "license", context);
+    // Simplified: skip license serial number entry, go directly to categories
+    await setState(userId, "categories", context);
     await sendComplexMessage(
       chatId,
-      `✅\n\n*ВУ*\n\nФормат: серия номер дата_выдачи [дата_окончания]\n\nПримеры:\n• 99 76 123456 15.03 (срок auto +10 лет)\n• 99 76 123456 15.03 15.03.2028\n\n(год без числа = ${CURRENT_YEAR})`,
-      [],
-      { removeKeyboard: true, parseMode: "Markdown" },
+      `✅\n\n*Категории водительского удостоверения*`,
+      buildCategoryKeyboard(),
+      { keyboardType: 'inline', parseMode: 'Markdown' },
     );
     return true;
   }
