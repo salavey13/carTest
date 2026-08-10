@@ -672,10 +672,25 @@ export async function getRentalReturnTodos(
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Fetch ALL crew_todos for this crew (both lead_followup and rental_verification)
+    // Fetch ALL crew_todos for this crew that could be return-related.
+    // We use the indexed `rental_id` column when available, falling back to
+    // parsing the description JSON blob for older rows that pre-date the index.
+    //
+    // IMPORTANT FIX (user-reported bug):
+    // Previously this query also included `rental_verification` category — those
+    // are START-of-rental verification todos (passport, drivers license, START
+    // odometer, dates). They are created by `createRentalVerificationTodos`
+    // BEFORE pickup, not at return time. Including them in the return checklist
+    // made the panel show "паспорт (главная страница)", "водительское
+    // удостоверение", "начальный одометр", "даты аренды" — none of which belong
+    // in a "Что вернуть" list.
+    //
+    // Now we ONLY return `lead_followup` todos (the equipment-return items
+    // created by doc-manual.ts at handoff: keys, bike docs, accessories,
+    // damage inspection). The closure modal handles final odometer separately.
     const { data: allTodos, error } = await supabaseAdmin
       .from("crew_todos")
-      .select("id, title, status, priority, category, description")
+      .select("id, title, status, priority, category, description, rental_id")
       .eq("crew_id", crewId)
       .order("created_at", { ascending: true });
 
@@ -684,23 +699,18 @@ export async function getRentalReturnTodos(
       return { success: false, error: error.message };
     }
 
-    // Filter by rental_id in description JSON
+    // Filter: only `lead_followup` todos belonging to this rental.
+    // Use the indexed `rental_id` column when present (fast path);
+    // fall back to parsing description JSON for legacy rows without it.
     const rentalTodos = (allTodos || []).filter((t) => {
-      if (t.category === "rental_verification") {
-        // Verification todos store rental_id directly in description
-        try {
-          const desc = JSON.parse(t.description || "{}");
-          return desc.rental_id === rentalId;
-        } catch { return false; }
-      }
-      // lead_followup todos may have rental_id or be generally return-related
-      if (t.category === "lead_followup") {
-        try {
-          const desc = JSON.parse(t.description || "{}");
-          return desc.rental_id === rentalId;
-        } catch { return false; }
-      }
-      return false;
+      if (t.category !== "lead_followup") return false;
+      // Fast path: indexed rental_id column (added by migration 20260720120200)
+      if (typeof t.rental_id === "string" && t.rental_id === rentalId) return true;
+      // Legacy fallback: rental_id stored in description JSON
+      try {
+        const desc = JSON.parse(t.description || "{}");
+        return desc.rental_id === rentalId;
+      } catch { return false; }
     });
 
     return {
