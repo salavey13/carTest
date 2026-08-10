@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { FranchizePageShell } from "@/app/franchize/components/FranchizePageShell";
 import { FranchizePriceQuickEditor } from "@/app/franchize/components/FranchizePriceQuickEditor";
@@ -42,7 +41,7 @@ export default async function FranchizeAdminPricesPage({
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4">
         <FranchizePriceQuickEditor initialSlug={resolvedSlug} initialCrew={crew} />
       </FranchizePageShell>
-      <CrewFooter crew={crew} />
+      {/* FIX: CrewFooter removed — admin page doesn't need footer (consistent with /admin page). */}
     </main>
   );
 }
