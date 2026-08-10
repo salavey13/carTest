@@ -95,6 +95,7 @@ export async function handleCommand(update: any) {
             text.startsWith("s_") ||
             text.startsWith("eq_") ||    // <<< FIX: equipment callbacks (eq_helmets, eq_done, etc)
             text.startsWith("pay_") ||   // <<< FIX: payment split callbacks (pay_cash, pay_all_cash, etc)
+            text.startsWith("paycard_") || // payment card selection callbacks (NEW)
             text.startsWith("dep_") ||   // deposit choice callbacks
             text.startsWith("depdest_") || // deposit destination callbacks (NEW)
             text.startsWith("depsplit_") || // deposit split card callbacks (NEW)
