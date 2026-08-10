@@ -39,18 +39,29 @@ fi
 
 # ─── State-aware dedup ──
 # Only alert about each return once (12h cooldown — covers the 3h window + buffer)
+#
+# BUG FIX (user-reported): Previously the script used `.agreed_end_date[11:16]`
+# to extract the time — this gets the RAW UTC time (e.g. "18:00" for a 21:00 MSK
+# return). Operator reading "до 18:00 UTC" mentally parsed it as MSK 18:00,
+# which happens to be the START time of the rental — so they thought the script
+# was showing start times instead of end times.
+#
+# FIX: Now we extract the full ISO string and convert it to Moscow time via
+# moscow_hhmm() before display. So "2026-08-10T18:00:00+00:00" → "21:00" (MSK).
+# The display label is also changed from "до 18:00 UTC" to "до 21:00 МСК" —
+# explicit timezone removes all ambiguity.
 NEW_RETURNS=$(echo "$RETURNS_DATA" | jq -r '
   .[] |
-  "RENTAL|\(.rental_id)|\(.agreed_end_date[11:16])|\(.total_cost // 0)"
-' | while IFS=| read -r prefix rid time cost; do
+  "RENTAL|\(.rental_id)|\(.agreed_end_date)|\(.total_cost // 0)"
+' | while IFS=| read -r prefix rid end_iso cost; do
   if ! already_alerted "returns" "$rid" 43200; then
-    local rlink
     rlink=$(rental_link "$rid")
+    end_msk=$(moscow_hhmm "$end_iso")
     # Use printf so \n becomes a real newline (echo "...\n..." in bash doesn't
     # interpret escapes unless using echo -e or $'...'). Real newlines are
     # needed so the message renders correctly in Telegram.
-    printf '• Аренда #%s — до %s UTC | %s ₽\n  📋 <a href="%s">Открыть</a>\n' \
-      "${rid:0:8}" "$time" "$cost" "$rlink"
+    printf '• Аренда #%s — до %s МСК | %s ₽\n  📋 <a href="%s">Открыть</a>\n' \
+      "${rid:0:8}" "$end_msk" "$cost" "$rlink"
     record_alert "returns" "$rid"
   fi
 done)
