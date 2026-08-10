@@ -351,6 +351,120 @@ function buildDepositChoiceKeyboard(depositAmount: string, bike?: any): Keyboard
 }
 
 /**
+ * Build deposit destination keyboard — asks WHERE the deposit was collected.
+ * Shown after deposit_choice (when a cash deposit amount is confirmed).
+ * NOT shown if СТС is chosen (no cash deposit to track).
+ */
+function buildDepositDestinationKeyboard(depositAmount: number): KeyboardButton[][] {
+  const formatted = depositAmount.toLocaleString("ru-RU");
+  return [
+    [{ text: `💵 Всё наличными (${formatted} ₽)`, callback_data: "depdest_cash" }],
+    [
+      { text: "💳 Тинькофф", callback_data: "depdest_tbank" },
+      { text: "💳 Сбербанк", callback_data: "depdest_sber" },
+    ],
+    [{ text: "🔀 Смешанный", callback_data: "depdest_split" }],
+    [{ text: "❌ Отменить", callback_data: "cancel" }],
+  ];
+}
+
+/**
+ * Navigate to the deposit destination step.
+ * Called after deposit_choice confirms a cash deposit amount.
+ * Skipped if СТС is chosen (stsPledgeUsed=true) or deposit=0.
+ */
+async function gotoDepositDestination(chatId: number, userId: string, context: DocFlowContext): Promise<void> {
+  const depositAmount = Number(context.depositOverride || "20000");
+  if (depositAmount <= 0) {
+    // No deposit to track — skip to confirm
+    logger.info(`[/doc] Deposit amount is 0, skipping deposit_destination`);
+    const summary = buildRentSummary(context);
+    await setState(userId, "confirm", context);
+    await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return;
+  }
+  await setState(userId, "deposit_destination", context);
+  await sendComplexMessage(
+    chatId,
+    `💰 *Депозит: ${depositAmount.toLocaleString("ru-RU")} ₽*\n\nГде получен депозит?`,
+    buildDepositDestinationKeyboard(depositAmount),
+    { keyboardType: 'inline', parseMode: 'Markdown' },
+  );
+}
+
+/**
+ * Insert deposit_entries rows for the collected deposit.
+ * Called after rental_id is created, before saving secrets/artifacts.
+ * Handles: all cash, all card, split (cash + one card).
+ */
+async function insertDepositEntries(rentalId: string, userId: string, context: DocFlowContext): Promise<void> {
+  const depositAmount = Number(context.depositOverride || "20000");
+  if (depositAmount <= 0 || context.stsPledgeUsed) {
+    logger.info(`[/doc] No deposit entries to insert (amount=${depositAmount}, sts=${context.stsPledgeUsed})`);
+    return;
+  }
+
+  const cashPortion = context.depositCashAmount || 0;
+  const cardPortion = context.depositCardAmount || 0;
+  const cardDest = context.depositCardDestination;
+
+  // If no destination info, default to all cash (backward compat)
+  if (cashPortion === 0 && cardPortion === 0) {
+    try {
+      await supabaseAdmin.from("deposit_entries").insert({
+        rental_id: rentalId,
+        entry_type: "deposit_collected",
+        amount: depositAmount,
+        direction: "in",
+        destination: "cash",
+        operator_chat_id: String(userId),
+        notes: "Deposit collected via /doc (no destination specified, defaulted to cash)",
+      });
+      logger.info(`[/doc] Inserted deposit_entries: ${depositAmount} cash (default)`);
+    } catch (err) {
+      logger.warn(`[/doc] Failed to insert deposit_entries (cash default):`, err);
+    }
+    return;
+  }
+
+  // Insert cash portion if > 0
+  if (cashPortion > 0) {
+    try {
+      await supabaseAdmin.from("deposit_entries").insert({
+        rental_id: rentalId,
+        entry_type: "deposit_collected",
+        amount: cashPortion,
+        direction: "in",
+        destination: "cash",
+        operator_chat_id: String(userId),
+        notes: "Deposit (cash portion)",
+      });
+      logger.info(`[/doc] Inserted deposit_entries: ${cashPortion} cash`);
+    } catch (err) {
+      logger.warn(`[/doc] Failed to insert deposit_entries (cash):`, err);
+    }
+  }
+
+  // Insert card portion if > 0
+  if (cardPortion > 0 && cardDest) {
+    try {
+      await supabaseAdmin.from("deposit_entries").insert({
+        rental_id: rentalId,
+        entry_type: "deposit_collected",
+        amount: cardPortion,
+        direction: "in",
+        destination: cardDest,
+        operator_chat_id: String(userId),
+        notes: `Deposit (${cardDest === 'tbank' ? 'T-Bank' : 'Sber'} portion)`,
+      });
+      logger.info(`[/doc] Inserted deposit_entries: ${cardPortion} ${cardDest}`);
+    } catch (err) {
+      logger.warn(`[/doc] Failed to insert deposit_entries (${cardDest}):`, err);
+    }
+  }
+}
+
+/**
  * Parse a date+time pair into a valid Date object.
  * Handles both DD.MM.YYYY (Russian) and YYYY-MM-DD (ISO) date formats.
  */
@@ -603,6 +717,14 @@ interface DocFlowContext {
   // How the total is split between cash and bank transfer.
   cashAmount?: number;     // amount paid in cash
   bankAmount?: number;     // amount paid by bank transfer
+
+  // ── Deposit destination (added 2026-08-10) ────────────────────────────────
+  // Tracks WHERE the deposit was collected: cash, T-Bank card, Sber card, or split.
+  // If depositCashAmount + depositCardAmount = total deposit, split is recorded.
+  // If stsPledgeUsed=true, these fields are undefined (no cash deposit).
+  depositCashAmount?: number;      // cash portion of deposit (0 if all card)
+  depositCardDestination?: 'tbank' | 'sber';  // which card for the card portion
+  depositCardAmount?: number;      // card portion of deposit (0 if all cash)
 }
 
 // ── Bike resolution ─────────────────────────────────────────────────────
@@ -1573,6 +1695,8 @@ ${qrDeepLink}`);
         rentalId = await createRentalFromDocContract(chatId, String(userId), context, bike, docSha256);
         if (rentalId) {
           logger.info('[/doc] Rental created successfully:', rentalId);
+          // Insert deposit_entries rows (tracks WHERE deposit was collected: cash/tbank/sber/split)
+          await insertDepositEntries(rentalId, String(userId), context);
         } else {
           logger.warn('[/doc] Failed to create rental, continuing without rental_id');
         }
@@ -2813,9 +2937,8 @@ export async function handleDocText(userId: string, chatId: number, text: string
     context.depositOverride = amount;
     context.stsPledgeUsed = false; // explicit cash deposit
     logger.info(`[/doc] deposit_custom: ${userId} → amount=${amount}`);
-    const summary = buildRentSummary(context);
-    await setState(userId, "confirm", context);
-    await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+    // Route to deposit destination (cash/card/split) instead of directly to confirm
+    await gotoDepositDestination(chatId, userId, context);
     return true;
   }
 
@@ -2823,6 +2946,58 @@ export async function handleDocText(userId: string, chatId: number, text: string
     // User typed instead of pressing a deposit-choice button — re-prompt
     logger.info(`[/doc] deposit_choice: ${userId} → typed instead of clicking, re-prompting`);
     await gotoDepositChoice(chatId, userId, context);
+    return true;
+  }
+
+  // ── Deposit destination text handlers ─────────────────────────────────────
+  if (state === "deposit_destination") {
+    // User typed instead of pressing a destination button — re-prompt
+    logger.info(`[/doc] deposit_destination: ${userId} → typed instead of clicking, re-prompting`);
+    await gotoDepositDestination(chatId, userId, context);
+    return true;
+  }
+
+  if (state === "deposit_split_cash") {
+    // User entered the cash portion for a split deposit
+    const cashAmount = parseInt(text.replace(/\D/g, ''));
+    const total = Number(context.depositOverride || "20000");
+    if (isNaN(cashAmount) || cashAmount < 0 || cashAmount >= total) {
+      logger.info(`[/doc] deposit_split_cash: ${userId} → invalid input "${text.slice(0,40)}"`);
+      await sendComplexMessage(chatId,
+        `❌ Введите сумму наличными (от 0 до ${(total - 1).toLocaleString("ru-RU")} ₽)\n` +
+        `Весь депозит: ${total.toLocaleString("ru-RU")} ₽`,
+        [], { removeKeyboard: true });
+      return true;
+    }
+    context.depositCashAmount = cashAmount;
+    context.depositCardAmount = total - cashAmount;
+    logger.info(`[/doc] deposit_split_cash: ${userId} → cash=${cashAmount}, card=${context.depositCardAmount}`);
+    // Ask which card for the remaining portion
+    await setState(userId, "deposit_split_card", context);
+    await sendComplexMessage(
+      chatId,
+      `Остаток: ${context.depositCardAmount!.toLocaleString("ru-RU")} ₽\n\nНа какую карту?`,
+      [
+        [{ text: "💳 Тинькофф", callback_data: "depsplit_tbank" }],
+        [{ text: "💳 Сбербанк", callback_data: "depsplit_sber" }],
+      ],
+      { keyboardType: 'inline', parseMode: 'Markdown' },
+    );
+    return true;
+  }
+
+  if (state === "deposit_split_card") {
+    // User typed instead of pressing a card button — re-prompt
+    logger.info(`[/doc] deposit_split_card: ${userId} → typed instead of clicking, re-prompting`);
+    await sendComplexMessage(
+      chatId,
+      `На какую карту? (остаток: ${context.depositCardAmount?.toLocaleString("ru-RU") || "?"} ₽)`,
+      [
+        [{ text: "💳 Тинькофф", callback_data: "depsplit_tbank" }],
+        [{ text: "💳 Сбербанк", callback_data: "depsplit_sber" }],
+      ],
+      { keyboardType: 'inline' },
+    );
     return true;
   }
 
@@ -3247,9 +3422,8 @@ export async function handleDocCallback(
     context.depositOverride = String(bike?.specs?.deposit_rub || "20000");
     context.stsPledgeUsed = false;
     logger.info(`[/doc] dep_confirm: ${userId} → cash deposit=${context.depositOverride}`);
-    const summary = buildRentSummary(context);
-    await setState(userId, "confirm", context);
-    await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+    // Route to deposit destination (cash/card/split) instead of directly to confirm
+    await gotoDepositDestination(chatId, userId, context);
     return true;
   }
 
@@ -3279,6 +3453,54 @@ export async function handleDocCallback(
       `*Серия и номер СТС*\n\nПримеры:\n• 77 12345678\n• 77 № 12345678\n• 7712 345678`,
       [], { removeKeyboard: true, parseMode: "Markdown" },
     );
+    return true;
+  }
+
+  // ── Deposit destination callbacks (depdest_*) — NEW step ──────────────────
+  if (callbackData === "depdest_cash") {
+    context.depositCashAmount = Number(context.depositOverride || "20000");
+    context.depositCardAmount = 0;
+    context.depositCardDestination = undefined;
+    logger.info(`[/doc] depdest_cash: ${userId} → all cash ${context.depositCashAmount}`);
+    const summary = buildRentSummary(context);
+    await setState(userId, "confirm", context);
+    await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData === "depdest_tbank" || callbackData === "depdest_sber") {
+    const dest = callbackData === "depdest_tbank" ? "tbank" : "sber";
+    context.depositCashAmount = 0;
+    context.depositCardAmount = Number(context.depositOverride || "20000");
+    context.depositCardDestination = dest;
+    logger.info(`[/doc] ${callbackData}: ${userId} → all ${dest} ${context.depositCardAmount}`);
+    const summary = buildRentSummary(context);
+    await setState(userId, "confirm", context);
+    await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData === "depdest_split") {
+    // Ask how much is cash; the rest goes to a card
+    const total = Number(context.depositOverride || "20000");
+    logger.info(`[/doc] depdest_split: ${userId} → asking for cash portion (total=${total})`);
+    await setState(userId, "deposit_split_cash", context);
+    await sendComplexMessage(
+      chatId,
+      `🔀 *Смешанный депозит: ${total.toLocaleString("ru-RU")} ₽*\n\nСколько наличными?`,
+      [], { removeKeyboard: true, parseMode: "Markdown" },
+    );
+    return true;
+  }
+
+  // ── Deposit split card callbacks (depsplit_*) ─────────────────────────────
+  if (callbackData === "depsplit_tbank" || callbackData === "depsplit_sber") {
+    const dest = callbackData === "depsplit_tbank" ? "tbank" : "sber";
+    context.depositCardDestination = dest;
+    logger.info(`[/doc] ${callbackData}: ${userId} → split: cash=${context.depositCashAmount} ${dest}=${context.depositCardAmount}`);
+    const summary = buildRentSummary(context);
+    await setState(userId, "confirm", context);
+    await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
   }
 
