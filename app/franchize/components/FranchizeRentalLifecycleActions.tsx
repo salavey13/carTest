@@ -124,11 +124,15 @@ export function FranchizeRentalLifecycleActions({
   const canConfirmReturn = (role === "owner" || role === "member") && status === "active";
   const canUploadStartPhoto = role === "renter" && ["pending_confirmation", "confirmed"].includes(status);
   const canUploadEndPhoto = role === "renter" && status === "active";
-  // NEW: Abort button — for pre-created rentals that never happened (customer no-show, cancelled, etc.)
+  // NEW: Abort button — for rentals that need to be cancelled:
+  //  - Pre-created rentals that never happened (customer no-show, cancelled, mistake)
+  //  - Active rentals created by mistake and needing to be voided (e.g. wrong bike, wrong renter, duplicate)
   // Sets status to 'cancelled' which is excluded from analytics KPIs.
-  // Only available for owner/member role on rentals that haven't started yet.
+  // Only available for owner/member role on rentals that haven't been completed yet.
+  // Active rentals CAN be aborted — but the operator gets an extra warning in the modal
+  // because cancelling an active rental is more impactful (bike already handed out).
   const canAbort = (role === "owner" || role === "member")
-    && ["pending_confirmation", "confirmed"].includes(status);
+    && ["pending_confirmation", "confirmed", "active"].includes(status);
 
   // ── BUG G fix: closure-data modal state ──
   // Previously the "Подтвердить возврат" button called confirmVehicleReturn
@@ -522,6 +526,13 @@ export function FranchizeRentalLifecycleActions({
               <li>Аренда перестанет учитываться в аналитике (KPI, выручка, конверсия)</li>
               <li>Арендатор получит уведомление в Telegram</li>
               <li>Действие необратимо — отмену нельзя будет «вернуть»</li>
+              {status === "active" && (
+                <li className="font-semibold text-rose-300 pt-1">
+                  ⚠ Внимание: эта аренда уже АКТИВНА — байк был выдан клиенту.
+                  Перед отменой убедитесь, что байк физически вернулся к вам.
+                  Эта кнопка только меняет статус в БД — она не оформляет возврат.
+                </li>
+              )}
             </ul>
             <label className="mt-3 block text-xs font-semibold" style={{ color: "var(--lifecycle-text)" }}>
               Причина отмены (необязательно, но желательно):
@@ -529,7 +540,7 @@ export function FranchizeRentalLifecycleActions({
             <textarea
               value={abortReason}
               onChange={(e) => setAbortReason(e.target.value)}
-              placeholder="Например: клиент не приехал, передумал, ошибка создания..."
+              placeholder="Например: клиент не приехал, передумал, ошибка создания, активная создана по ошибке..."
               rows={2}
               className="mt-1 w-full rounded-lg border p-2 text-sm"
               style={{
