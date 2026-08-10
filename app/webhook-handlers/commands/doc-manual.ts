@@ -291,7 +291,10 @@ function buildConfirmKeyboard(): KeyboardButton[][] {
       { text: "✅ Всё верно", callback_data: "ok" },
       { text: "↩️ Начать заново", callback_data: "restart" },
     ],
-    [{ text: "❌ Отменить", callback_data: "cancel" }],
+    [
+      { text: "🔢 Исправить шаг", callback_data: "correct_step" },
+      { text: "❌ Отменить", callback_data: "cancel" },
+    ],
   ];
 }
 
@@ -312,6 +315,16 @@ function buildSaleSummary(context: DocFlowContext, price: string | number): stri
     : (context.saleVin
         ? `🔢 VIN: ${context.saleVin}`
         : `🔢 VIN: (из карточки ТС)`);
+  // Delivery info (NEW)
+  let deliveryLine = "";
+  if (context.saleDeliveryMethod === 'pickup') {
+    deliveryLine = "🏪 Самовывоз";
+  } else if (context.saleDeliveryMethod === 'transport_company') {
+    const tc = context.saleTransportCompany || "?";
+    const payer = context.saleTransportPaymentType === 'buyer_pays' ? 'покупатель' : 'за наш счёт';
+    deliveryLine = `🚚 ТК: ${tc} (${payer})`;
+  }
+
   return [
     "*📋 Продажа — проверьте:*",
     "",
@@ -324,6 +337,7 @@ function buildSaleSummary(context: DocFlowContext, price: string | number): stri
     vinLine,
     "",
     `💰 ${Number(price).toLocaleString("ru-RU")} ₽`,
+    deliveryLine ? `\n${deliveryLine}` : "",
     "",
     "Всё верно?",
   ].join("\n");
@@ -744,6 +758,102 @@ interface DocFlowContext {
   depositCashAmount?: number;      // cash portion of deposit (0 if all card)
   depositCardDestination?: 'tbank' | 'sber';  // which card for the card portion
   depositCardAmount?: number;      // card portion of deposit (0 if all cash)
+
+  // ── Step tracking (added 2026-08-10) ──────────────────────────────────────
+  // Used for step numbering ("Шаг 3/17") and step correction.
+  currentStep?: number;
+  totalSteps?: number;
+  correctedSteps?: number[];
+
+  // ── Delivery method (added 2026-08-10 — sale only) ────────────────────────
+  saleDeliveryMethod?: 'pickup' | 'transport_company';
+  saleTransportCompany?: string;
+  saleTransportPaymentType?: 'buyer_pays' | 'seller_pays';
+}
+
+// ── Step arrays for flow-specific numbering ──────────────────────────────────
+
+interface StepDef { num: number | string; state: string; label: string; }
+
+const RENT_STEPS: StepDef[] = [
+  { num: 1, state: 'deal', label: 'Тип сделки' },
+  { num: 2, state: 'bike', label: 'Выбор байка' },
+  { num: 3, state: 'name', label: 'ФИО' },
+  { num: 4, state: 'passport', label: 'Паспорт' },
+  { num: 5, state: 'birth', label: 'Дата рождения' },
+  { num: 6, state: 'address', label: 'Адрес регистрации' },
+  { num: 7, state: 'has_license', label: 'Наличие ВУ' },
+  { num: 8, state: 'license', label: 'Водительское удостоверение' },
+  { num: 9, state: 'categories', label: 'Категории ВУ' },
+  { num: 10, state: 'schedule_start', label: 'Дата и время начала' },
+  { num: 11, state: 'schedule_end', label: 'Дата и время окончания' },
+  { num: 12, state: 'equipment', label: 'Оборудование' },
+  { num: 13, state: 'odometer', label: 'Одометр' },
+  { num: 14, state: 'payment_split', label: 'Способ оплаты' },
+  { num: 15, state: 'deposit_choice', label: 'Депозит / СТС' },
+  { num: 16, state: 'deposit_destination', label: 'Где получен депозит' },
+  { num: '16a', state: 'deposit_split_cash', label: 'Смешанный: сколько наличными' },
+  { num: '16b', state: 'deposit_split_card', label: 'Смешанный: выбор карты' },
+  { num: 17, state: 'confirm', label: 'Проверка данных' },
+  // СТС sub-flow states (not numbered — shown as "СТС: серия" etc.)
+  { num: 'СТС-1', state: 'sts_series', label: 'СТС: серия и номер' },
+  { num: 'СТС-2', state: 'sts_plate', label: 'СТС: госномер' },
+  { num: 'СТС-3', state: 'sts_owner', label: 'СТС: собственник' },
+  { num: 'СТС-4', state: 'sts_relation', label: 'СТС: отношение' },
+  { num: 'СТС-5', state: 'sts_vehicle', label: 'СТС: ТС' },
+  { num: 'СТС-6', state: 'sts_vin', label: 'СТС: VIN' },
+];
+
+const SALE_STEPS: StepDef[] = [
+  { num: 1, state: 'deal', label: 'Тип сделки' },
+  { num: 2, state: 'bike', label: 'Выбор байка' },
+  { num: 3, state: 'name', label: 'ФИО' },
+  { num: 4, state: 'passport', label: 'Паспорт' },
+  { num: 5, state: 'birth', label: 'Дата рождения' },
+  { num: 6, state: 'address', label: 'Адрес регистрации' },
+  { num: 7, state: 'sale_color', label: 'Цвет' },
+  { num: 8, state: 'sale_vin', label: 'VIN' },
+  { num: 9, state: 'price', label: 'Цена' },
+  { num: 10, state: 'client_phone', label: 'Телефон покупателя' },
+  { num: 11, state: 'sale_delivery', label: 'Способ получения' },
+  { num: 12, state: 'sale_transport', label: 'Транспортная компания' },
+  { num: 13, state: 'confirm', label: 'Проверка данных' },
+];
+
+/**
+ * Get step label for the current state.
+ * Returns "Шаг 3/17" for numbered steps, "СТС: серия" for СТС sub-flow,
+ * or "" if state not found.
+ */
+function stepLabel(state: string, dealType?: string): string {
+  const steps = dealType === 'sale' ? SALE_STEPS : RENT_STEPS;
+  const step = steps.find(s => s.state === state);
+  if (!step) return '';
+  if (typeof step.num === 'string' && step.num.startsWith('СТС')) {
+    return String(step.num);
+  }
+  const total = dealType === 'sale' ? 13 : 17;
+  return `Шаг ${step.num}/${total}`;
+}
+
+/**
+ * Get visible steps for step correction (filter out conditional states).
+ */
+function getVisibleSteps(context: DocFlowContext): StepDef[] {
+  const steps = context.dealType === 'sale' ? SALE_STEPS : RENT_STEPS;
+  return steps.filter(s => {
+    // Always hide confirm and СТС sub-states from correction list
+    if (s.state === 'confirm') return false;
+    if (typeof s.num === 'string' && s.num.startsWith('СТС')) return false;
+    // Hide deposit_destination if СТС chosen
+    if (s.state === 'deposit_destination' && context.stsPledgeUsed) return false;
+    // Hide split sub-states if not in split mode
+    if (s.state === 'deposit_split_cash' && context.depositCardDestination === undefined) return false;
+    if (s.state === 'deposit_split_card' && context.depositCardDestination === undefined) return false;
+    // Hide sale_transport if not TC
+    if (s.state === 'sale_transport' && context.saleDeliveryMethod !== 'transport_company') return false;
+    return true;
+  });
 }
 
 // ── Bike resolution ─────────────────────────────────────────────────────
@@ -1865,8 +1975,8 @@ ${qrDeepLink}`);
           original_sha256: docSha256,
           requested_bike_id: context.bikeId,
           resolved_bike_id: bike.id,
-          telegram_chat_id: String(userId),            // Always operator's Telegram ID
-          buyer_phone: context.clientPhone || null,     // Phone in dedicated column
+          telegram_chat_id: String(userId),
+          buyer_phone: context.clientPhone || null,
           telegram_message_id: null,
           buyer_full_name: context.mpFullName || null,
           buyer_passport_number: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
@@ -1874,8 +1984,12 @@ ${qrDeepLink}`);
           buyer_passport_issue_date: context.mpIssueDate || null,
           buyer_registration: context.mpRegistration || null,
           sale_price: salePrice,
-          warranty_months: "0", // Sold "as-is", no warranty
+          warranty_months: "0",
           template_version: 1,
+          // Delivery fields (NEW)
+          delivery_method: context.saleDeliveryMethod || null,
+          transport_company_name: context.saleTransportCompany || null,
+          transport_payment_type: context.saleTransportPaymentType || null,
         });
         if (saleError) {
           logger.error("[/doc] Failed to save sale_contract_artifacts:", saleError);
@@ -3070,13 +3184,118 @@ export async function handleDocText(userId: string, chatId: number, text: string
       return true;
     }
     context.salePrice = price;
-    const summary = buildSaleSummary(context, price);
+    // Route to delivery method step (NEW — sale flow step 11)
+    await gotoSaleDelivery(chatId, userId, context);
+    return true;
+  }
+
+  // ── Step correction text handler ───────────────────────────────────────────
+  if (state === "step_correction") {
+    const visibleSteps = getVisibleSteps(context);
+    const stepNum = parseInt(text.trim());
+    if (isNaN(stepNum) || stepNum < 1) {
+      await sendComplexMessage(chatId,
+        `⚠️ Введите номер шага от 1 до ${visibleSteps.length}`,
+        [], { removeKeyboard: true });
+      return true;
+    }
+    // Find by number (visibleSteps are 1-indexed by position, not by .num)
+    const step = visibleSteps[stepNum - 1];
+    if (!step) {
+      await sendComplexMessage(chatId,
+        `⚠️ Нет такого шага. Введите число от 1 до ${visibleSteps.length}`,
+        [], { removeKeyboard: true });
+      return true;
+    }
+    // Track corrected step
+    const stepKey = typeof step.num === 'number' ? step.num : step.num;
+    context.correctedSteps = context.correctedSteps || [];
+    if (!context.correctedSteps.includes(stepKey as number)) {
+      context.correctedSteps.push(stepKey as number);
+    }
+    logger.info(`[/doc] step_correction: ${userId} → correcting step ${step.num} (${step.state})`);
+
+    // Special handling: correcting step 1 (deal type) resets everything
+    if (step.state === 'deal') {
+      await clearState(userId);
+      await sendComplexMessage(chatId, "🔄 Начнём заново с выбора типа сделки.", buildDealKeyboard(), { keyboardType: 'inline' });
+      await setState(userId, "deal", context);
+      return true;
+    }
+
+    // Route to the step's question handler
+    // The state machine will re-ask the question; after answering, the flow
+    // continues normally (which may go to confirm if it's the last step,
+    // or to the next step if mid-flow).
+    await setState(userId, step.state, context);
+    await reAskStep(chatId, userId, context, step.state);
+    return true;
+  }
+
+  // ── Sale transport company text handler ───────────────────────────────────
+  if (state === "sale_transport") {
+    const companyName = text.trim();
+    if (companyName.length < 2) {
+      await sendComplexMessage(chatId, "❌ Введите название ТК (минимум 2 символа)", [], { removeKeyboard: true });
+      return true;
+    }
+    context.saleTransportCompany = companyName;
+    logger.info(`[/doc] sale_transport: ${userId} → TC="${companyName}"`);
+    const summary = buildSaleSummary(context, context.salePrice || "");
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
   }
 
   return false;
+}
+
+/**
+ * Re-ask a specific step question (used by step correction).
+ * Shows "Было: <old value>" prefix before the question.
+ */
+async function reAskStep(chatId: number, userId: string, context: DocFlowContext, state: string): Promise<void> {
+  // For most states, just setting the state is enough — the next text input
+  // will be handled by the existing text handler for that state.
+  // We just show a "correcting" prompt.
+  const visibleSteps = getVisibleSteps(context);
+  const step = visibleSteps.find(s => s.state === state);
+  const label = step?.label || state;
+
+  let oldValue = "";
+  switch (state) {
+    case 'name': oldValue = context.mpFullName || ""; break;
+    case 'passport': oldValue = context.mpSeries ? `${context.mpSeries} ${context.mpNumber}` : ""; break;
+    case 'birth': oldValue = context.mpBirthDate || ""; break;
+    case 'address': oldValue = context.mpRegistration || ""; break;
+    case 'license': oldValue = context.mlSeries ? `${context.mlSeries} ${context.mlNumber}` : ""; break;
+    case 'sale_color': oldValue = context.saleColor || ""; break;
+    case 'sale_vin': oldValue = context.saleVin || (context.saleVinSkipped ? "(пропущен)" : ""); break;
+    case 'sale_transport': oldValue = context.saleTransportCompany || ""; break;
+  }
+
+  const prefix = oldValue ? `Было: ${oldValue}\n\n` : '';
+  await sendComplexMessage(chatId,
+    `✏️ Исправление: ${label}\n\n${prefix}Введите новое значение:`,
+    [], { removeKeyboard: true });
+}
+
+/**
+ * Navigate to the sale delivery method step (NEW — sale flow step 11).
+ * Called after price is set, before confirm.
+ */
+async function gotoSaleDelivery(chatId: number, userId: string, context: DocFlowContext): Promise<void> {
+  await setState(userId, "sale_delivery", context);
+  await sendComplexMessage(
+    chatId,
+    `📦 *Способ получения*\n\nКак покупатель получит мотоцикл?`,
+    [
+      [{ text: "🏪 Самовывоз", callback_data: "delivery_pickup" }],
+      [{ text: "🚚 ТК (покупатель)", callback_data: "delivery_tc_buyer" }],
+      [{ text: "🚚 ТК (за наш счёт)", callback_data: "delivery_tc_seller" }],
+    ],
+    { keyboardType: 'inline', parseMode: 'Markdown' },
+  );
 }
 
 // ── Callback handlers ───────────────────────────────────────────────────────
@@ -3663,9 +3882,44 @@ export async function handleDocCallback(
       return true;
     }
     context.salePrice = price;
-    const summary = buildSaleSummary(context, price);
+    // Route to delivery method step (NEW — sale flow step 11)
+    await gotoSaleDelivery(chatId, userId, context);
+    return true;
+  }
+
+  // ── Delivery method callbacks (NEW — sale flow step 11) ───────────────────
+  if (callbackData === "delivery_pickup") {
+    context.saleDeliveryMethod = 'pickup';
+    context.saleTransportCompany = undefined;
+    context.saleTransportPaymentType = undefined;
+    logger.info(`[/doc] delivery_pickup: ${userId} → pickup`);
+    const summary = buildSaleSummary(context, context.salePrice || "");
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
+  if (callbackData === "delivery_tc_buyer" || callbackData === "delivery_tc_seller") {
+    context.saleDeliveryMethod = 'transport_company';
+    context.saleTransportPaymentType = callbackData === "delivery_tc_buyer" ? 'buyer_pays' : 'seller_pays';
+    logger.info(`[/doc] ${callbackData}: ${userId} → TC (${context.saleTransportPaymentType})`);
+    await setState(userId, "sale_transport", context);
+    await sendComplexMessage(
+      chatId,
+      `🚚 *Транспортная компания*\n\nУкажите название ТК:\n(например: Деловые Линии, ПЭК, СДЭК)`,
+      [], { removeKeyboard: true, parseMode: 'Markdown' },
+    );
+    return true;
+  }
+
+  // ── Step correction callback (NEW) ─────────────────────────────────────────
+  if (callbackData === "correct_step") {
+    const visibleSteps = getVisibleSteps(context);
+    const list = visibleSteps.map((s, i) => `${i + 1}. ${s.label}`).join('\n');
+    await setState(userId, "step_correction", context);
+    await sendComplexMessage(chatId,
+      `🔢 *Какой шаг исправить?*\n\n${list}\n\nВведите номер:`,
+      [], { removeKeyboard: true, parseMode: 'Markdown' });
     return true;
   }
 
