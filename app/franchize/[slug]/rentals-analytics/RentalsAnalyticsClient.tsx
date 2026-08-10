@@ -834,16 +834,21 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
 
   // ─── Calculations ───────────────────────────────────────────────────────────────
 
-  const totalRentals = rentals.length;
-  const rentalRevenue = rentals.reduce((sum, r) => sum + (r.total_cost || 0), 0);
+  // FIX: cancelled rentals (status='cancelled') are pre-created rentals that
+  // never physically happened (customer no-show, aborted, etc.). They should
+  // NOT pollute KPIs — exclude them from all aggregate calculations while
+  // keeping them visible in the list for audit purposes.
+  const nonCancelledRentals = rentals.filter(r => r.status !== "cancelled");
+  const totalRentals = nonCancelledRentals.length;
+  const rentalRevenue = nonCancelledRentals.reduce((sum, r) => sum + (r.total_cost || 0), 0);
   const totalSales = sales.length;
   const salesRevenue = salesSummary?.totalRevenue || 0;
   const totalProposals = proposals.length;
   const proposalsRevenue = proposals.reduce((sum, p) => sum + (p.total_price || 0), 0);
   const totalSubrents = subrents.length;
   const totalRevenue = rentalRevenue + salesRevenue + proposalsRevenue;
-  const activeRentals = rentals.filter(r => r.status === "active").length;
-  const completedRentals = rentals.filter(r => r.status === "completed").length;
+  const activeRentals = nonCancelledRentals.filter(r => r.status === "active").length;
+  const completedRentals = nonCancelledRentals.filter(r => r.status === "completed").length;
   const completionRate = totalRentals > 0 ? Math.round((completedRentals / totalRentals) * 100) : 0;
 
   // Theme colors from CSS variables
