@@ -2944,6 +2944,10 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               sale_price: salePrice,
               warranty_months: "0",
               template_version: CURRENT_RENTAL_TEMPLATE_VERSION,
+              // Delivery fields (NEW — from web order payload.delivery)
+              delivery_method: payload.delivery === "pickup" ? "pickup" : "transport_company",
+              transport_company_name: payload.delivery === "delivery" ? (payload.deliveryCompany || null) : null,
+              transport_payment_type: payload.delivery === "delivery" ? "buyer_pays" : null,
               metadata: {
                 flow_type: flowType,
                 order_id: payload.orderId,
@@ -3692,6 +3696,7 @@ const franchizeOrderInvoiceSchema = z.object({
   signatureFingerprint: z.string().trim().optional(),
   payment: z.enum(["telegram_xtr", "card", "cash", "sbp"]),
   delivery: z.enum(["pickup", "delivery"]),
+  deliveryCompany: z.string().trim().optional(),
   subtotal: z.number().finite().nonnegative(),
   extrasTotal: z.number().finite().nonnegative().default(0),
   promoCode: z.string().trim().optional(),
