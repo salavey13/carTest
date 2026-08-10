@@ -393,10 +393,29 @@ async function gotoDepositDestination(chatId: number, userId: string, context: D
 }
 
 /**
- * Insert deposit_entries rows for the collected deposit.
- * Called after rental_id is created, before saving secrets/artifacts.
- * Handles: all cash, all card, split (cash + one card).
+ * Format deposit destination for display in verification summary.
+ * Returns a string like " (💵 наличными)" or " (💳 Тинькофф)" or " (💵5 000 + 💳Т15 000)".
+ * Returns empty string if no destination info (backward compat for old flows).
  */
+function formatDepositDestination(context: DocFlowContext): string {
+  const cash = context.depositCashAmount || 0;
+  const card = context.depositCardAmount || 0;
+  const dest = context.depositCardDestination;
+
+  if (cash === 0 && card === 0) return ""; // no destination info
+  if (cash > 0 && card === 0) return " (💵 наличными)";
+  if (cash === 0 && card > 0 && dest) {
+    return dest === 'tbank' ? " (💳 Тинькофф)" : " (💳 Сбербанк)";
+  }
+  if (cash > 0 && card > 0 && dest) {
+    const destLabel = dest === 'tbank' ? '💳Т' : '💳С';
+    return ` (💵${cash.toLocaleString('ru-RU')} + ${destLabel}${card.toLocaleString('ru-RU')})`;
+  }
+  return "";
+}
+
+/**
+ * Insert deposit_entries rows for the collected deposit.
 async function insertDepositEntries(rentalId: string, userId: string, context: DocFlowContext): Promise<void> {
   const depositAmount = Number(context.depositOverride || "20000");
   if (depositAmount <= 0 || context.stsPledgeUsed) {
@@ -1065,7 +1084,8 @@ function buildRentSummary(context: DocFlowContext): string {
     );
   } else {
     const deposit = context.depositOverride || "20000";
-    lines.push("", `💰 Депозит: ${Number(deposit).toLocaleString("ru-RU")} ₽`);
+    const depositLabel = formatDepositDestination(context);
+    lines.push("", `💰 Депозит: ${Number(deposit).toLocaleString("ru-RU")} ₽${depositLabel}`);
   }
 
   lines.push("", "Всё верно?");
