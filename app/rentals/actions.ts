@@ -872,10 +872,19 @@ export async function abortRental(input: {
             return { success: false, error: 'Недостаточно прав для отмены аренды.' };
         }
 
-        // Only allow aborting pre-active rentals (never started / not yet picked up)
-        if (!['pending_confirmation', 'confirmed'].includes(rental.status)) {
-            return { success: false, error: 'Отменить можно только аренду, которая ещё не началась (статус «Ожидает» или «Подтверждена»).' };
+        // Allow aborting pre-active rentals (never started) AND active rentals
+        // (created by mistake — wrong bike, wrong renter, duplicate, etc.).
+        // Disputed rentals must be resolved through the dispute flow, not aborted.
+        // Completed rentals cannot be aborted (they're history).
+        if (!['pending_confirmation', 'confirmed', 'active'].includes(rental.status)) {
+            return { success: false, error: 'Отменить можно только аренду в статусе «Ожидает», «Подтверждена» или «Активна».' };
         }
+
+        // For active rentals: record that the bike was already handed out.
+        // This is important for audit — the renter may have already used the bike
+        // when the cancellation happens. The operator should also handle the
+        // physical bike return separately (this action only flips DB status).
+        const wasActive = rental.status === 'active';
 
         // Update rental: flip status + record abort metadata
         const currentMetadata = (rental.metadata as Record<string, any>) || {};
@@ -886,6 +895,7 @@ export async function abortRental(input: {
             aborted_reason: reason || 'operator_cancelled',
             aborted_from_status: rental.status,
             aborted_from_payment_status: rental.payment_status,
+            aborted_was_active: wasActive,  // flag: was the bike physically handed out?
         };
 
         const { error: updateError } = await supabaseAdmin
@@ -911,6 +921,7 @@ export async function abortRental(input: {
                 prev_payment_status: rental.payment_status,
                 actor: 'operator',
                 crew_slug: crewSlug || null,
+                was_active: wasActive,
             },
         });
 
