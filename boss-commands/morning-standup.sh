@@ -63,21 +63,30 @@ START_LOCAL="${TODAY}T00:00:00+03:00"
 END_LOCAL="${TODAY}T23:59:59+03:00"
 
 RETURNS_DUE=$(supabase_query "rentals" \
-  "select=rental_id,agreed_end_date,total_cost&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=gte.${START_LOCAL}&agreed_end_date=lte.${END_LOCAL}&order=agreed_end_date.asc&limit=5" \
-  | jq -r '
+  "select=rental_id,agreed_end_date,total_cost&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=gte.${START_LOCAL}&agreed_end_date=lte.${END_LOCAL}&order=agreed_end_date.asc&limit=5")
+
+# BUG FIX (user-reported): Was using `.agreed_end_date[11:16]` which gives RAW
+# UTC time. Operator reading "до 18:00" thought it was MSK (matching the START
+# time) when actually 18:00 UTC = 21:00 MSK (END time). Now we convert each
+# rental's end date to Moscow time via moscow_hhmm() and label as МСК.
+RETURNS_DUE_TEXT=$(echo "$RETURNS_DUE" | jq -r '
     if length == 0 then "Нет возвратов сегодня"
     else
-      map("• Аренда #\(.rental_id[0:8]) — до \(.agreed_end_date[11:16]) — \(.total_cost) ₽") | join("\n")
+      map("RENTAL_ROW|\(.rental_id[0:8])|\(.agreed_end_date)|\(.total_cost // 0)") | join("\n")
     end
-  ')
+  ' | while IFS='|' read -r prefix rid_short end_iso cost; do
+    [[ "$prefix" != "RENTAL_ROW" ]] && continue
+    end_msk=$(moscow_hhmm "$end_iso")
+    printf '• Аренда #%s — до %s МСК — %s ₽' "$rid_short" "$end_msk" "$cost"
+  done | paste -sd'\n' -)
+[[ -z "$RETURNS_DUE_TEXT" ]] && RETURNS_DUE_TEXT="Нет возвратов сегодня"
 
-RETURNS_COUNT=$(echo "$RETURNS_DUE" | head -1 | grep -q "^Нет" && echo 0 || echo "$RETURNS_DUE" | wc -l)
+RETURNS_COUNT=$(echo "$RETURNS_DUE_TEXT" | head -1 | grep -q "^Нет" && echo 0 || echo "$RETURNS_DUE_TEXT" | grep -c "^•" || echo 0)
 
 # Build per-rental deep links for returns due
 RETURNS_LINKS=""
 if [[ "$RETURNS_COUNT" -gt 0 ]]; then
-  RETURNS_LINKS=$(echo "$RETURNS_DUE_DATA" | jq -r '.[].rental_id' 2>/dev/null | while read -r rid; do
-    local rlink
+  RETURNS_LINKS=$(echo "$RETURNS_DUE" | jq -r '.[].rental_id' 2>/dev/null | while read -r rid; do
     rlink=$(rental_link "$rid")
     printf '  📋 <a href="%s">Открыть %s</a>\n' "$rlink" "${rid:0:8}"
   done)
@@ -86,16 +95,23 @@ fi
 # ─── 3. Overdue rentals ─────────────────────────────────────────────────────
 NOW_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-OVERDUE=$(supabase_query "rentals" \
-  "select=rental_id,agreed_end_date&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=lt.${NOW_UTC}&order=agreed_end_date.asc&limit=5" \
-  | jq -r '
+# Same MSK conversion fix as above — show "с DD.MM HH:MM МСК" instead of raw UTC date slice.
+OVERDUE_DATA=$(supabase_query "rentals" \
+  "select=rental_id,agreed_end_date&crew_id=eq.${CREW_ID}&status=eq.active&agreed_end_date=lt.${NOW_UTC}&order=agreed_end_date.asc&limit=5")
+
+OVERDUE=$(echo "$OVERDUE_DATA" | jq -r '
     if length == 0 then "Все аренды в графике ✓"
     else
-      map("• Аренда #\(.rental_id[0:8]) — ждёт оформления с \(.agreed_end_date[0:10])") | join("\n")
+      map("RENTAL_ROW|\(.rental_id[0:8])|\(.agreed_end_date)") | join("\n")
     end
-  ')
+  ' | while IFS='|' read -r prefix rid_short end_iso; do
+    [[ "$prefix" != "RENTAL_ROW" ]] && continue
+    end_msk=$(moscow_fmt "$end_iso")
+    printf '• Аренда #%s — ждёт оформления с %s МСК' "$rid_short" "$end_msk"
+  done | paste -sd'\n' -)
+[[ -z "$OVERDUE" ]] && OVERDUE="Все аренды в графике ✓"
 
-OVERDUE_COUNT=$(echo "$OVERDUE" | head -1 | grep -q "^Нет" && echo 0 || echo "$OVERDUE" | grep -c . || echo 0)
+OVERDUE_COUNT=$(echo "$OVERDUE" | head -1 | grep -q "^Все" && echo 0 || echo "$OVERDUE" | grep -c "^•" || echo 0)
 
 # ─── 4. Pending todos (not done, with due_date today or earlier) ─────────────
 TODAY_START_UTC="$(moscow_today_end_utc)"
@@ -124,7 +140,7 @@ MESSAGE="🔥 <b>Утренняя сводка</b> — ${TODAY}, ${NOW_DISPLAY} 
 ${HOT_LEADS}
 
 📍 <b>Возвраты сегодня (${RETURNS_COUNT}):</b>
-${RETURNS_DUE}
+${RETURNS_DUE_TEXT}
 
 📍 <b>Аренды к возврату (${OVERDUE_COUNT}):</b>
 ${OVERDUE}
