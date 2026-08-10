@@ -96,6 +96,9 @@ export async function handleCommand(update: any) {
             text.startsWith("eq_") ||    // <<< FIX: equipment callbacks (eq_helmets, eq_done, etc)
             text.startsWith("pay_") ||   // <<< FIX: payment split callbacks (pay_cash, pay_all_cash, etc)
             text.startsWith("dep_") ||   // deposit choice callbacks
+            text.startsWith("depdest_") || // deposit destination callbacks (NEW)
+            text.startsWith("depsplit_") || // deposit split card callbacks (NEW)
+            text.startsWith("delivery_") || // sale delivery method callbacks (NEW)
             text.startsWith("sr_") ||    // СТС owner-relation callbacks
             text.startsWith("salecol_") || // sale flow color callbacks
             text.startsWith("salevin_") || // sale flow VIN callbacks
@@ -103,6 +106,7 @@ export async function handleCommand(update: any) {
             text === "cancel" ||
             text === "ok" ||
             text === "restart" ||
+            text === "correct_step" ||   // step correction (NEW)
             text === "sts_skip" ||
             text === "ph_skip"           // <<< FIX: phone skip callback
         )) {
