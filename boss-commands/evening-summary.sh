@@ -157,6 +157,26 @@ SALES_LINK="$(analytics_link "sales" "$TODAY")"
 SERVICES_LINK="$(analytics_link "services" "$TODAY")"
 LEADS_LINK="$(analytics_link "leads" "$TODAY")"
 
+# ─── Deposit summary per destination (cash/tbank/sber) ───────────────────────
+DEPOSIT_DATA=$(supabase_query "deposit_entries" \
+  "select=destination,entry_type,direction,amount&created_at=gte.${START_UTC}&created_at=lte.${END_UTC}" \
+  "public")
+
+DEPOSIT_KPIS=$(echo "$DEPOSIT_DATA" | jq -r '
+  group_by(.destination) | map({
+    dest: .[0].destination,
+    collected: ([.[] | select(.entry_type == "deposit_collected")] | map(.amount) | add // 0),
+    returned: ([.[] | select(.entry_type == "deposit_returned")] | map(.amount) | add // 0),
+    penalty: ([.[] | select(.entry_type == "penalty")] | map(.amount) | add // 0)
+  }) |
+  .[] |
+  "  " + (
+    if .dest == "cash" then "💵" elif .dest == "tbank" then "💳Т" else "💳С" end
+  ) + ": +" + (.collected | tostring) + " collected, -" + (.returned | tostring) + " returned" +
+  (if .penalty > 0 then ", -" + (.penalty | tostring) + " penalty" else "" end) +
+  ", net: " + ((.collected - .returned - .penalty) | tostring)
+')
+
 MESSAGE="📊 <b>Итоги дня</b> — ${TODAY}, ${NOW_DISPLAY} МСК
 
 <b>🏍 <a href=\"${RENTALS_LINK}\">Аренды</a></b>
@@ -170,6 +190,9 @@ ${SERVICE_KPIS}
 
 <b>🛵 <a href=\"${LEADS_LINK}\">Тест-драйвы</a></b>
 ${TESTDRIVE_KPIS}
+
+<b>🏦 Депозиты</b>
+${DEPOSIT_KPIS}
 
 ━━━━━━━━━━━━━━━━━━
 ${ACTIVE_SECTION}<b>Итого выручка за день: ${TOTAL_REVENUE} ₽</b>
