@@ -173,7 +173,7 @@ async function validateUpload(
 > {
   const { data: rental, error } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id, user_id, owner_id, vehicle_id, status")
+    .select("rental_id, user_id, owner_id, vehicle_id, status, agreed_start_date")
     .eq("rental_id", rentalId)
     .maybeSingle();
 
@@ -181,12 +181,26 @@ async function validateUpload(
     return { ok: false, error: "Аренда не найдена." };
   }
 
-  // Status check: start photos only before pickup; end photos only when active
+  // Status check: start photos before pickup OR within 1 hour of start;
+  // end photos only when active.
+  // I4 enhancement: allow ДО photos for active rentals within 1 hour of
+  // agreed_start_date — operator might have flipped to active at handoff
+  // but still wants to capture pre-rental photos.
   if (photoType === "start") {
-    if (!["pending_confirmation", "confirmed"].includes(rental.status)) {
+    const allowedStatuses = ["pending_confirmation", "confirmed"];
+    // Also allow 'active' if within ±1 hour of agreed_start_date
+    if (rental.status === "active" && rental.agreed_start_date) {
+      const startTime = new Date(rental.agreed_start_date).getTime();
+      const now = Date.now();
+      const ONE_HOUR = 60 * 60 * 1000;
+      if (Math.abs(now - startTime) < ONE_HOUR) {
+        allowedStatuses.push("active");
+      }
+    }
+    if (!allowedStatuses.includes(rental.status)) {
       return {
         ok: false,
-        error: "Фото ДО можно добавить только до выдачи (статус «Ожидает» или «Подтверждена»).",
+        error: "Фото ДО можно добавить только до выдачи или в течение часа после начала аренды.",
       };
     }
   } else {
