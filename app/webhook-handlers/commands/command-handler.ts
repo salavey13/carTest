@@ -108,8 +108,9 @@ export async function handleCommand(update: any) {
             text === "cancel" ||
             text === "ok" ||
             text === "restart" ||
+            text === "correct_step" ||  // FIX: was missing — caused "неизвестная команда" on "Исправить шаг" button
             text === "sts_skip" ||
-            text === "ph_skip"           // <<< FIX: phone skip callback
+            text === "ph_skip"           // phone skip callback
         )) {
             const handled = await handleDocCallback(userIdStr, chatId, text, update.callback_query.id);
             if (handled) return;
@@ -384,6 +385,16 @@ export async function handleCommand(update: any) {
                 logger.error(`[Command Handler] Error executing command ${command}:`, cmdError);
             }
         } else {
+            // H1 guard: if this is an unrouted callback_query (button click that
+            // wasn't in any whitelist), DON'T feed its data into text handlers —
+            // they would silently store the callback_data string as user input
+            // and corrupt the flow state. Show "unknown command" instead.
+            if (update.callback_query) {
+                logger.warn(`[Command Handler] Unrouted callback_query: ${text} (user ${userIdStr})`);
+                await sendComplexMessage(chatId, "Неизвестная кнопка. Используй /help или /doc.", []);
+                return;
+            }
+
             // Check if user is in /doc flow (awaiting bike selection or schedule)
             const docHandled = await handleDocText(userIdStr, chatId, text);
             if (docHandled) return;
