@@ -136,10 +136,13 @@ carTest/
 - ✅ Doc-manual step correction + sale delivery
 - ✅ Accessories/todos dedup — `crew_todos` is single source of truth; rentals page shows pending todos (`5437369e`)
 
-**In Progress (I5, branch `feat/i5-service-operations`):**
-- 📋 **FRANCHIZE_SERVICE_OPERATIONS_PRD v4.1** — Equipment rentals, cash transactions, commissions, salary plans
-- Wave plan: `PLAN-I5-SERVICE-OPERATIONS.md`; task plans with ready tests: `docs/superpowers/plans/2026-08-12-i5-*.md` (18 задач)
-- PRD codebase-verified 2026-08-12 — contract amendments in wave plan (migration series `20260812*`, idempotent triggers, backfill fixes)
+**Shipped (I5, 2026-08-12):**
+- ✅ **Equipment rentals** — Standalone equipment (helmets/jackets/gloves/boots) with table, UI, doc-manual integration
+- ✅ **Cash ledger** — Unified cash_transactions table + triggers (idempotent I1 pattern) + backfill
+- ✅ **Commissions** — Configurable rates per operation (percentage/fixed), default 10% rental_hourly
+- ✅ **Salary** — Plans, calculations, payouts, "My Earnings"/"My Work" profile sections
+- ✅ **8 migrations** — `20260812000001-20260812` (equipment, cash, commissions, salary, triggers, backfill)
+- ✅ **4 commits pushed** — `feat/i5-service-operations` → ready for merge
 
 **See `CODEREVIEW_LEADS_RENTALS.md` for details.**
 
