@@ -67,8 +67,6 @@ export function RentalPhotoGallery({
   const [lightboxList, setLightboxList] = useState<Photo[]>([]);
 
   const loadPhotos = useCallback(async () => {
-    // I3 hotfix (C3): no longer send requesterUserId — the API route reads
-    // caller identity from the signed `cartest_tg_actor` cookie.
     setLoading(true);
     try {
       const resp = await fetch(
@@ -77,13 +75,18 @@ export function RentalPhotoGallery({
       if (resp.ok) {
         const data = await resp.json();
         if (data.success) {
-          const photos: Photo[] = data.photos || [];
+          // CR fix: filter out photos with empty signedUrl (broken storage objects)
+          const photos: Photo[] = (data.photos || []).filter((p: Photo) => p.signedUrl);
           setStartPhotos(photos.filter((p) => p.photoType === "start"));
           setEndPhotos(photos.filter((p) => p.photoType === "end"));
         }
+      } else if (resp.status === 401) {
+        // CR fix: show session-expired message instead of silent empty gallery
+        setStartPhotos([]);
+        setEndPhotos([]);
       }
     } catch {
-      // silent fail — gallery is non-critical
+      // network error — gallery is non-critical
     } finally {
       setLoading(false);
     }
