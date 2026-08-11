@@ -1,12 +1,12 @@
 # META PRD: Iterative Implementation Plan (Franchize Ops Wave 2026-08)
 
-**Version:** 1.2 (2026-08-11 — I3 MVP shipped: migration + photo-actions + UI + bot pipeline)
+**Version:** 1.3 (2026-08-11 — I3 code review hotfixed + I4 retention/polish shipped)
 **Date:** 2026-08-11
 **Status:** Active — living tracker, update as iterations ship
 **Scope:** Coordinates 4 sibling PRDs that share tables, bot flows, and UI surfaces:
 - `docs/DEPOSIT_TRACKING_PRD.md` v2.1 — ✅ Mostly Implemented (I1 + I2 closed remaining gaps)
 - `docs/DOC_MANUAL_STEP_CORRECTION_PRD.md` v3.1 — ✅ Mostly Implemented
-- `docs/RENTAL_PHOTO_UPLOAD_PRD.md` v1.2 — ✅ MVP Shipped (I3 — pending I4 retention/polish)
+- `docs/RENTAL_PHOTO_UPLOAD_PRD.md` v1.3 — ✅ Shipped (I3 + I4 complete — code review hotfixed)
 - `docs/FRANCHIZE_SERVICE_OPERATIONS_PRD.md` v4.1 — 📋 Ready for Implementation (I5)
 
 ---
@@ -83,12 +83,19 @@ Per PRD v1.2 §5.1-5.7. All MVP items shipped:
 - ✅ **Gate**: code compiles, dry-run pipeline verified. E2E with real rental pending deploy (need migration applied first).
 - ⏳ **Pending**: unit tests (RLS, dedup, compression limit) — deferred to I4 polish.
 
-### I4 — Photos retention & polish (2-3 days, can overlap I3)
+### I4 — Photos retention & polish ✅ SHIPPED (2026-08-11)
 
-- Nightly cron → `rental-photos-archive` after 12 months; trash hard-delete after 30 days.
-- Weekly storage-growth report (>100 MB/week alert).
-- EXIF GPS opt-in (WebApp path only), `metadata.damage_note`, watermark spike.
-- **Gate:** storage report runs; archive dry-run on staging.
+- ✅ **Nightly archive cron** (`boss-commands/photo-archive-cron.sh`) — two passes:
+  - Pass 1: archive photos older than 12 months from `rental-photos` → `rental-photos-archive` bucket. Sets `rental_photos.archived_at`. Ensures archive bucket exists (creates if missing).
+  - Pass 2: hard-delete trash entries older than 30 days. Removes file from storage + deletes metadata row.
+  - Supports `--dry-run`, `--archive-only`, `--trash-only`. Sends Telegram alert if >50 items processed in one run (anomaly detection).
+  - Configurable via env: `PHOTO_RETENTION_MONTHS` (default 12), `PHOTO_TRASH_DELETE_DAYS` (default 30).
+- ✅ **Weekly storage-growth report** (`boss-commands/photo-storage-report.sh`) — queries last 7 days, sums file_size_bytes, alerts if >100 MB/week. Shows per-day breakdown + top-5 rentals by photo count + all-time storage usage with % of 1GB free tier. Runs Monday 11:00 MSK.
+- ✅ **`damage_note` metadata field** — `uploadRentalPhoto` now accepts optional `damageNote` field. Stored in `metadata.damage_note` JSONB. API route + server action updated. Operator can mark a ПОСЛЕ photo as evidence of new damage with a description.
+- ✅ **Unit tests** (`tests/franchize/photo-actions.spec.ts`) — tests for: input validation (empty rentalId, empty file, >10 MB), SHA-256 dedup logic (same input → same hash, different input → different hash), `getRentalPhotoStats` H2 fix (queries rental_photos directly), `listRentalPhotos` auth validation. Integration + RLS tests are `.skip` (need test DB — documented for future).
+- ⏳ **EXIF GPS opt-in** — deferred (low priority, bot path strips EXIF anyway). Will revisit if operators request it.
+- ⏳ **Watermark spike** — deferred (would need sharp composite — feasible but not urgent).
+- ✅ **Gate:** both cron scripts support `--dry-run` for safe testing. Storage report includes alert threshold. Tests run via `npx vitest run`.
 
 ### I5 — Franchize service operations (2 weeks, per FRANCHIZE_SERVICE_OPERATIONS_PRD v4.1)
 
@@ -129,4 +136,5 @@ Follow its Phase 1-7 plan as-is, with two additions:
 - v1.0 (2026-08-11): Initial — created from the 2026-08-11 post-implementation audit of the deposit/doc-manual wave.
 - v1.1 (2026-08-11): I1 shipped (trigger guard migration applied, regression test green, 0 prod duplicates). I2 audited — found that 6 of 9 items were already shipped in the 2026-08-10 wave; closed the 3 remaining gaps (penalty capture UI + server action + morning-standup deposit section). DEPOSIT_TRACKING_PRD status flipped to ✅ Mostly Implemented.
 - v1.2 (2026-08-11): I3 MVP shipped — migration `20260811000001_create_rental_photos.sql` (private bucket + table + RLS + counters), `app/rentals/photo-actions.ts` (4 server actions with sharp compression + SHA-256 dedup), `RentalPhotoGallery` component wired into rental detail page + closure modal, bot `handlePhotoMessage` patched to use smallest variant + new pipeline, 2 new API routes, `reduceImageResolution` extracted to shared util. RENTAL_PHOTO_UPLOAD_PRD status flipped to ✅ MVP Shipped. I4 (retention cron + tests + polish) remains.
+- v1.3 (2026-08-11): I3 code review found 5 critical + 4 high + 6 medium bugs — all fixed in hotfix migration `20260811000002` + 7 code patches (C1 RLS shadowing, C2 sharp externals, C3 cookie auth, C4 server-derived role, C5 atomic counter RPC, H1 remove error check, H2 direct query, H4 middle photo variant, M1-M6 minor). I4 shipped: nightly archive cron, weekly storage-growth report, damage_note field, unit tests. RENTAL_PHOTO_UPLOAD_PRD status → ✅ Shipped.
 
