@@ -1,8 +1,8 @@
 # PRD: Rental Photo Upload (Before/After)
 
 **Feature**: Permanent photo storage for bike condition at handoff (ДО) and return (ПОСЛЕ)
-**Version**: 1.2 (revised 2026-08-11 — codebase-verified: corrected §3 (bot photos ARE already persisted), added upload-infrastructure inventory, `sharp` already installed, fixed webhook file paths)
-**Status**: Draft (not started — scheduled as Iteration I3/I4 in `docs/META_PRD_ITERATIVE_IMPLEMENTATION_PLAN.md`)
+**Version**: 1.3 (2026-08-11 — I3 MVP shipped: migration + photo-actions + UI + bot pipeline)
+**Status**: ✅ MVP Shipped (I3) — pending I4 retention/polish (nightly archive cron, storage-growth report, EXIF GPS opt-in, unit tests)
 **Author**: VIP Bike Engineering
 **Last updated**: 2026-08-11
 
@@ -552,3 +552,4 @@ async function downloadTelegramThumbnail(fileId: string): Promise<Buffer> {
   return Buffer.from(await fileResp.arrayBuffer());
 }
 ```
+
