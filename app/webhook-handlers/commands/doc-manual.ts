@@ -553,14 +553,12 @@ function buildPaymentSplitKeyboard(totalAmount: number): KeyboardButton[][] {
   const formatted = totalAmount.toLocaleString("ru-RU");
   return [
     [{ text: `💰 Итого: ${formatted} ₽`, callback_data: "pay_info" }],
+    // I4 enhancement: allow operator to override the calculated price
+    [{ text: "✏️ Изменить цену", callback_data: "pay_override" }],
     [{ text: "💵 Ввести сумму наличными", callback_data: "pay_cash" }],
     [
       { text: "✅ Всё наличными", callback_data: "pay_all_cash" },
     ],
-    // FIX: Previously a single "💳 Всё безнал" button was used, but the operator
-    // had no way to specify WHICH bank card (Tbank vs Sber) the money went to.
-    // This caused tracking ambiguity in the deposit-tracker text skill. Now we
-    // expose two distinct buttons that mirror the deposit destination pattern.
     [
       { text: "💳 Всё на Тинькофф", callback_data: "paydest_tbank" },
       { text: "💳 Всё на Сбербанк", callback_data: "paydest_sber" },
@@ -3044,6 +3042,24 @@ export async function handleDocText(userId: string, chatId: number, text: string
     return true;
   }
 
+  // I4 enhancement: price override — operator types a custom total price
+  if (state === "price_override") {
+    const value = text.replace(/\D/g, '');
+    if (!value || parseInt(value) < 100) {
+      logger.info(`[/doc] price_override: ${userId} → invalid input "${text.slice(0,40)}"`);
+      await sendComplexMessage(chatId, "❌ Введите цену (минимум 100 ₽)", [], { removeKeyboard: true });
+      return true;
+    }
+    const newPrice = parseInt(value);
+    // Override the cash/bank amounts to reflect the new total (default all cash)
+    context.cashAmount = newPrice;
+    context.bankAmount = 0;
+    logger.info(`[/doc] price_override: ${userId} → new price=${newPrice}`);
+    // Re-show the payment split with the new price
+    await gotoPaymentSplit(chatId, userId, context);
+    return true;
+  }
+
   if (state === "odometer") {
     // User entered odometer reading
     const value = text.replace(/\D/g, '');
@@ -3674,6 +3690,19 @@ export async function handleDocCallback(
   // ── Payment split callbacks (pay_*) — NEW step after odometer ───────────
   if (callbackData === "pay_info") {
     // Just informational button, do nothing
+    return true;
+  }
+
+  // I4 enhancement: price override — operator can manually set the total
+  if (callbackData === "pay_override") {
+    logger.info(`[/doc] pay_override: ${userId} → asking for custom price`);
+    await setState(userId, "price_override", context);
+    const currentTotal = (context.cashAmount || 0) + (context.bankAmount || 0);
+    await sendComplexMessage(
+      chatId,
+      `*✏️ Изменение цены*\n\nТекущая цена: *${currentTotal.toLocaleString("ru-RU")} ₽*\n\nВведите новую итоговую цену (руб):\n\nПример: \`7000\``,
+      [], { removeKeyboard: true, parseMode: "Markdown" },
+    );
     return true;
   }
 
