@@ -85,7 +85,14 @@ export async function reduceImageResolution(
       canvas.toBlob(
         (blob) => {
           if (blob) {
-            resolve(blob);
+            // CR fix: if compression made the file LARGER (e.g. small PNG → JPEG),
+            // return the original file instead. This prevents the client-side pass
+            // from increasing the upload payload.
+            if (blob.size >= file.size) {
+              resolve(file);
+            } else {
+              resolve(blob);
+            }
           } else {
             reject(new Error("Failed to create blob"));
           }
