@@ -1200,6 +1200,18 @@ export async function confirmVehicleReturn(
     damageNotes?: string | null;
     depositReturned?: boolean | null;
     returnNotes?: string | null;
+    // I2: penalty capture — when operator withholds part of the deposit
+    // (damage, missing fuel, etc.). Server action writes a `penalty` row
+    // + a manual `deposit_returned` row matching the full collected amount
+    // (so the auto-return trigger's NOT EXISTS guard skips).
+    //
+    // Math: collected=20000, penalty=3000 → manual_return=20000 (matches guard),
+    // penalty=3000. Balance = 20000 - 20000 - 3000 = -3000 (meaning 3000 kept).
+    penalty?: {
+      amount: number;          // how much to withhold
+      destination: "cash" | "tbank" | "sber";  // which destination
+      reason: string;          // why (damage description, etc.)
+    };
   }
 ) {
     noStore();
@@ -1295,6 +1307,83 @@ export async function confirmVehicleReturn(
             .eq('rental_id', rentalId);
 
         if (updateError) throw updateError;
+
+        // ── I2: Penalty capture — write penalty + manual deposit_returned rows ──
+        // IMPORTANT: this runs AFTER the status update, so the auto-return trigger
+        // has ALREADY fired and inserted its own deposit_returned row (matching
+        // each collected row with the same amount).
+        //
+        // Strategy: for the chosen destination, we now have:
+        //   - deposit_collected rows (original, e.g. 20000 cash)
+        //   - deposit_returned row (auto-inserted by trigger, 20000 cash)
+        //
+        // We need to convert this into:
+        //   - deposit_collected: 20000 cash (unchanged)
+        //   - deposit_returned: 20000 cash (auto, unchanged — matches guard)
+        //   - penalty: 3000 cash (NEW — records the withholding)
+        //
+        // The balance becomes: 20000 - 20000 - 3000 = -3000 (meaning 3000 kept).
+        // The customer received 17000 in their hand (20000 returned - 3000 penalty).
+        //
+        // We use the existing /api/franchize/deposit-penalty endpoint logic inline
+        // (can't call the API from a server action easily — duplicate the insert).
+        // The endpoint already validates: amount > 0, destination valid, amount ≤
+        // (collected - existing_penalties) for that destination.
+        let penaltyError: string | undefined;
+        if (closureData?.penalty && closureData.penalty.amount > 0) {
+            try {
+                const { amount, destination, reason } = closureData.penalty;
+
+                // Validate destination
+                if (!["cash", "tbank", "sber"].includes(destination)) {
+                    penaltyError = `Invalid destination: ${destination}`;
+                } else {
+                    // Fetch collected + existing penalties for this destination
+                    const { data: collectedRows } = await supabaseAdmin
+                        .from('deposit_entries')
+                        .select('amount')
+                        .eq('rental_id', rentalId)
+                        .eq('entry_type', 'deposit_collected')
+                        .eq('destination', destination);
+                    const totalCollected = (collectedRows || []).reduce((s, r) => s + Number(r.amount), 0);
+
+                    const { data: existingPenalties } = await supabaseAdmin
+                        .from('deposit_entries')
+                        .select('amount')
+                        .eq('rental_id', rentalId)
+                        .eq('entry_type', 'penalty')
+                        .eq('destination', destination);
+                    const totalPenalty = (existingPenalties || []).reduce((s, r) => s + Number(r.amount), 0);
+
+                    if (amount > totalCollected - totalPenalty) {
+                        penaltyError = `Penalty ${amount} exceeds available balance for ${destination} (collected: ${totalCollected}, already penalized: ${totalPenalty})`;
+                    } else {
+                        // Insert the penalty row
+                        const { error: penaltyInsertError } = await supabaseAdmin
+                            .from('deposit_entries')
+                            .insert({
+                                rental_id: rentalId,
+                                entry_type: 'penalty',
+                                amount: amount,
+                                direction: 'out',
+                                destination: destination,
+                                operator_chat_id: userId,
+                                notes: `Penalty at closure: ${reason}`,
+                            });
+                        if (penaltyInsertError) {
+                            penaltyError = penaltyInsertError.message;
+                        } else {
+                            logger.info('[confirmVehicleReturn] Penalty row inserted', {
+                                rentalId, amount, destination, reason,
+                            });
+                        }
+                    }
+                }
+            } catch (penErr: any) {
+                penaltyError = penErr?.message || 'Unknown penalty insert error';
+                logger.error('[confirmVehicleReturn] Penalty insert failed (non-fatal — rental already closed):', penErr);
+            }
+        }
 
         // ── BUG B fix: update bike's last_known_odometer ───────────────────────
         // Mirror what updateRentalStatus does (rentals-dashboard.ts:2076-2096)
@@ -1399,7 +1488,12 @@ export async function confirmVehicleReturn(
             logger.warn(`[confirmVehicleReturn] No renter chat_id available (user_id is null AND rental_contract_artefacts.telegram_chat_id is null/missing) — receipt skipped for rental ${rentalId}`);
         }
 
-        return { success: true, data: 'OK' };
+        return {
+            success: true,
+            data: 'OK',
+            // I2: surface penalty insert errors to the UI (non-fatal — rental is closed)
+            ...(penaltyError ? { penaltyError } : {}),
+        };
     } catch (e: any) {
         logger.error(`[confirmVehicleReturn] Error:`, e);
         return { success: false, error: e.message };
@@ -1982,4 +2076,5 @@ function escapeHtml(s: unknown): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
 
