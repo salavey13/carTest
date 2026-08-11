@@ -3,27 +3,31 @@
  */
 
 export interface BikePricingSpecs {
-  price_per_hour?: number;
-  price_per_2h?: number;
-  price_per_3h?: number;
-  price_per_6h?: number;
-  price_per_12h?: number;
-  dailyPrice?: number;
-  rent_weekday?: number;
-  rent_weekend?: number;
-  rent_2_4d?: number;
-  rent_5_10d?: number;
-  rent_11_30d?: number;
-  deposit_rub?: number;
+  price_per_hour?: number | string;
+  price_per_2h?: number | string;
+  price_per_3h?: number | string;
+  price_per_6h?: number | string;
+  price_per_12h?: number | string;
+  dailyPrice?: number | string;
+  rent_weekday?: number | string;
+  rent_weekend?: number | string;
+  rent_2_4d?: number | string;
+  rent_5_10d?: number | string;
+  rent_11_30d?: number | string;
+  deposit_rub?: number | string;
 }
 
 /**
  * Validate that a number is a positive value (or zero)
  * Returns the number if valid, undefined otherwise
  */
-function validatePositiveNumber(value: number | undefined): number | undefined {
-  if (value === undefined) return undefined;
-  return value > 0 ? value : undefined;
+function validatePositiveNumber(value: number | string | undefined): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  // FIX: specs JSONB can store prices as strings (e.g. "6000" instead of 6000).
+  // Coerce to number — if it fails, return undefined.
+  const num = typeof value === 'string' ? parseFloat(value.replace(/\s/g, '')) : value;
+  if (isNaN(num as number)) return undefined;
+  return (num as number) > 0 ? num as number : undefined;
 }
 
 /**
@@ -400,3 +404,4 @@ function getAvailableHourlyTiers(
   // No pricing available
   return { label: 'Цена', price: 'По запросу', period: '' };
 }
+
