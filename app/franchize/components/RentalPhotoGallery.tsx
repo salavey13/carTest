@@ -89,16 +89,14 @@ export function RentalPhotoGallery({
     }
   }, [rentalId]);
 
-  // I3 hotfix (M5): only fetch the full photo list if there are photos to fetch.
-  // The initial counts come from server-side render (rental.start_photo_count /
-  // rental.end_photo_count). If both are 0, skip the API call entirely.
+  // Always fetch photos on mount. Previously skipped when both initial counts
+  // were 0 — but that caused photos to not display on page load (only showed
+  // after the user uploaded a new photo, which triggered loadPhotos). The API
+  // call is cheap (one indexed query) and counter columns can drift, so always
+  // fetch from the source of truth.
   useEffect(() => {
-    if (initialStartCount === 0 && initialEndCount === 0) {
-      setLoading(false);
-      return;
-    }
     loadPhotos();
-  }, [loadPhotos, initialStartCount, initialEndCount]);
+  }, [loadPhotos]);
 
   // Keyboard navigation in lightbox
   useEffect(() => {
