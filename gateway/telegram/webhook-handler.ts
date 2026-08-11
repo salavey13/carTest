@@ -266,7 +266,19 @@ async function handlePhotoMessage(message: any) {
     const rental_id = rentalIdFromState;
     const photo_type = photoTypeFromState;
 
-    const photo = message.photo?.[message.photo.length - 1]; // берем самый большой размер
+    // ── I3: switch to SMALLEST photo variant (was largest) ──
+    // Telegram sends photos with multiple size variants: photo[0] is smallest
+    // (typically 320px wide, ~10-30 KB), photo[length-1] is largest (1-3 MB).
+    //
+    // PRD v1.2 §5.7: for freemium Supabase storage, the smallest variant is
+    // perfect for damage documentation — sufficient quality, ~50x smaller than
+    // full-res. The server action uploadRentalPhoto will compress further
+    // (sharp 1280px q75) but starting from a small source means faster download
+    // + smaller upload + less bandwidth.
+    //
+    // Fallback: if photo[0] is missing for some reason, use photo[1] (160px).
+    // Never download photo[2] or larger.
+    const photo = message.photo?.[0] || message.photo?.[1];
     if (!photo?.file_id) {
         await sendComplexMessage(chatId, '🚨 Не удалось прочитать фото. Отправьте изображение ещё раз.', [], undefined);
         return;
@@ -277,37 +289,53 @@ async function handlePhotoMessage(message: any) {
     try {
         const fileInfoResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile?file_id=${fileId}`);
         const fileInfo = await fileInfoResponse.json();
+
         if (!fileInfo.ok) throw new Error("Failed to get file info from Telegram");
 
         const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${fileInfo.result.file_path}`;
         const imageResponse = await fetch(fileUrl);
-        const imageBlob = await imageResponse.blob();
-        
-        const formData = new FormData();
-        formData.append('bucketName', 'rentals');
-        formData.append('file', imageBlob, `rental_${rental_id}_${photo_type}.jpg`);
+        const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
 
-        const { uploadSingleImage } = await import('@/app/rentals/actions');
-        const uploadResult = await uploadSingleImage(formData);
-        if (!uploadResult.success || !uploadResult.url) {
-            throw new Error(uploadResult.error || "Failed to upload image to storage.");
+        // ── I3: route through new uploadRentalPhoto pipeline ──
+        // Replaces the old path: uploadSingleImage → public `rentals` bucket →
+        // event-only log (no metadata, no hash, no compression).
+        //
+        // New path: uploadRentalPhoto → private `rental-photos` bucket →
+        // sharp compression (1280px q75, ≤500 KB) → SHA-256 dedup → metadata
+        // row in rental_photos → counter increment on rentals → event row.
+        const { uploadRentalPhoto } = await import('@/app/rentals/photo-actions');
+        const uploadResult = await uploadRentalPhoto({
+            rentalId: rental_id,
+            photoType: photo_type,
+            file: imageBuffer,
+            mimeType: 'image/jpeg',
+            uploaderUserId: userId,
+            uploaderRole: 'renter',  // bot path = renter uploading their own photo
+            source: 'bot',
+        });
+
+        if (!uploadResult.success) {
+            throw new Error(uploadResult.error || "Failed to upload photo via new pipeline.");
         }
 
-        const { error: eventError } = await supabaseAnon.from('events').insert({
-          rental_id: rental_id,
-          type: `photo_${photo_type}`,
-          status: 'completed',
-          created_by: userId,
-          payload: { photo_url: uploadResult.url }
-        });
-        
-        if (eventError) {
-          throw new Error(`Failed to create photo event: ${eventError.message}`);
+        if (uploadResult.deduped) {
+            await sendComplexMessage(
+                chatId,
+                `ℹ️ Это фото уже было загружено ранее для аренды ${rental_id.slice(0, 8)} — дубликат не создан.`,
+                [],
+                undefined,
+            );
+            // Still clear state — operator intent was to upload, we just deduped
+        } else {
+            await sendComplexMessage(
+                chatId,
+                `📸 Фото "${photo_type === 'start' ? 'ДО' : 'ПОСЛЕ'}" успешно загружено для аренды ${rental_id.slice(0, 8)}. Владелец уведомлен.`,
+                [],
+                undefined,
+            );
         }
 
         await supabaseAnon.from('user_states').delete().eq('user_id', userId);
-        
-        await sendComplexMessage(chatId, `📸 Фото "${photo_type === 'start' ? 'ДО' : 'ПОСЛЕ'}" успешно загружено для аренды ${rental_id.slice(0, 8)}. Владелец уведомлен.`, [], undefined);
 
     } catch (error) {
         logger.error(`[Webhook Photo Handler] Error processing photo for user ${userId}:`, error);
