@@ -14,6 +14,8 @@ import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRent
 // was duplicating RentalReturnChecklist which persists via API)
 import { RentalMessageInput } from "../../../components/RentalMessageInput";
 import { RentalReturnChecklist } from "../../../components/RentalReturnChecklist";
+// I3: photo gallery component for ДО/ПОСЛЕ bike photos
+import { RentalPhotoGallery } from "../../../components/RentalPhotoGallery";
 // goodmorning-polish: removed RentalTelegramGuard import (no longer used after streamline)
 import { crewPaletteForSurface, readablePaletteTextOnColor } from "../../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../../metadata";
@@ -489,6 +491,28 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             />
           </FranchizeRentalRoleGuard>
         )}
+
+          <FranchizeRentalRoleGuard
+            allowedRoles={["operator", "admin", "owner", "renter"]}
+            ownerId={rental.ownerId}
+            renterId={rental.renterId}
+            renterTelegramChatId={rental.renterTelegramChatId}
+            crewId={crew.id}
+            crewSlug={resolvedSlug}
+          >
+            {/* I3: Rental Photo Gallery — ДО (start) + ПОСЛЕ (end) photos.
+                v1: non-blocking. Shown for operators + renter (renter can
+                upload their own photos for damage documentation). */}
+            <div id="rental-photo-gallery">
+              <RentalPhotoGallery
+                rentalId={rental.rentalId}
+                initialStartCount={rental.startPhotoCount ?? 0}
+                initialEndCount={rental.endPhotoCount ?? 0}
+                canUpload={true}
+                compact={false}
+              />
+            </div>
+          </FranchizeRentalRoleGuard>
 
         {/* Message input — only show when renter has a real TG chat_id
             (QR claimed). If QR not scanned, message will fail silently.
