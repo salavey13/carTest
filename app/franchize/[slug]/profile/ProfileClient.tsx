@@ -390,11 +390,11 @@ export function FranchizeProfileClient({
             {/* Rentals section */}
             <div>
               <p className="mb-2 text-xs font-semibold " style={{ color: T.textMuted }}>
-                Текущие аренды
+                Мои аренды
               </p>
               {digest?.rentals && digest.rentals.length > 0 ? (
                 <div className="space-y-2">
-                  {digest.rentals.slice(0, 3).map((r) => (
+                  {digest.rentals.slice(0, 5).map((r) => (
                     <div
                       key={r.rentalId}
                       role="button"
@@ -943,3 +943,4 @@ export function FranchizeProfileClient({
     </motion.div>
   );
 }
+
