@@ -444,7 +444,17 @@ export function FranchizeProfileClient({
                               opacity: r.status === "active" ? 1 : 0.6,
                             }}
                           >
-                            {r.status === "active" ? "Активна" : r.status}
+                            {(() => {
+                              const STATUS_LABELS: Record<string, string> = {
+                                active: "Активна",
+                                completed: "Завершена",
+                                cancelled: "Отменена",
+                                disputed: "Спорная",
+                                confirmed: "Подтверждена",
+                                pending_confirmation: "Ждёт подтверждения",
+                              };
+                              return STATUS_LABELS[r.status] || r.status;
+                            })()}
                           </span>
                         )}
                       </div>
