@@ -266,19 +266,24 @@ async function handlePhotoMessage(message: any) {
     const rental_id = rentalIdFromState;
     const photo_type = photoTypeFromState;
 
-    // ── I3: switch to SMALLEST photo variant (was largest) ──
-    // Telegram sends photos with multiple size variants: photo[0] is smallest
-    // (typically 320px wide, ~10-30 KB), photo[length-1] is largest (1-3 MB).
+    // ── I3 hotfix (H4): use a MIDDLE photo variant (was smallest) ──
+    // Telegram sends photos with multiple size variants:
+    //   photo[0] = 160×160 (~5 KB)   — too small for damage disputes
+    //   photo[1] = 320×320 (~15 KB)  — still too small
+    //   photo[2] = 800×800 (~80 KB)  — sweet spot: readable + small
+    //   photo[3] = 1280×1280+ (~200 KB) — largest, often unnecessary
     //
-    // PRD v1.2 §5.7: for freemium Supabase storage, the smallest variant is
-    // perfect for damage documentation — sufficient quality, ~50x smaller than
-    // full-res. The server action uploadRentalPhoto will compress further
-    // (sharp 1280px q75) but starting from a small source means faster download
-    // + smaller upload + less bandwidth.
+    // I3 v1 originally used photo[0] for freemium storage, but code review
+    // pointed out 320px is too low-res to read license plates, VINs, or small
+    // scratches — exactly what damage documentation needs. sharp's compression
+    // won't upscale (withoutEnlargement: true), so we'd be stuck at 320px.
     //
-    // Fallback: if photo[0] is missing for some reason, use photo[1] (160px).
-    // Never download photo[2] or larger.
-    const photo = message.photo?.[0] || message.photo?.[1];
+    // photo[2] is the right tradeoff: ~80 KB before sharp compression (which
+    // brings it to ~30-50 KB at 1280px q75), sufficient quality for disputes,
+    // still 50x smaller than the original largest variant.
+    //
+    // Fallback chain: photo[2] → photo[1] → photo[0] (never photo[3]+).
+    const photo = message.photo?.[2] || message.photo?.[1] || message.photo?.[0];
     if (!photo?.file_id) {
         await sendComplexMessage(chatId, '🚨 Не удалось прочитать фото. Отправьте изображение ещё раз.', [], undefined);
         return;
