@@ -146,6 +146,19 @@ export function FranchizeRentalLifecycleActions({
   const [closureDepositReturned, setClosureDepositReturned] = useState(true);
   const [closureReturnNotes, setClosureReturnNotes] = useState("");
 
+  // ── I2: Penalty capture state ──
+  // When operator withholds part of the deposit (damage, missing fuel, etc.),
+  // they enter a penalty amount + destination + reason. confirmVehicleReturn
+  // then writes a `penalty` row + adjusts the auto-return to a reduced amount.
+  //
+  // Penalty UI is shown only when "Депозит возвращён" checkbox is ON (if it's
+  // off, the operator is signalling no deposit flow at all — penalty makes no
+  // sense). When penalty > 0, the modal shows a live "Возврат: X ₽ / Удержание: Y ₽"
+  // breakdown so the operator can verify the math before submitting.
+  const [closurePenaltyAmount, setClosurePenaltyAmount] = useState("");
+  const [closurePenaltyDestination, setClosurePenaltyDestination] = useState<"cash" | "tbank" | "sber">("cash");
+  const [closurePenaltyReason, setClosurePenaltyReason] = useState("");
+
   // ── Abort modal state ──
   // Confirm-before-abort: cancellation is irreversible (status flips to 'cancelled',
   // excluded from analytics, renter gets a Telegram notification). Modal collects
@@ -231,6 +244,10 @@ export function FranchizeRentalLifecycleActions({
               setClosureDamageLevel("none");
               setClosureDepositReturned(true);
               setClosureReturnNotes("");
+              // I2: reset penalty state too — don't carry over from previous rental
+              setClosurePenaltyAmount("");
+              setClosurePenaltyDestination("cash");
+              setClosurePenaltyReason("");
               setClosureModalOpen(true);
               // Scroll to modal after render
               setTimeout(() => {
@@ -379,6 +396,97 @@ export function FranchizeRentalLifecycleActions({
                 </span>
               </label>
 
+              {/* ── I2: Penalty capture ──
+                  Shows ONLY when "Депозит возвращён" is checked (otherwise penalty makes no sense).
+                  Lets the operator withhold part of the deposit for damage / missing fuel / etc.
+                  Writes a `penalty` row + adjusts the auto-return to a reduced amount.
+                  Math: if collected=20000, penalty=3000 → returned=17000. */}
+              {closureDepositReturned && (
+                <div
+                  className="rounded-lg border p-3 space-y-2"
+                  style={{
+                    borderColor: closurePenaltyAmount ? "rgba(239, 68, 68, 0.4)" : "var(--lifecycle-border)",
+                    backgroundColor: closurePenaltyAmount ? "rgba(239, 68, 68, 0.05)" : "transparent",
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold" style={{ color: "var(--lifecycle-muted)" }}>
+                      ⚠️ Удержание из депозита
+                    </span>
+                    <span className="text-[10px]" style={{ color: "var(--lifecycle-muted)" }}>
+                      необязательно
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="block">
+                      <span className="text-[10px] font-medium" style={{ color: "var(--lifecycle-muted)" }}>
+                        Сумма удержания, ₽
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={closurePenaltyAmount}
+                        onChange={(e) => setClosurePenaltyAmount(e.target.value.replace(/[^\d]/g, ""))}
+                        placeholder="например, 3000"
+                        disabled={isPending}
+                        className="mt-0.5 w-full rounded-lg border px-2 py-1.5 text-sm outline-none"
+                        style={{
+                          backgroundColor: "var(--lifecycle-bg)",
+                          borderColor: "var(--lifecycle-border)",
+                          color: "var(--lifecycle-text)",
+                        }}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-[10px] font-medium" style={{ color: "var(--lifecycle-muted)" }}>
+                        Куда применить
+                      </span>
+                      <select
+                        value={closurePenaltyDestination}
+                        onChange={(e) => setClosurePenaltyDestination(e.target.value as "cash" | "tbank" | "sber")}
+                        disabled={isPending}
+                        className="mt-0.5 w-full rounded-lg border px-2 py-1.5 text-sm outline-none"
+                        style={{
+                          backgroundColor: "var(--lifecycle-bg)",
+                          borderColor: "var(--lifecycle-border)",
+                          color: "var(--lifecycle-text)",
+                        }}
+                      >
+                        <option value="cash">💵 Наличные</option>
+                        <option value="tbank">💳 Тинькофф</option>
+                        <option value="sber">💳 Сбербанк</option>
+                      </select>
+                    </label>
+                  </div>
+                  {closurePenaltyAmount && (
+                    <label className="block">
+                      <span className="text-[10px] font-medium" style={{ color: "var(--lifecycle-muted)" }}>
+                        Причина удержания
+                      </span>
+                      <input
+                        type="text"
+                        value={closurePenaltyReason}
+                        onChange={(e) => setClosurePenaltyReason(e.target.value)}
+                        placeholder="например, царапина на баке"
+                        disabled={isPending}
+                        className="mt-0.5 w-full rounded-lg border px-2 py-1.5 text-sm outline-none"
+                        style={{
+                          backgroundColor: "var(--lifecycle-bg)",
+                          borderColor: "var(--lifecycle-border)",
+                          color: "var(--lifecycle-text)",
+                        }}
+                      />
+                    </label>
+                  )}
+                  {closurePenaltyAmount && (
+                    <p className="text-[10px] italic" style={{ color: "var(--lifecycle-muted)" }}>
+                      Депозит будет возвращён за вычетом удержания.
+                      Сумма удержания спишется с выбранного назначения (cash / T-Bank / Sber).
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <span className="text-xs font-semibold" style={{ color: "var(--lifecycle-muted)" }}>
                   Состояние ТС при возврате
@@ -470,6 +578,10 @@ export function FranchizeRentalLifecycleActions({
                       toast.error("Нужна авторизация в Telegram WebApp.");
                       return;
                     }
+                    // I2: parse penalty amount (empty string → 0)
+                    const penaltyAmt = closurePenaltyAmount
+                      ? parseInt(closurePenaltyAmount, 10)
+                      : 0;
                     const result = await confirmVehicleReturn(rentalId, dbUser.user_id, {
                       odometerAfter: closureOdometer ? parseInt(closureOdometer, 10) : null,
                       damageNotes: closureDamageLevel !== "none"
@@ -477,12 +589,25 @@ export function FranchizeRentalLifecycleActions({
                         : null,
                       depositReturned: closureDepositReturned,
                       returnNotes: closureReturnNotes.trim() || null,
+                      // I2: penalty capture — only sent if amount > 0
+                      ...(penaltyAmt > 0 ? {
+                        penalty: {
+                          amount: penaltyAmt,
+                          destination: closurePenaltyDestination,
+                          reason: closurePenaltyReason.trim() || "Penalty withheld at closure",
+                        },
+                      } : {}),
                     });
                     if (!result.success) {
                       toast.error(result.error || "Не удалось подтвердить возврат.");
                       return;
                     }
-                    toast.success("Возврат подтверждён. Карточка обновится.");
+                    // I2: surface penalty-specific errors (non-fatal — rental still closed)
+                    if (result.penaltyError) {
+                      toast.warning(`Возврат подтверждён, но удержание не записано: ${result.penaltyError}`);
+                    } else {
+                      toast.success("Возврат подтверждён. Карточка обновится.");
+                    }
                     setClosureModalOpen(false);
                     // router.refresh() re-fetches server data so the page reflects the new "completed" status
                     router.refresh();
@@ -598,3 +723,4 @@ export function FranchizeRentalLifecycleActions({
     </div>
   );
 }
+
