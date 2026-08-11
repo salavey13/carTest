@@ -854,9 +854,16 @@ function stepLabel(state: string, dealType?: string): string {
  * Prepend step label to a message text.
  * Returns "Шаг 3/16\n\n<message>" or just "<message>" if no step found.
  */
+// I4 enhancement (user request): step numbers are no longer shown in prompts.
+// Previously withStep() prepended "Шаг N/M\n\n" to the message — but only for
+// SOME steps (inconsistent). User requested removing step numbers entirely.
+//
+// The function is kept for backward compat (callers still pass state/dealType)
+// but now just returns the message unchanged. The stepLabel() function is still
+// used internally by getVisibleSteps() for the step-correction list (which
+// shows "N. <label>" using step.label, not stepLabel()).
 function withStep(message: string, state: string, dealType?: string): string {
-  const label = stepLabel(state, dealType);
-  return label ? `${label}\n\n${message}` : message;
+  return message;
 }
 
 /**
@@ -3312,8 +3319,8 @@ export async function handleDocText(userId: string, chatId: number, text: string
         [], { removeKeyboard: true });
       return true;
     }
-    // Track corrected step
-    const stepKey = typeof step.num === 'number' ? step.num : step.num;
+    // Track corrected step (M2 fix: was `typeof step.num === 'number' ? step.num : step.num` — meaningless ternary)
+    const stepKey = step.num;
     context.correctedSteps = context.correctedSteps || [];
     if (!context.correctedSteps.includes(stepKey as number)) {
       context.correctedSteps.push(stepKey as number);
