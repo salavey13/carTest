@@ -1,197 +1,124 @@
-# План волны — I5: Franchize Service Operations (cash ledger + equipment rentals + commissions + salary)
+# План волны — I5: Franchize Service Operations (equipment + cash ledger + commissions + salary)
 
-> **Date:** 2026-08-11 · Scope:** FRANCHIZE_SERVICE_OPERATIONS_PRD v4.1
-> **Status:** Ready for Implementation
-> **Estimated:** 2 weeks per PRD, following sfera-tender-bot high-velocity patterns
-
----
-
-## Этап 0 — фиксация (before starting)
-
-1. ✅ **Code review complete** — `CODEREVIEW_LEADS_RENTALS.md` reviewed
-2. ✅ **START-HERE.md created** — project documentation structure established
-3. ✅ **Fix accessories duplication** — synthetic generation deleted from `rentals.ts` (crew_todos is single source of truth)
-4. ✅ **Add todos to rentals page** — `getFranchizeCrewRentalsListAction()` returns `pendingTodos` + `todos`; UI shows badge + todo lines
-5. ⏳ **Read META_PRD** — Understand I1-I4 context and quality gates (reference: `docs/META_PRD_ITERATIVE_IMPLEMENTATION_PLAN.md`; I1-I4 shipped state already cross-verified via migrations during PRD review)
-6. ✅ **Read FRANCHIZE_SERVICE_OPERATIONS_PRD.md** — Full requirements reviewed, see PRD Review Notes below
-
-**Git branch:** `feat/i5-service-operations` — created ✅ (fixes committed to `main` as `5437369e`)
+> Дата: 2026-08-12 · Скоуп: `docs/FRANCHIZE_SERVICE_OPERATIONS_PRD.md` v4.1
+> Рабочие программы (содержимое задач сюда НЕ дублируется — оно в планах, с тестами):
+> - `docs/superpowers/plans/2026-08-12-i5-equipment-rentals.md` (5 задач)
+> - `docs/superpowers/plans/2026-08-12-i5-cash-ledger.md` (7 задач)
+> - `docs/superpowers/plans/2026-08-12-i5-commissions-salary.md` (6 задач)
+>
+> Этот план — оркестровка: кто, в каком порядке, где границы.
+> Ветка волны: `feat/i5-service-operations` — всё в неё; в `main` только merge после приёмки.
 
 ---
 
-## PRD Review Notes (2026-08-12, codebase-verified)
+## Этап 0 — фиксация (до тимейтов) — ✅ ЗАВЕРШЁН 2026-08-12
 
-### 🔴 Must fix before writing migrations
-
-1. **Migration numbering conflict** — PRD §2.1 proposes `20260810000003`–`20260810000008`, but repo already has `20260810000010/11/20` + `20260811000000`–`05` applied. Back-dating new migrations ahead of applied ones breaks ordering. **Use fresh `20260812...` series instead.**
-2. **§5.2 backfill bug** — `s.crew_slug::UUID` will fail: `crew_slug` is TEXT (`'vip-bike'`), not a UUID. Must `JOIN crews ON crews.slug = s.crew_slug` to get `crew_id`.
-3. **§3.1 trigger missing idempotency guard** — `auto_create_rental_transaction()` has the transition guard (`OLD.status != 'completed'`) but NO `NOT EXISTS` guard on INSERT. Re-completing a rental duplicates `income_rental` rows — the exact bug class fixed for deposits in `20260811000000_deposit_trigger_double_return_guard.sql`. Add `NOT EXISTS` on `(rental_id, transaction_type)`.
-4. **§3.1 trigger ignores `commission_type`** — treats `commission_value` as percentage always; if a crew configures `fixed_amount`, math breaks. Branch on `commission_type`.
-
-### 🟡 Stale PRD sections (already shipped)
-
-- **§0 deposit trigger warning** — outdated: double-return guard landed in `20260811000000` (verified: NOT EXISTS guard on `(rental_id, destination, amount)` + one-time dedup).
-- **§6.7 `rental_photos` "proposed"** — already shipped: `20260811000001_create_rental_photos.sql` + 3 hotfix migrations.
-
-### 🟢 Verified correct
-
-- `rentals.created_by_operator_chat_id` exists (`20260720120100`) ✅
-- `crew_member_shifts.member_id` is TEXT → `users(user_id)` — §6.2.2 "My Work" SQL works ✅
-- `sale_contract_artifacts` has `crew_slug`, `sale_price`, `total_sum`, `resolved_bike_id`, `created_by_operator_chat_id` — §5.2 backfill viable (with fix #2) ✅
-- RLS `auth.jwt() ->> 'chat_id'` pattern matches production reality (service_role bypasses; policies = defense-in-depth) ✅
-
-### Contract addendum (locks before Этап 1)
-
-- Migrations: `20260812000001_create_equipment_rentals.sql` → `..._cash_transactions.sql` → `..._commission_rates.sql` → `..._salary_plans.sql` → `..._salary_calculations.sql` → `..._seed_equipment_items.sql`
-- All triggers: transition guard **+** `NOT EXISTS` idempotency guard (I1 pattern)
-- `cash_transactions.sale_contract_id` column ships in the create migration (backfill depends on it); FK to `private.sale_contract_artifacts` added separately per Open Q5
+1. ✅ Code review leads/rentals — `CODEREVIEW_LEADS_RENTALS.md`
+2. ✅ Accessories duplication устранён + todos на rentals-странице — `main @ 5437369e` (crew_todos = single source of truth)
+3. ✅ `START-HERE.md` создан
+4. ✅ PRD v4.1 прочитан и сверен с продом — поправки свёрнуты в Контракт ниже (PRD Review Notes в конце)
+5. ✅ Ветка `feat/i5-service-operations` создана и запушена
+6. ⏳ Эталон тестов переподтвердить на ветке перед Этапом 1: `npm test` зелёный. Меньше — стоп, чинить окружение, не код.
 
 ---
 
 ## Тимейты волны
 
-| Name | Base (.agents/) | Model | What does | Owns (one writer) |
-|------|-----------------|-------|-----------|-------------------|
-| `backend-core` | backend-dev | sonnet | Cash transactions table + RLS + triggers, equipment_rentals table + RLS, commission_rates table + seed, salary_plans table + payout logic | `supabase/migrations/`, `app/franchize/server-actions/cash-transactions.ts`, `app/franchize/server-actions/equipment-rentals.ts`, `app/franchize/server-actions/commissions.ts` |
-| `backend-integration` | backend-dev | sonnet | Salary calculations + payout triggers, API endpoints, doc-manual integration (equipment tracking), rental closure integration | `app/franchize/server-actions/salary-calculations.ts`, `app/api/franchize/*`, `app/webhook-handlers/commands/doc-manual.ts` |
-| `frontend` | frontend-dev | sonnet | Equipment rental UI, cash ledger UI, commission config UI, salary payout UI | `app/franchize/[slug]/equipment/*`, `app/franchize/[slug]/cash-ledger/*`, `app/franchize/[slug]/admin/commissions/*`, `app/franchize/[slug]/admin/salary/*` |
-| `verifier` | verifier | opus | End-to-end verification after each phase | Tests all phases |
+| Имя | Модель | Что делает | Владеет (один писатель) |
+|---|---|---|---|
+| `backend-core` | sonnet | equipment-план T1–T2, cash-план T1–T4, salary-план T1–T3 | `supabase/migrations/20260812*`, `app/franchize/server-actions/{equipment-rentals,cash-transactions,commissions,salary-calculations}.ts`, `tests/franchize/{equipment-rentals,cash-transactions,commissions,salary-calculations}.spec.ts`, `tests/sql/i5_*` |
+| `backend-integration` | sonnet | equipment-план T4, cash-план T5, salary-план T6 (API часть) | `app/webhook-handlers/commands/doc-manual.ts`, `app/api/franchize/**`, `tests/franchize/i5-api.spec.ts` |
+| `frontend` | sonnet | equipment-план T3, cash-план T6, salary-план T4–T5 | `app/franchize/[slug]/{equipment,cash-ledger,admin/commissions,admin/salary}/**`, `app/franchize/[slug]/profile/ProfileClient.tsx`, `tests/franchize/i5-ui.spec.ts` |
+| `verifier` | opus | E2E-верификация после каждого этапа | прогон всех фаз |
 
-**Base roles** (`verifier`, `code-reviewer`, `security`, `test-runner`) — sub-agents, not team members.
+Базовые роли (`code-reviewer`, `security`, `test-runner`) — субагенты-гейты, не тимейты.
 
-⛔ **Tests each write only in their ownership directories** — don't touch files outside your scope.
+⛔ Тесты каждый пишет **только в своих** файлах-владениях. Файл не в твоей колонке — не трогаешь, шлёшь спеку владельцу.
 
 ---
 
-## Контракт между слоями (fixed before start)
+## Контракт между слоями (зафиксирован до старта, выдан всем одним текстом)
 
-1. **Cash Ledger API** — `GET /api/franchize/cash-ledger` returns `CashTransactionRow[]` with filters (date range, transaction_type, crew_id). POST/UPDATE restricted to crew owners/admins.
-2. **Equipment Rental API** — `POST /api/franchize/equipment-rentals` creates rental with `equipment_id→cars(id)`, returns equipment_rental row. Validation: `equipment_id` must have `cars.type='equipment'`.
-3. **Commission Config UI** — PATCH `/api/franchize/commissions/{crew_id}` updates `commission_rates` table. Frontend validates percentage ≤100.
-4. **Salary Payout** — `/api/franchize/salary-payout` triggers calculation for given period, returns `SalaryCalculation` row with breakdown. Only callable by crew owners.
-5. **Migrations** — backend-core writes migrations in order, backend-integration chains via `down_revision`. No two heads in alembic.
-
-**Contract changes** — only via peer-exchange with recorded agreement. Don't agree → escalate.
+1. **Миграции — серия `20260812000001`–`20260812000008`**, строго по порядку: `01 equipment_rentals` → `02 cash_transactions` → `03 commission_rates` → `04 salary_plans` → `05 salary_calculations` → `06 seed_equipment` → `07 cash triggers` → `08 backfill`. (PRD §2.1 предлагал `20260810000003-08` — **ОТКЛОНЕНО**: эти даты предшествуют уже применённым миграциям `20260811*`.)
+2. **Каждый триггер `AFTER UPDATE OF status`**: transition guard (`OLD.status != NEW`) **+** `NOT EXISTS` idempotency guard (паттерн I1, `20260811000000_deposit_trigger_double_return_guard.sql`). Повторное закрытие аренды НЕ создаёт дублей.
+3. **Комиссия в триггере**: ветвление по `commission_type` — `percentage` → `amount * value`, `fixed_amount` → `value`. (PRD §3.1 игнорировал тип — поправлено.)
+4. **`cash_transactions.sale_contract_id`** создаётся в миграции `02` (backfill зависит от колонки); cross-schema FK на `private.sale_contract_artifacts` — **НЕ** делаем (Open Q5).
+5. **Backfill продаж**: `JOIN public.crews ON crews.slug = s.crew_slug`. (PRD §5.2 `crew_slug::UUID` — **ОТКЛОНЕНО**, сломается: slug — текст.)
+6. **Server actions**: возвращают `{ success: boolean; data?: T; error?: string }`, доступ через `supabaseAdmin`, auth — паттерн `verifyCrewAccess` из `app/franchize/server-actions/leads.ts`.
+7. **API**: `app/api/franchize/[slug]/...` — Next.js dynamic segments, НЕ Express-синтаксис (PRD §4 note). Тонкие роуты → вызывают server actions, логика в actions.
+8. **Изменение контракта** — только через peer-обмен с записью в отчёты обеих сторон одними словами; не сошлись за два круга — эскалация координатору.
 
 ---
 
 ## Этапы
 
-### Этап 1 (параллельно): Database core + Equipment rentals
-**backend-core** — Tasks 1-4:
-- Cash transactions table + RLS + triggers
-- Equipment rentals table + RLS  
-- Commission rates table + seed
-- Equipment rental server actions
-
-**frontend** — Equipment rental UI:
-- Equipment catalog page
-- Rental creation form
-- Active rentals list
-
-**Этап 2 (параллельно): Integration + Commission config
-**backend-integration** — Tasks 5-7:
-- Salary plans table + payout logic
-- Salary calculations server actions
-- Doc-manual integration (track equipment in rentals)
-- API endpoints
-
-**frontend** — Commission config UI:
-- Commission rates editor
-- Per-crew, per-operation-type config
-- Validation UI
-
-### Этап 3 (интеграция): Cash ledger + Salary payout
-**backend-integration** — Cash ledger APIs + Salary payout triggers
-**frontend** — Cash ledger UI + Salary payout UI
-**verifier** — E2E: create equipment rental → close → verify cash entry; configure commission → create sale → verify commission; run salary payout → verify calculation
-
-### Этап 4 (гейт → production): Smoke + Deploy
-- All tests green: `npm test`, `npm run test:e2e`
-- `code-reviewer` PASS on diff
-- `security` review on new endpoints
-- Migration verification on staging
-- Production rollout
+- **Этап 1 (параллельно):** `backend-core` — equipment T1–T2 (миграция 01 + actions) и cash T1 (миграция 02); `frontend` — equipment T3 по контракту п.6 (моки ответов).
+- **Этап 2 (параллельно):** `backend-core` — salary T1 (миграции 03–05), equipment T1-сид (миграция 06), cash T2–T3 (триггеры 07, backfill 08); `backend-integration` — equipment T4 (doc-manual: строки `equipment_rentals` при аренде с экипом); `frontend` — cash T6 (ledger UI по мокам).
+- **Этап 3 (интеграция):** `backend-core` — cash T4 (actions) + salary T2–T3; `backend-integration` — cash T5 (API) + salary T6 (API); `frontend` — salary T4–T5 (commission config + salary/payout UI + profile «Моя работа»). Общий прогон: `npm test` + `npm run typecheck:franchize` + `npm run lint:target`.
+- **Этап 4 (гейт → production):** `verifier` E2E (equipment: rent → return → cash entry; commission: config → sale → commission row; salary: payout → correct calculation) · `code-reviewer` PASS по диффу ветки · `security` по новым endpoints (только crew owner пишет? service_role не утекает?) · миграции на staging в порядке 01→08 · выкатка + смоук на проде.
 
 ---
 
 ## Definition of Done волны
 
-- [ ] All tasks from FRANCHIZE_SERVICE_OPERATIONS_PRD v4.1 complete
-- [ ] All migrations applied in order (verify via `supabase migrations list`)
-- [ ] `npm test` green (all existing + new tests)
-- [ ] `npm run test:e2e` green (including new E2E scenarios)
-- [ ] `verifier` PASS with full test output
-- [ ] `code-reviewer` PASS on diff
-- [ ] Production smoke test: equipment rental → close → cash entry visible
-- [ ] Production smoke test: commission config → sale → commission calculated
-- [ ] Production smoke test: salary payout → correct calculation
-- [ ] `README.MD`, `META_PRD`, `FRANCHIZE_SERVICE_OPERATIONS_PRD.md` updated
-- [ ] Branch merged to `main` and pushed
+- [ ] Все 18 задач трёх планов закрыты по своим шагам (каждая — тест написан → упал → прошёл → коммит)
+- [ ] Миграции применены по порядку 01→08 (`supabase migration list` без « pending» середины)
+- [ ] `npm test` зелёный (все существующие + новые из планов), `npm run test:e2e` зелёный
+- [ ] `verifier` (свежий субагент, не автор) выдал PASS с дословным хвостом vitest в отчёте
+- [ ] Прод-смоук: equipment rental → return → `cash_transactions` запись видна в ledger UI
+- [ ] Прод-смоук: commission config → sale → комиссия посчитана по настроенному типу
+- [ ] Прод-смоук: salary payout → расчёт совпадает с ручной сверкой (shifts + commissions)
+- [ ] Re-completion регрессия: аренда completed → active → completed = ровно 1 `income_rental` (I1-паттерн)
+- [ ] `START-HERE.md`, `docs/META_PRD_ITERATIVE_IMPLEMENTATION_PLAN.md`, PRD v4.1 → v4.2 (shipped-sync) обновлены
+- [ ] Ветка смержена в `main` и запушена
 
 ---
 
-## Open Questions (non-blocking)
+## Открытые вопросы (не блокируют старт)
 
-1. **Equipment catalog seed** — Which equipment items to create? (helmets sizes, jackets, etc.)
-2. **Commission defaults** — What are default commission rates per operation type?
-3. **Salary payout schedule** — Confirm 10th/25th monthly payout cycle
-4. **Cash ledger retention** — How long to keep cash transaction records?
+1. **Equipment seed** — сверх 4 позиций PRD §2.7: расширяется одной строкой INSERT, не блокирует.
+2. **Default commission rates** — дефолт 10% rentals (PRD Q1); остальные типы заводятся через config UI.
+3. **Base monthly salary** поверх shift income? (PRD Q2) — схема `salary_plans.base_rate` уже готова к обоим ответам.
+4. **Equipment deposit** — отдельный залог за экип? (PRD Q4) — пока нет, депозит остаётся на bike-аренде.
+5. **Cross-schema FK** `sale_contract_id` → `private.sale_contract_artifacts(id)` (PRD Q5) — колонка без FK.
 
 ---
 
 ## Effort
 
-Set **high** on entire wave: financial data requires correctness, idempotency guards, proper RLS. Sub-agents don't inherit effort — depth set by model (all sonnet, `architect`/`critic` for disputes).
+**High** на всю волну: финансовые данные, идемпотентность, RLS. Субагентам effort не наследуется — глубина задаётся моделью (всем sonnet, `architect`/`critic` при спорах).
 
 ---
 
-## Rules from sfera-tender-bot (apply here)
+## PRD Review Notes (2026-08-12, codebase-verified)
 
-1. **Triggers with idempotency** — Every `AFTER UPDATE OF status` trigger needs `NOT EXISTS` guard
-2. **Migrations are additive** — `IF NOT EXISTS` / `IF EXISTS`, `on conflict do nothing`
-3. **Mock providers refuse** — Don't pretend success when mocking payment/LLM
-4. **Rate limits don't depend on Redis** — Fall back to in-memory counter
-5. **Ручка отключённая в интерфейсе остаётся открытой в API** — If disabling, close the endpoint too
-6. **Даты из БД сравнивать только через `_as_utc`** — Postgres aware vs SQLite naive
+Поправки 🔴 №1–4 уже свёрнуты в Контракт (п.1, 2, 3, 5 соответственно).
 
----
+**🟡 Stale в PRD v4.1 (не читать как работу):**
+- §0 warning про deposit double-return — устарел: guard в `20260811000000` (NOT EXISTS на `(rental_id, destination, amount)` + одноразовый dedup).
+- §6.7 «proposed `rental_photos`» — уже shipped: `20260811000001` + три hotfix-миграции.
 
-## Files Created This Session
-
-- `CODEREVIEW_LEADS_RENTALS.md` — Full code review (accessories duplication issue)
-- `START-HERE.md` — Project documentation structure
-- `PLAN-I5-SERVICE-OPERATIONS.md` — This file
+**🟢 Verified correct в PRD:**
+- `rentals.created_by_operator_chat_id` существует (`20260720120100`)
+- `crew_member_shifts.member_id` — TEXT → `users(user_id)` — SQL §6.2.2 «My Work» работает
+- `sale_contract_artifacts` имеет `crew_slug`, `sale_price`, `total_sum`, `resolved_bike_id`, `created_by_operator_chat_id` — backfill жизнеспособен (с фиксом контракта п.5)
+- RLS `auth.jwt() ->> 'chat_id'` соответствует проду (service_role обходит; политики = defense-in-depth)
 
 ---
 
-## Next Actions
+## Commit pattern (стандарт волны)
 
-1. Fix accessories duplication (delete from `rentals.ts:697-743`)
-2. Add todos to rentals page (enhance `profile-actions.ts`)
-3. Review FRANCHIZE_SERVICE_OPERATIONS_PRD.md thoroughly
-4. Create `feat/i5-service-operations` branch
-5. Begin Этап 1 with backend-core team
-
----
-
-**Lesson from sfera-tender-bot:** High velocity comes from:
-- Clear atomic commits
-- Parallelizable workstreams
-- Strong contracts between layers
-- Comprehensive testing per phase
-- Fast iteration cycles (commits within minutes of each other)
-
-**Commit pattern from sfera-tender-bot:**
 ```
-feat(cash-transactions): table + RLS + triggers
 feat(equipment-rentals): table + RLS
-feat(commissions): table + seed data
-feat(cash-ledger): API endpoints
-feat(salary): payout logic
-integration: doc-manual equipment tracking
-fix: idempotency guard on salary trigger
-test: E2E equipment rental flow
+feat(equipment-rentals): server actions
+feat(equipment): catalog + rental UI
+feat(cash-transactions): table + daily_cash_flow view
+feat(cash-transactions): auto-transaction triggers (idempotent)
+feat(cash-transactions): backfill rentals + sales
+feat(cash-ledger): server actions + API
+feat(commissions): table + seed + config actions
+feat(salary): plans + calculations + payout
+integration: doc-manual equipment_rentals rows
+feat(profile): My Earnings + My Work sections
+test: E2E I5 flows
 ```
-
-**This is the standard to match for I5.**
