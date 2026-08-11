@@ -1,6 +1,12 @@
 // /app/api/franchize/rental-photo-upload/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { uploadRentalPhoto } from "@/app/rentals/photo-actions";
+// I3 hotfix (C3): validate caller identity via signed cookie — no longer trust
+// client-supplied uploaderUserId (anyone could POST with someone else's id).
+import {
+  TELEGRAM_ACTOR_COOKIE,
+  verifyTelegramActorCookieValue,
+} from "@/lib/telegram-actor-cookie";
 
 /**
  * POST /api/franchize/rental-photo-upload
@@ -9,35 +15,37 @@ import { uploadRentalPhoto } from "@/app/rentals/photo-actions";
  *   - file:        the image file (will be compressed server-side via sharp)
  *   - rentalId:    UUID of the rental
  *   - photoType:   "start" | "end"
- *   - uploaderUserId: user ID of the uploader
- *   - uploaderRole:    "renter" | "operator" | "admin" | "owner"
  *   - source:      "webapp" | "operator_ui" | "drag_drop"
  *   - notes?:      optional notes (e.g. damage description)
  *
  * Returns: { success, photoId?, deduped?, error? }
  *
- * Auth: the server action validates that the uploader is authorized
- * (renter or crew member of the bike's crew). No separate auth here —
- * the server action is the source of truth.
+ * I3 hotfix (C3): caller identity is now extracted from the signed
+ * `cartest_tg_actor` cookie. The client no longer sends `uploaderUserId` or
+ * `uploaderRole` — the server derives both:
+ *   - userId = from verified cookie
+ *   - role = from user's relationship to the rental (renter/owner/operator)
  *
- * Used by:
- *   - RentalPhotoGallery component (rental detail page)
- *   - Closure modal "Добавить фото ПОСЛЕ" button (I3)
- *   - Pickup confirmation "Добавить фото ДО" button (I3)
+ * This prevents auth bypass where anyone could POST with a forged user_id.
  */
 export async function POST(request: NextRequest) {
   try {
+    // ── C3: Verify caller identity from signed cookie ──
+    const cookieStore = request.cookies;
+    const actorCookie = cookieStore.get(TELEGRAM_ACTOR_COOKIE)?.value;
+    const callerUserId = verifyTelegramActorCookieValue(actorCookie);
+
+    if (!callerUserId) {
+      return NextResponse.json(
+        { error: "Unauthorized — нужен вход через Telegram WebApp." },
+        { status: 401 },
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
     const rentalId = formData.get("rentalId") as string | null;
     const photoType = formData.get("photoType") as "start" | "end" | null;
-    const uploaderUserId = formData.get("uploaderUserId") as string | null;
-    const uploaderRole = formData.get("uploaderRole") as
-      | "renter"
-      | "operator"
-      | "admin"
-      | "owner"
-      | null;
     const source = (formData.get("source") as string | null) || "webapp";
     const notes = (formData.get("notes") as string | null) || undefined;
 
@@ -45,9 +53,9 @@ export async function POST(request: NextRequest) {
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: "file is required" }, { status: 400 });
     }
-    if (!rentalId || !photoType || !uploaderUserId || !uploaderRole) {
+    if (!rentalId || !photoType) {
       return NextResponse.json(
-        { error: "rentalId, photoType, uploaderUserId, uploaderRole are required" },
+        { error: "rentalId and photoType are required" },
         { status: 400 },
       );
     }
@@ -57,24 +65,18 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    if (!["renter", "operator", "admin", "owner"].includes(uploaderRole)) {
-      return NextResponse.json(
-        { error: "uploaderRole must be renter|operator|admin|owner" },
-        { status: 400 },
-      );
-    }
 
     // Read file into Buffer for the server action
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    // C4: uploaderRole is NOT passed from client — server derives it in validateUpload
     const result = await uploadRentalPhoto({
       rentalId,
       photoType,
       file: buffer,
       mimeType: file.type || "image/jpeg",
-      uploaderUserId,
-      uploaderRole,
+      uploaderUserId: callerUserId, // C3: from verified cookie, not form data
       source: source as "webapp" | "operator_ui" | "drag_drop",
       notes,
     });
