@@ -13,6 +13,13 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // I3 hotfix (C2): sharp is a native Node module — must be external so
+  // webpack doesn't try to bundle sharp.node. Without this, the server action
+  // uploadRentalPhoto (which imports sharp) fails at build/runtime with
+  // "Module not found: Can't resolve …/build/Release/sharp.node".
+  experimental: {
+    serverComponentsExternalPackages: ['sharp'],
+  },
   // Note: server-assets fonts are bundled automatically without explicit tracing
   // Disabled experimental features to reduce memory usage during build
   // Disable source maps in production to reduce memory usage
@@ -27,6 +34,8 @@ const nextConfig = {
       config.externals.push('pdf-lib', '@pdf-lib/fontkit');
       // Also mark heavy ML libraries as external to avoid memory issues during build
       config.externals.push('@xenova/transformers', '@huggingface/transformers');
+      // I3 hotfix (C2): belt + suspenders — also push sharp to externals
+      config.externals.push('sharp');
     }
     return config;
   },
@@ -88,3 +97,4 @@ function mergeConfig(nextConfig, userConfig) {
 }
 
 export default nextConfig
+
