@@ -68,7 +68,7 @@ BEGIN
   -- Only fire on transition TO 'completed'
   IF NEW.status = 'completed' AND (OLD IS NULL OR OLD.status != 'completed') THEN
     -- For each deposit_collected entry, create a matching deposit_returned entry
-    — UNLESS one already exists (idempotency guard added 2026-08-11, I1 hotfix).
+    -- UNLESS one already exists (idempotency guard added 2026-08-11, I1 hotfix).
     --
     -- The guard matches on (rental_id, destination, amount) — same triple the
     -- cancel path uses. A genuinely different re-collection (e.g. operator
