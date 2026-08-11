@@ -10,8 +10,7 @@ import {
   initiateTelegramRentalPhotoUpload,
   abortRental,
 } from "@/app/rentals/actions";
-// I3: import the photo gallery component for the closure modal
-import { RentalPhotoGallery } from "./RentalPhotoGallery";
+// Photo gallery import removed — gallery is only on the rental detail page, not in the closure modal
 
 interface FranchizeRentalLifecycleActionsProps {
   rentalId: string;
@@ -558,28 +557,9 @@ export function FranchizeRentalLifecycleActions({
               </label>
             </div>
 
-            {/* ── I3: Photo gallery in closure modal ──
-                Shows existing ПОСЛЕ photos + lets operator add more.
-                v1 decision (PRD §4.2): non-blocking. If 0 photos, operator can
-                still close — but a yellow warning is shown in the gallery.
-                I3 hotfix (M6): initialStartCount/initialEndCount default to 0
-                here because the lifecycle component doesn't have the rental's
-                photo counts as props. The gallery will fetch the list on mount
-                (acceptable — modal is opened on demand, not on every page load). */}
-            <div className="mt-3">
-              <span className="text-xs font-semibold" style={{ color: "var(--lifecycle-muted)" }}>
-                Фото байка (ДО / ПОСЛЕ)
-              </span>
-              <div className="mt-1.5">
-                <RentalPhotoGallery
-                  rentalId={rentalId}
-                  initialStartCount={0}
-                  initialEndCount={0}
-                  canUpload={role === "owner" || role === "member"}
-                  compact={false}
-                />
-              </div>
-            </div>
+            {/* Photo gallery removed from closure modal (user request — modal
+                was too big, didn't fit screen height). Photos are managed on
+                the rental detail page itself, not in the closure modal. */}
 
             <div className="mt-5 flex gap-2">
               <button
