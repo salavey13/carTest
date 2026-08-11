@@ -694,53 +694,10 @@ export async function getRentalReturnTodos(
       } catch { return false; }
     });
 
-    // ── I4 enhancement: also read rental metadata for equipment info ──
-    // If the rental has equipment (helmets, gloves, etc.) in its contract
-    // metadata but no corresponding accessory todos in crew_todos (e.g. rental
-    // was created before the todo-creation fix, or accessories were added
-    // after rental creation), generate them on-the-fly.
-    const { data: rental } = await supabaseAdmin
-      .from("rentals")
-      .select("metadata, vehicle_id, vehicles:cars(make, model)")
-      .eq("rental_id", rentalId)
-      .maybeSingle();
-
-    if (rental?.metadata) {
-      const meta = rental.metadata as Record<string, any>;
-      // Equipment can be in metadata.equipment (from contract vars) or
-      // metadata.handoff_equipment (from rental_handoffs)
-      const eq = meta.equipment || meta.handoff_equipment || {};
-      const existingTitles = rentalTodos.map(t => t.title.toLowerCase());
-      const vehicle = rental.vehicles as any;
-      const bikeName = vehicle ? `${vehicle.make} ${vehicle.model}` : "байк";
-
-      const accessoryItems: Array<{ title: string; priority: "low" | "medium" }> = [];
-      if (eq.helmets && Number(eq.helmets) > 0) {
-        accessoryItems.push({ title: `🪖 Принять ${eq.helmets} шлем(а/ов)`, priority: "medium" });
-      }
-      if (eq.gloves && Number(eq.gloves) > 0) {
-        accessoryItems.push({ title: `🧤 Принять ${eq.gloves} перчатки`, priority: "low" });
-      }
-      if (eq.jacket) accessoryItems.push({ title: `🧥 Принять куртку`, priority: "low" });
-      if (eq.boots) accessoryItems.push({ title: `👢 Принять боты`, priority: "low" });
-      if (eq.net) accessoryItems.push({ title: `🌐 Принять сетку`, priority: "low" });
-      if (eq.backpack) accessoryItems.push({ title: `👜 Принять рюкзак`, priority: "low" });
-      if (eq.bag) accessoryItems.push({ title: `👜 Принять сумку`, priority: "low" });
-      if (eq.charger) accessoryItems.push({ title: `🔌 Принять зарядное устройство`, priority: "medium" });
-
-      // Add items that don't already exist in the DB todos
-      for (const item of accessoryItems) {
-        if (!existingTitles.some(t => t.includes(item.title.toLowerCase().replace(/^[^\s]+\s/, "")))) {
-          rentalTodos.push({
-            id: `synthetic-${item.title}`,  // synthetic ID (not in DB)
-            title: item.title,
-            status: "pending",
-            priority: item.priority,
-            category: "lead_followup",
-          } as any);
-        }
-      }
-    }
+    // NOTE: accessory/return todos live ONLY in crew_todos (created by
+    // createLeadFollowupTodos during /doc contract generation). Do NOT
+    // synthesize them here from rentals.metadata — metadata.equipment is kept
+    // for analytics/reference only and must not drive todo generation.
 
     return {
       success: true,

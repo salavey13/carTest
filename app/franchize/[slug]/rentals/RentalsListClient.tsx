@@ -232,23 +232,43 @@ export function RentalsListClient({ initialSlug, crew }: RentalsListClientProps)
                       )}
                     </div>
                   </div>
-                  {rental.isTestRide ? (
-                    <span style={T.styles.accentBadge} className="rounded-full px-2 py-0.5 text-[10px] whitespace-nowrap">
-                      Тест-драйв
-                    </span>
-                  ) : (
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[10px] whitespace-nowrap"
-                      style={{
-                        ...T.styles.accentPill,
-                        opacity: isActiveStatus(rental.status) ? 1 : 0.6,
-                        ...(rental.status === "expired" ? { backgroundColor: T.borderSoft, color: T.textMuted } : {}),
-                      }}
-                    >
-                      {statusLabel(rental.status)}
-                    </span>
-                  )}
+                  <div className="flex flex-col items-end gap-1">
+                    {rental.isTestRide ? (
+                      <span style={T.styles.accentBadge} className="rounded-full px-2 py-0.5 text-[10px] whitespace-nowrap">
+                        Тест-драйв
+                      </span>
+                    ) : (
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[10px] whitespace-nowrap"
+                        style={{
+                          ...T.styles.accentPill,
+                          opacity: isActiveStatus(rental.status) ? 1 : 0.6,
+                          ...(rental.status === "expired" ? { backgroundColor: T.borderSoft, color: T.textMuted } : {}),
+                        }}
+                      >
+                        {statusLabel(rental.status)}
+                      </span>
+                    )}
+                    {(rental.pendingTodos ?? 0) > 0 && (
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[10px] whitespace-nowrap"
+                        style={{ ...T.styles.accentPill, opacity: 0.85 }}
+                        title="Невыполненные задачи по возврату"
+                      >
+                        📋 {rental.pendingTodos}
+                      </span>
+                    )}
+                  </div>
                 </div>
+                {(rental.todos?.length ?? 0) > 0 && (
+                  <div className="mt-2 space-y-1 border-t pt-2" style={{ borderColor: T.borderSoft }}>
+                    {rental.todos!.map((todo) => (
+                      <p key={todo.id} className="text-[11px] leading-snug" style={{ color: T.textMuted }}>
+                        {todo.title}
+                      </p>
+                    ))}
+                  </div>
+                )}
                 {isActiveStatus(rental.status) && (
                   <div className="mt-2 flex items-center justify-end gap-2 border-t pt-2"
                     style={{ borderColor: T.borderSoft }}>
