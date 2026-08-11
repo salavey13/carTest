@@ -3,7 +3,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Camera, X, Upload, AlertCircle, Loader2 } from "lucide-react";
-import { useAppContext } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { reduceImageResolution } from "@/lib/client-image-compress";
 
@@ -57,7 +56,8 @@ export function RentalPhotoGallery({
   canUpload,
   compact = false,
 }: RentalPhotoGalleryProps) {
-  const { dbUser } = useAppContext();
+  // I3 hotfix (C3): no longer use useAppContext/dbUser — caller identity is
+  // verified server-side via the signed `cartest_tg_actor` cookie.
   const [startPhotos, setStartPhotos] = useState<Photo[]>([]);
   const [endPhotos, setEndPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,11 +67,12 @@ export function RentalPhotoGallery({
   const [lightboxList, setLightboxList] = useState<Photo[]>([]);
 
   const loadPhotos = useCallback(async () => {
-    if (!dbUser?.user_id) return;
+    // I3 hotfix (C3): no longer send requesterUserId — the API route reads
+    // caller identity from the signed `cartest_tg_actor` cookie.
     setLoading(true);
     try {
       const resp = await fetch(
-        `/api/franchize/rental-photos?rentalId=${rentalId}&requesterUserId=${dbUser.user_id}`,
+        `/api/franchize/rental-photos?rentalId=${rentalId}`,
       );
       if (resp.ok) {
         const data = await resp.json();
@@ -86,19 +87,18 @@ export function RentalPhotoGallery({
     } finally {
       setLoading(false);
     }
-  }, [rentalId, dbUser?.user_id]);
+  }, [rentalId]);
 
-  useEffect(() => {
-    loadPhotos();
-  }, [loadPhotos]);
-
-  // Load photos on mount if there are any (only fetch full list if counts > 0,
-  // to avoid unnecessary API calls for rentals with no photos)
+  // I3 hotfix (M5): only fetch the full photo list if there are photos to fetch.
+  // The initial counts come from server-side render (rental.start_photo_count /
+  // rental.end_photo_count). If both are 0, skip the API call entirely.
   useEffect(() => {
     if (initialStartCount === 0 && initialEndCount === 0) {
       setLoading(false);
+      return;
     }
-  }, [initialStartCount, initialEndCount]);
+    loadPhotos();
+  }, [loadPhotos, initialStartCount, initialEndCount]);
 
   // Keyboard navigation in lightbox
   useEffect(() => {
@@ -118,11 +118,9 @@ export function RentalPhotoGallery({
   }, [lightboxPhoto, lightboxIndex, lightboxList]);
 
   const handleUpload = async (photoType: "start" | "end", file: File) => {
-    if (!dbUser?.user_id) {
-      toast.error("Нужна авторизация в Telegram WebApp.");
-      return;
-    }
-
+    // I3 hotfix (C3): no longer check dbUser here — the API route reads caller
+    // identity from the signed cookie. If the cookie is missing/invalid, the
+    // API returns 401 and we show the error toast.
     setUploadingType(photoType);
     try {
       // 1. Client-side compress (1600px, q80) — keeps upload payload small
@@ -131,17 +129,14 @@ export function RentalPhotoGallery({
         type: "image/jpeg",
       });
 
-      // 2. Determine uploader role (simplified — assume 'renter' if not crew admin)
-      //    The server action will do the real auth check anyway.
-      const uploaderRole = "renter"; // server action validates + corrects if needed
+      // I3 hotfix (C4): uploaderRole is NOT sent — server derives it in validateUpload.
+      // I3 hotfix (C3): uploaderUserId is NOT sent — server reads it from signed cookie.
 
-      // 3. Upload
+      // 2. Upload
       const formData = new FormData();
       formData.append("file", compressedFile);
       formData.append("rentalId", rentalId);
       formData.append("photoType", photoType);
-      formData.append("uploaderUserId", dbUser.user_id);
-      formData.append("uploaderRole", uploaderRole);
       formData.append("source", "webapp");
 
       const resp = await fetch("/api/franchize/rental-photo-upload", {
@@ -239,8 +234,9 @@ export function RentalPhotoGallery({
         />
       </div>
 
-      {/* Soft warning when both are empty (v1: non-blocking) */}
-      {startPhotos.length === 0 && endPhotos.length === 0 && (
+      {/* Soft warning when both are empty (v1: non-blocking).
+          I3 hotfix (M4): hidden in compact mode — analytics drawer can't act on it. */}
+      {!compact && startPhotos.length === 0 && endPhotos.length === 0 && (
         <div
           className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs"
           style={{ color: "var(--franchize-text-secondary, #999)" }}
