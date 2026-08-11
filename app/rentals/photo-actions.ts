@@ -50,6 +50,10 @@ export interface UploadRentalPhotoInput {
   source: "webapp" | "bot" | "operator_ui" | "drag_drop";
   /** Optional notes (e.g. damage description for ПОСЛЕ photos). */
   notes?: string;
+  /** I4: damage_note — operator marks a ПОСЛЕ photo as evidence of new damage
+   *  with a description. Stored in metadata.damage_note. Surfaces in the
+   *  gallery as a red badge on the thumbnail + in the lightbox. */
+  damageNote?: string;
 }
 
 export interface UploadRentalPhotoResult {
@@ -245,7 +249,7 @@ async function validateUpload(
 export async function uploadRentalPhoto(
   input: UploadRentalPhotoInput,
 ): Promise<UploadRentalPhotoResult> {
-  const { rentalId, photoType, file, mimeType, uploaderUserId, source, notes } = input;
+  const { rentalId, photoType, file, mimeType, uploaderUserId, source, notes, damageNote } = input;
   // I3 hotfix (C4): ignore client-supplied uploaderRole — derive from auth
   // The `input.uploaderRole` field is kept for backward compat but not read.
 
@@ -336,7 +340,11 @@ export async function uploadRentalPhoto(
         uploaded_by: uploaderUserId,
         uploader_role: derivedRole, // C4: server-derived, not client-supplied
         source,
-        metadata: notes ? { notes } : {},
+        // I4: store notes + damage_note in metadata JSONB
+        metadata: {
+          ...(notes ? { notes } : {}),
+          ...(damageNote ? { damage_note: damageNote } : {}),
+        },
       })
       .select("id")
       .single();
