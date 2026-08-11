@@ -763,6 +763,10 @@ interface DocFlowContext {
   // Which bank card the bank portion went to (mirrors depositCardDestination).
   // Set by paydest_tbank / paydest_sber / paysplit_tbank / paysplit_sber callbacks.
   paymentCardDestination?: 'tbank' | 'sber';
+  // I4 code-review fix: when operator overrides the price, this flag prevents
+  // gotoPaymentSplit + all pay_* handlers + createRentalFromDocContract from
+  // re-calculating the price from scratch and discarding the override.
+  priceOverridden?: boolean;
 
   // ── Deposit destination (added 2026-08-10) ────────────────────────────────
   // Tracks WHERE the deposit was collected: cash, T-Bank card, Sber card, or split.
@@ -1457,7 +1461,11 @@ async function createRentalFromDocContract(
     const backpackEq = context.backpack ? 1 : 0;
     const bagEq = context.bag ? 1 : 0;
     const equipmentCostTotal = helmetsEq * getHelmetPrice(hours) + glovesEq * 500 + jacketEq * 500 + bootsEq * 500 + netEq * 500 + backpackEq * 500 + bagEq * 500;
-    const totalCost = baseRentalCost + equipmentCostTotal;
+    // CR fix: if operator overrode the price, use the overridden value
+    // (cashAmount + bankAmount) instead of the recalculated total.
+    const totalCost = context.priceOverridden
+      ? (context.cashAmount || 0) + (context.bankAmount || 0)
+      : (baseRentalCost + equipmentCostTotal);
 
     logger.info('[/doc] createRentalFromDocContract: pricing', {
       dailyPrice,
@@ -1508,6 +1516,23 @@ async function createRentalFromDocContract(
         daily_price: dailyPrice,
         created_by: 'doc-manual',
         doc_sha256: docSha256,
+        // CR fix: store equipment in metadata so getRentalReturnTodos can
+        // generate accessory return-checklist items for this rental.
+        equipment: {
+          helmets: context.helmets || 0,
+          gloves: context.gloves || 0,
+          jacket: context.jacket || false,
+          boots: context.boots || false,
+          net: context.net || false,
+          backpack: context.backpack || false,
+          bag: context.bag || false,
+          charger: context.charger || false,
+        },
+        // CR fix: record if the operator overrode the calculated price
+        price_overridden: context.priceOverridden || false,
+        price_override_amount: context.priceOverridden
+          ? (context.cashAmount || 0) + (context.bankAmount || 0)
+          : null,
       },
     };
 
@@ -2542,11 +2567,20 @@ async function gotoPaymentSplit(chatId: number, userId: string, context: DocFlow
   const bag = context.bag ? 1 : 0;
 
   const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
-  const totalAmount = rentalCost + equipmentCost;
+  const calculatedTotal = rentalCost + equipmentCost;
 
-  // Store total in context for later use
-  context.cashAmount = totalAmount; // Default to all cash
-  context.bankAmount = 0;
+  // CR fix: if operator overrode the price, use the overridden value instead
+  // of the recalculated total. Without this, gotoPaymentSplit silently discards
+  // the override and the operator's custom price is lost.
+  const totalAmount = context.priceOverridden
+    ? (context.cashAmount || 0) + (context.bankAmount || 0)
+    : calculatedTotal;
+
+  // Store total in context for later use (only if not overridden — don't clobber)
+  if (!context.priceOverridden) {
+    context.cashAmount = totalAmount; // Default to all cash
+    context.bankAmount = 0;
+  }
 
   await setState(userId, "payment_split", context);
 
@@ -3054,6 +3088,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     // Override the cash/bank amounts to reflect the new total (default all cash)
     context.cashAmount = newPrice;
     context.bankAmount = 0;
+    context.priceOverridden = true;  // CR fix: flag prevents re-calc from discarding override
     logger.info(`[/doc] price_override: ${userId} → new price=${newPrice}`);
     // Re-show the payment split with the new price
     await gotoPaymentSplit(chatId, userId, context);
@@ -3120,7 +3155,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
     const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
-    const totalAmount = rentalCost + equipmentCost;
+    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : (rentalCost + equipmentCost);
     context.cashAmount = Math.min(cashAmount, totalAmount);
     context.bankAmount = Math.max(0, totalAmount - cashAmount);
     logger.info(`[/doc] payment_cash: ${userId} → cash=${context.cashAmount}, bank=${context.bankAmount}`);
@@ -3175,7 +3210,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
     const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
-    const totalAmount = rentalCost + equipmentCost;
+    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : (rentalCost + equipmentCost);
     context.cashAmount = Math.min(cashAmount, totalAmount);
     context.bankAmount = Math.max(0, totalAmount - cashAmount);
     logger.info(`[/doc] payment_split_cash: ${userId} → cash=${context.cashAmount}, bank=${context.bankAmount}, asking which card`);
@@ -3755,7 +3790,7 @@ export async function handleDocCallback(
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
     const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
-    const totalAmount = rentalCost + equipmentCost;
+    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : (rentalCost + equipmentCost);
     context.cashAmount = totalAmount;
     context.bankAmount = 0;
     logger.info(`[/doc] pay_all_cash: ${userId} → cash=${totalAmount}, bank=0`);
@@ -3812,7 +3847,7 @@ export async function handleDocCallback(
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
     const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
-    const totalAmount = rentalCost + equipmentCost;
+    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : (rentalCost + equipmentCost);
     context.cashAmount = 0;
     context.bankAmount = totalAmount;
     context.paymentCardDestination = dest;
@@ -3860,7 +3895,7 @@ export async function handleDocCallback(
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
     const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
-    const totalAmount = rentalCost + equipmentCost;
+    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : (rentalCost + equipmentCost);
     logger.info(`[/doc] paydest_split: ${userId} → asking for cash portion (total=${totalAmount})`);
     // Use payment_split_cash state (separate from payment_cash) so we can ask
     // which card the bank portion goes to after the cash amount is typed.
