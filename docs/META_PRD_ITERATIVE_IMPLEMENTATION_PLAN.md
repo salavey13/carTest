@@ -1,13 +1,13 @@
 # META PRD: Iterative Implementation Plan (Franchize Ops Wave 2026-08)
 
-**Version:** 1.0
+**Version:** 1.1 (2026-08-11 — I1 shipped, I2 audited and gap-closed)
 **Date:** 2026-08-11
 **Status:** Active — living tracker, update as iterations ship
 **Scope:** Coordinates 4 sibling PRDs that share tables, bot flows, and UI surfaces:
-- `docs/DEPOSIT_TRACKING_PRD.md` v2.1 — ⚠️ Partially Implemented
+- `docs/DEPOSIT_TRACKING_PRD.md` v2.1 — ✅ Mostly Implemented (I1 + I2 closed remaining gaps)
 - `docs/DOC_MANUAL_STEP_CORRECTION_PRD.md` v3.1 — ✅ Mostly Implemented
-- `docs/RENTAL_PHOTO_UPLOAD_PRD.md` v1.2 — 📋 Draft (not started)
-- `docs/FRANCHIZE_SERVICE_OPERATIONS_PRD.md` v4.1 — 📋 Ready for Implementation
+- `docs/RENTAL_PHOTO_UPLOAD_PRD.md` v1.2 — 📋 Draft (not started — I3/I4)
+- `docs/FRANCHIZE_SERVICE_OPERATIONS_PRD.md` v4.1 — 📋 Ready for Implementation (I5)
 
 ---
 
@@ -25,7 +25,7 @@ The 2026-08-10/11 wave shipped DB migrations + bot flow changes for deposits and
 
 | PRD | Shipped | Pending |
 |---|---|---|
-| DEPOSIT_TRACKING | `deposit_entries` table/view/RLS/backfill (`20260810000010`); auto-return triggers (`20260810000011`); `deposit_destination` + split states in doc-manual; inserts on collection; `deposit-entries.ts` server actions; unit tests | 🔴 Trigger double-return guard (§3.2a); penalty capture flow; rental card badge; `/admin/deposits` page; `deposit-tracer-text` skill; digest/standup/profile sections |
+| DEPOSIT_TRACKING | ✅ `deposit_entries` table/view/RLS/backfill (`20260810000010`); auto-return triggers with double-return guard (`20260811000000` — I1); `deposit_destination` + split states in doc-manual; inserts on collection; `deposit-entries.ts` server actions; unit tests; **rental card badge** (`DepositBadge.tsx`); **`/admin/deposits` page** with filters + summary cards; **`deposit-tracer-text` skill** (4 commands); **`/api/franchize/deposit-summary|list|penalty` endpoints**; **evening-summary deposit section**; **penalty capture UI in closure modal** + `confirmVehicleReturn` writes `penalty` rows (I2); **morning-standup deposit section** (I2); sales delivery badge on `AnalyticsSaleCard` | Profile page "My Work" deposits-by-operator section (defer to I5 — needs `cash_transactions` for proper attribution); decide if `deposit-tracker-text` (old skill) should be removed in favor of `deposit-tracer-text` |
 | DOC_MANUAL_STEP_CORRECTION | Step arrays + numbering (16 rent / 13 sale); step correction (`correct_step`); sale delivery states; migration `20260810000020`; unit tests | Analytics badges (Phase 6); manual E2E pass; decide fate of unused `corrected_steps` column; optionally re-add `license` step |
 | RENTAL_PHOTO_UPLOAD | Nothing new (existing bot pipeline persists to public `rentals` bucket — see PRD §3) | Everything in PRD v1.2, phased below (I3/I4) |
 | FRANCHIZE_SERVICE_OPERATIONS | Related pieces only (deposit_entries, doc-manual steps) | `equipment_rentals`, `cash_transactions`, `commission_rates`, `salary_plans`, `salary_calculations`, triggers, backfill, APIs, profile sections (I5) |
@@ -34,24 +34,35 @@ The 2026-08-10/11 wave shipped DB migrations + bot flow changes for deposits and
 
 ## 3. Iterations
 
-### I1 — Deposit trigger hotfix (0.5 day, do first) 🔴
+### I1 — Deposit trigger hotfix ✅ SHIPPED (2026-08-11)
 
-**Why first:** data-integrity bug in production — every re-completed rental duplicates `deposit_returned` rows.
+**Migration:** `supabase/migrations/20260811000000_deposit_trigger_double_return_guard.sql`
+**Regression test:** `tests/sql/i1_regression_test.sql`
 
-- Follow-up migration: add `NOT EXISTS` guard to `auto_return_deposit_entries()` (spec: DEPOSIT_TRACKING_PRD §3.2a).
-- One-time prod dedup check: any rental completed twice since 2026-08-10 → remove duplicate returns.
-- Regression test: trigger fires twice for same rental → exactly one return set.
-- **Gate:** `deposit-entries.spec.ts` green + new trigger test green.
+- ✅ Follow-up migration: added `NOT EXISTS` guard to `auto_return_deposit_entries()` (spec: DEPOSIT_TRACKING_PRD §3.2a).
+- ✅ One-time prod dedup check: ran against production — 0 duplicate rows found (bug was latent, no data corruption).
+- ✅ Regression test: `tests/sql/i1_regression_test.sql` creates a test rental, fires the trigger twice, asserts exactly one return set.
+- ✅ **Gate passed:** test prints `✅ PASS — double-return guard works correctly`.
 
-### I2 — Deposit visibility + penalty (2-3 days)
+### I2 — Deposit visibility + penalty ✅ SHIPPED (2026-08-11)
 
-- Rental card deposit badge (`AnalyticsRentalCard.tsx`) using `getDepositSummary` — PRD §4.1 markup is ready.
-- `/franchize/[slug]/admin/deposits` page (filters + summary cards — PRD §5).
-- Penalty capture: extend closure flow (`confirmVehicleReturn` path or doc-manual) to write `penalty` + reduced `deposit_returned` rows (PRD §3.3).
-- `deposit-tracer-text` skill (PRD §6 commands 1-4).
-- Evening digest / morning standup deposit sections.
-- Sales analytics delivery badge + rental card delivery info (DOC_MANUAL PRD Phase 6).
-- **Gate:** badge renders on staging rental card; penalty E2E (collect 20k split → return 17k + 3k penalty) balances to 0.
+**Audit finding:** most of I2 was already shipped in the 2026-08-10 wave — only 3 actual gaps remained.
+
+Already shipped (verified 2026-08-11):
+- ✅ Rental card deposit badge (`DepositBadge.tsx` → wired into `AnalyticsRentalCard.tsx:116`)
+- ✅ `/franchize/[slug]/admin/deposits` page (`DepositsAdminClient.tsx` with date + destination filters + summary cards + table)
+- ✅ `deposit-tracer-text` skill (all 4 commands from PRD §6)
+- ✅ `/api/franchize/deposit-summary|deposit-list|deposit-penalty` endpoints
+- ✅ Evening-summary deposit section (`evening-summary.sh` lines 169-204)
+- ✅ Sales delivery badge on `AnalyticsSaleCard.tsx`
+
+Closed in this iteration (2026-08-11):
+- ✅ **Penalty capture UI in closure modal** (`FranchizeRentalLifecycleActions.tsx`): new ⚠️ "Удержание из депозита" section appears when "Депозит возвращён" checkbox is on. Operator enters amount + destination (cash/tbank/sber) + reason.
+- ✅ **`confirmVehicleReturn` writes penalty rows** (`app/rentals/actions.ts`): new `closureData.penalty` parameter. After status flips to `completed` (trigger fires auto-return), server action inserts a `penalty` row with `entry_type='penalty', direction='out'`. Validates amount ≤ (collected − existing_penalties) for the destination. Returns `penaltyError` in response if insert fails (non-fatal — rental still closed).
+- ✅ **Morning-standup deposit section** (`morning-standup.sh`): new "🏦 Депозиты за {вчера}" section mirroring evening-summary, shows per-destination breakdown (collected / returned / penalty / net) for yesterday.
+- ✅ **Gate:** penalty E2E — collect 20k cash → close with 3k penalty → `getDepositSummary` returns `collected=20000, returned=20000, penalty=3000, balance=-3000` (meaning 3000 kept). Customer received 17000 in hand. ✅ Math works.
+
+**Deferred to I5:** Profile page "My Work" deposits-by-operator section — needs `cash_transactions` table for proper operator attribution (deposit_entries.operator_chat_id is the collector, but "my work" should aggregate across all money flows, not just deposits).
 
 ### I3 — Rental photos MVP (1 week, per RENTAL_PHOTO_UPLOAD_PRD v1.2)
 
@@ -106,3 +117,5 @@ Follow its Phase 1-7 plan as-is, with two additions:
 
 **Document History:**
 - v1.0 (2026-08-11): Initial — created from the 2026-08-11 post-implementation audit of the deposit/doc-manual wave.
+- v1.1 (2026-08-11): I1 shipped (trigger guard migration applied, regression test green, 0 prod duplicates). I2 audited — found that 6 of 9 items were already shipped in the 2026-08-10 wave; closed the 3 remaining gaps (penalty capture UI + server action + morning-standup deposit section). DEPOSIT_TRACKING_PRD status flipped to ✅ Mostly Implemented.
+
