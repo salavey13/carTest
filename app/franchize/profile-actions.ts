@@ -36,8 +36,15 @@ export type FranchizeFormPrefill = {
   comment: string;
 };
 
+export type FranchizeRentalTodoSummary = {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+};
+
 export type FranchizeActivityDigest = {
-  rentals: Array<{ rentalId: string; status: string; paymentStatus: string; isTestRide: boolean; vehicleId: string; vehicleLabel: string; vehicleImage: string | null; agreedStartDate: string | null; agreedEndDate: string | null; docLink: string }>;
+  rentals: Array<{ rentalId: string; status: string; paymentStatus: string; isTestRide: boolean; vehicleId: string; vehicleLabel: string; vehicleImage: string | null; agreedStartDate: string | null; agreedEndDate: string | null; docLink: string; pendingTodos?: number; todos?: FranchizeRentalTodoSummary[] }>;
   buyOrders: Array<{ orderId: string; status: string; vehicleIds: string[]; docLink: string; createdAt: string; docFileName?: string }>;
 };
 
@@ -424,6 +431,30 @@ export async function getFranchizeCrewRentalsListAction(params: {
       .order("created_at", { ascending: false })
       .limit(50);
 
+    // ── Fetch return todos (accessories + basic checks) from crew_todos ──
+    // crew_todos is the single source of truth for return tasks — todos are
+    // created by createLeadFollowupTodos() during /doc contract generation.
+    // rentals.metadata.equipment is intentionally NOT read (analytics only).
+    const rentalIds = (rentals || []).map((r: any) => r.rental_id).filter(Boolean);
+    const todosByRental = new Map<string, FranchizeRentalTodoSummary[]>();
+    if (rentalIds.length > 0) {
+      const { data: todos } = await supabaseAdmin
+        .from("crew_todos")
+        .select("id, rental_id, title, status, priority")
+        .eq("crew_id", crew.id)
+        .eq("category", "lead_followup")
+        .in("rental_id", rentalIds)
+        .neq("status", "done")
+        .order("created_at", { ascending: true });
+
+      for (const t of todos || []) {
+        if (!t.rental_id) continue;
+        const list = todosByRental.get(t.rental_id) || [];
+        list.push({ id: t.id, title: t.title, status: t.status, priority: t.priority });
+        todosByRental.set(t.rental_id, list);
+      }
+    }
+
     const now = Date.now();
     const RENTAL_END_GRACE_MS = 24 * 60 * 60 * 1000; // 24h grace (matches actions-runtime.ts)
     const result = (rentals || []).map((r: any) => {
@@ -448,6 +479,8 @@ export async function getFranchizeCrewRentalsListAction(params: {
         agreedStartDate: r.agreed_start_date || null,
         agreedEndDate: r.agreed_end_date || null,
         docLink: `/franchize/${slug}/rental/${r.rental_id}`,
+        pendingTodos: (todosByRental.get(r.rental_id) || []).length,
+        todos: todosByRental.get(r.rental_id) || [],
       };
     });
 
