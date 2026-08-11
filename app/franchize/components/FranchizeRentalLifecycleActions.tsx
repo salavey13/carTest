@@ -561,7 +561,11 @@ export function FranchizeRentalLifecycleActions({
             {/* ── I3: Photo gallery in closure modal ──
                 Shows existing ПОСЛЕ photos + lets operator add more.
                 v1 decision (PRD §4.2): non-blocking. If 0 photos, operator can
-                still close — but a yellow warning is shown in the gallery. */}
+                still close — but a yellow warning is shown in the gallery.
+                I3 hotfix (M6): initialStartCount/initialEndCount default to 0
+                here because the lifecycle component doesn't have the rental's
+                photo counts as props. The gallery will fetch the list on mount
+                (acceptable — modal is opened on demand, not on every page load). */}
             <div className="mt-3">
               <span className="text-xs font-semibold" style={{ color: "var(--lifecycle-muted)" }}>
                 Фото байка (ДО / ПОСЛЕ)
