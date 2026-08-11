@@ -48,6 +48,8 @@ export async function POST(request: NextRequest) {
     const photoType = formData.get("photoType") as "start" | "end" | null;
     const source = (formData.get("source") as string | null) || "webapp";
     const notes = (formData.get("notes") as string | null) || undefined;
+    // I4: optional damage_note — operator marks ПОСЛЕ photo as damage evidence
+    const damageNote = (formData.get("damageNote") as string | null) || undefined;
 
     // Validate required fields
     if (!file || !(file instanceof File)) {
@@ -79,6 +81,7 @@ export async function POST(request: NextRequest) {
       uploaderUserId: callerUserId, // C3: from verified cookie, not form data
       source: source as "webapp" | "operator_ui" | "drag_drop",
       notes,
+      damageNote, // I4: optional damage evidence note
     });
 
     if (!result.success) {
