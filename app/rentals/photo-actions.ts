@@ -257,11 +257,13 @@ export async function uploadRentalPhoto(
     return { success: false, error: "rentalId and file are required." };
   }
 
-  // Pre-compression size guard (reject anything > 10 MB at the input)
-  if (file.length > 10 * 1024 * 1024) {
+  // Pre-compression size guard — I4 enhancement: raised from 10 MB → 25 MB
+  // because modern phones (especially iPhones with HEIC) produce 10-12 MB photos.
+  // The sharp compression pipeline handles them fine.
+  if (file.length > 25 * 1024 * 1024) {
     return {
       success: false,
-      error: "Файл слишком большой (макс. 10 МБ до сжатия).",
+      error: `Файл слишком большой (${Math.round(file.length / 1024 / 1024)} МБ, макс. 25 МБ до сжатия).`,
     };
   }
 
