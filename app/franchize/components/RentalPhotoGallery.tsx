@@ -117,56 +117,91 @@ export function RentalPhotoGallery({
     return () => window.removeEventListener("keydown", handler);
   }, [lightboxPhoto, lightboxIndex, lightboxList]);
 
+  // I4 enhancement: batch upload state — track progress across multiple files
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; fileName: string } | null>(null);
+
   const handleUpload = async (photoType: "start" | "end", file: File) => {
-    // I3 hotfix (C3): no longer check dbUser here — the API route reads caller
-    // identity from the signed cookie. If the cookie is missing/invalid, the
-    // API returns 401 and we show the error toast.
+    // Single-file upload (wrapper around handleBatchUpload for backward compat)
+    await handleBatchUpload(photoType, [file]);
+  };
+
+  // I4 enhancement: batch upload — compress + upload multiple files sequentially.
+  // Sequential (not parallel) to avoid hammering the server + keep progress accurate.
+  // Each file: client compress → POST → toast. At end: refresh photo list + summary toast.
+  const handleBatchUpload = async (photoType: "start" | "end", files: File[]) => {
+    if (files.length === 0) return;
+
     setUploadingType(photoType);
-    try {
-      // 1. Client-side compress (1600px, q80) — keeps upload payload small
-      const compressedBlob = await reduceImageResolution(file);
-      const compressedFile = new File([compressedBlob], file.name.replace(/\.[^.]+$/, ".jpg"), {
-        type: "image/jpeg",
-      });
+    setBatchProgress({ current: 0, total: files.length, fileName: files[0].name });
 
-      // I3 hotfix (C4): uploaderRole is NOT sent — server derives it in validateUpload.
-      // I3 hotfix (C3): uploaderUserId is NOT sent — server reads it from signed cookie.
+    let successCount = 0;
+    let dedupCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
 
-      // 2. Upload
-      const formData = new FormData();
-      formData.append("file", compressedFile);
-      formData.append("rentalId", rentalId);
-      formData.append("photoType", photoType);
-      formData.append("source", "webapp");
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setBatchProgress({ current: i + 1, total: files.length, fileName: file.name });
 
-      const resp = await fetch("/api/franchize/rental-photo-upload", {
-        method: "POST",
-        body: formData,
-      });
-      const result = await resp.json();
+      try {
+        // 1. Client-side compress (1400px, q70 — I4 enhancement: lowered from 1600/0.80)
+        const compressedBlob = await reduceImageResolution(file);
+        const compressedFile = new File([compressedBlob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+          type: "image/jpeg",
+        });
 
-      if (!resp.ok || !result.success) {
-        toast.error(result.error || "Не удалось загрузить фото.");
-        return;
+        // 2. Upload
+        const formData = new FormData();
+        formData.append("file", compressedFile);
+        formData.append("rentalId", rentalId);
+        formData.append("photoType", photoType);
+        formData.append("source", "webapp");
+
+        const resp = await fetch("/api/franchize/rental-photo-upload", {
+          method: "POST",
+          body: formData,
+        });
+        const result = await resp.json();
+
+        if (!resp.ok || !result.success) {
+          errorCount++;
+          errors.push(`${file.name}: ${result.error || "ошибка"}`);
+        } else if (result.deduped) {
+          dedupCount++;
+        } else {
+          successCount++;
+        }
+      } catch (err: any) {
+        errorCount++;
+        errors.push(`${file.name}: ${err?.message || "ошибка"}`);
       }
-
-      if (result.deduped) {
-        toast.info("Это фото уже было загружено ранее — дубликат не создан.");
-      } else {
-        toast.success(
-          photoType === "start"
-            ? "Фото ДО добавлено."
-            : "Фото ПОСЛЕ добавлено.",
-        );
-      }
-
-      // Refresh photo list
-      await loadPhotos();
-    } catch (err: any) {
-      toast.error(err?.message || "Ошибка при загрузке фото.");
-    } finally {
-      setUploadingType(null);
     }
+
+    // Summary toast
+    if (files.length === 1) {
+      // Single file — keep the original simple toast
+      if (successCount === 1) {
+        toast.success(photoType === "start" ? "Фото ДО добавлено." : "Фото ПОСЛЕ добавлено.");
+      } else if (dedupCount === 1) {
+        toast.info("Это фото уже было загружено ранее — дубликат не создан.");
+      } else if (errorCount === 1) {
+        toast.error(errors[0] || "Не удалось загрузить фото.");
+      }
+    } else {
+      // Batch — show summary
+      const parts: string[] = [];
+      if (successCount > 0) parts.push(`✅ ${successCount} загружено`);
+      if (dedupCount > 0) parts.push(`ℹ️ ${dedupCount} дубликатов пропущено`);
+      if (errorCount > 0) parts.push(`❌ ${errorCount} с ошибкой`);
+      toast.success(`Готово: ${parts.join(", ")}`, {
+        description: errorCount > 0 ? errors.slice(0, 3).join("\n") : undefined,
+      });
+    }
+
+    // Refresh photo list
+    await loadPhotos();
+    setBatchProgress(null);
+    setUploadingType(null);
   };
 
   const openLightbox = (photo: Photo, list: Photo[]) => {
@@ -211,7 +246,8 @@ export function RentalPhotoGallery({
           photos={startPhotos}
           canUpload={canUpload}
           uploading={uploadingType === "start"}
-          onUpload={(file) => handleUpload("start", file)}
+          onUpload={(files) => handleBatchUpload("start", files)}
+          batchProgress={uploadingType === "start" ? batchProgress : null}
           onPhotoClick={(p) => openLightbox(p, startPhotos)}
           formatSize={formatSize}
           formatDate={formatDate}
@@ -226,7 +262,8 @@ export function RentalPhotoGallery({
           photos={endPhotos}
           canUpload={canUpload}
           uploading={uploadingType === "end"}
-          onUpload={(file) => handleUpload("end", file)}
+          onUpload={(files) => handleBatchUpload("end", files)}
+          batchProgress={uploadingType === "end" ? batchProgress : null}
           onPhotoClick={(p) => openLightbox(p, endPhotos)}
           formatSize={formatSize}
           formatDate={formatDate}
@@ -336,7 +373,10 @@ interface PhotoColumnProps {
   photos: Photo[];
   canUpload: boolean;
   uploading: boolean;
-  onUpload: (file: File) => void;
+  // I4 enhancement: batch upload — onUpload now receives an array of files
+  onUpload: (files: File[]) => void;
+  // I4 enhancement: batch progress display
+  batchProgress: { current: number; total: number; fileName: string } | null;
   onPhotoClick: (photo: Photo) => void;
   formatSize: (bytes: number) => string;
   formatDate: (iso: string) => string;
@@ -350,6 +390,7 @@ function PhotoColumn({
   canUpload,
   uploading,
   onUpload,
+  batchProgress,
   onPhotoClick,
   formatSize,
   formatDate,
@@ -412,14 +453,17 @@ function PhotoColumn({
 
       {canUpload && !compact && (
         <>
+          {/* I4 enhancement: multiple — allows selecting multiple photos at once.
+              Also raised accepted types to include HEIC (iPhone default). */}
           <input
             id={fileInputId}
             type="file"
             accept="image/jpeg,image/png,image/webp,image/heic"
+            multiple
             className="hidden"
             onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onUpload(file);
+              const files = Array.from(e.target.files ?? []);
+              if (files.length > 0) onUpload(files);
               e.target.value = ""; // reset so same file can be re-selected
             }}
           />
@@ -436,7 +480,10 @@ function PhotoColumn({
             {uploading ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Загрузка…
+                {/* I4 enhancement: show batch progress if uploading multiple files */}
+                {batchProgress && batchProgress.total > 1
+                  ? `Загрузка ${batchProgress.current}/${batchProgress.total}…`
+                  : "Загрузка…"}
               </>
             ) : (
               <>
