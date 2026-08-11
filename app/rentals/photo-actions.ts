@@ -42,7 +42,10 @@ export interface UploadRentalPhotoInput {
   mimeType: string;
   /** User ID of the uploader (renter, operator, admin, owner, or bot system id). */
   uploaderUserId: string;
-  uploaderRole: "renter" | "operator" | "admin" | "owner" | "bot";
+  /** I3 hotfix (C4): uploaderRole is now DERIVED server-side from the user's
+   *  relationship to the rental — the client-supplied value is IGNORED.
+   *  Kept in the interface for backward compat but not read. */
+  uploaderRole?: "renter" | "operator" | "admin" | "owner" | "bot";
   /** Which surface initiated the upload. */
   source: "webapp" | "bot" | "operator_ui" | "drag_drop";
   /** Optional notes (e.g. damage description for ПОСЛЕ photos). */
@@ -147,12 +150,23 @@ async function ensureBucket(): Promise<void> {
 /**
  * Validate that the rental exists, the photo_type is allowed for its status,
  * and the uploader is authorized (renter or crew member).
+ *
+ * I3 hotfix (C4): returns the DERIVED uploader role — caller no longer trusts
+ * the client-supplied role. The role is determined by the user's relationship
+ * to the rental:
+ *   - rental.user_id === uploader → "renter"
+ *   - rental.owner_id === uploader → "owner"
+ *   - crew_members.role === "member" → "operator"
+ *   - crew_members.role === "admin"/"co_owner"/"owner" → that role
  */
 async function validateUpload(
   rentalId: string,
   photoType: "start" | "end",
   uploaderUserId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; role: "renter" | "operator" | "admin" | "owner" | "bot" }
+  | { ok: false; error: string }
+> {
   const { data: rental, error } = await supabaseAdmin
     .from("rentals")
     .select("rental_id, user_id, owner_id, vehicle_id, status")
@@ -180,12 +194,13 @@ async function validateUpload(
     }
   }
 
-  // Auth: renter (user_id) or owner matches
-  if (
-    rental.user_id === uploaderUserId ||
-    rental.owner_id === uploaderUserId
-  ) {
-    return { ok: true };
+  // Auth + role derivation: renter (user_id) matches
+  if (rental.user_id === uploaderUserId) {
+    return { ok: true, role: "renter" };
+  }
+  // owner_id matches
+  if (rental.owner_id === uploaderUserId) {
+    return { ok: true, role: "owner" };
   }
 
   // Auth: crew member of the bike's crew
@@ -208,7 +223,14 @@ async function validateUpload(
         membership?.membership_status === "active" &&
         ["owner", "admin", "co_owner", "member"].includes(membership.role)
       ) {
-        return { ok: true };
+        // Map crew role to uploader role
+        const roleMap: Record<string, "operator" | "admin" | "owner"> = {
+          member: "operator",
+          admin: "admin",
+          co_owner: "admin",
+          owner: "owner",
+        };
+        return { ok: true, role: roleMap[membership.role] };
       }
     }
   }
@@ -223,7 +245,9 @@ async function validateUpload(
 export async function uploadRentalPhoto(
   input: UploadRentalPhotoInput,
 ): Promise<UploadRentalPhotoResult> {
-  const { rentalId, photoType, file, mimeType, uploaderUserId, uploaderRole, source, notes } = input;
+  const { rentalId, photoType, file, mimeType, uploaderUserId, source, notes } = input;
+  // I3 hotfix (C4): ignore client-supplied uploaderRole — derive from auth
+  // The `input.uploaderRole` field is kept for backward compat but not read.
 
   if (!rentalId || !file || file.length === 0) {
     return { success: false, error: "rentalId and file are required." };
@@ -238,11 +262,12 @@ export async function uploadRentalPhoto(
   }
 
   try {
-    // 1. Validate
+    // 1. Validate (returns derived role)
     const validation = await validateUpload(rentalId, photoType, uploaderUserId);
     if (!validation.ok) {
       return { success: false, error: validation.error };
     }
+    const derivedRole = validation.role; // C4: server-derived, not client-supplied
 
     // 2. Compress
     const { buffer: compressed, width, height } = await compressImage(file);
@@ -309,7 +334,7 @@ export async function uploadRentalPhoto(
         width,
         height,
         uploaded_by: uploaderUserId,
-        uploader_role: uploaderRole,
+        uploader_role: derivedRole, // C4: server-derived, not client-supplied
         source,
         metadata: notes ? { notes } : {},
       })
@@ -323,32 +348,17 @@ export async function uploadRentalPhoto(
       return { success: false, error: `Metadata insert failed: ${insertError.message}` };
     }
 
-    // 9. Increment counter on rentals
+    // 9. Increment counter on rentals (atomic RPC — added in I3 hotfix C5)
     const counterColumn = photoType === "start" ? "start_photo_count" : "end_photo_count";
     const { error: counterError } = await supabaseAdmin.rpc("increment_photo_count", {
       p_rental_id: rentalId,
       p_column: counterColumn,
-    }).then(
-      // RPC may not exist — fall back to manual increment
-      async (rpcResult: any) => {
-        if (rpcResult.error) {
-          // Fallback: read current + write new
-          const { data: r } = await supabaseAdmin
-            .from("rentals")
-            .select(counterColumn)
-            .eq("rental_id", rentalId)
-            .maybeSingle();
-          const current = (r as any)?.[counterColumn] ?? 0;
-          await supabaseAdmin
-            .from("rentals")
-            .update({ [counterColumn]: current + 1 })
-            .eq("rental_id", rentalId);
-        }
-      },
-    );
+      p_delta: 1,
+    });
 
     if (counterError) {
-      logger.warn("[uploadRentalPhoto] Counter increment failed (non-fatal):", counterError);
+      // RPC should exist after migration 20260811000002. If it doesn't, log loudly.
+      logger.error("[uploadRentalPhoto] Counter increment RPC failed (non-fatal but counters will drift):", counterError);
     }
 
     // 10. Insert event row for audit trail (compatible with existing photo_start/photo_end events)
@@ -365,7 +375,7 @@ export async function uploadRentalPhoto(
         width,
         height,
         source,
-        uploader_role: uploaderRole,
+        uploader_role: derivedRole, // C4: server-derived
         notes: notes || null,
       },
     });
@@ -536,47 +546,31 @@ export async function getRentalPhotoStats(
 } | null> {
   if (!rentalId) return null;
 
-  const { data: rental, error } = await supabaseAdmin
-    .from("rentals")
-    .select("start_photo_count, end_photo_count")
+  // I3 hotfix (H2): query rental_photos DIRECTLY instead of trusting the
+  // counter columns on rentals. The counters can drift if the RPC fails or
+  // if rows are manually inserted. Querying the source of truth is safer
+  // and only marginally slower (one indexed query).
+  //
+  // Single query: get all photo rows for this rental, aggregate in JS.
+  const { data: rows, error } = await supabaseAdmin
+    .from("rental_photos")
+    .select("photo_type, created_at")
     .eq("rental_id", rentalId)
-    .maybeSingle();
+    .order("created_at", { ascending: false });
 
-  if (error || !rental) return null;
-
-  // Fetch latest timestamps (only if count > 0, to avoid unnecessary queries)
-  let latestStartAt: string | null = null;
-  let latestEndAt: string | null = null;
-
-  if ((rental as any).start_photo_count > 0) {
-    const { data: latestStart } = await supabaseAdmin
-      .from("rental_photos")
-      .select("created_at")
-      .eq("rental_id", rentalId)
-      .eq("photo_type", "start")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    latestStartAt = latestStart?.created_at ?? null;
+  if (error) {
+    logger.error("[getRentalPhotoStats] Query failed:", error);
+    return null;
   }
 
-  if ((rental as any).end_photo_count > 0) {
-    const { data: latestEnd } = await supabaseAdmin
-      .from("rental_photos")
-      .select("created_at")
-      .eq("rental_id", rentalId)
-      .eq("photo_type", "end")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    latestEndAt = latestEnd?.created_at ?? null;
-  }
+  const startRows = (rows ?? []).filter((r) => r.photo_type === "start");
+  const endRows = (rows ?? []).filter((r) => r.photo_type === "end");
 
   return {
-    startCount: (rental as any).start_photo_count ?? 0,
-    endCount: (rental as any).end_photo_count ?? 0,
-    latestStartAt,
-    latestEndAt,
+    startCount: startRows.length,
+    endCount: endRows.length,
+    latestStartAt: startRows.length > 0 ? startRows[0].created_at : null,
+    latestEndAt: endRows.length > 0 ? endRows[0].created_at : null,
   };
 }
 
@@ -598,10 +592,10 @@ export async function deleteRentalPhoto(
   }
 
   try {
-    // Fetch the photo row + rental + crew for auth check
+    // M1: fetch photo_type in the INITIAL query (was a separate query after update)
     const { data: photo, error: photoErr } = await supabaseAdmin
       .from("rental_photos")
-      .select("id, rental_id, storage_path, deleted_at")
+      .select("id, rental_id, storage_path, photo_type, deleted_at")
       .eq("id", photoId)
       .maybeSingle();
 
@@ -647,18 +641,38 @@ export async function deleteRentalPhoto(
       return { success: false, error: "Только owner/admin экипажа может удалять фото." };
     }
 
+    // M2: TOCTOU guard — conditional update, only if deleted_at IS NULL.
+    // If another caller already deleted it, this returns 0 rows updated.
+    const { error: claimErr, count: claimCount } = await supabaseAdmin
+      .from("rental_photos")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", photoId)
+      .is("deleted_at", null)
+      .select("id", { count: "exact", head: true });
+
+    if (claimErr) {
+      logger.error("[deleteRentalPhoto] Claim update failed:", claimErr);
+      return { success: false, error: "Не удалось обновить запись фото." };
+    }
+    if (claimCount === 0) {
+      // Another caller already deleted it
+      return { success: false, error: "Фото уже удалено другим вызовом." };
+    }
+
     // Move file to _trash/
     const trashPath = photo.storage_path.replace(
       /^([^/]+)\//,
       "_trash/$1/",
     );
 
-    // Copy to trash, then remove original
+    // Copy to trash
     const { data: fileData, error: downloadErr } = await supabaseAdmin.storage
       .from(PHOTO_BUCKET)
       .download(photo.storage_path);
     if (downloadErr) {
       logger.error("[deleteRentalPhoto] Download for move failed:", downloadErr);
+      // Rollback the deleted_at claim so another caller can retry
+      await supabaseAdmin.from("rental_photos").update({ deleted_at: null }).eq("id", photoId);
       return { success: false, error: "Не удалось прочитать файл для перемещения." };
     }
 
@@ -668,43 +682,42 @@ export async function deleteRentalPhoto(
       .upload(trashPath, buffer, { contentType: "image/jpeg" });
     if (trashUploadErr) {
       logger.error("[deleteRentalPhoto] Trash upload failed:", trashUploadErr);
+      await supabaseAdmin.from("rental_photos").update({ deleted_at: null }).eq("id", photoId);
       return { success: false, error: "Не удалось переместить файл в корзину." };
     }
 
-    // Remove original
-    await supabaseAdmin.storage.from(PHOTO_BUCKET).remove([photo.storage_path]);
+    // H1: Remove original — CHECK the error (was silently swallowed)
+    const { error: removeErr } = await supabaseAdmin.storage
+      .from(PHOTO_BUCKET)
+      .remove([photo.storage_path]);
+    if (removeErr) {
+      // Rollback: delete the trash copy so we don't have a duplicate
+      await supabaseAdmin.storage.from(PHOTO_BUCKET).remove([trashPath]);
+      // Rollback the deleted_at claim
+      await supabaseAdmin.from("rental_photos").update({ deleted_at: null }).eq("id", photoId);
+      logger.error("[deleteRentalPhoto] Original remove failed; rolled back trash copy + claim:", removeErr);
+      return { success: false, error: "Не удалось удалить оригинал файла." };
+    }
 
-    // Update metadata row (soft delete)
+    // Update storage_path to trash path (so future hard-delete can find it)
     const { error: updateErr } = await supabaseAdmin
       .from("rental_photos")
-      .update({
-        deleted_at: new Date().toISOString(),
-        storage_path: trashPath, // update path so future hard-delete can find it
-      })
+      .update({ storage_path: trashPath })
       .eq("id", photoId);
 
     if (updateErr) {
-      logger.error("[deleteRentalPhoto] Metadata update failed:", updateErr);
+      logger.error("[deleteRentalPhoto] Storage path update failed (non-fatal — file already moved):", updateErr);
     }
 
-    // Decrement counter on rentals
-    const { data: photoMeta } = await supabaseAdmin
-      .from("rental_photos")
-      .select("photo_type")
-      .eq("id", photoId)
-      .maybeSingle();
-    if (photoMeta?.photo_type) {
-      const counterColumn = photoMeta.photo_type === "start" ? "start_photo_count" : "end_photo_count";
-      const { data: r } = await supabaseAdmin
-        .from("rentals")
-        .select(counterColumn)
-        .eq("rental_id", photo.rental_id)
-        .maybeSingle();
-      const current = (r as any)?.[counterColumn] ?? 0;
-      await supabaseAdmin
-        .from("rentals")
-        .update({ [counterColumn]: Math.max(0, current - 1) })
-        .eq("rental_id", photo.rental_id);
+    // C5: Decrement counter atomically via RPC (was read-modify-write race)
+    const counterColumn = photo.photo_type === "start" ? "start_photo_count" : "end_photo_count";
+    const { error: decErr } = await supabaseAdmin.rpc("increment_photo_count", {
+      p_rental_id: photo.rental_id,
+      p_column: counterColumn,
+      p_delta: -1, // GREATEST(0, ...) clamps to 0
+    });
+    if (decErr) {
+      logger.error("[deleteRentalPhoto] Counter decrement RPC failed (non-fatal but counters will drift):", decErr);
     }
 
     logger.info("[deleteRentalPhoto] Soft-deleted", {
