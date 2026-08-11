@@ -10,6 +10,8 @@ import {
   initiateTelegramRentalPhotoUpload,
   abortRental,
 } from "@/app/rentals/actions";
+// I3: import the photo gallery component for the closure modal
+import { RentalPhotoGallery } from "./RentalPhotoGallery";
 
 interface FranchizeRentalLifecycleActionsProps {
   rentalId: string;
@@ -554,6 +556,25 @@ export function FranchizeRentalLifecycleActions({
                   }}
                 />
               </label>
+            </div>
+
+            {/* ── I3: Photo gallery in closure modal ──
+                Shows existing ПОСЛЕ photos + lets operator add more.
+                v1 decision (PRD §4.2): non-blocking. If 0 photos, operator can
+                still close — but a yellow warning is shown in the gallery. */}
+            <div className="mt-3">
+              <span className="text-xs font-semibold" style={{ color: "var(--lifecycle-muted)" }}>
+                Фото байка (ДО / ПОСЛЕ)
+              </span>
+              <div className="mt-1.5">
+                <RentalPhotoGallery
+                  rentalId={rentalId}
+                  initialStartCount={0}
+                  initialEndCount={0}
+                  canUpload={role === "owner" || role === "member"}
+                  compact={false}
+                />
+              </div>
             </div>
 
             <div className="mt-5 flex gap-2">
