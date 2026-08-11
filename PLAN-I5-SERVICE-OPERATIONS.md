@@ -10,12 +10,41 @@
 
 1. ✅ **Code review complete** — `CODEREVIEW_LEADS_RENTALS.md` reviewed
 2. ✅ **START-HERE.md created** — project documentation structure established
-3. ⏳ **Fix accessories duplication** — Delete synthetic generation from `rentals.ts:697-743`
-4. ⏳ **Add todos to rentals page** — Enhance `getFranchizeCrewRentalsListAction()` to return todos
-5. ⏳ **Read META_PRD** — Understand I1-I4 context and quality gates
-6. ⏳ **Read FRANCHIZE_SERVICE_OPERATIONS_PRD.md** — Full requirements
+3. ✅ **Fix accessories duplication** — synthetic generation deleted from `rentals.ts` (crew_todos is single source of truth)
+4. ✅ **Add todos to rentals page** — `getFranchizeCrewRentalsListAction()` returns `pendingTodos` + `todos`; UI shows badge + todo lines
+5. ⏳ **Read META_PRD** — Understand I1-I4 context and quality gates (reference: `docs/META_PRD_ITERATIVE_IMPLEMENTATION_PLAN.md`; I1-I4 shipped state already cross-verified via migrations during PRD review)
+6. ✅ **Read FRANCHIZE_SERVICE_OPERATIONS_PRD.md** — Full requirements reviewed, see PRD Review Notes below
 
-**Git branch:** `feat/i5-service-operations` — everything goes here, merge to `main` after acceptance
+**Git branch:** `feat/i5-service-operations` — created ✅ (fixes committed to `main` as `5437369e`)
+
+---
+
+## PRD Review Notes (2026-08-12, codebase-verified)
+
+### 🔴 Must fix before writing migrations
+
+1. **Migration numbering conflict** — PRD §2.1 proposes `20260810000003`–`20260810000008`, but repo already has `20260810000010/11/20` + `20260811000000`–`05` applied. Back-dating new migrations ahead of applied ones breaks ordering. **Use fresh `20260812...` series instead.**
+2. **§5.2 backfill bug** — `s.crew_slug::UUID` will fail: `crew_slug` is TEXT (`'vip-bike'`), not a UUID. Must `JOIN crews ON crews.slug = s.crew_slug` to get `crew_id`.
+3. **§3.1 trigger missing idempotency guard** — `auto_create_rental_transaction()` has the transition guard (`OLD.status != 'completed'`) but NO `NOT EXISTS` guard on INSERT. Re-completing a rental duplicates `income_rental` rows — the exact bug class fixed for deposits in `20260811000000_deposit_trigger_double_return_guard.sql`. Add `NOT EXISTS` on `(rental_id, transaction_type)`.
+4. **§3.1 trigger ignores `commission_type`** — treats `commission_value` as percentage always; if a crew configures `fixed_amount`, math breaks. Branch on `commission_type`.
+
+### 🟡 Stale PRD sections (already shipped)
+
+- **§0 deposit trigger warning** — outdated: double-return guard landed in `20260811000000` (verified: NOT EXISTS guard on `(rental_id, destination, amount)` + one-time dedup).
+- **§6.7 `rental_photos` "proposed"** — already shipped: `20260811000001_create_rental_photos.sql` + 3 hotfix migrations.
+
+### 🟢 Verified correct
+
+- `rentals.created_by_operator_chat_id` exists (`20260720120100`) ✅
+- `crew_member_shifts.member_id` is TEXT → `users(user_id)` — §6.2.2 "My Work" SQL works ✅
+- `sale_contract_artifacts` has `crew_slug`, `sale_price`, `total_sum`, `resolved_bike_id`, `created_by_operator_chat_id` — §5.2 backfill viable (with fix #2) ✅
+- RLS `auth.jwt() ->> 'chat_id'` pattern matches production reality (service_role bypasses; policies = defense-in-depth) ✅
+
+### Contract addendum (locks before Этап 1)
+
+- Migrations: `20260812000001_create_equipment_rentals.sql` → `..._cash_transactions.sql` → `..._commission_rates.sql` → `..._salary_plans.sql` → `..._salary_calculations.sql` → `..._seed_equipment_items.sql`
+- All triggers: transition guard **+** `NOT EXISTS` idempotency guard (I1 pattern)
+- `cash_transactions.sale_contract_id` column ships in the create migration (backfill depends on it); FK to `private.sale_contract_artifacts` added separately per Open Q5
 
 ---
 
