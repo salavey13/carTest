@@ -314,3 +314,141 @@ export async function listEquipmentRentals(params: {
     return { success: false, error: err?.message || "Unknown error." };
   }
 }
+
+// ── Doc-manual integration (I5 Equipment T4) ─────────────────────────────────────
+
+/**
+ * Mapping from equipment flags in DocFlowContext to cars equipment IDs.
+ * These IDs are seeded in migration 20260812000006_seed_equipment.sql.
+ */
+const EQUIPMENT_FLAG_TO_CAR_ID: Record<string, string> = {
+  // Helmets (size preferences default to M if not specified)
+  helmets: 'equip-helmet-m',
+  // Gloves (size M default)
+  gloves: 'equip-gloves-m',
+  // Jacket (size M default)
+  jacket: 'equip-jacket-m',
+  // Boots (size M default)
+  boots: 'equip-boots-m',
+};
+
+/**
+ * DocFlowContext subset for equipment rental creation.
+ */
+export interface DocFlowEquipmentContext {
+  helmets?: number;
+  gloves?: number;
+  jacket?: boolean;
+  boots?: boolean;
+  net?: boolean;
+  backpack?: boolean;
+  bag?: boolean;
+  charger?: boolean;
+}
+
+/**
+ * Create equipment_rentals rows for equipment rented with a bike.
+ * Called from doc-manual after successful rental creation.
+ *
+ * Maps equipment flags (helmets, gloves, jacket, boots) to equipment_rentals rows
+ * with primary_rental_id linking to the bike rental.
+ *
+ * @param rentalId - The bike rental ID
+ * @param context - DocFlowContext with equipment flags
+ * @param operatorChatId - Operator who created the rental
+ * @param crewId - Crew ID for the rentals
+ */
+export async function createEquipmentRowsForRental(params: {
+  rentalId: string;
+  context: DocFlowEquipmentContext;
+  operatorChatId: string;
+  crewId: string;
+}): Promise<{ success: boolean; created: number; error?: string }> {
+  const { rentalId, context, operatorChatId, crewId } = params;
+
+  try {
+    const rowsToCreate: Array<{
+      equipment_id: string;
+      daily_price: number;
+      total_cost: number;
+    }> = [];
+
+    // Helmets (0-2 helmets)
+    const helmetCount = context.helmets || 0;
+    for (let i = 0; i < helmetCount; i++) {
+      rowsToCreate.push({
+        equipment_id: EQUIPMENT_FLAG_TO_CAR_ID.helmets,
+        daily_price: 200,
+        total_cost: 200, // TODO: calculate based on rental duration
+      });
+    }
+
+    // Gloves (0-2 pairs)
+    const glovesCount = context.gloves || 0;
+    for (let i = 0; i < glovesCount; i++) {
+      rowsToCreate.push({
+        equipment_id: EQUIPMENT_FLAG_TO_CAR_ID.gloves,
+        daily_price: 100,
+        total_cost: 100,
+      });
+    }
+
+    // Jacket (1 if true)
+    if (context.jacket) {
+      rowsToCreate.push({
+        equipment_id: EQUIPMENT_FLAG_TO_CAR_ID.jacket,
+        daily_price: 300,
+        total_cost: 300,
+      });
+    }
+
+    // Boots (1 if true)
+    if (context.boots) {
+      rowsToCreate.push({
+        equipment_id: EQUIPMENT_FLAG_TO_CAR_ID.boots,
+        daily_price: 150,
+        total_cost: 150,
+      });
+    }
+
+    // Skip if no equipment
+    if (rowsToCreate.length === 0) {
+      return { success: true, created: 0 };
+    }
+
+    // Insert all rows in one batch
+    const { data, error } = await supabaseAdmin
+      .from('equipment_rentals')
+      .insert(
+        rowsToCreate.map((row) => ({
+          crew_id: crewId,
+          equipment_id: row.equipment_id,
+          primary_rental_id: rentalId,
+          daily_price: row.daily_price,
+          total_cost: row.total_cost,
+          status: 'active',
+          issued_by: operatorChatId,
+          issued_at: new Date().toISOString(),
+          created_by: operatorChatId,
+        }))
+      )
+      .select('id');
+
+    if (error) {
+      logger.warn('[createEquipmentRowsForRental] Failed to insert rows:', error);
+      // Continue — rental is more important than equipment rows (contract over breakdown)
+      return { success: false, created: 0, error: error.message };
+    }
+
+    logger.info('[createEquipmentRowsForRental] Created equipment rentals', {
+      rentalId,
+      crewId,
+      created: data?.length || 0,
+    });
+
+    return { success: true, created: data?.length || 0 };
+  } catch (err: any) {
+    logger.error('[createEquipmentRowsForRental] Exception:', err);
+    return { success: false, created: 0, error: err?.message || 'Unknown error' };
+  }
+}
