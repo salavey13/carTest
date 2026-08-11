@@ -11,44 +11,45 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createHash } from "crypto";
 
 // Mock the supabaseAdmin + sharp before importing the module under test
-vi.mock("@/lib/supabase-server", () => ({
-  supabaseAdmin: {
-    from: vi.fn(() => ({
-      select: vi.fn(() => {
-        // Self-referential chain: supports .eq().eq().maybeSingle(),
-        // .eq().order(), and other query-builder combinations used in
-        // photo-actions.ts (validateUpload, dedup check, stats query).
-        const chain: Record<string, unknown> = {
-          eq: vi.fn(() => chain),
-          order: vi.fn(() => ({ data: [], error: null })),
-          maybeSingle: vi.fn(() => ({ data: null, error: null })),
-          single: vi.fn(() => ({ data: null, error: null })),
-        };
-        return chain;
-      }),
-      insert: vi.fn(() => ({
-        select: vi.fn(() => ({
-          single: vi.fn(() => ({ data: { id: "test-id" }, error: null })),
+vi.mock("@/lib/supabase-server", () => {
+  // Build self-referential chain that supports: from().select().eq().maybeSingle(),
+  // from().select().eq().eq().maybeSingle(), from().select().eq().order(), etc.
+  const buildChain = () => ({
+    select: vi.fn(() => buildChain()),
+    eq: vi.fn(() => buildChain()),
+    in: vi.fn(() => buildChain()),
+    order: vi.fn(() => buildChain()),
+    limit: vi.fn(() => buildChain()),
+    single: vi.fn(() => ({ data: null, error: null })),
+    maybeSingle: vi.fn(() => ({ data: null, error: null })),
+    // Terminal: returns data array (for stats, list queries)
+    then: vi.fn((resolve: any) => resolve({ data: [], error: null })),
+  });
+
+  return {
+    supabaseAdmin: {
+      from: vi.fn(() => buildChain()),
+      insert: vi.fn(() => buildChain()),
+      update: vi.fn(() => buildChain()),
+      delete: vi.fn(() => buildChain()),
+      storage: {
+        from: vi.fn(() => ({
+          upload: vi.fn(() => ({ error: null })),
+          remove: vi.fn(() => ({ error: null })),
+          download: vi.fn(() => ({
+            data: new Blob([new Uint8Array([0xff, 0xd8, 0xff])]),
+            error: null,
+          })),
+          createSignedUrls: vi.fn(() => ({
+            data: [{ signedUrl: "https://example.com/signed.jpg" }],
+            error: null,
+          })),
         })),
-      })),
-    })),
-    storage: {
-      from: vi.fn(() => ({
-        upload: vi.fn(() => ({ error: null })),
-        remove: vi.fn(() => ({ error: null })),
-        download: vi.fn(() => ({
-          data: new Blob([new Uint8Array([0xff, 0xd8, 0xff])]),
-          error: null,
-        })),
-        createSignedUrls: vi.fn(() => ({
-          data: [{ signedUrl: "https://example.com/signed.jpg" }],
-          error: null,
-        })),
-      })),
+      },
+      rpc: vi.fn(() => ({ error: null })),
     },
-    rpc: vi.fn(() => ({ error: null })),
-  },
-}));
+  };
+});
 
 vi.mock("@/lib/logger", () => ({
   logger: {
