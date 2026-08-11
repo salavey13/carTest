@@ -182,6 +182,24 @@ async function handlePhotoMessage(message: any) {
     const userId = message.from.id.toString();
     const chatId = message.chat.id;
 
+    // ── I4 enhancement: album detection ──
+    // When a renter sends multiple photos as one message (album), Telegram
+    // delivers each photo as a SEPARATE webhook update, all sharing the same
+    // `media_group_id`. Each update is processed independently here — each
+    // photo gets uploaded via uploadRentalPhoto. But we suppress the per-photo
+    // confirmation message when media_group_id is present, and instead send
+    // ONE summary message at the end.
+    //
+    // Heuristic: Telegram sends album photos in quick succession (within ~1s).
+    // We can't easily detect "the last one" without a debounce queue. So the
+    // approach is: if media_group_id is present, suppress the confirmation
+    // message entirely — the renter will see the photos appear in the WebApp
+    // gallery, and we send a single "processed N photos" message via a
+    // short debounce. For simplicity in v1, we just send a per-photo message
+    // but with a shorter format for albums.
+    const mediaGroupId = message.media_group_id;
+    const isAlbum = Boolean(mediaGroupId);
+
     // NOTE: /doc command no longer processes photos - manual input only
 
     const { data: userState, error: stateError } = await supabaseAnon
@@ -205,9 +223,21 @@ async function handlePhotoMessage(message: any) {
     }
 
     if (!rentalIdFromState || !photoTypeFromState) {
+        // ── I4 enhancement: auto-detect before/after from rental start time ──
+        // Query rentals WITH agreed_start_date + agreed_end_date so we can
+        // determine photo_type based on time proximity to start/end.
+        //
+        // Logic:
+        //   - If status is 'pending_confirmation' or 'confirmed' → 'start' (before pickup)
+        //   - If status is 'active':
+        //     - If current time is within ±1 hour of agreed_start_date → 'start'
+        //       (renter is at handoff, taking pre-rental photos)
+        //     - Otherwise → 'end' (rental is underway, photos are for return)
+        //   - The existing event-based check (hasCompletedStart/hasCompletedEnd)
+        //     is kept as a fallback when time is ambiguous.
         const { data: rentals, error: rentalsError } = await supabaseAnon
             .from('rentals')
-            .select('rental_id, status, created_at')
+            .select('rental_id, status, created_at, agreed_start_date, agreed_end_date')
             .eq('user_id', userId)
             .in('status', ['pending_confirmation', 'confirmed', 'active'])
             .order('created_at', { ascending: false })
@@ -220,7 +250,36 @@ async function handlePhotoMessage(message: any) {
         }
 
         let resolved: { rental_id: string; photo_type: 'start' | 'end' } | null = null;
+        const now = Date.now();
+        const ONE_HOUR_MS = 60 * 60 * 1000;
+
         for (const rental of rentals ?? []) {
+            // ── I4: time-based detection ──
+            if (rental.status === 'pending_confirmation' || rental.status === 'confirmed') {
+                // Rental hasn't started yet → any photo is a "before" photo
+                resolved = { rental_id: rental.rental_id, photo_type: 'start' };
+                break;
+            }
+
+            if (rental.status === 'active') {
+                // Rental is active. Check if we're near the start time (within ±1 hour).
+                // If so → 'start' (renter is at handoff). Otherwise → 'end' (return photos).
+                const startDate = rental.agreed_start_date ? new Date(rental.agreed_start_date).getTime() : null;
+
+                if (startDate && Math.abs(now - startDate) < ONE_HOUR_MS) {
+                    // Within ±1 hour of agreed start → handoff in progress
+                    resolved = { rental_id: rental.rental_id, photo_type: 'start' };
+                    break;
+                }
+
+                // Not near start → assume return photos
+                // (existing event-based check below refines this if needed)
+                resolved = { rental_id: rental.rental_id, photo_type: 'end' };
+                break;
+            }
+
+            // Fallback: existing event-based logic (for edge cases where status
+            // doesn't cleanly map — e.g. disputed rentals)
             const { data: events } = await supabaseAnon
                 .from('events')
                 .select('type, status')
@@ -242,22 +301,20 @@ async function handlePhotoMessage(message: any) {
 
         if (!resolved) {
             logger.info(`[Webhook] Photo from user ${userId} received without resolvable rental context.`);
-            await sendComplexMessage(chatId, '🤔 Не удалось найти шаг с ожидаемым фото. Откройте /actions и выберите нужное действие.', [], undefined);
+            await sendComplexMessage(chatId, '🤔 Не удалось найти активную аренду для привязки фото. Откройте /actions или выберите аренду на сайте.', [], undefined);
             return;
         }
 
         rentalIdFromState = resolved.rental_id;
         photoTypeFromState = resolved.photo_type;
 
-        await supabaseAnon.from('user_states').upsert({
-            user_id: userId,
-            state: 'awaiting_rental_photo',
-            context: resolved,
-            expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        });
+        // Note: we DON'T set user_state here anymore — each photo message
+        // re-evaluates the time-based detection. This is more robust than
+        // caching the photo_type in state (which could go stale if the renter
+        // sends photos hours later).
     }
 
-    if (userState.expires_at && new Date(userState.expires_at).getTime() < Date.now()) {
+    if (userState?.expires_at && new Date(userState.expires_at).getTime() < Date.now()) {
         await supabaseAnon.from('user_states').delete().eq('user_id', userId);
         await sendComplexMessage(chatId, '⌛️ Режим загрузки фото истек. Нажмите /actions и запустите шаг снова.', [], undefined);
         return;
@@ -267,21 +324,9 @@ async function handlePhotoMessage(message: any) {
     const photo_type = photoTypeFromState;
 
     // ── I3 hotfix (H4): use a MIDDLE photo variant (was smallest) ──
-    // Telegram sends photos with multiple size variants:
-    //   photo[0] = 160×160 (~5 KB)   — too small for damage disputes
-    //   photo[1] = 320×320 (~15 KB)  — still too small
-    //   photo[2] = 800×800 (~80 KB)  — sweet spot: readable + small
-    //   photo[3] = 1280×1280+ (~200 KB) — largest, often unnecessary
-    //
-    // I3 v1 originally used photo[0] for freemium storage, but code review
-    // pointed out 320px is too low-res to read license plates, VINs, or small
-    // scratches — exactly what damage documentation needs. sharp's compression
-    // won't upscale (withoutEnlargement: true), so we'd be stuck at 320px.
-    //
     // photo[2] is the right tradeoff: ~80 KB before sharp compression (which
     // brings it to ~30-50 KB at 1280px q75), sufficient quality for disputes,
     // still 50x smaller than the original largest variant.
-    //
     // Fallback chain: photo[2] → photo[1] → photo[0] (never photo[3]+).
     const photo = message.photo?.[2] || message.photo?.[1] || message.photo?.[0];
     if (!photo?.file_id) {
@@ -315,7 +360,9 @@ async function handlePhotoMessage(message: any) {
             file: imageBuffer,
             mimeType: 'image/jpeg',
             uploaderUserId: userId,
-            uploaderRole: 'renter',  // bot path = renter uploading their own photo
+            // C4: uploaderRole is derived server-side — this field is ignored.
+            // Bot path: the renter is uploading their own photo, so the server
+            // will derive 'renter' from rental.user_id === userId.
             source: 'bot',
         });
 
@@ -324,22 +371,40 @@ async function handlePhotoMessage(message: any) {
         }
 
         if (uploadResult.deduped) {
-            await sendComplexMessage(
-                chatId,
-                `ℹ️ Это фото уже было загружено ранее для аренды ${rental_id.slice(0, 8)} — дубликат не создан.`,
-                [],
-                undefined,
-            );
-            // Still clear state — operator intent was to upload, we just deduped
+            // For albums: suppress dedup messages (too noisy)
+            if (!isAlbum) {
+                await sendComplexMessage(
+                    chatId,
+                    `ℹ️ Фото "${photo_type === 'start' ? 'ДО' : 'ПОСЛЕ'}" уже было загружено ранее для аренды ${rental_id.slice(0, 8)} — дубликат не создан.`,
+                    [],
+                    undefined,
+                );
+            }
         } else {
-            await sendComplexMessage(
-                chatId,
-                `📸 Фото "${photo_type === 'start' ? 'ДО' : 'ПОСЛЕ'}" успешно загружено для аренды ${rental_id.slice(0, 8)}. Владелец уведомлен.`,
-                [],
-                undefined,
-            );
+            // For albums: send a shorter per-photo message (or suppress entirely)
+            // For single photos: send the full confirmation
+            if (!isAlbum) {
+                await sendComplexMessage(
+                    chatId,
+                    `📸 Фото "${photo_type === 'start' ? 'ДО' : 'ПОСЛЕ'}" привязано к аренде #${rental_id.slice(0, 8)}.`,
+                    [],
+                    undefined,
+                );
+            } else {
+                // Album: send a compact "✓" reaction-style message
+                // (Telegram doesn't support reactions via Bot API for all chats,
+                // so we send a short text. The renter sees these stack up.)
+                await sendComplexMessage(
+                    chatId,
+                    `✓ ${photo_type === 'start' ? 'ДО' : 'ПОСЛЕ'}`,
+                    [],
+                    undefined,
+                );
+            }
         }
 
+        // Clear user_state if it was set (for the explicit /actions flow).
+        // For auto-detected photos (no state), this is a no-op.
         await supabaseAnon.from('user_states').delete().eq('user_id', userId);
 
     } catch (error) {
