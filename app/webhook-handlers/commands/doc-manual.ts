@@ -1447,13 +1447,26 @@ async function createRentalFromDocContract(
       rent_11_30d: bike.specs?.rent_11_30d,
     };
     const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateIso);
-    const dailyPrice = tierResult.rate > 0 ? tierResult.rate : baseDailyPrice;
-    const totalCost = tierResult.price > 0 ? tierResult.price : baseDailyPrice * days;
+    const dailyPrice = Number(tierResult.rate > 0 ? tierResult.rate : baseDailyPrice);
+    // FIX: ensure totalCost is a number (tierResult.price can be string from JSONB specs)
+    // Also add equipment costs to totalCost (was missing — only rental price was saved)
+    const baseRentalCost = Number(tierResult.price > 0 ? tierResult.price : baseDailyPrice * days);
+    const helmetsEq = context.helmets || 0;
+    const glovesEq = context.gloves || 0;
+    const jacketEq = context.jacket ? 1 : 0;
+    const bootsEq = context.boots ? 1 : 0;
+    const netEq = context.net ? 1 : 0;
+    const backpackEq = context.backpack ? 1 : 0;
+    const bagEq = context.bag ? 1 : 0;
+    const equipmentCostTotal = helmetsEq * getHelmetPrice(hours) + glovesEq * 500 + jacketEq * 500 + bootsEq * 500 + netEq * 500 + backpackEq * 500 + bagEq * 500;
+    const totalCost = baseRentalCost + equipmentCostTotal;
 
     logger.info('[/doc] createRentalFromDocContract: pricing', {
       dailyPrice,
       hours,
       days,
+      baseRentalCost,
+      equipmentCostTotal,
       totalCost,
       tier: tierResult.period,
       tierPrice: tierResult.price,
@@ -2519,7 +2532,7 @@ async function gotoPaymentSplit(chatId: number, userId: string, context: DocFlow
   })();
 
   const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateForCalc);
-  const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
+  const rentalCost = Number(tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000));
 
   // Add equipment costs
   const helmets = context.helmets || 0;
@@ -3082,7 +3095,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
       return startDate;
     })();
     const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateForCalc);
-    const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
+    const rentalCost = Number(tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000));
     const helmets = context.helmets || 0;
     const gloves = context.gloves || 0;
     const jacket = context.jacket ? 1 : 0;
@@ -3137,7 +3150,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
       return startDate;
     })();
     const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateForCalc);
-    const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
+    const rentalCost = Number(tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000));
     const helmets = context.helmets || 0;
     const gloves = context.gloves || 0;
     const jacket = context.jacket ? 1 : 0;
@@ -3704,7 +3717,7 @@ export async function handleDocCallback(
       return startDate;
     })();
     const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateForCalc);
-    const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
+    const rentalCost = Number(tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000));
     const helmets = context.helmets || 0;
     const gloves = context.gloves || 0;
     const jacket = context.jacket ? 1 : 0;
@@ -3761,7 +3774,7 @@ export async function handleDocCallback(
       return startDate;
     })();
     const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateForCalc);
-    const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
+    const rentalCost = Number(tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000));
     const helmets = context.helmets || 0;
     const gloves = context.gloves || 0;
     const jacket = context.jacket ? 1 : 0;
@@ -3809,7 +3822,7 @@ export async function handleDocCallback(
       return startDate;
     })();
     const tierResult = calculatePriceForDuration(specsForPricing, hours, startDateForCalc);
-    const rentalCost = tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000);
+    const rentalCost = Number(tierResult.price > 0 ? tierResult.price : Number(specs.dailyPrice || specs.rent_weekday || 10000));
     const helmets = context.helmets || 0;
     const gloves = context.gloves || 0;
     const jacket = context.jacket ? 1 : 0;
