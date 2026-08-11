@@ -132,6 +132,35 @@ PENDING_TODOS=$(supabase_query "crew_todos" \
 
 TODOS_COUNT=$(echo "$PENDING_TODOS" | head -1 | grep -q "^Нет" && echo 0 || echo "$PENDING_TODOS" | wc -l)
 
+# ─── I2: Yesterday's deposit balance per card (cash/tbank/sber) ──────────────
+# Mirrors the evening-summary deposit section. Shows the operator how much
+# money is sitting on each card from yesterday's deposits (collected minus
+# returned minus penalty = net still held).
+YESTERDAY=$(TZ=Europe/Moscow date -d 'yesterday' +%Y-%m-%d)
+YESTERDAY_START="${YESTERDAY}T00:00:00+03:00"
+YESTERDAY_END="${YESTERDAY}T23:59:59+03:00"
+
+DEPOSIT_DATA=$(supabase_query "deposit_entries" \
+  "select=destination,entry_type,direction,amount&created_at=gte.${YESTERDAY_START}&created_at=lte.${YESTERDAY_END}" \
+  "public")
+
+DEPOSIT_KPIS=$(echo "$DEPOSIT_DATA" | jq -r '
+  if length == 0 then "  Нет движений за вчера"
+  else
+    group_by(.destination) | map({
+      dest: .[0].destination,
+      collected: ([.[] | select(.entry_type == "deposit_collected")] | map(.amount) | add // 0),
+      returned: ([.[] | select(.entry_type == "deposit_returned")] | map(.amount) | add // 0),
+      penalty: ([.[] | select(.entry_type == "penalty")] | map(.amount) | add // 0)
+    }) | .[] |
+    "  " + (
+      if .dest == "cash" then "💵" elif .dest == "tbank" then "💳Т" else "💳С" end
+    ) + ": +" + (.collected | tostring) + " / -" + (.returned | tostring) +
+    (if .penalty > 0 then " / -" + (.penalty | tostring) + " штраф" else "" end) +
+    " = " + ((.collected - .returned - .penalty) | tostring) + " ₽"
+  end
+')
+
 # ─── Compose message ─────────────────────────────────────────────────────────
 DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
 MESSAGE="🔥 <b>Утренняя сводка</b> — ${TODAY}, ${NOW_DISPLAY} МСК
@@ -147,6 +176,9 @@ ${OVERDUE}
 
 📍 <b>Задачи в фокусе (${TODOS_COUNT}):</b>
 ${PENDING_TODOS}
+
+🏦 <b>Депозиты за ${YESTERDAY}:</b>
+${DEPOSIT_KPIS}
 
 📊 Дашборд: <a href=\"${DASHBOARD_LINK}\">Открыть</a>"
 
