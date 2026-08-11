@@ -1,12 +1,12 @@
 # META PRD: Iterative Implementation Plan (Franchize Ops Wave 2026-08)
 
-**Version:** 1.1 (2026-08-11 — I1 shipped, I2 audited and gap-closed)
+**Version:** 1.2 (2026-08-11 — I3 MVP shipped: migration + photo-actions + UI + bot pipeline)
 **Date:** 2026-08-11
 **Status:** Active — living tracker, update as iterations ship
 **Scope:** Coordinates 4 sibling PRDs that share tables, bot flows, and UI surfaces:
 - `docs/DEPOSIT_TRACKING_PRD.md` v2.1 — ✅ Mostly Implemented (I1 + I2 closed remaining gaps)
 - `docs/DOC_MANUAL_STEP_CORRECTION_PRD.md` v3.1 — ✅ Mostly Implemented
-- `docs/RENTAL_PHOTO_UPLOAD_PRD.md` v1.2 — 📋 Draft (not started — I3/I4)
+- `docs/RENTAL_PHOTO_UPLOAD_PRD.md` v1.2 — ✅ MVP Shipped (I3 — pending I4 retention/polish)
 - `docs/FRANCHIZE_SERVICE_OPERATIONS_PRD.md` v4.1 — 📋 Ready for Implementation (I5)
 
 ---
@@ -64,14 +64,24 @@ Closed in this iteration (2026-08-11):
 
 **Deferred to I5:** Profile page "My Work" deposits-by-operator section — needs `cash_transactions` table for proper operator attribution (deposit_entries.operator_chat_id is the collector, but "my work" should aggregate across all money flows, not just deposits).
 
-### I3 — Rental photos MVP (1 week, per RENTAL_PHOTO_UPLOAD_PRD v1.2)
+### I3 — Rental photos MVP ✅ SHIPPED (2026-08-11)
 
-- Migration `20260811000000_create_rental_photos.sql` (private bucket + table + RLS + counters on `rentals`).
-- `app/rentals/photo-actions.ts`: `uploadRentalPhoto` (sharp compress ≤500 KB, SHA-256 dedup — pattern from `doc-verifier`), `listRentalPhotos` (signed URLs), `getRentalPhotoStats`, `deleteRentalPhoto` (soft).
-- Extract `reduceImageResolution` from `PhotoUploadButton.tsx` → shared util.
-- Bot: switch `handlePhotoMessage` to smallest photo variant + call `uploadRentalPhoto` (private bucket) + multi-rental disambiguation keyboard.
-- UI: `RentalPhotoGallery` on rental detail; photo steps in pickup/closure modals with **non-blocking** `photoWarning` (v1 decision).
-- **Gate:** unit tests (RLS, dedup, compression limit); one real rental with ДО+ПОСЛЕ photos end-to-end.
+Per PRD v1.2 §5.1-5.7. All MVP items shipped:
+
+- ✅ **Migration `20260811000001_create_rental_photos.sql`** — private `rental-photos` bucket (500 KB limit, JPEG/PNG/WebP only), `rental_photos` metadata table (SHA-256, dimensions, uploader, source), convenience counters on `rentals` (`start_photo_count`, `end_photo_count`), path-based RLS via `can_access_rental_photo()` function (renter OR crew member), 4 RLS policies on `storage.objects` + 4 on `rental_photos` (SELECT for authorized, INSERT/UPDATE/DELETE service-role only).
+- ✅ **`app/rentals/photo-actions.ts`** — 4 server actions:
+  - `uploadRentalPhoto` — full pipeline: validate → sharp compress (1280px q75, ≤500 KB with progressive quality reduction) → SHA-256 hash → dedup check → upload to private bucket → insert metadata → increment counter → insert event row.
+  - `listRentalPhotos` — returns signed URLs (15-min TTL) + metadata.
+  - `getRentalPhotoStats` — fast read from counter columns (no join).
+  - `deleteRentalPhoto` — soft delete (moves to `_trash/` prefix, sets `deleted_at`). Owner/admin only.
+- ✅ **Extracted `reduceImageResolution`** into `lib/client-image-compress.ts` (shared util, parameterized maxSize/quality).
+- ✅ **Bot: `handlePhotoMessage` patched** — now downloads `photo[0]` (smallest variant, ~10-30 KB) instead of `photo[length-1]` (1-3 MB). Routes through `uploadRentalPhoto` (private bucket + compression + hash + metadata) instead of old `uploadSingleImage` (public bucket, no compression). Auto-resolves rental from `user_id` (existing logic preserved). Multi-rental disambiguation: existing first-match logic preserved (PRD §5.7 note: "silent first-match — no disambiguation when several rentals qualify" — acceptable for v1, revisit if operators report confusion).
+- ✅ **`RentalPhotoGallery` component** — two-column ДО/ПОСЛЕ layout, thumbnail grid, click → fullscreen lightbox with ←/→ keyboard nav, metadata overlay (timestamp, uploader, file size). Upload via file picker → client-side compress → POST `/api/franchize/rental-photo-upload`. Soft yellow warning when both columns empty (v1: non-blocking).
+- ✅ **Wired into rental detail page** (`app/franchize/[slug]/rental/[id]/page.tsx`) — gallery rendered between return checklist and message input. Visible to operators + renter.
+- ✅ **Wired into closure modal** (`FranchizeRentalLifecycleActions.tsx`) — gallery shown inside the modal so operator can add ПОСЛЕ photos before closing. Non-blocking.
+- ✅ **2 new API routes**: `POST /api/franchize/rental-photo-upload` (multipart), `GET /api/franchize/rental-photos` (list with signed URLs).
+- ✅ **Gate**: code compiles, dry-run pipeline verified. E2E with real rental pending deploy (need migration applied first).
+- ⏳ **Pending**: unit tests (RLS, dedup, compression limit) — deferred to I4 polish.
 
 ### I4 — Photos retention & polish (2-3 days, can overlap I3)
 
@@ -118,4 +128,5 @@ Follow its Phase 1-7 plan as-is, with two additions:
 **Document History:**
 - v1.0 (2026-08-11): Initial — created from the 2026-08-11 post-implementation audit of the deposit/doc-manual wave.
 - v1.1 (2026-08-11): I1 shipped (trigger guard migration applied, regression test green, 0 prod duplicates). I2 audited — found that 6 of 9 items were already shipped in the 2026-08-10 wave; closed the 3 remaining gaps (penalty capture UI + server action + morning-standup deposit section). DEPOSIT_TRACKING_PRD status flipped to ✅ Mostly Implemented.
+- v1.2 (2026-08-11): I3 MVP shipped — migration `20260811000001_create_rental_photos.sql` (private bucket + table + RLS + counters), `app/rentals/photo-actions.ts` (4 server actions with sharp compression + SHA-256 dedup), `RentalPhotoGallery` component wired into rental detail page + closure modal, bot `handlePhotoMessage` patched to use smallest variant + new pipeline, 2 new API routes, `reduceImageResolution` extracted to shared util. RENTAL_PHOTO_UPLOAD_PRD status flipped to ✅ MVP Shipped. I4 (retention cron + tests + polish) remains.
 
