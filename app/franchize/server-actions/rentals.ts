@@ -673,21 +673,6 @@ export async function getRentalReturnTodos(
     });
 
     // Fetch ALL crew_todos for this crew that could be return-related.
-    // We use the indexed `rental_id` column when available, falling back to
-    // parsing the description JSON blob for older rows that pre-date the index.
-    //
-    // IMPORTANT FIX (user-reported bug):
-    // Previously this query also included `rental_verification` category — those
-    // are START-of-rental verification todos (passport, drivers license, START
-    // odometer, dates). They are created by `createRentalVerificationTodos`
-    // BEFORE pickup, not at return time. Including them in the return checklist
-    // made the panel show "паспорт (главная страница)", "водительское
-    // удостоверение", "начальный одометр", "даты аренды" — none of which belong
-    // in a "Что вернуть" list.
-    //
-    // Now we ONLY return `lead_followup` todos (the equipment-return items
-    // created by doc-manual.ts at handoff: keys, bike docs, accessories,
-    // damage inspection). The closure modal handles final odometer separately.
     const { data: allTodos, error } = await supabaseAdmin
       .from("crew_todos")
       .select("id, title, status, priority, category, description, rental_id")
@@ -700,18 +685,62 @@ export async function getRentalReturnTodos(
     }
 
     // Filter: only `lead_followup` todos belonging to this rental.
-    // Use the indexed `rental_id` column when present (fast path);
-    // fall back to parsing description JSON for legacy rows without it.
     const rentalTodos = (allTodos || []).filter((t) => {
       if (t.category !== "lead_followup") return false;
-      // Fast path: indexed rental_id column (added by migration 20260720120200)
       if (typeof t.rental_id === "string" && t.rental_id === rentalId) return true;
-      // Legacy fallback: rental_id stored in description JSON
       try {
         const desc = JSON.parse(t.description || "{}");
         return desc.rental_id === rentalId;
       } catch { return false; }
     });
+
+    // ── I4 enhancement: also read rental metadata for equipment info ──
+    // If the rental has equipment (helmets, gloves, etc.) in its contract
+    // metadata but no corresponding accessory todos in crew_todos (e.g. rental
+    // was created before the todo-creation fix, or accessories were added
+    // after rental creation), generate them on-the-fly.
+    const { data: rental } = await supabaseAdmin
+      .from("rentals")
+      .select("metadata, vehicle_id, vehicles:cars(make, model)")
+      .eq("rental_id", rentalId)
+      .maybeSingle();
+
+    if (rental?.metadata) {
+      const meta = rental.metadata as Record<string, any>;
+      // Equipment can be in metadata.equipment (from contract vars) or
+      // metadata.handoff_equipment (from rental_handoffs)
+      const eq = meta.equipment || meta.handoff_equipment || {};
+      const existingTitles = rentalTodos.map(t => t.title.toLowerCase());
+      const vehicle = rental.vehicles as any;
+      const bikeName = vehicle ? `${vehicle.make} ${vehicle.model}` : "байк";
+
+      const accessoryItems: Array<{ title: string; priority: "low" | "medium" }> = [];
+      if (eq.helmets && Number(eq.helmets) > 0) {
+        accessoryItems.push({ title: `🪖 Принять ${eq.helmets} шлем(а/ов)`, priority: "medium" });
+      }
+      if (eq.gloves && Number(eq.gloves) > 0) {
+        accessoryItems.push({ title: `🧤 Принять ${eq.gloves} перчатки`, priority: "low" });
+      }
+      if (eq.jacket) accessoryItems.push({ title: `🧥 Принять куртку`, priority: "low" });
+      if (eq.boots) accessoryItems.push({ title: `👢 Принять боты`, priority: "low" });
+      if (eq.net) accessoryItems.push({ title: `🌐 Принять сетку`, priority: "low" });
+      if (eq.backpack) accessoryItems.push({ title: `👜 Принять рюкзак`, priority: "low" });
+      if (eq.bag) accessoryItems.push({ title: `👜 Принять сумку`, priority: "low" });
+      if (eq.charger) accessoryItems.push({ title: `🔌 Принять зарядное устройство`, priority: "medium" });
+
+      // Add items that don't already exist in the DB todos
+      for (const item of accessoryItems) {
+        if (!existingTitles.some(t => t.includes(item.title.toLowerCase().replace(/^[^\s]+\s/, "")))) {
+          rentalTodos.push({
+            id: `synthetic-${item.title}`,  // synthetic ID (not in DB)
+            title: item.title,
+            status: "pending",
+            priority: item.priority,
+            category: "lead_followup",
+          } as any);
+        }
+      }
+    }
 
     return {
       success: true,
