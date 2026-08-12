@@ -38,6 +38,19 @@ const TONE_COLOR: Record<LeadSignal["tone"], string> = {
 };
 
 /**
+ * Type guard for LeadRow validation at runtime.
+ * Provides type safety while maintaining defensive programming.
+ */
+function isValidLeadRow(lead: unknown): lead is LeadRow {
+  return (
+    typeof lead === "object" &&
+    lead !== null &&
+    "user_id" in lead &&
+    typeof (lead as LeadRow).user_id === "string"
+  );
+}
+
+/**
  * Lead card v2 — operational dashboard card.
  * - Left edge color stripe (3px wide, stage color)
  * - Avatar (40px mobile / 48px desktop) + name + verified check + task count badge
@@ -53,13 +66,11 @@ const TONE_COLOR: Record<LeadSignal["tone"], string> = {
  * accent indicator without eating into the card content.
  */
 export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Props) {
-  // Defensive null-guard: parent (LeadsClient) already filters nulls, but if a
-  // sparse array slips through we want a graceful fallback rather than a
-  // "Cannot read properties of null (reading 'stageKey')" runtime crash.
-  if (!lead || typeof lead !== "object") {
+  // Type guard provides both runtime safety and type narrowing
+  if (!isValidLeadRow(lead)) {
     return null;
   }
-  const stageKey = (lead as { stageKey?: string }).stageKey || "new";
+  const stageKey = lead.stageKey || "new";
   const stageColor = STAGE_COLORS[stageKey] || "#64748b";
   const stageLabel = STAGE_LABELS[stageKey] || stageKey;
   const displayName = lead.full_name || "Без имени";

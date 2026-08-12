@@ -11,11 +11,26 @@ import {
 import { activateRental, updateRentalStatus } from "@/app/franchize/server-actions/rentals-dashboard";
 import { fmtMoney, formatDate } from "../leads-utils";
 import { LeadsErrorBoundary } from "./LeadsErrorBoundary";
+import type { LeadRow } from "../leads-types";
+
+interface ThemeTokens {
+  bg: string;
+  bgElevated: string;
+  border: string;
+  text: string;
+  textFaint: string;
+  textSecondary: string;
+  primary: string;
+  primaryFaint: string;
+  success: string;
+  danger: string;
+  warning: string;
+}
 
 interface DealsPanelProps {
-  lead: any; // LeadRow
+  lead: LeadRow;
   slug: string;
-  T: any; // ThemeTokens
+  T: ThemeTokens;
 }
 
 export function DealsPanel({ lead, slug, T }: DealsPanelProps) {
