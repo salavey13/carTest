@@ -18,9 +18,16 @@ import {
   type CommissionRate,
 } from "@/app/franchize/server-actions/commissions";
 
+interface Crew {
+  id: string;
+  slug: string;
+  name: string;
+  theme: Record<string, string>;
+}
+
 interface CommissionsClientProps {
   crewSlug: string;
-  crew: any;
+  crew: Crew;
 }
 
 export function CommissionsClient({ crewSlug, crew }: CommissionsClientProps) {
