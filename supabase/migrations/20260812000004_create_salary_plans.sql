@@ -5,8 +5,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 --
 -- Salary plans define a payout period for a crew member.
--- Generated columns total_shift_income, total_commissions, total_accrued
--- aggregate from shifts and commissions for the period.
+-- NOTE: Generated columns removed (PostgreSQL doesn't support subqueries).
+--        Use salary_calculations table for computed breakdowns.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS public.salary_plans (
@@ -21,31 +21,14 @@ CREATE TABLE IF NOT EXISTS public.salary_plans (
   -- Payout schedule (default: 10th and 25th of month)
   payout_schedule   TEXT[] NOT NULL DEFAULT ARRAY['10', '25'],
 
-  -- Generated columns (aggregates from shifts + commissions)
-  total_shift_income NUMERIC GENERATED ALWAYS AS (
-    COALESCE((SELECT SUM(salary_amount) FROM public.crew_member_shifts
-              WHERE crew_id = salary_plans.crew_id
-                AND member_id = salary_plans.member_id
-                AND shift_start >= salary_plans.period_start
-                AND shift_start < salary_plans.period_end), 0)
-  ) STORED,
-
-  total_commissions NUMERIC GENERATED ALWAYS AS (
-    COALESCE((SELECT SUM(amount) FROM public.cash_transactions
-              WHERE crew_id = salary_plans.crew_id
-                AND to_user_id = salary_plans.member_id
-                AND transaction_type = 'expense_commission'
-                AND transaction_date >= salary_plans.period_start
-                AND transaction_date < salary_plans.period_end), 0)
-  ) STORED,
-
-  total_accrued     NUMERIC GENERATED ALWAYS AS (
-    COALESCE(total_shift_income, 0) + COALESCE(total_commissions, 0)
-  ) STORED,
-
-  -- Payout tracking
+  -- Manual accrual tracking (replaces generated columns)
+  base_salary       NUMERIC NOT NULL DEFAULT 0,
+  total_accrued     NUMERIC NOT NULL DEFAULT 0,
+  total_paid        NUMERIC NOT NULL DEFAULT 0,
   balance_due       NUMERIC NOT NULL DEFAULT 0,  -- total_accrued - total_paid
+
   last_payout_date  TIMESTAMPTZ,
+  notes             TEXT,
 
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -55,6 +38,22 @@ CREATE TABLE IF NOT EXISTS public.salary_plans (
 
 CREATE INDEX IF NOT EXISTS idx_salary_plans_crew_member ON public.salary_plans(crew_id, member_id);
 CREATE INDEX IF NOT EXISTS idx_salary_plans_period ON public.salary_plans(period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_salary_plans_balance ON public.salary_plans(balance_due) WHERE balance_due > 0;
+
+-- Trigger to update balance_due and updated_at
+CREATE OR REPLACE FUNCTION public.update_salary_plan_balance()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.balance_due := GREATEST(0, NEW.total_accrued - NEW.total_paid);
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_update_salary_plan_balance ON public.salary_plans;
+CREATE TRIGGER trg_update_salary_plan_balance
+  BEFORE INSERT OR UPDATE ON public.salary_plans
+  FOR EACH ROW EXECUTE FUNCTION public.update_salary_plan_balance();
 
 -- RLS: crew members can read own, crew owners can manage
 ALTER TABLE public.salary_plans ENABLE ROW LEVEL SECURITY;
@@ -76,4 +75,4 @@ CREATE POLICY "Crew owners can manage salary plans"
   );
 
 COMMENT ON TABLE public.salary_plans IS
-'I5: salary plans per crew member per period. Generated columns aggregate shift income + commissions. balance_due = total_accrued - total_paid. Default payout_schedule: [10, 25] (days of month).';
+'I5: salary plans per crew member per period. Manual accrual tracking (base_salary, total_accrued, total_paid, balance_due). Computed breakdowns stored in salary_calculations. Default payout_schedule: [10, 25] (days of month).';
