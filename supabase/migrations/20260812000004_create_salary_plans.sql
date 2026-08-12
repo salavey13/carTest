@@ -62,7 +62,7 @@ DROP POLICY IF EXISTS "Crew members can read own salary plans" ON public.salary_
 CREATE POLICY "Crew members can read own salary plans"
   ON public.salary_plans FOR SELECT
   TO authenticated USING (
-    user_id = auth.jwt() ->> 'chat_id'
+    member_id = auth.jwt() ->> 'chat_id'
   );
 
 DROP POLICY IF EXISTS "Crew owners can manage salary plans" ON public.salary_plans;

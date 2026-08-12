@@ -159,10 +159,11 @@ export function CommissionsClient({ crewSlug, crew }: CommissionsClientProps) {
 
   const getOperationLabel = (operation: string) => {
     const labels: Record<string, string> = {
-      rental: "Аренда",
+      rental_hourly: "Аренда (почасовая)",
+      rental_daily: "Аренда (посуточная)",
       sale: "Продажа",
-      service_return: "Возврат сервиса",
-      purchase: "Закупка",
+      service: "Сервис",
+      equipment_rental: "Аренда экипировки",
     };
     return labels[operation] || operation;
   };
@@ -233,10 +234,11 @@ export function CommissionsClient({ crewSlug, crew }: CommissionsClientProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="rental">Аренда</SelectItem>
+                      <SelectItem value="rental_hourly">Аренда (почасовая)</SelectItem>
+                      <SelectItem value="rental_daily">Аренда (посуточная)</SelectItem>
                       <SelectItem value="sale">Продажа</SelectItem>
-                      <SelectItem value="service_return">Возврат сервиса</SelectItem>
-                      <SelectItem value="purchase">Закупка</SelectItem>
+                      <SelectItem value="service">Сервис</SelectItem>
+                      <SelectItem value="equipment_rental">Аренда экипировки</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
