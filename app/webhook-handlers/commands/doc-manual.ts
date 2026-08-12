@@ -1533,6 +1533,14 @@ async function createRentalFromDocContract(
         price_override_amount: context.priceOverridden
           ? (context.cashAmount || 0) + (context.bankAmount || 0)
           : null,
+        // Fix: store odometer_before so RentalOdometerDelta can display it
+        odometer_before: context.odometerBefore || null,
+        // Fix: store payment split so closure modal can show "было получено"
+        payment_split: {
+          cash: context.cashAmount || 0,
+          bank: context.bankAmount || 0,
+          card_destination: context.paymentCardDestination || null,
+        },
       },
     };
 
