@@ -48,7 +48,73 @@ export function temperatureLabel(urgency: number | null | undefined, pendingTodo
   if (score >= 90) return "Горячий";
   if (score >= 60) return "Тёплый";
   if (score >= 30) return "Холодный";
-  return "Спящий";
+  return "Ледяной";
+}
+
+/**
+ * Generates CSV export of leads data.
+ * UTF-8 BOM for proper Excel Russian character display.
+ */
+export function generateLeadsCSV(leads: LeadRow[]): string {
+  const BOM = "﻿";
+  const headers = [
+    "ID",
+    "Имя",
+    "Телефон",
+    "Источник",
+    "Статус верификации",
+    "Тема",
+    "Этап",
+    "Байк",
+    "Создан",
+    "Активность",
+    "Срочность",
+    "Telegram ID"
+  ];
+
+  const rows = leads.map((lead) => {
+    const source = SOURCE_META[lead.source as keyof typeof SOURCE_META];
+    return [
+      lead.user_id,
+      lead.full_name || "Без имени",
+      lead.phone || "—",
+      source?.label || lead.source,
+      lead.verified ? "Верифицирован" : "Не верифицирован",
+      lead.intentType || "—",
+      lead.intentStage || "new",
+      lead.bikeTitle || "—",
+      lead.createdAt ? formatDate(lead.createdAt) : "—",
+      lead.lastSeenAt ? formatDate(lead.lastSeenAt) : "—",
+      lead.urgencyScore?.toString() || "0",
+      lead.telegramChatId || "—"
+    ].map((field) => {
+      // Escape quotes and wrap in quotes for CSV
+      const str = String(field).replace(/"/g, '""');
+      return `"${str}"`;
+    }).join(",");
+  });
+
+  return BOM + [headers.join(","), ...rows].join("\n");
+}
+
+/**
+ * Triggers browser download of CSV file.
+ */
+export function downloadLeadsCSV(leads: LeadRow[], filename: string = `leads-${new Date().toISOString().split('T')[0]}.csv`): void {
+  const csv = generateLeadsCSV(leads);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(url);
 }
 
 export function isToday(dateStr: string | null): boolean {
