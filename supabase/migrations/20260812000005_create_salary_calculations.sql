@@ -68,17 +68,17 @@ CREATE POLICY "Crew owners can manage salary calculations"
     )
   );
 
-COMMENT ON TABLE public.salary_calculations IS
-'I5: salary calculation records (payouts). Links to salary_plans, stores breakdown snapshot. When paid, creates expense_salary in cash_transactions and links via cash_transaction_id. Updates salary_plans.total_paid and balance_due via trigger.';
-
 -- ── Trigger: Update salary_plans when payout is marked as paid ─────────────────────
 CREATE OR REPLACE FUNCTION public.update_salary_plan_on_payout()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
   -- When a calculation is marked as paid, update the parent plan
+  -- IDEMPOTENCY: Only increment total_paid on transition to 'paid'
   IF NEW.payout_status = 'paid' AND (OLD IS NULL OR OLD.payout_status IS DISTINCT FROM 'paid') THEN
     UPDATE public.salary_plans
-    SET total_paid = total_paid + NEW.total_income,
+    SET total_paid = total_paid +
+          CASE WHEN OLD IS NULL OR OLD.payout_status IS DISTINCT FROM 'paid'
+               THEN NEW.total_income ELSE 0 END,
         last_payout_date = NEW.paid_at
     WHERE id = NEW.salary_plan_id;
   END IF;
@@ -94,4 +94,4 @@ CREATE TRIGGER trg_update_salary_plan_on_payout
   FOR EACH ROW EXECUTE FUNCTION public.update_salary_plan_on_payout();
 
 COMMENT ON FUNCTION public.update_salary_plan_on_payout() IS
-'I5: Updates salary_plans.total_paid and last_payout_date when a salary calculation is marked as paid.';
+'I5: Updates salary_plans.total_paid and last_payout_date when a salary calculation is marked as paid. Idempotent: only increments on transition to paid status.';

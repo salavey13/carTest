@@ -5,6 +5,8 @@ import {
   createManualCashTransaction,
 } from "@/app/franchize/server-actions/cash-transactions";
 import { logger } from "@/lib/logger";
+import { verifyTelegramActorCookieValue, TELEGRAM_ACTOR_COOKIE } from "@/lib/telegram-actor-cookie";
+import { cookies } from "next/headers";
 
 /**
  * API routes for cash transactions.
@@ -15,15 +17,27 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { slug } = await params;
     const { searchParams } = new URL(request.url);
-    const actorUserId = searchParams.get("actorUserId");
     const from = searchParams.get("from");
     const to = searchParams.get("to");
     const type = searchParams.get("type");
     const category = searchParams.get("category");
 
-    if (!slug || !actorUserId) {
+    // SECURITY: Derive actorUserId from auth cookie, not query params
+    const cookieStore = await cookies();
+    const actorUserId = verifyTelegramActorCookieValue(
+      cookieStore.get(TELEGRAM_ACTOR_COOKIE)?.value,
+    );
+
+    if (!actorUserId) {
       return NextResponse.json(
-        { success: false, error: "Missing slug or actorUserId" },
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    if (!slug) {
+      return NextResponse.json(
+        { success: false, error: "Missing slug" },
         { status: 400 }
       );
     }
@@ -64,11 +78,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const { slug } = await params;
     const body = await request.json();
-    const { actorUserId, type, category, amount, method, description } = body;
+    const { type, category, amount, method, description } = body;
 
-    if (!slug || !actorUserId || !type || !amount) {
+    // SECURITY: Derive actorUserId from auth cookie, not request body
+    const cookieStore = await cookies();
+    const actorUserId = verifyTelegramActorCookieValue(
+      cookieStore.get(TELEGRAM_ACTOR_COOKIE)?.value,
+    );
+
+    if (!actorUserId) {
       return NextResponse.json(
-        { success: false, error: "Missing required fields (slug, actorUserId, type, amount)" },
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    if (!slug || !type || !amount) {
+      return NextResponse.json(
+        { success: false, error: "Missing required fields (slug, type, amount)" },
         { status: 400 }
       );
     }
