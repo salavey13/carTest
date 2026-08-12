@@ -16,6 +16,46 @@ import {
  * Plan: docs/superpowers/plans/2026-08-12-i5-commissions-salary.md (Task 3)
  */
 
+// Cache для расчётов зарплаты (24 часа TTL для оптимизации повторных запросов)
+const salaryCalcCache = new Map<string, { data: any; expiry: number }>();
+
+/**
+ * Проверяет, пересекаются ли периоды дат.
+ *
+ * @param existingStart - Начало существующего периода
+ * @param existingEnd - Конец существующего периода
+ * @param newStart - Начало нового периода
+ * @param newEnd - Конец нового периода
+ * @returns true если периоды пересекаются
+ */
+function periodsOverlap(
+  existingStart: string,
+  existingEnd: string,
+  newStart: string,
+  newEnd: string
+): boolean {
+  const eStart = new Date(existingStart);
+  const eEnd = new Date(existingEnd);
+  const nStart = new Date(newStart);
+  const nEnd = new Date(newEnd);
+
+  // Периоды пересекаются если: (StartA <= EndB) и (EndA >= StartB)
+  return eStart < nEnd && eEnd > nStart;
+}
+
+/**
+ * Получает существующий план зарплаты или создаёт новый для указанного периода.
+ *
+ * @param params - Параметры для получения/создания плана
+ * @param params.slug - Slug команды для доступа
+ * @param params.actorUserId - ID пользователя, выполняющего действие
+ * @param params.memberId - ID сотрудника, для которого создаётся план
+ * @param params.periodStart - Начало периода в формате ISO
+ * @param params.periodEnd - Конец периода в формате ISO
+ * @returns Объект с success и id плана, или error
+ *
+ * @throws Возвращает ошибку, если пользователь не владелец или период некорректен
+ */
 export async function getOrCreateSalaryPlan(params: {
   slug: string;
   actorUserId: string;
@@ -25,10 +65,17 @@ export async function getOrCreateSalaryPlan(params: {
 }): Promise<ActionResponse<{ id: string }>> {
   const { slug, actorUserId, memberId, periodStart, periodEnd } = params;
 
+  // Валидация периодов
+  const startDate = new Date(periodStart);
+  const endDate = new Date(periodEnd);
+  if (startDate >= endDate) {
+    return { success: false, error: "Дата начала должна быть раньше даты окончания." };
+  }
+
   try {
     const access = await verifyCrewAccess(slug);
     if (!access.allowed || !access.isOwner) {
-      return { success: false, error: access.error || "Только владелец." };
+      return { success: false, error: access.error || "Только владелец может управлять планами зарплаты." };
     }
 
     // Try to get existing plan
@@ -43,6 +90,28 @@ export async function getOrCreateSalaryPlan(params: {
 
     if (existing) {
       return { success: true, data: { id: existing.id } };
+    }
+
+    // Проверка на пересечение периодов (защита от дублирования)
+    const { data: overlappingPlans } = await supabaseAdmin
+      .from("salary_plans")
+      .select("id, period_start, period_end")
+      .eq("crew_id", access.crewId)
+      .eq("member_id", memberId);
+
+    if (overlappingPlans && overlappingPlans.length > 0) {
+      const hasOverlap = overlappingPlans.some(plan =>
+        periodsOverlap(plan.period_start, plan.period_end, periodStart, periodEnd)
+      );
+
+      if (hasOverlap) {
+        logger.warn("[getOrCreateSalaryPlan] Period overlap detected", {
+          crewId: access.crewId,
+          memberId,
+          newPeriod: { start: periodStart, end: periodEnd },
+        });
+        return { success: false, error: "Период пересекается с существующим планом зарплаты." };
+      }
     }
 
     // Create new plan
@@ -71,6 +140,22 @@ export async function getOrCreateSalaryPlan(params: {
   }
 }
 
+/**
+ * Рассчитывает доход сотрудника за указанный период.
+ *
+ * @param params - Параметры для расчёта зарплаты
+ * @param params.slug - Slug команды
+ * @param params.actorUserId - ID пользователя, запрашивающего расчёт
+ * @param params.memberId - ID сотрудника
+ * @param params.periodStart - Начало периода
+ * @param params.periodEnd - Конец периода
+ * @returns Объект с breakdown доходов (смены, комиссии, бонусы) и итоговыми суммами
+ *
+ * Вычисляет доход от:
+ * - Смены (salary_amount из crew_member_shifts)
+ * - Комиссии (expense_commission транзакции)
+ * - Бонусы (зарезервировано для будущего использования)
+ */
 export async function calculateSalaryForPeriod(params: {
   slug: string;
   actorUserId: string;
@@ -93,6 +178,14 @@ export async function calculateSalaryForPeriod(params: {
     }
 
     // Get shift income
+    // Проверяем кеш для расчётов зарплаты (оптимизация повторных запросов)
+    const cacheKey = `${access.crewId}-${memberId}-${periodStart}-${periodEnd}`;
+    const cached = salaryCalcCache.get(cacheKey);
+    if (cached && cached.expiry > Date.now()) {
+      logger.debug("[calculateSalaryForPeriod] Cache hit", { cacheKey });
+      return successResponse(cached.data);
+    }
+
     const { data: shifts, error: shiftError } = await supabaseAdmin
       .from("crew_member_shifts")
       .select("salary_amount, shift_start, bike_id")
@@ -105,7 +198,10 @@ export async function calculateSalaryForPeriod(params: {
       logger.warn("[calculateSalaryForPeriod] Shifts query failed:", shiftError);
     }
 
-    const shiftIncome = (shifts || []).reduce((sum: number, s: any) => sum + Number(s.salary_amount || 0), 0);
+    const shiftIncome = (shifts || []).reduce((sum: number, s: any) => {
+      const amount = Number(s.salary_amount || 0);
+      return sum + (amount > 0 ? amount : 0); // Защита от отрицательных значений
+    }, 0);
 
     // Get commission income
     const { data: commissions, error: commError } = await supabaseAdmin
@@ -121,7 +217,10 @@ export async function calculateSalaryForPeriod(params: {
       logger.warn("[calculateSalaryForPeriod] Commissions query failed:", commError);
     }
 
-    const commissionIncome = (commissions || []).reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
+    const commissionIncome = (commissions || []).reduce((sum: number, c: any) => {
+      const amount = Number(c.amount || 0);
+      return sum + (amount > 0 ? amount : 0); // Защита от отрицательных значений
+    }, 0);
 
     // Build breakdown
     const breakdown: Array<{ type: string; amount: number; description: string }> = [];
@@ -130,19 +229,42 @@ export async function calculateSalaryForPeriod(params: {
 
     const totalIncome = shiftIncome + commissionIncome;
 
-    return successResponse({
+    const result = {
       shiftIncome,
       commissionIncome,
       bonusIncome: 0,
       totalIncome,
       breakdown,
+    };
+
+    // Кэшируем результат на 24 часа
+    salaryCalcCache.set(cacheKey, {
+      data: result,
+      expiry: Date.now() + 24 * 60 * 60 * 1000, // 24 часа
     });
+
+    return successResponse(result);
   } catch (err) {
     logger.error("[calculateSalaryForPeriod] Exception:", err);
     return errorResponse(handleError(err, "calculateSalaryForPeriod"));
   }
 }
 
+/**
+ * Регистрирует выплату зарплаты, создавая транзакцию и обновляя статус расчёта.
+ *
+ * @param params - Параметры для записи выплаты
+ * @param params.slug - Slug команды
+ * @param params.actorUserId - ID пользователя, выполняющего выплату
+ * @param params.salaryCalcId - ID расчёта зарплаты
+ * @returns Объект с success или error
+ *
+ * Процесс:
+ * 1. Проверяет права доступа (владелец)
+ * 2. Проверяет idempotency — если уже выплачено, возвращает success без изменений
+ * 3. Создаёт транзакцию expense_salary
+ * 4. Обновляет статус расчёта на "paid"
+ */
 export async function recordPayout(params: {
   slug: string;
   actorUserId: string;
@@ -153,7 +275,7 @@ export async function recordPayout(params: {
   try {
     const access = await verifyCrewAccess(slug);
     if (!access.allowed || !access.isOwner) {
-      return { success: false, error: access.error || "Только владелец." };
+      return { success: false, error: access.error || "Только владелец может выплачивать зарплату." };
     }
 
     // Get salary calculation details
@@ -236,6 +358,18 @@ export async function recordPayout(params: {
   }
 }
 
+/**
+ * Получает сводку заработка текущего пользователя.
+ *
+ * @param params - Параметры запроса
+ * @param params.slug - Slug команды
+ * @param params.actorUserId - ID пользователя
+ * @returns Текущий план зарплаты и последние комиссии
+ *
+ * Данные включают:
+ * - currentPlan: начисленные суммы, баланс, следующая дата выплаты
+ * - recentCommissions: до 10 последних комиссионных транзакций
+ */
 export async function getMyEarnings(params: {
   slug: string;
   actorUserId: string;

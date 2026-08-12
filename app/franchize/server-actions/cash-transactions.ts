@@ -35,6 +35,21 @@ export interface CashTransaction {
   createdBy?: string;
 }
 
+/**
+ * Получает транзакции кассы с фильтрацией и подсчётом итогов.
+ *
+ * @param params - Параметры для получения транзакций
+ * @param params.slug - Slug команды
+ * @param params.actorUserId - ID пользователя
+ * @param params.from - Начало периода (ISO string)
+ * @param params.to - Конец периода (ISO string)
+ * @param params.transactionType - Фильтр по типу транзакции
+ * @returns Транзакции и сводка (входящие, исходящие, чистый поток)
+ *
+ * Возвращает:
+ * - data: массив транзакций
+ * - summary: итоги по incoming/outgoing/net потокам
+ */
 export async function getCashTransactions(params: {
   slug: string;
   actorUserId: string;
@@ -48,6 +63,17 @@ export async function getCashTransactions(params: {
   error?: string;
 }> {
   const { slug, actorUserId, from, to, transactionType } = params;
+
+  // Валидация формата дат
+  if (from && isNaN(new Date(from).getTime())) {
+    return { success: false, error: "Некорректный формат даты начала." };
+  }
+  if (to && isNaN(new Date(to).getTime())) {
+    return { success: false, error: "Некорректный формат даты окончания." };
+  }
+  if (from && to && new Date(from) > new Date(to)) {
+    return { success: false, error: "Дата начала должна быть раньше даты окончания." };
+  }
 
   try {
     const access = await verifyCrewAccess(slug);
@@ -79,24 +105,27 @@ export async function getCashTransactions(params: {
       return { success: false, error: "Не удалось загрузить транзакции." };
     }
 
-    const formatted = (transactions || []).map((t: any) => ({
-      id: t.id,
-      crewId: t.crew_id,
-      rentalId: t.rental_id,
-      saleContractId: t.sale_contract_id,
-      equipmentRentalId: t.equipment_rental_id,
-      salaryCalcId: t.salary_calc_id,
-      transactionType: t.transaction_type,
-      flowDirection: t.flow_direction,
-      amount: Number(t.amount),
-      paymentMethod: t.payment_method,
-      fromUserId: t.from_user_id,
-      toUserId: t.to_user_id,
-      category: t.category,
-      description: t.description,
-      transactionDate: t.transaction_date,
-      createdBy: t.created_by,
-    }));
+    const formatted = (transactions || []).map((t: any) => {
+      const amount = Number(t.amount || 0);
+      return {
+        id: t.id,
+        crewId: t.crew_id,
+        rentalId: t.rental_id,
+        saleContractId: t.sale_contract_id,
+        equipmentRentalId: t.equipment_rental_id,
+        salaryCalcId: t.salary_calc_id,
+        transactionType: t.transaction_type,
+        flowDirection: t.flow_direction,
+        amount: amount > 0 ? amount : 0, // Защита от отрицательных сумм
+        paymentMethod: t.payment_method,
+        fromUserId: t.from_user_id,
+        toUserId: t.to_user_id,
+        category: t.category,
+        description: t.description,
+        transactionDate: t.transaction_date,
+        createdBy: t.created_by,
+      };
+    });
 
     // Calculate summary
     const totalIn = formatted
@@ -121,6 +150,24 @@ export async function getCashTransactions(params: {
   }
 }
 
+/**
+ * Создаёт ручную транзакцию кассы.
+ *
+ * @param params - Параметры для создания транзакции
+ * @param params.slug - Slug команды
+ * @param params.actorUserId - ID пользователя
+ * @param params.transactionType - Тип транзакции (например, 'income_other', 'expense_other')
+ * @param params.amount - Сумма (должна быть > 0)
+ * @param params.paymentMethod - Способ оплаты (по умолчанию 'cash')
+ * @param params.category - Категория для отчётности
+ * @param params.description - Описание транзакции
+ * @returns Объект с success и id созданной транзакции
+ *
+ * Валидация:
+ * - Сумма должна быть положительной
+ * - Только владелец или администратор может создавать записи
+ * - flow_direction определяется автоматически из префикса transaction_type
+ */
 export async function createManualCashTransaction(params: {
   slug: string;
   actorUserId: string;
@@ -132,8 +179,14 @@ export async function createManualCashTransaction(params: {
 }): Promise<ActionResponse<{ id: string }>> {
   const { slug, actorUserId, transactionType, amount, paymentMethod, category, description } = params;
 
+  // Валидация суммы
   if (amount <= 0) {
     return { success: false, error: "Сумма должна быть больше нуля." };
+  }
+
+  // Валидация типа транзакции
+  if (!transactionType || transactionType.trim() === "") {
+    return { success: false, error: "Тип транзакции обязателен." };
   }
 
   try {
@@ -201,6 +254,21 @@ export async function createManualCashTransaction(params: {
   }
 }
 
+/**
+ * Получает ежедневный отчёт по кассе.
+ *
+ * @param params - Параметры для ежедневного отчёта
+ * @param params.slug - Slug команды
+ * @param params.actorUserId - ID пользователя
+ * @param params.date - Дата для отчёта (ISO string)
+ * @returns Сводка за день и детальные транзакции
+ *
+ * Возвращает:
+ * - totalIn: входящий поток за день
+ * - totalOut: исходящий поток за день
+ * - net: чистое изменение
+ * - transactions: все транзакции за день
+ */
 export async function getDailyCashReport(params: {
   slug: string;
   actorUserId: string;
@@ -213,6 +281,11 @@ export async function getDailyCashReport(params: {
   transactions: CashTransaction[];
 }>> {
   const { slug, actorUserId, date } = params;
+
+  // Валидация формата даты
+  if (!date || isNaN(new Date(date).getTime())) {
+    return { success: false, error: "Некорректный формат даты. Используйте формат ISO (YYYY-MM-DD)." };
+  }
 
   try {
     const access = await verifyCrewAccess(slug);
@@ -250,24 +323,27 @@ export async function getDailyCashReport(params: {
       return { success: false, error: "Не удалось загрузить отчёт." };
     }
 
-    const formatted = (transactions || []).map((t: any) => ({
-      id: t.id,
-      crewId: t.crew_id,
-      rentalId: t.rental_id,
-      saleContractId: t.sale_contract_id,
-      equipmentRentalId: t.equipment_rental_id,
-      salaryCalcId: t.salary_calc_id,
-      transactionType: t.transaction_type,
-      flowDirection: t.flow_direction,
-      amount: Number(t.amount),
-      paymentMethod: t.payment_method,
-      fromUserId: t.from_user_id,
-      toUserId: t.to_user_id,
-      category: t.category,
-      description: t.description,
-      transactionDate: t.transaction_date,
-      createdBy: t.created_by,
-    }));
+    const formatted = (transactions || []).map((t: any) => {
+      const amount = Number(t.amount || 0);
+      return {
+        id: t.id,
+        crewId: t.crew_id,
+        rentalId: t.rental_id,
+        saleContractId: t.sale_contract_id,
+        equipmentRentalId: t.equipment_rental_id,
+        salaryCalcId: t.salary_calc_id,
+        transactionType: t.transaction_type,
+        flowDirection: t.flow_direction,
+        amount: amount > 0 ? amount : 0, // Защита от отрицательных сумм
+        paymentMethod: t.payment_method,
+        fromUserId: t.from_user_id,
+        toUserId: t.to_user_id,
+        category: t.category,
+        description: t.description,
+        transactionDate: t.transaction_date,
+        createdBy: t.created_by,
+      };
+    });
 
     const totalIn = formatted
       .filter((t) => t.flowDirection === "in")
