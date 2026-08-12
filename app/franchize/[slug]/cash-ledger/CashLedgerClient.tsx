@@ -14,6 +14,17 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 
+// Accessibility helpers
+const ariaLabels = {
+  showForm: "Показать форму добавления транзакции",
+  hideForm: "Скрыть форму добавления транзакции",
+  submitTransaction: "Добавить транзакцию",
+  filterByType: "Фильтр по типу транзакции",
+  clearFromDate: "Очистить дату начала",
+  clearToDate: "Очистить дату конца",
+  transactionsTable: "Таблица транзакций",
+} as const;
+
 interface CashTransaction {
   id: string;
   transactionType: string;
@@ -31,9 +42,16 @@ interface CashSummary {
   net: number;
 }
 
+interface Crew {
+  id: string;
+  slug: string;
+  name: string;
+  theme: Record<string, string>;
+}
+
 interface CashLedgerClientProps {
   crewSlug: string;
-  crew: any;
+  crew: Crew;
 }
 
 export function CashLedgerClient({ crewSlug, crew }: CashLedgerClientProps) {
@@ -209,6 +227,7 @@ export function CashLedgerClient({ crewSlug, crew }: CashLedgerClientProps) {
         {isOwner && (
           <Button
             onClick={() => setShowForm(!showForm)}
+            aria-label={showForm ? ariaLabels.hideForm : ariaLabels.showForm}
             style={tokens.styles.ctaPrimary}
             className="min-h-[44px] px-4"
           >
@@ -419,6 +438,7 @@ export function CashLedgerClient({ crewSlug, crew }: CashLedgerClientProps) {
                 <Button
                   type="submit"
                   disabled={submitting}
+                  aria-label={ariaLabels.submitTransaction}
                   style={tokens.styles.ctaPrimary}
                   className="min-h-[44px] px-6"
                 >
