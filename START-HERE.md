@@ -136,13 +136,14 @@ carTest/
 - ✅ Doc-manual step correction + sale delivery
 - ✅ Accessories/todos dedup — `crew_todos` is single source of truth; rentals page shows pending todos (`5437369e`)
 
-**Shipped (I5, 2026-08-12):**
+**Shipped (I5 + I5b, 2026-08-12):**
 - ✅ **Equipment rentals** — Standalone equipment (helmets/jackets/gloves/boots) with table, UI, doc-manual integration
-- ✅ **Cash ledger** — Unified cash_transactions table + triggers (idempotent I1 pattern) + backfill
-- ✅ **Commissions** — Configurable rates per operation (percentage/fixed), default 10% rental_hourly
-- ✅ **Salary** — Plans, calculations, payouts, "My Earnings"/"My Work" profile sections
+- ✅ **Cash ledger** — Unified cash_transactions table + triggers (idempotent I1 pattern) + backfill + API + UI page
+- ✅ **Commissions** — Configurable rates per operation (percentage/fixed), default 10% rental_hourly + config UI
+- ✅ **Salary** — Plans, calculations, payouts, "My Earnings"/"My Work" profile sections + admin page
 - ✅ **8 migrations** — `20260812000001-20260812` (equipment, cash, commissions, salary, triggers, backfill)
-- ✅ **4 commits pushed** — `feat/i5-service-operations` → ready for merge
+- ✅ **5 crew-specific UI pages** — /cash-ledger, /commissions, /salary, profile sections
+- ✅ **3 API routes** — cash-transactions, daily-report, salary/[memberId]
 
 **See `CODEREVIEW_LEADS_RENTALS.md` for details.**
 

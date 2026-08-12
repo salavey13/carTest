@@ -3,63 +3,18 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
+import {
+  verifyCrewAccess,
+  handleError,
+  successResponse,
+  errorResponse,
+  type ActionResponse,
+} from "./shared/auth-helpers";
 
 /**
  * I5 — Cash ledger server actions.
  * Plan: docs/superpowers/plans/2026-08-12-i5-cash-ledger.md (Task 4)
  */
-
-// Auth helper (reuse pattern from equipment-rentals.ts)
-async function verifyCrewAccess(
-  slug: string,
-): Promise<{ allowed: boolean; crewId?: string; actorUserId?: string; error?: string }> {
-  const { cookies } = await import("next/headers");
-  const { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } = await import("@/lib/telegram-actor-cookie");
-
-  const cookieUserId = verifyTelegramActorCookieValue(
-    (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
-  );
-
-  if (cookieUserId) {
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("metadata")
-      .eq("user_id", cookieUserId)
-      .maybeSingle();
-
-    const userMetadata = user?.metadata as Record<string, unknown> | null;
-    const isAdmin = userMetadata?.role === "admin" || userMetadata?.status === "admin";
-
-    const { data: crew } = await supabaseAdmin
-      .from("crews")
-      .select("id, owner_id")
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (!crew) {
-      return { allowed: false, error: "Экипаж не найден." };
-    }
-
-    if (crew.owner_id === cookieUserId || isAdmin) {
-      return { allowed: true, crewId: crew.id, actorUserId: cookieUserId };
-    }
-
-    const { data: membership } = await supabaseAdmin
-      .from("crew_members")
-      .select("role, membership_status")
-      .eq("crew_id", crew.id)
-      .eq("user_id", cookieUserId)
-      .maybeSingle();
-
-    if (membership?.membership_status === "active") {
-      return { allowed: true, crewId: crew.id, actorUserId: cookieUserId };
-    }
-
-    return { allowed: false, error: "Недостаточно прав." };
-  }
-
-  return { allowed: false, error: "Не авторизовано." };
-}
 
 export interface CashTransaction {
   id: string;
@@ -160,9 +115,9 @@ export async function getCashTransactions(params: {
         net: totalIn - totalOut,
       },
     };
-  } catch (err: any) {
+  } catch (err) {
     logger.error("[getCashTransactions] Exception:", err);
-    return { success: false, error: err?.message || "Unknown error." };
+    return errorResponse(handleError(err, "getCashTransactions"));
   }
 }
 
@@ -174,7 +129,7 @@ export async function createManualCashTransaction(params: {
   paymentMethod?: string;
   category?: string;
   description?: string;
-}): Promise<{ success: boolean; data?: { id: string }; error?: string }> {
+}): Promise<ActionResponse<{ id: string }>> {
   const { slug, actorUserId, transactionType, amount, paymentMethod, category, description } = params;
 
   if (amount <= 0) {
@@ -239,10 +194,10 @@ export async function createManualCashTransaction(params: {
       amount,
     });
 
-    return { success: true, data: { id: transaction.id } };
-  } catch (err: any) {
+    return successResponse({ id: transaction.id });
+  } catch (err) {
     logger.error("[createManualCashTransaction] Exception:", err);
-    return { success: false, error: err?.message || "Unknown error." };
+    return errorResponse(handleError(err, "createManualCashTransaction"));
   }
 }
 
@@ -250,17 +205,13 @@ export async function getDailyCashReport(params: {
   slug: string;
   actorUserId: string;
   date: string;
-}): Promise<{
-  success: boolean;
-  data?: {
-    date: string;
-    totalIn: number;
-    totalOut: number;
-    net: number;
-    transactions: CashTransaction[];
-  };
-  error?: string;
-}> {
+}): Promise<ActionResponse<{
+  date: string;
+  totalIn: number;
+  totalOut: number;
+  net: number;
+  transactions: CashTransaction[];
+}>> {
   const { slug, actorUserId, date } = params;
 
   try {
@@ -325,18 +276,15 @@ export async function getDailyCashReport(params: {
       .filter((t) => t.flowDirection === "out")
       .reduce((sum, t) => sum + t.amount, 0);
 
-    return {
-      success: true,
-      data: {
-        date,
-        totalIn: summary?.total_in ? Number(summary.total_in) : totalIn,
-        totalOut: summary?.total_out ? Number(summary.total_out) : totalOut,
-        net: summary?.net_flow ? Number(summary.net_flow) : totalIn - totalOut,
-        transactions: formatted,
-      },
-    };
-  } catch (err: any) {
+    return successResponse({
+      date,
+      totalIn: summary?.total_in ? Number(summary.total_in) : totalIn,
+      totalOut: summary?.total_out ? Number(summary.total_out) : totalOut,
+      net: summary?.net_flow ? Number(summary.net_flow) : totalIn - totalOut,
+      transactions: formatted,
+    });
+  } catch (err) {
     logger.error("[getDailyCashReport] Exception:", err);
-    return { success: false, error: err?.message || "Unknown error." };
+    return errorResponse(handleError(err, "getDailyCashReport"));
   }
 }
