@@ -173,7 +173,7 @@ async function validateUpload(
 > {
   const { data: rental, error } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id, user_id, owner_id, vehicle_id, status, agreed_start_date")
+    .select("rental_id, user_id, owner_id, vehicle_id, status, agreed_start_date, metadata, updated_at")
     .eq("rental_id", rentalId)
     .maybeSingle();
 
@@ -204,10 +204,29 @@ async function validateUpload(
       };
     }
   } else {
-    if (rental.status !== "active") {
+    // ПОСЛЕ photos: allowed when status='active', OR when status='completed'
+    // within 1 hour of closure (similar to ДО photos for active within 1h of start).
+    // Operator might have closed the rental but still wants to add return photos.
+    const allowedEndStatuses = ["active"];
+    if (rental.status === "completed") {
+      // Check if closure was less than 1 hour ago
+      // Closure timestamp is in metadata.return_confirmed_at or metadata.closure_data.return_confirmed_at
+      const closureTs = (rental as any).metadata?.return_confirmed_at
+        || (rental as any).metadata?.closure_data?.return_confirmed_at
+        || (rental as any).updated_at;
+      if (closureTs) {
+        const closureTime = new Date(closureTs).getTime();
+        const now = Date.now();
+        const ONE_HOUR = 60 * 60 * 1000;
+        if (now - closureTime < ONE_HOUR) {
+          allowedEndStatuses.push("completed");
+        }
+      }
+    }
+    if (!allowedEndStatuses.includes(rental.status)) {
       return {
         ok: false,
-        error: "Фото ПОСЛЕ можно добавить только для активной аренды.",
+        error: "Фото ПОСЛЕ можно добавить только для активной аренды или в течение часа после закрытия.",
       };
     }
   }
