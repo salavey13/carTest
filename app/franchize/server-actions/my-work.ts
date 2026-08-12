@@ -3,6 +3,7 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
+import { handleError } from "./shared/auth-helpers";
 
 /**
  * I5 — My Work server actions for profile sections.
@@ -157,8 +158,8 @@ export async function getMyWorkTodayAction(params: {
         },
       },
     };
-  } catch (err: any) {
+  } catch (err) {
     logger.error("[getMyWorkTodayAction] Exception:", err);
-    return { success: false, error: err?.message || "Unknown error." };
+    return { success: false, error: handleError(err, "getMyWorkTodayAction") };
   }
 }

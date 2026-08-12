@@ -68,6 +68,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { AnalyticsPasswordEntry } from "@/app/franchize/components/AnalyticsPasswordEntry";
 import { AnalyticsLoading } from "@/app/franchize/components/AnalyticsLoading";
 import { LeadsErrorBoundary } from "./LeadsErrorBoundary";
+import { downloadLeadsCSV } from "../leads-utils";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -230,6 +231,16 @@ export function LeadsClient({
     getTodosForLead,
     getLeadSignals,
   });
+
+  // ── CSV Export ──
+  const handleExport = useCallback(() => {
+    const leadsToExport = sortedLeads.filter(lead => {
+      // Apply current filters to export
+      if (filterFlags.hideOperatorPlaceholders && !lead.user_id.startsWith("u")) return false;
+      return true;
+    });
+    downloadLeadsCSV(leadsToExport, `leads-${slug}-${new Date().toISOString().split('T')[0]}.csv`);
+  }, [sortedLeads, filterFlags, slug]);
 
   // ── Selected lead (derived from sortedLeads + selectedId) ──
   const selectedLead = useMemo(
@@ -446,7 +457,7 @@ export function LeadsClient({
           onFilterFlagsChange={handleFilterFlagsChange}
           viewMode={viewMode}
           onViewModeChange={(v) => setViewMode(v as "list" | "board")}
-          onExport={undefined}  // LOW #21: disabled until CSV export is implemented
+          onExport={handleExport}
           T={T}
         />
 
