@@ -118,27 +118,32 @@ carTest/
 | `README.MD` | Full project setup and operations guide |
 | `docs/README_TLDR.md` | Quick reference for common operations |
 | `AGENTS.md` | Agent operating guide with triggers and prohibitions |
-| `CODEREVIEW_LEADS_RENTALS.md` | Latest code review findings (accessories/todos duplication) |
+| `CODEREVIEW_LEADS_RENTALS.md` | Latest code review findings (accessories/todos duplication — **fixed**) |
 | `docs/META_PRD_ITERATIVE_IMPLEMENTATION_PLAN.md` | Coordination across 4 PRDs (deposit, doc-manual, photos, services) |
 | `docs/FRANCHIZE_SERVICE_OPERATIONS_PRD.md` | Services PRD v4.1 (I5 — ready for implementation) |
+| `PLAN-I5-SERVICE-OPERATIONS.md` | I5 wave orchestration (teams, contract, gates) |
+| `docs/superpowers/plans/` | I5 task plans broken into tasks with ready tests — бери и делай по шагам |
 | `docs/RENTAL_PHOTO_UPLOAD_PRD.md` | Photo upload PRD v1.3 (shipped) |
 
 ---
 
-## 6. Current Status (2026-08-11)
+## 6. Current Status (2026-08-12)
 
 **Recently Shipped (I1-I4):**
 - ✅ Deposit trigger idempotency fix (`20260811000000_deposit_trigger_double_return_guard.sql`)
 - ✅ Deposit visibility + penalty capture UI
 - ✅ Rental photos MVP + retention cron + unit tests
 - ✅ Doc-manual step correction + sale delivery
+- ✅ Accessories/todos dedup — `crew_todos` is single source of truth; rentals page shows pending todos (`5437369e`)
 
-**Ready for Implementation (I5):**
-- 📋 **FRANCHIZE_SERVICE_OPERATIONS_PRD v4.1** — Equipment rentals, cash transactions, commissions, salary plans
-
-**Known Issues (Being Fixed):**
-- 🔴 **Accessories/todos duplication** — Two parallel systems (metadata JSONB vs crew_todos table)
-- 🟡 **Rentals page missing todos display** — Need to add accessory + basic return todos
+**Shipped (I5 + I5b, 2026-08-12):**
+- ✅ **Equipment rentals** — Standalone equipment (helmets/jackets/gloves/boots) with table, UI, doc-manual integration
+- ✅ **Cash ledger** — Unified cash_transactions table + triggers (idempotent I1 pattern) + backfill + API + UI page
+- ✅ **Commissions** — Configurable rates per operation (percentage/fixed), default 10% rental_hourly + config UI
+- ✅ **Salary** — Plans, calculations, payouts, "My Earnings"/"My Work" profile sections + admin page
+- ✅ **8 migrations** — `20260812000001-20260812` (equipment, cash, commissions, salary, triggers, backfill)
+- ✅ **5 crew-specific UI pages** — /cash-ledger, /commissions, /salary, profile sections
+- ✅ **3 API routes** — cash-transactions, daily-report, salary/[memberId]
 
 **See `CODEREVIEW_LEADS_RENTALS.md` for details.**
 
@@ -208,5 +213,5 @@ For questions or issues:
 
 ---
 
-**Last Updated:** 2026-08-11
-**Status:** ✅ Active development — I5 (services) ready for implementation
+**Last Updated:** 2026-08-12
+**Status:** ✅ Active development — I5 (services) wave planned, Этап 1 ready to start

@@ -11,37 +11,45 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createHash } from "crypto";
 
 // Mock the supabaseAdmin + sharp before importing the module under test
-vi.mock("@/lib/supabase-server", () => ({
-  supabaseAdmin: {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          maybeSingle: vi.fn(() => ({ data: null, error: null })),
+vi.mock("@/lib/supabase-server", () => {
+  // Build self-referential chain that supports: from().select().eq().maybeSingle(),
+  // from().select().eq().eq().maybeSingle(), from().select().eq().order(), etc.
+  const buildChain = () => ({
+    select: vi.fn(() => buildChain()),
+    eq: vi.fn(() => buildChain()),
+    in: vi.fn(() => buildChain()),
+    order: vi.fn(() => buildChain()),
+    limit: vi.fn(() => buildChain()),
+    single: vi.fn(() => ({ data: null, error: null })),
+    maybeSingle: vi.fn(() => ({ data: null, error: null })),
+    // Terminal: returns data array (for stats, list queries)
+    then: vi.fn((resolve: any) => resolve({ data: [], error: null })),
+  });
+
+  return {
+    supabaseAdmin: {
+      from: vi.fn(() => buildChain()),
+      insert: vi.fn(() => buildChain()),
+      update: vi.fn(() => buildChain()),
+      delete: vi.fn(() => buildChain()),
+      storage: {
+        from: vi.fn(() => ({
+          upload: vi.fn(() => ({ error: null })),
+          remove: vi.fn(() => ({ error: null })),
+          download: vi.fn(() => ({
+            data: new Blob([new Uint8Array([0xff, 0xd8, 0xff])]),
+            error: null,
+          })),
+          createSignedUrls: vi.fn(() => ({
+            data: [{ signedUrl: "https://example.com/signed.jpg" }],
+            error: null,
+          })),
         })),
-      })),
-      insert: vi.fn(() => ({
-        select: vi.fn(() => ({
-          single: vi.fn(() => ({ data: { id: "test-id" }, error: null })),
-        })),
-      })),
-    })),
-    storage: {
-      from: vi.fn(() => ({
-        upload: vi.fn(() => ({ error: null })),
-        remove: vi.fn(() => ({ error: null })),
-        download: vi.fn(() => ({
-          data: new Blob([new Uint8Array([0xff, 0xd8, 0xff])]),
-          error: null,
-        })),
-        createSignedUrls: vi.fn(() => ({
-          data: [{ signedUrl: "https://example.com/signed.jpg" }],
-          error: null,
-        })),
-      })),
+      },
+      rpc: vi.fn(() => ({ error: null })),
     },
-    rpc: vi.fn(() => ({ error: null })),
-  },
-}));
+  };
+});
 
 vi.mock("@/lib/logger", () => ({
   logger: {
@@ -102,8 +110,9 @@ describe("uploadRentalPhoto — pure logic tests", () => {
     expect(result.error).toContain("required");
   });
 
-  it("rejects file > 10 MB before compression", async () => {
-    const largeFile = Buffer.alloc(11 * 1024 * 1024); // 11 MB
+  it("rejects file > 25 MB before compression", async () => {
+    // I4: limit raised 10 MB → 25 MB (modern phones produce 10-12 MB photos)
+    const largeFile = Buffer.alloc(26 * 1024 * 1024); // 26 MB
     const result = await uploadRentalPhoto({
       rentalId: "test-rental",
       photoType: "start",
@@ -170,10 +179,14 @@ describe("getRentalPhotoStats — H2 fix (queries rental_photos directly)", () =
   });
 
   it("returns zero counts when no photos exist", async () => {
-    // The mock returns null data — should return 0/0/null/null
+    // The mock returns [] for the query — should aggregate to 0/0/null/null
     const result = await getRentalPhotoStats("test-rental");
-    // Mock returns null for the query, so this returns null
-    expect(result).toBeNull();
+    expect(result).toEqual({
+      startCount: 0,
+      endCount: 0,
+      latestStartAt: null,
+      latestEndAt: null,
+    });
   });
 });
 

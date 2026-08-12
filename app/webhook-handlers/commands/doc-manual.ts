@@ -1558,6 +1558,28 @@ async function createRentalFromDocContract(
     }
 
     logger.info('[/doc] Created rental:', rental.rental_id);
+
+    // ── I5: Create equipment_rentals rows for equipment rented with bike ─────
+    // Maps equipment flags from context to equipment_rental rows with primary_rental_id
+    if (bike.crew_id && (context.helmets || context.gloves || context.jacket || context.boots)) {
+      try {
+        const { createEquipmentRowsForRental } = await import('@/app/franchize/server-actions/equipment-rentals');
+        const equipmentResult = await createEquipmentRowsForRental({
+          rentalId: rental.rental_id,
+          context,
+          operatorChatId: String(userId),
+          crewId: bike.crew_id,
+        });
+        if (equipmentResult.success) {
+          logger.info(`[/doc] Created ${equipmentResult.created} equipment_rentals rows`);
+        } else {
+          logger.warn(`[/doc] Failed to create equipment_rentals: ${equipmentResult.error}`);
+        }
+      } catch (eqErr: any) {
+        logger.warn(`[/doc] Equipment rental creation exception (non-fatal): ${eqErr?.message}`);
+      }
+    }
+
     return rental.rental_id;
   } catch (error) {
     logger.error('[/doc] Rental creation exception:', error);

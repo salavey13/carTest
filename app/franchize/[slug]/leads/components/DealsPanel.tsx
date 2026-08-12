@@ -10,16 +10,33 @@ import {
 
 import { activateRental, updateRentalStatus } from "@/app/franchize/server-actions/rentals-dashboard";
 import { fmtMoney, formatDate } from "../leads-utils";
+import { LeadsErrorBoundary } from "./LeadsErrorBoundary";
+import type { LeadRow } from "../leads-types";
+
+interface ThemeTokens {
+  bg: string;
+  bgElevated: string;
+  border: string;
+  text: string;
+  textFaint: string;
+  textSecondary: string;
+  primary: string;
+  primaryFaint: string;
+  success: string;
+  danger: string;
+  warning: string;
+}
 
 interface DealsPanelProps {
-  lead: any; // LeadRow
+  lead: LeadRow;
   slug: string;
-  T: any; // ThemeTokens
+  T: ThemeTokens;
 }
 
 export function DealsPanel({ lead, slug, T }: DealsPanelProps) {
   return (
-    <div className="space-y-3">
+    <LeadsErrorBoundary componentName="DealsPanel">
+      <div className="space-y-3">
       {lead.rentals.length === 0 && lead.sales.length === 0 && (
         <div className="rounded-xl border py-4 text-center" style={{ borderColor: T.border, backgroundColor: T.bgElevated }}>
           <p className="text-xs" style={{ color: T.textFaint }}>Пока нет сделок</p>
@@ -40,6 +57,7 @@ export function DealsPanel({ lead, slug, T }: DealsPanelProps) {
         </div>
       )}
     </div>
+    </LeadsErrorBoundary>
   );
 }
 
