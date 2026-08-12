@@ -737,7 +737,7 @@ export async function archivePendingRental(
     try {
         const { data: rental, error: fetchError } = await supabaseAdmin
             .from('rentals')
-            .select('rental_id, user_id, owner_id, status, payment_status, metadata')
+            .select('rental_id, user_id, owner_id, crew_id, vehicle_id, status, payment_status, metadata')
             .eq('rental_id', rentalId)
             .single();
 
@@ -745,8 +745,41 @@ export async function archivePendingRental(
             return { success: false, error: 'Аренда не найдена.' };
         }
 
+        // FIX: also allow crew members (same pattern as addRentalDamageReport +
+        // confirmVehicleReturn + abortRental + uploadRentalPhoto).
         const isParticipant = rental.user_id === userId || rental.owner_id === userId;
+        let isCrewMember = false;
         if (!isParticipant) {
+            if (rental.crew_id) {
+                const { data: membership } = await supabaseAdmin
+                    .from('crew_members')
+                    .select('role, membership_status')
+                    .eq('crew_id', rental.crew_id)
+                    .eq('user_id', userId)
+                    .maybeSingle();
+                if (membership?.membership_status === "active"
+                    && ["owner", "admin", "co_owner", "member"].includes(membership.role)) {
+                    isCrewMember = true;
+                }
+            }
+            if (!isCrewMember && rental.vehicle_id) {
+                const { data: vehicle } = await supabaseAdmin
+                    .from('cars').select('crew_id').eq('id', rental.vehicle_id).maybeSingle();
+                if (vehicle?.crew_id) {
+                    const { data: membership } = await supabaseAdmin
+                        .from('crew_members')
+                        .select('role, membership_status')
+                        .eq('crew_id', vehicle.crew_id)
+                        .eq('user_id', userId)
+                        .maybeSingle();
+                    if (membership?.membership_status === "active"
+                        && ["owner", "admin", "co_owner", "member"].includes(membership.role)) {
+                        isCrewMember = true;
+                    }
+                }
+            }
+        }
+        if (!isParticipant && !isCrewMember) {
             return { success: false, error: 'Недостаточно прав для архивации.' };
         }
 
@@ -984,11 +1017,48 @@ export async function confirmVehiclePickup(rentalId: string, userId: string) {
     try {
         const { data: rental, error: fetchError } = await supabaseAdmin
             .from('rentals')
-            .select('rental_id, owner_id, user_id, crew_id, metadata')
+            .select('rental_id, owner_id, user_id, crew_id, vehicle_id, metadata')
             .eq('rental_id', rentalId)
             .maybeSingle();
         if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
-        if (rental.owner_id !== userId) return { success: false, error: "Только владелец может подтвердить получение." };
+
+        // FIX: also allow crew members (same pattern as confirmVehicleReturn +
+        // addRentalDamageReport + abortRental). Previously only owner_id was
+        // checked — crew members couldn't confirm pickup from the rental page.
+        const isOwner = rental.owner_id === userId;
+        let isCrewMember = false;
+        if (!isOwner) {
+            if (rental.crew_id) {
+                const { data: membership } = await supabaseAdmin
+                    .from('crew_members')
+                    .select('role, membership_status')
+                    .eq('crew_id', rental.crew_id)
+                    .eq('user_id', userId)
+                    .maybeSingle();
+                if (membership?.membership_status === "active"
+                    && ["owner", "admin", "co_owner", "member"].includes(membership.role)) {
+                    isCrewMember = true;
+                }
+            }
+            if (!isCrewMember && rental.vehicle_id) {
+                const { data: vehicle } = await supabaseAdmin
+                    .from('cars').select('crew_id').eq('id', rental.vehicle_id).maybeSingle();
+                if (vehicle?.crew_id) {
+                    const { data: membership } = await supabaseAdmin
+                        .from('crew_members')
+                        .select('role, membership_status')
+                        .eq('crew_id', vehicle.crew_id)
+                        .eq('user_id', userId)
+                        .maybeSingle();
+                    if (membership?.membership_status === "active"
+                        && ["owner", "admin", "co_owner", "member"].includes(membership.role)) {
+                        isCrewMember = true;
+                    }
+                }
+            }
+        }
+        if (!isOwner && !isCrewMember) return { success: false, error: "Недостаточно прав для подтверждения выдачи." };
+
         const currentMetadata = (rental.metadata as Record<string, any>) || {};
         const hasPickupFreeze = Boolean(currentMetadata.pickup_freeze?.frozen_at);
         if (!hasPickupFreeze) {
@@ -1138,13 +1208,54 @@ export async function addRentalDamageReport(
     try {
         const { data: rental, error: fetchError } = await supabaseAdmin
             .from("rentals")
-            .select("user_id, owner_id, metadata")
+            .select("user_id, owner_id, crew_id, vehicle_id, metadata")
             .eq("rental_id", rentalId)
             .single();
         if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
         const isOwner = rental.owner_id === userId;
         const isRenter = rental.user_id === userId;
-        if (!isOwner && !isRenter) return { success: false, error: "Недостаточно прав для отчета о повреждении." };
+
+        // FIX: also allow crew members (owner/admin/co_owner/member) of the bike's crew.
+        // Same pattern as confirmVehicleReturn (BUG J fix) and uploadRentalPhoto.
+        // Previously only isOwner/isRenter were checked — crew members got
+        // "Недостаточно прав для отчета о повреждении" even though they're
+        // authorized operators.
+        let isCrewMember = false;
+        if (!isOwner && !isRenter) {
+            if (rental.crew_id) {
+                const { data: membership } = await supabaseAdmin
+                    .from('crew_members')
+                    .select('role, membership_status')
+                    .eq('crew_id', rental.crew_id)
+                    .eq('user_id', userId)
+                    .maybeSingle();
+                if (membership?.membership_status === "active"
+                    && ["owner", "admin", "co_owner", "member"].includes(membership.role)) {
+                    isCrewMember = true;
+                }
+            }
+            // Also check via vehicle's crew_id (some rentals have crew_id=null but vehicle has it)
+            if (!isCrewMember && rental.vehicle_id) {
+                const { data: vehicle } = await supabaseAdmin
+                    .from('cars')
+                    .select('crew_id')
+                    .eq('id', rental.vehicle_id)
+                    .maybeSingle();
+                if (vehicle?.crew_id) {
+                    const { data: membership } = await supabaseAdmin
+                        .from('crew_members')
+                        .select('role, membership_status')
+                        .eq('crew_id', vehicle.crew_id)
+                        .eq('user_id', userId)
+                        .maybeSingle();
+                    if (membership?.membership_status === "active"
+                        && ["owner", "admin", "co_owner", "member"].includes(membership.role)) {
+                        isCrewMember = true;
+                    }
+                }
+            }
+        }
+        if (!isOwner && !isRenter && !isCrewMember) return { success: false, error: "Недостаточно прав для отчета о повреждении." };
 
         const photoUrls = (payload.photoUrls || []).map((url) => String(url || "").trim()).filter(Boolean).slice(0, 8);
         const currentMetadata = (rental.metadata as Record<string, any>) || {};
