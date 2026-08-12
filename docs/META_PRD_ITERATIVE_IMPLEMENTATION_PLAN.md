@@ -97,12 +97,36 @@ Per PRD v1.2 §5.1-5.7. All MVP items shipped:
 - ⏳ **Watermark spike** — deferred (would need sharp composite — feasible but not urgent).
 - ✅ **Gate:** both cron scripts support `--dry-run` for safe testing. Storage report includes alert threshold. Tests run via `npx vitest run`.
 
-### I5 — Franchize service operations (2 weeks, per FRANCHIZE_SERVICE_OPERATIONS_PRD v4.1)
+### I5 — Franchize service operations ✅ SHIPPED (2026-08-12)
 
-Follow its Phase 1-7 plan as-is, with two additions:
-- Apply lessons from this audit: write triggers with idempotency guards from day one (`auto_create_rental_transaction` needs the same NOT EXISTS pattern).
-- Reconcile §0 table inventory against prod BEFORE writing migrations (two tables listed as "never applied" may have landed since).
-- **Gate:** each phase ships with migration + tests + PRD status flip in the same PR.
+**Branch:** `feat/i5-service-operations` (5 commits, pushed)
+
+Backend complete (server actions + migrations + triggers):
+- ✅ **Equipment rentals** — `equipment_rentals` table + RLS (`20260812000001`), `equipment-rentals.ts` server actions (create, return, list), doc-manual integration (`createEquipmentRowsForRental`), equipment seed (`20260812000006`)
+- ✅ **Cash ledger** — `cash_transactions` table + `daily_cash_flow` view (`20260812000002`), idempotent triggers (`20260812000007`), backfill (`20260812000008`), `cash-transactions.ts` server actions (getCashTransactions, createManualCashTransaction, getDailyCashReport)
+- ✅ **Commissions** — `commission_rates` table + seed (`20260812000003`), `commissions.ts` server actions (getCommissionRates, upsertCommissionRate, deactivateCommissionRate)
+- ✅ **Salary** — `salary_plans` + `salary_calculations` tables (`20260812000004-05`), `salary-calculations.ts` server actions (calculateSalaryForPeriod, recordPayout, getMyEarnings)
+
+UI placeholders (deferred to I5b):
+- ⚠️ Cash API routes (`/cash-transactions`, `/dashboard/daily-report`)
+- ⚠️ Cash ledger page (`/cash-ledger`)
+- ⚠️ Commission config UI (`/admin/commissions`)
+- ⚠️ Salary admin page (`/admin/salary`)
+- ⚠️ Profile sections ("My Earnings", "My Work")
+- ⚠️ Salary API route (`/salary/[memberId]`)
+
+**Gate:** migrations follow strict `20260812*` series (01→08), idempotency via transition guard + NOT EXISTS (I1 pattern), commission branching (percentage /100 vs fixed_amount direct).
+
+### I5b — UI/API completion 📋 PLANNED (2026-08-12)
+
+**Plan:** `PLAN-I5B-UI-COMPLETION.md`
+**Scope:** Complete placeholders — 5 UI pages + 3 API routes
+**Branch:** `feat/i5-service-operations` (continue) or create `feat/i5b-ui-completion`
+
+Round 1: Cash API + Cash Ledger UI + Commission Config UI
+Round 2: Salary Admin + Profile sections + Salary API
+
+See plan for teammates, contract, and DoD.
 
 ---
 

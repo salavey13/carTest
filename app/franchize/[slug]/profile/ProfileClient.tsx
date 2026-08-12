@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Trophy, MapPin, ShoppingCart, Lock, CheckCircle } from "lucide-react";
+import { Trophy, MapPin, ShoppingCart, Lock, CheckCircle, Wallet, Briefcase, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,8 @@ import {
   franchizeOperatorInputClassName,
   franchizeOperatorInputStyle,
 } from "../../components/FranchizeOperatorSurface";
+import { getMyEarnings } from "../../server-actions/salary-calculations";
+import { getMyWorkTodayAction } from "../../server-actions/my-work";
 
 const fallbackCrew: FranchizeCrewVM = {
   id: "",
@@ -221,6 +223,20 @@ export function FranchizeProfileClient({
     comment: "",
   });
   const [canOpenCloserDashboard, setCanOpenCloserDashboard] = useState(false);
+
+  // Earnings and work state
+  const [earnings, setEarnings] = useState<{
+    currentPlan: { accrued: number; balanceDue: number; nextPayoutDate: string | null };
+    recentCommissions: Array<{ amount: number; date: string; description: string }>;
+  } | null>(null);
+  const [myWork, setMyWork] = useState<{
+    date: string;
+    rentals: { count: number; total: number };
+    sales: { count: number; total: number };
+    serviceReturns: { count: number; total: number };
+  } | null>(null);
+  const [earningsLoading, setEarningsLoading] = useState(true);
+  const [workLoading, setWorkLoading] = useState(true);
   // Pre-entered rental docs (passport/license) from private.user_rental_secrets
   const [docsPrefill, setDocsPrefill] = useState<{
     fullName?: string; phone?: string; birthDate?: string;
@@ -278,6 +294,25 @@ export function FranchizeProfileClient({
         incrementCounters: { profileOpenCount: 1 },
       });
       setIsLoading(false);
+
+      // Load earnings and work data
+      setEarningsLoading(true);
+      setWorkLoading(true);
+
+      const [earningsRes, workRes] = await Promise.all([
+        getMyEarnings({ slug, actorUserId: dbUser.user_id }),
+        getMyWorkTodayAction({ slug, userId: dbUser.user_id }),
+      ]);
+
+      if (earningsRes.success && earningsRes.data) {
+        setEarnings(earningsRes.data);
+      }
+      setEarningsLoading(false);
+
+      if (workRes.success && workRes.data) {
+        setMyWork(workRes.data);
+      }
+      setWorkLoading(false);
     };
     void run();
   }, [dbUser?.user_id, slug]);
@@ -538,6 +573,161 @@ export function FranchizeProfileClient({
               )}
             </div>
           </div>
+        </FranchizeOperatorPanel>
+      </motion.div>
+
+      {/* My Earnings Panel */}
+      <motion.div variants={itemVariants}>
+        <FranchizeOperatorPanel>
+          <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
+            <Wallet className="h-4 w-4" /> Мои доходы
+          </h2>
+          {earningsLoading ? (
+            <div className="py-4 text-center text-sm" style={{ color: T.textMuted }}>
+              Загрузка данных...
+            </div>
+          ) : earnings ? (
+            <div className="mt-3 space-y-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
+                  <p className="text-xs" style={{ color: T.textMuted }}>Начислено (месяц)</p>
+                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
+                    {new Intl.NumberFormat("ru-RU", {
+                      style: "currency",
+                      currency: "RUB",
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    }).format(earnings.currentPlan.accrued)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
+                  <p className="text-xs" style={{ color: T.textMuted }}>К выплате</p>
+                  <p className="mt-1 text-lg font-semibold" style={{ color: earnings.currentPlan.balanceDue > 0 ? "#f59e0b" : "#10b981" }}>
+                    {new Intl.NumberFormat("ru-RU", {
+                      style: "currency",
+                      currency: "RUB",
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    }).format(earnings.currentPlan.balanceDue)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
+                  <p className="text-xs" style={{ color: T.textMuted }}>Следующая выплата</p>
+                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
+                    {earnings.currentPlan.nextPayoutDate
+                      ? new Date(earnings.currentPlan.nextPayoutDate).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+
+              {earnings.recentCommissions.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-semibold" style={{ color: T.textMuted }}>
+                    Последние комиссии
+                  </p>
+                  <div className="space-y-2">
+                    {earnings.recentCommissions.slice(0, 5).map((comm, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+                        style={{ borderColor: T.borderSoft }}
+                      >
+                        <div className="flex-1">
+                          <p style={{ color: T.text }}>{comm.description}</p>
+                          <p className="text-xs" style={{ color: T.textMuted }}>
+                            {new Date(comm.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
+                        <span className="font-mono font-semibold" style={{ color: T.accent }}>
+                          {new Intl.NumberFormat("ru-RU", {
+                            style: "currency",
+                            currency: "RUB",
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 0,
+                          }).format(comm.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="py-4 text-center text-sm" style={{ color: T.textMuted }}>
+              Нет данных о доходах
+            </div>
+          )}
+        </FranchizeOperatorPanel>
+      </motion.div>
+
+      {/* My Work Panel */}
+      <motion.div variants={itemVariants}>
+        <FranchizeOperatorPanel>
+          <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
+            <Briefcase className="h-4 w-4" /> Моя работа
+          </h2>
+          {workLoading ? (
+            <div className="py-4 text-center text-sm" style={{ color: T.textMuted }}>
+              Загрузка данных...
+            </div>
+          ) : myWork ? (
+            <div className="mt-3 space-y-4">
+              <div className="flex items-center gap-2 text-sm" style={{ color: T.textMuted }}>
+                <Calendar className="h-4 w-4" />
+                <span>Сегодня: {new Date(myWork.date).toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })}</span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
+                  <p className="text-xs" style={{ color: T.textMuted }}>Аренды</p>
+                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
+                    {myWork.rentals.count}
+                  </p>
+                  <p className="text-xs" style={{ color: T.textMuted }}>
+                    {new Intl.NumberFormat("ru-RU", {
+                      style: "currency",
+                      currency: "RUB",
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    }).format(myWork.rentals.total)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
+                  <p className="text-xs" style={{ color: T.textMuted }}>Продажи</p>
+                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
+                    {myWork.sales.count}
+                  </p>
+                  <p className="text-xs" style={{ color: T.textMuted }}>
+                    {new Intl.NumberFormat("ru-RU", {
+                      style: "currency",
+                      currency: "RUB",
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    }).format(myWork.sales.total)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
+                  <p className="text-xs" style={{ color: T.textMuted }}>Сервис/Возвраты</p>
+                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
+                    {myWork.serviceReturns.count}
+                  </p>
+                  <p className="text-xs" style={{ color: T.textMuted }}>
+                    {new Intl.NumberFormat("ru-RU", {
+                      style: "currency",
+                      currency: "RUB",
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    }).format(myWork.serviceReturns.total)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="py-4 text-center text-sm" style={{ color: T.textMuted }}>
+              Нет данных о работе
+            </div>
+          )}
         </FranchizeOperatorPanel>
       </motion.div>
 
