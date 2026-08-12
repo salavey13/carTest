@@ -149,7 +149,12 @@ set
             jsonb_build_object('label', 'Мои аренды', 'href', '/franchize/{slug}/profile'),
             jsonb_build_object('label', 'Сообщество', 'href', '/franchize/{slug}/community'),
             jsonb_build_object('label', 'Партнёрам', 'href', '/franchize/{slug}/onboarding'),
-            jsonb_build_object('label', 'Продажи', 'href', '/franchize/{slug}/sales')
+            jsonb_build_object('label', 'Продажи', 'href', '/franchize/{slug}/sales'),
+            -- I5 Service Operations pages
+            jsonb_build_object('label', 'Касса', 'href', '/franchize/{slug}/cash-ledger', 'icon', 'DollarSign'),
+            jsonb_build_object('label', 'Комиссии', 'href', '/franchize/{slug}/commissions', 'icon', 'Percent'),
+            jsonb_build_object('label', 'Зарплата', 'href', '/franchize/{slug}/salary', 'icon', 'Wallet'),
+            jsonb_build_object('label', 'Экипировка', 'href', '/franchize/{slug}/equipment', 'icon', 'Package')
           ),
           'quickActions', jsonb_build_array(
             jsonb_build_object('label', 'Тест-драйв', 'href', '/franchize/{slug}#test-drive', 'icon', 'FaMotorcycle')
@@ -171,7 +176,10 @@ set
                 jsonb_build_object('type', 'link', 'label', 'Тест-драйв', 'href', '/franchize/{slug}#test-drive', 'icon', 'FaMotorcycle'),
                 jsonb_build_object('type', 'link', 'label', 'Мои аренды', 'href', '/franchize/{slug}/profile', 'icon', 'FaList'),
                 jsonb_build_object('type', 'link', 'label', 'О нас', 'href', '/franchize/{slug}/about', 'icon', 'FaCircleInfo'),
-                jsonb_build_object('type', 'link', 'label', 'Контакты', 'href', '/franchize/{slug}/contacts', 'icon', 'FaPhone')
+                jsonb_build_object('type', 'link', 'label', 'Контакты', 'href', '/franchize/{slug}/contacts', 'icon', 'FaPhone'),
+                -- I5 Service Operations links
+                jsonb_build_object('type', 'link', 'label', 'Касса', 'href', '/franchize/{slug}/cash-ledger', 'icon', 'FaDollarSign'),
+                jsonb_build_object('type', 'link', 'label', 'Зарплата', 'href', '/franchize/{slug}/salary', 'icon', 'FaWallet')
               )
             ),
             jsonb_build_object(
