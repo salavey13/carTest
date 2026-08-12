@@ -16,10 +16,6 @@ interface FranchizeRentalLifecycleActionsProps {
   rentalId: string;
   ownerId: string;
   renterId: string;
-  // NEW (polish 2026-07-30): fallback renter identity for bot/QR-flow rentals.
-  // When rentals.user_id is null (rental created via bot / QR claim), the
-  // renter's Telegram chat ID lives in private.rental_contract_artefacts.telegram_chat_id.
-  // We use it to detect the renter role when renterId is empty.
   renterTelegramChatId?: string;
   renterFullName?: string;
   crewId: string;
@@ -27,6 +23,8 @@ interface FranchizeRentalLifecycleActionsProps {
   status: string;
   paymentStatus: string;
   hasPickupFreeze: boolean;
+  // Fix: show how much cash/bank was collected at rental start
+  paymentSplit?: { cash: number; bank: number; cardDestination?: string | null } | null;
   palette: {
     accentMain: string;
     accentMainHover: string;
@@ -49,6 +47,7 @@ export function FranchizeRentalLifecycleActions({
   status,
   paymentStatus,
   hasPickupFreeze,
+  paymentSplit,
   palette,
   isAuto = false,
 }: FranchizeRentalLifecycleActionsProps) {
@@ -383,6 +382,30 @@ export function FranchizeRentalLifecycleActions({
                   }}
                 />
               </label>
+
+              {/* Fix: show payment split from rental start — helps operator
+                  understand how much was collected and in what form. */}
+              {paymentSplit && (paymentSplit.cash > 0 || paymentSplit.bank > 0) && (
+                <div
+                  className="rounded-lg border px-3 py-2 text-xs"
+                  style={{
+                    borderColor: "var(--lifecycle-border)",
+                    backgroundColor: "color-mix(in srgb, var(--lifecycle-accent) 5%, transparent)",
+                  }}
+                >
+                  <span style={{ color: "var(--lifecycle-muted)" }}>Получено при выдаче: </span>
+                  {paymentSplit.cash > 0 && (
+                    <span style={{ color: "#22c55e" }}>💵 {paymentSplit.cash.toLocaleString("ru-RU")} ₽</span>
+                  )}
+                  {paymentSplit.cash > 0 && paymentSplit.bank > 0 && <span style={{ color: "var(--lifecycle-muted)" }}> + </span>}
+                  {paymentSplit.bank > 0 && (
+                    <span style={{ color: "#3b82f6" }}>
+                      💳 {paymentSplit.bank.toLocaleString("ru-RU")} ₽
+                      {paymentSplit.cardDestination ? ` (${paymentSplit.cardDestination === "tbank" ? "Тинькофф" : "Сбербанк"})` : ""}
+                    </span>
+                  )}
+                </div>
+              )}
 
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
