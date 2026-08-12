@@ -606,6 +606,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                 status={status}
                 paymentStatus={rental.paymentStatus}
                 hasPickupFreeze={Boolean((rental.metadata as { pickup_freeze?: { frozen_at?: unknown } } | null)?.pickup_freeze?.frozen_at)}
+                // Fix: pass payment split so closure modal can show "Получено при выдаче"
+                paymentSplit={(rental.metadata as { payment_split?: { cash: number; bank: number; card_destination?: string | null } } | null)?.payment_split ?? null}
                 palette={p}
                 isAuto={isAuto}
               />
