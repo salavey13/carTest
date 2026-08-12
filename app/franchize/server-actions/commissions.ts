@@ -26,6 +26,20 @@ export interface CommissionRate {
   isActive: boolean;
 }
 
+/**
+ * Получает все активные ставки комиссии команды.
+ *
+ * @param params - Параметры запроса
+ * @param params.slug - Slug команды
+ * @param params.actorUserId - ID пользователя
+ * @returns Массив ставок комиссии, отсортированных по приоритету
+ *
+ * Ставки включают:
+ * - operationType: тип операции (например, 'rental', 'sale')
+ * - commissionType: тип комиссии ('percentage' или 'fixed_amount')
+ * - commissionValue: значение процента или фиксированной суммы
+ * - priority: приоритет применения (выше = применяется первым)
+ */
 export async function getCommissionRates(params: {
   slug: string;
   actorUserId: string;
@@ -66,6 +80,23 @@ export async function getCommissionRates(params: {
   }
 }
 
+/**
+ * Создаёт или обновляет ставку комиссии.
+ *
+ * @param params - Параметры для создания/обновления ставки
+ * @param params.slug - Slug команды
+ * @param params.actorUserId - ID пользователя
+ * @param params.operationType - Тип операции (например, 'rental', 'sale')
+ * @param params.commissionType - Тип комиссии ('percentage' или 'fixed_amount')
+ * @param params.commissionValue - Значение (процент или фиксированная сумма)
+ * @param params.priority - Приоритет (по умолчанию 0)
+ * @returns Объект с success и id созданной/обновлённой ставки
+ *
+ * Валидация:
+ * - Для percentage: значение должно быть > 0 и <= 100
+ * - Для fixed_amount: значение должно быть > 0
+ * - Только владелец может настраивать комиссии
+ */
 export async function upsertCommissionRate(params: {
   slug: string;
   actorUserId: string;
@@ -86,9 +117,29 @@ export async function upsertCommissionRate(params: {
       return { success: false, error: "Только владелец может настраивать комиссии." };
     }
 
-    // Validate percentage <= 100
-    if (commissionType === "percentage" && commissionValue > 100) {
-      return { success: false, error: "Процент не может превышать 100%." };
+    // Validate commission value based on type
+    if (commissionValue <= 0) {
+      return { success: false, error: "Значение комиссии должно быть больше нуля." };
+    }
+
+    if (commissionType === "percentage") {
+      if (commissionValue > 100) {
+        return { success: false, error: "Процент комиссии не может превышать 100%. Укажите значение от 0.01 до 100." };
+      }
+      if (commissionValue < 0.01) {
+        return { success: false, error: "Минимальный процент комиссии — 0.01%." };
+      }
+    }
+
+    if (commissionType === "fixed_amount") {
+      if (commissionValue < 1) {
+        return { success: false, error: "Минимальная фиксированная комиссия — 1 рубль." };
+      }
+    }
+
+    // Валидация operationType
+    if (!operationType || operationType.trim() === "") {
+      return { success: false, error: "Тип операции обязателен для создания комиссии." };
     }
 
     // Upsert: insert or update on conflict

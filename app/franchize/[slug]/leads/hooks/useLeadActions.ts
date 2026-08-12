@@ -157,27 +157,50 @@ export function useLeadActions({
   // ── Toggle todo ──
   const handleToggleTodo = useCallback(
     async (todoId: string) => {
-      // HIGH FIX #5: capture the current status BEFORE toggling so we can
-      // restore to the exact pre-click state on failure. Previously we called
-      // onTodoUpdate("toggle", todoId) again to revert, but if the user
-      // double-clicked (pending→done, then done→pending) before the first
-      // PATCH resolved, the revert would toggle the CURRENT state (which had
-      // already changed) — restoring the wrong direction.
-      // Now we use onSetStatus which takes an explicit target status.
-      onTodoUpdate("toggle", todoId);
+      // BUG 1 FIX: Capture the current status BEFORE toggling to prevent race condition
+      // on double-click. Find the todo in current state and store its exact status.
+      const currentTodo = leadsState
+        .flatMap((lead) => lead.todos || [])
+        .find((t) => t.id === todoId);
+
+      if (!currentTodo) return;
+
+      const originalStatus = currentTodo.status;
+      const targetStatus = originalStatus === "done" ? "pending" : "done";
+
+      // Optimistically update to target status
+      setTodosState((prev) =>
+        prev.map((t) =>
+          t.id === todoId ? { ...t, status: targetStatus } : t
+        )
+      );
+
       try {
-        await fetch("/api/franchize/lead-todo", {
+        const res = await fetch("/api/franchize/lead-todo", {
           method: "PATCH",
-          headers: { "Content-Type": "application/json", ...(dbUser?.user_id || passwordAuthOwnerId ? { "x-telegram-user-id": dbUser?.user_id || passwordAuthOwnerId } : {}) },
+          headers: {
+            "Content-Type": "application/json",
+            ...(dbUser?.user_id || passwordAuthOwnerId
+              ? { "x-telegram-user-id": dbUser?.user_id || passwordAuthOwnerId }
+              : {})
+          },
           body: JSON.stringify({ todoId, slug, crewId, action: "toggle" }),
         });
+
+        if (!res.ok) {
+          throw new Error(`Toggle failed: ${res.status}`);
+        }
       } catch (e) {
         console.error("[useLeadActions] Toggle todo failed:", e);
-        // Revert: toggle back (best-effort — the race window is small)
-        onTodoUpdate("toggle", todoId);
+        // Revert to exact original status, not a toggle
+        setTodosState((prev) =>
+          prev.map((t) =>
+            t.id === todoId ? { ...t, status: originalStatus } : t
+          )
+        );
       }
     },
-    [slug, crewId, dbUser, onTodoUpdate]
+    [slug, crewId, dbUser, passwordAuthOwnerId, leadsState]
   );
 
   // ── Delete todo ──
