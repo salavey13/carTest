@@ -3,6 +3,14 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
+import {
+  verifyCrewAccess,
+  handleError,
+  successResponse,
+  errorResponse,
+  type ActionResponse,
+  type CrewAccessResult,
+} from "./shared/auth-helpers";
 
 /**
  * I5 — Equipment rentals server actions.
@@ -13,61 +21,6 @@ import { logger } from "@/lib/logger";
  * Rentals stored in equipment_rentals table, optionally linked to bike rental via
  * primary_rental_id (NULL = standalone rental).
  */
-
-// ── Auth helper (verifyCrewAccess pattern from leads.ts) ─────────────────────
-async function verifyCrewAccess(
-  slug: string,
-): Promise<{ allowed: boolean; crewId?: string; actorUserId?: string; error?: string }> {
-  const { cookies } = await import("next/headers");
-  const { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } = await import("@/lib/telegram-actor-cookie");
-
-  const cookieUserId = verifyTelegramActorCookieValue(
-    (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
-  );
-
-  if (cookieUserId) {
-    // Telegram auth — verify crew access
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("metadata")
-      .eq("user_id", cookieUserId)
-      .maybeSingle();
-
-    const userMetadata = user?.metadata as Record<string, unknown> | null;
-    const isAdmin = userMetadata?.role === "admin" || userMetadata?.status === "admin";
-
-    const { data: crew } = await supabaseAdmin
-      .from("crews")
-      .select("id, owner_id")
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (!crew) {
-      return { allowed: false, error: "Экипаж не найден." };
-    }
-
-    // Owner or admin has access
-    if (crew.owner_id === cookieUserId || isAdmin) {
-      return { allowed: true, crewId: crew.id, actorUserId: cookieUserId };
-    }
-
-    // Active crew member
-    const { data: membership } = await supabaseAdmin
-      .from("crew_members")
-      .select("role, membership_status")
-      .eq("crew_id", crew.id)
-      .eq("user_id", cookieUserId)
-      .maybeSingle();
-
-    if (membership?.membership_status === "active") {
-      return { allowed: true, crewId: crew.id, actorUserId: cookieUserId };
-    }
-
-    return { allowed: false, error: "Недостаточно прав." };
-  }
-
-  return { allowed: false, error: "Не авторизовано." };
-}
 
 // ── Types ───────────────────────────────────────────────────────────────────
 export interface CreateEquipmentRentalInput {
@@ -105,11 +58,27 @@ export interface EquipmentRental {
 // ── Actions ─────────────────────────────────────────────────────────────────
 /**
  * Create a new equipment rental.
- * Validates equipment is type='equipment', calculates total_cost = daily_price * days.
+ *
+ * Validates that the equipment exists and has type='equipment', then creates a rental record.
+ * Total cost is automatically calculated based on the daily price and rental duration.
+ *
+ * @param input - Rental parameters including equipment ID, pricing, and dates
+ * @returns Success with rental ID, or error with message
+ *
+ * @example
+ * ```ts
+ * const result = await createEquipmentRental({
+ *   slug: "my-crew",
+ *   actorUserId: "user-123",
+ *   equipmentId: "equip-helmet-m",
+ *   dailyPrice: 200,
+ *   expectedReturnDate: "2026-08-15"
+ * });
+ * ```
  */
 export async function createEquipmentRental(
   input: CreateEquipmentRentalInput,
-): Promise<{ success: boolean; data?: { id: string }; error?: string }> {
+): Promise<ActionResponse<{ id: string }>> {
   const { slug, actorUserId, equipmentId, renterUserId, expectedReturnDate, dailyPrice, primaryRentalId } = input;
 
   if (!slug || !actorUserId || !equipmentId || dailyPrice <= 0) {
@@ -180,9 +149,9 @@ export async function createEquipmentRental(
     });
 
     return { success: true, data: { id: rental.id } };
-  } catch (err: any) {
+  } catch (err) {
     logger.error("[createEquipmentRental] Exception:", err);
-    return { success: false, error: err?.message || "Unknown error." };
+    return errorResponse(handleError(err, "createEquipmentRental"));
   }
 }
 
@@ -192,7 +161,7 @@ export async function createEquipmentRental(
  */
 export async function returnEquipmentRental(
   input: ReturnEquipmentRentalInput,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ActionResponse> {
   const { slug, actorUserId, id, condition, conditionNotes } = input;
 
   if (!slug || !actorUserId || !id || !condition) {
@@ -237,9 +206,9 @@ export async function returnEquipmentRental(
     });
 
     return { success: true };
-  } catch (err: any) {
+  } catch (err) {
     logger.error("[returnEquipmentRental] Exception:", err);
-    return { success: false, error: err?.message || "Unknown error." };
+    return errorResponse(handleError(err, "returnEquipmentRental"));
   }
 }
 
@@ -251,11 +220,7 @@ export async function listEquipmentRentals(params: {
   slug: string;
   actorUserId: string;
   statusFilter?: string;
-}): Promise<{
-  success: boolean;
-  data?: EquipmentRental[];
-  error?: string;
-}> {
+}): Promise<ActionResponse<EquipmentRental[]>> {
   const { slug, actorUserId, statusFilter } = params;
 
   try {
@@ -309,9 +274,9 @@ export async function listEquipmentRentals(params: {
     }));
 
     return { success: true, data: formatted };
-  } catch (err: any) {
+  } catch (err) {
     logger.error("[listEquipmentRentals] Exception:", err);
-    return { success: false, error: err?.message || "Unknown error." };
+    return errorResponse(handleError(err, "listEquipmentRentals"));
   }
 }
 
@@ -363,7 +328,7 @@ export async function createEquipmentRowsForRental(params: {
   context: DocFlowEquipmentContext;
   operatorChatId: string;
   crewId: string;
-}): Promise<{ success: boolean; created: number; error?: string }> {
+}): Promise<ActionResponse<{ created: number }>> {
   const { rentalId, context, operatorChatId, crewId } = params;
 
   try {
@@ -413,7 +378,7 @@ export async function createEquipmentRowsForRental(params: {
 
     // Skip if no equipment
     if (rowsToCreate.length === 0) {
-      return { success: true, created: 0 };
+      return successResponse({ created: 0 });
     }
 
     // Insert all rows in one batch
@@ -437,7 +402,7 @@ export async function createEquipmentRowsForRental(params: {
     if (error) {
       logger.warn('[createEquipmentRowsForRental] Failed to insert rows:', error);
       // Continue — rental is more important than equipment rows (contract over breakdown)
-      return { success: false, created: 0, error: error.message };
+      return errorResponse(error.message);
     }
 
     logger.info('[createEquipmentRowsForRental] Created equipment rentals', {
@@ -446,9 +411,9 @@ export async function createEquipmentRowsForRental(params: {
       created: data?.length || 0,
     });
 
-    return { success: true, created: data?.length || 0 };
-  } catch (err: any) {
+    return successResponse({ created: data?.length || 0 });
+  } catch (err) {
     logger.error('[createEquipmentRowsForRental] Exception:', err);
-    return { success: false, created: 0, error: err?.message || 'Unknown error' };
+    return errorResponse(handleError(err, 'createEquipmentRowsForRental'));
   }
 }

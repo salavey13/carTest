@@ -3,64 +3,18 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
+import {
+  verifyCrewAccess,
+  handleError,
+  successResponse,
+  errorResponse,
+  type ActionResponse,
+} from "./shared/auth-helpers";
 
 /**
  * I5 — Salary calculations server actions.
  * Plan: docs/superpowers/plans/2026-08-12-i5-commissions-salary.md (Task 3)
  */
-
-async function verifyCrewAccess(
-  slug: string,
-): Promise<{ allowed: boolean; crewId?: string; actorUserId?: string; isOwner?: boolean; error?: string }> {
-  const { cookies } = await import("next/headers");
-  const { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } = await import("@/lib/telegram-actor-cookie");
-
-  const cookieUserId = verifyTelegramActorCookieValue(
-    (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
-  );
-
-  if (cookieUserId) {
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("metadata")
-      .eq("user_id", cookieUserId)
-      .maybeSingle();
-
-    const userMetadata = user?.metadata as Record<string, unknown> | null;
-    const isAdmin = userMetadata?.role === "admin" || userMetadata?.status === "admin";
-
-    const { data: crew } = await supabaseAdmin
-      .from("crews")
-      .select("id, owner_id")
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (!crew) {
-      return { allowed: false, error: "Экипаж не найден." };
-    }
-
-    const isOwner = crew.owner_id === cookieUserId || isAdmin;
-
-    if (isOwner) {
-      return { allowed: true, crewId: crew.id, actorUserId: cookieUserId, isOwner: true };
-    }
-
-    const { data: membership } = await supabaseAdmin
-      .from("crew_members")
-      .select("role, membership_status")
-      .eq("crew_id", crew.id)
-      .eq("user_id", cookieUserId)
-      .maybeSingle();
-
-    if (membership?.membership_status === "active") {
-      return { allowed: true, crewId: crew.id, actorUserId: cookieUserId, isOwner: false };
-    }
-
-    return { allowed: false, error: "Недостаточно прав." };
-  }
-
-  return { allowed: false, error: "Не авторизовано." };
-}
 
 export async function getOrCreateSalaryPlan(params: {
   slug: string;
@@ -68,7 +22,7 @@ export async function getOrCreateSalaryPlan(params: {
   memberId: string;
   periodStart: string;
   periodEnd: string;
-}): Promise<{ success: boolean; data?: { id: string }; error?: string }> {
+}): Promise<ActionResponse<{ id: string }>> {
   const { slug, actorUserId, memberId, periodStart, periodEnd } = params;
 
   try {
@@ -110,10 +64,10 @@ export async function getOrCreateSalaryPlan(params: {
       return { success: false, error: "Не удалось создать план." };
     }
 
-    return { success: true, data: { id: plan.id } };
-  } catch (err: any) {
+    return successResponse({ id: plan.id });
+  } catch (err) {
     logger.error("[getOrCreateSalaryPlan] Exception:", err);
-    return { success: false, error: err?.message || "Unknown error." };
+    return errorResponse(handleError(err, "getOrCreateSalaryPlan"));
   }
 }
 
@@ -123,17 +77,13 @@ export async function calculateSalaryForPeriod(params: {
   memberId: string;
   periodStart: string;
   periodEnd: string;
-}): Promise<{
-  success: boolean;
-  data?: {
-    shiftIncome: number;
-    commissionIncome: number;
-    bonusIncome: number;
-    totalIncome: number;
-    breakdown: Array<{ type: string; amount: number; description: string }>;
-  };
-  error?: string;
-}> {
+}): Promise<ActionResponse<{
+  shiftIncome: number;
+  commissionIncome: number;
+  bonusIncome: number;
+  totalIncome: number;
+  breakdown: Array<{ type: string; amount: number; description: string }>;
+}>> {
   const { slug, actorUserId, memberId, periodStart, periodEnd } = params;
 
   try {
@@ -180,19 +130,16 @@ export async function calculateSalaryForPeriod(params: {
 
     const totalIncome = shiftIncome + commissionIncome;
 
-    return {
-      success: true,
-      data: {
-        shiftIncome,
-        commissionIncome,
-        bonusIncome: 0,
-        totalIncome,
-        breakdown,
-      },
-    };
-  } catch (err: any) {
+    return successResponse({
+      shiftIncome,
+      commissionIncome,
+      bonusIncome: 0,
+      totalIncome,
+      breakdown,
+    });
+  } catch (err) {
     logger.error("[calculateSalaryForPeriod] Exception:", err);
-    return { success: false, error: err?.message || "Unknown error." };
+    return errorResponse(handleError(err, "calculateSalaryForPeriod"));
   }
 }
 
@@ -200,7 +147,7 @@ export async function recordPayout(params: {
   slug: string;
   actorUserId: string;
   salaryCalcId: string;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<ActionResponse> {
   const { slug, actorUserId, salaryCalcId } = params;
 
   try {
@@ -282,10 +229,10 @@ export async function recordPayout(params: {
       amount: calc.total_income,
     });
 
-    return { success: true };
-  } catch (err: any) {
+    return successResponse();
+  } catch (err) {
     logger.error("[recordPayout] Exception:", err);
-    return { success: false, error: err?.message || "Unknown error." };
+    return errorResponse(handleError(err, "recordPayout"));
   }
 }
 
@@ -349,13 +296,10 @@ export async function getMyEarnings(params: {
       description: c.description,
     }));
 
-    return {
-      success: true,
-      data: { currentPlan, recentCommissions },
-    };
-  } catch (err: any) {
+    return successResponse({ currentPlan, recentCommissions });
+  } catch (err) {
     logger.error("[getMyEarnings] Exception:", err);
-    return { success: false, error: err?.message || "Unknown error." };
+    return errorResponse(handleError(err, "getMyEarnings"));
   }
 }
 
@@ -365,7 +309,7 @@ function getNextPayoutDate(schedule: string[]): string | null {
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
 
-  for (const dayStr of schedule.sort()) {
+  for (const dayStr of [...schedule].sort()) {
     const day = parseInt(dayStr, 10);
     if (day > today) {
       return new Date(currentYear, currentMonth, day).toISOString();

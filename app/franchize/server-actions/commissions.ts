@@ -3,64 +3,18 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
+import {
+  verifyCrewAccess,
+  handleError,
+  successResponse,
+  errorResponse,
+  type ActionResponse,
+} from "./shared/auth-helpers";
 
 /**
  * I5 — Commission rates server actions.
  * Plan: docs/superpowers/plans/2026-08-12-i5-commissions-salary.md (Task 2)
  */
-
-async function verifyCrewAccess(
-  slug: string,
-): Promise<{ allowed: boolean; crewId?: string; actorUserId?: string; isOwner?: boolean; error?: string }> {
-  const { cookies } = await import("next/headers");
-  const { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } = await import("@/lib/telegram-actor-cookie");
-
-  const cookieUserId = verifyTelegramActorCookieValue(
-    (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
-  );
-
-  if (cookieUserId) {
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("metadata")
-      .eq("user_id", cookieUserId)
-      .maybeSingle();
-
-    const userMetadata = user?.metadata as Record<string, unknown> | null;
-    const isAdmin = userMetadata?.role === "admin" || userMetadata?.status === "admin";
-
-    const { data: crew } = await supabaseAdmin
-      .from("crews")
-      .select("id, owner_id")
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (!crew) {
-      return { allowed: false, error: "Экипаж не найден." };
-    }
-
-    const isOwner = crew.owner_id === cookieUserId || isAdmin;
-
-    if (isOwner) {
-      return { allowed: true, crewId: crew.id, actorUserId: cookieUserId, isOwner: true };
-    }
-
-    const { data: membership } = await supabaseAdmin
-      .from("crew_members")
-      .select("role, membership_status")
-      .eq("crew_id", crew.id)
-      .eq("user_id", cookieUserId)
-      .maybeSingle();
-
-    if (membership?.membership_status === "active") {
-      return { allowed: true, crewId: crew.id, actorUserId: cookieUserId, isOwner: false };
-    }
-
-    return { allowed: false, error: "Недостаточно прав." };
-  }
-
-  return { allowed: false, error: "Не авторизовано." };
-}
 
 export interface CommissionRate {
   id: string;
@@ -75,7 +29,7 @@ export interface CommissionRate {
 export async function getCommissionRates(params: {
   slug: string;
   actorUserId: string;
-}): Promise<{ success: boolean; data?: CommissionRate[]; error?: string }> {
+}): Promise<ActionResponse<CommissionRate[]>> {
   const { slug, actorUserId } = params;
 
   try {
@@ -105,10 +59,10 @@ export async function getCommissionRates(params: {
       isActive: r.is_active,
     }));
 
-    return { success: true, data: formatted };
-  } catch (err: any) {
+    return successResponse(formatted);
+  } catch (err) {
     logger.error("[getCommissionRates] Exception:", err);
-    return { success: false, error: err?.message || "Unknown error." };
+    return errorResponse(handleError(err, "getCommissionRates"));
   }
 }
 
@@ -119,7 +73,7 @@ export async function upsertCommissionRate(params: {
   commissionType: "percentage" | "fixed_amount";
   commissionValue: number;
   priority?: number;
-}): Promise<{ success: boolean; data?: { id: string }; error?: string }> {
+}): Promise<ActionResponse<{ id: string }>> {
   const { slug, actorUserId, operationType, commissionType, commissionValue, priority = 0 } = params;
 
   try {
@@ -168,10 +122,10 @@ export async function upsertCommissionRate(params: {
       operationType,
     });
 
-    return { success: true, data: { id: rate.id } };
-  } catch (err: any) {
+    return successResponse({ id: rate.id });
+  } catch (err) {
     logger.error("[upsertCommissionRate] Exception:", err);
-    return { success: false, error: err?.message || "Unknown error." };
+    return errorResponse(handleError(err, "upsertCommissionRate"));
   }
 }
 
@@ -179,7 +133,7 @@ export async function deactivateCommissionRate(params: {
   slug: string;
   actorUserId: string;
   id: string;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<ActionResponse> {
   const { slug, actorUserId, id } = params;
 
   try {
@@ -205,9 +159,9 @@ export async function deactivateCommissionRate(params: {
 
     logger.info("[deactivateCommissionRate] Deactivated commission rate", { id });
 
-    return { success: true };
-  } catch (err: any) {
+    return successResponse();
+  } catch (err) {
     logger.error("[deactivateCommissionRate] Exception:", err);
-    return { success: false, error: err?.message || "Unknown error." };
+    return errorResponse(handleError(err, "deactivateCommissionRate"));
   }
 }
