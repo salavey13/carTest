@@ -66,10 +66,6 @@ const SOCIAL_LINKS: SocialLink[] = [
   {
     id: "reviews", label: "Отзывы", href: "https://yandex.ru/maps/org/vip_bike_electro/81589395232/reviews/", color: "#FFCC00",
     gradient: "from-[#FFCC00] to-[#FF9500]", hoverGlow: "rgba(255, 204, 0, 0.5)", description: "Яндекс.Карты",
-  },
-  {
-    id: "website", label: "Сайт", href: "https://vip-bike.ru", color: "#10B981",
-    gradient: "from-[#10B981] to-[#059669]", hoverGlow: "rgba(16, 185, 129, 0.5)", description: "vip-bike.ru",
     icon: (<svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z" /></svg>),
   },
   {
