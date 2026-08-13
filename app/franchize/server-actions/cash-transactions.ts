@@ -52,7 +52,7 @@ export interface CashTransaction {
  */
 export async function getCashTransactions(params: {
   slug: string;
-  actorUserId: string;
+  actorUserId?: string; // Deprecated: unused, derived from cookie
   from?: string;
   to?: string;
   transactionType?: string;
@@ -62,7 +62,7 @@ export async function getCashTransactions(params: {
   summary?: { totalIn: number; totalOut: number; net: number };
   error?: string;
 }> {
-  const { slug, actorUserId, from, to, transactionType } = params;
+  const { slug, from, to, transactionType } = params;
 
   // Валидация формата дат
   if (from && isNaN(new Date(from).getTime())) {
@@ -179,14 +179,14 @@ export async function getCashTransactions(params: {
  */
 export async function createManualCashTransaction(params: {
   slug: string;
-  actorUserId: string;
+  actorUserId?: string; // Deprecated: unused, derived from cookie
   transactionType: string;
   amount: number;
   paymentMethod?: string;
   category?: string;
   description?: string;
 }): Promise<ActionResponse<{ id: string }>> {
-  const { slug, actorUserId, transactionType, amount, paymentMethod, category, description } = params;
+  const { slug, transactionType, amount, paymentMethod, category, description } = params;
 
   // Валидация суммы
   if (amount <= 0) {
@@ -287,7 +287,7 @@ export async function createManualCashTransaction(params: {
  */
 export async function getDailyCashReport(params: {
   slug: string;
-  actorUserId: string;
+  actorUserId?: string; // Deprecated: unused, derived from cookie
   date: string;
 }): Promise<ActionResponse<{
   date: string;
@@ -296,7 +296,7 @@ export async function getDailyCashReport(params: {
   net: number;
   transactions: CashTransaction[];
 }>> {
-  const { slug, actorUserId, date } = params;
+  const { slug, date } = params;
 
   // Валидация формата даты
   if (!date || isNaN(new Date(date).getTime())) {

@@ -28,7 +28,7 @@ const OPERATION_TYPES = [
 ];
 
 export function CommissionsClient({ slug, crew }: CommissionsClientProps) {
-  const { dbUser } = useAppContext();
+  const { dbUser, userCrewMemberships } = useAppContext();
   const [rates, setRates] = useState<CommissionRate[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -58,7 +58,9 @@ export function CommissionsClient({ slug, crew }: CommissionsClientProps) {
     accentContrast: "#16130A",
   };
 
-  const isOwner = crew?.ownerId === dbUser?.user_id;
+  const isOwner = userCrewMemberships.some(
+    (m) => m.slug === slug && ["owner", "admin", "co_owner"].includes(m.role)
+  );
 
   useEffect(() => {
     loadRates();
@@ -304,7 +306,7 @@ export function CommissionsClient({ slug, crew }: CommissionsClientProps) {
 
                 <div>
                   <label className="block text-sm font-medium mb-1" style={{ color: T.text }}>
-                    Значение {form.commissionType === "percentage" ? "(%) : (₽)"}
+                    Значение {form.commissionType === "percentage" ? "(%)" : "(₽)"}
                   </label>
                   <input
                     type="number"
