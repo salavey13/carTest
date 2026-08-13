@@ -38,30 +38,36 @@ type SocialLink = {
   featured?: "electric" | "gold" | null;
 };
 
-/* ══ Electric loop keyframes (for VK Electro — chaotic cyan electric current) ══ */
+/* ══ Electric loop keyframes (for VK Electro — periodic chaotic cyan burst) ══ */
 const ELECTRIC_LOOP_KEYFRAMES = `
 @keyframes vip-electric-glow {
-  0%, 100% { box-shadow: 0 0 8px 1px rgba(34, 211, 238, 0.4), 0 0 16px 2px rgba(34, 211, 238, 0.3); }
-  15%      { box-shadow: 0 0 14px 3px rgba(34, 211, 238, 0.7), 0 0 28px 6px rgba(34, 211, 238, 0.5); }
-  30%      { box-shadow: 0 0 6px 1px rgba(34, 211, 238, 0.3), 0 0 12px 2px rgba(34, 211, 238, 0.2); }
-  45%      { box-shadow: 0 0 18px 4px rgba(34, 211, 238, 0.8), 0 0 36px 8px rgba(34, 211, 238, 0.6); }
-  60%      { box-shadow: 0 0 4px 0px rgba(34, 211, 238, 0.2), 0 0 8px 1px rgba(34, 211, 238, 0.15); }
-  75%      { box-shadow: 0 0 16px 3px rgba(34, 211, 238, 0.75), 0 0 32px 7px rgba(34, 211, 238, 0.55); }
-  90%      { box-shadow: 0 0 10px 2px rgba(34, 211, 238, 0.5), 0 0 20px 3px rgba(34, 211, 238, 0.35); }
+  0%, 70%, 100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0), 0 0 0 0 rgba(34, 211, 238, 0); }
+  72%      { box-shadow: 0 0 8px 1px rgba(34, 211, 238, 0.4), 0 0 16px 2px rgba(34, 211, 238, 0.3); }
+  75%      { box-shadow: 0 0 14px 3px rgba(34, 211, 238, 0.7), 0 0 28px 6px rgba(34, 211, 238, 0.5); }
+  78%      { box-shadow: 0 0 6px 1px rgba(34, 211, 238, 0.3), 0 0 12px 2px rgba(34, 211, 238, 0.2); }
+  82%      { box-shadow: 0 0 18px 4px rgba(34, 211, 238, 0.8), 0 0 36px 8px rgba(34, 211, 238, 0.6); }
+  86%      { box-shadow: 0 0 4px 0px rgba(34, 211, 238, 0.2), 0 0 8px 1px rgba(34, 211, 238, 0.15); }
+  90%      { box-shadow: 0 0 16px 3px rgba(34, 211, 238, 0.75), 0 0 32px 7px rgba(34, 211, 238, 0.55); }
+  94%      { box-shadow: 0 0 10px 2px rgba(34, 211, 238, 0.5), 0 0 20px 3px rgba(34, 211, 238, 0.35); }
 }
 @keyframes vip-electric-spark {
-  0%   { opacity: 0; transform: scale(0.8); }
-  10%  { opacity: 1; transform: scale(1.1); }
-  20%  { opacity: 0.3; transform: scale(0.9); }
-  35%  { opacity: 0.9; transform: scale(1.05); }
-  50%  { opacity: 0.1; transform: scale(0.85); }
-  65%  { opacity: 1; transform: scale(1.15); }
-  80%  { opacity: 0.4; transform: scale(0.95); }
-  100% { opacity: 0; transform: scale(0.8); }
+  0%, 70%, 100% { opacity: 0; transform: scale(0.8); }
+  72%   { opacity: 1; transform: scale(1.1); }
+  75%   { opacity: 0.3; transform: scale(0.9); }
+  80%   { opacity: 0.9; transform: scale(1.05); }
+  84%   { opacity: 0.1; transform: scale(0.85); }
+  88%   { opacity: 1; transform: scale(1.15); }
+  92%   { opacity: 0.4; transform: scale(0.95); }
+  96%   { opacity: 0; transform: scale(0.8); }
 }
 @keyframes vip-electric-arc {
-  0%   { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0%, 70% { opacity: 0; transform: rotate(0deg); }
+  72%     { opacity: 1; transform: rotate(60deg); }
+  78%     { opacity: 0.5; transform: rotate(120deg); }
+  84%     { opacity: 1; transform: rotate(180deg); }
+  90%     { opacity: 0.3; transform: rotate(240deg); }
+  96%     { opacity: 0.8; transform: rotate(300deg); }
+  100%    { opacity: 0; transform: rotate(360deg); }
 }
 `;
 
@@ -150,13 +156,13 @@ const BIKE_TIERS = [
     id: "beginner", tier: "Новичок", emoji: "🌱", tagline: "Лёгкие электро-эндуро",
     description: "Не нужны права категории А — садишься и едешь. Идеально для первого знакомства с мотоциклом, для города и лёгкого бездорожья. Лёгкие, тихие, экологичные.",
     licenseReq: "Без категории А — достаточно прав B", accentColor: "#22C55E",
-    bikes: ["79BIKE Falcon GT", "79BIKE Falcon Lite", "79BIKE Falcon Pro", "79BIKE Falcon Lynx", "HMD M02", "Jilang Max Pro", "Sotion EM01", "Wenbox U2 Pro", "Kayo TSD 110"],
+    bikes: ["79BIKE Falcon GT", "79BIKE Falcon Lite", "79BIKE Falcon Pro", "79BIKE Falcon Lynx", "HMD M02", "Sotion EM01", "Wenbox U2 Pro", "Kayo TSD 110"],
   },
   {
     id: "intermediate", tier: "Опытный", emoji: "⚡", tagline: "Мощные электромотоциклы",
     description: "Больше скорости, больше динамики, больше эмоций. Рекомендуется категория M/AM или предыдущий опыт езды на мотоцикле. Мгновенный электро-момент на колёса.",
     licenseReq: "Категория M/AM или опыт езды", accentColor: "#F59E0B",
-    bikes: ["Kawasaki Ninja 650", "Motoland Breakout 300", "Ducati Panigale S Electro", "Rerode R1+", "Y-VOLT Surge V", "Regulmoto Nibbler"],
+    bikes: ["Kawasaki Ninja 650", "Motoland Breakout 300", "Ducati Panigale S Electro", "Rerode R1+", "Y-VOLT Surge V", "Regulmoto Nibbler", "Jilang Max Pro"],
   },
   {
     id: "pro", tier: "Профи", emoji: "🔥", tagline: "Полноразмерные мотоциклы",
@@ -572,7 +578,7 @@ function CinematicHero() {
                     backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 80%, transparent)",
                     border: `1.5px solid color-mix(in srgb, ${social.color} 40%, transparent)`,
                     backdropFilter: "blur(8px)",
-                    ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 1.8s linear infinite" } : {}),
+                    ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 5s linear infinite" } : {}),
                   }}
                 >
                   {social.featured === "gold" && (
@@ -583,9 +589,9 @@ function CinematicHero() {
                   {social.featured === "electric" && (
                     <>
                       {/* Rotating arc ring — chaotic electric current around border */}
-                      <span className="pointer-events-none absolute inset-0 rounded-2xl" style={{ background: "conic-gradient(from 0deg, transparent 0%, rgba(34,211,238,0.6) 8%, transparent 16%, transparent 40%, rgba(34,211,238,0.4) 48%, transparent 56%, transparent 70%, rgba(34,211,238,0.7) 78%, transparent 86%)", animation: "vip-electric-arc 2s linear infinite", maskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)", WebkitMaskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)" }} />
+                      <span className="pointer-events-none absolute inset-0 rounded-2xl" style={{ background: "conic-gradient(from 0deg, transparent 0%, rgba(34,211,238,0.6) 8%, transparent 16%, transparent 40%, rgba(34,211,238,0.4) 48%, transparent 56%, transparent 70%, rgba(34,211,238,0.7) 78%, transparent 86%)", animation: "vip-electric-arc 5s linear infinite", maskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)", WebkitMaskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)" }} />
                       {/* Inner spark flicker — chaotic opacity + scale */}
-                      <span className="pointer-events-none absolute inset-1 rounded-2xl" style={{ background: "radial-gradient(circle, rgba(34,211,238,0.3), transparent 70%)", animation: "vip-electric-spark 0.4s ease-in-out infinite" }} />
+                      <span className="pointer-events-none absolute inset-1 rounded-2xl" style={{ background: "radial-gradient(circle, rgba(34,211,238,0.3), transparent 70%)", animation: "vip-electric-spark 5s ease-in-out infinite" }} />
                     </>
                   )}
                   <div className="relative transition-all duration-300 group-hover:scale-110" style={{ color: social.color }}>
@@ -620,7 +626,8 @@ function CinematicHero() {
 
 /* ══ CINEMATIC FINALE SECTION — Tesla-style scroll-snap with shared parallax background ══
    Wraps Final CTA + Footer as ONE full-screen section. Background image has smooth
-   y-only parallax (no scale = no jitter), content slides up into place. */
+   y-only parallax (no scale = no jitter), content slides up into place.
+   On mobile: background is hidden (footer gets its own 100vh picture bg instead). */
 function CinematicFinaleSection({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
@@ -632,8 +639,9 @@ function CinematicFinaleSection({ children }: { children: React.ReactNode }) {
 
   return (
     <div ref={ref} className="vip-snap-section relative min-h-screen overflow-hidden">
-      {/* Shared parallax background image — y-only, no scale (prevents jitter) */}
-      <motion.div style={{ y: bgY }} className="absolute inset-0 z-0">
+      {/* Shared parallax background image — y-only, no scale (prevents jitter).
+          Hidden on mobile (footer gets its own 100vh picture bg on mobile). */}
+      <motion.div style={{ y: bgY }} className="absolute inset-0 z-0 hidden md:block">
         <img
           src={DUO_SECTION_BG}
           alt=""
@@ -755,7 +763,7 @@ export default function Home() {
                         <span>Без категории А — достаточно прав B</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5 mb-4">
-                        {["Falcon GT", "Falcon Pro", "Falcon Lynx", "HMD M02", "Jilang Max Pro", "Wenbox U2 Pro", "Kayo TSD 110"].map(b => (
+                        {["Falcon GT", "Falcon Pro", "Falcon Lynx", "HMD M02", "Wenbox U2 Pro", "Kayo TSD 110"].map(b => (
                           <span key={b} className="px-2.5 py-1 rounded-lg text-xs" style={{ backgroundColor: "rgba(34, 197, 94, 0.08)", color: "#22c55e" }}>{b}</span>
                         ))}
                       </div>
@@ -782,7 +790,7 @@ export default function Home() {
                         <span>Категория M/AM или опыт езды</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5 mb-4">
-                        {["Kawasaki Ninja 650", "Motoland Breakout 300", "Ducati Panigale S Electro", "Rerode R1+", "Y-VOLT Surge V", "Regulmoto Nibbler"].map(b => (
+                        {["Kawasaki Ninja 650", "Motoland Breakout 300", "Ducati Panigale S Electro", "Rerode R1+", "Y-VOLT Surge V", "Regulmoto Nibbler", "Jilang Max Pro"].map(b => (
                           <span key={b} className="px-2.5 py-1 rounded-lg text-xs" style={{ backgroundColor: "rgba(245, 158, 11, 0.08)", color: "#f59e0b" }}>{b}</span>
                         ))}
                       </div>
@@ -944,16 +952,16 @@ export default function Home() {
               <SectionHeader badge="Партнёры" title="Друзья и" highlight="партнёры" subtitle="Магазины, академия и сообщество — вместе мы делаем мото-сцену Нижнего сильнее." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[
-                  { name: "moto-selection.ru", href: "https://moto-selection.ru/", logo: "https://static.tildacdn.com/tild6335-3266-4164-b461-363834666561/__.png", desc: "Мото-экипировка и аксессуары" },
-                  { name: "academy.cr", href: "https://academy.cr/", logo: "https://academy.cr/themes/academy/dist/img/icons/logo.svg", desc: "Мото-школа и тренировки" },
-                  { name: "bikeland.ru", href: "https://bikeland.ru/", logo: "https://bikeland.ru/local/templates/2019/svg/logo.svg", desc: "Сообщество и магазин" },
+                  { name: "moto-selection.ru", href: "https://moto-selection.ru/", logo: "https://static.tildacdn.com/tild6335-3266-4164-b461-363834666561/__.png", desc: "Мото-экипировка и аксессуары", darkLogo: true },
+                  { name: "bikeland.ru", href: "https://bikeland.ru/", logo: "https://bikeland.ru/local/templates/2019/svg/logo.svg", desc: "Сообщество и магазин", darkLogo: false },
+                  { name: "academy.cr", href: "https://academy.cr/", logo: "https://academy.cr/themes/academy/dist/img/icons/logo.svg", desc: "Мото-школа и тренировки", darkLogo: true },
                 ].map((partner, idx) => (
                   <AnimatedSection key={partner.name} delay={idx * 0.1}>
                     <a
                       href={partner.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="relative z-10 group flex flex-col items-center gap-4 p-6 rounded-2xl transition-all duration-300 hover:-translate-y-1 h-full"
+                      className="relative z-10 group flex flex-col items-center gap-4 p-6 rounded-2xl transition-all duration-300 hover:-translate-y-1 h-full cursor-pointer"
                       style={{ backgroundColor: "transparent" }}
                     >
                       <div
@@ -964,17 +972,17 @@ export default function Home() {
                           src={partner.logo}
                           alt={`Логотип ${partner.name}`}
                           className="w-full max-w-[200px] h-auto object-contain"
-                          style={{ filter: "var(--partner-logo-filter, none)" }}
+                          style={{
+                            filter: partner.darkLogo
+                              ? "brightness(0) invert(1) opacity(0.85)"
+                              : "var(--partner-logo-filter, none)",
+                          }}
                           loading="lazy"
                         />
                       </div>
                       <div className="text-center">
                         <h4 className="text-lg font-bold mb-1 transition-colors duration-300" style={{ color: "var(--vip-text-primary)" }}>{partner.name}</h4>
                         <p className="text-sm" style={{ color: "var(--vip-text-secondary)" }}>{partner.desc}</p>
-                      </div>
-                      <div className="mt-auto flex items-center gap-1.5 text-xs font-semibold transition-colors duration-300" style={{ color: "var(--vip-accent-main)" }}>
-                        Перейти на сайт
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-300 group-hover:translate-x-1"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                       </div>
                     </a>
                   </AnimatedSection>
@@ -1006,16 +1014,32 @@ export default function Home() {
             </div>
           </section>
 
-          {/* ─── FOOTER (inside cinematic finale, no own background) ─── */}
-          <footer className="relative border-t mt-auto" style={{ borderColor: "color-mix(in srgb, var(--vip-accent-main) 20%, var(--vip-border-soft))" }}>
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-14 md:py-20">
+          {/* ─── FOOTER (inside cinematic finale; mobile gets own 100vh picture bg) ─── */}
+          <footer className="relative border-t mt-auto min-h-[100vh] md:min-h-0 overflow-hidden" style={{ borderColor: "color-mix(in srgb, var(--vip-accent-main) 20%, var(--vip-border-soft))" }}>
+          {/* Mobile-only picture background for footer (100vh) */}
+          <div className="absolute inset-0 z-0 md:hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={DUO_SECTION_BG}
+              alt=""
+              className="w-full h-full object-cover"
+              loading="lazy"
+              aria-hidden
+            />
+            <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, color-mix(in srgb, var(--vip-bg-base) 90%, transparent) 0%, color-mix(in srgb, var(--vip-bg-base) 85%, transparent) 50%, color-mix(in srgb, var(--vip-bg-base) 95%, transparent) 100%)" }} />
+          </div>
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-14 md:py-20">
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
               {/* Brand + tagline + contact */}
               <div className="sm:col-span-2 lg:col-span-1">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(to-br, var(--vip-accent-main), var(--vip-accent-main-hover))" }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--vip-bg-base)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><path d="M5 16v-4a8 8 0 0116 0v4" /><circle cx="8" cy="16" r="2" /><circle cx="16" cy="16" r="2" /><path d="M10 16h4" /></svg>
-                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/1000033868-a2e57b7e-5ed8-4440-9304-f3f54f63cc46.jpg"
+                    alt="VIP BIKE"
+                    className="w-12 h-12 rounded-xl object-cover"
+                    style={{ border: "1px solid color-mix(in srgb, var(--vip-accent-main) 30%, transparent)" }}
+                  />
                   <div>
                     <h4 className="font-black text-xl leading-tight" style={{ color: "var(--vip-text-primary)" }}>VIP BIKE</h4>
                     <p className="text-xs" style={{ color: "var(--vip-text-secondary)" }}>Аренда мотоциклов</p>
@@ -1055,7 +1079,7 @@ export default function Home() {
                 <h5 className="font-bold mb-4 uppercase text-xs tracking-widest" style={{ color: "var(--vip-text-secondary)" }}>Мы в соцсетях</h5>
                 <div className="flex flex-wrap gap-2.5 md:gap-3 md:flex-nowrap justify-center md:justify-start">
                   {SOCIAL_LINKS.map((social) => (
-                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0" style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1.5px solid color-mix(in srgb, ${social.color} 30%, transparent)`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 1.8s linear infinite" } : {}) }}>
+                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0" style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1.5px solid color-mix(in srgb, ${social.color} 30%, transparent)`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 5s linear infinite" } : {}) }}>
                       {social.featured === "gold" && (
                         <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
                           <span className="absolute top-0 left-0 w-1/2 h-full" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.85) 50%, transparent)", animation: "vip-gold-blic 2s ease-in-out infinite" }} />
@@ -1063,8 +1087,8 @@ export default function Home() {
                       )}
                       {social.featured === "electric" && (
                         <>
-                          <span className="pointer-events-none absolute inset-0 rounded-full" style={{ background: "conic-gradient(from 0deg, transparent 0%, rgba(34,211,238,0.6) 8%, transparent 16%, transparent 40%, rgba(34,211,238,0.4) 48%, transparent 56%, transparent 70%, rgba(34,211,238,0.7) 78%, transparent 86%)", animation: "vip-electric-arc 2s linear infinite", maskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)", WebkitMaskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)" }} />
-                          <span className="pointer-events-none absolute inset-1 rounded-full" style={{ background: "radial-gradient(circle, rgba(34,211,238,0.3), transparent 70%)", animation: "vip-electric-spark 0.4s ease-in-out infinite" }} />
+                          <span className="pointer-events-none absolute inset-0 rounded-full" style={{ background: "conic-gradient(from 0deg, transparent 0%, rgba(34,211,238,0.6) 8%, transparent 16%, transparent 40%, rgba(34,211,238,0.4) 48%, transparent 56%, transparent 70%, rgba(34,211,238,0.7) 78%, transparent 86%)", animation: "vip-electric-arc 5s linear infinite", maskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)", WebkitMaskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)" }} />
+                          <span className="pointer-events-none absolute inset-1 rounded-full" style={{ background: "radial-gradient(circle, rgba(34,211,238,0.3), transparent 70%)", animation: "vip-electric-spark 5s ease-in-out infinite" }} />
                         </>
                       )}
                       <div className="relative transition-colors duration-300" style={{ color: social.color }}>
