@@ -390,6 +390,11 @@ export async function getMyEarnings(params: {
       return { success: false, error: access.error };
     }
 
+    // CR fix H2: use access.actorUserId (from cookie) instead of client-supplied actorUserId.
+    // Previously: any crew member could pass another member's user_id to read
+    // their salary plan + commission payments (data exposure).
+    const secureUserId = access.actorUserId;
+
     // Get current month plan
     const now = new Date();
     const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -399,7 +404,7 @@ export async function getMyEarnings(params: {
       .from("salary_plans")
       .select("*")
       .eq("crew_id", access.crewId)
-      .eq("member_id", actorUserId)
+      .eq("member_id", secureUserId)
       .eq("period_start", periodStart)
       .maybeSingle();
 
@@ -420,7 +425,7 @@ export async function getMyEarnings(params: {
       .from("cash_transactions")
       .select("amount, description, transaction_date")
       .eq("crew_id", access.crewId)
-      .eq("to_user_id", actorUserId)
+      .eq("to_user_id", secureUserId)  // CR fix H2: cookie-derived, not client-supplied
       .eq("transaction_type", "expense_commission")
       .order("transaction_date", { ascending: false })
       .limit(10);
