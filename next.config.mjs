@@ -61,17 +61,26 @@ const nextConfig = {
         destination: '/franchize/vip-bike/order/:id',
         permanent: false,
       },
+      // I12 hotfix: redirect the old /vipbikerental page → "/" so the new
+      // landing page (app/page.tsx) is shown. This also fixes the back-button
+      // trap: when a user navigates from /vipbikerental → /franchize/vip-bike
+      // and hits browser Back, they'd land back on /vipbikerental (which
+      // redirects to the landing). With the rewrite removed below, "/" now
+      // renders the landing page directly.
+      {
+        source: '/vipbikerental',
+        destination: '/',
+        permanent: false,
+      },
     ]
   },
-  // Чистый URL: корень rental.vip-bike.ru отдаёт каталог аренды без /franchize/vip-bike в адресе.
-  // beforeFiles — чтобы перебить файловый роут app/page.tsx (иначе rewrite не сработает).
-  async rewrites() {
-    return {
-      beforeFiles: [
-        { source: '/home', destination: '/franchize/vip-bike' },
-      ],
-    }
-  },
+  // I12 hotfix: REMOVED the beforeFiles rewrite { source: '/', destination: '/franchize/vip-bike' }.
+  // Previously "/" was rewritten to the franchize catalog, which meant the
+  // landing page (app/page.tsx) was never shown. Now "/" renders app/page.tsx
+  // directly, and the landing page's CTA buttons link to /franchize/vip-bike.
+  // The rewrites() function is intentionally omitted so no path overrides run
+  // before filesystem/edge checks. If user-config (v0-user-next.config) adds
+  // its own rewrites, they will still apply via the mergeConfig step below.
 }
 
 mergeConfig(nextConfig, userConfig)
@@ -97,4 +106,3 @@ function mergeConfig(nextConfig, userConfig) {
 }
 
 export default nextConfig
-
