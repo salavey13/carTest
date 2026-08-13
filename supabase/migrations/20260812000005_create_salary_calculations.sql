@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS public.salary_calculations (
   paid_at           TIMESTAMPTZ,
 
   -- Cash transaction link (created when payout_status='paid')
-  cash_transaction_id UUID REFERENCES public.cash_transactions(id) ON DELETE SET NULL,
+  -- No FK to cash_transactions to avoid circular dependency
+  -- (cash_transactions.salary_calc_id has FK to salary_calculations.id)
+  cash_transaction_id UUID,
 
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()

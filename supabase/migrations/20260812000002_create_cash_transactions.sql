@@ -24,7 +24,9 @@ CREATE TABLE IF NOT EXISTS public.cash_transactions (
   rental_id         UUID REFERENCES public.rentals(rental_id) ON DELETE SET NULL,
   sale_contract_id  UUID,  -- REFERENCES private.sale_contract_artifacts(id) — cross-schema FK NOT created (contract p.4)
   equipment_rental_id UUID REFERENCES public.equipment_rentals(id) ON DELETE SET NULL,
-  salary_calc_id    UUID REFERENCES public.salary_calculations(id) ON DELETE SET NULL,
+  -- salary_calc_id: UUID column without FK to avoid circular dependency
+  -- (salary_calculations has FK to cash_transactions.cash_transaction_id)
+  salary_calc_id    UUID,
 
   -- Classification
   transaction_type  TEXT NOT NULL CHECK (transaction_type IN (
