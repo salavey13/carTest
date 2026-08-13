@@ -91,8 +91,8 @@ export function ThemeToggleButton({ size = 'md' }: { size?: 'sm' | 'md' }) {
           {isSaving 
             ? <FaSpinner className={cn("animate-spin text-muted-foreground", iconSizeClass)} />
             : isDark 
-              ? <FaMoon className={cn(iconSizeClass, "text-brand-purple")} /> 
-              : <FaSun className={cn(iconSizeClass, "text-brand-orange")} />
+              ? <FaMoon className={cn(iconSizeClass, "text-foreground")} /> 
+              : <FaSun className={cn(iconSizeClass, "text-foreground")} />
           }
         </motion.span>
       </AnimatePresence>
