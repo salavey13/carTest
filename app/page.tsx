@@ -604,13 +604,11 @@ export default function Home() {
               <div className="grid md:grid-cols-3 gap-6">
                 {/* Beginner */}
                 <AnimatedSection delay={0}>
-                  <Card className="overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
-                    <div className="relative aspect-[9/16] overflow-hidden" style={{ maxHeight: "540px" }}>
-                      <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2026/image_1.jpg" alt="Электро-эндуро 79BIKE Falcon" className="object-cover w-full h-full" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
-                      <div className="absolute inset-0" style={{ background: "linear-gradient(to top, var(--vip-bg-card) 8%, transparent 50%)" }} />
-                      <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold" style={{ backgroundColor: "rgba(34, 197, 94, 0.2)", color: "#22c55e", border: "1px solid rgba(34, 197, 94, 0.3)", backdropFilter: "blur(8px)" }}>Без прав</div>
-                    </div>
-                    <CardContent className="p-5 md:p-6 -mt-8 relative z-10">
+                  <Card className="relative aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                    <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2026/image_1.jpg" alt="Электро-эндуро 79BIKE Falcon" className="absolute top-0 left-0 w-full object-cover z-0" style={{ height: "76%" }} whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
+                    <div className="absolute top-0 left-0 w-full pointer-events-none z-[1]" style={{ height: "76%", background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
+                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-10" style={{ backgroundColor: "rgba(34, 197, 94, 0.2)", color: "#22c55e", border: "1px solid rgba(34, 197, 94, 0.3)", backdropFilter: "blur(8px)" }}>Без прав</div>
+                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-10">
                       <h4 className="text-xl font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>Новичок</h4>
                       <p className="text-sm mb-4" style={{ color: "var(--vip-text-secondary)" }}>Электро-эндуро до 4 кВт. Не нужны права категории А — достаточно B или M. Лёгкие, тихие, прощают ошибки.</p>
                       <div className="flex flex-wrap gap-1.5 mb-4">
@@ -625,13 +623,11 @@ export default function Home() {
 
                 {/* Intermediate */}
                 <AnimatedSection delay={0.15}>
-                  <Card className="overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
-                    <div className="relative aspect-[9/16] overflow-hidden" style={{ maxHeight: "540px" }}>
-                      <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/ducati-panigale-s-electro-gold/image_1.jpg" alt="Ducati Panigale S Electro" className="object-cover w-full h-full" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
-                      <div className="absolute inset-0" style={{ background: "linear-gradient(to top, var(--vip-bg-card) 8%, transparent 50%)" }} />
-                      <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold" style={{ backgroundColor: "rgba(245, 158, 11, 0.2)", color: "#f59e0b", border: "1px solid rgba(245, 158, 11, 0.3)", backdropFilter: "blur(8px)" }}>Права M/AM</div>
-                    </div>
-                    <CardContent className="p-5 md:p-6 -mt-8 relative z-10">
+                  <Card className="relative aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                    <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/ducati-panigale-s-electro-gold/image_1.jpg" alt="Ducati Panigale S Electro" className="absolute top-0 left-0 w-full object-cover z-0" style={{ height: "76%" }} whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
+                    <div className="absolute top-0 left-0 w-full pointer-events-none z-[1]" style={{ height: "76%", background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
+                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-10" style={{ backgroundColor: "rgba(245, 158, 11, 0.2)", color: "#f59e0b", border: "1px solid rgba(245, 158, 11, 0.3)", backdropFilter: "blur(8px)" }}>Права M/AM</div>
+                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-10">
                       <h4 className="text-xl font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>Опытный</h4>
                       <p className="text-sm mb-4" style={{ color: "var(--vip-text-secondary)" }}>Мощные электро и ДВС-байки. Рекомендуется опыт езды. Категория B или M — уточняй у оператора.</p>
                       <div className="flex flex-wrap gap-1.5 mb-4">
@@ -646,13 +642,11 @@ export default function Home() {
 
                 {/* Pro */}
                 <AnimatedSection delay={0.3}>
-                  <Card className="overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
-                    <div className="relative aspect-[9/16] overflow-hidden" style={{ maxHeight: "540px" }}>
-                      <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/livewire-one/image_1.jpg" alt="LiveWire ONE" className="object-cover w-full h-full" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
-                      <div className="absolute inset-0" style={{ background: "linear-gradient(to top, var(--vip-bg-card) 8%, transparent 50%)" }} />
-                      <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold" style={{ backgroundColor: "rgba(239, 68, 68, 0.2)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.3)", backdropFilter: "blur(8px)" }}>Категория А</div>
-                    </div>
-                    <CardContent className="p-5 md:p-6 -mt-8 relative z-10">
+                  <Card className="relative aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                    <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/livewire-one/image_1.jpg" alt="LiveWire ONE" className="absolute top-0 left-0 w-full object-cover z-0" style={{ height: "76%" }} whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
+                    <div className="absolute top-0 left-0 w-full pointer-events-none z-[1]" style={{ height: "76%", background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
+                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-10" style={{ backgroundColor: "rgba(239, 68, 68, 0.2)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.3)", backdropFilter: "blur(8px)" }}>Категория А</div>
+                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-10">
                       <h4 className="text-xl font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>Профи</h4>
                       <p className="text-sm mb-4" style={{ color: "var(--vip-text-secondary)" }}>Полноразмерные спортбайки и премиум-электро. Категория А обязательна. Требуется уверенный опыт езды.</p>
                       <div className="flex flex-wrap gap-1.5 mb-4">
