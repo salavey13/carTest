@@ -30,7 +30,7 @@ const BOT_HREF = "https://t.me/oneBikePlsBot";
 const OPERATOR_HREF = "https://t.me/I_O_S_NN";
 const INSTAGRAM_HREF = "https://www.instagram.com/vipbikerental_nn";
 
-/* ══ SOCIAL LINKS — 5 platforms: Instagram, Telegram, YouTube, VK, WhatsApp ══ */
+/* ══ SOCIAL LINKS — 6 platforms: Instagram, Telegram, VK Electro, VK, WhatsApp, Reviews ══ */
 type SocialLink = {
   id: string; label: string; href: string; color: string;
   gradient: string; hoverGlow: string; description: string;
@@ -407,68 +407,127 @@ const ArrowRight = ({ size = 20 }: { size?: number }) => (
 function CinematicHero() {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
-  const imageY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
-  const imageScale = useTransform(scrollYProgress, [0, 1], [1, 1.15]);
-  const contentY = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
-  // Delayed fade: stats stay visible longer during scroll.
-  const contentOpacity = useTransform(scrollYProgress, [0.5, 0.95], [1, 0]);
+  const imageY = useTransform(scrollYProgress, [0, 1], ["0%", "25%"]);
+  const imageScale = useTransform(scrollYProgress, [0, 1], [1, 1.12]);
+  const contentY = useTransform(scrollYProgress, [0, 1], ["0%", "40%"]);
+  // Stats fade very late — visible for most of the hero scroll
+  const contentOpacity = useTransform(scrollYProgress, [0.7, 0.98], [1, 0]);
   const headlineWords = ["VIP", "BIKE", "RENTAL"];
   const headlineRef = useRef(null);
   const headlineInView = useInView(headlineRef, { once: true, margin: "-100px" });
 
   return (
-    <section ref={ref} className="relative min-h-screen flex items-center overflow-hidden pt-20">
+    <section ref={ref} className="relative min-h-screen flex items-center overflow-hidden pt-16 md:pt-20">
+      {/* Background image with parallax */}
       <motion.div style={{ y: imageY, scale: imageScale }} className="absolute inset-0 z-0">
-        <HeroImageCarousel images={HERO_IMAGES} alt="VIP Bike — аренда мотоциклов в Нижнем Новгороде: электро и ДВС" />
-        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, color-mix(in srgb, var(--vip-bg-base) 70%, transparent) 0%, color-mix(in srgb, var(--vip-bg-base) 35%, transparent) 45%, var(--vip-bg-base) 100%)" }} />
-        <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 40%, transparent 0%, color-mix(in srgb, var(--vip-bg-base) 65%, transparent) 100%)" }} />
+        <HeroImageCarousel images={HERO_IMAGES} alt="VIP Bike — аренда мотоциклов в Нижнем Новгороде" />
+        {/* Lighter tint for better image visibility */}
+        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, color-mix(in srgb, var(--vip-bg-base) 50%, transparent) 0%, color-mix(in srgb, var(--vip-bg-base) 25%, transparent) 40%, var(--vip-bg-base) 95%)" }} />
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 35%, transparent 0%, color-mix(in srgb, var(--vip-bg-base) 50%, transparent) 100%)" }} />
       </motion.div>
-      <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] rounded-full blur-[120px] z-[1] pointer-events-none" style={{ backgroundColor: "var(--vip-accent-main)", opacity: 0.08 }} />
-      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full blur-[100px] z-[1] pointer-events-none" style={{ backgroundColor: "#26A5E4", opacity: 0.06 }} />
 
-      <motion.div style={{ y: contentY, opacity: contentOpacity }} className="relative z-10 max-w-5xl mx-auto px-4 text-center w-full">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-6">
-          <Badge variant="outline" className="px-4 py-2 text-sm" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)", backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 10%, transparent)", backdropFilter: "blur(8px)" }}>⚡️ Электро и ДВС мотоциклы в аренду</Badge>
+      {/* Glow accents */}
+      <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] rounded-full blur-[100px] z-[1] pointer-events-none" style={{ backgroundColor: "var(--vip-accent-main)", opacity: 0.06 }} />
+      <div className="absolute bottom-1/3 right-1/4 w-[300px] h-[300px] rounded-full blur-[80px] z-[1] pointer-events-none" style={{ backgroundColor: "#26A5E4", opacity: 0.05 }} />
+
+      {/* Main content */}
+      <motion.div style={{ y: contentY, opacity: contentOpacity }} className="relative z-10 max-w-5xl mx-auto px-4 text-center w-full py-8">
+
+        {/* Badge */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-5">
+          <Badge variant="outline" className="px-3 py-1.5 text-xs md:text-sm" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)", backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 8%, transparent)", backdropFilter: "blur(8px)" }}>
+            Электро и ДВС мотоциклы в аренду
+          </Badge>
         </motion.div>
-        <h2 ref={headlineRef} className="text-5xl sm:text-7xl md:text-8xl font-black mb-6 leading-[0.95] tracking-tight" style={{ color: "var(--vip-text-primary)" }}>
+
+        {/* Headline */}
+        <h2 ref={headlineRef} className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black mb-4 leading-[0.95] tracking-tighter" style={{ color: "var(--vip-text-primary)" }}>
           {headlineWords.map((word, i) => (
-            <motion.span key={i} initial={{ opacity: 0, y: 60, rotateX: -90 }} animate={headlineInView ? { opacity: 1, y: 0, rotateX: 0 } : {}} transition={{ duration: 0.7, delay: 0.2 + i * 0.15, ease: [0.215, 0.61, 0.355, 1] }} className="inline-block mr-4 last:mr-0" style={{ backgroundImage: i === 2 ? "linear-gradient(to right, var(--vip-accent-main), var(--vip-accent-main-hover), var(--vip-accent-main))" : "none", WebkitBackgroundClip: i === 2 ? "text" : "unset", WebkitTextFillColor: i === 2 ? "transparent" : "var(--vip-text-primary)", backgroundClip: "text", transformOrigin: "bottom" }}>{word}</motion.span>
+            <motion.span key={i} initial={{ opacity: 0, y: 50, rotateX: -90 }} animate={headlineInView ? { opacity: 1, y: 0, rotateX: 0 } : {}} transition={{ duration: 0.6, delay: 0.15 + i * 0.12, ease: [0.215, 0.61, 0.355, 1] }} className="inline-block mr-3 md:mr-4 last:mr-0" style={{ backgroundImage: i === 2 ? "linear-gradient(135deg, var(--vip-accent-main), var(--vip-accent-main-hover))" : "none", WebkitBackgroundClip: i === 2 ? "text" : "unset", WebkitTextFillColor: i === 2 ? "transparent" : "var(--vip-text-primary)", backgroundClip: "text", transformOrigin: "bottom" }}>{word}</motion.span>
           ))}
         </h2>
-        <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.7 }} className="text-lg md:text-2xl max-w-2xl mx-auto mb-4 leading-relaxed font-medium" style={{ color: "var(--vip-text-primary)" }}>Аренда мотоциклов без заморочек 🏍️💨</motion.p>
-        <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.85 }} className="text-base md:text-lg max-w-2xl mx-auto mb-10" style={{ color: "var(--vip-text-secondary)" }}>24 байка от 18 брендов. Электро-эндуро без категории А, мощные электросуперкары и классические спортбайки. Выбери свой — садись и поезжай.</motion.p>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 1 }} className="flex flex-wrap justify-center gap-2 md:gap-3 mb-10">
-          {[
-            { text: "⚡️", detail: "электро и ДВС" },
-            { text: "10 дней", detail: "на возврат, деньги обратно" },
-            { text: "💰 Залог", detail: "от 10 000 ₽" },
-          ].map((pill, i) => (
-            <div key={i} className="px-4 py-2 rounded-full border text-sm backdrop-blur-sm" style={{ borderColor: "var(--vip-border-soft)", backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 70%, transparent)" }}>
-              <span className="font-semibold" style={{ color: "var(--vip-accent-main)" }}>{pill.text}</span>{" "}
-              <span style={{ color: "var(--vip-text-secondary)" }}>{pill.detail}</span>
-            </div>
-          ))}
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 1.15 }} className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+
+        {/* Subtitle */}
+        <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.6 }} className="text-base md:text-xl max-w-xl mx-auto mb-3 leading-relaxed font-medium" style={{ color: "var(--vip-text-primary)" }}>
+          Аренда мотоциклов без заморочек
+        </motion.p>
+        <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.75 }} className="text-sm md:text-base max-w-lg mx-auto mb-6" style={{ color: "var(--vip-text-secondary)" }}>
+          24 байка от 18 брендов. Электро-эндуро без категории А, мощные электросуперкары и классические спортбайки.
+        </motion.p>
+
+        {/* CTA Buttons */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.9 }} className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-8">
           <MagneticButton href={CATALOG_HREF} primary>Выбрать байк<ArrowRight /></MagneticButton>
           <MagneticButton href={BOT_HREF}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="mr-2 inline"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" /></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="mr-2 inline"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" /></svg>
             Бронь в боте
           </MagneticButton>
         </motion.div>
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 1.4 }} className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto mt-16 pt-8 border-t" style={{ borderColor: "var(--vip-border-soft)" }}>
+
+        {/* ══ SOCIAL LINKS — MAIN FEATURE, INSIDE HERO ══ */}
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 1.1 }} className="mb-8">
+          <p className="text-xs uppercase tracking-[0.2em] mb-4 font-semibold" style={{ color: "var(--vip-text-secondary)" }}>
+            Мы в соцсетях — подписывайся
+          </p>
+          <div className="flex flex-wrap justify-center items-center gap-3 md:gap-4">
+            {SOCIAL_LINKS.map((social, idx) => (
+              <motion.a
+                key={social.id}
+                href={social.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, delay: 1.2 + idx * 0.08 }}
+                whileHover={{ scale: 1.15, y: -3 }}
+                whileTap={{ scale: 0.92 }}
+                className="group relative flex items-center justify-center"
+                aria-label={social.label}
+              >
+                <div
+                  className="w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center transition-all duration-300"
+                  style={{
+                    backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 80%, transparent)",
+                    border: `1.5px solid color-mix(in srgb, ${social.color} 40%, transparent)`,
+                    backdropFilter: "blur(8px)",
+                  }}
+                >
+                  <div className="transition-all duration-300 group-hover:scale-110" style={{ color: social.color }}>
+                    {social.icon}
+                  </div>
+                </div>
+                {/* Tooltip label on hover */}
+                <span
+                  className="absolute -bottom-7 left-1/2 -translate-x-1/2 text-[10px] md:text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none px-2 py-1 rounded-md"
+                  style={{ backgroundColor: social.color, color: "#fff" }}
+                >
+                  {social.label}
+                </span>
+              </motion.a>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Stats — compact, visible, at the bottom of hero */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 1.5 }} className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto pt-6 border-t" style={{ borderColor: "color-mix(in srgb, var(--vip-border-soft) 50%, transparent)" }}>
           {HERO_STATS.map((stat, i) => (
             <div key={i} className="text-center">
-              <div className="text-3xl md:text-4xl font-black mb-1" style={{ color: "var(--vip-text-primary)" }}><AnimatedCounter value={stat.value} suffix={stat.suffix} decimals={0} /></div>
-              <div className="text-xs md:text-sm uppercase tracking-wide" style={{ color: "var(--vip-text-secondary)" }}>{stat.label}</div>
+              <div className="text-xl md:text-3xl font-black mb-0.5" style={{ color: "var(--vip-text-primary)" }}>
+                <AnimatedCounter value={stat.value} suffix={stat.suffix} decimals={0} />
+              </div>
+              <div className="text-[10px] md:text-xs uppercase tracking-wide" style={{ color: "var(--vip-text-secondary)" }}>
+                {stat.label}
+              </div>
             </div>
           ))}
         </motion.div>
       </motion.div>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2, duration: 1 }} className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 hidden md:flex flex-col items-center gap-2" style={{ color: "var(--vip-text-secondary)" }}>
-        <span className="text-xs uppercase tracking-widest">Листай вниз</span>
-        <motion.div animate={{ y: [0, 8, 0] }} transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+
+      {/* Scroll indicator */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.2, duration: 0.8 }} className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 hidden md:flex flex-col items-center gap-1" style={{ color: "var(--vip-text-secondary)" }}>
+        <span className="text-[10px] uppercase tracking-widest opacity-60">Листай</span>
+        <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
         </motion.div>
       </motion.div>
     </section>
@@ -546,16 +605,6 @@ export default function Home() {
 
         <main className="flex-1">
           <CinematicHero />
-
-          {/* ─── SOCIAL CIRCLES ROW (right after hero) ─── */}
-          <section className="py-14 md:py-20 px-4 border-b" style={{ borderColor: "var(--vip-border-soft)" }}>
-            <div className="max-w-4xl mx-auto">
-              <SectionHeader badge="Мы в соцсетях 📱" title="Подписывайся и" highlight="будь в теме" subtitle="Покатушки, эксклюзивы, мемы. Выбирай платформу — мы везде." />
-              <div className="flex flex-wrap justify-center items-start gap-6 md:gap-10">
-                {SOCIAL_LINKS.map((social, idx) => (<SocialCircleButton key={social.id} social={social} index={idx} />))}
-              </div>
-            </div>
-          </section>
 
           {/* ─── BARRIER CARDS (why electro) ─── */}
           <section id="catalog" className="py-20 md:py-28 px-4">
