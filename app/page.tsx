@@ -49,7 +49,7 @@ const SOCIAL_LINKS: SocialLink[] = [
     icon: (<svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" /></svg>),
   },
   {
-    id: "youtube", label: "YouTube", href: "https://youtube.com/@vipbikerental", color: "#FF0000",
+    id: "vk-electro", label: "VK Electro", href: "https://vk.ru/vip_bike_electro", color: "#0077FF",
     gradient: "from-[#FF0000] to-[#CC0000]", hoverGlow: "rgba(255, 0, 0, 0.5)", description: "Видео покатушек",
     icon: (<svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" /></svg>),
   },
@@ -60,6 +60,7 @@ const SOCIAL_LINKS: SocialLink[] = [
   },
   {
     id: "whatsapp", label: "WhatsApp", href: "https://wa.me/79200789888", color: "#25D366",
+    { id: "reviews", label: "Отзывы", href: "https://yandex.ru/maps/org/vip_bike_electro/81589395232/reviews/", color: "#FFCC00" },
     gradient: "from-[#25D366] to-[#128C7E]", hoverGlow: "rgba(37, 211, 102, 0.5)", description: "Напишите нам",
     icon: (<svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>),
   },
@@ -85,29 +86,29 @@ const BIKE_TIERS = [
     id: "beginner", tier: "Новичок", emoji: "🌱", tagline: "Лёгкие электро-эндуро",
     description: "Не нужны права категории А — садишься и едешь. Идеально для первого знакомства с мотоциклом, для города и лёгкого бездорожья. Лёгкие, тихие, экологичные.",
     licenseReq: "Без категории А — достаточно прав B", accentColor: "#22C55E",
-    bikes: ["79BIKE Falcon GT", "79BIKE Falcon Lite", "79BIKE Falcon Pro", "79BIKE Falcon Lynx", "HMD M02", "Jilang Max Pro", "Sotion EM01", "Wenbox U2 Pro"],
+    bikes: ["79BIKE Falcon GT", "79BIKE Falcon Lite", "79BIKE Falcon Pro", "79BIKE Falcon Lynx", "HMD M02", "Jilang Max Pro", "Sotion EM01", "Wenbox U2 Pro", "Kayo TSD 110"],
   },
   {
     id: "intermediate", tier: "Опытный", emoji: "⚡", tagline: "Мощные электромотоциклы",
     description: "Больше скорости, больше динамики, больше эмоций. Рекомендуется категория M/AM или предыдущий опыт езды на мотоцикле. Мгновенный электро-момент на колёса.",
     licenseReq: "Категория M/AM или опыт езды", accentColor: "#F59E0B",
-    bikes: ["LiveWire ONE", "Ducati Panigale S Electro", "Rerode R1+", "Y-VOLT Surge V", "Regulmoto Nibbler"],
+    bikes: ["Kawasaki Ninja 650", "Motoland Breakout 300", "Ducati Panigale S Electro", "Rerode R1+", "Y-VOLT Surge V", "Regulmoto Nibbler"],
   },
   {
     id: "pro", tier: "Профи", emoji: "🔥", tagline: "Полноразмерные мотоциклы",
     description: "Серьёзная техника для серьёзных райдеров. ДВС-спортбайки и электрические суперкары. Категория А обязательна — это уже не игрушки, а настоящая мощь.",
     licenseReq: "Категория А обязательна", accentColor: "#EF4444",
-    bikes: ["Kawasaki Ninja 650", "BMW F800R", "Yamaha R7", "Suzuki GSX-S1000F", "Aprilia Shiver 750", "Sequence Zero", "Motoland Breakout 300", "Kayo TSD 110"],
+    bikes: ["LiveWire ONE", "BMW F800R", "Yamaha R7", "Suzuki GSX-S1000F", "Aprilia Shiver 750", "Sequence Zero"],
   },
 ];
 
 /* ══ PRICING TIERS ══ */
 const PRICING_TIERS = [
-  { id: "hour", label: "Час", emoji: "⚡️", price: "от 1 500 ₽", per: "/ час", note: "минимум 1 час",
-    features: ["Шлем + перчатки в комплекте", "200 км/сутки включено (для ДВС)", "150 км/сутки включено (для электро)", "Страховка депозита от 20 000 ₽"],
+  { id: "hour", label: "Час", emoji: "⚡️", price: "от 1 500 ₽", per: "/ час", note: "минимум 3 часа",
+    features: ["Шлем + перчатки — от 500 ₽", "200 км/сутки включено (для ДВС)", "150 км/сутки включено (для электро)", "Залог от 10 000 ₽"],
     cta: "Покататься часок", href: BOT_HREF, highlighted: false },
   { id: "day", label: "Сутки", emoji: "🔥", price: "от 10 000 ₽", per: "/ сутки", note: "бронь на 18:00 → 10:00",
-    features: ["Всё из тарифа «Час», но на сутки", "Скидка 10% от 3 суток", "Скидка 15% от 7 суток", "СТС вместо депозита — без денег в кассу", "Доставка по городу — 500 ₽"],
+    features: ["Всё из тарифа «Час», но на сутки", "Скидка 10% от 3 суток", "Скидка 15% от 7 суток"],
     cta: "Забрать на сутки", href: BOT_HREF, highlighted: true },
   { id: "week", label: "Неделя", emoji: "🚀", price: "от 60 000 ₽", per: "/ 7 суток", note: "скидка 20% от 14 суток",
     features: ["Всё из тарифа «Сутки», но дешевле", "Приоритетное бронирование", "Экипировка с брендированием (по запросу)", "Выделенный менеджер в Telegram", "Бесплатная доставка по городу"],
@@ -116,22 +117,22 @@ const PRICING_TIERS = [
 
 /* ══ FAQ ITEMS ══ */
 const FAQ_ITEMS = [
-  { q: "Так, мне правда не нужна категория А? 🤨", a: "Правда — если берёшь электро-эндуро до 4 кВт (L1e-B). По закону достаточно категории B (или M). Покажешь права — садишься. Для полноразмерных ДВС-байков (Ninja 650, R7, GSX-S1000F и т.д.) категория А обязательна." },
-  { q: "А ОСАГО и ПТС точно не нужны?", a: "Для электро до 4 кВт — точно. Не регистрируется в ГИБДД, ПТС нет, ОСАГО нет. Никакой бюрократии. Сел — поехал. Для ДВС-байков ОСАГО и СТС уже оформлены на нас, тебе ничего делать не нужно." },
-  { q: "А если без прав категории B? 🙃", a: "Тогда никак — закон есть закон. Но если у тебя M или A1 — тоже прокатит, позвони оператору, подберём байк под твою категорию." },
-  { q: "Что за СТС вместо депозита? 🪪", a: "Вместо денежного залога 20 000 ₽ можно оставить оригинал СТС своего автомобиля или мотоцикла. СТС возвращаем в течение 3 рабочих дней после возврата байка. Удобно, если не хочешь замораживать кэш." },
-  { q: "Можно ли обменять или вернуть байк? 💸", a: "Да. Первые 10 дней — тест-драйв с возвратом денег, если что-то не зашло. Возврат — по акту приёма-передачи, деньги возвращаем в течение 3 рабочих дней." },
-  { q: "А если я уроню или утоплю? 😬", a: "Царапины — по прайсу (от 5 000 ₽). Глубокие повреждения — по счёту СТО. Утопление — стоимость восстановительного ремонта. Всё прозрачно, в договоре прописано до копейки. GPS-трекер на каждом байке — это страховка от «байк угнали»." },
+  { q: "Так, мне правда не нужна категория А?", a: "Правда — если берёшь электро-эндуро до 4 кВт (L1e-B). По закону достаточно категории B (или M). Покажешь права — садишься. Для полноразмерных ДВС-байков (Ninja 650, R7, GSX-S1000F и т.д.) категория А обязательна." },
+  { q: "А ОСАГО и ПТС точно не нужны?", a: "Для электро до 4 кВт — точно. Не регистрируется в ГИБДД, ПТС нет, ОСАГО нет. Никакой бюрократии. Сел — поехал. Для ДВС-байков ОСАГО уже оформлено на нас, тебе ничего делать не нужно." },
+  { q: "А если без прав категории B?", a: "Тогда никак — закон есть закон. Но если у тебя M или A1 — тоже прокатит, позвони оператору, подберём байк под твою категорию." },
+  { q: "Что за залог?", a: "Залог возвращается при возврате байка в исходном состоянии. Сумма зависит от модели — от 10 000 ₽ за электро-эндуро до 50 000 ₽ за премиум-электро." },
+  { q: "Можно ли обменять или вернуть байк?", a: "Да. Первые 10 дней — тест-драйв с возвратом денег, если что-то не зашло. Возврат — по акту приёма-передачи, деньги возвращаем в течение 3 рабочих дней." },
+  { q: "А если я уроню или утоплю?", a: "Царапины — по прайсу (от 5 000 ₽). Глубокие повреждения — по счёту СТО. Утопление — стоимость восстановительного ремонта. Всё прозрачно, в договоре прописано до копейки. GPS-трекер на каждом байке — это страховка от «байк угнали»." },
   { q: "Доставка есть? 📍", a: "Да. По Нижнему Новгороду — 500 ₽. За пределы города — по согласованию. Привозим и забираем сами, тебе не нужно никуда ехать." },
-  { q: "А экипировка? 🪖", a: "Шлем и перчатки — обязательно, выдаём бесплатно. Куртка, черепаха, второй шлем — по запросу. За утрату или порчу экипировки — по прайсу из приложения №3 к договору." },
+  { q: "А экипировка?", a: "Шлем и перчатки — от 500 ₽. Куртка, второй шлем — по запросу. За утрату или порчу экипировки — по прайсу из приложения №3 к договору." },
 ];
 
 /* ══ HOW IT WORKS — 4 STEPS ══ */
 const HOW_IT_WORKS_STEPS = [
   { n: "01", title: "Выбрал", desc: "Жмёшь «Выбрать байк» → попадаешь в каталог. 24 байка от 18 брендов. Смотришь фото, читаешь спеку, выбираешь по сердцу.", emoji: "👆" },
-  { n: "02", title: "Забронировал", desc: "В боте @oneBikePlsBot — 2 клика: даты + формат поездки. Депозит или СТС — на твой выбор.", emoji: "📲" },
+  { n: "02", title: "Забронировал", desc: "В боте @oneBikePlsBot — 2 клика: даты + формат поездки. Залог — на выбор: наличными или переводом.", emoji: "📲" },
   { n: "03", title: "Забрал", desc: "Приезжаешь на пл. Комсомольская 2. Подписываешь договор (3 минуты), получаешь байк + экипировку.", emoji: "🔑" },
-  { n: "04", title: "Катался", desc: "Откручиваешь ручку. Возвращаешь в согласованное время — забираешь депозит или СТС. Всё.", emoji: "🏍️" },
+  { n: "04", title: "Покатался", desc: "Откручиваешь ручку. Возвращаешь в согласованное время — забираешь залог. Всё.", emoji: "🏍️" },
 ];
 
 /* ══ Gradient text helper (reused across section headings) ══ */
@@ -436,7 +437,7 @@ function CinematicHero() {
           {[
             { text: "⚡️", detail: "электро и ДВС" },
             { text: "10 дней", detail: "на возврат, деньги обратно" },
-            { text: "🪪 СТС", detail: "вместо депозита" },
+            { text: "💰 Залог", detail: "от 10 000 ₽" },
           ].map((pill, i) => (
             <div key={i} className="px-4 py-2 rounded-full border text-sm backdrop-blur-sm" style={{ borderColor: "var(--vip-border-soft)", backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 70%, transparent)" }}>
               <span className="font-semibold" style={{ color: "var(--vip-accent-main)" }}>{pill.text}</span>{" "}
@@ -555,7 +556,7 @@ export default function Home() {
           {/* ─── BARRIER CARDS (why electro) ─── */}
           <section id="catalog" className="py-20 md:py-28 px-4">
             <div className="max-w-7xl mx-auto">
-              <SectionHeader badge="Почему мы, а не бензин ⛽️❌" title="Три барьера," highlight="которые мы снесли" subtitle="Тестили наши электро-эндуро везде: город, просёлок, снег, грязь, лёд. Без пинков, без отказов, без драмы." />
+              <SectionHeader badge="Почему мы, а не бензин ⛽️❌" title="Как это работает," highlight="которые мы снесли" subtitle="Тестили наши электро-эндуро везде: город, просёлок, снег, грязь, лёд. Без пинков, без отказов, без драмы." />
               <div className="grid md:grid-cols-3 gap-6">
                 {[
                   { id: "prohodimost", number: "01", title: "Поле, лес, грязь, лестницы 🌲", description: "Кочки, корни, песок, снег, подъёмы и спуски. Куда сам дошёл — туда и заехал. В обзорах «корни съел как не фиг на фиг», едет по кроссовой трассе наравне с бензином.", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b1-prohodimost.jpeg" },
@@ -628,7 +629,7 @@ export default function Home() {
           {/* ─── PRICING ─── */}
           <section id="pricing" className="py-20 md:py-28 px-4">
             <div className="max-w-6xl mx-auto">
-              <SectionHeader badge="Тарифы 💰" title="Платишь за время," highlight="не за нервы" subtitle="Никаких скрытых платежей. Депозит или СТС — на выбор. Скидки от объёма работают автоматически." />
+              <SectionHeader badge="Тарифы 💰" title="Платишь за время," highlight="не за нервы" subtitle="Никаких скрытых платежей. Залог возвращается при возврате. Скидки от объёма работают автоматически." />
               <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
                 {PRICING_TIERS.map((tier, idx) => (<PricingCard key={tier.id} tier={tier} index={idx} />))}
               </div>
@@ -641,12 +642,12 @@ export default function Home() {
           {/* ─── ABOUT ─── */}
           <section id="about" className="py-20 md:py-28 px-4" style={{ backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 40%, transparent)" }}>
             <div className="max-w-7xl mx-auto">
-              <SectionHeader badge="О нас 🤙" title="VIP Bike —" highlight="аренда мотоциклов в Нижнем" subtitle="24 байка от 18 брендов. Электро и ДВС. Доставка по городу. Без скрытых платежей." />
+              <SectionHeader badge="О нас" title="VIP Bike —" highlight="аренда мотоциклов в Нижнем" subtitle="24 байка от 18 брендов. Электро и ДВС. Без скрытых платежей." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
                   { title: "⚡️ Быстрая онлайн-бронь", desc: "Выбирай байк, даты и формат поездки в пару кликов в боте" },
                   { title: "🪪 Электро без категории А", desc: "Лёгкие электро-эндуро законно по правам категории B" },
-                  { title: "🛡️ СТС вместо депозита", desc: "Не замораживай кэш — оставь СТС своего авто" },
+                  { title: "🛡️ Залог", desc: "Возвращается при возврате байка — от 10 000 ₽" },
                   { title: "📍 Центр Нижнего", desc: "пл. Комсомольская 2 — удобно добираться из любой точки города" },
                 ].map((feature, idx) => (
                   <AnimatedSection key={feature.title} delay={idx * 0.1}>
@@ -663,7 +664,7 @@ export default function Home() {
           {/* ─── FAQ ─── */}
           <section id="faq" className="py-20 md:py-28 px-4">
             <div className="max-w-3xl mx-auto">
-              <SectionHeader badge="FAQ 🤔" title="Вопросы, которые" highlight="задают всегда" />
+              <SectionHeader badge="FAQ" title="Вопросы, которые" highlight="задают всегда" />
               <p className="text-lg text-center -mt-10 mb-12" style={{ color: "var(--vip-text-secondary)" }}>Коротко, честно, без воды. Если чего-то нет — пиши в{" "}<a href={OPERATOR_HREF} target="_blank" rel="noopener noreferrer" className="underline font-semibold" style={{ color: "var(--vip-accent-main)" }}>@I_O_S_NN</a>.</p>
               <div className="space-y-3">
                 {FAQ_ITEMS.map((item, idx) => (<FaqItem key={idx} item={item} index={idx} />))}
@@ -721,7 +722,7 @@ export default function Home() {
             </div>
             <div className="max-w-4xl mx-auto text-center relative z-10">
               <AnimatedSection>
-                <Badge variant="outline" className="mb-6" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)", backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 10%, transparent)" }}>Готов к выезду? 🔥</Badge>
+                <Badge variant="outline" className="mb-6" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)", backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 10%, transparent)" }}>Готов к выезду?</Badge>
                 <h3 className="text-4xl md:text-6xl font-black mb-6 leading-tight tracking-tight" style={{ color: "var(--vip-text-primary)" }}>Начни свой <GradientText>путь</GradientText> сегодня</h3>
                 <p className="text-xl max-w-2xl mx-auto mb-10" style={{ color: "var(--vip-text-secondary)" }}>Выбери байк. Забронируй слот. Покатайся. Верни. Никакой волокиты — только кайф.</p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -753,7 +754,7 @@ export default function Home() {
                     <p className="text-xs" style={{ color: "var(--vip-text-secondary)" }}>Аренда мотоциклов</p>
                   </div>
                 </div>
-                <p className="text-sm leading-relaxed mb-5" style={{ color: "var(--vip-text-secondary)" }}>Аренда мотоциклов в Нижнем Новгороде. 24 байка от 18 брендов. Электро и ДВС. Доставка по городу. ⚡️🏍️</p>
+                <p className="text-sm leading-relaxed mb-5" style={{ color: "var(--vip-text-secondary)" }}>Аренда мотоциклов в Нижнем Новгороде. 24 байка от 18 брендов. Электро и ДВС.️🏍️</p>
                 <div className="space-y-2 text-sm" style={{ color: "var(--vip-text-secondary)" }}>
                   <a href={CONTACT_INFO.phoneHref} className="flex items-center gap-2 transition-colors hover:opacity-80">
                     <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.5" className="w-4 h-4 flex-shrink-0" style={{ stroke: "var(--vip-accent-main)" }}><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
@@ -798,7 +799,7 @@ export default function Home() {
               </div>
             </div>
             <div className="pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4" style={{ borderColor: "var(--vip-border-soft)" }}>
-              <p className="text-xs" style={{ color: "var(--vip-text-secondary)" }}>&copy; {new Date().getFullYear()} VIP BIKE — аренда мотоциклов в Нижнем Новгороде ⚡️</p>
+              <p className="text-xs" style={{ color: "var(--vip-text-secondary)" }}>&copy; {new Date().getFullYear()} VIP BIKE — аренда мотоциклов в Нижнем Новгороде️</p>
               <a href="https://t.me/oneSitePlsBot" target="_blank" rel="noopener noreferrer" className="text-xs transition-colors hover:opacity-80" style={{ color: "var(--vip-text-secondary)" }}>powered by oneSitePls &middot; @SALAVEY13</a>
             </div>
           </div>
