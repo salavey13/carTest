@@ -341,14 +341,16 @@ export interface EquipmentItem {
  * These IDs are seeded in migration 20260812000006_seed_equipment.sql.
  */
 const EQUIPMENT_FLAG_TO_CAR_ID: Record<string, string> = {
-  // Helmets (size preferences default to M if not specified)
-  helmets: 'equip-helmet-m',
-  // Gloves (size M default)
-  gloves: 'equip-gloves-m',
-  // Jacket (size M default)
-  jacket: 'equip-jacket-m',
-  // Boots (size M default)
-  boots: 'equip-boots-m',
+  // Helmets (default: Street Pro - mid-range versatile helmet)
+  helmets: 'equip-helmet-street-pro',
+  // Gloves (default: Summer X - lightweight summer gloves)
+  gloves: 'equip-gloves-summer-x',
+  // Jacket (default: Trail Guard - versatile adventure jacket)
+  jacket: 'equip-jacket-trail-guard',
+  // Pants (default: Trail Adv - versatile adventure pants)
+  pants: 'equip-pants-trail-adv',
+  // Boots (default: Street Sport - urban comfortable boots)
+  boots: 'equip-boots-street-sport',
 };
 
 /**
