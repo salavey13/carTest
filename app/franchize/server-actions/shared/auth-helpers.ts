@@ -76,9 +76,19 @@ export async function verifyCrewAccess(
       return { allowed: false, error: "Экипаж не найден." };
     }
 
+    // Active crew member has limited access (owner, admin, co_owner get full access)
+    const { data: membership } = await supabaseAdmin
+      .from("crew_members")
+      .select("role, membership_status")
+      .eq("crew_id", crew.id)
+      .eq("user_id", cookieUserId)
+      .maybeSingle();
+
     // Owner or admin has full access
     const isOwner = crew.owner_id === cookieUserId || isAdmin;
-    if (isOwner) {
+    const isCoOwner = membership?.membership_status === "active" && ["co_owner", "admin"].includes(membership?.role || "");
+
+    if (isOwner || isCoOwner) {
       return {
         allowed: true,
         crewId: crew.id,
@@ -87,14 +97,7 @@ export async function verifyCrewAccess(
       };
     }
 
-    // Active crew member has limited access
-    const { data: membership } = await supabaseAdmin
-      .from("crew_members")
-      .select("role, membership_status")
-      .eq("crew_id", crew.id)
-      .eq("user_id", cookieUserId)
-      .maybeSingle();
-
+    // Regular active crew member has limited access
     if (membership?.membership_status === "active") {
       return {
         allowed: true,
