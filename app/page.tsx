@@ -30,7 +30,7 @@ const BOT_HREF = "https://t.me/oneBikePlsBot";
 const OPERATOR_HREF = "https://t.me/I_O_S_NN";
 const INSTAGRAM_HREF = "https://www.instagram.com/vipbikerental_nn";
 
-/* ══ SOCIAL LINKS — 6 platforms: Instagram, Telegram, VK Electro, VK, WhatsApp, Reviews ══ */
+/* ══ SOCIAL LINKS — 7 platforms: Instagram, Telegram, VK Electro, VK, WhatsApp, Reviews, Website ══ */
 type SocialLink = {
   id: string; label: string; href: string; color: string;
   gradient: string; hoverGlow: string; description: string;
@@ -66,7 +66,16 @@ const SOCIAL_LINKS: SocialLink[] = [
   {
     id: "reviews", label: "Отзывы", href: "https://yandex.ru/maps/org/vip_bike_electro/81589395232/reviews/", color: "#FFCC00",
     gradient: "from-[#FFCC00] to-[#FF9500]", hoverGlow: "rgba(255, 204, 0, 0.5)", description: "Яндекс.Карты",
-    icon: (<svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>),
+  },
+  {
+    id: "website", label: "Сайт", href: "https://vip-bike.ru", color: "#10B981",
+    gradient: "from-[#10B981] to-[#059669]", hoverGlow: "rgba(16, 185, 129, 0.5)", description: "vip-bike.ru",
+    icon: (<svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z" /></svg>),
+  },
+  {
+    id: "website", label: "Сайт", href: "https://vip-bike.ru", color: "#10B981",
+    gradient: "from-[#10B981] to-[#059669]", hoverGlow: "rgba(16, 185, 129, 0.5)", description: "vip-bike.ru",
+    icon: (<svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" /></svg>),
   },
 ];
 
@@ -76,13 +85,7 @@ const CONTACT_INFO = {
   address: "Н. Новгород, пл. Комсомольская 2", workingHours: "10:00 — 22:00 (ежедневно)",
 };
 
-/* ══ HERO STATS — real data: 24 байка, 18 брендов, 10–22 часов, центр города ══ */
-const HERO_STATS = [
-  { value: 24, suffix: "", label: "байка в парке" },
-  { value: 18, suffix: "", label: "брендов" },
-  { value: "10–22", suffix: "", label: "часов работы" },
-  { value: "Н. Новгород", suffix: "", label: "центр города" },
-];
+
 
 /* ══ BIKE TIERS — 3 experience levels (Новичок / Опытный / Профи) ══ */
 const BIKE_TIERS = [
@@ -114,7 +117,7 @@ const PRICING_TIERS = [
   { id: "day", label: "Сутки", emoji: "🔥", price: "от 6 000 ₽", per: "/ сутки", note: "бронь на 18:00 → 10:00",
     features: ["Всё из тарифа «Час», но на сутки", "Скидка 10% от 3 суток", "Скидка 15% от 7 суток"],
     cta: "Забрать на сутки", href: BOT_HREF, highlighted: true },
-  { id: "week", label: "Неделя", emoji: "🚀", price: "от 60 000 ₽", per: "/ 7 суток", note: "скидка 20% от 14 суток",
+  { id: "week", label: "Неделя", emoji: "🚀", price: "от 29 400 ₽", per: "/ 7 суток", note: "скидка 20% от 14 суток",
     features: ["Всё из тарифа «Сутки», но дешевле", "Приоритетное бронирование", "Экипировка с брендированием (по запросу)", "Выделенный менеджер в Telegram", "Бесплатная доставка по городу"],
     cta: "Уйти в неделю", href: BOT_HREF, highlighted: false },
 ];
@@ -133,7 +136,7 @@ const FAQ_ITEMS = [
 
 /* ══ HOW IT WORKS — 4 STEPS ══ */
 const HOW_IT_WORKS_STEPS = [
-  { n: "01", title: "Выбрал", desc: "Жмёшь «Выбрать байк» → попадаешь в каталог. 24 байка от 18 брендов. Смотришь фото, читаешь спеку, выбираешь по сердцу.", emoji: "👆" },
+  { n: "01", title: "Выбрал", desc: "Жмёшь «Выбрать байк» → попадаешь в каталог. Смотришь фото, читаешь спеку, выбираешь по сердцу.", emoji: "👆" },
   { n: "02", title: "Забронировал", desc: "В боте @oneBikePlsBot — 2 клика: даты + формат поездки. Залог — на выбор: наличными или переводом.", emoji: "📲" },
   { n: "03", title: "Забрал", desc: "Приезжаешь на пл. Комсомольская 2. Подписываешь договор (3 минуты), получаешь байк + экипировку.", emoji: "🔑" },
   { n: "04", title: "Покатался", desc: "Откручиваешь ручку. Возвращаешь в согласованное время — забираешь залог. Всё.", emoji: "🏍️" },
@@ -452,7 +455,7 @@ function CinematicHero() {
           Аренда мотоциклов без заморочек
         </motion.p>
         <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.75 }} className="text-sm md:text-base max-w-lg mx-auto mb-6" style={{ color: "var(--vip-text-secondary)" }}>
-          24 байка от 18 брендов. Электро-эндуро без категории А, мощные электросуперкары и классические спортбайки.
+          Электро-эндуро без категории А, мощные электросуперкары и классические спортбайки. Выбери свой — садись и поезжай.
         </motion.p>
 
         {/* CTA Buttons */}
@@ -508,19 +511,7 @@ function CinematicHero() {
           </div>
         </motion.div>
 
-        {/* Stats — compact, visible, at the bottom of hero */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 1.5 }} className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto pt-6 border-t" style={{ borderColor: "color-mix(in srgb, var(--vip-border-soft) 50%, transparent)" }}>
-          {HERO_STATS.map((stat, i) => (
-            <div key={i} className="text-center">
-              <div className="text-xl md:text-3xl font-black mb-0.5" style={{ color: "var(--vip-text-primary)" }}>
-                <AnimatedCounter value={stat.value} suffix={stat.suffix} decimals={0} />
-              </div>
-              <div className="text-[10px] md:text-xs uppercase tracking-wide" style={{ color: "var(--vip-text-secondary)" }}>
-                {stat.label}
-              </div>
-            </div>
-          ))}
-        </motion.div>
+
       </motion.div>
 
       {/* Scroll indicator */}
@@ -606,38 +597,74 @@ export default function Home() {
         <main className="flex-1">
           <CinematicHero />
 
-          {/* ─── BARRIER CARDS (why electro) ─── */}
+          {/* ─── BIKE TIERS SHOWCASE (replaces old "why electro" section) ─── */}
           <section id="catalog" className="py-20 md:py-28 px-4">
             <div className="max-w-7xl mx-auto">
-              <SectionHeader badge="Почему мы, а не бензин ⛽️❌" title="Как это работает," highlight="которые мы снесли" subtitle="Тестили наши электро-эндуро везде: город, просёлок, снег, грязь, лёд. Без пинков, без отказов, без драмы." />
+              <SectionHeader badge="Каталог" title="Байки под" highlight="любой уровень" subtitle="От электро-эндуро для новичков до премиум-электро для профи. Выбирай по опыту и правам." />
               <div className="grid md:grid-cols-3 gap-6">
-                {[
-                  { id: "prohodimost", number: "01", title: "Поле, лес, грязь, лестницы 🌲", description: "Кочки, корни, песок, снег, подъёмы и спуски. Куда сам дошёл — туда и заехал. В обзорах «корни съел как не фиг на фиг», едет по кроссовой трассе наравне с бензином.", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b1-prohodimost.jpeg" },
-                  { id: "razgon", number: "02", title: "Выстреливает из рогатки 🚀", description: "Электро-тяга бьёт мгновенно — без сцепления и передач. Проваливаешься в седло как в суперкаре. Открутил ручку — и поехал, на максимум сразу.", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b2-razgon.jpeg" },
-                  { id: "voda", number: "03", title: "Топили в озере — едет 🌊", description: "Влагозащита IP67. На тесте погружали в ледяное озеро — завёлся, год катается. Лужи, дождь, мокрая трава — без последствий.", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b3-voda.jpeg" },
-                ].map((card, idx) => (
-                  <AnimatedSection key={card.id} delay={idx * 0.15}>
-                    <Card className="overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
-                      <div className="relative aspect-video bg-gradient-to-br overflow-hidden" style={{ backgroundImage: "linear-gradient(to bottom right, #1e293b, #0f172a)" }}>
-                        <motion.img src={card.image} alt={card.title} className="object-cover w-full h-full" whileHover={{ scale: 1.1 }} transition={{ duration: 0.7 }} />
-                        <div className="absolute top-4 left-4 flex items-center gap-2">
-                          <div className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm" style={{ backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 20%, transparent)", border: "1px solid color-mix(in srgb, var(--vip-accent-main) 30%, transparent)" }}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="var(--vip-accent-main)" strokeWidth="2" className="w-5 h-5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
-                          </div>
-                          <span className="text-2xl font-bold text-white drop-shadow-lg">{card.number}</span>
-                        </div>
+                {/* Beginner */}
+                <AnimatedSection delay={0}>
+                  <Card className="overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                    <div className="relative aspect-[9/16] overflow-hidden" style={{ maxHeight: "400px" }}>
+                      <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2025/image_1.jpg" alt="Электро-эндуро 79BIKE Falcon" className="object-cover w-full h-full" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
+                      <div className="absolute inset-0" style={{ background: "linear-gradient(to top, var(--vip-bg-card) 5%, transparent 60%)" }} />
+                      <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold" style={{ backgroundColor: "rgba(34, 197, 94, 0.2)", color: "#22c55e", border: "1px solid rgba(34, 197, 94, 0.3)", backdropFilter: "blur(8px)" }}>Без прав</div>
+                    </div>
+                    <CardContent className="p-5 md:p-6">
+                      <h4 className="text-xl font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>Новичок</h4>
+                      <p className="text-sm mb-4" style={{ color: "var(--vip-text-secondary)" }}>Электро-эндуро до 4 кВт. Не нужны права категории А — достаточно B или M. Лёгкие, тихие, прощают ошибки.</p>
+                      <div className="flex flex-wrap gap-1.5 mb-4">
+                        {["Falcon GT", "Falcon Pro", "Falcon Lynx", "HMD M02", "Jilang Max Pro", "Wenbox U2 Pro", "Kayo TSD 110"].map(b => (
+                          <span key={b} className="px-2.5 py-1 rounded-lg text-xs" style={{ backgroundColor: "rgba(34, 197, 94, 0.08)", color: "#22c55e" }}>{b}</span>
+                        ))}
                       </div>
-                      <CardContent className="p-6">
-                        <h4 className="text-xl font-bold mb-3" style={{ color: "var(--vip-text-primary)" }}>{card.title}</h4>
-                        <p className="text-sm leading-relaxed" style={{ color: "var(--vip-text-secondary)" }}>{card.description}</p>
-                      </CardContent>
-                    </Card>
-                  </AnimatedSection>
-                ))}
+                      <MagneticButton href={CATALOG_HREF} primary className="w-full">Выбрать байк</MagneticButton>
+                    </CardContent>
+                  </Card>
+                </AnimatedSection>
+
+                {/* Intermediate */}
+                <AnimatedSection delay={0.15}>
+                  <Card className="overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                    <div className="relative aspect-[9/16] overflow-hidden" style={{ maxHeight: "400px" }}>
+                      <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/ducati-panigale-s-electro-gold/image_1.jpg" alt="Ducati Panigale S Electro" className="object-cover w-full h-full" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
+                      <div className="absolute inset-0" style={{ background: "linear-gradient(to top, var(--vip-bg-card) 5%, transparent 60%)" }} />
+                      <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold" style={{ backgroundColor: "rgba(245, 158, 11, 0.2)", color: "#f59e0b", border: "1px solid rgba(245, 158, 11, 0.3)", backdropFilter: "blur(8px)" }}>Права M/AM</div>
+                    </div>
+                    <CardContent className="p-5 md:p-6">
+                      <h4 className="text-xl font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>Опытный</h4>
+                      <p className="text-sm mb-4" style={{ color: "var(--vip-text-secondary)" }}>Мощные электро и ДВС-байки. Рекомендуется опыт езды. Категория B или M — уточняй у оператора.</p>
+                      <div className="flex flex-wrap gap-1.5 mb-4">
+                        {["Kawasaki Ninja 650", "Motoland Breakout 300", "Ducati Panigale S Electro", "Rerode R1+", "Y-VOLT Surge V", "Regulmoto Nibbler"].map(b => (
+                          <span key={b} className="px-2.5 py-1 rounded-lg text-xs" style={{ backgroundColor: "rgba(245, 158, 11, 0.08)", color: "#f59e0b" }}>{b}</span>
+                        ))}
+                      </div>
+                      <MagneticButton href={CATALOG_HREF} className="w-full">Выбрать байк</MagneticButton>
+                    </CardContent>
+                  </Card>
+                </AnimatedSection>
+
+                {/* Pro */}
+                <AnimatedSection delay={0.3}>
+                  <Card className="overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                    <div className="relative aspect-[9/16] overflow-hidden" style={{ maxHeight: "400px" }}>
+                      <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/livewire-one/image_1.jpg" alt="LiveWire ONE" className="object-cover w-full h-full" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
+                      <div className="absolute inset-0" style={{ background: "linear-gradient(to top, var(--vip-bg-card) 5%, transparent 60%)" }} />
+                      <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold" style={{ backgroundColor: "rgba(239, 68, 68, 0.2)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.3)", backdropFilter: "blur(8px)" }}>Категория А</div>
+                    </div>
+                    <CardContent className="p-5 md:p-6">
+                      <h4 className="text-xl font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>Профи</h4>
+                      <p className="text-sm mb-4" style={{ color: "var(--vip-text-secondary)" }}>Полноразмерные спортбайки и премиум-электро. Категория А обязательна. Требуется уверенный опыт езды.</p>
+                      <div className="flex flex-wrap gap-1.5 mb-4">
+                        {["LiveWire ONE", "BMW F800R", "Yamaha R7", "Suzuki GSX-S1000F", "Aprilia Shiver 750", "Sequence Zero"].map(b => (
+                          <span key={b} className="px-2.5 py-1 rounded-lg text-xs" style={{ backgroundColor: "rgba(239, 68, 68, 0.08)", color: "#ef4444" }}>{b}</span>
+                        ))}
+                      </div>
+                      <MagneticButton href={CATALOG_HREF} className="w-full">Выбрать байк</MagneticButton>
+                    </CardContent>
+                  </Card>
+                </AnimatedSection>
               </div>
-              <AnimatedSection delay={0.4} className="text-center mt-12">
-                <MagneticButton href={CATALOG_HREF} primary>Смотреть все 24 байка в каталоге<ArrowRight /></MagneticButton>
-              </AnimatedSection>
             </div>
           </section>
 
@@ -695,7 +722,7 @@ export default function Home() {
           {/* ─── ABOUT ─── */}
           <section id="about" className="py-20 md:py-28 px-4" style={{ backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 40%, transparent)" }}>
             <div className="max-w-7xl mx-auto">
-              <SectionHeader badge="О нас" title="VIP Bike —" highlight="аренда мотоциклов в Нижнем" subtitle="24 байка от 18 брендов. Электро и ДВС. Без скрытых платежей." />
+              <SectionHeader badge="О нас" title="VIP Bike —" highlight="аренда мотоциклов в Нижнем" subtitle="Электро и ДВС. Без скрытых платежей." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
                   { title: "⚡️ Быстрая онлайн-бронь", desc: "Выбирай байк, даты и формат поездки в пару кликов в боте" },
@@ -807,7 +834,7 @@ export default function Home() {
                     <p className="text-xs" style={{ color: "var(--vip-text-secondary)" }}>Аренда мотоциклов</p>
                   </div>
                 </div>
-                <p className="text-sm leading-relaxed mb-5" style={{ color: "var(--vip-text-secondary)" }}>Аренда мотоциклов в Нижнем Новгороде. 24 байка от 18 брендов. Электро и ДВС.️🏍️</p>
+                <p className="text-sm leading-relaxed mb-5" style={{ color: "var(--vip-text-secondary)" }}>Аренда мотоциклов в Нижнем Новгороде. Электро и ДВС.🏍️</p>
                 <div className="space-y-2 text-sm" style={{ color: "var(--vip-text-secondary)" }}>
                   <a href={CONTACT_INFO.phoneHref} className="flex items-center gap-2 transition-colors hover:opacity-80">
                     <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.5" className="w-4 h-4 flex-shrink-0" style={{ stroke: "var(--vip-accent-main)" }}><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
@@ -826,7 +853,6 @@ export default function Home() {
                   {[
                     { label: "Каталог", href: CATALOG_HREF, external: false },
                     { label: "Telegram бот", href: BOT_HREF, external: true },
-                    { label: "Instagram", href: INSTAGRAM_HREF, external: true },
                     { label: "Тарифы", href: "#pricing", external: false },
                     { label: "FAQ", href: "#faq", external: false },
                     { label: "Контакты", href: "#contacts", external: false },
