@@ -204,43 +204,50 @@ export async function createManualCashTransaction(params: {
       return { success: false, error: access.error };
     }
 
-    // Only owner/admin can create manual transactions
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("metadata")
-      .eq("user_id", actorUserId)
-      .maybeSingle();
-
-    const userMetadata = user?.metadata as Record<string, unknown> | null;
-    const isAdmin = userMetadata?.role === "admin" || userMetadata?.status === "admin";
-
-    if (!isAdmin) {
-      const { data: crew } = await supabaseAdmin
-        .from("crews")
-        .select("owner_id")
-        .eq("id", access.crewId)
-        .maybeSingle();
-
-      if (crew?.owner_id !== actorUserId) {
-        return { success: false, error: "Только владелец может создавать записи." };
-      }
+    // CR fix H1: use access.isOwner from cookie, NOT client-supplied actorUserId.
+    // Previously: re-derived ownership from actorUserId (privilege escalation —
+    // any crew member could pass the owner's user_id to bypass the check).
+    if (!access.isOwner) {
+      return { success: false, error: "Только владелец может создавать записи." };
     }
 
-    // Determine flow_direction from transaction_type prefix
-    const flowDirection = transactionType.startsWith("income_") ? "in" : "out";
+    // CR fix C1+H3: map client-friendly type names to DB CHECK constraint values.
+    // The UI sends "manual_in" / "manual_out" but the DB only allows:
+    //   income_rental, income_sale, income_equipment, income_service, income_other,
+    //   expense_commission, expense_salary, expense_deposit_return, expense_other
+    // Also map payment_method: "tbank"/"sber" → "transfer" (DB only allows cash/card/transfer/other).
+    const TYPE_MAP: Record<string, { dbType: string; flow: "in" | "out" }> = {
+      manual_in: { dbType: "income_other", flow: "in" },
+      manual_out: { dbType: "expense_other", flow: "out" },
+      // Also accept the DB-native types directly (for future use)
+      income_other: { dbType: "income_other", flow: "in" },
+      expense_other: { dbType: "expense_other", flow: "out" },
+    };
+    const mapped = TYPE_MAP[transactionType] ?? { dbType: transactionType, flow: (transactionType.startsWith("income_") ? "in" : "out") as "in" | "out" };
+    const flowDirection = mapped.flow;
+
+    const METHOD_MAP: Record<string, string> = {
+      tbank: "transfer",
+      sber: "transfer",
+      cash: "cash",
+      card: "card",
+      transfer: "transfer",
+      other: "other",
+    };
+    const mappedMethod = METHOD_MAP[paymentMethod || "cash"] || "cash";
 
     const { data: transaction, error } = await supabaseAdmin
       .from("cash_transactions")
       .insert({
         crew_id: access.crewId,
-        transaction_type: transactionType,
+        transaction_type: mapped.dbType,
         flow_direction: flowDirection,
         amount,
-        payment_method: paymentMethod || "cash",
+        payment_method: mappedMethod,
         category: category || "Прочее",
         description: description || "Ручная запись",
         transaction_date: new Date().toISOString(),
-        created_by: actorUserId,
+        created_by: access.actorUserId,  // CR fix H1: use cookie-derived identity
       })
       .select("id")
       .single();
