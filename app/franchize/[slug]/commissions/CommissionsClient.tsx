@@ -34,9 +34,16 @@ export function CommissionsClient({ slug, crew }: CommissionsClientProps) {
   const [showForm, setShowForm] = useState(false);
   const [editingRate, setEditingRate] = useState<CommissionRate | null>(null);
 
-  const [form, setForm] = useState({
+  type FormState = {
+    operationType: string;
+    commissionType: "percentage" | "fixed_amount";
+    commissionValue: string;
+    priority: string;
+  };
+
+  const [form, setForm] = useState<FormState>({
     operationType: "rental_hourly",
-    commissionType: "percentage" as "percentage" | "fixed_amount",
+    commissionType: "percentage",
     commissionValue: "",
     priority: "0",
   });
@@ -371,3 +378,4 @@ export function CommissionsClient({ slug, crew }: CommissionsClientProps) {
     </div>
   );
 }
+
