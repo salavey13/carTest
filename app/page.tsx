@@ -38,34 +38,63 @@ type SocialLink = {
   featured?: "electric" | "gold" | null;
 };
 
-/* ══ Electric loop keyframes (for VK Electro — cyan electric current flowing around icon) ══ */
+/* ══ Electric loop keyframes (for VK Electro — chaotic cyan electric current) ══ */
 const ELECTRIC_LOOP_KEYFRAMES = `
-@keyframes vip-electric-loop {
-  0%   { background-position: 0% 50%; box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.5), 0 0 18px 2px rgba(34, 211, 238, 0.4); }
-  25%  { background-position: 50% 0%; box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.0), 0 0 22px 4px rgba(34, 211, 238, 0.7); }
-  50%  { background-position: 100% 50%; box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.0), 0 0 18px 2px rgba(34, 211, 238, 0.5); }
-  75%  { background-position: 50% 100%; box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.0), 0 0 22px 4px rgba(34, 211, 238, 0.7); }
-  100% { background-position: 0% 50%; box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.5), 0 0 18px 2px rgba(34, 211, 238, 0.4); }
+@keyframes vip-electric-glow {
+  0%, 100% { box-shadow: 0 0 8px 1px rgba(34, 211, 238, 0.4), 0 0 16px 2px rgba(34, 211, 238, 0.3); }
+  15%      { box-shadow: 0 0 14px 3px rgba(34, 211, 238, 0.7), 0 0 28px 6px rgba(34, 211, 238, 0.5); }
+  30%      { box-shadow: 0 0 6px 1px rgba(34, 211, 238, 0.3), 0 0 12px 2px rgba(34, 211, 238, 0.2); }
+  45%      { box-shadow: 0 0 18px 4px rgba(34, 211, 238, 0.8), 0 0 36px 8px rgba(34, 211, 238, 0.6); }
+  60%      { box-shadow: 0 0 4px 0px rgba(34, 211, 238, 0.2), 0 0 8px 1px rgba(34, 211, 238, 0.15); }
+  75%      { box-shadow: 0 0 16px 3px rgba(34, 211, 238, 0.75), 0 0 32px 7px rgba(34, 211, 238, 0.55); }
+  90%      { box-shadow: 0 0 10px 2px rgba(34, 211, 238, 0.5), 0 0 20px 3px rgba(34, 211, 238, 0.35); }
 }
 @keyframes vip-electric-spark {
-  0%, 100% { opacity: 0.2; }
-  20%, 60% { opacity: 1; }
-  40%, 80% { opacity: 0.4; }
+  0%   { opacity: 0; transform: scale(0.8); }
+  10%  { opacity: 1; transform: scale(1.1); }
+  20%  { opacity: 0.3; transform: scale(0.9); }
+  35%  { opacity: 0.9; transform: scale(1.05); }
+  50%  { opacity: 0.1; transform: scale(0.85); }
+  65%  { opacity: 1; transform: scale(1.15); }
+  80%  { opacity: 0.4; transform: scale(0.95); }
+  100% { opacity: 0; transform: scale(0.8); }
+}
+@keyframes vip-electric-arc {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 `;
 
-/* ══ Gold blic keyframes (for VK — gold shine sweep across icon) ══ */
+/* ══ Gold blic keyframes (for VK — gold shine sweep, longer line + quicker) ══ */
 const GOLD_BLIC_KEYFRAMES = `
 @keyframes vip-gold-blic {
-  0%   { transform: translateX(-150%) rotate(25deg); }
-  60%  { transform: translateX(150%) rotate(25deg); }
-  100% { transform: translateX(150%) rotate(25deg); }
+  0%   { transform: translateX(-300%) rotate(25deg); }
+  50%  { transform: translateX(300%) rotate(25deg); }
+  100% { transform: translateX(300%) rotate(25deg); }
 }
 @keyframes vip-gold-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4), 0 0 14px 2px rgba(255, 215, 0, 0.3); }
   50%      { box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.0), 0 0 22px 5px rgba(255, 215, 0, 0.6); }
 }
 `;
+
+/* ══ Scroll-snap CSS for Tesla-style duo section ══ */
+const SCROLL_SNAP_CSS = `
+.vip-snap-container {
+  scroll-snap-type: y proximity;
+}
+.vip-snap-section {
+  scroll-snap-align: start;
+  scroll-snap-stop: normal;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vip-snap-container { scroll-snap-type: none; }
+  .vip-snap-section { scroll-snap-align: none; }
+}
+`;
+
+/* ══ Cinematic duo section background (shared between Partners + Final CTA) ══ */
+const DUO_SECTION_BG = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/livewire-one/image_3.jpg";
 
 const SOCIAL_LINKS: SocialLink[] = [
   {
@@ -346,11 +375,11 @@ function VipBikeThemeStyles() {
     // in light theme, keep logos as-is (they're designed for white backgrounds).
     root.style.setProperty("--partner-logo-filter", resolvedTheme === "dark" ? "brightness(0.92) contrast(1.05)" : "none");
     document.body.style.backgroundColor = theme.bgBase;
-    // Inject keyframes for social link animations (electric loop + gold blic)
+    // Inject keyframes for social link animations (electric loop + gold blic) + scroll-snap CSS
     if (!document.getElementById("vip-social-keyframes")) {
       const style = document.createElement("style");
       style.id = "vip-social-keyframes";
-      style.textContent = ELECTRIC_LOOP_KEYFRAMES + GOLD_BLIC_KEYFRAMES;
+      style.textContent = ELECTRIC_LOOP_KEYFRAMES + GOLD_BLIC_KEYFRAMES + SCROLL_SNAP_CSS;
       document.head.appendChild(style);
     }
   }, [resolvedTheme]);
@@ -543,16 +572,21 @@ function CinematicHero() {
                     backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 80%, transparent)",
                     border: `1.5px solid color-mix(in srgb, ${social.color} 40%, transparent)`,
                     backdropFilter: "blur(8px)",
-                    ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-loop 2.8s linear infinite" } : {}),
+                    ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 1.8s linear infinite" } : {}),
                   }}
                 >
                   {social.featured === "gold" && (
                     <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-                      <span className="absolute top-0 left-0 w-1/3 h-full" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent)", animation: "vip-gold-blic 3.2s ease-in-out infinite" }} />
+                      <span className="absolute top-0 left-0 w-1/2 h-full" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.85) 50%, transparent)", animation: "vip-gold-blic 2s ease-in-out infinite" }} />
                     </span>
                   )}
                   {social.featured === "electric" && (
-                    <span className="pointer-events-none absolute inset-0 rounded-2xl" style={{ background: "conic-gradient(from 0deg, transparent 0%, rgba(34,211,238,0.4) 25%, transparent 50%, rgba(34,211,238,0.4) 75%, transparent 100%)", animation: "vip-electric-spark 0.6s ease-in-out infinite", maskImage: "radial-gradient(circle, transparent 60%, black 62%, black 100%)", WebkitMaskImage: "radial-gradient(circle, transparent 60%, black 62%, black 100%)" }} />
+                    <>
+                      {/* Rotating arc ring — chaotic electric current around border */}
+                      <span className="pointer-events-none absolute inset-0 rounded-2xl" style={{ background: "conic-gradient(from 0deg, transparent 0%, rgba(34,211,238,0.6) 8%, transparent 16%, transparent 40%, rgba(34,211,238,0.4) 48%, transparent 56%, transparent 70%, rgba(34,211,238,0.7) 78%, transparent 86%)", animation: "vip-electric-arc 2s linear infinite", maskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)", WebkitMaskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)" }} />
+                      {/* Inner spark flicker — chaotic opacity + scale */}
+                      <span className="pointer-events-none absolute inset-1 rounded-2xl" style={{ background: "radial-gradient(circle, rgba(34,211,238,0.3), transparent 70%)", animation: "vip-electric-spark 0.4s ease-in-out infinite" }} />
+                    </>
                   )}
                   <div className="relative transition-all duration-300 group-hover:scale-110" style={{ color: social.color }}>
                     {social.icon}
@@ -581,6 +615,43 @@ function CinematicHero() {
         </motion.div>
       </motion.div>
     </section>
+  );
+}
+
+/* ══ CINEMATIC DUO SECTION — Tesla-style scroll-snap with shared parallax background ══
+   Wraps Partners + Final CTA. Section snaps to viewport top on scroll (proximity snap),
+   background image has parallax, content slides up into place. */
+function CinematicDuoSection({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  // Background parallax: moves slower than scroll
+  const bgY = useTransform(scrollYProgress, [0, 1], ["-15%", "15%"]);
+  const bgScale = useTransform(scrollYProgress, [0, 0.5, 1], [1.1, 1.0, 1.1]);
+  // Content slide-in: starts offset down, slides up as section enters viewport
+  const contentY = useTransform(scrollYProgress, [0, 0.3, 0.7, 1], ["60px", "0px", "0px", "-30px"]);
+  const contentOpacity = useTransform(scrollYProgress, [0, 0.15, 0.85, 1], [0.3, 1, 1, 0.5]);
+
+  return (
+    <div ref={ref} className="vip-snap-section relative min-h-screen overflow-hidden">
+      {/* Shared parallax background image */}
+      <motion.div style={{ y: bgY, scale: bgScale }} className="absolute inset-0 z-0">
+        <img
+          src={DUO_SECTION_BG}
+          alt=""
+          className="w-full h-full object-cover"
+          loading="lazy"
+          aria-hidden
+        />
+        {/* Dark overlay for text readability — adapts to theme */}
+        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, color-mix(in srgb, var(--vip-bg-base) 85%, transparent) 0%, color-mix(in srgb, var(--vip-bg-base) 75%, transparent) 50%, color-mix(in srgb, var(--vip-bg-base) 90%, transparent) 100%)" }} />
+        {/* Accent glow */}
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full blur-[120px] pointer-events-none" style={{ backgroundColor: "var(--vip-accent-main)", opacity: 0.06 }} />
+      </motion.div>
+      {/* Content layer — slides up as section enters viewport */}
+      <motion.div style={{ y: contentY, opacity: contentOpacity }} className="relative z-10">
+        {children}
+      </motion.div>
+    </div>
   );
 }
 
@@ -658,7 +729,7 @@ export default function Home() {
           </AnimatePresence>
         </header>
 
-        <main className="flex-1">
+        <main className="flex-1 vip-snap-container">
           <CinematicHero />
 
           {/* ─── BIKE TIERS SHOWCASE (replaces old "why electro" section) ─── */}
@@ -750,12 +821,12 @@ export default function Home() {
             <div className="max-w-6xl mx-auto relative z-10">
               <SectionHeader badge="Как это работает" title="Забери. Покатайся." highlight="Верни." subtitle="От «хочу» до «катюсь» — 15 минут. Без очередей, без бумажной волокиты, без звонков «а можно забронировать?»." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 relative">
-                {/* Connector line: BEHIND steps. z-0 so steps (z-10) cover it during animation. */}
+                {/* Connector line: behind steps. Steps have opaque bg to hide line where they overlap. */}
                 <div className="hidden lg:block absolute top-12 left-[12.5%] right-[12.5%] h-0.5 z-0 pointer-events-none" style={{ background: "linear-gradient(to right, transparent, var(--vip-accent-main), transparent)", opacity: 0.3 }} />
                 {HOW_IT_WORKS_STEPS.map((step, idx) => (
                   <AnimatedSection key={step.n} delay={idx * 0.15} className="relative z-10">
                     <div className="flex flex-col items-center text-center">
-                      <div className="relative w-24 h-24 rounded-full flex items-center justify-center mb-5 transition-transform duration-300 hover:scale-110" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--vip-accent-main) 20%, transparent), color-mix(in srgb, var(--vip-accent-main) 5%, transparent))", border: "2px solid color-mix(in srgb, var(--vip-accent-main) 40%, transparent)", backdropFilter: "blur(8px)", color: "var(--vip-accent-main)" }}>
+                      <div className="relative w-24 h-24 rounded-full flex items-center justify-center mb-5 transition-transform duration-300 hover:scale-110" style={{ backgroundColor: "var(--vip-bg-card)", backgroundImage: "linear-gradient(135deg, color-mix(in srgb, var(--vip-accent-main) 20%, transparent), color-mix(in srgb, var(--vip-accent-main) 5%, transparent))", border: "2px solid color-mix(in srgb, var(--vip-accent-main) 40%, transparent)", color: "var(--vip-accent-main)" }}>
                         {step.icon}
                         <span className="absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black" style={{ background: "var(--vip-accent-main)", color: "var(--vip-bg-base)" }}>{step.n}</span>
                       </div>
@@ -859,6 +930,8 @@ export default function Home() {
             </div>
           </section>
 
+          {/* ══ CINEMATIC DUO SECTION — Partners + Final CTA with shared parallax background ══ */}
+          <CinematicDuoSection>
           {/* ─── PARTNERS ─── */}
           <section id="partners" className="py-20 md:py-28 px-4">
             <div className="max-w-6xl mx-auto">
@@ -866,26 +939,25 @@ export default function Home() {
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[
                   { name: "moto-selection.ru", href: "https://moto-selection.ru/", logo: "https://static.tildacdn.com/tild6335-3266-4164-b461-363834666561/__.png", desc: "Мото-экипировка и аксессуары" },
-                  { name: "academy.cr", href: "https://academy.cr/", logo: "https://optim.tildacdn.com/tild3434-6531-4533-b264-656433623137/-/resize/289x/-/format/webp/VboLB5caDbrEwJdRviGc.png.webp", desc: "Мото-школа и тренировки" },
-                  { name: "bikeland.ru", href: "https://bikeland.ru/", logo: "https://optim.tildacdn.com/tild6332-3437-4639-b864-626262356466/-/resize/283x/-/format/webp/a85d6fbe3e31832458bb.jpg.webp", desc: "Сообщество и магазин" },
+                  { name: "academy.cr", href: "https://academy.cr/", logo: "https://academy.cr/themes/academy/dist/img/icons/logo.svg", desc: "Мото-школа и тренировки" },
+                  { name: "bikeland.ru", href: "https://bikeland.ru/", logo: "https://bikeland.ru/local/templates/2019/svg/logo.svg", desc: "Сообщество и магазин" },
                 ].map((partner, idx) => (
                   <AnimatedSection key={partner.name} delay={idx * 0.1}>
                     <a
                       href={partner.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="relative z-10 group flex flex-col items-center gap-5 p-8 rounded-2xl border transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full"
-                      style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}
+                      className="relative z-10 group flex flex-col items-center gap-4 p-6 rounded-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full"
+                      style={{ backgroundColor: "transparent" }}
                     >
                       <div
-                        className="relative w-full h-24 md:h-28 rounded-xl flex items-center justify-center p-4 overflow-hidden transition-all duration-300 group-hover:scale-[1.02]"
-                        style={{ backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--vip-accent-main) 15%, transparent)" }}
+                        className="relative w-full flex items-center justify-center py-6 transition-all duration-300 group-hover:scale-[1.03]"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={partner.logo}
                           alt={`Логотип ${partner.name}`}
-                          className="max-h-full max-w-full object-contain"
+                          className="w-full max-w-[200px] h-auto object-contain"
                           style={{ filter: "var(--partner-logo-filter, none)" }}
                           loading="lazy"
                         />
@@ -909,11 +981,7 @@ export default function Home() {
           </section>
 
           {/* ─── FINAL CTA ─── */}
-          <section className="py-24 md:py-32 px-4 relative overflow-hidden">
-            <div className="absolute inset-0">
-              <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, var(--vip-bg-base), color-mix(in srgb, var(--vip-bg-base) 50%, transparent), var(--vip-bg-base))" }} />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] rounded-full blur-[150px]" style={{ backgroundColor: "var(--vip-accent-main)", opacity: 0.08 }} />
-            </div>
+          <section className="py-24 md:py-32 px-4 relative">
             <div className="max-w-4xl mx-auto text-center relative z-10">
               <AnimatedSection>
                 <Badge variant="outline" className="mb-6" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)", backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 10%, transparent)" }}>Готов к выезду?</Badge>
@@ -929,6 +997,7 @@ export default function Home() {
               </AnimatedSection>
             </div>
           </section>
+          </CinematicDuoSection>
         </main>
 
         {/* ─── FOOTER (redesigned) ─── */}
@@ -980,16 +1049,19 @@ export default function Home() {
               {/* Social links as circle row */}
               <div className="sm:col-span-2 lg:col-span-1">
                 <h5 className="font-bold mb-4 uppercase text-xs tracking-widest" style={{ color: "var(--vip-text-secondary)" }}>Мы в соцсетях</h5>
-                <div className="flex flex-wrap gap-2 md:gap-2.5 md:flex-nowrap justify-center md:justify-start">
+                <div className="flex flex-wrap gap-2.5 md:gap-3 md:flex-nowrap justify-center md:justify-start">
                   {SOCIAL_LINKS.map((social) => (
-                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group relative w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1" style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${social.color} 30%, transparent)`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-loop 2.8s linear infinite" } : {}) }}>
+                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0" style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1.5px solid color-mix(in srgb, ${social.color} 30%, transparent)`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 1.8s linear infinite" } : {}) }}>
                       {social.featured === "gold" && (
                         <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
-                          <span className="absolute top-0 left-0 w-1/3 h-full" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent)", animation: "vip-gold-blic 3.2s ease-in-out infinite" }} />
+                          <span className="absolute top-0 left-0 w-1/2 h-full" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.85) 50%, transparent)", animation: "vip-gold-blic 2s ease-in-out infinite" }} />
                         </span>
                       )}
                       {social.featured === "electric" && (
-                        <span className="pointer-events-none absolute inset-0 rounded-full" style={{ background: "conic-gradient(from 0deg, transparent 0%, rgba(34,211,238,0.4) 25%, transparent 50%, rgba(34,211,238,0.4) 75%, transparent 100%)", animation: "vip-electric-spark 0.6s ease-in-out infinite", maskImage: "radial-gradient(circle, transparent 60%, black 62%, black 100%)", WebkitMaskImage: "radial-gradient(circle, transparent 60%, black 62%, black 100%)" }} />
+                        <>
+                          <span className="pointer-events-none absolute inset-0 rounded-full" style={{ background: "conic-gradient(from 0deg, transparent 0%, rgba(34,211,238,0.6) 8%, transparent 16%, transparent 40%, rgba(34,211,238,0.4) 48%, transparent 56%, transparent 70%, rgba(34,211,238,0.7) 78%, transparent 86%)", animation: "vip-electric-arc 2s linear infinite", maskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)", WebkitMaskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)" }} />
+                          <span className="pointer-events-none absolute inset-1 rounded-full" style={{ background: "radial-gradient(circle, rgba(34,211,238,0.3), transparent 70%)", animation: "vip-electric-spark 0.4s ease-in-out infinite" }} />
+                        </>
                       )}
                       <div className="relative transition-colors duration-300" style={{ color: social.color }}>
                         <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">{social.icon.props.children}</svg>
