@@ -1670,6 +1670,11 @@ export function ItemModal({
                 <div>
                   <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">Залог / тариф</p>
                   <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.priceTeaser}</p>
+                  {item.rawSpecs?.deposit_rub ? (
+                    <p className="mt-0.5 text-[10px] text-[var(--item-muted-text)]">
+                      Залог: {Number(item.rawSpecs.deposit_rub).toLocaleString("ru-RU")} ₽
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ) : null}
