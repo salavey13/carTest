@@ -1,52 +1,21 @@
-import type { Metadata } from "next";
-import { CrewFooter } from "@/app/franchize/components/CrewFooter";
-import { CrewHeader } from "@/app/franchize/components/CrewHeader";
-import { FranchizePageShell } from "@/app/franchize/components/FranchizePageShell";
-import { getFranchizeBySlug } from "@/app/franchize/actions";
-import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
-import { buildFranchizeSectionMetadata } from "../metadata";
+// app/franchize/[slug]/commissions/page.tsx
+import { Suspense } from "react";
 import { CommissionsClient } from "./CommissionsClient";
+import { getFranchizeBySlug } from "../../actions";
 
-interface FranchizeSlugCommissionsPageProps {
+interface CommissionsPageProps {
   params: Promise<{ slug: string }>;
 }
 
-export async function generateMetadata({
-  params,
-}: FranchizeSlugCommissionsPageProps): Promise<Metadata> {
+export default async function CommissionsPage({ params }: CommissionsPageProps) {
   const { slug } = await params;
-  return buildFranchizeSectionMetadata(slug, {
-    sectionTitle: "Комиссионные ставки",
-    sectionDescription:
-      "Управление комиссионными ставками экипажа: проценты и фиксированные суммы.",
-    pathSuffix: "/commissions",
-  });
-}
-
-export default async function FranchizeSlugCommissionsPage({
-  params,
-}: FranchizeSlugCommissionsPageProps) {
-  const { slug } = await params;
-  const { crew, items } = await getFranchizeBySlug(slug);
-  const resolvedSlug = crew.slug || slug;
-  const activePath = `/franchize/${resolvedSlug}/commissions`;
-  const surface = crewPaletteForSurface(crew.theme);
+  const { crew } = await getFranchizeBySlug(slug);
 
   return (
-    <main className="min-h-screen" style={surface.page}>
-      <CrewHeader
-        crew={crew}
-        activePath={activePath}
-        groupLinks={items.map((item) => item.category)}
-      />
-      <FranchizePageShell
-        theme={crew.theme}
-        width="wide"
-        contentClassName="space-y-4"
-      >
-        <CommissionsClient crewSlug={resolvedSlug} crew={crew} />
-      </FranchizePageShell>
-      <CrewFooter crew={crew} />
-    </main>
+    <div className="container mx-auto px-4 py-6">
+      <Suspense fallback={<div className="text-center py-12">Загрузка...</div>}>
+        <CommissionsClient slug={slug} crew={crew} />
+      </Suspense>
+    </div>
   );
 }
