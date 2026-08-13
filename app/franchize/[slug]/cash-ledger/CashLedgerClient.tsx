@@ -39,7 +39,7 @@ const TRANSACTION_TYPES = [
 ];
 
 export function CashLedgerClient({ slug, crew }: CashLedgerClientProps) {
-  const { dbUser } = useAppContext();
+  const { dbUser, userCrewMemberships } = useAppContext();
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
   const [summary, setSummary] = useState<Summary>({ totalIn: 0, totalOut: 0, net: 0 });
   const [loading, setLoading] = useState(true);
@@ -76,7 +76,9 @@ export function CashLedgerClient({ slug, crew }: CashLedgerClientProps) {
     accentContrast: "#16130A",
   };
 
-  const isOwner = crew?.ownerId === dbUser?.user_id;
+  const isOwner = userCrewMemberships.some(
+    (m) => m.slug === slug && ["owner", "admin", "co_owner"].includes(m.role)
+  );
 
   useEffect(() => {
     loadData();

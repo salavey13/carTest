@@ -28,7 +28,7 @@ const OPERATION_TYPES = [
 ];
 
 export function CommissionsClient({ slug, crew }: CommissionsClientProps) {
-  const { dbUser } = useAppContext();
+  const { dbUser, userCrewMemberships } = useAppContext();
   const [rates, setRates] = useState<CommissionRate[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -53,7 +53,9 @@ export function CommissionsClient({ slug, crew }: CommissionsClientProps) {
     accentContrast: "#16130A",
   };
 
-  const isOwner = crew?.ownerId === dbUser?.user_id;
+  const isOwner = userCrewMemberships.some(
+    (m) => m.slug === slug && ["owner", "admin", "co_owner"].includes(m.role)
+  );
 
   useEffect(() => {
     loadRates();
