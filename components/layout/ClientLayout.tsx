@@ -35,7 +35,7 @@ import FranchizeMapBottomNav from "@/components/layout/FranchizeMapBottomNav";
 
 import StickyChatButton from "@/components/StickyChatButton";
 import { AppProvider, useAppContext, useStrikeballLobbyContext } from "@/contexts/AppContext";
-import { ThemeProvider } from "@/components/theme-provider"; 
+import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
@@ -122,6 +122,11 @@ const THEME_CONFIG = {
     Footer: Footer,
     BottomNav: BottomNavigation,
     isTransparent: false,
+    // I12 hotfix: the landing page at "/" (and any other default-themed route)
+    // renders its own full-page UI with its own CTA buttons and footer contact
+    // info. The floating StickyChatButton would overlap/duplicate that UI, so
+    // we suppress it here — same pattern as franchize/svarprofi/nnvolt.
+    hideStickyChat: true,
   },
 };
 
@@ -252,7 +257,7 @@ function useThemeSync() {
       if (settings && typeof settings.dark_mode_enabled === 'boolean') {
         const dbWantsDark = settings.dark_mode_enabled;
         const currentIsDark = resolvedTheme === 'dark';
-        
+
         if (dbWantsDark !== currentIsDark) {
             logger.info(`[ThemeSync] Syncing theme from DB. User wants: ${dbWantsDark ? 'DARK' : 'LIGHT'}`);
             setTheme(dbWantsDark ? 'dark' : 'light');
@@ -269,7 +274,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     startParamPayload,
   } = useAppContext();
   const { activeLobby } = useStrikeballLobbyContext();
-  
+
   const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
   const theme = useMemo(() => getThemeForPath(pathname), [pathname]);
   const CurrentHeader = theme.Header;
@@ -284,7 +289,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const isFranchizeMapBottomNavRoute = FRANCHIZE_MAP_BOTTOM_NAV_RE.test(pathname || "");
 
   useBio30ThemeFix();
-  useThemeSync(); 
+  useThemeSync();
   useStartParamRouter();
 
   // These paths show the legacy bottom nav (NOT franchize — franchize handles its own)
@@ -307,6 +312,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   // NOTE: /franchize/ is NOT here. Franchize pages use CrewHeader for
   // navigation and optionally FranchizeMapBottomNav on map-riders routes.
   // NOTE: /svarprofi is NOT here. SvarProfi landing handles its own navigation.
+  // NOTE: "/" is NOT here. The landing page has its own sticky header + CTA.
 
   const showBottomNav =
     pathsToShowBottomNavForStartsWith.some((p) => pathname?.startsWith(p));
@@ -317,8 +323,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname === "/profile" ||
         pathname === "/repo-xml" ||
         pathname === "/sauna-rent" ||
-        pathname?.startsWith("/wb") || 
-        pathname === "/wblanding" || 
+        pathname?.startsWith("/wb") ||
+        pathname === "/wblanding" ||
         pathname === "/wblanding/referral" ||
         pathname === "/csv-compare" ||
         pathname === "/streamer" ||
@@ -327,7 +333,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname?.startsWith("/optimapipe") ||
         pathname?.startsWith("/rules") ||
         pathname?.startsWith("/svarprofi") ||   // PATCH: svarprofi has own header/footer
-        pathname === "/" ||
+        pathname === "/" ||                      // PATCH: landing page has own header/footer
         pathname === "/admin/map-routes"
       )
     );
@@ -339,30 +345,34 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      {/* 
-          GHOST-VIS: 
-          If Tactical Mode is active (Combat or Incoming Invite), we suppress the background 
+      {/*
+          GHOST-VIS:
+          If Tactical Mode is active (Combat or Incoming Invite), we suppress the background
           completely to save battery and reduce screen illumination (Night Vision compatibility).
       */}
       {isStrikeballTheme && !isTacticalMode && <StrikeballBackground />}
 
       {showHeaderAndFooter && CurrentHeader && <CurrentHeader />}
-      
+
       <main className={cn(
-        "flex-1", 
-        showBottomNav || isFranchizeMapBottomNavRoute ? "pb-20 sm:pb-0" : "", 
+        "flex-1",
+        showBottomNav || isFranchizeMapBottomNavRoute ? "pb-20 sm:pb-0" : "",
         isTacticalMode ? "bg-[#000000] text-white selection:bg-red-900" : (!isTransparentPage && "bg-background")
       )}>
         {children}
       </main>
-      
+
       {/* Legacy theme bottom navs (bike, sauna, strikeball) */}
       {(showBottomNav || isStrikeballTheme) && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
 
       {/* Franchize-scoped bottom nav — only on map-riders / leaderboard routes */}
       {isFranchizeMapBottomNavRoute && <FranchizeMapBottomNav pathname={pathname || ""} />}
-      
+
       <Suspense fallback={null}>
+        {/* I12 hotfix: hideStickyChat is now set on the default theme too, so
+            the floating chat button is suppressed on "/" (landing) and all
+            other default-themed routes. Franchize/svarprofi/nnvolt already
+            had this flag. */}
         {!theme.hideStickyChat && <StickyChatButton />}
       </Suspense>
       {showHeaderAndFooter && CurrentFooter && <CurrentFooter />}
