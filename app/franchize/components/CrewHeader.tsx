@@ -20,6 +20,8 @@ import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE }
 import type { FranchizeSectionLink } from "../lib/section-links";
 import { hasRentPrice, hasSalePrice, hasServicePrice } from "../lib/catalog-utils";
 import { readablePaletteTextOnColor, withAlpha } from "../lib/theme";
+
+const EQUIPMENT_PATH = "equipment";
 import { SHOW_CART } from "@/lib/feature-flags";
 import {
   ensureSpookyKeyframes,
@@ -310,7 +312,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
           className="-mx-4 mt-1 border-t px-4 pt-2"
           style={{ borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft }}
         >
-          <div className="mx-auto flex w-full max-w-7xl gap-2 pb-1" role="tablist" aria-label="Режим отображения каталога">
+          <div className="mx-auto flex w-full max-w-7xl gap-2 pb-1" role="tablist" aria-label="Навигация экипажа">
             {([
               { key: "rent" as const, label: "Аренда", count: items?.filter(hasRentPrice).length ?? 0 },
               { key: "sale" as const, label: "Продажа", count: items?.filter(hasSalePrice).length ?? 0 },
@@ -355,6 +357,24 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                 </button>
               );
             })}
+            {/* Equipment link */}
+            <Link
+              href={`${mainCatalogPath}/${EQUIPMENT_PATH}`}
+              className={`shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 select-none active:scale-95 no-underline ${
+                pathname === `${mainCatalogPath}/${EQUIPMENT_PATH}` ? "ring-2 ring-offset-2" : "opacity-70 hover:opacity-100"
+              }`}
+              style={{
+                backgroundColor: pathname === `${mainCatalogPath}/${EQUIPMENT_PATH}`
+                  ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain)
+                  : (crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard),
+                color: pathname === `${mainCatalogPath}/${EQUIPMENT_PATH}`
+                  ? activePillText
+                  : (crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary),
+                transform: pathname === `${mainCatalogPath}/${EQUIPMENT_PATH}` ? "scale(1.05)" : "scale(1)",
+              }}
+            >
+              Экипировка
+            </Link>
           </div>
         </div>
       )}
