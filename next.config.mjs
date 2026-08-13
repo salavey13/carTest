@@ -1,4 +1,4 @@
-let userConfig = undefined
+hlet userConfig = undefined
 try {
   userConfig = await import('./v0-user-next.config')
 } catch (e) {
@@ -68,7 +68,7 @@ const nextConfig = {
   async rewrites() {
     return {
       beforeFiles: [
-        { source: '/', destination: '/franchize/vip-bike' },
+        { source: '/home', destination: '/franchize/vip-bike' },
       ],
     }
   },
