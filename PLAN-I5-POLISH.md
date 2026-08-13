@@ -18,41 +18,51 @@
 **✅ Fixed:**
 - Critical bugs (route params, double state updates, array mutation)
 - Security issues (auth bypass, RLS policy)
-- Circular dependency (cash_transactions FK)
+- Circular dependency (cash_transactions ↔ salary_calculations FKs)
 - Navigation integration (I5 pages in menu)
+- All 5 code review issues (equipment page, auth message, amount validation, JOIN query, hardcoded theme)
+
+**✅ Migration Order Fixed:**
+```
+20260812000001_create_equipment_rentals.sql     # equipment_rentals table
+20260812000003_create_commission_rates.sql       # commission_rates table
+20260812000004_create_salary_plans.sql           # salary_plans table
+20260812000005_create_salary_calculations.sql    # salary_calculations (no FK to cash_transactions)
+20260812000002_create_cash_transactions.sql      # cash_transactions (no FK to salary_calculations)
+20260812000006_seed_equipment.sql                # seed data
+20260812000007_cash_transaction_triggers.sql     # triggers
+20260812000008_backfill_cash_transactions.sql    # backfill
+20260812000009_add_salary_fk_constraints.sql     # ADD circular FKs AFTER both tables exist
+```
 
 **🔄 Remaining Polish:**
-- Medium priority issues from code review
-- Equipment page (mock implementation)
 - Remaining test coverage
 
 ---
 
 ## Remaining Issues (From Code Review)
 
-### Medium Priority
+### ✅ Completed
 
-1. **Incomplete auth in salary-calculations** (`salary-calculations.ts:76-79`)
-   - Issue: Error message says "only owner" but members should read own plans
-   - Fix: Separate read vs write access or clarify permission model
+1. **✅ Equipment page mock → real server actions**
+   - Added `getEquipmentCatalog` server action
+   - Wired `loadCatalog`, `loadRentals`, `handleCreateRental`, `handleReturn`
+   - Added `dbUser` auth context
 
-2. **Cash transaction amount validation** (`cash-transactions.ts:119`)
-   - Issue: Silently converts negative to zero instead of rejecting
-   - Fix: Add explicit rejection or warning log
+2. **✅ Auth message clarity** (`salary-calculations.ts:76-79`)
+   - Simplified: "Только владелец может управлять планами зарплаты"
 
-### Low Priority
+3. **✅ Redundant query → JOIN** (`salary-calculations.ts:254-261`)
+   - Combined `salary_calculations` + `salary_plans` into single JOIN query
 
-3. **Redundant query in salary-calculations** (`salary-calculations.ts:254-261`)
-   - Issue: Separate queries could be JOINed
-   - Fix: Use single query with JOIN
+4. **✅ Hardcoded theme → shared constant** (`SalaryClient.tsx:67-119`)
+   - Replaced with `import { fallbackCrew } from "@/app/franchize/lib/fallback-crew"`
 
-4. **Hardcoded fallback theme** (`salary/SalaryClient.tsx:67-119`)
-   - Issue: 50+ lines of hardcoded theme
-   - Fix: Extract to shared constant
+5. **✅ Amount validation → explicit rejection** (`cash-transactions.ts:119`)
+   - Added warning logs when negative amounts are found and converted to zero
 
-5. **Mock equipment page** (`equipment/EquipmentClient.tsx:51-73`)
-   - Issue: Functions are mocked, page non-functional
-   - Fix: Wire up to real server actions or implement
+6. **✅ Circular dependency → deferred FKs**
+   - Created `00009_add_salary_fk_constraints.sql` to add FKs after both tables exist
 
 ---
 
