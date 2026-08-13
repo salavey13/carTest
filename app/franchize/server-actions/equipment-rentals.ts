@@ -130,9 +130,9 @@ export async function createEquipmentRental(
         daily_price: dailyPrice,
         total_cost: totalCost,
         status: "active",
-        issued_by: actorUserId,
+        issued_by: access.actorUserId,  // CR fix M6: cookie-derived, not client-supplied
         issued_at: new Date().toISOString(),
-        created_by: actorUserId,
+        created_by: access.actorUserId,  // CR fix M6: cookie-derived
       })
       .select("id")
       .single();
@@ -180,7 +180,7 @@ export async function returnEquipmentRental(
       .update({
         status: condition,
         returned_at: new Date().toISOString(),
-        received_by: actorUserId,
+        received_by: access.actorUserId,  // CR fix M6: cookie-derived
         condition_notes: conditionNotes || null,
         updated_at: new Date().toISOString(),
       })
