@@ -766,6 +766,9 @@ export function FranchizeProfileClient({
               <FranchizeOperatorLinkButton href={`/franchize/${slug}/admin/deposits`}>
                 🏦 Депозиты
               </FranchizeOperatorLinkButton>
+              <FranchizeOperatorLinkButton href={`/franchize/${slug}/calc-explainer`}>
+                📐 Как считаются деньги
+              </FranchizeOperatorLinkButton>
             </div>
           </FranchizeOperatorPanel>
         </motion.div>
