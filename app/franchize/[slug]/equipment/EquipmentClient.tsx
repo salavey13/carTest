@@ -40,9 +40,9 @@ interface EquipmentClientProps {
 const CATEGORIES = [
   { key: "helmet", label: "Шлемы", icon: "🪖", color: "#3b82f6" },
   { key: "jacket", label: "Куртки", icon: "🧥", color: "#8b5cf6" },
+  { key: "pants", label: "Штаны", icon: "👖", color: "#f97316" },
   { key: "gloves", label: "Перчатки", icon: "🧤", color: "#22c55e" },
   { key: "boots", label: "Ботинки", icon: "👢", color: "#f59e0b" },
-  { key: "rainwear", label: "Дождевики", icon: "🌧️", color: "#06b6d4" },
   { key: "security", label: "Замки", icon: "🔒", color: "#ef4444" },
   { key: "electronics", label: "Электроника", icon: "📱", color: "#ec4899" },
 ];
@@ -184,7 +184,7 @@ export function EquipmentClient({ slug, crew }: EquipmentClientProps) {
       lightweight: { label: "Лёгкий", emoji: "🪶" },
       urban: { label: "Город", emoji: "🏙️" },
       security: { label: "Защита", emoji: "🔒" },
-      tech: { label: "Tech", emoji: "📱" },
+      tech: { label: "Технологии", emoji: "📱" },
     };
 
     const info = badgeMap[badge] || { label: badge, emoji: "⭐" };

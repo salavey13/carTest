@@ -1,8 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Migration: 20260812000006_seed_equipment.sql
--- Purpose:   I5 — seed premium equipment catalog (helmets, jackets, gloves, boots)
+-- Purpose:   I5 — seed premium equipment catalog (helmets, jackets, pants, gloves, boots)
 -- Plan:      docs/superpowers/plans/2026-08-12-i5-equipment-rentals.md (Этап 2)
 -- Quality:  Fly catalog matching rentals/sales/services standards
+-- Language:  Russian specs for all equipment
 -- ═══════════════════════════════════════════════════════════════════════════
 --
 -- Premium equipment catalog using specs jsonb for rich details.
@@ -23,7 +24,7 @@ BEGIN
   END IF;
 
   -- ═══════════════════════════════════════════════════════════════════════════
-  -- HELMETS — Premium MT Helmets with visors, ventilation, safety certs
+  -- ШЛЕМЫ — Премиальные шлемы MT с визорами, вентиляцией, сертификатами
   -- ═══════════════════════════════════════════════════════════════════════════
 
   INSERT INTO public.cars (id, crew_id, make, model, description, type, daily_price, specs, created_at)
@@ -40,12 +41,12 @@ BEGIN
         "category": "helmet",
         "brand": "MT",
         "collection": "Street",
-        "materials": "ABS plastic shell, EPS foam",
-        "features": ["Built-in sun visor", "Removable neck curtain", "Quick-release buckle", "Multi-port ventilation"],
-        "safety": ["ECE 22.05 certified", "DOT approved"],
-        "sizes": ["S (54-55cm)", "M (56-57cm)", "L (58-59cm)", "XL (60-61cm)"],
-        "colors": ["Matt Black", "White", "Silver"],
-        "weight": "1450g ±50g",
+        "materials": "ABS-пластик, вспененный EPS",
+        "features": ["Встроенный солнцезащитный визор", "Съёмный подшлемник", "Быстросъёмная застёжка", "Мультипортовая вентиляция"],
+        "safety": ["Сертификат ECE 22.05", "Одобрен DOT"],
+        "sizes": ["S (54-55см)", "M (56-57см)", "L (58-59см)", "XL (60-61см)"],
+        "colors": ["Матовый чёрный", "Белый", "Серебристый"],
+        "weight": "1450г ±50г",
         "images": [],
         "badge": "bestseller",
         "badge_color": "#D99A00"
@@ -64,12 +65,12 @@ BEGIN
         "category": "helmet",
         "brand": "MT",
         "collection": "Thunder",
-        "materials": "Fiberglass composite, Multi-density EPS",
-        "features": ["Race-ready aerodynamics", "Improved ventilation channels", "Anti-fog visor", "Emergency quick-release cheek pads"],
-        "safety": ["ECE 22.06", "DOT", "Sharp penetration tested"],
-        "sizes": ["S (54-55cm)", "M (56-57cm)", "L (58-59cm)", "XL (60-61cm)"],
-        "colors": ["Metallic Black", "Metallic Red", "Metallic Blue", "Matt Grey"],
-        "weight": "1400g ±50g",
+        "materials": "Стеклокомпозит, многослойный EPS",
+        "features": ["Аэродинамика для гонок", "Улучшенные вентиляционные каналы", "Анти-туманный визор", "Аварийный quick-release щёк"],
+        "safety": ["ECE 22.06", "DOT", "Испытание на проникновение Sharp"],
+        "sizes": ["S (54-55см)", "M (56-57см)", "L (58-59см)", "XL (60-61см)"],
+        "colors": ["Металлик чёрный", "Металлик красный", "Металлик синий", "Матовый серый"],
+        "weight": "1400г ±50г",
         "images": [],
         "badge": "premium",
         "badge_color": "#ef4444"
@@ -88,12 +89,12 @@ BEGIN
         "category": "helmet",
         "brand": "MT",
         "collection": "Urban",
-        "materials": "High-impact ABS, lightweight EPS",
-        "features": ["Open-face design", "UV400 visor", "Ventilated chin guard", "City-style graphics"],
-        "safety": ["ECE 22.05 certified"],
-        "sizes": ["S (54-55cm)", "M (56-57cm)", "L (58-59cm)", "XL (60-61cm)"],
-        "colors": ["Gloss Black", "White", "Matt Black/Gold"],
-        "weight": "1200g ±50g",
+        "materials": "Ударопрочный ABS, лёгкий EPS",
+        "features": ["Открытый фасон", "Визор UV400", "Вентилируемый подбородочный бампер", "Городской стиль"],
+        "safety": ["Сертификат ECE 22.05"],
+        "sizes": ["S (54-55см)", "M (56-57см)", "L (58-59см)", "XL (60-61см)"],
+        "colors": ["Глянцевый чёрный", "Белый", "Матовый чёрный/золото"],
+        "weight": "1200г ±50г",
         "images": [],
         "badge": "lightweight",
         "badge_color": "#22c55e"
@@ -102,7 +103,7 @@ BEGIN
     ),
 
   -- ═══════════════════════════════════════════════════════════════════════════
-  -- JACKETS — Textile & leather with protection, weather resistance
+  -- КУРТКИ — Текстиль и кожа с защитой, влагостойкостью
   -- ═══════════════════════════════════════════════════════════════════════════
 
     (
@@ -117,12 +118,12 @@ BEGIN
         "category": "jacket",
         "brand": "MT",
         "collection": "Adventure",
-        "materials": "600D polyester, breathable mesh, Reissa waterproof membrane",
-        "protection": ["CE Level 1 armor shoulders/elbows", "Spine protector pocket", "Reflective panels"],
-        "features": ["Waterproof & breathable", "Removable thermal liner", "Adjustable cuffs/waist", "Multiple pockets"],
-        "season": ["Spring", "Summer", "Fall"],
+        "materials": "Полиэстер 600D, дышащая сетка, мембрана Reissa",
+        "protection": ["Защита CE Level 1 плечи/локти", "Карман для защиты спины", "Светоотражающие панели"],
+        "features": ["Влагостойкая и дышащая", "Съёмная тёплая подкладка", "Регулируемые манжеты/талия", "Множество карманов"],
+        "season": ["Весна", "Лето", "Осень"],
         "sizes": ["S (48)", "M (50)", "L (52)", "XL (54)", "XXL (56)"],
-        "colors": ["Black", "Grey", "Black/Orange"],
+        "colors": ["Чёрный", "Серый", "Чёрный/оранжевый"],
         "images": [],
         "badge": "versatile",
         "badge_color": "#3b82f6"
@@ -141,12 +142,12 @@ BEGIN
         "category": "jacket",
         "brand": "MT",
         "collection": "Race",
-        "materials": "1.2-1.4mm cowhide leather, ballistic stretch panels",
-        "protection": ["CE Level 2 armor shoulders/elbows", "Chest protector pocket", "External shoulder sliders", "Spine protector included"],
-        "features": ["Race-fit pre-curved sleeves", "Air vent system", "Zipper for pant connection", "Aerodynamic hump"],
-        "season": ["Spring", "Summer", "Fall"],
+        "materials": "Кожа 1.2-1.4мм, эластичные панели баллистического типа",
+        "protection": ["Защита CE Level 2 плечи/локти", "Карман для защиты груди", "Внешние слайдеры плечей", "Защита спины в комплекте"],
+        "features": ["Предизогнутые рукава для гонок", "Система вентиляции", "Застёжка для соединения со штанами", "Аэродинамический горб"],
+        "season": ["Весна", "Лето", "Осень"],
         "sizes": ["S (48)", "M (50)", "L (52)", "XL (54)", "XXL (56)"],
-        "colors": ["Black/Red", "Black/Blue", "Black/White"],
+        "colors": ["Чёрный/красный", "Чёрный/синий", "Чёрный/белый"],
         "images": [],
         "badge": "premium",
         "badge_color": "#ef4444"
@@ -165,12 +166,12 @@ BEGIN
         "category": "jacket",
         "brand": "MT",
         "collection": "Urban",
-        "materials": "Air-mesh outer, breathable lining, 600D high-impact zones",
-        "protection": ["CE Level 1 armor", "Removable back protector"],
-        "features": ["Full mesh construction", "Stretch panels", "Lightweight design", "Urban cut"],
-        "season": ["Summer"],
+        "materials": "Сеточный внешний слой, дышащая подкладка, зоны 600D",
+        "protection": ["Защита CE Level 1", "Съёмная защита спины"],
+        "features": ["Полная сеточная конструкция", "Эластичные панели", "Лёгкий дизайн", "Городской фасон"],
+        "season": ["Лето"],
         "sizes": ["S (48)", "M (50)", "L (52)", "XL (54)", "XXL (56)"],
-        "colors": ["Black", "White", "Black/Neon Yellow"],
+        "colors": ["Чёрный", "Белый", "Чёрный/неоновый жёлтый"],
         "images": [],
         "badge": "summer",
         "badge_color": "#f59e0b"
@@ -179,7 +180,84 @@ BEGIN
     ),
 
   -- ═══════════════════════════════════════════════════════════════════════════
-  -- GLOVES — Summer, winter, racing options
+  -- ШТАНЫ — Текстиль и кожа для эндуро, туризма, гонок
+  -- ═══════════════════════════════════════════════════════════════════════════
+
+    (
+      'equip-pants-trail-adv',
+      v_crew_id,
+      'MT',
+      'Trail Adv',
+      'Штаны для эндуро и туризма. Влагостойкие, с защитой коленей.',
+      'equipment',
+      450,
+      '{
+        "category": "pants",
+        "brand": "MT",
+        "collection": "Adventure",
+        "materials": "Полиэстер 600D, мембрана Reissa",
+        "protection": ["Защита CE Level 1 колени", "Карман для защиты бёдер", "Светоотражающие элементы"],
+        "features": ["Влагостойкие", "Дышащая мембрана", "Регулируемая талия", "Множество карманов"],
+        "season": ["Весна", "Лето", "Осень"],
+        "sizes": ["S (48)", "M (50)", "L (52)", "XL (54)", "XXL (56)"],
+        "colors": ["Чёрный", "Серый"],
+        "images": [],
+        "badge": "versatile",
+        "badge_color": "#3b82f6"
+      }'::jsonb,
+      now()
+    ),
+    (
+      'equip-pants-leather-pro',
+      v_crew_id,
+      'MT',
+      'Leather Pro',
+      'Кожаные гоночные штаны. Максимальная защита, агрессивный стиль.',
+      'equipment',
+      600,
+      '{
+        "category": "pants",
+        "brand": "MT",
+        "collection": "Race",
+        "materials": "Кожа 1.2-1.4мм, эластичные панели",
+        "protection": ["Защита CE Level 2 колени/бёдра", "Внешние слайдеры коленей", "Защита бёдер в комплекте"],
+        "features": ["Предизогнутые для посадки на мотоцикл", "Система вентиляции", "Застёжка для соединения с курткой", "Аэродинамический силуэт"],
+        "season": ["Весна", "Лето", "Осень"],
+        "sizes": ["S (48)", "M (50)", "L (52)", "XL (54)", "XXL (56)"],
+        "colors": ["Чёрный/красный", "Чёрный/синий", "Чёрный/белый"],
+        "images": [],
+        "badge": "premium",
+        "badge_color": "#ef4444"
+      }'::jsonb,
+      now()
+    ),
+    (
+      'equip-pants-denim-urban',
+      v_crew_id,
+      'MT',
+      'Denim Urban',
+      'Джинсовые штаны для города. Скрытая защита, повседневный стиль.',
+      'equipment',
+      350,
+      '{
+        "category": "pants",
+        "brand": "MT",
+        "collection": "Urban",
+        "materials": "Джинсовая ткань, арамидные волокна, Кевлар в зонах риска",
+        "protection": ["Скрытая защита колен Level 1", "Усиление швов арамидом"],
+        "features": ["Повседневный стиль", "Съёмная защита", "Карманы", "Дышащие"],
+        "season": ["Весна", "Лето", "Осень"],
+        "sizes": ["S (28-30)", "M (32-34)", "L (36-38)", "XL (40-42)"],
+        "colors": ["Синий", "Чёрный", "Серый"],
+        "images": [],
+        "badge": "urban",
+        "badge_color": "#8b5cf6"
+      }'::jsonb,
+      now()
+    ),
+
+  -- ═══════════════════════════════════════════════════════════════════════════
+  -- ПЕРЧАТКИ — Летние, зимние, гоночные варианты
   -- ═══════════════════════════════════════════════════════════════════════════
 
     (
@@ -194,12 +272,12 @@ BEGIN
         "category": "gloves",
         "brand": "MT",
         "collection": "Summer",
-        "materials": "Mesh outer, clarino palm, TPR knuckle protection",
-        "protection": ["Hard knuckle guards", "Palm sliders", "Finger armor"],
-        "features": ["Pre-curved fingers", "Touch-screen compatible", "Adjustable wrist strap", "Breathable"],
-        "season": ["Summer"],
+        "materials": "Сеточный внешний слой, Clarino ладонь, защита костяшек TPR",
+        "protection": ["Жёсткая защита костяшек", "Слайдеры ладони", "Защита пальцев"],
+        "features": ["Предизогнутые пальцы", "Совместимость с сенсорными экранами", "Регулируемый ремень запястья", "Дышащие"],
+        "season": ["Лето"],
         "sizes": ["S (7-8)", "M (8-9)", "L (9-10)", "XL (10-11)"],
-        "colors": ["Black", "Black/Red", "Black/Blue"],
+        "colors": ["Чёрный", "Чёрный/красный", "Чёрный/синий"],
         "images": [],
         "badge": "essential",
         "badge_color": "#22c55e"
@@ -218,12 +296,12 @@ BEGIN
         "category": "gloves",
         "brand": "MT",
         "collection": "Winter",
-        "materials": "Gore-Tex membrane, Thinsulate insulation, Clarino palm",
-        "protection": ["Hard knuckle protection", "Palm reinforcement", "Wrist guards"],
-        "features": ["100% waterproof", "Insulated for cold weather", "Long cuff", "Grip palm"],
-        "season": ["Fall", "Winter", "Spring"],
+        "materials": "Мембрана Gore-Tex, утеплитель Thinsulate, ладонь Clarino",
+        "protection": ["Жёсткая защита костяшек", "Усиление ладони", "Защита запястья"],
+        "features": ["100% влагостойкость", "Утепление для холодной погоды", "Длинный манжет", "Противоскользящая ладонь"],
+        "season": ["Осень", "Зима", "Весна"],
         "sizes": ["S (7-8)", "M (8-9)", "L (9-10)", "XL (10-11)"],
-        "colors": ["Black", "Black/Orange"],
+        "colors": ["Чёрный", "Чёрный/оранжевый"],
         "images": [],
         "badge": "winter",
         "badge_color": "#3b82f6"
@@ -242,12 +320,12 @@ BEGIN
         "category": "gloves",
         "brand": "MT",
         "collection": "Race",
-        "materials": "Leather palm, Kevlar reinforcement, Carbon fiber knuckles",
-        "protection": ["Carbon fiber knuckle guards", "Palm sliders", "Finger bridge", "External pinky guards"],
-        "features": ["Pre-curved race fit", "Air vents", "Gauntlet style", "Zipper closure"],
-        "season": ["Spring", "Summer", "Fall"],
+        "materials": "Кожаная ладонь, усиление Kevlar, карбоновые костяшки",
+        "protection": ["Карбоновая защита костяшек", "Слайдеры ладони", "Мост между пальцами", "Внешняя защита мизинца"],
+        "features": ["Предизогнутый гоночный фасон", "Воздуховоды", "Длинный краг", "Застёжка-молния"],
+        "season": ["Весна", "Лето", "Осень"],
         "sizes": ["S (7-8)", "M (8-9)", "L (9-10)", "XL (10-11)"],
-        "colors": ["Black/Red", "Black/White", "Black/Blue"],
+        "colors": ["Чёрный/красный", "Чёрный/белый", "Чёрный/синий"],
         "images": [],
         "badge": "premium",
         "badge_color": "#ef4444"
@@ -256,7 +334,7 @@ BEGIN
     ),
 
   -- ═══════════════════════════════════════════════════════════════════════════
-  -- BOOTS — Touring, racing, urban options
+  -- БОТИНКИ — Туристические, гоночные, городские варианты
   -- ═══════════════════════════════════════════════════════════════════════════
 
     (
@@ -271,12 +349,12 @@ BEGIN
         "category": "boots",
         "brand": "MT",
         "collection": "Adventure",
-        "materials": "Full-grain leather, waterproof membrane, rubber sole",
-        "protection": ["Ankle armor", "Shin guards", "Toe sliders", "Heel reinforcement"],
-        "features": ["Waterproof", "Breathable membrane", "Multiple closures", "Ortholite footbed"],
-        "season": ["All-season"],
+        "materials": "Грубая кожа, влагостойкая мембрана, резиновая подошва",
+        "protection": ["Защита лодыжек", "Защита голени", "Слайдеры носка", "Усиление пятки"],
+        "features": ["Влагостойкость", "Дышащая мембрана", "Множественные застёжки", "Стелька Ortholite"],
+        "season": ["Всесезон"],
         "sizes": ["EU 40", "EU 41", "EU 42", "EU 43", "EU 44", "EU 45", "EU 46"],
-        "colors": ["Black", "Black/Grey"],
+        "colors": ["Чёрный", "Чёрный/серый"],
         "images": [],
         "badge": "versatile",
         "badge_color": "#3b82f6"
@@ -295,12 +373,12 @@ BEGIN
         "category": "boots",
         "brand": "MT",
         "collection": "Urban",
-        "materials": "Leather upper, mesh panels, rubber sole",
-        "protection": ["Ankle protection", "Reinforced heel/toe", "Shift pad"],
-        "features": ["Walking comfort", "Quick lacing system", "Breathable", "Urban style"],
-        "season": ["Spring", "Summer", "Fall"],
+        "materials": "Кожаный верх, сеточные панели, резиновая подошва",
+        "protection": ["Защита лодыжек", "Усиление пятки/носка", "Шift pad для переключения"],
+        "features": ["Комфорт при ходьбе", "Система быстрой шнуровки", "Дышащие", "Городской стиль"],
+        "season": ["Весна", "Лето", "Осень"],
         "sizes": ["EU 40", "EU 41", "EU 42", "EU 43", "EU 44", "EU 45", "EU 46"],
-        "colors": ["Black", "Black/Red", "Black/White"],
+        "colors": ["Чёрный", "Чёрный/красный", "Чёрный/белый"],
         "images": [],
         "badge": "urban",
         "badge_color": "#8b5cf6"
@@ -319,12 +397,12 @@ BEGIN
         "category": "boots",
         "brand": "MT",
         "collection": "Race",
-        "materials": "Full-grain leather, anti-slip sole",
-        "protection": ["External ankle braces", "Shin/foot armor", "Toe sliders", "Heel guards"],
-        "features": ["Race-fit pre-curved", "Quick-release buckles", "Air intake vents", "Replaceable parts"],
-        "season": ["Spring", "Summer", "Fall"],
+        "materials": "Грубая кожа, противоскользящая подошва",
+        "protection": ["Внешние фиксаторы лодыжек", "Броня голени/стопы", "Слайдеры носка", "Защита пятки"],
+        "features": ["Предизогнутый гоночный фасон", "Быстросъёмные пряжки", "Воздухозаборники", "Заменяемые части"],
+        "season": ["Весна", "Лето", "Осень"],
         "sizes": ["EU 40", "EU 41", "EU 42", "EU 43", "EU 44", "EU 45", "EU 46"],
-        "colors": ["Black/White", "Black/Red", "Black/Blue"],
+        "colors": ["Чёрный/белый", "Чёрный/красный", "Чёрный/синий"],
         "images": [],
         "badge": "premium",
         "badge_color": "#ef4444"
@@ -333,31 +411,9 @@ BEGIN
     ),
 
   -- ═══════════════════════════════════════════════════════════════════════════
-  -- ACCESSORIES — Rain gear, locks, communication
+  -- АКСЕССУАРЫ — Замки, коммуникация, защита
   -- ═══════════════════════════════════════════════════════════════════════════
 
-    (
-      'equip-rain-suit-elite',
-      v_crew_id,
-      'MT',
-      'Rain Suit Elite',
-      'Элитный дождевик. Полная защита от дождя, дыхательная мембрана.',
-      'equipment',
-      400,
-      '{
-        "category": "rainwear",
-        "brand": "MT",
-        "collection": "Protection",
-        "materials": "2-layer waterproof fabric, sealed seams, mesh lining",
-        "features": ["100% waterproof", "Breathable membrane", "Reflective panels", "Packable into pouch", "One-piece design"],
-        "sizes": ["S/M", "L/XL", "XXL/XXXL"],
-        "colors": ["Black", "Black/Neon Yellow"],
-        "images": [],
-        "badge": "essential",
-        "badge_color": "#3b82f6"
-      }'::jsonb,
-      now()
-    ),
     (
       'equip-disc-lock-pro',
       v_crew_id,
@@ -370,10 +426,10 @@ BEGIN
         "category": "security",
         "brand": "MT",
         "collection": "Security",
-        "materials": "Hardened steel, alloy body",
-        "features": ["120dB alarm", "Carry pouch included", "Disc-lock reminder cable", "Weather-resistant"],
-        "compatibility": "Fits most disc brakes (3-6mm thickness)",
-        "colors": ["Black", "Red", "Orange"],
+        "materials": "Закалённая сталь, сплав",
+        "features": ["Сигнализация 120дБ", "Сумка для переноски в комплекте", "Напоминающий трос", "Влагостойкость"],
+        "compatibility": "Подходит большинству дисковых тормозов (3-6мм толщина)",
+        "colors": ["Чёрный", "Красный", "Оранжевый"],
         "images": [],
         "badge": "security",
         "badge_color": "#f59e0b"
@@ -392,23 +448,44 @@ BEGIN
         "category": "electronics",
         "brand": "MT",
         "collection": "Tech",
-        "features": ["Bluetooth 5.0", "Mesh intercom (up to 8 riders)", "Hi-Fi speakers", "FM radio", "Voice commands"],
-        "battery": "Up to 20 hours talk time",
-        "compatibility": "Universal fit for most helmets",
+        "features": ["Bluetooth 5.0", "Интерком Mesh (до 8 райдеров)", "Hi-Fi динамики", "FM радио", "Голосовые команды"],
+        "battery": "До 20 часов разговора",
+        "compatibility": "Универсальное подходит к большинству шлемов",
         "water_resistance": "IP67",
         "images": [],
         "badge": "tech",
         "badge_color": "#8b5cf6"
       }'::jsonb,
       now()
+    ),
+    (
+      'equip-chain-lock',
+      v_crew_id,
+      'MT',
+      'Chain Lock',
+      'Цепной замок с чехлом. Надёжная защита от угона.',
+      'equipment',
+      200,
+      '{
+        "category": "security",
+        "brand": "MT",
+        "collection": "Security",
+        "materials": "Закалённая сталь 10мм, чехол",
+        "features": ["Длина 120см", "Чехол для защиты", "Ключевой механизм", "Влагостойкость"],
+        "colors": ["Чёрный", "Чёрный/жёлтый"],
+        "images": [],
+        "badge": "security",
+        "badge_color": "#f59e0b"
+      }'::jsonb,
+      now()
     )
   ON CONFLICT (id) DO NOTHING;
 
-  RAISE NOTICE 'Equipment catalog seeded: % items', 14;
+  RAISE NOTICE 'Equipment catalog seeded: % items', 17;
 END $$;
 
 COMMENT ON TABLE public.cars IS
-'Vehicles and equipment catalog. Equipment items have type=''equipment'' with rich specs jsonb. Premium MT brand products: helmets, jackets, gloves, boots, accessories.';
+'Vehicles and equipment catalog. Equipment items have type=''equipment'' with rich specs jsonb. Premium MT brand products: helmets, jackets, pants, gloves, boots, accessories.';
 
 COMMENT ON TABLE public.equipment_rentals IS
-'I5: standalone equipment rentals. Equipment = cars rows with type=''equipment''. Seed IDs: equip-helmet-*, equip-jacket-*, equip-gloves-*, equip-boots-*, equip-*-*, with sizes/features in specs jsonb.';
+'I5: standalone equipment rentals. Equipment = cars rows with type=''equipment''. Seed IDs: equip-helmet-*, equip-jacket-*, equip-pants-*, equip-gloves-*, equip-boots-*, equip-*-*, with sizes/features in specs jsonb.';
