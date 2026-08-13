@@ -743,7 +743,7 @@ export default function Home() {
           {/* ─── BIKE TIERS SHOWCASE (merged — pictures + full info from BikeTierCard) ─── */}
           <section id="catalog" className="py-20 md:py-28 px-4">
             <div className="max-w-7xl mx-auto">
-              <SectionHeader badge="Каталог 24 байков" title="Байки под" highlight="любой уровень" subtitle="От электро-эндуро для новичков до премиум-электро для профи. Выбирай по опыту и правам." />
+              <SectionHeader badge="Каталог байков" title="Байки под" highlight="любой уровень" subtitle="От электро-эндуро для новичков до премиум-электро для профи. Выбирай по опыту и правам." />
               <div className="grid md:grid-cols-3 gap-6">
                 {/* Beginner */}
                 <AnimatedSection delay={0}>
@@ -946,8 +946,8 @@ export default function Home() {
             </div>
           </section>
 
-          {/* ══ PARTNERS SECTION — solid dark accent-tinted background, no card shadows ══ */}
-          <section id="partners" className="py-20 md:py-28 px-4" style={{ backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 8%, var(--vip-bg-base))" }}>
+          {/* ══ PARTNERS SECTION — stronger accent-tinted background, logos not inverted ══ */}
+          <section id="partners" className="py-20 md:py-28 px-4" style={{ backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 15%, var(--vip-bg-base))" }}>
             <div className="max-w-6xl mx-auto">
               <SectionHeader badge="Партнёры" title="Друзья и" highlight="партнёры" subtitle="Магазины, академия и сообщество — вместе мы делаем мото-сцену Нижнего сильнее." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -973,14 +973,13 @@ export default function Home() {
                           alt={`Логотип ${partner.name}`}
                           className="w-full max-w-[200px] h-auto object-contain"
                           style={{
-                            filter: partner.darkLogo
-                              ? "brightness(0) invert(1) opacity(0.85)"
-                              : "var(--partner-logo-filter, none)",
+                            filter: "var(--partner-logo-filter, none)",
+                            opacity: 0.9,
                           }}
                           loading="lazy"
                         />
                       </div>
-                      <div className="text-center">
+                      <div className="text-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <h4 className="text-lg font-bold mb-1 transition-colors duration-300" style={{ color: "var(--vip-text-primary)" }}>{partner.name}</h4>
                         <p className="text-sm" style={{ color: "var(--vip-text-secondary)" }}>{partner.desc}</p>
                       </div>
@@ -1035,7 +1034,7 @@ export default function Home() {
                 <div className="flex items-center gap-3 mb-4">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/1000033868-a2e57b7e-5ed8-4440-9304-f3f54f63cc46.jpg"
+                    src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/logo-electro-neon.png"
                     alt="VIP BIKE"
                     className="w-12 h-12 rounded-xl object-cover"
                     style={{ border: "1px solid color-mix(in srgb, var(--vip-accent-main) 30%, transparent)" }}
@@ -1079,20 +1078,20 @@ export default function Home() {
                 <h5 className="font-bold mb-4 uppercase text-xs tracking-widest" style={{ color: "var(--vip-text-secondary)" }}>Мы в соцсетях</h5>
                 <div className="flex flex-wrap gap-2.5 md:gap-3 md:flex-nowrap justify-center md:justify-start">
                   {SOCIAL_LINKS.map((social) => (
-                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0" style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1.5px solid color-mix(in srgb, ${social.color} 30%, transparent)`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 5s linear infinite" } : {}) }}>
+                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group relative w-12 h-12 md:rounded-full rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0" style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${social.color} 30%, transparent)`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 5s linear infinite" } : {}) }}>
                       {social.featured === "gold" && (
-                        <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
+                        <span className="pointer-events-none absolute inset-0 overflow-hidden md:rounded-full rounded-xl">
                           <span className="absolute top-0 left-0 w-1/2 h-full" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.85) 50%, transparent)", animation: "vip-gold-blic 2s ease-in-out infinite" }} />
                         </span>
                       )}
                       {social.featured === "electric" && (
                         <>
-                          <span className="pointer-events-none absolute inset-0 rounded-full" style={{ background: "conic-gradient(from 0deg, transparent 0%, rgba(34,211,238,0.6) 8%, transparent 16%, transparent 40%, rgba(34,211,238,0.4) 48%, transparent 56%, transparent 70%, rgba(34,211,238,0.7) 78%, transparent 86%)", animation: "vip-electric-arc 5s linear infinite", maskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)", WebkitMaskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)" }} />
-                          <span className="pointer-events-none absolute inset-1 rounded-full" style={{ background: "radial-gradient(circle, rgba(34,211,238,0.3), transparent 70%)", animation: "vip-electric-spark 5s ease-in-out infinite" }} />
+                          <span className="pointer-events-none absolute inset-0 md:rounded-full rounded-xl" style={{ background: "conic-gradient(from 0deg, transparent 0%, rgba(34,211,238,0.6) 8%, transparent 16%, transparent 40%, rgba(34,211,238,0.4) 48%, transparent 56%, transparent 70%, rgba(34,211,238,0.7) 78%, transparent 86%)", animation: "vip-electric-arc 5s linear infinite", maskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)", WebkitMaskImage: "radial-gradient(circle, transparent 62%, black 64%, black 100%)" }} />
+                          <span className="pointer-events-none absolute inset-1 md:rounded-full rounded-xl" style={{ background: "radial-gradient(circle, rgba(34,211,238,0.3), transparent 70%)", animation: "vip-electric-spark 5s ease-in-out infinite" }} />
                         </>
                       )}
                       <div className="relative transition-colors duration-300" style={{ color: social.color }}>
-                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">{social.icon.props.children}</svg>
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 md:w-4 md:h-4">{social.icon.props.children}</svg>
                       </div>
                     </a>
                   ))}
