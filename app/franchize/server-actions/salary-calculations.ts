@@ -74,8 +74,9 @@ export async function getOrCreateSalaryPlan(params: {
 
   try {
     const access = await verifyCrewAccess(slug);
+    // Only owners can manage salary plans
     if (!access.allowed || !access.isOwner) {
-      return { success: false, error: access.error || "Только владелец может управлять планами зарплаты." };
+      return { success: false, error: "Только владелец может управлять планами зарплаты." };
     }
 
     // Try to get existing plan
@@ -278,10 +279,16 @@ export async function recordPayout(params: {
       return { success: false, error: access.error || "Только владелец может выплачивать зарплату." };
     }
 
-    // Get salary calculation details
+    // Get salary calculation with plan details in single query (optimization)
     const { data: calc, error: calcError } = await supabaseAdmin
       .from("salary_calculations")
-      .select("*")
+      .select(`
+        *,
+        salary_plans!inner (
+          member_id,
+          crew_id
+        )
+      `)
       .eq("id", salaryCalcId)
       .maybeSingle();
 
@@ -289,13 +296,7 @@ export async function recordPayout(params: {
       return { success: false, error: "Расчёт не найден." };
     }
 
-    // Get salary plan to find member_id
-    const { data: plan } = await supabaseAdmin
-      .from("salary_plans")
-      .select("member_id, crew_id")
-      .eq("id", calc.salary_plan_id)
-      .single();
-
+    const plan = calc.salary_plans;
     if (!plan) {
       return { success: false, error: "План не найден." };
     }

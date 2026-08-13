@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from "react";
 import { Calendar, DollarSign, Package, CheckCircle, AlertTriangle } from "lucide-react";
+import { useAppContext } from "@/contexts/AppContext";
 
 interface EquipmentItem {
   id: string;
@@ -32,6 +33,7 @@ interface EquipmentClientProps {
 }
 
 export function EquipmentClient({ slug }: EquipmentClientProps) {
+  const { dbUser } = useAppContext();
   const [catalog, setCatalog] = useState<EquipmentItem[]>([]);
   const [rentals, setRentals] = useState<EquipmentRental[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,17 +48,18 @@ export function EquipmentClient({ slug }: EquipmentClientProps) {
   useEffect(() => {
     loadCatalog();
     loadRentals();
-  }, [slug]);
+  }, [slug, dbUser?.user_id]);
 
   const loadCatalog = async () => {
     try {
-      // Mock: In real implementation, call server action to get equipment catalog
-      // const result = await getEquipmentCatalog({ slug });
-      setCatalog([
-        { id: "equip-helmet-l", make: "MT", model: "Helmet L", daily_price: 200, type: "equipment" },
-        { id: "equip-jacket-m", make: "MT", model: "Jacket M", daily_price: 300, type: "equipment" },
-        { id: "equip-gloves-m", make: "MT", model: "Gloves M", daily_price: 100, type: "equipment" },
-      ]);
+      const { getEquipmentCatalog } = await import("../../server-actions/equipment-rentals");
+      const result = await getEquipmentCatalog({
+        slug,
+        actorUserId: dbUser?.user_id || "",
+      });
+      if (result.success && result.data) {
+        setCatalog(result.data);
+      }
     } catch (err) {
       console.error("Failed to load catalog:", err);
     }
@@ -64,34 +67,65 @@ export function EquipmentClient({ slug }: EquipmentClientProps) {
 
   const loadRentals = async () => {
     try {
-      // Mock: In real implementation, call listEquipmentRentals
-      setLoading(false);
+      const { listEquipmentRentals } = await import("../../server-actions/equipment-rentals");
+      const result = await listEquipmentRentals({
+        slug,
+        actorUserId: dbUser?.user_id || "",
+      });
+      if (result.success && result.data) {
+        setRentals(result.data);
+      }
     } catch (err) {
       console.error("Failed to load rentals:", err);
+    } finally {
       setLoading(false);
     }
   };
 
   const handleCreateRental = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEquipment) return;
+    if (!selectedEquipment || !dbUser?.user_id) return;
 
     try {
-      // Mock: await createEquipmentRental({ slug, equipmentId, ... })
-      alert(`Создана аренда: ${selectedEquipment.make} ${selectedEquipment.model}`);
-      setShowRentalForm(false);
-      setSelectedEquipment(null);
-      loadRentals();
+      const { createEquipmentRental } = await import("../../server-actions/equipment-rentals");
+      const result = await createEquipmentRental({
+        slug,
+        actorUserId: dbUser.user_id,
+        equipmentId: selectedEquipment.id,
+        renterUserId: rentalForm.renterUserId || undefined,
+        expectedReturnDate: rentalForm.expectedReturnDate || undefined,
+        dailyPrice: rentalForm.dailyPrice,
+      });
+
+      if (result.success) {
+        setShowRentalForm(false);
+        setSelectedEquipment(null);
+        loadRentals();
+      } else {
+        alert(`Ошибка: ${result.error}`);
+      }
     } catch (err: any) {
       alert(`Ошибка: ${err.message}`);
     }
   };
 
   const handleReturn = async (id: string, condition: "returned" | "damaged" | "lost") => {
+    if (!dbUser?.user_id) return;
+
     try {
-      // Mock: await returnEquipmentRental({ slug, id, condition })
-      alert(`Экипировка возвращена: ${condition}`);
-      loadRentals();
+      const { returnEquipmentRental } = await import("../../server-actions/equipment-rentals");
+      const result = await returnEquipmentRental({
+        slug,
+        actorUserId: dbUser.user_id,
+        id,
+        condition,
+      });
+
+      if (result.success) {
+        loadRentals();
+      } else {
+        alert(`Ошибка: ${result.error}`);
+      }
     } catch (err: any) {
       alert(`Ошибка: ${err.message}`);
     }
