@@ -299,7 +299,7 @@ export function CommissionsClient({ slug, crew }: CommissionsClientProps) {
 
                 <div>
                   <label className="block text-sm font-medium mb-1" style={{ color: T.text }}>
-                    Значение {form.commissionType === "percentage" ? "(%) : (₽)"}
+                    Значение {form.commissionType === "percentage" ? "(%)" : "(₽)"}
                   </label>
                   <input
                     type="number"
