@@ -29,6 +29,7 @@ SELECT
 FROM public.rentals r
 WHERE r.status IN ('completed', 'active')
   AND r.crew_id IS NOT NULL
+  AND COALESCE(r.total_cost, 0) > 0
   AND NOT EXISTS (
     SELECT 1 FROM public.cash_transactions ct
     WHERE ct.rental_id = r.rental_id AND ct.transaction_type = 'income_rental'
@@ -52,7 +53,8 @@ SELECT
   COALESCE(s.created_by_operator_chat_id, 'system')
 FROM private.sale_contract_artifacts s
 JOIN public.crews c ON c.slug = s.crew_slug
-WHERE NOT EXISTS (
+WHERE COALESCE(s.total_sum, NULLIF(REPLACE(s.sale_price, ' ', ''), '')::NUMERIC, 0) > 0
+  AND NOT EXISTS (
   SELECT 1 FROM public.cash_transactions ct
   WHERE ct.sale_contract_id = s.id AND ct.transaction_type = 'income_sale'
 );

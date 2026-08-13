@@ -1,134 +1,57 @@
-// /app/api/franchize/[slug]/cash-transactions/route.ts
+// app/api/franchize/[slug]/cash-transactions/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getCashTransactions,
-  createManualCashTransaction,
-} from "@/app/franchize/server-actions/cash-transactions";
-import { logger } from "@/lib/logger";
-import { verifyTelegramActorCookieValue, TELEGRAM_ACTOR_COOKIE } from "@/lib/telegram-actor-cookie";
-import { cookies } from "next/headers";
+import { getCashTransactions, createManualCashTransaction } from "@/app/franchize/server-actions/cash-transactions";
 
-/**
- * API routes for cash transactions.
- * GET: List transactions with filters
- * POST: Create manual transaction
- */
-export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
-  try {
-    const { slug } = await params;
-    const { searchParams } = new URL(request.url);
-    const from = searchParams.get("from");
-    const to = searchParams.get("to");
-    const type = searchParams.get("type");
-    const category = searchParams.get("category");
+export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const { searchParams } = new URL(req.url);
 
-    // SECURITY: Derive actorUserId from auth cookie, not query params
-    const cookieStore = await cookies();
-    const actorUserId = verifyTelegramActorCookieValue(
-      cookieStore.get(TELEGRAM_ACTOR_COOKIE)?.value,
-    );
+  const actorUserId = searchParams.get("actorUserId") || "";
+  const from = searchParams.get("from") || "";
+  const to = searchParams.get("to") || "";
+  const transactionType = searchParams.get("transactionType") || "";
 
-    if (!actorUserId) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    if (!slug) {
-      return NextResponse.json(
-        { success: false, error: "Missing slug" },
-        { status: 400 }
-      );
-    }
-
-    const result = await getCashTransactions({
-      slug,
-      actorUserId,
-      from: from || undefined,
-      to: to || undefined,
-      transactionType: type || undefined,
-    });
-
-    if (!result.success) {
-      return NextResponse.json(
-        { success: false, error: result.error },
-        { status: result.error?.includes("не найден") ? 404 : 401 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: result.data,
-      summary: result.summary,
-    });
-  } catch (error) {
-    logger.error("[cash-transactions GET] Error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+  if (!actorUserId) {
+    return NextResponse.json({ success: false, error: "Требуется actorUserId" }, { status: 400 });
   }
+
+  const result = await getCashTransactions({
+    slug,
+    actorUserId,
+    from: from || undefined,
+    to: to || undefined,
+    transactionType: transactionType || undefined,
+  });
+
+  return NextResponse.json(result);
 }
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
-  try {
-    const { slug } = await params;
-    const body = await request.json();
-    const { type, category, amount, method, description } = body;
+export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const body = await req.json();
 
-    // SECURITY: Derive actorUserId from auth cookie, not request body
-    const cookieStore = await cookies();
-    const actorUserId = verifyTelegramActorCookieValue(
-      cookieStore.get(TELEGRAM_ACTOR_COOKIE)?.value,
-    );
+  const { actorUserId, transactionType, amount, flowDirection, category, description, paymentMethod } = body;
 
-    if (!actorUserId) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    if (!slug || !type || !amount) {
-      return NextResponse.json(
-        { success: false, error: "Missing required fields (slug, type, amount)" },
-        { status: 400 }
-      );
-    }
-
-    const result = await createManualCashTransaction({
-      slug,
-      actorUserId,
-      transactionType: type,
-      amount: Number(amount),
-      paymentMethod: method || undefined,
-      category: category || undefined,
-      description: description || undefined,
-    });
-
-    if (!result.success) {
-      return NextResponse.json(
-        { success: false, error: result.error },
-        { status: result.error?.includes("недостаточно") ? 401 : 400 }
-      );
-    }
-
-    return NextResponse.json(
-      { success: true, data: result.data },
-      { status: 201 }
-    );
-  } catch (error) {
-    logger.error("[cash-transactions POST] Error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+  if (!actorUserId) {
+    return NextResponse.json({ success: false, error: "Требуется actorUserId" }, { status: 400 });
   }
+  if (!transactionType || !amount || !flowDirection) {
+    return NextResponse.json({ success: false, error: "Требуются transactionType, amount, flowDirection" }, { status: 400 });
+  }
+  if (Number(amount) <= 0) {
+    return NextResponse.json({ success: false, error: "Сумма должна быть больше 0" }, { status: 400 });
+  }
+
+  const result = await createManualCashTransaction({
+    slug,
+    actorUserId,
+    transactionType,
+    amount: Number(amount),
+    flowDirection,
+    category,
+    description,
+    paymentMethod,
+  });
+
+  return NextResponse.json(result);
 }
