@@ -946,8 +946,8 @@ export default function Home() {
             </div>
           </section>
 
-          {/* ══ PARTNERS SECTION — stronger accent-tinted background, logos not inverted ══ */}
-          <section id="partners" className="py-20 md:py-28 px-4" style={{ backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 15%, var(--vip-bg-base))" }}>
+          {/* ══ PARTNERS SECTION — strong accent-tinted background, logos not inverted ══ */}
+          <section id="partners" className="py-20 md:py-28 px-4" style={{ backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 25%, var(--vip-bg-base))" }}>
             <div className="max-w-6xl mx-auto">
               <SectionHeader badge="Партнёры" title="Друзья и" highlight="партнёры" subtitle="Магазины, академия и сообщество — вместе мы делаем мото-сцену Нижнего сильнее." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1014,7 +1014,7 @@ export default function Home() {
           </section>
 
           {/* ─── FOOTER (inside cinematic finale; mobile gets own 100vh picture bg) ─── */}
-          <footer className="relative border-t mt-auto min-h-[100vh] md:min-h-0 overflow-hidden" style={{ borderColor: "color-mix(in srgb, var(--vip-accent-main) 20%, var(--vip-border-soft))" }}>
+          <footer className="relative border-t mt-auto min-h-[calc(100vh-4rem)] md:min-h-0 overflow-hidden" style={{ borderColor: "color-mix(in srgb, var(--vip-accent-main) 20%, var(--vip-border-soft))" }}>
           {/* Mobile-only picture background for footer (100vh) */}
           <div className="absolute inset-0 z-0 md:hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1034,7 +1034,7 @@ export default function Home() {
                 <div className="flex items-center gap-3 mb-4">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/logo-electro-neon.png"
+                    src="/logo-electro-neon.png"
                     alt="VIP BIKE"
                     className="w-12 h-12 rounded-xl object-cover"
                     style={{ border: "1px solid color-mix(in srgb, var(--vip-accent-main) 30%, transparent)" }}
