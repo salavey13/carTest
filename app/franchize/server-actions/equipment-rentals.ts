@@ -280,6 +280,56 @@ export async function listEquipmentRentals(params: {
   }
 }
 
+/**
+ * Get equipment catalog for a crew.
+ * Returns all cars rows with type='equipment'.
+ */
+export async function getEquipmentCatalog(params: {
+  slug: string;
+  actorUserId: string;
+}): Promise<ActionResponse<EquipmentItem[]>> {
+  const { slug, actorUserId } = params;
+
+  try {
+    const access = await verifyCrewAccess(slug);
+    if (!access.allowed) {
+      return { success: false, error: access.error };
+    }
+
+    const { data: equipment, error } = await supabaseAdmin
+      .from("cars")
+      .select("id, make, model, daily_price, type")
+      .eq("type", "equipment")
+      .order("make", { ascending: true });
+
+    if (error) {
+      logger.error("[getEquipmentCatalog] Query failed:", error);
+      return { success: false, error: "Не удалось загрузить каталог." };
+    }
+
+    const formatted = (equipment || []).map((e: any) => ({
+      id: e.id,
+      make: e.make,
+      model: e.model,
+      daily_price: Number(e.daily_price || 0),
+      type: e.type,
+    }));
+
+    return { success: true, data: formatted };
+  } catch (err) {
+    logger.error("[getEquipmentCatalog] Exception:", err);
+    return errorResponse(handleError(err, "getEquipmentCatalog"));
+  }
+}
+
+export interface EquipmentItem {
+  id: string;
+  make: string;
+  model: string;
+  daily_price: number;
+  type: string;
+}
+
 // ── Doc-manual integration (I5 Equipment T4) ─────────────────────────────────────
 
 /**

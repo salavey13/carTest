@@ -105,8 +105,17 @@ export async function getCashTransactions(params: {
       return { success: false, error: "Не удалось загрузить транзакции." };
     }
 
+    // Check for negative amounts and log warning
+    const negativeCount = (transactions || []).filter((t: any) => Number(t.amount || 0) < 0).length;
+    if (negativeCount > 0) {
+      logger.warn("[getCashTransactions] Found negative amounts, converting to zero", { count: negativeCount });
+    }
+
     const formatted = (transactions || []).map((t: any) => {
       const amount = Number(t.amount || 0);
+      if (amount < 0) {
+        logger.warn("[getCashTransactions] Negative amount found", { id: t.id, amount });
+      }
       return {
         id: t.id,
         crewId: t.crew_id,
@@ -116,7 +125,7 @@ export async function getCashTransactions(params: {
         salaryCalcId: t.salary_calc_id,
         transactionType: t.transaction_type,
         flowDirection: t.flow_direction,
-        amount: amount > 0 ? amount : 0, // Защита от отрицательных сумм
+        amount: amount > 0 ? amount : 0, // Защита от отрицательных сумм с логированием
         paymentMethod: t.payment_method,
         fromUserId: t.from_user_id,
         toUserId: t.to_user_id,
@@ -323,8 +332,17 @@ export async function getDailyCashReport(params: {
       return { success: false, error: "Не удалось загрузить отчёт." };
     }
 
+    // Check for negative amounts and log warning
+    const negativeCount = (transactions || []).filter((t: any) => Number(t.amount || 0) < 0).length;
+    if (negativeCount > 0) {
+      logger.warn("[getDailyCashReport] Found negative amounts, converting to zero", { count: negativeCount });
+    }
+
     const formatted = (transactions || []).map((t: any) => {
       const amount = Number(t.amount || 0);
+      if (amount < 0) {
+        logger.warn("[getDailyCashReport] Negative amount found", { id: t.id, amount });
+      }
       return {
         id: t.id,
         crewId: t.crew_id,
@@ -334,7 +352,7 @@ export async function getDailyCashReport(params: {
         salaryCalcId: t.salary_calc_id,
         transactionType: t.transaction_type,
         flowDirection: t.flow_direction,
-        amount: amount > 0 ? amount : 0, // Защита от отрицательных сумм
+        amount: amount > 0 ? amount : 0, // Защита от отрицательных сумм с логированием
         paymentMethod: t.payment_method,
         fromUserId: t.from_user_id,
         toUserId: t.to_user_id,
