@@ -556,9 +556,9 @@ export default function Home() {
 
         {/* ─── HEADER ─── */}
         <header className="sticky top-0 z-40 border-b backdrop-blur-xl" style={{ borderColor: "var(--vip-border-soft)", backgroundColor: "color-mix(in srgb, var(--vip-bg-base) 80%, transparent)" }}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between relative">
-            {/* Logo: centered on mobile (absolute), left on desktop (static) */}
-            <div className="flex items-center gap-3 absolute left-1/2 -translate-x-1/2 md:static md:left-auto md:translate-x-0">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            {/* Desktop: logo on left + nav on right */}
+            <div className="hidden md:flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(to-br, var(--vip-accent-main), var(--vip-accent-main-hover))" }}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="var(--vip-bg-base)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M5 16v-4a8 8 0 0116 0v4" /><circle cx="8" cy="16" r="2" /><circle cx="16" cy="16" r="2" /><path d="M10 16h4" /></svg>
               </div>
@@ -572,8 +572,9 @@ export default function Home() {
               <ThemeToggleButton size="md" />
               <MagneticButton href={CATALOG_HREF} primary size="sm">Забронировать</MagneticButton>
             </nav>
-            {/* Mobile controls — pushed right via ml-auto so logo stays centered */}
-            <div className="flex items-center gap-2 md:hidden ml-auto">
+            {/* Mobile: title + theme + hamburger grouped and centered together */}
+            <div className="md:hidden flex items-center gap-2 mx-auto">
+              <h1 className="font-bold text-lg leading-tight" style={{ color: "var(--vip-text-primary)" }}>VIP BIKE</h1>
               <ThemeToggleButton size="sm" />
               <button className="p-2" style={{ color: "var(--vip-text-primary)" }} onClick={() => setMenuOpen(!menuOpen)} aria-label="Меню">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">{menuOpen ? <path d="M18 6L6 18M6 6l12 12" /> : <path d="M4 6h16M4 12h16M4 18h16" />}</svg>
@@ -605,10 +606,12 @@ export default function Home() {
                 {/* Beginner */}
                 <AnimatedSection delay={0}>
                   <Card className="relative aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
-                    <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2026/image_1.jpg" alt="Электро-эндуро 79BIKE Falcon" className="absolute top-0 left-0 w-full object-cover z-0" style={{ height: "76%" }} whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
-                    <div className="absolute top-0 left-0 w-full pointer-events-none z-[1]" style={{ height: "76%", background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
+                    <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
+                      <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2026/image_1.jpg" alt="Электро-эндуро 79BIKE Falcon" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
+                      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
+                    </div>
                     <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-10" style={{ backgroundColor: "rgba(34, 197, 94, 0.2)", color: "#22c55e", border: "1px solid rgba(34, 197, 94, 0.3)", backdropFilter: "blur(8px)" }}>Без прав</div>
-                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-10">
+                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-20" style={{ backgroundColor: "var(--vip-bg-card)" }}>
                       <h4 className="text-xl font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>Новичок</h4>
                       <p className="text-sm mb-4" style={{ color: "var(--vip-text-secondary)" }}>Электро-эндуро до 4 кВт. Не нужны права категории А — достаточно B или M. Лёгкие, тихие, прощают ошибки.</p>
                       <div className="flex flex-wrap gap-1.5 mb-4">
@@ -624,10 +627,12 @@ export default function Home() {
                 {/* Intermediate */}
                 <AnimatedSection delay={0.15}>
                   <Card className="relative aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
-                    <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/ducati-panigale-s-electro-gold/image_1.jpg" alt="Ducati Panigale S Electro" className="absolute top-0 left-0 w-full object-cover z-0" style={{ height: "76%" }} whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
-                    <div className="absolute top-0 left-0 w-full pointer-events-none z-[1]" style={{ height: "76%", background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
+                    <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
+                      <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/ducati-panigale-s-electro-gold/image_1.jpg" alt="Ducati Panigale S Electro" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
+                      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
+                    </div>
                     <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-10" style={{ backgroundColor: "rgba(245, 158, 11, 0.2)", color: "#f59e0b", border: "1px solid rgba(245, 158, 11, 0.3)", backdropFilter: "blur(8px)" }}>Права M/AM</div>
-                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-10">
+                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-20" style={{ backgroundColor: "var(--vip-bg-card)" }}>
                       <h4 className="text-xl font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>Опытный</h4>
                       <p className="text-sm mb-4" style={{ color: "var(--vip-text-secondary)" }}>Мощные электро и ДВС-байки. Рекомендуется опыт езды. Категория B или M — уточняй у оператора.</p>
                       <div className="flex flex-wrap gap-1.5 mb-4">
@@ -643,10 +648,12 @@ export default function Home() {
                 {/* Pro */}
                 <AnimatedSection delay={0.3}>
                   <Card className="relative aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
-                    <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/livewire-one/image_1.jpg" alt="LiveWire ONE" className="absolute top-0 left-0 w-full object-cover z-0" style={{ height: "76%" }} whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
-                    <div className="absolute top-0 left-0 w-full pointer-events-none z-[1]" style={{ height: "76%", background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
+                    <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
+                      <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/livewire-one/image_1.jpg" alt="LiveWire ONE" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
+                      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
+                    </div>
                     <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-10" style={{ backgroundColor: "rgba(239, 68, 68, 0.2)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.3)", backdropFilter: "blur(8px)" }}>Категория А</div>
-                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-10">
+                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-20" style={{ backgroundColor: "var(--vip-bg-card)" }}>
                       <h4 className="text-xl font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>Профи</h4>
                       <p className="text-sm mb-4" style={{ color: "var(--vip-text-secondary)" }}>Полноразмерные спортбайки и премиум-электро. Категория А обязательна. Требуется уверенный опыт езды.</p>
                       <div className="flex flex-wrap gap-1.5 mb-4">
