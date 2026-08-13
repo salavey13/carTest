@@ -282,7 +282,7 @@ export async function listEquipmentRentals(params: {
 
 /**
  * Get equipment catalog for a crew.
- * Returns all cars rows with type='equipment'.
+ * Returns all cars rows with type='equipment' with rich specs.
  */
 export async function getEquipmentCatalog(params: {
   slug: string;
@@ -298,7 +298,7 @@ export async function getEquipmentCatalog(params: {
 
     const { data: equipment, error } = await supabaseAdmin
       .from("cars")
-      .select("id, make, model, daily_price, type")
+      .select("id, make, model, description, daily_price, type, specs")
       .eq("type", "equipment")
       .order("make", { ascending: true });
 
@@ -311,8 +311,10 @@ export async function getEquipmentCatalog(params: {
       id: e.id,
       make: e.make,
       model: e.model,
+      description: e.description || null,
       daily_price: Number(e.daily_price || 0),
       type: e.type,
+      specs: e.specs || {},
     }));
 
     return { success: true, data: formatted };
@@ -326,8 +328,10 @@ export interface EquipmentItem {
   id: string;
   make: string;
   model: string;
+  description: string | null;
   daily_price: number;
   type: string;
+  specs: Record<string, unknown>;
 }
 
 // ── Doc-manual integration (I5 Equipment T4) ─────────────────────────────────────
