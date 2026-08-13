@@ -58,57 +58,67 @@ VIN не сохранялся (RLS). PATCH endpoint, скролл, палитр�
 Координирующий документ, I1–I4, 10 критических багов найдено и исправлено.
 **~4 000 ₽**
 
+**Итого волна 1: 56 000 ₽**
+
 ---
 
-## Волна 2: I5 — Сервисные операции (11–12 августа, merge из branch)
+## Волна 2: I5 — Сервисные операции (11–13 августа)
 
 ### 14. Equipment rentals — учёт проката оборудования
-Таблица `equipment_rentals` + RLS. API: POST `/api/franchize/[slug]/equipment-rentals`. UI: `/franchize/[slug]/equipment` — каталог оборудования (шлемы, перчатки, куртки) с ценами и статусом. Seed-данные для 8 единиц оборудования.
-**~5 000 ₽**
+Таблица `equipment_rentals` + RLS. API + UI: каталог оборудования (шлемы, перчатки, куртки, штаны) с ценами и статусом. Redesign каталога. Seed-данные. Навигация.
+**~6 000 ₽**
 
 ### 15. Cash transactions — кассовая книга
-Таблица `cash_transactions` с типизацией (rental_income, sale_income, expense, salary_payment, deposit_flow). Автоматическое создание записей при завершении аренды/продажи (триггеры с idempotency guard). API: POST `/api/franchize/[slug]/cash-transactions`, GET `/api/franchize/[slug]/dashboard/daily-report`. UI: `/franchize/[slug]/cash-ledger` — кассовая книга с фильтрами по дате, типу, оператору. Сводка: приход/расход/сальдо за день.
-**~8 000 ₽**
+Таблица `cash_transactions` с типизацией (income_rental, income_sale, expense, salary_payment). Триггеры: авто-создание записей при завершении аренды/продажи с **idempotency guard** (NOT EXISTS + transition guard). Backfill для существующих аренд/продаж с **guard от zero-amount inserts**. API + UI: кассовая книга с фильтрами, сводка приход/расход/сальдо. Security fixes из код-ревью.
+**~10 000 ₽**
 
 ### 16. Commission rates — комиссионные ставки
-Таблица `commission_rates` — гибкие ставки по типам сделок (rent, sale, service) с процентами для оператора/экипажа. Server actions: CRUD для ставок. UI: `/franchize/[slug]/commissions` — управление ставками.
+Таблица `commission_rates` — гибкие ставки (percentage / fixed_amount) по типам сделок. UI управления ставками. Ветвление в триггере: percentage → total_cost × value / 100, fixed_amount → value.
 **~4 000 ₽**
 
 ### 17. Salary plans + calculations — зарплата
-Таблицы `salary_plans` (часовая ставка / оклад / процент) + `salary_calculations` (расчёт за период). API: GET `/api/franchize/[slug]/salary/[employeeId]`. UI: `/franchize/[slug]/salary` — расчёт зарплаты по сотруднику за период, учёт смен + комиссионных + кассовых операций. Профиль: секция «Мои заработки».
-**~6 000 ₽**
+Таблицы `salary_plans` (часовая / оклад / процент) + `salary_calculations`. Триггер расчёта. API + UI: расчёт зарплаты по сотруднику за период, учёт смен + комиссионных. Профиль: «Мои заработки». Migration fix: убраны generated columns, добавлен trigger.
+**~7 000 ₽**
 
 ### 18. Leads quality upgrade — улучшение CRM
-Split LeadDetailDrawer на LeadDetailTodos + LeadDetailNotes. LeadDetailNotes — заметки с тегами. LeadsErrorBoundary — изоляция ошибок. Type safety — убраны `any` типы, добавлены интерфейсы. CSV export лидов. Race condition в todo toggle исправлен. Auth reset при ошибке.
+Split LeadDetailDrawer на LeadDetailTodos + LeadDetailNotes. ErrorBoundary. Type safety — убраны `any`. CSV export. Race condition в todo toggle исправлен.
 **~5 000 ₽**
 
 ### 19. Shared auth helpers — единая авторизация
-Выделен `shared/auth-helpers.ts` — единый паттерн проверки прав для всех server actions (crew member + role check). Используется cash-transactions, commissions, salary, equipment. Устраняет дублирование кода.
+`shared/auth-helpers.ts` — единый паттерн проверки прав. Устраняет дублирование.
 **~2 000 ₽**
+
+### 20. I5 polish — circular FK, navigation, redesign
+Circular FK dependency разрешена через deferred migration. Equipment catalog redesign. Navigation integration. Удалены superseded hotfix миграции (20260811000002/003 — заменены на 20260811000004).
+**~3 000 ₽**
+
+**Итого волна 2: 37 000 ₽**
 
 ---
 
 ## Волна 3: Полировка (12–13 августа)
 
-### 20. Одометр before/after на странице аренды
-`doc-manual.ts` теперь записывает `odometer_before` в `rentals.metadata`. `RentalOdometerDelta` отображает «Пробег: 405 → 412 км (7 км за аренду)» с подсветкой превышения.
+### 21. Одометр before/after
+`doc-manual.ts` записывает `odometer_before` в metadata. `RentalOdometerDelta` отображает пробег.
 **~2 000 ₽**
 
-### 21. Фото ПОСЛЕ для закрытых аренд
-Разрешено добавление фото ПОСЛЕ в течение 1 часа после закрытия аренды (аналогично фото ДО в течение часа после начала). Проверка по `metadata.return_confirmed_at`.
+### 22. Фото ПОСЛЕ для закрытых аренд
+Разрешено в течение 1 часа после закрытия. Проверка по `metadata.return_confirmed_at`.
 **~2 000 ₽**
 
-### 22. Информация о платежах в модалке закрытия
-В модалке закрытия показывается «Получено при выдаче: 💵 5000 ₽ + 💳 2000 ₽ (Тинькофф)» — оператор видит, сколько было собрано и в какой форме, что помогает при расчёте возврата депозита + удержаний.
+### 23. Платежи в модалке закрытия
+«Получено при выдаче: 💵 5000 ₽ + 💳 2000 ₽ (Тинькофф)» — помогает при расчёте возврата.
 **~2 000 ₽**
+
+**Итого волна 3: 6 000 ₽**
 
 ---
 
 ## Итого
 
-| Волна | Работы | ₽ |
-|-------|--------|---|
-| 1 | Депозиты, фото, цены, /doc, крон, профиль, админка, права, мета-PRD (13 пунктов) | 56 000 |
-| 2 | I5: equipment, cash ledger, commissions, salary, leads, auth (6 пунктов) | 30 000 |
-| 3 | Одометр, фото ПОСЛЕ, платежи в модалке (3 пункта) | 6 000 |
-| | **ИТОГО** | **92 000 ₽** |
+| Волна | Период | Пунктов | ₽ |
+|-------|--------|---------|---|
+| 1 | 10–11 авг | 13 | 56 000 |
+| 2 | 11–13 авг | 7 | 37 000 |
+| 3 | 12–13 авг | 3 | 6 000 |
+| | **ИТОГО** | **23** | **99 000 ₽** |
