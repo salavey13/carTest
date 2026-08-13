@@ -380,7 +380,18 @@ function VipBikeThemeStyles() {
     // Partner logos: in dark theme, invert+dim white-bg logos so they blend;
     // in light theme, keep logos as-is (they're designed for white backgrounds).
     root.style.setProperty("--partner-logo-filter", resolvedTheme === "dark" ? "brightness(0.92) contrast(1.05)" : "none");
+    // Hero badge bg: white in light theme, transparent accent-tint in dark theme
+    root.style.setProperty("--vip-badge-bg", resolvedTheme === "dark" ? "color-mix(in srgb, var(--vip-accent-main) 8%, transparent)" : "rgba(255, 255, 255, 0.85)");
     document.body.style.backgroundColor = theme.bgBase;
+
+    // Footer logo: swap src based on theme (dark = local neon, light = supabase photo)
+    document.querySelectorAll<HTMLImageElement>("img.footer-logo-img").forEach((img) => {
+      const lightSrc = img.getAttribute("data-light-src");
+      if (lightSrc) {
+        img.src = resolvedTheme === "dark" ? "/logo-electro-neon.png" : lightSrc;
+      }
+    });
+
     // Inject keyframes for social link animations (electric loop + gold blic) + scroll-snap CSS
     if (!document.getElementById("vip-social-keyframes")) {
       const style = document.createElement("style");
@@ -523,7 +534,7 @@ function CinematicHero() {
 
         {/* Badge */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-5">
-          <Badge variant="outline" className="px-3 py-1.5 text-xs md:text-sm" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)", backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 8%, transparent)", backdropFilter: "blur(8px)" }}>
+          <Badge variant="outline" className="px-3 py-1.5 text-xs md:text-sm" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)", backgroundColor: "var(--vip-badge-bg)", backdropFilter: "blur(8px)" }}>
             Электро и ДВС мотоциклы в аренду
           </Badge>
         </motion.div>
@@ -575,9 +586,10 @@ function CinematicHero() {
                 <div
                   className="relative w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center transition-all duration-300 overflow-hidden"
                   style={{
-                    backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 80%, transparent)",
+                    backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 30%, transparent)",
                     border: `1.5px solid color-mix(in srgb, ${social.color} 40%, transparent)`,
-                    backdropFilter: "blur(8px)",
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
                     ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 5s linear infinite" } : {}),
                   }}
                 >
@@ -1035,9 +1047,10 @@ export default function Home() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src="/logo-electro-neon.png"
+                    data-light-src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/1000033868-a2e57b7e-5ed8-4440-9304-f3f54f63cc46.jpg"
                     alt="VIP BIKE"
-                    className="w-12 h-12 rounded-xl object-cover"
-                    style={{ border: "1px solid color-mix(in srgb, var(--vip-accent-main) 30%, transparent)" }}
+                    className="w-12 h-12 rounded-full object-cover footer-logo-img"
+                    style={{ border: "none" }}
                   />
                   <div>
                     <h4 className="font-black text-xl leading-tight" style={{ color: "var(--vip-text-primary)" }}>VIP BIKE</h4>
@@ -1076,9 +1089,9 @@ export default function Home() {
               {/* Social links as circle row */}
               <div className="sm:col-span-2 lg:col-span-1">
                 <h5 className="font-bold mb-4 uppercase text-xs tracking-widest" style={{ color: "var(--vip-text-secondary)" }}>Мы в соцсетях</h5>
-                <div className="flex flex-wrap gap-2.5 md:gap-3 md:flex-nowrap justify-center md:justify-start">
+                <div className="flex flex-wrap gap-2 md:gap-3 md:flex-nowrap justify-center md:justify-start">
                   {SOCIAL_LINKS.map((social) => (
-                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group relative w-12 h-12 md:rounded-full rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0" style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${social.color} 30%, transparent)`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 5s linear infinite" } : {}) }}>
+                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group relative w-10 h-10 md:w-12 md:h-12 md:rounded-full rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0" style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${social.color} 30%, transparent)`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 5s linear infinite" } : {}) }}>
                       {social.featured === "gold" && (
                         <span className="pointer-events-none absolute inset-0 overflow-hidden md:rounded-full rounded-xl">
                           <span className="absolute top-0 left-0 w-1/2 h-full" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.85) 50%, transparent)", animation: "vip-gold-blic 2s ease-in-out infinite" }} />
@@ -1091,7 +1104,7 @@ export default function Home() {
                         </>
                       )}
                       <div className="relative transition-colors duration-300" style={{ color: social.color }}>
-                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 md:w-4 md:h-4">{social.icon.props.children}</svg>
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 md:w-4 md:h-4">{social.icon.props.children}</svg>
                       </div>
                     </a>
                   ))}
