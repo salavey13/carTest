@@ -208,7 +208,7 @@ export async function createManualCashTransaction(params: {
     // Previously: re-derived ownership from actorUserId (privilege escalation —
     // any crew member could pass the owner's user_id to bypass the check).
     if (!access.isOwner) {
-      return { success: false, error: "Только владелец может создавать записи." };
+      return { success: false, error: "Только владелец, со-владелец или администратор может создавать записи." };
     }
 
     // CR fix C1+H3: map client-friendly type names to DB CHECK constraint values.
