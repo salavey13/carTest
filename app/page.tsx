@@ -605,7 +605,7 @@ export default function Home() {
               <div className="grid md:grid-cols-3 gap-6">
                 {/* Beginner */}
                 <AnimatedSection delay={0}>
-                  <Card className="relative aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
                     <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
                       <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2026/image_1.jpg" alt="Электро-эндуро 79BIKE Falcon" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
                       <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
@@ -626,7 +626,7 @@ export default function Home() {
 
                 {/* Intermediate */}
                 <AnimatedSection delay={0.15}>
-                  <Card className="relative aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
                     <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
                       <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/ducati-panigale-s-electro-gold/image_1.jpg" alt="Ducati Panigale S Electro" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
                       <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
@@ -647,7 +647,7 @@ export default function Home() {
 
                 {/* Pro */}
                 <AnimatedSection delay={0.3}>
-                  <Card className="relative aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
                     <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
                       <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/livewire-one/image_1.jpg" alt="LiveWire ONE" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
                       <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
