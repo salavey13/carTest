@@ -21,6 +21,11 @@
 - Circular dependency (cash_transactions ↔ salary_calculations FKs)
 - Navigation integration (I5 pages in menu)
 - All 5 code review issues (equipment page, auth message, amount validation, JOIN query, hardcoded theme)
+- **🔥 Equipment catalog redesign → fly AF premium design**
+  - Rich specs jsonb with badges, features, materials, sizes, colors
+  - 14 premium items: helmets, jackets, gloves, boots, accessories
+  - Category-based filtering with icons
+  - Card-based UI matching rentals/sales/services catalog quality
 
 **✅ Migration Order Fixed:**
 ```

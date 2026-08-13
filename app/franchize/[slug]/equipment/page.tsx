@@ -5,14 +5,20 @@
 
 import { Suspense } from "react";
 import { EquipmentClient } from "./EquipmentClient";
+import { getFranchizeBySlug } from "../../actions";
 
-export default function EquipmentPage({ params }: { params: { slug: string } }) {
+interface EquipmentPageProps {
+  params: Promise<{ slug: string }>;
+}
+
+export default async function EquipmentPage({ params }: EquipmentPageProps) {
+  const { slug } = await params;
+  const { crew } = await getFranchizeBySlug(slug);
+
   return (
     <div className="container mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold mb-6">Экипировка</h1>
-
-      <Suspense fallback={<div>Загрузка...</div>}>
-        <EquipmentClient slug={params.slug} />
+      <Suspense fallback={<div className="text-center py-12">Загрузка...</div>}>
+        <EquipmentClient slug={slug} crew={crew} />
       </Suspense>
     </div>
   );
