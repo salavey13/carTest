@@ -52,7 +52,7 @@ export interface CashTransaction {
  */
 export async function getCashTransactions(params: {
   slug: string;
-  actorUserId: string;
+  actorUserId?: string; // Deprecated: unused, derived from cookie
   from?: string;
   to?: string;
   transactionType?: string;
@@ -62,7 +62,7 @@ export async function getCashTransactions(params: {
   summary?: { totalIn: number; totalOut: number; net: number };
   error?: string;
 }> {
-  const { slug, actorUserId, from, to, transactionType } = params;
+  const { slug, from, to, transactionType } = params;
 
   // Валидация формата дат
   if (from && isNaN(new Date(from).getTime())) {
@@ -179,14 +179,14 @@ export async function getCashTransactions(params: {
  */
 export async function createManualCashTransaction(params: {
   slug: string;
-  actorUserId: string;
+  actorUserId?: string; // Deprecated: unused, derived from cookie
   transactionType: string;
   amount: number;
   paymentMethod?: string;
   category?: string;
   description?: string;
 }): Promise<ActionResponse<{ id: string }>> {
-  const { slug, actorUserId, transactionType, amount, paymentMethod, category, description } = params;
+  const { slug, transactionType, amount, paymentMethod, category, description } = params;
 
   // Валидация суммы
   if (amount <= 0) {
@@ -205,25 +205,8 @@ export async function createManualCashTransaction(params: {
     }
 
     // Only owner/admin can create manual transactions
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("metadata")
-      .eq("user_id", actorUserId)
-      .maybeSingle();
-
-    const userMetadata = user?.metadata as Record<string, unknown> | null;
-    const isAdmin = userMetadata?.role === "admin" || userMetadata?.status === "admin";
-
-    if (!isAdmin) {
-      const { data: crew } = await supabaseAdmin
-        .from("crews")
-        .select("owner_id")
-        .eq("id", access.crewId)
-        .maybeSingle();
-
-      if (crew?.owner_id !== actorUserId) {
-        return { success: false, error: "Только владелец может создавать записи." };
-      }
+    if (!access.isOwner) {
+      return { success: false, error: "Только владелец может создавать записи." };
     }
 
     // Determine flow_direction from transaction_type prefix
@@ -240,7 +223,7 @@ export async function createManualCashTransaction(params: {
         category: category || "Прочее",
         description: description || "Ручная запись",
         transaction_date: new Date().toISOString(),
-        created_by: actorUserId,
+        created_by: access.actorUserId,
       })
       .select("id")
       .single();
@@ -280,7 +263,7 @@ export async function createManualCashTransaction(params: {
  */
 export async function getDailyCashReport(params: {
   slug: string;
-  actorUserId: string;
+  actorUserId?: string; // Deprecated: unused, derived from cookie
   date: string;
 }): Promise<ActionResponse<{
   date: string;
@@ -289,7 +272,7 @@ export async function getDailyCashReport(params: {
   net: number;
   transactions: CashTransaction[];
 }>> {
-  const { slug, actorUserId, date } = params;
+  const { slug, date } = params;
 
   // Валидация формата даты
   if (!date || isNaN(new Date(date).getTime())) {
