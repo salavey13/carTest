@@ -618,34 +618,34 @@ function CinematicHero() {
   );
 }
 
-/* ══ CINEMATIC DUO SECTION — Tesla-style scroll-snap with shared parallax background ══
-   Wraps Partners + Final CTA. Section snaps to viewport top on scroll (proximity snap),
-   background image has parallax, content slides up into place. */
-function CinematicDuoSection({ children }: { children: React.ReactNode }) {
+/* ══ CINEMATIC FINALE SECTION — Tesla-style scroll-snap with shared parallax background ══
+   Wraps Final CTA + Footer as ONE full-screen section. Background image has smooth
+   y-only parallax (no scale = no jitter), content slides up into place. */
+function CinematicFinaleSection({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
-  // Background parallax: moves slower than scroll
-  const bgY = useTransform(scrollYProgress, [0, 1], ["-15%", "15%"]);
-  const bgScale = useTransform(scrollYProgress, [0, 0.5, 1], [1.1, 1.0, 1.1]);
+  // Background parallax: smooth y-only movement (NO scale — scale causes jitter)
+  const bgY = useTransform(scrollYProgress, [0, 1], ["-10%", "10%"]);
   // Content slide-in: starts offset down, slides up as section enters viewport
-  const contentY = useTransform(scrollYProgress, [0, 0.3, 0.7, 1], ["60px", "0px", "0px", "-30px"]);
-  const contentOpacity = useTransform(scrollYProgress, [0, 0.15, 0.85, 1], [0.3, 1, 1, 0.5]);
+  const contentY = useTransform(scrollYProgress, [0, 0.2, 0.8, 1], ["40px", "0px", "0px", "-20px"]);
+  const contentOpacity = useTransform(scrollYProgress, [0, 0.1, 0.9, 1], [0.4, 1, 1, 0.6]);
 
   return (
     <div ref={ref} className="vip-snap-section relative min-h-screen overflow-hidden">
-      {/* Shared parallax background image */}
-      <motion.div style={{ y: bgY, scale: bgScale }} className="absolute inset-0 z-0">
+      {/* Shared parallax background image — y-only, no scale (prevents jitter) */}
+      <motion.div style={{ y: bgY }} className="absolute inset-0 z-0">
         <img
           src={DUO_SECTION_BG}
           alt=""
           className="w-full h-full object-cover"
+          style={{ minHeight: "120%" }}
           loading="lazy"
           aria-hidden
         />
-        {/* Dark overlay for text readability — adapts to theme */}
-        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, color-mix(in srgb, var(--vip-bg-base) 85%, transparent) 0%, color-mix(in srgb, var(--vip-bg-base) 75%, transparent) 50%, color-mix(in srgb, var(--vip-bg-base) 90%, transparent) 100%)" }} />
+        {/* Theme-adaptive overlay for text readability */}
+        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, color-mix(in srgb, var(--vip-bg-base) 92%, transparent) 0%, color-mix(in srgb, var(--vip-bg-base) 85%, transparent) 40%, color-mix(in srgb, var(--vip-bg-base) 95%, transparent) 100%)" }} />
         {/* Accent glow */}
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full blur-[120px] pointer-events-none" style={{ backgroundColor: "var(--vip-accent-main)", opacity: 0.06 }} />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full blur-[120px] pointer-events-none" style={{ backgroundColor: "var(--vip-accent-main)", opacity: 0.06 }} />
       </motion.div>
       {/* Content layer — slides up as section enters viewport */}
       <motion.div style={{ y: contentY, opacity: contentOpacity }} className="relative z-10">
@@ -732,22 +732,28 @@ export default function Home() {
         <main className="flex-1 vip-snap-container">
           <CinematicHero />
 
-          {/* ─── BIKE TIERS SHOWCASE (replaces old "why electro" section) ─── */}
+          {/* ─── BIKE TIERS SHOWCASE (merged — pictures + full info from BikeTierCard) ─── */}
           <section id="catalog" className="py-20 md:py-28 px-4">
             <div className="max-w-7xl mx-auto">
-              <SectionHeader badge="Каталог" title="Байки под" highlight="любой уровень" subtitle="От электро-эндуро для новичков до премиум-электро для профи. Выбирай по опыту и правам." />
+              <SectionHeader badge="Каталог 24 байков" title="Байки под" highlight="любой уровень" subtitle="От электро-эндуро для новичков до премиум-электро для профи. Выбирай по опыту и правам." />
               <div className="grid md:grid-cols-3 gap-6">
                 {/* Beginner */}
                 <AnimatedSection delay={0}>
-                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "color-mix(in srgb, #22C55E 40%, var(--vip-border-soft))" }}>
                     <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
                       <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2026/image_1.jpg" alt="Электро-эндуро 79BIKE Falcon" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
-                      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
+                      <div className="absolute inset-0 pointer-events-none z-10" style={{ background: "linear-gradient(to bottom, transparent 30%, var(--vip-bg-card) 85%)" }} />
                     </div>
-                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-10" style={{ backgroundColor: "rgba(34, 197, 94, 0.2)", color: "#22c55e", border: "1px solid rgba(34, 197, 94, 0.3)", backdropFilter: "blur(8px)" }}>Без прав</div>
-                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-20" style={{ backgroundColor: "var(--vip-bg-card)" }}>
-                      <h4 className="text-xl font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>Новичок</h4>
-                      <p className="text-sm mb-4" style={{ color: "var(--vip-text-secondary)" }}>Электро-эндуро до 4 кВт. Не нужны права категории А — достаточно B или M. Лёгкие, тихие, прощают ошибки.</p>
+                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-20" style={{ backgroundColor: "rgba(34, 197, 94, 0.2)", color: "#22c55e", border: "1px solid rgba(34, 197, 94, 0.3)", backdropFilter: "blur(8px)" }}>Без прав</div>
+                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-30" style={{ backgroundColor: "transparent" }}>
+                      <div className="text-xs uppercase tracking-widest font-bold mb-1" style={{ color: "#22C55E" }}>Уровень 01</div>
+                      <h4 className="text-xl font-black mb-1" style={{ color: "var(--vip-text-primary)" }}>Новичок</h4>
+                      <p className="text-sm font-semibold mb-2" style={{ color: "#22C55E" }}>Лёгкие электро-эндуро</p>
+                      <p className="text-sm mb-3" style={{ color: "var(--vip-text-secondary)" }}>Не нужны права категории А — садишься и едешь. Идеально для первого знакомства с мотоциклом, для города и лёгкого бездорожья. Лёгкие, тихие, экологичные.</p>
+                      <div className="flex items-start gap-2 p-2 rounded-lg mb-3 text-xs font-medium" style={{ backgroundColor: "rgba(34, 197, 94, 0.08)", border: "1px solid rgba(34, 197, 94, 0.2)", color: "var(--vip-text-primary)" }}>
+                        <span style={{ color: "#22C55E" }}>🪪</span>
+                        <span>Без категории А — достаточно прав B</span>
+                      </div>
                       <div className="flex flex-wrap gap-1.5 mb-4">
                         {["Falcon GT", "Falcon Pro", "Falcon Lynx", "HMD M02", "Jilang Max Pro", "Wenbox U2 Pro", "Kayo TSD 110"].map(b => (
                           <span key={b} className="px-2.5 py-1 rounded-lg text-xs" style={{ backgroundColor: "rgba(34, 197, 94, 0.08)", color: "#22c55e" }}>{b}</span>
@@ -760,15 +766,21 @@ export default function Home() {
 
                 {/* Intermediate */}
                 <AnimatedSection delay={0.15}>
-                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "color-mix(in srgb, #F59E0B 40%, var(--vip-border-soft))" }}>
                     <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
                       <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/ducati-panigale-s-electro-gold/image_1.jpg" alt="Ducati Panigale S Electro" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
-                      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
+                      <div className="absolute inset-0 pointer-events-none z-10" style={{ background: "linear-gradient(to bottom, transparent 30%, var(--vip-bg-card) 85%)" }} />
                     </div>
-                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-10" style={{ backgroundColor: "rgba(245, 158, 11, 0.2)", color: "#f59e0b", border: "1px solid rgba(245, 158, 11, 0.3)", backdropFilter: "blur(8px)" }}>Права M/AM</div>
-                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-20" style={{ backgroundColor: "var(--vip-bg-card)" }}>
-                      <h4 className="text-xl font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>Опытный</h4>
-                      <p className="text-sm mb-4" style={{ color: "var(--vip-text-secondary)" }}>Мощные электро и ДВС-байки. Рекомендуется опыт езды. Категория B или M — уточняй у оператора.</p>
+                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-20" style={{ backgroundColor: "rgba(245, 158, 11, 0.2)", color: "#f59e0b", border: "1px solid rgba(245, 158, 11, 0.3)", backdropFilter: "blur(8px)" }}>Права M/AM</div>
+                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-30" style={{ backgroundColor: "transparent" }}>
+                      <div className="text-xs uppercase tracking-widest font-bold mb-1" style={{ color: "#F59E0B" }}>Уровень 02</div>
+                      <h4 className="text-xl font-black mb-1" style={{ color: "var(--vip-text-primary)" }}>Опытный</h4>
+                      <p className="text-sm font-semibold mb-2" style={{ color: "#F59E0B" }}>Мощные электромотоциклы</p>
+                      <p className="text-sm mb-3" style={{ color: "var(--vip-text-secondary)" }}>Больше скорости, больше динамики, больше эмоций. Рекомендуется категория M/AM или предыдущий опыт езды. Мгновенный электро-момент на колёса.</p>
+                      <div className="flex items-start gap-2 p-2 rounded-lg mb-3 text-xs font-medium" style={{ backgroundColor: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.2)", color: "var(--vip-text-primary)" }}>
+                        <span style={{ color: "#F59E0B" }}>🪪</span>
+                        <span>Категория M/AM или опыт езды</span>
+                      </div>
                       <div className="flex flex-wrap gap-1.5 mb-4">
                         {["Kawasaki Ninja 650", "Motoland Breakout 300", "Ducati Panigale S Electro", "Rerode R1+", "Y-VOLT Surge V", "Regulmoto Nibbler"].map(b => (
                           <span key={b} className="px-2.5 py-1 rounded-lg text-xs" style={{ backgroundColor: "rgba(245, 158, 11, 0.08)", color: "#f59e0b" }}>{b}</span>
@@ -781,15 +793,21 @@ export default function Home() {
 
                 {/* Pro */}
                 <AnimatedSection delay={0.3}>
-                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "color-mix(in srgb, #EF4444 40%, var(--vip-border-soft))" }}>
                     <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
                       <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/livewire-one/image_1.jpg" alt="LiveWire ONE" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
-                      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent 40%, var(--vip-bg-card) 90%)" }} />
+                      <div className="absolute inset-0 pointer-events-none z-10" style={{ background: "linear-gradient(to bottom, transparent 30%, var(--vip-bg-card) 85%)" }} />
                     </div>
-                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-10" style={{ backgroundColor: "rgba(239, 68, 68, 0.2)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.3)", backdropFilter: "blur(8px)" }}>Категория А</div>
-                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-20" style={{ backgroundColor: "var(--vip-bg-card)" }}>
-                      <h4 className="text-xl font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>Профи</h4>
-                      <p className="text-sm mb-4" style={{ color: "var(--vip-text-secondary)" }}>Полноразмерные спортбайки и премиум-электро. Категория А обязательна. Требуется уверенный опыт езды.</p>
+                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-20" style={{ backgroundColor: "rgba(239, 68, 68, 0.2)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.3)", backdropFilter: "blur(8px)" }}>Категория А</div>
+                    <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-30" style={{ backgroundColor: "transparent" }}>
+                      <div className="text-xs uppercase tracking-widest font-bold mb-1" style={{ color: "#EF4444" }}>Уровень 03</div>
+                      <h4 className="text-xl font-black mb-1" style={{ color: "var(--vip-text-primary)" }}>Профи</h4>
+                      <p className="text-sm font-semibold mb-2" style={{ color: "#EF4444" }}>Полноразмерные мотоциклы</p>
+                      <p className="text-sm mb-3" style={{ color: "var(--vip-text-secondary)" }}>Серьёзная техника для серьёзных райдеров. ДВС-спортбайки и электрические суперкары. Категория А обязательна — это уже не игрушки, а настоящая мощь.</p>
+                      <div className="flex items-start gap-2 p-2 rounded-lg mb-3 text-xs font-medium" style={{ backgroundColor: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.2)", color: "var(--vip-text-primary)" }}>
+                        <span style={{ color: "#EF4444" }}>🪪</span>
+                        <span>Категория А обязательна</span>
+                      </div>
                       <div className="flex flex-wrap gap-1.5 mb-4">
                         {["LiveWire ONE", "BMW F800R", "Yamaha R7", "Suzuki GSX-S1000F", "Aprilia Shiver 750", "Sequence Zero"].map(b => (
                           <span key={b} className="px-2.5 py-1 rounded-lg text-xs" style={{ backgroundColor: "rgba(239, 68, 68, 0.08)", color: "#ef4444" }}>{b}</span>
@@ -799,16 +817,6 @@ export default function Home() {
                     </CardContent>
                   </Card>
                 </AnimatedSection>
-              </div>
-            </div>
-          </section>
-
-          {/* ─── BIKE TIERS (3 experience levels) ─── */}
-          <section id="tiers" className="py-20 md:py-28 px-4 relative overflow-hidden" style={{ backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 40%, transparent)" }}>
-            <div className="max-w-7xl mx-auto relative z-10">
-              <SectionHeader badge="Каталог 24 байков" title="Байк под" highlight="твой уровень" subtitle="От лёгких электро-эндуро для новичков до полноразмерных спортбайков для профи. Выбери категорию — покажем подходящие байки." />
-              <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
-                {BIKE_TIERS.map((tier, idx) => (<BikeTierCard key={tier.id} tier={tier} index={idx} />))}
               </div>
               <AnimatedSection delay={0.4} className="text-center mt-12">
                 <p className="text-sm max-w-2xl mx-auto" style={{ color: "var(--vip-text-secondary)" }}>💡 Не знаешь, какой выбрать? Напиши оператору{" "}<a href={OPERATOR_HREF} target="_blank" rel="noopener noreferrer" className="underline font-semibold" style={{ color: "var(--vip-accent-main)" }}>@I_O_S_NN</a>{" "}— подберём под твой опыт и задачи.</p>
@@ -930,10 +938,8 @@ export default function Home() {
             </div>
           </section>
 
-          {/* ══ CINEMATIC DUO SECTION — Partners + Final CTA with shared parallax background ══ */}
-          <CinematicDuoSection>
-          {/* ─── PARTNERS ─── */}
-          <section id="partners" className="py-20 md:py-28 px-4">
+          {/* ══ PARTNERS SECTION — solid dark accent-tinted background, no card shadows ══ */}
+          <section id="partners" className="py-20 md:py-28 px-4" style={{ backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 8%, var(--vip-bg-base))" }}>
             <div className="max-w-6xl mx-auto">
               <SectionHeader badge="Партнёры" title="Друзья и" highlight="партнёры" subtitle="Магазины, академия и сообщество — вместе мы делаем мото-сцену Нижнего сильнее." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -947,7 +953,7 @@ export default function Home() {
                       href={partner.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="relative z-10 group flex flex-col items-center gap-4 p-6 rounded-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full"
+                      className="relative z-10 group flex flex-col items-center gap-4 p-6 rounded-2xl transition-all duration-300 hover:-translate-y-1 h-full"
                       style={{ backgroundColor: "transparent" }}
                     >
                       <div
@@ -980,6 +986,8 @@ export default function Home() {
             </div>
           </section>
 
+          {/* ══ CINEMATIC FINALE — Final CTA + Footer merged into ONE full-screen section ══ */}
+          <CinematicFinaleSection>
           {/* ─── FINAL CTA ─── */}
           <section className="py-24 md:py-32 px-4 relative">
             <div className="max-w-4xl mx-auto text-center relative z-10">
@@ -997,13 +1005,9 @@ export default function Home() {
               </AnimatedSection>
             </div>
           </section>
-          </CinematicDuoSection>
-        </main>
 
-        {/* ─── FOOTER (redesigned) ─── */}
-        <footer className="relative border-t overflow-hidden mt-auto" style={{ borderColor: "var(--vip-border-soft)" }}>
-          <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to bottom, var(--vip-bg-base), color-mix(in srgb, var(--vip-accent-main) 4%, var(--vip-bg-base)))" }} />
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[300px] rounded-full blur-[120px] pointer-events-none" style={{ backgroundColor: "var(--vip-accent-main)", opacity: 0.05 }} />
+          {/* ─── FOOTER (inside cinematic finale, no own background) ─── */}
+          <footer className="relative border-t mt-auto" style={{ borderColor: "color-mix(in srgb, var(--vip-accent-main) 20%, var(--vip-border-soft))" }}>
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-14 md:py-20">
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
               {/* Brand + tagline + contact */}
@@ -1017,7 +1021,7 @@ export default function Home() {
                     <p className="text-xs" style={{ color: "var(--vip-text-secondary)" }}>Аренда мотоциклов</p>
                   </div>
                 </div>
-                <p className="text-sm leading-relaxed mb-5" style={{ color: "var(--vip-text-secondary)" }}>Аренда мотоциклов в Нижнем Новгороде. Электро и ДВС.🏍️</p>
+                <p className="text-sm leading-relaxed mb-5" style={{ color: "var(--vip-text-secondary)" }}>Аренда мотоциклов в Нижнем Новгороде. Электро и ДВС.</p>
                 <div className="space-y-2 text-sm" style={{ color: "var(--vip-text-secondary)" }}>
                   <a href={CONTACT_INFO.phoneHref} className="flex items-center gap-2 transition-colors hover:opacity-80">
                     <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.5" className="w-4 h-4 flex-shrink-0" style={{ stroke: "var(--vip-accent-main)" }}><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
@@ -1071,12 +1075,14 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <div className="pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4" style={{ borderColor: "var(--vip-border-soft)" }}>
-              <p className="text-xs" style={{ color: "var(--vip-text-secondary)" }}>&copy; {new Date().getFullYear()} VIP BIKE — аренда мотоциклов в Нижнем Новгороде️</p>
+            <div className="pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4" style={{ borderColor: "color-mix(in srgb, var(--vip-accent-main) 15%, var(--vip-border-soft))" }}>
+              <p className="text-xs" style={{ color: "var(--vip-text-secondary)" }}>&copy; {new Date().getFullYear()} VIP BIKE — аренда мотоциклов в Нижнем Новгороде</p>
               <a href="https://t.me/oneSitePlsBot" target="_blank" rel="noopener noreferrer" className="text-xs transition-colors hover:opacity-80" style={{ color: "var(--vip-text-secondary)" }}>powered by oneSitePls &middot; @SALAVEY13</a>
             </div>
           </div>
         </footer>
+          </CinematicFinaleSection>
+        </main>
       </div>
     </>
   );
