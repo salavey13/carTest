@@ -1,29 +1,9 @@
+// app/franchize/[slug]/cash-ledger/CashLedgerClient.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { DollarSign, TrendingUp, TrendingDown, Plus, Filter } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
-import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Loading } from "@/components/Loading";
-import { Plus, TrendingUp, TrendingDown, DollarSign, Filter, X } from "lucide-react";
-import { toast } from "sonner";
-import { format } from "date-fns";
-import { ru } from "date-fns/locale";
-
-// Accessibility helpers
-const ariaLabels = {
-  showForm: "Показать форму добавления транзакции",
-  hideForm: "Скрыть форму добавления транзакции",
-  submitTransaction: "Добавить транзакцию",
-  filterByType: "Фильтр по типу транзакции",
-  clearFromDate: "Очистить дату начала",
-  clearToDate: "Очистить дату конца",
-  transactionsTable: "Таблица транзакций",
-} as const;
 
 interface CashTransaction {
   id: string;
@@ -36,516 +16,400 @@ interface CashTransaction {
   transactionDate: string;
 }
 
-interface CashSummary {
+interface Summary {
   totalIn: number;
   totalOut: number;
   net: number;
 }
 
-interface Crew {
-  id: string;
-  slug: string;
-  name: string;
-  theme: Record<string, string>;
-}
-
 interface CashLedgerClientProps {
-  crewSlug: string;
-  crew: Crew;
+  slug: string;
+  crew: any;
 }
 
-export function CashLedgerClient({ crewSlug, crew }: CashLedgerClientProps) {
-  const { dbUser, userCrewMemberships } = useAppContext();
-  const tokens = useCrewTokens(crew.theme);
+const TRANSACTION_TYPES = [
+  { value: "", label: "Все типы" },
+  { value: "income_rental", label: "Аренда (вход)" },
+  { value: "income_sale", label: "Продажа (вход)" },
+  { value: "income_equipment", label: "Экипировка (вход)" },
+  { value: "expense_commission", label: "Комиссия (расход)" },
+  { value: "expense_salary", label: "Зарплата (расход)" },
+  { value: "manual_in", label: "Ручной вход" },
+  { value: "manual_out", label: "Ручной расход" },
+];
 
-  const [loading, setLoading] = useState(true);
+export function CashLedgerClient({ slug, crew }: CashLedgerClientProps) {
+  const { dbUser } = useAppContext();
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
-  const [summary, setSummary] = useState<CashSummary>({ totalIn: 0, totalOut: 0, net: 0 });
-  const [showForm, setShowForm] = useState(false);
+  const [summary, setSummary] = useState<Summary>({ totalIn: 0, totalOut: 0, net: 0 });
+  const [loading, setLoading] = useState(true);
+  const [showManualForm, setShowManualForm] = useState(false);
 
   // Filters
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-
-  // Form state
-  const [formData, setFormData] = useState({
-    type: "income_rent",
-    category: "rent",
-    amount: "",
-    method: "cash",
-    description: "",
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1); // First day of current month
+    return d.toISOString().split('T')[0];
   });
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [submitting, setSubmitting] = useState(false);
+  const [toDate, setToDate] = useState(() => {
+    const d = new Date();
+    return d.toISOString().split('T')[0];
+  });
+  const [transactionType, setTransactionType] = useState("");
 
-  const isOwner = userCrewMemberships.some(
-    (m) => m.slug === crewSlug && ["owner", "admin", "co_owner"].includes(m.role)
-  );
+  // Manual form
+  const [manualForm, setManualForm] = useState({
+    transactionType: "manual_in",
+    amount: "",
+    category: "",
+    description: "",
+    paymentMethod: "cash",
+  });
+
+  const T = crew?.theme?.palette || {
+    bg: "#0B0C10",
+    bgCard: "#111217",
+    borderSoft: "#24262E",
+    text: "#F2F2F3",
+    textMuted: "#A7ABB4",
+    accent: "#D99A00",
+    accentContrast: "#16130A",
+  };
+
+  const isOwner = crew?.ownerId === dbUser?.user_id;
 
   useEffect(() => {
-    loadTransactions();
-  }, [crewSlug, fromDate, toDate, typeFilter]);
+    loadData();
+  }, [slug, dbUser?.user_id, fromDate, toDate, transactionType]);
 
-  const loadTransactions = async () => {
-    setLoading(true);
+  const loadData = async () => {
+    if (!dbUser?.user_id) return;
+
     try {
-      if (!dbUser?.user_id) {
-        toast.error("Не авторизовано");
-        return;
-      }
-
       const params = new URLSearchParams({
-        slug: crewSlug,
-        actorUserId: dbUser?.user_id || "",
+        actorUserId: dbUser.user_id,
+        from: fromDate,
+        to: toDate,
       });
+      if (transactionType) params.set("transactionType", transactionType);
 
-      if (fromDate) params.append("from", fromDate);
-      if (toDate) params.append("to", toDate);
-      if (typeFilter !== "all") params.append("type", typeFilter);
-
-      const response = await fetch(`/api/franchize/${crewSlug}/cash-transactions?${params}`);
-      const result = await response.json();
+      const res = await fetch(`/api/franchize/${slug}/cash-transactions?${params}`);
+      const result = await res.json();
 
       if (result.success) {
         setTransactions(result.data || []);
         setSummary(result.summary || { totalIn: 0, totalOut: 0, net: 0 });
-      } else {
-        toast.error(result.error || "Не удалось загрузить транзакции");
       }
-    } catch (error) {
-      console.error("[loadTransactions] Error:", error);
-      toast.error("Ошибка загрузки данных");
+    } catch (err) {
+      console.error("Failed to load cash ledger:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateTransaction = async (e: React.FormEvent) => {
+  const handleCreateManual = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormErrors({});
-    setSubmitting(true);
+    if (!dbUser?.user_id) return;
 
-    // Validation
-    const errors: Record<string, string> = {};
-    if (!formData.amount || Number(formData.amount) <= 0) {
-      errors.amount = "Сумма должна быть больше нуля";
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
-      setSubmitting(false);
+    const amount = Number(manualForm.amount);
+    if (amount <= 0) {
+      alert("Сумма должна быть больше 0");
       return;
     }
 
     try {
-      const response = await fetch(`/api/franchize/${crewSlug}/cash-transactions`, {
+      const res = await fetch(`/api/franchize/${slug}/cash-transactions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          slug: crewSlug,
-          actorUserId: dbUser?.user_id,
-          type: formData.type,
-          category: formData.category,
-          amount: Number(formData.amount),
-          method: formData.method,
-          description: formData.description,
+          actorUserId: dbUser.user_id,
+          transactionType: manualForm.transactionType,
+          amount,
+          flowDirection: manualForm.transactionType === "manual_out" ? "out" : "in",
+          category: manualForm.category,
+          description: manualForm.description,
+          paymentMethod: manualForm.paymentMethod,
         }),
       });
 
-      const result = await response.json();
-
+      const result = await res.json();
       if (result.success) {
-        toast.success("Транзакция создана");
-        setShowForm(false);
-        setFormData({
-          type: "income_rent",
-          category: "rent",
-          amount: "",
-          method: "cash",
-          description: "",
-        });
-        loadTransactions();
+        setShowManualForm(false);
+        setManualForm({ transactionType: "manual_in", amount: "", category: "", description: "", paymentMethod: "cash" });
+        loadData();
       } else {
-        toast.error(result.error || "Не удалось создать транзакцию");
+        alert(`Ошибка: ${result.error}`);
       }
-    } catch (error) {
-      console.error("[handleCreateTransaction] Error:", error);
-      toast.error("Ошибка создания транзакции");
-    } finally {
-      setSubmitting(false);
+    } catch (err: any) {
+      alert(`Ошибка: ${err.message}`);
     }
   };
 
-  const resetFilters = () => {
-    setFromDate("");
-    setToDate("");
-    setTypeFilter("all");
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("ru-RU", {
+      style: "currency",
+      currency: "RUB",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      return format(new Date(dateString), "dd MMM yyyy, HH:mm", { locale: ru });
-    } catch {
-      return dateString;
-    }
-  };
-
-  const getTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      income_rent: "Доход: Аренда",
-      income_sale: "Доход: Продажа",
-      income_other: "Доход: Прочее",
-      expense_salary: "Расход: Зарплата",
-      expense_purchase: "Расход: Закупка",
-      expense_operational: "Расход: Операционный",
-      expense_other: "Расход: Прочее",
-    };
-    return labels[type] || type;
-  };
-
-  const getMethodLabel = (method?: string) => {
-    const labels: Record<string, string> = {
-      cash: "Наличные",
-      bank_transfer: "Банковский перевод",
-      card: "Карта",
-      crypto: "Криптовалюта",
-    };
-    return labels[method || ""] || method || "-";
+  const getTransactionLabel = (type: string) => {
+    const found = TRANSACTION_TYPES.find((t) => t.value === type);
+    return found?.label || type;
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold uppercase tracking-tighter md:text-3xl">
-            Кассовая книга
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">{crew?.name || crewSlug}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold" style={{ color: T.text }}>Касса</h2>
+          <p className="mt-1 text-sm" style={{ color: T.textMuted }}>Движение денежных средств</p>
         </div>
         {isOwner && (
-          <Button
-            onClick={() => setShowForm(!showForm)}
-            aria-label={showForm ? ariaLabels.hideForm : ariaLabels.showForm}
-            style={tokens.styles.ctaPrimary}
-            className="min-h-[44px] px-4"
+          <button
+            onClick={() => setShowManualForm(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors"
+            style={{ background: T.accent, color: T.accentContrast }}
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Ручная запись
-          </Button>
+            <Plus className="w-4 h-4" />
+            Вручную
+          </button>
         )}
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card style={tokens.styles.card}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <TrendingUp className="h-5 w-5 text-green-500" />
-              <div>
-                <div className="text-2xl font-bold">{summary.totalIn.toLocaleString()} ₽</div>
-                <div className="text-xs text-muted-foreground">Доход</div>
-              </div>
+        <div className="rounded-xl border p-4" style={{ background: T.bgCard, borderColor: T.borderSoft }}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full" style={{ background: "#22c55e20" }}>
+              <TrendingUp className="w-5 h-5" style={{ color: "#22c55e" }} />
             </div>
-          </CardContent>
-        </Card>
-
-        <Card style={tokens.styles.card}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <TrendingDown className="h-5 w-5 text-red-500" />
-              <div>
-                <div className="text-2xl font-bold">{summary.totalOut.toLocaleString()} ₽</div>
-                <div className="text-xs text-muted-foreground">Расход</div>
-              </div>
+            <div>
+              <p className="text-xs" style={{ color: T.textMuted }}>Входящие</p>
+              <p className="text-lg font-bold" style={{ color: T.text }}>{formatCurrency(summary.totalIn)}</p>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card style={tokens.styles.card}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <DollarSign className="h-5 w-5" style={{ color: tokens.accent }} />
-              <div>
-                <div
-                  className="text-2xl font-bold"
-                  style={{
-                    color: summary.net >= 0 ? "#10b981" : "#ef4444",
-                  }}
-                >
-                  {summary.net >= 0 ? "+" : ""}{summary.net.toLocaleString()} ₽
-                </div>
-                <div className="text-xs text-muted-foreground">Чистый поток</div>
-              </div>
+          </div>
+        </div>
+        <div className="rounded-xl border p-4" style={{ background: T.bgCard, borderColor: T.borderSoft }}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full" style={{ background: "#ef444420" }}>
+              <TrendingDown className="w-5 h-5" style={{ color: "#ef4444" }} />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-xs" style={{ color: T.textMuted }}>Исходящие</p>
+              <p className="text-lg font-bold" style={{ color: T.text }}>{formatCurrency(summary.totalOut)}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border p-4" style={{ background: T.bgCard, borderColor: T.borderSoft }}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full" style={{ background: `${T.accent}20` }}>
+              <DollarSign className="w-5 h-5" style={{ color: T.accent }} />
+            </div>
+            <div>
+              <p className="text-xs" style={{ color: T.textMuted }}>Чистый поток</p>
+              <p className="text-lg font-bold" style={{ color: T.text }}>{formatCurrency(summary.net)}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Filters */}
-      <Card style={tokens.styles.subtleCard}>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <Input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="w-auto"
-              style={tokens.styles.input}
-            />
-            <Input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="w-auto"
-              style={tokens.styles.input}
-            />
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[180px]" style={tokens.styles.input}>
-                <SelectValue placeholder="Тип транзакции" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Все типы</SelectItem>
-                <SelectItem value="income_rent">Доходы</SelectItem>
-                <SelectItem value="expense_salary">Расходы</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={resetFilters}
-              className="h-[38px] px-3"
-            >
-              <X className="h-4 w-4 mr-1" />
-              Сбросить
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Manual Entry Form */}
-      {showForm && isOwner && (
-        <Card style={tokens.styles.card}>
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Новая ручная запись</h3>
-            <form onSubmit={handleCreateTransaction} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Тип транзакции</label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value) => {
-                      const newCategory = value.startsWith("income_") ? "rent" : "salary";
-                      setFormData({
-                        ...formData,
-                        type: value,
-                        category: newCategory
-                      });
-                    }}
-                  >
-                    <SelectTrigger style={tokens.styles.input}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="income_rent">Доход: Аренда</SelectItem>
-                      <SelectItem value="income_sale">Доход: Продажа</SelectItem>
-                      <SelectItem value="income_other">Доход: Прочее</SelectItem>
-                      <SelectItem value="expense_salary">Расход: Зарплата</SelectItem>
-                      <SelectItem value="expense_purchase">Расход: Закупка</SelectItem>
-                      <SelectItem value="expense_operational">Расход: Операционный</SelectItem>
-                      <SelectItem value="expense_other">Расход: Прочее</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Категория</label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) => setFormData({ ...formData, category: value })}
-                  >
-                    <SelectTrigger style={tokens.styles.input}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {formData.type.startsWith("income_") ? (
-                        <>
-                          <SelectItem value="rent">Аренда</SelectItem>
-                          <SelectItem value="sale">Продажа</SelectItem>
-                          <SelectItem value="other">Прочее</SelectItem>
-                        </>
-                      ) : (
-                        <>
-                          <SelectItem value="salary">Зарплата</SelectItem>
-                          <SelectItem value="purchase">Закупка</SelectItem>
-                          <SelectItem value="operational">Операционный</SelectItem>
-                          <SelectItem value="other">Прочее</SelectItem>
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Сумма (₽)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                    placeholder="0.00"
-                    style={tokens.styles.input}
-                    className={formErrors.amount ? "border-red-500" : ""}
-                  />
-                  {formErrors.amount && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.amount}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Способ оплаты</label>
-                  <Select
-                    value={formData.method}
-                    onValueChange={(value) => setFormData({ ...formData, method: value })}
-                  >
-                    <SelectTrigger style={tokens.styles.input}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">Наличные</SelectItem>
-                      <SelectItem value="bank_transfer">Банковский перевод</SelectItem>
-                      <SelectItem value="card">Карта</SelectItem>
-                      <SelectItem value="crypto">Криптовалюта</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Описание</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Описание транзакции..."
-                  className="w-full min-h-[80px] p-3 rounded-lg resize-none"
-                  style={tokens.styles.input}
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <Button
-                  type="submit"
-                  disabled={submitting}
-                  aria-label={ariaLabels.submitTransaction}
-                  style={tokens.styles.ctaPrimary}
-                  className="min-h-[44px] px-6"
-                >
-                  {submitting ? "Создание..." : "Создать"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setShowForm(false);
-                    setFormErrors({});
-                    setFormData({
-                      type: "income_rent",
-                      category: "rent",
-                      amount: "",
-                      method: "cash",
-                      description: "",
-                    });
-                  }}
-                  style={tokens.styles.ctaSecondary}
-                  className="min-h-[44px] px-6"
-                >
-                  Отмена
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+      <div className="flex flex-wrap gap-4 items-center">
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4" style={{ color: T.textMuted }} />
+          <span className="text-sm" style={{ color: T.textMuted }}>Фильтры:</span>
+        </div>
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          className="px-3 py-2 rounded-lg border text-sm"
+          style={{ background: T.bgCard, borderColor: T.borderSoft, color: T.text }}
+        />
+        <span style={{ color: T.textMuted }}>—</span>
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          className="px-3 py-2 rounded-lg border text-sm"
+          style={{ background: T.bgCard, borderColor: T.borderSoft, color: T.text }}
+        />
+        <select
+          value={transactionType}
+          onChange={(e) => setTransactionType(e.target.value)}
+          className="px-3 py-2 rounded-lg border text-sm"
+          style={{ background: T.bgCard, borderColor: T.borderSoft, color: T.text }}
+        >
+          {TRANSACTION_TYPES.map((type) => (
+            <option key={type.value} value={type.value}>
+              {type.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* Transactions Table */}
-      <Card style={tokens.styles.card}>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <Loading variant="bike" text="Загрузка транзакций..." />
-            </div>
-          ) : transactions.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>Нет транзакций за выбранный период</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b" style={{ borderColor: tokens.borderSoft }}>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Дата</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Тип</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Категория</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Сумма</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Способ</th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">Описание</th>
+      {loading ? (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent mx-auto" style={{ borderColor: T.accent }} />
+        </div>
+      ) : transactions.length === 0 ? (
+        <div className="text-center py-12 rounded-xl border" style={{ background: T.bgCard, borderColor: T.borderSoft }}>
+          <DollarSign className="w-12 h-12 mx-auto mb-4 opacity-50" style={{ color: T.textMuted }} />
+          <p className="text-lg font-medium" style={{ color: T.text }}>Нет транзакций</p>
+          <p className="text-sm mt-1" style={{ color: T.textMuted }}>За выбранный период операций не было</p>
+        </div>
+      ) : (
+        <div className="rounded-xl border overflow-hidden" style={{ background: T.bgCard, borderColor: T.borderSoft }}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead style={{ background: `${T.borderSoft}20` }}>
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-medium" style={{ color: T.textMuted }}>Дата</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium" style={{ color: T.textMuted }}>Тип</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium" style={{ color: T.textMuted }}>Описание</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium" style={{ color: T.textMuted }}>Сумма</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map((tx) => (
+                  <tr key={tx.id} className="border-t" style={{ borderColor: T.borderSoft }}>
+                    <td className="px-4 py-3 text-sm" style={{ color: T.text }}>
+                      {new Date(tx.transactionDate).toLocaleDateString("ru-RU")}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className="text-xs px-2 py-1 rounded-full"
+                        style={{
+                          background: tx.flowDirection === "in" ? "#22c55e20" : "#ef444420",
+                          color: tx.flowDirection === "in" ? "#22c55e" : "#ef4444",
+                        }}
+                      >
+                        {getTransactionLabel(tx.transactionType)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm" style={{ color: T.text }}>
+                      {tx.description || tx.category || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium" style={{ color: tx.flowDirection === "in" ? "#22c55e" : "#ef4444" }}>
+                      {tx.flowDirection === "in" ? "+" : "-"}{formatCurrency(tx.amount)}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((tx) => (
-                    <tr
-                      key={tx.id}
-                      className="border-b hover:bg-muted/50 transition-colors"
-                      style={{ borderColor: tokens.borderSoft }}
-                    >
-                      <td className="p-4 text-sm">{formatDate(tx.transactionDate)}</td>
-                      <td className="p-4 text-sm">
-                        <Badge
-                          variant={tx.flowDirection === "in" ? "default" : "secondary"}
-                          style={
-                            tx.flowDirection === "in"
-                              ? tokens.styles.successBadge
-                              : {
-                                  backgroundColor: "rgba(239, 68, 68, 0.16)",
-                                  color: "#b91c1c",
-                                  borderColor: "rgba(239, 68, 68, 0.4)",
-                                  borderWidth: "1px",
-                                  borderStyle: "solid",
-                                }
-                          }
-                        >
-                          {getTypeLabel(tx.transactionType)}
-                        </Badge>
-                      </td>
-                      <td className="p-4 text-sm text-muted-foreground">
-                        {tx.category || "-"}
-                      </td>
-                      <td className="p-4 text-sm font-semibold">
-                        <span
-                          style={{
-                            color: tx.flowDirection === "in" ? "#10b981" : "#ef4444",
-                          }}
-                        >
-                          {tx.flowDirection === "in" ? "+" : "-"}
-                          {tx.amount.toLocaleString()} ₽
-                        </span>
-                      </td>
-                      <td className="p-4 text-sm text-muted-foreground">
-                        {getMethodLabel(tx.paymentMethod)}
-                      </td>
-                      <td className="p-4 text-sm text-muted-foreground max-w-[200px] truncate">
-                        {tx.description || "-"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Entry Modal */}
+      {showManualForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="rounded-2xl border max-w-md w-full max-h-[90vh] overflow-y-auto" style={{ background: T.bgCard, borderColor: T.borderSoft }}>
+            <div className="p-6 space-y-4">
+              <div className="flex items-start justify-between">
+                <h3 className="text-lg font-semibold" style={{ color: T.text }}>Ручная запись</h3>
+                <button
+                  onClick={() => setShowManualForm(false)}
+                  className="p-2 rounded-full transition-colors hover:bg-white/10"
+                  style={{ color: T.textMuted }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateManual} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: T.text }}>Тип операции</label>
+                  <select
+                    value={manualForm.transactionType}
+                    onChange={(e) => setManualForm({ ...manualForm, transactionType: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border"
+                    style={{ background: T.bg, borderColor: T.borderSoft, color: T.text }}
+                  >
+                    <option value="manual_in">Входящая</option>
+                    <option value="manual_out">Исходящая</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: T.text }}>Сумма (₽)</label>
+                  <input
+                    type="number"
+                    value={manualForm.amount}
+                    onChange={(e) => setManualForm({ ...manualForm, amount: e.target.value })}
+                    min="0"
+                    step="0.01"
+                    className="w-full px-3 py-2 rounded-xl border font-mono"
+                    style={{ background: T.bg, borderColor: T.borderSoft, color: T.text }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: T.text }}>Категория</label>
+                  <input
+                    type="text"
+                    value={manualForm.category}
+                    onChange={(e) => setManualForm({ ...manualForm, category: e.target.value })}
+                    placeholder="Например: Внесение, Выплата"
+                    className="w-full px-3 py-2 rounded-xl border"
+                    style={{ background: T.bg, borderColor: T.borderSoft, color: T.text }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: T.text }}>Описание</label>
+                  <input
+                    type="text"
+                    value={manualForm.description}
+                    onChange={(e) => setManualForm({ ...manualForm, description: e.target.value })}
+                    placeholder="Детали операции"
+                    className="w-full px-3 py-2 rounded-xl border"
+                    style={{ background: T.bg, borderColor: T.borderSoft, color: T.text }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: T.text }}>Способ оплаты</label>
+                  <select
+                    value={manualForm.paymentMethod}
+                    onChange={(e) => setManualForm({ ...manualForm, paymentMethod: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border"
+                    style={{ background: T.bg, borderColor: T.borderSoft, color: T.text }}
+                  >
+                    <option value="cash">Наличные</option>
+                    <option value="card">Карта</option>
+                    <option value="tbank">Т-Банк</option>
+                    <option value="sber">Сбер</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 rounded-xl font-semibold transition-colors"
+                    style={{ background: T.accent, color: T.accentContrast }}
+                  >
+                    Создать
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualForm(false)}
+                    className="px-4 py-2 rounded-xl font-semibold border transition-colors"
+                    style={{ borderColor: T.borderSoft, color: T.text, background: "transparent" }}
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </form>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

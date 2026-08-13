@@ -1,545 +1,373 @@
+// app/franchize/[slug]/commissions/CommissionsClient.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { Plus, Trash2, Edit3, Percent, DollarSign } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
-import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Loading } from "@/components/Loading";
-import { Plus, Settings, Trash2, Check, X, Percent, DollarSign } from "lucide-react";
-import { toast } from "sonner";
-import {
-  getCommissionRates,
-  upsertCommissionRate,
-  deactivateCommissionRate,
-  type CommissionRate,
-} from "@/app/franchize/server-actions/commissions";
 
-interface Crew {
+interface CommissionRate {
   id: string;
-  slug: string;
-  name: string;
-  theme: Record<string, string>;
+  operationType: string;
+  commissionType: "percentage" | "fixed_amount";
+  commissionValue: number;
+  priority: number;
+  isActive: boolean;
 }
 
 interface CommissionsClientProps {
-  crewSlug: string;
-  crew: Crew;
+  slug: string;
+  crew: any;
 }
 
-export function CommissionsClient({ crewSlug, crew }: CommissionsClientProps) {
-  const { dbUser, userCrewMemberships } = useAppContext();
-  const tokens = useCrewTokens(crew.theme);
+const OPERATION_TYPES = [
+  { value: "rental_hourly", label: "Аренда (почасовая)" },
+  { value: "rental_daily", label: "Аренда (дневная)" },
+  { value: "sale", label: "Продажа" },
+  { value: "equipment_rental", label: "Аренда экипировки" },
+  { value: "service", label: "Сервис" },
+];
 
-  const [loading, setLoading] = useState(true);
+export function CommissionsClient({ slug, crew }: CommissionsClientProps) {
+  const { dbUser } = useAppContext();
   const [rates, setRates] = useState<CommissionRate[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [editingRate, setEditingRate] = useState<CommissionRate | null>(null);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    operationType: "rental",
+  const [form, setForm] = useState({
+    operationType: "rental_hourly",
     commissionType: "percentage" as "percentage" | "fixed_amount",
     commissionValue: "",
     priority: "0",
   });
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [submitting, setSubmitting] = useState(false);
 
-  const isOwner = userCrewMemberships.some(
-    (m) => m.slug === crewSlug && ["owner", "admin", "co_owner"].includes(m.role)
-  );
+  const [formError, setFormError] = useState("");
+
+  const T = crew?.theme?.palette || {
+    bg: "#0B0C10",
+    bgCard: "#111217",
+    borderSoft: "#24262E",
+    text: "#F2F2F3",
+    textMuted: "#A7ABB4",
+    accent: "#D99A00",
+    accentContrast: "#16130A",
+  };
+
+  const isOwner = crew?.ownerId === dbUser?.user_id;
 
   useEffect(() => {
     loadRates();
-  }, [crewSlug]);
+  }, [slug, dbUser?.user_id]);
 
   const loadRates = async () => {
-    setLoading(true);
+    if (!dbUser?.user_id) return;
+
     try {
-      const result = await getCommissionRates({
-        slug: crewSlug,
-        actorUserId: dbUser?.user_id || "",
-      });
+      const { getCommissionRates } = await import("../../server-actions/commissions");
+      const result = await getCommissionRates({ slug, actorUserId: dbUser.user_id });
 
       if (result.success) {
         setRates(result.data || []);
-      } else {
-        toast.error(result.error || "Не удалось загрузить ставки");
       }
-    } catch (error) {
-      console.error("[loadRates] Error:", error);
-      toast.error("Ошибка загрузки данных");
+    } catch (err) {
+      console.error("Failed to load commission rates:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpsertRate = async (e: React.FormEvent) => {
+  const handleUpsert = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormErrors({});
-    setSubmitting(true);
+    setFormError("");
 
-    // Validation
-    const errors: Record<string, string> = {};
-    const value = Number(formData.commissionValue);
-
-    if (formData.commissionType === "percentage") {
-      if (isNaN(value) || value <= 0) {
-        errors.commissionValue = "Процент должен быть больше нуля";
-      } else if (value > 100) {
-        errors.commissionValue = "Процент не может превышать 100%";
-      }
-    } else {
-      if (isNaN(value) || value <= 0) {
-        errors.commissionValue = "Фиксированная сумма должна быть больше нуля";
-      }
+    const value = Number(form.commissionValue);
+    if (value <= 0) {
+      setFormError("Значение должно быть больше 0");
+      return;
     }
-
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
-      setSubmitting(false);
+    if (form.commissionType === "percentage" && value > 100) {
+      setFormError("Процент не может превышать 100");
       return;
     }
 
     try {
+      const { upsertCommissionRate } = await import("../../server-actions/commissions");
       const result = await upsertCommissionRate({
-        slug: crewSlug,
-        actorUserId: dbUser?.user_id || "",
-        operationType: formData.operationType,
-        commissionType: formData.commissionType,
+        slug,
+        actorUserId: dbUser.user_id!,
+        operationType: form.operationType,
+        commissionType: form.commissionType,
         commissionValue: value,
-        priority: Number(formData.priority),
+        priority: Number(form.priority),
       });
 
       if (result.success) {
-        toast.success("Ставка сохранена");
         setShowForm(false);
-        setFormData({
-          operationType: "rental",
-          commissionType: "percentage",
-          commissionValue: "",
-          priority: "0",
-        });
+        setEditingRate(null);
+        setForm({ operationType: "rental_hourly", commissionType: "percentage", commissionValue: "", priority: "0" });
         loadRates();
       } else {
-        toast.error(result.error || "Не удалось сохранить ставку");
+        setFormError(result.error || "Ошибка при сохранении");
       }
-    } catch (error) {
-      console.error("[handleUpsertRate] Error:", error);
-      toast.error("Ошибка сохранения ставки");
-    } finally {
-      setSubmitting(false);
+    } catch (err: any) {
+      setFormError(err.message || "Ошибка при сохранении");
     }
   };
 
   const handleDeactivate = async (id: string) => {
+    if (!confirm("Деактивировать ставку?")) return;
+
     try {
+      const { deactivateCommissionRate } = await import("../../server-actions/commissions");
       const result = await deactivateCommissionRate({
-        slug: crewSlug,
-        actorUserId: dbUser?.user_id || "",
+        slug,
+        actorUserId: dbUser.user_id!,
         id,
       });
 
       if (result.success) {
-        toast.success("Ставка деактивирована");
-        setConfirmDelete(null);
         loadRates();
       } else {
-        toast.error(result.error || "Не удалось деактивировать ставку");
+        alert(`Ошибка: ${result.error}`);
       }
-    } catch (error) {
-      console.error("[handleDeactivate] Error:", error);
-      toast.error("Ошибка деактивации");
+    } catch (err: any) {
+      alert(`Ошибка: ${err.message}`);
     }
   };
 
-  const getOperationLabel = (operation: string) => {
-    const labels: Record<string, string> = {
-      rental_hourly: "Аренда (почасовая)",
-      rental_daily: "Аренда (посуточная)",
-      sale: "Продажа",
-      service: "Сервис",
-      equipment_rental: "Аренда экипировки",
-    };
-    return labels[operation] || operation;
+  const handleEdit = (rate: CommissionRate) => {
+    setEditingRate(rate);
+    setForm({
+      operationType: rate.operationType,
+      commissionType: rate.commissionType,
+      commissionValue: String(rate.commissionValue),
+      priority: String(rate.priority),
+    });
+    setShowForm(true);
   };
+
+  const getOperationLabel = (type: string) => {
+    const found = OPERATION_TYPES.find((t) => t.value === type);
+    return found?.label || type;
+  };
+
+  const activeRates = rates.filter((r) => r.isActive);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold uppercase tracking-tighter md:text-3xl">
-            Комиссионные ставки
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {crew?.name || crewSlug}
-          </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold" style={{ color: T.text }}>Комиссии</h2>
+          <p className="mt-1 text-sm" style={{ color: T.textMuted }}>Настройка ставок для расчёта вознаграждений</p>
         </div>
         {isOwner && (
-          <Button
-            onClick={() => setShowForm(!showForm)}
-            style={tokens.styles.ctaPrimary}
-            className="min-h-[44px] px-4"
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors"
+            style={{ background: T.accent, color: T.accentContrast }}
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Добавить ставку
-          </Button>
+            <Plus className="w-4 h-4" />
+            Новая ставка
+          </button>
         )}
       </div>
 
-      {/* Stats Card */}
-      <Card style={tokens.styles.card}>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold mb-1">Всего активных ставок</h3>
-              <p className="text-muted-foreground text-sm">
-                {rates.filter((r) => r.isActive).length} из {rates.length}
-              </p>
-            </div>
-            <Settings className="h-8 w-8 text-muted-foreground" />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Upsert Form */}
-      {showForm && isOwner && (
-        <Card style={tokens.styles.card}>
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4">
-              {formData.operationType && rates.some(
-                (r) => r.operationType === formData.operationType && r.priority === Number(formData.priority)
-              )
-                ? "Обновить ставку"
-                : "Новая ставка"}
-            </h3>
-            <form onSubmit={handleUpsertRate} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Операция
-                  </label>
-                  <Select
-                    value={formData.operationType}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, operationType: value })
-                    }
-                  >
-                    <SelectTrigger style={tokens.styles.input}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="rental_hourly">Аренда (почасовая)</SelectItem>
-                      <SelectItem value="rental_daily">Аренда (посуточная)</SelectItem>
-                      <SelectItem value="sale">Продажа</SelectItem>
-                      <SelectItem value="service">Сервис</SelectItem>
-                      <SelectItem value="equipment_rental">Аренда экипировки</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Тип комиссии
-                  </label>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant={formData.commissionType === "percentage" ? "default" : "outline"}
-                      onClick={() =>
-                        setFormData({
-                          ...formData,
-                          commissionType: "percentage",
-                          commissionValue: "",
-                        })
-                      }
-                      style={
-                        formData.commissionType === "percentage"
-                          ? tokens.styles.ctaPrimary
-                          : tokens.styles.ctaSecondary
-                      }
-                      className="flex-1"
-                    >
-                      <Percent className="h-4 w-4 mr-2" />
-                      Процент
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={formData.commissionType === "fixed_amount" ? "default" : "outline"}
-                      onClick={() => {
-                        const newCommissionType = "fixed_amount";
-                        setFormData({
-                          ...formData,
-                          commissionType: newCommissionType,
-                          commissionValue: "",
-                        });
-                      }}
-                      style={
-                        formData.commissionType === "fixed_amount"
-                          ? tokens.styles.ctaPrimary
-                          : tokens.styles.ctaSecondary
-                      }
-                      className="flex-1"
-                    >
-                      <DollarSign className="h-4 w-4 mr-2" />
-                      Фикс
-                    </Button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    {formData.commissionType === "percentage"
-                      ? "Значение (%)"
-                      : "Значение (₽)"}
-                  </label>
-                  <Input
-                    type="number"
-                    step={formData.commissionType === "percentage" ? "0.01" : "0.01"}
-                    value={formData.commissionValue}
-                    onChange={(e) =>
-                      setFormData({ ...formData, commissionValue: e.target.value })
-                    }
-                    placeholder={
-                      formData.commissionType === "percentage"
-                        ? "0.00"
-                        : "0.00"
-                    }
-                    style={tokens.styles.input}
-                    className={formErrors.commissionValue ? "border-red-500" : ""}
-                  />
-                  {formErrors.commissionValue && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {formErrors.commissionValue}
-                    </p>
-                  )}
-                  {formData.commissionType === "percentage" &&
-                    formData.commissionValue &&
-                    Number(formData.commissionValue) > 100 && (
-                      <p className="text-red-500 text-xs mt-1">
-                        Процент не может превышать 100%
-                      </p>
-                    )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Приоритет
-                  </label>
-                  <Input
-                    type="number"
-                    value={formData.priority}
-                    onChange={(e) =>
-                      setFormData({ ...formData, priority: e.target.value })
-                    }
-                    placeholder="0"
-                    style={tokens.styles.input}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Чем выше число, тем выше приоритет
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <Button
-                  type="submit"
-                  disabled={submitting}
-                  style={tokens.styles.ctaPrimary}
-                  className="min-h-[44px] px-6"
-                >
-                  {submitting ? "Сохранение..." : "Сохранить"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setShowForm(false);
-                    setFormErrors({});
-                    setFormData({
-                      operationType: "rental",
-                      commissionType: "percentage",
-                      commissionValue: "",
-                      priority: "0",
-                    });
-                  }}
-                  style={tokens.styles.ctaSecondary}
-                  className="min-h-[44px] px-6"
-                >
-                  Отмена
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Rates Table */}
-      <Card style={tokens.styles.card}>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <Loading variant="bike" text="Загрузка ставок..." />
-            </div>
-          ) : rates.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>Нет настроенных ставок</p>
-              {isOwner && (
-                <p className="text-sm mt-2">
-                  Нажмите "Добавить ставку" для создания первой ставки
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr
-                    className="border-b"
-                    style={{ borderColor: tokens.borderSoft }}
-                  >
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      Операция
-                    </th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      Тип
-                    </th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      Значение
-                    </th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      Приоритет
-                    </th>
-                    <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                      Статус
-                    </th>
+      {loading ? (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent mx-auto" style={{ borderColor: T.accent }} />
+        </div>
+      ) : activeRates.length === 0 ? (
+        <div className="text-center py-12 rounded-xl border" style={{ background: T.bgCard, borderColor: T.borderSoft }}>
+          <Percent className="w-12 h-12 mx-auto mb-4 opacity-50" style={{ color: T.textMuted }} />
+          <p className="text-lg font-medium" style={{ color: T.text }}>Нет ставок</p>
+          <p className="text-sm mt-1" style={{ color: T.textMuted }}>Создайте первую ставку комиссии</p>
+        </div>
+      ) : (
+        <div className="rounded-xl border overflow-hidden" style={{ background: T.bgCard, borderColor: T.borderSoft }}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead style={{ background: `${T.borderSoft}20` }}>
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-medium" style={{ color: T.textMuted }}>Операция</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium" style={{ color: T.textMuted }}>Тип</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium" style={{ color: T.textMuted }}>Значение</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium" style={{ color: T.textMuted }}>Приоритет</th>
+                  {isOwner && <th className="text-right px-4 py-3 text-xs font-medium" style={{ color: T.textMuted }}>Действия</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {activeRates.map((rate) => (
+                  <tr key={rate.id} className="border-t" style={{ borderColor: T.borderSoft }}>
+                    <td className="px-4 py-3 text-sm" style={{ color: T.text }}>
+                      {getOperationLabel(rate.operationType)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full"
+                        style={{ background: `${T.accent}20`, color: T.accent }}
+                      >
+                        {rate.commissionType === "percentage" ? <Percent className="w-3 h-3" /> : <DollarSign className="w-3 h-3" />}
+                        {rate.commissionType === "percentage" ? "Процент" : "Фиксированный"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium" style={{ color: T.text }}>
+                      {rate.commissionValue}
+                      {rate.commissionType === "percentage" && "%"}
+                    </td>
+                    <td className="px-4 py-3 text-sm" style={{ color: T.textMuted }}>{rate.priority}</td>
                     {isOwner && (
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">
-                        Действия
-                      </th>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleEdit(rate)}
+                            className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
+                            style={{ color: T.textMuted }}
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeactivate(rate.id)}
+                            className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
+                            style={{ color: "#ef4444" }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
                     )}
                   </tr>
-                </thead>
-                <tbody>
-                  {rates.map((rate) => (
-                    <tr
-                      key={rate.id}
-                      className="border-b hover:bg-muted/50 transition-colors"
-                      style={{ borderColor: tokens.borderSoft }}
-                    >
-                      <td className="p-4 text-sm font-medium">
-                        {getOperationLabel(rate.operationType)}
-                      </td>
-                      <td className="p-4 text-sm">
-                        <Badge
-                          variant={rate.commissionType === "percentage" ? "default" : "secondary"}
-                          style={tokens.styles.accentPill}
-                        >
-                          {rate.commissionType === "percentage" ? (
-                            <>
-                              <Percent className="h-3 w-3 mr-1" />
-                              Процент
-                            </>
-                          ) : (
-                            <>
-                              <DollarSign className="h-3 w-3 mr-1" />
-                              Фикс
-                            </>
-                          )}
-                        </Badge>
-                      </td>
-                      <td className="p-4 text-sm font-semibold">
-                        {rate.commissionType === "percentage"
-                          ? `${rate.commissionValue}%`
-                          : `${rate.commissionValue.toLocaleString()} ₽`}
-                      </td>
-                      <td className="p-4 text-sm text-muted-foreground">
-                        {rate.priority}
-                      </td>
-                      <td className="p-4 text-sm">
-                        {rate.isActive ? (
-                          <Badge style={tokens.styles.successBadge}>
-                            <Check className="h-3 w-3 mr-1" />
-                            Активна
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" style={tokens.styles.mutedText}>
-                            <X className="h-3 w-3 mr-1" />
-                            Неактивна
-                          </Badge>
-                        )}
-                      </td>
-                      {isOwner && (
-                        <td className="p-4 text-sm">
-                          {rate.isActive ? (
-                            confirmDelete === rate.id ? (
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => handleDeactivate(rate.id)}
-                                  className="h-[32px] px-3"
-                                >
-                                  <Check className="h-3 w-3 mr-1" />
-                                  Да
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setConfirmDelete(null)}
-                                  className="h-[32px] px-3"
-                                >
-                                  <X className="h-3 w-3 mr-1" />
-                                  Нет
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setConfirmDelete(rate.id)}
-                                className="h-[32px] px-3 text-red-500 hover:text-red-600 hover:bg-red-50"
-                                style={{
-                                  color: "#ef4444",
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Деактивировать
-                              </Button>
-                            )
-                          ) : (
-                            <span className="text-muted-foreground text-xs">
-                              Деактивирована
-                            </span>
-                          )}
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-      {/* Help Card */}
-      <Card style={tokens.styles.subtleCard}>
-        <CardContent className="p-6">
-          <h4 className="font-semibold mb-2">Как работают комиссии</h4>
-          <ul className="space-y-1 text-sm text-muted-foreground">
-            <li>• Процентные ставки вычисляются от суммы операции</li>
-            <li>• Фиксированные ставки добавляют постоянную сумму</li>
-            <li>• Ставки с более высоким приоритетом применяются первыми</li>
-            <li>• Можно создать несколько ставок для одной операции</li>
-          </ul>
-        </CardContent>
-      </Card>
+      {/* Form Modal */}
+      {showForm && isOwner && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="rounded-2xl border max-w-md w-full max-h-[90vh] overflow-y-auto" style={{ background: T.bgCard, borderColor: T.borderSoft }}>
+            <div className="p-6 space-y-4">
+              <div className="flex items-start justify-between">
+                <h3 className="text-lg font-semibold" style={{ color: T.text }}>
+                  {editingRate ? "Редактировать ставку" : "Новая ставка"}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingRate(null);
+                    setFormError("");
+                  }}
+                  className="p-2 rounded-full transition-colors hover:bg-white/10"
+                  style={{ color: T.textMuted }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleUpsert} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: T.text }}>Операция</label>
+                  <select
+                    value={form.operationType}
+                    onChange={(e) => setForm({ ...form, operationType: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border"
+                    style={{ background: T.bg, borderColor: T.borderSoft, color: T.text }}
+                  >
+                    {OPERATION_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: T.text }}>Тип комиссии</label>
+                  <select
+                    value={form.commissionType}
+                    onChange={(e) => setForm({ ...form, commissionType: e.target.value as "percentage" | "fixed_amount" })}
+                    className="w-full px-3 py-2 rounded-xl border"
+                    style={{ background: T.bg, borderColor: T.borderSoft, color: T.text }}
+                  >
+                    <option value="percentage">Процент (%)</option>
+                    <option value="fixed_amount">Фиксированная сумма (₽)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: T.text }}>
+                    Значение {form.commissionType === "percentage" ? "(%) : (₽)"}
+                  </label>
+                  <input
+                    type="number"
+                    value={form.commissionValue}
+                    onChange={(e) => setForm({ ...form, commissionValue: e.target.value })}
+                    min="0"
+                    step="0.01"
+                    className="w-full px-3 py-2 rounded-xl border font-mono"
+                    style={{ background: T.bg, borderColor: T.borderSoft, color: T.text }}
+                    required
+                  />
+                  {form.commissionType === "percentage" && (
+                    <p className="text-xs mt-1" style={{ color: T.textMuted }}>Максимум: 100%</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: T.text }}>Приоритет</label>
+                  <input
+                    type="number"
+                    value={form.priority}
+                    onChange={(e) => setForm({ ...form, priority: e.target.value })}
+                    min="0"
+                    className="w-full px-3 py-2 rounded-xl border"
+                    style={{ background: T.bg, borderColor: T.borderSoft, color: T.text }}
+                  />
+                  <p className="text-xs mt-1" style={{ color: T.textMuted }}>Больший = применяется первым</p>
+                </div>
+
+                {formError && (
+                  <div className="px-3 py-2 rounded-lg text-sm" style={{ background: "#ef444420", color: "#ef4444" }}>
+                    {formError}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 rounded-xl font-semibold transition-colors"
+                    style={{ background: T.accent, color: T.accentContrast }}
+                  >
+                    {editingRate ? "Сохранить" : "Создать"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForm(false);
+                      setEditingRate(null);
+                      setFormError("");
+                    }}
+                    className="px-4 py-2 rounded-xl font-semibold border transition-colors"
+                    style={{ borderColor: T.borderSoft, color: T.text, background: "transparent" }}
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Non-owner warning */}
+      {!isOwner && (
+        <div className="text-center py-8 rounded-xl border" style={{ background: `${T.borderSoft}10`, borderColor: T.borderSoft }}>
+          <p className="text-sm" style={{ color: T.textMuted }}>Только владелец может настраивать комиссии</p>
+        </div>
+      )}
     </div>
   );
 }

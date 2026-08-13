@@ -33,7 +33,7 @@ BEGIN
     IF v_crew_id IS NULL THEN RETURN NEW; END IF;
 
     -- Idempotency: no duplicate income_rental for this rental
-    IF NOT EXISTS (
+    IF NEW.total_cost > 0 AND NOT EXISTS (
       SELECT 1 FROM public.cash_transactions
       WHERE rental_id = NEW.rental_id AND transaction_type = 'income_rental'
     ) THEN
@@ -99,13 +99,16 @@ DECLARE
   v_comm_type TEXT;
   v_comm_value NUMERIC;
   v_commission NUMERIC;
+  v_sale_amount NUMERIC;
 BEGIN
   -- Resolve crew_id from crew_slug (contract p.5: JOIN crews ON slug)
   SELECT id INTO v_crew_id FROM public.crews WHERE slug = NEW.crew_slug;
   IF v_crew_id IS NULL THEN RETURN NEW; END IF;
 
+  v_sale_amount := COALESCE(NEW.total_sum, NULLIF(REPLACE(NEW.sale_price, ' ', ''), '')::NUMERIC, 0);
+
   -- Idempotency: no duplicate income_sale for this contract
-  IF NOT EXISTS (
+  IF v_sale_amount > 0 AND NOT EXISTS (
     SELECT 1 FROM public.cash_transactions
     WHERE sale_contract_id = NEW.id AND transaction_type = 'income_sale'
   ) THEN
@@ -114,7 +117,7 @@ BEGIN
       payment_method, category, description, transaction_date, created_by
     ) VALUES (
       v_crew_id, NEW.id, 'income_sale',
-      COALESCE(NEW.total_sum, NULLIF(REPLACE(NEW.sale_price, ' ', ''), '')::NUMERIC, 0), 'in',
+      v_sale_amount, 'in',
       'cash', 'Продажа',
       'Продажа ' || COALESCE((SELECT model FROM public.cars WHERE id = NEW.resolved_bike_id), ''),
       NEW.created_at, COALESCE(NEW.created_by_operator_chat_id, 'system')
@@ -128,35 +131,30 @@ BEGIN
   ORDER BY priority DESC LIMIT 1;
 
   IF v_comm_type IS NOT NULL THEN
-    DECLARE v_sale_amount NUMERIC;
-    BEGIN
-      v_sale_amount := COALESCE(NEW.total_sum, NULLIF(REPLACE(NEW.sale_price, ' ', ''), '')::NUMERIC, 0);
-
-      v_commission := CASE v_comm_type
-        WHEN 'percentage'   THEN v_sale_amount * v_comm_value / 100
-        WHEN 'fixed_amount' THEN v_comm_value
-      END;
-
-      SELECT owner_id INTO v_manager_id FROM public.crews WHERE id = v_crew_id;
-
-      IF v_manager_id IS NOT NULL AND v_commission > 0
-         AND NOT EXISTS (
-           SELECT 1 FROM public.cash_transactions
-           WHERE sale_contract_id = NEW.id AND transaction_type = 'expense_commission'
-         ) THEN
-        INSERT INTO public.cash_transactions (
-          crew_id, sale_contract_id, transaction_type, amount, flow_direction,
-          payment_method, category, description, transaction_date,
-          to_user_id, created_by
-        ) VALUES (
-          v_crew_id, NEW.id, 'expense_commission', v_commission, 'out',
-          'cash', 'Комиссия',
-          'Комиссия за продажу ' || SUBSTRING(NEW.id::TEXT FROM 1 FOR 8),
-          NEW.created_at, v_manager_id,
-          COALESCE(NEW.created_by_operator_chat_id, 'system')
-        );
-      END IF;
+    v_commission := CASE v_comm_type
+      WHEN 'percentage'   THEN v_sale_amount * v_comm_value / 100
+      WHEN 'fixed_amount' THEN v_comm_value
     END;
+
+    SELECT owner_id INTO v_manager_id FROM public.crews WHERE id = v_crew_id;
+
+    IF v_manager_id IS NOT NULL AND v_commission > 0
+       AND NOT EXISTS (
+         SELECT 1 FROM public.cash_transactions
+         WHERE sale_contract_id = NEW.id AND transaction_type = 'expense_commission'
+       ) THEN
+      INSERT INTO public.cash_transactions (
+        crew_id, sale_contract_id, transaction_type, amount, flow_direction,
+        payment_method, category, description, transaction_date,
+        to_user_id, created_by
+      ) VALUES (
+        v_crew_id, NEW.id, 'expense_commission', v_commission, 'out',
+        'cash', 'Комиссия',
+        'Комиссия за продажу ' || SUBSTRING(NEW.id::TEXT FROM 1 FOR 8),
+        NEW.created_at, v_manager_id,
+        COALESCE(NEW.created_by_operator_chat_id, 'system')
+      );
+    END IF;
   END IF;
 
   RETURN NEW;
@@ -173,10 +171,10 @@ RETURNS TRIGGER SECURITY DEFINER LANGUAGE plpgsql AS $$
 BEGIN
   -- Only on transition to 'returned', 'damaged', or 'lost'
   IF NEW.status IN ('returned', 'damaged', 'lost')
-     AND (OLD IS NULL OR OLD.status IS DISTINCT FROM ALL (ARRAY['returned', 'damaged', 'lost'])) THEN
+     AND (OLD IS NULL OR OLD.status NOT IN ('returned', 'damaged', 'lost')) THEN
 
     -- Idempotency: no duplicate income_equipment for this equipment rental
-    IF NOT EXISTS (
+    IF NEW.total_cost > 0 AND NOT EXISTS (
       SELECT 1 FROM public.cash_transactions
       WHERE equipment_rental_id = NEW.id AND transaction_type = 'income_equipment'
     ) THEN
