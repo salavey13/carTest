@@ -35,7 +35,37 @@ type SocialLink = {
   id: string; label: string; href: string; color: string;
   gradient: string; hoverGlow: string; description: string;
   icon: React.ReactElement<{ children?: React.ReactNode }>;
+  featured?: "electric" | "gold" | null;
 };
+
+/* ══ Electric loop keyframes (for VK Electro — cyan electric current flowing around icon) ══ */
+const ELECTRIC_LOOP_KEYFRAMES = `
+@keyframes vip-electric-loop {
+  0%   { background-position: 0% 50%; box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.5), 0 0 18px 2px rgba(34, 211, 238, 0.4); }
+  25%  { background-position: 50% 0%; box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.0), 0 0 22px 4px rgba(34, 211, 238, 0.7); }
+  50%  { background-position: 100% 50%; box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.0), 0 0 18px 2px rgba(34, 211, 238, 0.5); }
+  75%  { background-position: 50% 100%; box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.0), 0 0 22px 4px rgba(34, 211, 238, 0.7); }
+  100% { background-position: 0% 50%; box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.5), 0 0 18px 2px rgba(34, 211, 238, 0.4); }
+}
+@keyframes vip-electric-spark {
+  0%, 100% { opacity: 0.2; }
+  20%, 60% { opacity: 1; }
+  40%, 80% { opacity: 0.4; }
+}
+`;
+
+/* ══ Gold blic keyframes (for VK — gold shine sweep across icon) ══ */
+const GOLD_BLIC_KEYFRAMES = `
+@keyframes vip-gold-blic {
+  0%   { transform: translateX(-150%) rotate(25deg); }
+  60%  { transform: translateX(150%) rotate(25deg); }
+  100% { transform: translateX(150%) rotate(25deg); }
+}
+@keyframes vip-gold-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4), 0 0 14px 2px rgba(255, 215, 0, 0.3); }
+  50%      { box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.0), 0 0 22px 5px rgba(255, 215, 0, 0.6); }
+}
+`;
 
 const SOCIAL_LINKS: SocialLink[] = [
   {
@@ -49,13 +79,15 @@ const SOCIAL_LINKS: SocialLink[] = [
     icon: (<svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" /></svg>),
   },
   {
-    id: "vk-electro", label: "VK Electro", href: "https://vk.ru/vip_bike_electro", color: "#0077FF",
-    gradient: "from-[#0077FF] to-[#0055CC]", hoverGlow: "rgba(0, 119, 255, 0.5)", description: "Видео покатушек",
+    id: "vk-electro", label: "VK Electro", href: "https://vk.ru/vip_bike_electro", color: "#22D3EE",
+    gradient: "from-[#22D3EE] via-[#06B6D4] to-[#0E7490]", hoverGlow: "rgba(34, 211, 238, 0.6)", description: "Видео покатушек",
+    featured: "electric",
     icon: (<svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.391 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.12-5.335-3.202C4.624 10.857 4.03 8.57 4.03 8.096c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.678.847 2.49 2.27 4.675 2.85 4.675.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.204.17-.407.44-.407h2.744c.373 0 .508.203.508.644v3.49c0 .373.17.508.271.508.22 0 .407-.135.813-.542 1.254-1.406 2.152-3.574 2.152-3.574.119-.254.322-.491.763-.491h1.744c.525 0 .644.27.525.644-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.78 1.203 1.253.746.847 1.32 1.558 1.473 2.05.17.49-.085.744-.576.744z" /></svg>),
   },
   {
-    id: "vk", label: "VK", href: "https://vk.com/vip_bike", color: "#4C75A3",
-    gradient: "from-[#4C75A3] to-[#2A5885]", hoverGlow: "rgba(76, 117, 163, 0.5)", description: "Группа ВКонтакте",
+    id: "vk", label: "VK", href: "https://vk.com/vip_bike", color: "#FFD700",
+    gradient: "from-[#FFD700] via-[#FFC125] to-[#D4AF37]", hoverGlow: "rgba(255, 215, 0, 0.6)", description: "Группа ВКонтакте",
+    featured: "gold",
     icon: (<svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.391 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.12-5.335-3.202C4.624 10.857 4.03 8.57 4.03 8.096c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.678.847 2.49 2.27 4.675 2.85 4.675.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.204.17-.407.44-.407h2.744c.373 0 .508.203.508.644v3.49c0 .373.17.508.271.508.22 0 .407-.135.813-.542 1.254-1.406 2.152-3.574 2.152-3.574.119-.254.322-.491.763-.491h1.744c.525 0 .644.27.525.644-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.78 1.203 1.253.746.847 1.32 1.558 1.473 2.05.17.49-.085.744-.576.744z" /></svg>),
   },
   {
@@ -130,12 +162,24 @@ const FAQ_ITEMS = [
   { q: "А экипировка?", a: "Шлем и перчатки — от 1 500 ₽. Куртка, второй шлем — по запросу. За утрату или порчу экипировки — по прайсу из приложения №3 к договору." },
 ];
 
-/* ══ HOW IT WORKS — 4 STEPS ══ */
+/* ══ HOW IT WORKS — 4 STEPS (cool SVG icons instead of emojis) ══ */
 const HOW_IT_WORKS_STEPS = [
-  { n: "01", title: "Выбрал", desc: "Жмёшь «Выбрать байк» → попадаешь в каталог. Смотришь фото, читаешь спеку, выбираешь по сердцу.", emoji: "👆" },
-  { n: "02", title: "Забронировал", desc: "В боте @oneBikePlsBot — 2 клика: даты + формат поездки. Залог — на выбор: наличными или переводом.", emoji: "📲" },
-  { n: "03", title: "Забрал", desc: "Приезжаешь на пл. Комсомольская 2. Подписываешь договор (3 минуты), получаешь байк + экипировку.", emoji: "🔑" },
-  { n: "04", title: "Покатался", desc: "Откручиваешь ручку. Возвращаешь в согласованное время — забираешь залог. Всё.", emoji: "🏍️" },
+  {
+    n: "01", title: "Выбрал", desc: "Жмёшь «Выбрать байк» → попадаешь в каталог. Смотришь фото, читаешь спеку, выбираешь по сердцу.",
+    icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>),
+  },
+  {
+    n: "02", title: "Забронировал", desc: "В боте @oneBikePlsBot — 2 клика: даты + формат поездки. Залог — на выбор: наличными или переводом.",
+    icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8"><rect x="5" y="2" width="14" height="20" rx="2" ry="2" /><line x1="12" y1="18" x2="12.01" y2="18" /></svg>),
+  },
+  {
+    n: "03", title: "Забрал", desc: "Приезжаешь на пл. Комсомольская 2. Подписываешь договор (3 минуты), получаешь байк + экипировку.",
+    icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" /></svg>),
+  },
+  {
+    n: "04", title: "Покатался", desc: "Откручиваешь ручку. Возвращаешь в согласованное время — забираешь залог. Всё.",
+    icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8"><circle cx="5.5" cy="17.5" r="3.5" /><circle cx="18.5" cy="17.5" r="3.5" /><path d="M15 6a5 5 0 010 6l-3-3-3 3a5 5 0 010-6l3-3 3 3z" /><path d="M5.5 17.5L9 14m9.5 3.5L15 14" /></svg>),
+  },
 ];
 
 /* ══ Gradient text helper (reused across section headings) ══ */
@@ -298,7 +342,17 @@ function VipBikeThemeStyles() {
     root.style.setProperty("--vip-text-primary", theme.textPrimary);
     root.style.setProperty("--vip-text-secondary", theme.textSecondary);
     root.style.setProperty("--vip-border-soft", theme.borderSoft);
+    // Partner logos: in dark theme, invert+dim white-bg logos so they blend;
+    // in light theme, keep logos as-is (they're designed for white backgrounds).
+    root.style.setProperty("--partner-logo-filter", resolvedTheme === "dark" ? "brightness(0.92) contrast(1.05)" : "none");
     document.body.style.backgroundColor = theme.bgBase;
+    // Inject keyframes for social link animations (electric loop + gold blic)
+    if (!document.getElementById("vip-social-keyframes")) {
+      const style = document.createElement("style");
+      style.id = "vip-social-keyframes";
+      style.textContent = ELECTRIC_LOOP_KEYFRAMES + GOLD_BLIC_KEYFRAMES;
+      document.head.appendChild(style);
+    }
   }, [resolvedTheme]);
   return null;
 }
@@ -332,7 +386,7 @@ function PricingCard({ tier, index }: { tier: (typeof PRICING_TIERS)[0]; index: 
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
   return (
-    <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: 0.6, delay: index * 0.15, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-colors duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: tier.highlighted ? "var(--vip-accent-main)" : "var(--vip-border-soft)", boxShadow: tier.highlighted ? `0 20px 60px color-mix(in srgb, var(--vip-accent-main) 20%, transparent)` : "0 4px 16px rgba(0,0,0,0.15)" }}>
+    <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: 0.6, delay: index * 0.15, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative z-10 flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-colors duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: tier.highlighted ? "var(--vip-accent-main)" : "var(--vip-border-soft)", boxShadow: tier.highlighted ? `0 20px 60px color-mix(in srgb, var(--vip-accent-main) 20%, transparent)` : "0 4px 16px rgba(0,0,0,0.15)" }}>
       {tier.highlighted && <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wide" style={{ background: "var(--vip-accent-main)", color: "var(--vip-bg-base)" }}>🔥 Хит</div>}
       <div className="text-center mb-6">
         <div className="text-4xl mb-2">{tier.emoji}</div>
@@ -364,7 +418,7 @@ function BikeTierCard({ tier, index }: { tier: (typeof BIKE_TIERS)[0]; index: nu
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
   return (
-    <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: 0.6, delay: index * 0.15, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-all duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: `color-mix(in srgb, ${tier.accentColor} 40%, var(--vip-border-soft))`, boxShadow: `0 10px 40px color-mix(in srgb, ${tier.accentColor} 10%, transparent)` }}>
+    <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: 0.6, delay: index * 0.15, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative z-10 flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-all duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: `color-mix(in srgb, ${tier.accentColor} 40%, var(--vip-border-soft))`, boxShadow: `0 10px 40px color-mix(in srgb, ${tier.accentColor} 10%, transparent)` }}>
       <div className="flex items-center gap-4 mb-5">
         <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl leading-none flex-shrink-0" style={{ background: `linear-gradient(135deg, ${tier.accentColor}33, ${tier.accentColor}11)`, border: `1px solid ${tier.accentColor}55` }}>{tier.emoji}</div>
         <div>
@@ -484,14 +538,23 @@ function CinematicHero() {
                 aria-label={social.label}
               >
                 <div
-                  className="w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center transition-all duration-300"
+                  className="relative w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center transition-all duration-300 overflow-hidden"
                   style={{
                     backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 80%, transparent)",
                     border: `1.5px solid color-mix(in srgb, ${social.color} 40%, transparent)`,
                     backdropFilter: "blur(8px)",
+                    ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-loop 2.8s linear infinite" } : {}),
                   }}
                 >
-                  <div className="transition-all duration-300 group-hover:scale-110" style={{ color: social.color }}>
+                  {social.featured === "gold" && (
+                    <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+                      <span className="absolute top-0 left-0 w-1/3 h-full" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent)", animation: "vip-gold-blic 3.2s ease-in-out infinite" }} />
+                    </span>
+                  )}
+                  {social.featured === "electric" && (
+                    <span className="pointer-events-none absolute inset-0 rounded-2xl" style={{ background: "conic-gradient(from 0deg, transparent 0%, rgba(34,211,238,0.4) 25%, transparent 50%, rgba(34,211,238,0.4) 75%, transparent 100%)", animation: "vip-electric-spark 0.6s ease-in-out infinite", maskImage: "radial-gradient(circle, transparent 60%, black 62%, black 100%)", WebkitMaskImage: "radial-gradient(circle, transparent 60%, black 62%, black 100%)" }} />
+                  )}
+                  <div className="relative transition-all duration-300 group-hover:scale-110" style={{ color: social.color }}>
                     {social.icon}
                   </div>
                 </div>
@@ -687,12 +750,13 @@ export default function Home() {
             <div className="max-w-6xl mx-auto relative z-10">
               <SectionHeader badge="Как это работает" title="Забери. Покатайся." highlight="Верни." subtitle="От «хочу» до «катюсь» — 15 минут. Без очередей, без бумажной волокиты, без звонков «а можно забронировать?»." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 relative">
-                <div className="hidden lg:block absolute top-12 left-[12.5%] right-[12.5%] h-0.5 z-0" style={{ background: "linear-gradient(to right, transparent, var(--vip-accent-main), transparent)", opacity: 0.3 }} />
+                {/* Connector line: BEHIND steps. z-0 so steps (z-10) cover it during animation. */}
+                <div className="hidden lg:block absolute top-12 left-[12.5%] right-[12.5%] h-0.5 z-0 pointer-events-none" style={{ background: "linear-gradient(to right, transparent, var(--vip-accent-main), transparent)", opacity: 0.3 }} />
                 {HOW_IT_WORKS_STEPS.map((step, idx) => (
                   <AnimatedSection key={step.n} delay={idx * 0.15} className="relative z-10">
                     <div className="flex flex-col items-center text-center">
-                      <div className="relative w-24 h-24 rounded-full flex items-center justify-center mb-5 text-4xl transition-transform duration-300 hover:scale-110" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--vip-accent-main) 20%, transparent), color-mix(in srgb, var(--vip-accent-main) 5%, transparent))", border: "2px solid color-mix(in srgb, var(--vip-accent-main) 40%, transparent)", backdropFilter: "blur(8px)" }}>
-                        <span>{step.emoji}</span>
+                      <div className="relative w-24 h-24 rounded-full flex items-center justify-center mb-5 transition-transform duration-300 hover:scale-110" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--vip-accent-main) 20%, transparent), color-mix(in srgb, var(--vip-accent-main) 5%, transparent))", border: "2px solid color-mix(in srgb, var(--vip-accent-main) 40%, transparent)", backdropFilter: "blur(8px)", color: "var(--vip-accent-main)" }}>
+                        {step.icon}
                         <span className="absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black" style={{ background: "var(--vip-accent-main)", color: "var(--vip-bg-base)" }}>{step.n}</span>
                       </div>
                       <h4 className="text-lg font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>{step.title}</h4>
@@ -732,7 +796,7 @@ export default function Home() {
                   { title: "Центр Нижнего", desc: "пл. Комсомольская 2 — удобно добираться из любой точки города" },
                 ].map((feature, idx) => (
                   <AnimatedSection key={feature.title} delay={idx * 0.1}>
-                    <div className="p-6 rounded-2xl border text-center transition-all duration-300 group h-full hover:-translate-y-1 hover:shadow-lg" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                    <div className="relative z-10 p-6 rounded-2xl border text-center transition-all duration-300 group h-full hover:-translate-y-1 hover:shadow-lg" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
                       <h4 className="text-lg font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>{feature.title}</h4>
                       <p className="text-sm leading-relaxed" style={{ color: "var(--vip-text-secondary)" }}>{feature.desc}</p>
                     </div>
@@ -759,7 +823,7 @@ export default function Home() {
               <SectionHeader badge="Контакты" title="Свяжись" highlight="с нами" subtitle="Всегда на связи — выбирай удобный способ" />
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 <AnimatedSection>
-                  <a href={CONTACT_INFO.phoneHref} className="flex flex-col items-center gap-4 p-8 rounded-2xl border transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                  <a href={CONTACT_INFO.phoneHref} className="relative z-10 flex flex-col items-center gap-4 p-8 rounded-2xl border transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
                     <div className="w-14 h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300" style={{ backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--vip-accent-main) 20%, transparent)" }}>
                       <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.5" className="w-6 h-6" style={{ stroke: "var(--vip-accent-main)" }}><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                     </div>
@@ -770,7 +834,7 @@ export default function Home() {
                   </a>
                 </AnimatedSection>
                 <AnimatedSection delay={0.1}>
-                  <a href={OPERATOR_HREF} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-4 p-8 rounded-2xl border transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                  <a href={OPERATOR_HREF} target="_blank" rel="noopener noreferrer" className="relative z-10 flex flex-col items-center gap-4 p-8 rounded-2xl border transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
                     <div className="w-14 h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300" style={{ backgroundColor: "color-mix(in srgb, #26A5E4 10%, transparent)", border: "1px solid color-mix(in srgb, #26A5E4 20%, transparent)" }}>
                       <svg viewBox="0 0 24 24" fill="#26A5E4" className="w-6 h-6"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" /></svg>
                     </div>
@@ -781,7 +845,7 @@ export default function Home() {
                   </a>
                 </AnimatedSection>
                 <AnimatedSection delay={0.2}>
-                  <div className="flex flex-col items-center gap-4 p-8 rounded-2xl border sm:col-span-2 lg:col-span-1" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                  <div className="relative z-10 flex flex-col items-center gap-4 p-8 rounded-2xl border sm:col-span-2 lg:col-span-1" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
                     <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--vip-accent-main) 20%, transparent)" }}>
                       <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.5" className="w-6 h-6" style={{ stroke: "var(--vip-accent-main)" }}><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     </div>
@@ -792,6 +856,55 @@ export default function Home() {
                   </div>
                 </AnimatedSection>
               </div>
+            </div>
+          </section>
+
+          {/* ─── PARTNERS ─── */}
+          <section id="partners" className="py-20 md:py-28 px-4">
+            <div className="max-w-6xl mx-auto">
+              <SectionHeader badge="Партнёры" title="Друзья и" highlight="партнёры" subtitle="Магазины, академия и сообщество — вместе мы делаем мото-сцену Нижнего сильнее." />
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[
+                  { name: "moto-selection.ru", href: "https://moto-selection.ru/", logo: "https://static.tildacdn.com/tild6335-3266-4164-b461-363834666561/__.png", desc: "Мото-экипировка и аксессуары" },
+                  { name: "academy.cr", href: "https://academy.cr/", logo: "https://optim.tildacdn.com/tild3434-6531-4533-b264-656433623137/-/resize/289x/-/format/webp/VboLB5caDbrEwJdRviGc.png.webp", desc: "Мото-школа и тренировки" },
+                  { name: "bikeland.ru", href: "https://bikeland.ru/", logo: "https://optim.tildacdn.com/tild6332-3437-4639-b864-626262356466/-/resize/283x/-/format/webp/a85d6fbe3e31832458bb.jpg.webp", desc: "Сообщество и магазин" },
+                ].map((partner, idx) => (
+                  <AnimatedSection key={partner.name} delay={idx * 0.1}>
+                    <a
+                      href={partner.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="relative z-10 group flex flex-col items-center gap-5 p-8 rounded-2xl border transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full"
+                      style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}
+                    >
+                      <div
+                        className="relative w-full h-24 md:h-28 rounded-xl flex items-center justify-center p-4 overflow-hidden transition-all duration-300 group-hover:scale-[1.02]"
+                        style={{ backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--vip-accent-main) 15%, transparent)" }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={partner.logo}
+                          alt={`Логотип ${partner.name}`}
+                          className="max-h-full max-w-full object-contain"
+                          style={{ filter: "var(--partner-logo-filter, none)" }}
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <h4 className="text-lg font-bold mb-1 transition-colors duration-300" style={{ color: "var(--vip-text-primary)" }}>{partner.name}</h4>
+                        <p className="text-sm" style={{ color: "var(--vip-text-secondary)" }}>{partner.desc}</p>
+                      </div>
+                      <div className="mt-auto flex items-center gap-1.5 text-xs font-semibold transition-colors duration-300" style={{ color: "var(--vip-accent-main)" }}>
+                        Перейти на сайт
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-300 group-hover:translate-x-1"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+                      </div>
+                    </a>
+                  </AnimatedSection>
+                ))}
+              </div>
+              <AnimatedSection delay={0.4} className="text-center mt-10">
+                <p className="text-sm" style={{ color: "var(--vip-text-secondary)" }}>Хочешь стать партнёром? Напиши оператору{" "}<a href={OPERATOR_HREF} target="_blank" rel="noopener noreferrer" className="underline font-semibold" style={{ color: "var(--vip-accent-main)" }}>@I_O_S_NN</a>{" "}— обсудим.</p>
+              </AnimatedSection>
             </div>
           </section>
 
@@ -869,8 +982,16 @@ export default function Home() {
                 <h5 className="font-bold mb-4 uppercase text-xs tracking-widest" style={{ color: "var(--vip-text-secondary)" }}>Мы в соцсетях</h5>
                 <div className="flex flex-wrap gap-2 md:gap-2.5 md:flex-nowrap justify-center md:justify-start">
                   {SOCIAL_LINKS.map((social) => (
-                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1" style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${social.color} 30%, transparent)` }}>
-                      <div className="transition-colors duration-300" style={{ color: social.color }}>
+                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group relative w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1" style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${social.color} 30%, transparent)`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-loop 2.8s linear infinite" } : {}) }}>
+                      {social.featured === "gold" && (
+                        <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
+                          <span className="absolute top-0 left-0 w-1/3 h-full" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent)", animation: "vip-gold-blic 3.2s ease-in-out infinite" }} />
+                        </span>
+                      )}
+                      {social.featured === "electric" && (
+                        <span className="pointer-events-none absolute inset-0 rounded-full" style={{ background: "conic-gradient(from 0deg, transparent 0%, rgba(34,211,238,0.4) 25%, transparent 50%, rgba(34,211,238,0.4) 75%, transparent 100%)", animation: "vip-electric-spark 0.6s ease-in-out infinite", maskImage: "radial-gradient(circle, transparent 60%, black 62%, black 100%)", WebkitMaskImage: "radial-gradient(circle, transparent 60%, black 62%, black 100%)" }} />
+                      )}
+                      <div className="relative transition-colors duration-300" style={{ color: social.color }}>
                         <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">{social.icon.props.children}</svg>
                       </div>
                     </a>
