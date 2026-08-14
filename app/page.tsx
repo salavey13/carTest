@@ -26,7 +26,7 @@ const HERO_IMAGES = [
 
 /* ══ CTA TARGETS ══ */
 const CATALOG_HREF = "/franchize/vip-bike";
-const BOT_HREF = "https://t.me/oneBikePlsBot";
+const BOT_HREF = "https://t.me/oneBikePlsBot/app?startapp=home";
 const OPERATOR_HREF = "https://t.me/I_O_S_NN";
 const INSTAGRAM_HREF = "https://www.instagram.com/vipbikerental_nn";
 
@@ -366,7 +366,16 @@ function FloatingSocialBar() {
 
 /* ══ VIP BIKE THEME STYLE INJECTOR ══ */
 function VipBikeThemeStyles() {
-  const { resolvedTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
+  // Force dark theme on landing page (default), but allow user to toggle after
+  useEffect(() => {
+    // Only force on initial mount — if user explicitly toggled, respect their choice
+    const hasUserChosen = sessionStorage.getItem("vip-landing-theme-chosen");
+    if (!hasUserChosen) {
+      setTheme("dark");
+    }
+  }, [setTheme]);
+
   useEffect(() => {
     const root = document.documentElement;
     const theme = resolvedTheme === "dark" ? VIP_BIKE_THEMES.dark : VIP_BIKE_THEMES.light;
@@ -384,6 +393,12 @@ function VipBikeThemeStyles() {
     root.style.setProperty("--vip-badge-bg", resolvedTheme === "dark" ? "color-mix(in srgb, var(--vip-accent-main) 8%, transparent)" : "rgba(255, 255, 255, 0.85)");
     document.body.style.backgroundColor = theme.bgBase;
 
+    // Track that user has a resolved theme (after initial dark-forced mount).
+    // If resolvedTheme is light AFTER our forced dark, user must have toggled.
+    if (resolvedTheme === "light") {
+      sessionStorage.setItem("vip-landing-theme-chosen", "1");
+    }
+
     // Footer logo: swap src based on theme (dark = local neon, light = supabase photo)
     document.querySelectorAll<HTMLImageElement>("img.footer-logo-img").forEach((img) => {
       const lightSrc = img.getAttribute("data-light-src");
@@ -399,7 +414,7 @@ function VipBikeThemeStyles() {
       style.textContent = ELECTRIC_LOOP_KEYFRAMES + GOLD_BLIC_KEYFRAMES + SCROLL_SNAP_CSS;
       document.head.appendChild(style);
     }
-  }, [resolvedTheme]);
+  }, [resolvedTheme, setTheme]);
   return null;
 }
 
