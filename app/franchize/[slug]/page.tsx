@@ -24,7 +24,9 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
     (hostname === "rental.vip-bike.ru" || hostname === "www.rental.vip-bike.ru");
   const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteWithCssVars(crew.theme);
-  const ctaPolicy = getFranchizeRouteCtaPolicy("catalog");
+  const ctaPolicy = getFranchizeRouteCtaPolicy(
+    isVipBikeRentalHost ? "rental" : "catalog",
+  );
 
   return (
     <main className={`min-h-screen overflow-x-clip ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
