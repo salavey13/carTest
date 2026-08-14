@@ -692,7 +692,7 @@ function SectionHeader({ badge, title, highlight, subtitle }: { badge: string; t
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const navLinks = [
-    { label: "Каталог", href: "#catalog" }, { label: "Уровни", href: "#tiers" },
+    { label: "Каталог", href: "#catalog" },
     { label: "Тарифы", href: "#pricing" }, { label: "Как это работает", href: "#how" },
     { label: "FAQ", href: "#faq" }, { label: "Контакты", href: "#contacts" },
   ];
@@ -713,9 +713,14 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             {/* Desktop: logo on left + nav on right */}
             <div className="hidden md:flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(to-br, var(--vip-accent-main), var(--vip-accent-main-hover))" }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="var(--vip-bg-base)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M5 16v-4a8 8 0 0116 0v4" /><circle cx="8" cy="16" r="2" /><circle cx="16" cy="16" r="2" /><path d="M10 16h4" /></svg>
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo-electro-neon.png"
+                data-light-src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/1000033868-a2e57b7e-5ed8-4440-9304-f3f54f63cc46.jpg"
+                alt="VIP BIKE"
+                className="w-10 h-10 rounded-full object-cover footer-logo-img"
+                style={{ border: "none" }}
+              />
               <div>
                 <h1 className="font-bold text-lg leading-tight" style={{ color: "var(--vip-text-primary)" }}>VIP BIKE</h1>
                 <p className="text-[10px] leading-tight hidden sm:block" style={{ color: "var(--vip-text-secondary)" }}>Аренда мотоциклов в Нижнем</p>
