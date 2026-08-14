@@ -213,14 +213,14 @@ export async function GET(request: Request) {
       .gte("clock_in_time", cutoff)
       .order("clock_in_time", { ascending: false });
 
-    // Enrich shifts with member info
+    // Enrich shifts with member info including hourly_rate
     const enrichedShifts = shifts
       ? await Promise.all(
           shifts.map(async (shift) => {
             const [memberData, crewMemberData] = await Promise.all([
               supabaseAdmin
                 .from("users")
-                .select("id, username, avatar_url")
+                .select("id, username, avatar_url, metadata")
                 .eq("id", shift.member_id)
                 .single()
                 .then((r) => r.data),
@@ -233,14 +233,19 @@ export async function GET(request: Request) {
                 .then((r) => r.data),
             ]);
 
+            // Extract hourly_rate from metadata if available
+            const hourlyRate = memberData?.metadata?.hourly_rate || 500; // Default 500 RUB/hour
+
             return {
               ...shift,
+              hourly_rate: hourlyRate,
               member: memberData
                 ? {
                     user_id: memberData.id,
                     username: memberData.username || "Unknown",
                     avatar_url: memberData.avatar_url,
                     live_status: crewMemberData?.live_status || "offline",
+                    hourly_rate: hourlyRate,
                   }
                 : undefined,
             };

@@ -144,6 +144,11 @@ export async function getOrCreateSalaryPlan(params: {
 /**
  * Рассчитывает доход сотрудника за указанный период.
  *
+ * Integration with shifts and commissions:
+ * - Shifts: Uses salary_amount from crew_member_shifts (auto-calculated as duration_minutes/60 * hourly_rate)
+ * - Commissions: Looks up commission rates from commission_rates table based on operation_type
+ *   Applies percentages to cash_transactions income types (rental, sale, equipment)
+ *
  * @param params - Параметры для расчёта зарплаты
  * @param params.slug - Slug команды
  * @param params.actorUserId - ID пользователя, запрашивающего расчёт
@@ -154,7 +159,7 @@ export async function getOrCreateSalaryPlan(params: {
  *
  * Вычисляет доход от:
  * - Смены (salary_amount из crew_member_shifts)
- * - Комиссии (expense_commission транзакции)
+ * - Комиссии (expense_commission транзакции + auto-calc from operation types)
  * - Бонусы (зарезервировано для будущего использования)
  */
 export async function calculateSalaryForPeriod(params: {
@@ -204,7 +209,82 @@ export async function calculateSalaryForPeriod(params: {
       return sum + (amount > 0 ? amount : 0); // Защита от отрицательных значений
     }, 0);
 
-    // Get commission income
+    // Get commission rates for this crew
+    const { data: commissionRates, error: ratesError } = await supabaseAdmin
+      .from("commission_rates")
+      .select("*")
+      .eq("crew_id", access.crewId)
+      .eq("is_active", true);
+
+    if (ratesError) {
+      logger.warn("[calculateSalaryForPeriod] Commission rates query failed:", ratesError);
+    }
+
+    // Build rate map: operation_type -> { commissionType, commissionValue }
+    const rateMap = new Map();
+    (commissionRates || []).forEach((rate: any) => {
+      // Use highest priority rate for each operation type
+      const existing = rateMap.get(rate.operation_type);
+      if (!existing || (rate.priority > existing.priority)) {
+        rateMap.set(rate.operation_type, {
+          commissionType: rate.commission_type,
+          commissionValue: Number(rate.commission_value),
+        });
+      }
+    });
+
+    // Get all income transactions for this member to calculate potential commissions
+    const { data: incomeTransactions, error: incomeError } = await supabaseAdmin
+      .from("cash_transactions")
+      .select("id, amount, transaction_type, flow_direction, description, transaction_date")
+      .eq("crew_id", access.crewId)
+      .eq("created_by", memberId)
+      .in("transaction_type", ["income_rental", "income_sale", "income_equipment"])
+      .gte("transaction_date", periodStart)
+      .lt("transaction_date", periodEnd);
+
+    // Calculate potential commissions based on rates
+    let calculatedCommissionIncome = 0;
+    const commissionBreakdown: Array<{ operation: string; amount: number; description: string }> = [];
+
+    if (incomeTransactions && commissionRates) {
+      for (const tx of incomeTransactions) {
+        const incomeAmount = Number(tx.amount);
+        if (incomeAmount <= 0) continue;
+
+        // Map transaction type to operation type
+        let operationType: string | null = null;
+        if (tx.transaction_type === "income_rental") {
+          // Could be hourly or daily - for now assume daily
+          operationType = "rental_daily";
+        } else if (tx.transaction_type === "income_sale") {
+          operationType = "sale";
+        } else if (tx.transaction_type === "income_equipment") {
+          operationType = "equipment_rental";
+        }
+
+        if (!operationType) continue;
+
+        const rate = rateMap.get(operationType);
+        if (!rate) continue;
+
+        let commissionAmount = 0;
+        if (rate.commissionType === "percentage") {
+          commissionAmount = (incomeAmount * rate.commissionValue) / 100;
+        } else {
+          commissionAmount = rate.commissionValue;
+        }
+
+        calculatedCommissionIncome += commissionAmount;
+        commissionBreakdown.push({
+          operation: operationType,
+          amount: commissionAmount,
+          description: `${tx.description || tx.transaction_type}`,
+        });
+      }
+    }
+
+    // Get existing recorded commission payments
     const { data: commissions, error: commError } = await supabaseAdmin
       .from("cash_transactions")
       .select("amount, description, transaction_date")
@@ -218,15 +298,30 @@ export async function calculateSalaryForPeriod(params: {
       logger.warn("[calculateSalaryForPeriod] Commissions query failed:", commError);
     }
 
-    const commissionIncome = (commissions || []).reduce((sum: number, c: any) => {
+    const recordedCommissionIncome = (commissions || []).reduce((sum: number, c: any) => {
       const amount = Number(c.amount || 0);
-      return sum + (amount > 0 ? amount : 0); // Защита от отрицательных значений
+      return sum + (amount > 0 ? amount : 0);
     }, 0);
+
+    // Use calculated commissions if available, otherwise use recorded
+    const commissionIncome = calculatedCommissionIncome > 0 ? calculatedCommissionIncome : recordedCommissionIncome;
 
     // Build breakdown
     const breakdown: Array<{ type: string; amount: number; description: string }> = [];
     breakdown.push({ type: "shifts", amount: shiftIncome, description: "Смены" });
-    breakdown.push({ type: "commissions", amount: commissionIncome, description: "Комиссии" });
+
+    // Add commission details
+    if (calculatedCommissionIncome > 0 && commissionBreakdown.length > 0) {
+      commissionBreakdown.forEach((cb) => {
+        breakdown.push({
+          type: `commission_${cb.operation}`,
+          amount: cb.amount,
+          description: `Комиссия: ${cb.description}`,
+        });
+      });
+    } else if (recordedCommissionIncome > 0) {
+      breakdown.push({ type: "commissions", amount: recordedCommissionIncome, description: "Комиссии (выплачено)" });
+    }
 
     const totalIncome = shiftIncome + commissionIncome;
 
