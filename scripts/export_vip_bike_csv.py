@@ -196,7 +196,6 @@ RENT_CSV_COLUMNS = [
     "transmission",
     "cooling",
     "rent_link",
-    "specs_json",        # full specs as JSON for reference
 ]
 
 # Columns for SALE CSV — focused on sale-relevant info
@@ -242,7 +241,6 @@ SALE_CSV_COLUMNS = [
     "buy_colors_json",
     "buy_options_json",
     "rent_link",
-    "specs_json",
 ]
 
 
@@ -295,7 +293,6 @@ def build_rent_row(bike):
         "transmission": safe_str(get_spec(specs, "transmission")),
         "cooling": safe_str(get_spec(specs, "cooling")),
         "rent_link": bike.get("rent_link", ""),
-        "specs_json": serialize_nested(specs),
     }
     return row
 
@@ -345,7 +342,6 @@ def build_sale_row(bike):
         "buy_colors_json": serialize_nested(get_spec(specs, "buy_colors")),
         "buy_options_json": serialize_nested(get_spec(specs, "buy_options")),
         "rent_link": bike.get("rent_link", ""),
-        "specs_json": serialize_nested(specs),
     }
     return row
 
