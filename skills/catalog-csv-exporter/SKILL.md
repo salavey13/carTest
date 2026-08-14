@@ -65,7 +65,7 @@ Or manually push via the standard push_file pattern (see push script).
 
 ## CSV schema
 
-### vip-bike-rent.csv columns (46)
+### vip-bike-rent.csv columns (45)
 
 ```
 id, make, model, bike_subtype, type, year, license_class, description,
@@ -76,10 +76,10 @@ power_kw, motor_peak_kw, motor_nominal_kw, power_hp, torque_nm, top_speed_kmh,
 range_km, battery, voltage_v, weight_kg, seat_height_mm,
 brake_type, suspension_type, frame_type, drive, color, charge_time_h,
 engine_cc, fuel_type, fuel_capacity_l, transmission, cooling,
-rent_link, specs_json
+rent_link
 ```
 
-### vip-bike-sale.csv columns (42)
+### vip-bike-sale.csv columns (41)
 
 ```
 id, make, model, bike_subtype, type, year, license_class, description,
@@ -89,7 +89,7 @@ power_kw, motor_peak_kw, power_hp, torque_nm, top_speed_kmh,
 range_km, battery, voltage_v, weight_kg, seat_height_mm,
 brake_type, suspension_type, frame_type, drive, color, charge_time_h,
 engine_cc, fuel_type, fuel_capacity_l, transmission, cooling,
-buy_colors_json, buy_options_json, rent_link, specs_json
+buy_colors_json, buy_options_json, rent_link
 ```
 
 ## Corruption prevention
