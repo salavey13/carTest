@@ -369,7 +369,7 @@ function FloatingSocialBar() {
       {isVisible && (
         <motion.div initial={{ x: -80, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -80, opacity: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="fixed left-4 top-1/2 -translate-y-1/2 z-50 hidden lg:flex flex-col gap-3">
           {SOCIAL_LINKS.map((social) => (
-            <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group relative w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110" style={{ background: `${social.color}15`, border: `1px solid ${social.color}30` }}>
+            <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group relative w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110" style={{ background: `${social.color}15`, border: `1px solid ${social.color}30` }}>
               <div className="transition-all duration-300 group-hover:scale-110" style={{ color: social.color }}>
                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">{social.icon.props.children}</svg>
               </div>
@@ -636,7 +636,7 @@ function CinematicHero() {
                 aria-label={social.label}
               >
                 <div
-                  className="relative w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center transition-all duration-300 overflow-hidden"
+                  className="relative w-11 h-11 md:w-12 md:h-12 rounded-2xl flex items-center justify-center transition-all duration-300 overflow-hidden"
                   style={{
                     backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 30%, transparent)",
                     border: `1.5px solid color-mix(in srgb, ${social.color} 40%, transparent)`,
@@ -1148,7 +1148,7 @@ export default function Home() {
                 <h5 className="font-bold mb-4 uppercase text-xs tracking-widest" style={{ color: "var(--vip-text-secondary)" }}>Мы в соцсетях</h5>
                 <div className="flex flex-wrap gap-2 md:gap-3 md:flex-nowrap justify-center md:justify-start">
                   {SOCIAL_LINKS.map((social) => (
-                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group relative w-10 h-10 md:w-12 md:h-12 md:rounded-full rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0" style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${social.color} 30%, transparent)`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 5s linear infinite" } : {}) }}>
+                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group relative w-11 h-11 md:w-12 md:h-12 md:rounded-full rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0" style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${social.color} 30%, transparent)`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 5s linear infinite" } : {}) }}>
                       {social.featured === "gold" && (
                         <span className="pointer-events-none absolute inset-0 overflow-hidden md:rounded-full rounded-xl">
                           <span className="absolute top-0 left-0 w-1/2 h-full" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.85) 50%, transparent)", animation: "vip-gold-blic 2s ease-in-out infinite" }} />
