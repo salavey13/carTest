@@ -39,19 +39,19 @@ Export VIP Bike catalog from Supabase `public.cars` to clean, compact CSV files 
 ### Step 1: Run the export script
 
 ```bash
-python3 /home/z/my-project/scripts/export_vip_bike_csv.py
+python3 scripts/export_vip_bike_csv.py
 ```
 
-This generates 2 files in `/home/z/my-project/download/`:
+This generates 2 files in `<repo>/download/` (`<repo>` = repo root, e.g. `/opt/vip-bike-electro-factory/rental-repo`):
 - `vip-bike-rent.csv` (21 rows, 46 columns)
 - `vip-bike-sale.csv` (19 rows, 42 columns)
 
 ### Step 2: Push CSVs to repo
 
-Use the GitHub Contents API to push both CSVs to `docs/autoreply/`:
+Commit + push both CSVs to `docs/autoreply/` via the repo's git remote:
 
 ```bash
-python3 /home/z/my-project/scripts/push_catalog_csvs.py
+python3 scripts/push_catalog_csvs.py
 ```
 
 Or manually push via the standard push_file pattern (see push script).
@@ -146,13 +146,13 @@ rerode-r1-plus, sequence-zero, sotion-em01, wenbox-u2-pro, y-volt-surge-v
 To regenerate CSVs nightly:
 
 ```cron
-0 3 * * * /usr/bin/python3 /home/z/my-project/scripts/export_vip_bike_csv.py && /usr/bin/python3 /home/z/my-project/scripts/push_catalog_csvs.py
+0 3 * * * cd /opt/vip-bike-electro-factory/rental-repo && /usr/bin/python3 scripts/export_vip_bike_csv.py && /usr/bin/python3 scripts/push_catalog_csvs.py
 ```
 
 ## Related files
 
-- Script: `/home/z/my-project/scripts/export_vip_bike_csv.py`
-- Push script: `/home/z/my-project/scripts/push_catalog_csvs.py`
-- Output (local): `/home/z/my-project/download/vip-bike-rent.csv`, `vip-bike-sale.csv`
+- Script: `scripts/export_vip_bike_csv.py`
+- Push script: `scripts/push_catalog_csvs.py`
+- Output (local): `<repo>/download/vip-bike-rent.csv`, `vip-bike-sale.csv`
 - Output (repo): `docs/autoreply/vip-bike-rent.csv`, `docs/autoreply/vip-bike-sale.csv`
 - Supabase gold-standard schemas: `docs/gold-standard-ice-bike-spec-schema.md`, `docs/gold-standard-electro-bike-spec-schema.md`
