@@ -19,11 +19,13 @@ const DisplayModeContext = createContext<DisplayModeContextValue>({
 export function DisplayModeProvider({
   children,
   initialMode = "rent",
+  lockMode,
 }: {
   children: ReactNode;
   initialMode?: DisplayMode;
+  lockMode?: DisplayMode;
 }) {
-  const [displayMode, setDisplayModeState] = useState<DisplayMode>(initialMode);
+  const [displayMode, setDisplayModeState] = useState<DisplayMode>(lockMode ?? initialMode);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   // On mount, read the actual mode from the URL (handles deep-links / refreshes
@@ -31,14 +33,23 @@ export function DisplayModeProvider({
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
+    if (lockMode) {
+      setDisplayModeState(lockMode);
+      if (params.has("mode")) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("mode");
+        window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+      }
+      return;
+    }
     const urlMode = params.get("mode");
     if (urlMode === "sale" || urlMode === "rent" || urlMode === "service") {
       setDisplayModeState(urlMode);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [lockMode]);
 
   const setDisplayMode = useCallback((mode: DisplayMode) => {
+    if (lockMode) return;
     if (mode === displayMode) return; // Skip if same mode
 
     setIsTransitioning(true);
@@ -57,7 +68,7 @@ export function DisplayModeProvider({
 
     // Clear transition flag after animation completes
     setTimeout(() => setIsTransitioning(false), 300);
-  }, [displayMode]);
+  }, [displayMode, lockMode]);
 
   return (
     <DisplayModeContext.Provider value={{ displayMode, setDisplayMode, isTransitioning }}>

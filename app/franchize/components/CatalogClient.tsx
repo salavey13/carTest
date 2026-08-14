@@ -1298,7 +1298,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         );
                       })}
                     </div>
-                    <div className="mt-3 flex items-center justify-center gap-2" aria-label={`Пагинация карусели ${group.category}`}>
+                    <div className="mt-1 flex flex-wrap items-center justify-center" aria-label={`Пагинация карусели ${group.category}`}>
                       {(() => {
                         const groupKey = group.category || group.title || "section";
                         const activeIndex = carouselActiveByCategory[groupKey] ?? 0;
@@ -1310,15 +1310,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               type="button"
                               aria-label={`Показать карточку ${index + 1}`}
                               aria-current={isActive ? "true" : undefined}
-                              className="rounded-full transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
-                              style={{
-                                width: isActive ? "24px" : "10px",
-                                height: "10px",
-                                backgroundColor: isActive
-                                  ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain)
-                                  : (crew.theme.isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary),
-                                opacity: isActive ? 1 : 0.4,
-                              }}
+                              className="grid h-11 min-w-11 place-items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
                               onClick={() => {
                                 const root = carouselRefs.current[groupKey];
                                 if (!root) return;
@@ -1326,7 +1318,19 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                                 const gap = 12; // gap-3 = 0.75rem = 12px
                                 root.scrollTo({ left: (slotWidth + gap) * index, behavior: "smooth" });
                               }}
-                            />
+                            >
+                              <span
+                                className="h-2.5 rounded-full transition-all duration-300"
+                                style={{
+                                  width: isActive ? "24px" : "10px",
+                                  backgroundColor: isActive
+                                    ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain)
+                                    : (crew.theme.isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary),
+                                  opacity: isActive ? 1 : 0.4,
+                                }}
+                                aria-hidden
+                              />
+                            </button>
                           );
                         });
                       })()}

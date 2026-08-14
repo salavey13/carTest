@@ -314,9 +314,25 @@ function HeroImageCarousel({ images, alt }: { images: string[]; alt: string }) {
         <motion.img key={index} src={images[index]} alt={alt} initial={{ opacity: 0, scale: 1.03 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.3, ease: "easeInOut" }} className="absolute inset-0 w-full h-full object-cover" loading="eager" />
       </AnimatePresence>
       {images.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-2">
+        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10 flex">
           {images.map((_, i) => (
-            <button key={i} onClick={() => setIndex(i)} aria-label={`Слайд ${i + 1}`} className="h-1.5 rounded-full transition-all duration-300" style={{ backgroundColor: i === index ? "var(--vip-accent-main)" : "rgba(255,255,255,0.35)", width: i === index ? "28px" : "8px" }} />
+            <button
+              key={i}
+              type="button"
+              onClick={() => setIndex(i)}
+              aria-label={`Слайд ${i + 1}`}
+              aria-current={i === index ? "true" : undefined}
+              className="grid h-11 min-w-11 place-items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              <span
+                className="h-1.5 rounded-full transition-all duration-300"
+                style={{
+                  backgroundColor: i === index ? "var(--vip-accent-main)" : "rgba(255,255,255,0.35)",
+                  width: i === index ? "28px" : "8px",
+                }}
+                aria-hidden="true"
+              />
+            </button>
           ))}
         </div>
       )}
@@ -764,14 +780,14 @@ export default function Home() {
             </div>
             <nav className="hidden md:flex items-center gap-6 text-sm">
               {navLinks.map((link) => (<a key={link.href} href={link.href} className="transition-colors duration-200 hover:opacity-80" style={{ color: "var(--vip-text-secondary)" }}>{link.label}</a>))}
-              <ThemeToggleButton size="md" />
+              <ThemeToggleButton size="md" className="h-11 w-11" />
               <MagneticButton href={CATALOG_HREF} primary size="sm">Забронировать</MagneticButton>
             </nav>
             {/* Mobile: title + theme + hamburger grouped and centered together */}
             <div className="md:hidden flex items-center gap-2 mx-auto">
               <h1 className="font-bold text-lg leading-tight" style={{ color: "var(--vip-text-primary)" }}>VIP BIKE</h1>
-              <ThemeToggleButton size="sm" />
-              <button className="p-2" style={{ color: "var(--vip-text-primary)" }} onClick={() => setMenuOpen(!menuOpen)} aria-label="Меню">
+              <ThemeToggleButton size="sm" className="h-11 w-11" />
+              <button className="min-h-11 min-w-11 p-2" style={{ color: "var(--vip-text-primary)" }} onClick={() => setMenuOpen(!menuOpen)} aria-label="Меню">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">{menuOpen ? <path d="M18 6L6 18M6 6l12 12" /> : <path d="M4 6h16M4 12h16M4 18h16" />}</svg>
               </button>
             </div>
@@ -1154,7 +1170,7 @@ export default function Home() {
             </div>
             <div className="pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4" style={{ borderColor: "color-mix(in srgb, var(--vip-accent-main) 15%, var(--vip-border-soft))" }}>
               <p className="text-xs" style={{ color: "var(--vip-text-secondary)" }}>&copy; {new Date().getFullYear()} VIP BIKE — аренда мотоциклов в Нижнем Новгороде</p>
-              <a href="https://t.me/oneSitePlsBot" target="_blank" rel="noopener noreferrer" className="text-xs transition-colors hover:opacity-80" style={{ color: "var(--vip-text-secondary)" }}>powered by oneSitePls &middot; @SALAVEY13</a>
+              <span className="text-xs" style={{ color: "var(--vip-text-secondary)" }}>Приходи — садись — едь.</span>
             </div>
           </div>
         </footer>
