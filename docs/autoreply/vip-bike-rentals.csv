@@ -1,0 +1,2 @@
+"rental_id","vehicle_id","bike_make","bike_model","user_id","status","payment_status","start_date","end_date","duration_days","total_cost","deposit_amount","deposit_method","deposit_collected_at","deposit_returned","delivery_address","is_active_today","is_upcoming","created_at","crew_id"
+"29786155-4c5f-4017-9cae-0a032c2cbb0e","y-volt-surge-v","Y-VOLT","Surge V","avito_134629736","pending_confirmation","interest_paid","2026-08-14 15:00","2026-08-15 15:00","1.0","","0","","","false","","true","","2026-08-14 07:04","2d5fde70-1dd3-4f0d-8d72-66ccf6908746"
