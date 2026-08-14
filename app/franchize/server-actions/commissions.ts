@@ -117,25 +117,10 @@ export async function upsertCommissionRate(params: {
       return { success: false, error: "Только владелец может настраивать комиссии." };
     }
 
-    // Validate commission value based on type
-    if (commissionValue <= 0) {
-      return { success: false, error: "Значение комиссии должно быть больше нуля." };
-    }
-
-    if (commissionType === "percentage") {
-      if (commissionValue > 100) {
-        return { success: false, error: "Процент комиссии не может превышать 100%. Укажите значение от 0.01 до 100." };
-      }
-      if (commissionValue < 0.01) {
-        return { success: false, error: "Минимальный процент комиссии — 0.01%." };
-      }
-    }
-
-    if (commissionType === "fixed_amount") {
-      if (commissionValue < 1) {
-        return { success: false, error: "Минимальная фиксированная комиссия — 1 рубль." };
-      }
-    }
+    // Priority 2 Fix 4: Validation is now handled by database trigger trg_validate_commission_rate
+    // Client-side validation removed to avoid duplication - database provides authoritative validation
+    // Trigger checks: percentage ≤ 100, no negatives, warns on large fixed amounts (>1M RUB)
+    // Any constraint violation will return proper error from database
 
     // Валидация operationType
     if (!operationType || operationType.trim() === "") {
