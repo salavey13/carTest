@@ -27,6 +27,18 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
   const ctaPolicy = getFranchizeRouteCtaPolicy(
     isVipBikeRentalHost ? "rental" : "catalog",
   );
+  const conversionCta = isVipBikeRentalHost
+    ? {
+        title: "Нужна помощь с арендой?",
+        description:
+          "Не определился с моделью или датами? Напиши Илье — он проверит доступность и условия до бронирования.",
+        buttonHref: "https://t.me/I_O_S_NN",
+        buttonLabel: "Написать менеджеру",
+      }
+    : crew.cta;
+  const conversionWorkingHours = isVipBikeRentalHost
+    ? "10:00–20:00 (ежедневно)"
+    : crew.contacts.workingHours;
 
   return (
     <main className={`min-h-screen overflow-x-clip ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
@@ -137,17 +149,17 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="max-w-2xl">
             <h2 className="text-2xl font-bold uppercase tracking-tight md:text-3xl" style={{ color: "var(--franchize-text-primary, inherit)" }}>
-              {crew.cta.title}
+              {conversionCta.title}
             </h2>
             <p className="mt-2 text-sm leading-relaxed md:text-base" style={{ color: "var(--franchize-text-secondary, inherit)" }}>
-              {crew.cta.description}
+              {conversionCta.description}
             </p>
             <div id="contacts" className="mt-4 flex scroll-mt-24 flex-wrap gap-4 text-sm" style={{ color: "var(--franchize-text-secondary, inherit)" }}>
               {crew.contacts.address && (
                 <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" aria-hidden /> {crew.contacts.address}</span>
               )}
-              {crew.contacts.workingHours && (
-                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" aria-hidden /> {crew.contacts.workingHours}</span>
+              {conversionWorkingHours && (
+                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" aria-hidden /> {conversionWorkingHours}</span>
               )}
               {crew.contacts.phone && (
                 <span className="flex items-center gap-1.5"><Phone className="h-4 w-4" aria-hidden /> {crew.contacts.phone}</span>
@@ -155,9 +167,9 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
             </div>
           </div>
           <div id="operator" className="flex scroll-mt-24 flex-col gap-3 sm:flex-row md:flex-col">
-            {crew.cta.buttonHref && (
+            {conversionCta.buttonHref && (
               <a
-                href={crew.cta.buttonHref}
+                href={conversionCta.buttonHref}
                 target="_blank"
                 rel="noreferrer noopener"
                 className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold uppercase tracking-wide transition active:scale-95"
@@ -166,7 +178,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
                   color: "var(--franchize-accent-contrast, #16130A)",
                 }}
               >
-                {crew.cta.buttonLabel}
+                {conversionCta.buttonLabel}
               </a>
             )}
           </div>
