@@ -4,8 +4,10 @@ import { Suspense } from "react";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import type { Metadata, Viewport } from 'next';
+import { headers } from "next/headers";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Loading } from "@/components/Loading"; 
+import { YandexMetrika } from "@/components/YandexMetrika";
 
 // Static metadata content to be used by generateMetadata
 const pageMetadataContent = {
@@ -15,6 +17,31 @@ const pageMetadataContent = {
 
 // Server-only function to generate metadata
 export async function generateMetadata(): Promise<Metadata> {
+  const hostname = (headers().get("host") || "").split(":")[0].toLowerCase();
+  if (hostname === "rental.vip-bike.ru" || hostname === "www.rental.vip-bike.ru") {
+    return {
+      metadataBase: new URL("https://rental.vip-bike.ru"),
+      title: "Аренда мотоциклов в Нижнем Новгороде | VIP BIKE",
+      description:
+        "Электромотоциклы и мотоциклы в аренду в Нижнем Новгороде. Выберите байк, даты и оставьте заявку менеджеру VIP BIKE.",
+      alternates: {
+        canonical: "/",
+      },
+      robots: {
+        index: true,
+        follow: true,
+      },
+      openGraph: {
+        type: "website",
+        locale: "ru_RU",
+        siteName: "VIP BIKE",
+        title: "Аренда мотоциклов в Нижнем Новгороде | VIP BIKE",
+        description:
+          "Каталог электромотоциклов и мотоциклов в аренду. Бронирование через VIP BIKE.",
+        url: "https://rental.vip-bike.ru/",
+      },
+    };
+  }
   return {
     title: pageMetadataContent.title,
     description: pageMetadataContent.description,
@@ -28,8 +55,6 @@ export async function generateViewport(): Promise<Viewport> {
   return {
     width: 'device-width',
     initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
     themeColor: [ 
       { media: '(prefers-color-scheme: light)', color: 'hsl(220 25% 98%)' }, 
       { media: '(prefers-color-scheme: dark)', color: 'hsl(263 80% 6%)' }, 
@@ -38,6 +63,9 @@ export async function generateViewport(): Promise<Viewport> {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const hostname = (headers().get("host") || "").split(":")[0].toLowerCase();
+  const isVipBikeRentalHost =
+    hostname === "rental.vip-bike.ru" || hostname === "www.rental.vip-bike.ru";
   return (
     <html lang="ru" className="h-full" suppressHydrationWarning>
       <head>
@@ -46,7 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="mobile-web-app-capable" content="yes" />
         <link rel="icon" href="/favicon.png" />
         <link rel="shortcut icon" href="/favicon.png" type="image/png" />
-        <link rel="manifest" href="/manifest.json" /> 
+        <link rel="manifest" href={isVipBikeRentalHost ? "/manifest.webmanifest" : "/manifest.json"} />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png"></link>
         {/* Updated msapplication-TileColor to match light theme background by default */}
         <meta name="msapplication-TileColor" content="hsl(220 25% 98%)"></meta>
@@ -66,6 +94,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={cn(
           "flex min-h-screen flex-col bg-background text-foreground antialiased",
       )}>
+        <Suspense fallback={null}>
+          <YandexMetrika />
+        </Suspense>
         <ClientLayout>
           <Suspense fallback={<Loading text="Загружаем..." />}>
             {children}

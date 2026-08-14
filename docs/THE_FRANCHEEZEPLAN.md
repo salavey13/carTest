@@ -651,3 +651,12 @@ This root file stays intentionally compact so operators and agents can load it q
 - `notes`: Fixed a tricky VIP Bike MapRiders touch trap: the secondary mobile riders drawer was leaving invisible Vaul content in the pointer hit-test stack while closed, so Leaflet pan/zoom worked reliably only from marker interactions. Closed drawer content now unmounts, only the small handle remains interactive, and the Leaflet map explicitly owns touch gestures.
 - `next_step`: Preview-smoke `/franchize/vip-bike/map-riders` in Telegram WebApp on mobile: pan/zoom from blank map tiles, rider marker drag-start, drawer handle open/close, and meetup long-press.
 - `risks`: Local Playwright browser launch was blocked by missing system library `libatk-1.0.so.0`, so device QA remains the decisive proof.
+
+### 2026-08-14 — rental.vip-bike.ru: paid rental attribution and lead path
+
+- `status`: in_progress
+- `updated_at`: 2026-08-14T00:00:00+03:00
+- `owner`: codex
+- `notes`: Added rental-host Yandex Metrika integration, first/last-touch Direct attribution, validated callback lead persistence with Telegram forwarding, and a canonical VIP Bike rental allowlist. Paid entry is split into `/franchize/vip-bike?propulsion=electric` and `/franchize/vip-bike?propulsion=petrol`; stale catalog prices, deposits, hourly packages, discounts, equipment prices, and non-SSOT models are excluded from rental mode. Public rental UI no longer uses Unicode emoji and critical controls have 44px touch targets.
+- `next_step`: Run full typecheck/build/tests, deploy a Vercel preview, verify Metrika network calls and one controlled lead delivery, then publish production. Keep the new Direct campaign in exact dry-run state until the required separate approval.
+- `risks`: Metrika goal objects and production Telegram/Supabase environment values require deployed read-back; the Direct apply step remains intentionally blocked until explicit confirmation.

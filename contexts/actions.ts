@@ -6,6 +6,12 @@ import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
 import type { UserCrewInfo, ActiveLobbyInfo } from "./AppContext";
 
+const INTERNAL_TEMP_CART_PREFIX = "vip-bike-callback-";
+
+function isReservedTempCartId(value: string) {
+  return value.startsWith(INTERNAL_TEMP_CART_PREFIX);
+}
+
 export async function fetchDbUserAction(userId: string): Promise<Database["public"]["Tables"]["users"]["Row"] | null> {
   if (!userId) return null;
   try {
@@ -261,6 +267,9 @@ export async function upsertTempFranchizeCartAction(input: {
 }): Promise<{ ok: boolean; error?: string }> {
   const cartId = input.cartId?.trim();
   if (!cartId) return { ok: false, error: "Missing cartId" };
+  if (cartId.length > 160 || isReservedTempCartId(cartId)) {
+    return { ok: false, error: "Invalid cartId" };
+  }
   if (!input.cartBySlug || typeof input.cartBySlug !== "object" || Array.isArray(input.cartBySlug)) {
     return { ok: false, error: "cartBySlug must be an object" };
   }
@@ -293,6 +302,9 @@ export async function consumeTempFranchizeCartAction(input: {
   const cartId = input.cartId?.trim();
   const userId = input.userId?.trim();
   if (!cartId || !userId) return { ok: false, error: "Missing cartId or userId" };
+  if (cartId.length > 160 || isReservedTempCartId(cartId)) {
+    return { ok: false, error: "Invalid cartId" };
+  }
 
   try {
     const { data: tempCart, error: tempCartError } = await supabaseAdmin

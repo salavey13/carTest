@@ -16,16 +16,18 @@ const VIP_BIKE_THEMES = {
   light: { bgBase: "#FAFAFA", bgCard: "#FFFFFF", accentMain: "#0891B2", accentMainHover: "#0E7490", textPrimary: "#1A1A1A", textSecondary: "#4A4A4A", borderSoft: "#CCFBF1" },
 };
 
-/* ══ HERO IMAGES — LiveWire ONE gallery + signature shot (crossfade every 5s) ══ */
+/* ══ HERO IMAGES — confirmed rental catalog models ══ */
 const HERO_IMAGES = [
-  "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/livewire-one/image_1.jpg",
-  "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/livewire-one/image_2.jpg",
-  "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/livewire-one/image_3.jpg",
-  "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/b2-razgon.jpeg",
+  "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2026/image_1.jpg",
+  "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/y-volt-surge-v/image_1.jpg",
+  "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/yamaha-r7/image_1.jpg",
+  "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/kawasaki-ex650k/image_1.jpg",
 ];
 
 /* ══ CTA TARGETS ══ */
 const CATALOG_HREF = "/franchize/vip-bike";
+const ELECTRIC_CATALOG_HREF = "/franchize/vip-bike?propulsion=electric";
+const PETROL_CATALOG_HREF = "/franchize/vip-bike?propulsion=petrol";
 const BOT_HREF = "https://t.me/oneBikePlsBot/app?startapp=home";
 const OPERATOR_HREF = "https://t.me/I_O_S_NN";
 const INSTAGRAM_HREF = "https://www.instagram.com/vipbikerental_nn";
@@ -100,7 +102,7 @@ const SCROLL_SNAP_CSS = `
 `;
 
 /* ══ Cinematic duo section background (shared between Partners + Final CTA) ══ */
-const DUO_SECTION_BG = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/livewire-one/image_3.jpg";
+const DUO_SECTION_BG = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2026/image_1.jpg";
 
 const SOCIAL_LINKS: SocialLink[] = [
   {
@@ -144,7 +146,7 @@ const SOCIAL_LINKS: SocialLink[] = [
 
 /* ══ CONTACT INFO ══ */
 const CONTACT_INFO = {
-  phone: "+7 9200-789-888", phoneHref: "tel:+79200789888",
+  phone: "+7 (920) 078-98-88", phoneHref: "tel:+79200789888",
   address: "пл. Комсомольская 2", workingHours: "10:00 — 20:00 (ежедневно)",
 };
 
@@ -153,48 +155,48 @@ const CONTACT_INFO = {
 /* ══ BIKE TIERS — 3 experience levels (Новичок / Опытный / Профи) ══ */
 const BIKE_TIERS = [
   {
-    id: "beginner", tier: "Новичок", emoji: "🌱", tagline: "Лёгкие электро-эндуро",
-    description: "Не нужны права категории А — садишься и едешь. Идеально для первого знакомства с мотоциклом, для города и лёгкого бездорожья. Лёгкие, тихие, экологичные.",
-    licenseReq: "Без категории А — достаточно прав B", accentColor: "#22C55E",
-    bikes: ["79BIKE Falcon GT", "79BIKE Falcon Lite", "79BIKE Falcon Pro", "79BIKE Falcon Lynx", "HMD M02", "Sotion EM01", "Wenbox U2 Pro", "Kayo TSD 110"],
+    id: "electric", tier: "Электро", marker: "01", tagline: "Электромотоциклы в аренду",
+    description: "Тихая тяга и быстрый отклик. Выбирай модель по мощности, запасу хода и своему опыту.",
+    licenseReq: "Требования к категории зависят от модели", accentColor: "#22C55E",
+    bikes: ["Falcon GT", "Falcon PRO", "Falcon LYNX Purple", "HMD M02", "Sotion EM01", "Y-VOLT Surge V"],
   },
   {
-    id: "intermediate", tier: "Опытный", emoji: "⚡", tagline: "Мощные электромотоциклы",
-    description: "Больше скорости, больше динамики, больше эмоций. Рекомендуется категория M/AM или предыдущий опыт езды на мотоцикле. Мгновенный электро-момент на колёса.",
-    licenseReq: "Категория M/AM или опыт езды", accentColor: "#F59E0B",
-    bikes: ["Kawasaki Ninja 650", "Motoland Breakout 300", "Ducati Panigale S Electro", "Rerode R1+", "Y-VOLT Surge V", "Regulmoto Nibbler", "Jilang Max Pro"],
+    id: "petrol", tier: "Бензин", marker: "02", tagline: "Мотоциклы с ДВС",
+    description: "Городские, дорожные и спортивные модели. Выбирай объём, посадку и характер техники.",
+    licenseReq: "Для бензиновых мотоциклов обязательна категория А", accentColor: "#F59E0B",
+    bikes: ["BMW F800R", "Yamaha R7", "Kawasaki Ninja 650", "Suzuki GSX-S1000F", "Motoland Breakout 300", "Kayo TSD 110"],
   },
   {
-    id: "pro", tier: "Профи", emoji: "🔥", tagline: "Полноразмерные мотоциклы",
-    description: "Серьёзная техника для серьёзных райдеров. ДВС-спортбайки и электрические суперкары. Категория А обязательна — это уже не игрушки, а настоящая мощь.",
-    licenseReq: "Категория А обязательна", accentColor: "#EF4444",
-    bikes: ["LiveWire ONE", "BMW F800R", "Yamaha R7", "Suzuki GSX-S1000F", "Aprilia Shiver 750", "Sequence Zero"],
+    id: "selection", tier: "Подбор", marker: "03", tagline: "Если ещё не определился",
+    description: "Расскажи менеджеру про опыт, маршрут и даты. Он проверит доступность и поможет выбрать подходящую модель.",
+    licenseReq: "Документы и условия менеджер подтвердит до бронирования", accentColor: "#EF4444",
+    bikes: ["Подбор по опыту", "Проверка доступности", "Подтверждение условий"],
   },
 ];
 
 /* ══ PRICING TIERS ══ */
 const PRICING_TIERS = [
-  { id: "hour", label: "Час", emoji: "⚡️", price: "от 4 000 ₽", per: "/ 3 часа", note: "минимум 3 часа",
-    features: ["Шлем + перчатки — от 1 500 ₽", "200 км/сутки включено (для ДВС)", "150 км/сутки включено (для электро)", "Залог от 10 000 ₽"],
-    cta: "Покататься часок", href: BOT_HREF, highlighted: false },
-  { id: "day", label: "Сутки", emoji: "🔥", price: "от 6 000 ₽", per: "/ сутки", note: "бронь на 18:00 → 18:00",
-    features: ["Всё из тарифа «Час», но на сутки", "Скидка 10% от 3 суток", "Скидка 15% от 7 суток"],
-    cta: "Забрать на сутки", href: BOT_HREF, highlighted: true },
-  { id: "week", label: "Неделя", emoji: "🚀", price: "от 30 000 ₽", per: "/ 7 суток", note: "скидка 20% от 14 суток",
-    features: ["Всё из тарифа «Сутки», но дешевле", "Приоритетное бронирование", "Экипировка с брендированием (по запросу)", "Выделенный менеджер в Telegram", "Бесплатная доставка по городу"],
-    cta: "Уйти в неделю", href: BOT_HREF, highlighted: false },
+  { id: "electric", label: "Электро", marker: "Э", price: "5 000–12 000 ₽", per: "/ сутки", note: "подтверждённые суточные тарифы",
+    features: ["Sotion EM01 — 5 000 ₽", "Falcon GT — 12 000 ₽", "Y-VOLT Surge V — 12 000 ₽; выходной — 15 000 ₽"],
+    cta: "Выбрать электро", href: ELECTRIC_CATALOG_HREF, highlighted: true },
+  { id: "petrol", label: "Бензин", marker: "ДВС", price: "4 000–14 000 ₽", per: "/ сутки", note: "подтверждённые суточные тарифы",
+    features: ["Kayo TSD 110 — 4 000 ₽", "Yamaha R7 — 10 000 ₽", "Suzuki GSX-S1000F — 14 000 ₽"],
+    cta: "Выбрать бензин", href: PETROL_CATALOG_HREF, highlighted: false },
+  { id: "terms", label: "Условия", marker: "INFO", price: "Уточнит менеджер", per: "", note: "до подтверждения брони",
+    features: ["Паспорт и водительское удостоверение", "Для бензиновых моделей — категория А", "Даты и дополнительные условия подтверждаются отдельно"],
+    cta: "Написать менеджеру", href: OPERATOR_HREF, highlighted: false },
 ];
 
 /* ══ FAQ ITEMS ══ */
 const FAQ_ITEMS = [
-  { q: "Так, мне правда не нужна категория А?", a: "Правда — если берёшь электро-эндуро до 4 кВт (L1e-B). По закону достаточно категории B (или M). Покажешь права — садишься. Для полноразмерных ДВС-байков (Ninja 650, R7, GSX-S1000F и т.д.) категория А обязательна." },
-  { q: "А ОСАГО и ПТС точно не нужны?", a: "Для электро до 4 кВт — точно. Не регистрируется в ГИБДД, ПТС нет, ОСАГО нет. Никакой бюрократии. Сел — поехал. Для ДВС-байков ОСАГО уже оформлено на нас, тебе ничего делать не нужно." },
-  { q: "А если без прав категории B?", a: "Тогда никак — закон есть закон. Но если у тебя M или A1 — тоже прокатит, позвони оператору, подберём байк под твою категорию." },
-  { q: "Что за залог?", a: "Залог возвращается при возврате байка в исходном состоянии. Сумма зависит от модели — от 10 000 ₽ за электро-эндуро до 50 000 ₽ за премиум-электро." },
-  { q: "Можно ли обменять или вернуть байк?", a: "Да. Первые 10 дней — тест-драйв с возвратом денег, если что-то не зашло. Возврат — по акту приёма-передачи, деньги возвращаем в течение 3 рабочих дней." },
-  { q: "А если я уроню или утоплю?", a: "Царапины — по прайсу (от 5 000 ₽). Глубокие повреждения — по счёту СТО. Утопление — стоимость восстановительного ремонта. Всё прозрачно, в договоре прописано до копейки. GPS-трекер на каждом байке — это страховка от «байк угнали»." },
-  { q: "Доставка есть?", a: "Да. По Нижнему Новгороду — 500 ₽. За пределы города — по согласованию. Привозим и забираем сами, тебе не нужно никуда ехать." },
-  { q: "А экипировка?", a: "Шлем и перчатки — от 1 500 ₽. Куртка, второй шлем — по запросу. За утрату или порчу экипировки — по прайсу из приложения №3 к договору." },
+  { q: "Какая категория нужна?", a: "Для бензиновых мотоциклов обязательна категория А. Для электрических требования зависят от конкретной модели — менеджер проверит их до подтверждения брони." },
+  { q: "Какие документы нужны?", a: "Паспорт и водительское удостоверение. Для аренды бензинового мотоцикла в удостоверении должна быть категория А." },
+  { q: "Сколько стоит аренда?", a: "Подтверждённые суточные тарифы: электро — от 5 000 до 12 000 ₽, бензин — от 4 000 до 14 000 ₽. У Y-VOLT Surge V тариф выходного дня — 15 000 ₽." },
+  { q: "Как узнать условия и сумму залога?", a: "Оставь заявку на выбранную модель. Менеджер проверит даты и сообщит дополнительные условия до подтверждения брони." },
+  { q: "Есть ли почасовая аренда?", a: "Почасовой тариф определяет оператор. Напиши менеджеру и укажи модель, дату и нужное время." },
+  { q: "Где выдаёте мотоциклы?", a: "Нижний Новгород, пл. Комсомольская, 2. Шоурум работает ежедневно с 10:00 до 20:00." },
+  { q: "Как проверить доступность?", a: "Выбери модель и даты в каталоге или оставь номер телефона. Менеджер проверит слот и свяжется с тобой." },
+  { q: "Куда написать?", a: "По вопросам аренды напиши в Telegram менеджеру: @I_O_S_NN." },
 ];
 
 /* ══ HOW IT WORKS — 4 STEPS (cool SVG icons instead of emojis) ══ */
@@ -204,15 +206,15 @@ const HOW_IT_WORKS_STEPS = [
     icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>),
   },
   {
-    n: "02", title: "Забронировал", desc: "В боте @oneBikePlsBot — 2 клика: даты + формат поездки. Залог — на выбор: наличными или переводом.",
+    n: "02", title: "Указал даты", desc: "Выбираешь период аренды и оставляешь заявку в каталоге или Telegram-боте.",
     icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8"><rect x="5" y="2" width="14" height="20" rx="2" ry="2" /><line x1="12" y1="18" x2="12.01" y2="18" /></svg>),
   },
   {
-    n: "03", title: "Забрал", desc: "Приезжаешь на пл. Комсомольская 2. Подписываешь договор (3 минуты), получаешь байк + экипировку.",
+    n: "03", title: "Подтвердил", desc: "Менеджер проверяет доступность модели и заранее сообщает условия аренды.",
     icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" /></svg>),
   },
   {
-    n: "04", title: "Покатался", desc: "Откручиваешь ручку. Возвращаешь в согласованное время — забираешь залог. Всё.",
+    n: "04", title: "Получил байк", desc: "Приезжаешь на пл. Комсомольскую, 2 с паспортом и водительским удостоверением, оформляешь договор и забираешь мотоцикл.",
     icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8"><circle cx="5.5" cy="17.5" r="3.5" /><circle cx="18.5" cy="17.5" r="3.5" /><path d="M15 6a5 5 0 010 6l-3-3-3 3a5 5 0 010-6l3-3 3 3z" /><path d="M5.5 17.5L9 14m9.5 3.5L15 14" /></svg>),
   },
 ];
@@ -442,15 +444,34 @@ function FaqItem({ item, index }: { item: (typeof FAQ_ITEMS)[0]; index: number }
   );
 }
 
+function LicenseIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="8" cy="11" r="2" />
+      <path d="M13 10h5M13 14h4M6 16h4" />
+    </svg>
+  );
+}
+
+function InfoIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 8h.01" />
+    </svg>
+  );
+}
+
 /* ══ PRICING CARD ══ */
 function PricingCard({ tier, index }: { tier: (typeof PRICING_TIERS)[0]; index: number }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
   return (
     <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: 0.6, delay: index * 0.15, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative z-10 flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-colors duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: tier.highlighted ? "var(--vip-accent-main)" : "var(--vip-border-soft)", boxShadow: tier.highlighted ? `0 20px 60px color-mix(in srgb, var(--vip-accent-main) 20%, transparent)` : "0 4px 16px rgba(0,0,0,0.15)" }}>
-      {tier.highlighted && <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wide" style={{ background: "var(--vip-accent-main)", color: "var(--vip-bg-base)" }}>🔥 Хит</div>}
+      {tier.highlighted && <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wide" style={{ background: "var(--vip-accent-main)", color: "var(--vip-bg-base)" }}>Хит</div>}
       <div className="text-center mb-6">
-        <div className="text-4xl mb-2">{tier.emoji}</div>
+        <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-full border text-sm font-black" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)" }}>{tier.marker}</div>
         <h4 className="text-xl font-bold uppercase tracking-wide" style={{ color: "var(--vip-text-primary)" }}>{tier.label}</h4>
         <p className="text-xs mt-1" style={{ color: "var(--vip-text-secondary)" }}>{tier.note}</p>
       </div>
@@ -481,7 +502,7 @@ function BikeTierCard({ tier, index }: { tier: (typeof BIKE_TIERS)[0]; index: nu
   return (
     <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: 0.6, delay: index * 0.15, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative z-10 flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-all duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: `color-mix(in srgb, ${tier.accentColor} 40%, var(--vip-border-soft))`, boxShadow: `0 10px 40px color-mix(in srgb, ${tier.accentColor} 10%, transparent)` }}>
       <div className="flex items-center gap-4 mb-5">
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl leading-none flex-shrink-0" style={{ background: `linear-gradient(135deg, ${tier.accentColor}33, ${tier.accentColor}11)`, border: `1px solid ${tier.accentColor}55` }}>{tier.emoji}</div>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-sm font-black leading-none flex-shrink-0" style={{ background: `linear-gradient(135deg, ${tier.accentColor}33, ${tier.accentColor}11)`, border: `1px solid ${tier.accentColor}55`, color: tier.accentColor }}>{tier.marker}</div>
         <div>
           <div className="text-xs uppercase tracking-widest font-bold mb-1" style={{ color: tier.accentColor }}>Уровень 0{index + 1}</div>
           <h4 className="text-2xl md:text-3xl font-black" style={{ color: "var(--vip-text-primary)" }}>{tier.tier}</h4>
@@ -490,7 +511,7 @@ function BikeTierCard({ tier, index }: { tier: (typeof BIKE_TIERS)[0]; index: nu
       <p className="text-base font-semibold mb-3" style={{ color: "var(--vip-text-primary)" }}>{tier.tagline}</p>
       <p className="text-sm leading-relaxed mb-5" style={{ color: "var(--vip-text-secondary)" }}>{tier.description}</p>
       <div className="flex items-start gap-2 p-3 rounded-xl mb-6 text-sm font-medium" style={{ backgroundColor: `color-mix(in srgb, ${tier.accentColor} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${tier.accentColor} 25%, transparent)`, color: "var(--vip-text-primary)" }}>
-        <span className="text-lg leading-none" style={{ color: tier.accentColor }}>🪪</span>
+        <LicenseIcon className="mt-0.5 h-4 w-4 shrink-0" />
         <span>{tier.licenseReq}</span>
       </div>
       <div className="flex-1 mb-6">
@@ -566,7 +587,7 @@ function CinematicHero() {
           Аренда мотоциклов без заморочек
         </motion.p>
         <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.75 }} className="text-sm md:text-base max-w-lg mx-auto mb-6" style={{ color: "var(--vip-text-secondary)" }}>
-          Электро-эндуро без категории А, мощные электросуперкары и классические спортбайки. Выбери свой — садись и поезжай.
+          Выбирай электрическую или бензиновую модель. Даты, доступность и дополнительные условия менеджер подтвердит до бронирования.
         </motion.p>
 
         {/* CTA Buttons */}
@@ -775,7 +796,7 @@ export default function Home() {
           {/* ─── BIKE TIERS SHOWCASE (merged — pictures + full info from BikeTierCard) ─── */}
           <section id="catalog" className="py-20 md:py-28 px-4">
             <div className="max-w-7xl mx-auto">
-              <SectionHeader badge="Каталог байков" title="Байки под" highlight="любой уровень" subtitle="От электро-эндуро для новичков до премиум-электро для профи. Выбирай по опыту и правам." />
+              <SectionHeader badge="Каталог байков" title="Электро, бензин" highlight="или помощь с выбором" subtitle="Два отдельных каталога без смешения запросов. Выбирай по типу техники, опыту и датам." />
               <div className="grid md:grid-cols-3 gap-6">
                 {/* Beginner */}
                 <AnimatedSection delay={0}>
@@ -784,22 +805,22 @@ export default function Home() {
                       <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2026/image_1.jpg" alt="Электро-эндуро 79BIKE Falcon" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
                       <div className="absolute inset-0 pointer-events-none z-10" style={{ background: "linear-gradient(to bottom, transparent 30%, var(--vip-bg-card) 85%)" }} />
                     </div>
-                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-20" style={{ backgroundColor: "rgba(34, 197, 94, 0.2)", color: "#22c55e", border: "1px solid rgba(34, 197, 94, 0.3)", backdropFilter: "blur(8px)" }}>Без прав</div>
+                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-20" style={{ backgroundColor: "rgba(34, 197, 94, 0.2)", color: "#22c55e", border: "1px solid rgba(34, 197, 94, 0.3)", backdropFilter: "blur(8px)" }}>от 5 000 ₽/сутки</div>
                     <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-30" style={{ backgroundColor: "transparent" }}>
-                      <div className="text-xs uppercase tracking-widest font-bold mb-1" style={{ color: "#22C55E" }}>Уровень 01</div>
-                      <h4 className="text-xl font-black mb-1" style={{ color: "var(--vip-text-primary)" }}>Новичок</h4>
-                      <p className="text-sm font-semibold mb-2" style={{ color: "#22C55E" }}>Лёгкие электро-эндуро</p>
-                      <p className="text-sm mb-3" style={{ color: "var(--vip-text-secondary)" }}>Не нужны права категории А — садишься и едешь. Идеально для первого знакомства с мотоциклом, для города и лёгкого бездорожья. Лёгкие, тихие, экологичные.</p>
+                      <div className="text-xs uppercase tracking-widest font-bold mb-1" style={{ color: "#22C55E" }}>Каталог 01</div>
+                      <h4 className="text-xl font-black mb-1" style={{ color: "var(--vip-text-primary)" }}>Электро</h4>
+                      <p className="text-sm font-semibold mb-2" style={{ color: "#22C55E" }}>Электромотоциклы в аренду</p>
+                      <p className="text-sm mb-3" style={{ color: "var(--vip-text-secondary)" }}>Подтверждённые суточные тарифы — от 5 000 до 12 000 ₽. Требования к категории зависят от конкретной модели.</p>
                       <div className="flex items-start gap-2 p-2 rounded-lg mb-3 text-xs font-medium" style={{ backgroundColor: "rgba(34, 197, 94, 0.08)", border: "1px solid rgba(34, 197, 94, 0.2)", color: "var(--vip-text-primary)" }}>
-                        <span style={{ color: "#22C55E" }}>🪪</span>
-                        <span>Без категории А — достаточно прав B</span>
+                        <LicenseIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>Менеджер проверит документы и доступность до брони</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5 mb-4">
-                        {["Falcon GT", "Falcon Pro", "Falcon Lynx", "HMD M02", "Wenbox U2 Pro", "Kayo TSD 110"].map(b => (
+                        {["Falcon GT", "Falcon PRO", "Falcon LYNX", "HMD M02", "Sotion EM01", "Y-VOLT Surge V"].map(b => (
                           <span key={b} className="px-2.5 py-1 rounded-lg text-xs" style={{ backgroundColor: "rgba(34, 197, 94, 0.08)", color: "#22c55e" }}>{b}</span>
                         ))}
                       </div>
-                      <MagneticButton href={CATALOG_HREF} primary className="w-full">Выбрать байк</MagneticButton>
+                      <MagneticButton href={ELECTRIC_CATALOG_HREF} primary className="w-full">Выбрать электро</MagneticButton>
                     </CardContent>
                   </Card>
                 </AnimatedSection>
@@ -808,25 +829,25 @@ export default function Home() {
                 <AnimatedSection delay={0.15}>
                   <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "color-mix(in srgb, #F59E0B 40%, var(--vip-border-soft))" }}>
                     <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
-                      <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/ducati-panigale-s-electro-gold/image_1.jpg" alt="Ducati Panigale S Electro" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
+                      <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/kawasaki-ex650k/image_1.jpg" alt="Бензиновый мотоцикл Kawasaki Ninja 650" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
                       <div className="absolute inset-0 pointer-events-none z-10" style={{ background: "linear-gradient(to bottom, transparent 30%, var(--vip-bg-card) 85%)" }} />
                     </div>
-                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-20" style={{ backgroundColor: "rgba(245, 158, 11, 0.2)", color: "#f59e0b", border: "1px solid rgba(245, 158, 11, 0.3)", backdropFilter: "blur(8px)" }}>Права M/AM</div>
+                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-20" style={{ backgroundColor: "rgba(245, 158, 11, 0.2)", color: "#f59e0b", border: "1px solid rgba(245, 158, 11, 0.3)", backdropFilter: "blur(8px)" }}>от 4 000 ₽/сутки</div>
                     <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-30" style={{ backgroundColor: "transparent" }}>
-                      <div className="text-xs uppercase tracking-widest font-bold mb-1" style={{ color: "#F59E0B" }}>Уровень 02</div>
-                      <h4 className="text-xl font-black mb-1" style={{ color: "var(--vip-text-primary)" }}>Опытный</h4>
-                      <p className="text-sm font-semibold mb-2" style={{ color: "#F59E0B" }}>Мощные электромотоциклы</p>
-                      <p className="text-sm mb-3" style={{ color: "var(--vip-text-secondary)" }}>Больше скорости, больше динамики, больше эмоций. Рекомендуется категория M/AM или предыдущий опыт езды. Мгновенный электро-момент на колёса.</p>
+                      <div className="text-xs uppercase tracking-widest font-bold mb-1" style={{ color: "#F59E0B" }}>Каталог 02</div>
+                      <h4 className="text-xl font-black mb-1" style={{ color: "var(--vip-text-primary)" }}>Бензин</h4>
+                      <p className="text-sm font-semibold mb-2" style={{ color: "#F59E0B" }}>Мотоциклы с ДВС</p>
+                      <p className="text-sm mb-3" style={{ color: "var(--vip-text-secondary)" }}>Подтверждённые суточные тарифы — от 4 000 до 14 000 ₽. Для аренды обязательна категория А.</p>
                       <div className="flex items-start gap-2 p-2 rounded-lg mb-3 text-xs font-medium" style={{ backgroundColor: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.2)", color: "var(--vip-text-primary)" }}>
-                        <span style={{ color: "#F59E0B" }}>🪪</span>
-                        <span>Категория M/AM или опыт езды</span>
+                        <LicenseIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>Паспорт, водительское удостоверение и категория А</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5 mb-4">
-                        {["Kawasaki Ninja 650", "Motoland Breakout 300", "Ducati Panigale S Electro", "Rerode R1+", "Y-VOLT Surge V", "Regulmoto Nibbler", "Jilang Max Pro"].map(b => (
+                        {["Kawasaki Ninja 650", "Yamaha R7", "BMW F800R", "Suzuki GSX-S1000F", "Motoland Breakout 300", "Kayo TSD 110"].map(b => (
                           <span key={b} className="px-2.5 py-1 rounded-lg text-xs" style={{ backgroundColor: "rgba(245, 158, 11, 0.08)", color: "#f59e0b" }}>{b}</span>
                         ))}
                       </div>
-                      <MagneticButton href={CATALOG_HREF} className="w-full">Выбрать байк</MagneticButton>
+                      <MagneticButton href={PETROL_CATALOG_HREF} className="w-full">Выбрать бензин</MagneticButton>
                     </CardContent>
                   </Card>
                 </AnimatedSection>
@@ -835,31 +856,31 @@ export default function Home() {
                 <AnimatedSection delay={0.3}>
                   <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "color-mix(in srgb, #EF4444 40%, var(--vip-border-soft))" }}>
                     <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
-                      <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/livewire-one/image_1.jpg" alt="LiveWire ONE" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
+                      <motion.img src={DUO_SECTION_BG} alt="Помощь с подбором мотоцикла" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
                       <div className="absolute inset-0 pointer-events-none z-10" style={{ background: "linear-gradient(to bottom, transparent 30%, var(--vip-bg-card) 85%)" }} />
                     </div>
-                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-20" style={{ backgroundColor: "rgba(239, 68, 68, 0.2)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.3)", backdropFilter: "blur(8px)" }}>Категория А</div>
+                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-20" style={{ backgroundColor: "rgba(239, 68, 68, 0.2)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.3)", backdropFilter: "blur(8px)" }}>Помощь менеджера</div>
                     <CardContent className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-30" style={{ backgroundColor: "transparent" }}>
-                      <div className="text-xs uppercase tracking-widest font-bold mb-1" style={{ color: "#EF4444" }}>Уровень 03</div>
-                      <h4 className="text-xl font-black mb-1" style={{ color: "var(--vip-text-primary)" }}>Профи</h4>
-                      <p className="text-sm font-semibold mb-2" style={{ color: "#EF4444" }}>Полноразмерные мотоциклы</p>
-                      <p className="text-sm mb-3" style={{ color: "var(--vip-text-secondary)" }}>Серьёзная техника для серьёзных райдеров. ДВС-спортбайки и электрические суперкары. Категория А обязательна — это уже не игрушки, а настоящая мощь.</p>
+                      <div className="text-xs uppercase tracking-widest font-bold mb-1" style={{ color: "#EF4444" }}>Подбор 03</div>
+                      <h4 className="text-xl font-black mb-1" style={{ color: "var(--vip-text-primary)" }}>Не определился?</h4>
+                      <p className="text-sm font-semibold mb-2" style={{ color: "#EF4444" }}>Подберём модель под задачу</p>
+                      <p className="text-sm mb-3" style={{ color: "var(--vip-text-secondary)" }}>Напиши, какой у тебя опыт, маршрут и даты. Менеджер проверит парк и предложит подходящие варианты.</p>
                       <div className="flex items-start gap-2 p-2 rounded-lg mb-3 text-xs font-medium" style={{ backgroundColor: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.2)", color: "var(--vip-text-primary)" }}>
-                        <span style={{ color: "#EF4444" }}>🪪</span>
-                        <span>Категория А обязательна</span>
+                        <LicenseIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>Все условия подтвердим до бронирования</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5 mb-4">
-                        {["LiveWire ONE", "BMW F800R", "Yamaha R7", "Suzuki GSX-S1000F", "Aprilia Shiver 750", "Sequence Zero"].map(b => (
+                        {["Опыт", "Маршрут", "Даты", "Тип техники", "Доступность"].map(b => (
                           <span key={b} className="px-2.5 py-1 rounded-lg text-xs" style={{ backgroundColor: "rgba(239, 68, 68, 0.08)", color: "#ef4444" }}>{b}</span>
                         ))}
                       </div>
-                      <MagneticButton href={CATALOG_HREF} className="w-full">Выбрать байк</MagneticButton>
+                      <MagneticButton href={OPERATOR_HREF} className="w-full">Написать менеджеру</MagneticButton>
                     </CardContent>
                   </Card>
                 </AnimatedSection>
               </div>
               <AnimatedSection delay={0.4} className="text-center mt-12">
-                <p className="text-sm max-w-2xl mx-auto" style={{ color: "var(--vip-text-secondary)" }}>💡 Не знаешь, какой выбрать? Напиши оператору{" "}<a href={OPERATOR_HREF} target="_blank" rel="noopener noreferrer" className="underline font-semibold" style={{ color: "var(--vip-accent-main)" }}>@I_O_S_NN</a>{" "}— подберём под твой опыт и задачи.</p>
+                <p className="mx-auto flex max-w-2xl items-start justify-center gap-1.5 text-sm" style={{ color: "var(--vip-text-secondary)" }}><InfoIcon className="mt-0.5 h-4 w-4 shrink-0" /> <span>Не знаешь, какой выбрать? Напиши оператору{" "}<a href={OPERATOR_HREF} target="_blank" rel="noopener noreferrer" className="underline font-semibold" style={{ color: "var(--vip-accent-main)" }}>@I_O_S_NN</a>{" "}— подберём под твой опыт и задачи.</span></p>
               </AnimatedSection>
             </div>
           </section>
@@ -867,7 +888,7 @@ export default function Home() {
           {/* ─── HOW IT WORKS ─── */}
           <section id="how" className="py-20 md:py-28 px-4 relative overflow-hidden" style={{ backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 40%, transparent)" }}>
             <div className="max-w-6xl mx-auto relative z-10">
-              <SectionHeader badge="Как это работает" title="Забери. Покатайся." highlight="Верни." subtitle="От «хочу» до «катюсь» — 15 минут. Без очередей, без бумажной волокиты, без звонков «а можно забронировать?»." />
+              <SectionHeader badge="Как это работает" title="Выбери. Оставь заявку." highlight="Получи подтверждение." subtitle="Менеджер проверит модель и даты, затем сообщит условия аренды." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 relative">
                 {/* Connector line: behind steps. Steps have opaque bg to hide line where they overlap. */}
                 <div className="hidden lg:block absolute top-12 left-[12.5%] right-[12.5%] h-0.5 z-0 pointer-events-none" style={{ background: "linear-gradient(to right, transparent, var(--vip-accent-main), transparent)", opacity: 0.3 }} />
@@ -893,12 +914,12 @@ export default function Home() {
           {/* ─── PRICING ─── */}
           <section id="pricing" className="py-20 md:py-28 px-4">
             <div className="max-w-6xl mx-auto">
-              <SectionHeader badge="Тарифы" title="Платишь за время," highlight="не за нервы" subtitle="Никаких скрытых платежей. Залог возвращается при возврате. Скидки от объёма работают автоматически." />
+              <SectionHeader badge="Тарифы" title="Подтверждённые цены" highlight="за сутки" subtitle="Показываем только тарифы из актуального прайса. Дополнительные условия сообщает менеджер." />
               <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
                 {PRICING_TIERS.map((tier, idx) => (<PricingCard key={tier.id} tier={tier} index={idx} />))}
               </div>
               <AnimatedSection delay={0.5} className="text-center mt-10">
-                <p className="text-sm" style={{ color: "var(--vip-text-secondary)" }}>💡 Не нашёл подходящий тариф? Напиши оператору{" "}<a href={OPERATOR_HREF} target="_blank" rel="noopener noreferrer" className="underline font-semibold" style={{ color: "var(--vip-accent-main)" }}>@I_O_S_NN</a>{" "}— соберём индивидуальный пакет.</p>
+                <p className="flex items-start justify-center gap-1.5 text-sm" style={{ color: "var(--vip-text-secondary)" }}><InfoIcon className="mt-0.5 h-4 w-4 shrink-0" /> <span>Не нашёл подходящий тариф? Напиши оператору{" "}<a href={OPERATOR_HREF} target="_blank" rel="noopener noreferrer" className="underline font-semibold" style={{ color: "var(--vip-accent-main)" }}>@I_O_S_NN</a>{" "}— соберём индивидуальный пакет.</span></p>
               </AnimatedSection>
             </div>
           </section>
@@ -906,12 +927,12 @@ export default function Home() {
           {/* ─── ABOUT ─── */}
           <section id="about" className="py-20 md:py-28 px-4" style={{ backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 40%, transparent)" }}>
             <div className="max-w-7xl mx-auto">
-              <SectionHeader badge="О нас" title="VIP Bike —" highlight="аренда мотоциклов в Нижнем" subtitle="Электро и ДВС. Без скрытых платежей." />
+              <SectionHeader badge="О нас" title="VIP Bike —" highlight="аренда мотоциклов в Нижнем" subtitle="Электро и бензин с раздельным выбором и подтверждением условий." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
-                  { title: "⚡️ Быстрая онлайн-бронь", desc: "Выбирай байк, даты и формат поездки в пару кликов в боте" },
-                  { title: "🪪 Электро без категории А", desc: "Лёгкие электро-эндуро законно по правам категории B" },
-                  { title: "🛡️ Залог", desc: "Возвращается при возврате байка — от 10 000 ₽" },
+                  { title: "Заявка онлайн", desc: "Выбирай модель и даты в каталоге или Telegram-боте" },
+                  { title: "Раздельный каталог", desc: "Электро и бензин не смешиваются в рекламных сценариях" },
+                  { title: "Условия до брони", desc: "Менеджер подтверждает доступность и дополнительные условия заранее" },
                   { title: "Центр Нижнего", desc: "пл. Комсомольская 2 — удобно добираться из любой точки города" },
                 ].map((feature, idx) => (
                   <AnimatedSection key={feature.title} delay={idx * 0.1}>
@@ -1033,7 +1054,7 @@ export default function Home() {
               <AnimatedSection>
                 <Badge variant="outline" className="mb-6" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)", backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 10%, transparent)" }}>Готов к выезду?</Badge>
                 <h3 className="text-4xl md:text-6xl font-black mb-6 leading-tight tracking-tight" style={{ color: "var(--vip-text-primary)" }}>Начни свой <GradientText>путь</GradientText> сегодня</h3>
-                <p className="text-xl max-w-2xl mx-auto mb-10" style={{ color: "var(--vip-text-secondary)" }}>Выбери байк. Забронируй слот. Покатайся. Верни. Никакой волокиты — только кайф.</p>
+                <p className="text-xl max-w-2xl mx-auto mb-10" style={{ color: "var(--vip-text-secondary)" }}>Выбери тип техники и модель, укажи даты — менеджер подтвердит доступность и условия.</p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                   <MagneticButton href={CATALOG_HREF} primary>Выбрать байк<ArrowRight /></MagneticButton>
                   <MagneticButton href={OPERATOR_HREF}>
