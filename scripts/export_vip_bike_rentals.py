@@ -3,7 +3,7 @@
 Export VIP Bike active rentals to CSV for agent use.
 
 Generates 1 CSV file:
-  - /home/z/my-project/download/vip-bike-rentals.csv  (active + upcoming rents)
+  - <repo>/download/vip-bike-rentals.csv  (active + upcoming rents)
 
 Source: Supabase public.rentals table
   - crew_id = vip-bike crew (2d5fde70-1dd3-4f0d-8d72-66ccf6908746)
@@ -25,13 +25,23 @@ from pathlib import Path
 # CONFIG
 # ════════════════════════════════════════════════════════════
 SUPABASE_URL = "https://inmctohsodgdohamhzag.supabase.co"
-SERVICE_KEY = os.environ.get(
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODMzOTU4NSwiZXhwIjoyMDUzOTE1NTg1fQ.xD91Es2o8T1vM-2Ok8iKCn4jGDA5TwBbapD5eqhblLM"
-)
+
+# Service key: prefer env, fall back to the repo's .env.local (never hardcode).
+def _load_service_key() -> str:
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if key:
+        return key
+    env_local = Path(__file__).resolve().parent.parent / ".env.local"
+    if env_local.exists():
+        for line in env_local.read_text().splitlines():
+            if line.startswith("SUPABASE_SERVICE_ROLE_KEY="):
+                return line.split("=", 1)[1].strip()
+    raise SystemExit("SUPABASE_SERVICE_ROLE_KEY not found (set env or .env.local)")
+
+SERVICE_KEY = _load_service_key()
 VIP_BIKE_CREW_ID = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746"
 
-OUTPUT_DIR = Path("/home/z/my-project/download")
+OUTPUT_DIR = Path(__file__).resolve().parent.parent / "download"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # How far ahead to look for upcoming rents (days)

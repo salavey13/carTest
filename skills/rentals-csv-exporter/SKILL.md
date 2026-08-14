@@ -36,15 +36,15 @@ Export VIP Bike active rentals from Supabase `public.rentals` to a compact CSV f
 ### Step 1: Run the export script
 
 ```bash
-python3 /home/z/my-project/scripts/export_vip_bike_rentals.py
+python3 scripts/export_vip_bike_rentals.py
 ```
 
-Generates: `/home/z/my-project/download/vip-bike-rentals.csv`
+Generates: `<repo>/download/vip-bike-rentals.csv` (`<repo>` = repo root, e.g. `/opt/vip-bike-electro-factory/rental-repo`)
 
 ### Step 2: Push CSV to repo
 
 ```bash
-python3 /home/z/my-project/scripts/push_rentals_csv.py
+python3 scripts/push_rentals_csv.py
 ```
 
 ### Step 3: Verify
@@ -99,15 +99,15 @@ The script prints a summary at the end showing which bike IDs are unavailable to
 ## Cron job setup (future)
 
 ```cron
-0 * * * * /usr/bin/python3 /home/z/my-project/scripts/export_vip_bike_rentals.py && /usr/bin/python3 /home/z/my-project/scripts/push_rentals_csv.py
+0 * * * * cd /opt/vip-bike-electro-factory/rental-repo && /usr/bin/python3 scripts/export_vip_bike_rentals.py && /usr/bin/python3 scripts/push_rentals_csv.py
 ```
 
 Hourly regeneration keeps the rental status current. More frequent than catalog CSVs since rentals change throughout the day.
 
 ## Related files
 
-- Script: `/home/z/my-project/scripts/export_vip_bike_rentals.py`
-- Push script: `/home/z/my-project/scripts/push_rentals_csv.py`
-- Output (local): `/home/z/my-project/download/vip-bike-rentals.csv`
+- Script: `scripts/export_vip_bike_rentals.py`
+- Push script: `scripts/push_rentals_csv.py`
+- Output (local): `<repo>/download/vip-bike-rentals.csv`
 - Output (repo): `docs/autoreply/vip-bike-rentals.csv`
 - Companion skill: `skills/catalog-csv-exporter/SKILL.md` (bike catalog CSVs)
