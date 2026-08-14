@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ShoppingCart, Wrench } from "lucide-react";
+import { Search, ShoppingCart, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { toCategoryId } from "../lib/navigation";
@@ -26,6 +26,15 @@ import { getCatalogPropulsionSegment } from "../lib/catalog-propulsion";
 import { localImageSrc, handleImageError } from "@/lib/image-fallback";
 import { logger } from "@/lib/logger";
 import { decodeStartappState, isStartappStateFresh } from "@/lib/startapp-state";
+import { getBrowserMarketingAttribution } from "@/lib/marketing-attribution";
+import {
+  reachVipBikeGoal,
+  VIP_BIKE_METRIKA_GOALS,
+} from "@/lib/yandex-metrika";
+import {
+  buildVipBikeRentalCatalog,
+  parseVipBikeRentalSegment,
+} from "@/lib/vip-bike-rental-catalog";
 
 interface CatalogClientProps {
   crew: FranchizeCrewVM;
@@ -63,13 +72,13 @@ function getItemAccessTier(item: CatalogItemVM): AccessTier {
   return "none";
 }
 
-/** Get tier emoji + color for a given access tier */
-function tierVisuals(tier: AccessTier): { emoji: string; color: string; label: string } {
+/** Get tier color + label for a given access tier. */
+function tierVisuals(tier: AccessTier): { color: string; label: string } {
   switch (tier) {
-    case "entry": return { emoji: "🟢", color: "#22c55e", label: "Базовый" };
-    case "mid":   return { emoji: "🟡", color: "#eab308", label: "Средний" };
-    case "pro":   return { emoji: "🔴", color: "#ef4444", label: "Профи" };
-    default:      return { emoji: "⚪", color: "#9ca3af", label: "" };
+    case "entry": return { color: "#22c55e", label: "Базовый" };
+    case "mid":   return { color: "#eab308", label: "Средний" };
+    case "pro":   return { color: "#ef4444", label: "Профи" };
+    default:      return { color: "#9ca3af", label: "" };
   }
 }
 
@@ -147,52 +156,9 @@ function getItemCtaLabel(item: CatalogItemVM): string {
 // NOTE: getVisiblePriceLines was removed — price rendering is now inline (rentalbikes-style)
 // with hasRentPrice/hasSalePrice from shared catalog-utils.ts
 
-// Map common spec keys to emoji icons for card display
-// FIX: Expanded pattern matching + return empty string instead of default ⚙️
-// when no pattern matches — avoids showing meaningless gear icons on every spec
-function specIconForKey(key: string): string {
-  const k = key.toLowerCase();
-
-  // ── Specific matches FIRST (avoid short substrings that match too broadly) ──
-
-  // Power / horsepower
-  if (k.includes("мощ") || k.includes("power") || k.includes("квт") || k.includes("kw") || k.includes("л.с") || k.includes("hp")) return "⚡";
-  // Weight — MUST come before battery so "вес"/"weight" never mislabels as 🔋
-  if (k.includes("вес") || k.includes("weight") || k.includes("масс")) return "⚖️";
-  // Battery / capacity — specific tokens only; bare "в"/"v" removed (matched "вес", "velocity", etc.)
-  if (
-    k.includes("бат") || k.includes("bat") ||
-    k.includes("ач") || k.includes("ah") ||
-    k.includes("ёмкост") || k.includes("capacity") ||
-    /\d\s*в\b/.test(k) ||           // "48В", "48 В" (digit + optional space + В at word boundary)
-    /\d\s*v\b/.test(k) ||           // "48V", "48 V"
-    k.includes("вольт") || k.includes("volt") ||
-    k.endsWith(" в") || k.endsWith(",в") || k.endsWith(", в") ||  // trailing "в" with separator
-    k.endsWith(" v") || k.endsWith(",v") || k.endsWith(", v")     // trailing "v" with separator
-  ) return "🔋";
-  // Range / distance
-  if (k.includes("запас") || k.includes("ход") || k.includes("range") || k.includes("км") || k.includes("km") || k.includes("дальн")) return "📍";
-  // Speed
-  if (k.includes("скор") || k.includes("speed") || k.includes("км/ч") || k.includes("km/h")) return "🚀";
-  // Mass units alone (e.g. "кг", "kg" not already caught by weight check above)
-  if (k.includes("кг") || k.includes("kg")) return "⚖️";
-  // Motor / engine
-  if (k.includes("двиг") || k.includes("motor") || k.includes("engine") || k.includes("мотор")) return "🔧";
-  // Brakes
-  if (k.includes("торм") || k.includes("brake") || k.includes("диск")) return "🛑";
-  // Transmission / gear
-  if (k.includes("короб") || k.includes("transm") || k.includes("передач") || k.includes("gear")) return "🔩";
-  // Suspension
-  if (k.includes("подвес") || k.includes("susp") || k.includes("аморт")) return "🛞";
-  // Frame / chassis
-  if (k.includes("рам") || k.includes("frame") || k.includes("шасси")) return "🏗️";
-  // Wheel / tire
-  if (k.includes("колес") || k.includes("wheel") || k.includes("шин") || k.includes("tire")) return "🛞";
-  // Display / screen
-  if (k.includes("экран") || k.includes("display") || k.includes("дисплей")) return "📱";
-  // Charge / connector
-  if (k.includes("заряд") || k.includes("charge") || k.includes("разъём") || k.includes("порт")) return "🔌";
-  // No match — return empty string (no icon) instead of default ⚙️
+// Icons inside specification data are intentionally not rendered: public
+// storefront icons are SVG components, never Unicode pictograms.
+function specIconForKey(_key: string): string {
   return "";
 }
 
@@ -260,20 +226,20 @@ function pickChip(rawSpecs: Record<string, unknown>, def: SpecChipDef): { icon: 
 
 // Electric: power → range → battery, with top speed / charge time as fillers.
 const ELECTRIC_CHIP_DEFS: SpecChipDef[] = [
-  { keys: ["power_kw", "motor_nominal_kw", "motor_kw", "motor_peak_kw"], icon: "⚡", format: (v) => `${formatSpecNum(v)} кВт` },
-  { keys: ["power_w"], icon: "⚡", format: (v) => `${Math.round((Number(String(v).replace(/[^\d.]/g, "")) || 0) / 1000)} кВт` },
-  { keys: ["range_km", "max_range_km"], icon: "📍", format: (v) => `${formatSpecNum(v)} км` },
-  { keys: ["battery", "battery_capacity", "battery_capacity_kwh"], icon: "🔋", format: (v) => v, extract: extractAh },
-  { keys: ["top_speed_kmh", "max_speed_kmh"], icon: "🚀", format: (v) => `${formatSpecNum(v)} км/ч` },
-  { keys: ["charge_time_h", "charging_time_h"], icon: "🔌", format: (v) => `${formatSpecNum(v)} ч` },
+  { keys: ["power_kw", "motor_nominal_kw", "motor_kw", "motor_peak_kw"], icon: "", format: (v) => `${formatSpecNum(v)} кВт` },
+  { keys: ["power_w"], icon: "", format: (v) => `${Math.round((Number(String(v).replace(/[^\d.]/g, "")) || 0) / 1000)} кВт` },
+  { keys: ["range_km", "max_range_km"], icon: "", format: (v) => `${formatSpecNum(v)} км` },
+  { keys: ["battery", "battery_capacity", "battery_capacity_kwh"], icon: "", format: (v) => v, extract: extractAh },
+  { keys: ["top_speed_kmh", "max_speed_kmh"], icon: "", format: (v) => `${formatSpecNum(v)} км/ч` },
+  { keys: ["charge_time_h", "charging_time_h"], icon: "", format: (v) => `${formatSpecNum(v)} ч` },
 ];
 
 // Gas/ICE: power → displacement → top speed, with torque as filler.
 const GAS_CHIP_DEFS: SpecChipDef[] = [
-  { keys: ["power_hp", "horsepower", "hp", "bike_power_hp"], icon: "⚡", format: (v) => `${formatSpecNum(v)} л.с.` },
-  { keys: ["engine_cc", "bike_engine_cc", "displacement_cc", "cc"], icon: "🔧", format: (v) => `${formatSpecNum(v)} см³` },
-  { keys: ["top_speed_kmh", "max_speed_kmh"], icon: "🚀", format: (v) => `${formatSpecNum(v)} км/ч` },
-  { keys: ["torque_nm"], icon: "🔩", format: (v) => `${formatSpecNum(v)} Н·м` },
+  { keys: ["power_hp", "horsepower", "hp", "bike_power_hp"], icon: "", format: (v) => `${formatSpecNum(v)} л.с.` },
+  { keys: ["engine_cc", "bike_engine_cc", "displacement_cc", "cc"], icon: "", format: (v) => `${formatSpecNum(v)} см³` },
+  { keys: ["top_speed_kmh", "max_speed_kmh"], icon: "", format: (v) => `${formatSpecNum(v)} км/ч` },
+  { keys: ["torque_nm"], icon: "", format: (v) => `${formatSpecNum(v)} Н·м` },
 ];
 
 function buildChipsFromDefs(rawSpecs: Record<string, unknown>, defs: SpecChipDef[]): Array<{ icon: string; text: string }> {
@@ -385,10 +351,26 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const { displayMode, isTransitioning } = useDisplayMode();
   const { user, dbUser } = useAppContext();
   const lastQueryViewedVehicleRef = useRef<string>("");
+  const catalogGoalSentRef = useRef(false);
   const recordRentIntentRef = useRef<
     (item: CatalogItemVM, stage: "viewed" | "configured", metadata?: Record<string, unknown>) => Promise<unknown>
   >();
   const resolvedSlug = crew.slug || slug;
+  const paidRentalSegment = parseVipBikeRentalSegment(
+    searchParams.get("propulsion"),
+  );
+  const requestedMode = searchParams.get("mode");
+  const isVipBikeRental =
+    resolvedSlug === "vip-bike" && displayMode === "rent";
+  const isVipBikeRentalTracking =
+    isVipBikeRental && (requestedMode === null || requestedMode === "rent");
+  const displayItems = useMemo(
+    () =>
+      isVipBikeRental
+        ? buildVipBikeRentalCatalog(items, paidRentalSegment)
+        : items,
+    [isVipBikeRental, items, paidRentalSegment],
+  );
   const showFloatingCart = SHOW_CART && (ctaPolicy ? shouldShowFloatingCart(ctaPolicy, { cartRelevant: true }) : true);
   const carouselRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -508,7 +490,13 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     return gradients[index % gradients.length];
   };
 
-  const orderedCategories = useMemo(() => Array.from(new Set(items.map((item) => item.category).filter(Boolean))), [items]);
+  const orderedCategories = useMemo(
+    () =>
+      Array.from(
+        new Set(displayItems.map((item) => item.category).filter(Boolean)),
+      ),
+    [displayItems],
+  );
 
   const matchesQuickFilter = (item: CatalogItemVM, filter: QuickFilterKey) => {
     if (filter === "budget") {
@@ -531,16 +519,16 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    return items.filter((item) => {
+    return displayItems.filter((item) => {
       const matchesSearch = !query || [item.title, item.subtitle, item.description, item.category].join(" ").toLowerCase().includes(query);
       if (!matchesSearch) return false;
       return matchesQuickFilter(item, quickFilter);
     });
-  }, [items, quickFilter, searchQuery]);
+  }, [displayItems, quickFilter, searchQuery]);
 
   const quickFilterCounts = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    const searchFiltered = items.filter((item) => !query || [item.title, item.subtitle, item.description, item.category].join(" ").toLowerCase().includes(query));
+    const searchFiltered = displayItems.filter((item) => !query || [item.title, item.subtitle, item.description, item.category].join(" ").toLowerCase().includes(query));
     // Also respect header filter (rent vs sale mode)
     const modeFiltered = searchFiltered.filter(item => {
       if (displayMode === "rent") return hasRentPrice(item);
@@ -555,7 +543,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       },
       { all: 0, budget: 0, premium: 0, newbie: 0, topRated: 0, entry: 0, mid: 0, pro: 0 },
     );
-  }, [items, searchQuery, displayMode]);
+  }, [displayItems, searchQuery, displayMode]);
 
   const itemsByCategory = useMemo(() => {
     const sortedFilteredItems = quickFilter === "topRated"
@@ -644,6 +632,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const recordRentIntent = useCallback((item: CatalogItemVM, stage: "viewed" | "configured", metadata: Record<string, unknown> = {}) => {
     const isServiceItem = hasServicePrice(item);
     const strip = buildCatalogRentalStrip(item, crew);
+    const attribution = getBrowserMarketingAttribution();
+    if (stage === "configured" && isVipBikeRentalTracking) {
+      reachVipBikeGoal(
+        VIP_BIKE_METRIKA_GOALS.bikeConfigured,
+        { bike_id: item.id, bike_title: item.title },
+        attribution,
+      );
+    }
     return upsertFranchizeIntent({
       slug: resolvedSlug,
       bikeId: item.id,
@@ -661,14 +657,34 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         nearestStartWindow: strip.nearestStartWindow,
         pickupHint: strip.pickupHint,
         priceTeaser: strip.priceTeaser,
+        attribution,
         ...metadata,
       },
     }).catch((error) => console.warn("rent intent tracking failed", error));
-  }, [crew, dbUser, resolvedSlug, user]);
+  }, [crew, dbUser, isVipBikeRentalTracking, resolvedSlug, user]);
 
   useEffect(() => {
     recordRentIntentRef.current = recordRentIntent;
   }, [recordRentIntent]);
+
+  useEffect(() => {
+    if (
+      !isVipBikeRentalTracking ||
+      catalogGoalSentRef.current ||
+      displayItems.length === 0
+    ) return;
+    catalogGoalSentRef.current = true;
+    const attribution = getBrowserMarketingAttribution();
+    reachVipBikeGoal(
+      VIP_BIKE_METRIKA_GOALS.catalogOpen,
+      {
+        slug: resolvedSlug,
+        items_count: displayItems.length,
+        propulsion: paidRentalSegment ?? "all",
+      },
+      attribution,
+    );
+  }, [displayItems.length, isVipBikeRentalTracking, paidRentalSegment, resolvedSlug]);
 
   const openItem = (item: CatalogItemVM) => {
     setSelectedItem(item);
@@ -694,7 +710,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
 
     try {
       const editContext = JSON.parse(editContextStr);
-      const item = items.find((i) => i.id === editContext.itemId);
+      const item = displayItems.find((i) => i.id === editContext.itemId);
       if (!item) return;
 
       // Open modal with the item and pre-filled options
@@ -716,12 +732,12 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       console.warn("Failed to parse edit context:", error);
       sessionStorage.removeItem("franchize-edit-cart-line");
     }
-  }, [items]);
+  }, [displayItems]);
 
   useEffect(() => {
     const focusedVehicle = (searchParams.get("vehicle") || "").trim().toLowerCase();
     if (!focusedVehicle) return;
-    const target = items.find((item) => item.id.toLowerCase() === focusedVehicle);
+    const target = displayItems.find((item) => item.id.toLowerCase() === focusedVehicle);
     if (target && lastQueryViewedVehicleRef.current !== target.id) {
       lastQueryViewedVehicleRef.current = target.id;
       setSelectedItem(target);
@@ -734,7 +750,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       setSelectedOptions(defaultOptions);
       void recordRentIntentRef.current?.(target, "viewed", { trigger: "vehicle_query", options: defaultOptions });
     }
-  }, [auctionTickOptions, items, searchParams]);
+  }, [auctionTickOptions, displayItems, searchParams]);
 
   /**
    * Handle deep-link from Telegram bot (startapp state payload).
@@ -755,7 +771,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     // Guard against re-triggering on every re-render — only run once per param set.
     if (lastQueryViewedVehicleRef.current === startappBikeId) return;
 
-    const target = items.find((item) => item.id === startappBikeId);
+    const target = displayItems.find((item) => item.id === startappBikeId);
     if (!target) {
       logger.warn("[startapp-state] bike not found in catalog", { bikeId: startappBikeId });
       return;
@@ -767,14 +783,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     // Build pre-filled options from the query params.
     const extrasParts: string[] = [];
     const helmetCount = searchParams.get("helmetCount");
-    if (helmetCount && Number(helmetCount) > 0) extrasParts.push(`🪖 Шлем ×${helmetCount}`);
-    if (searchParams.get("extrasGloves") === "true") extrasParts.push("🧤 Перчатки");
-    if (searchParams.get("extrasNet") === "true") extrasParts.push("🌐 Сеть");
-    if (searchParams.get("extrasBag") === "true") extrasParts.push("👜 Сумка");
-    if (searchParams.get("extrasJacket") === "true") extrasParts.push("🧥 Куртка");
-    if (searchParams.get("extrasBoots") === "true") extrasParts.push("👢 Боты");
-    if (searchParams.get("extrasBackpack") === "true") extrasParts.push("🎒 Рюкзак");
-    if (searchParams.get("extrasCharger") === "true") extrasParts.push("🔌 Зарядка");
+    if (helmetCount && Number(helmetCount) > 0) extrasParts.push(`Шлем ×${helmetCount}`);
+    if (searchParams.get("extrasGloves") === "true") extrasParts.push("Перчатки");
+    if (searchParams.get("extrasNet") === "true") extrasParts.push("Сетка");
+    if (searchParams.get("extrasBag") === "true") extrasParts.push("Сумка");
+    if (searchParams.get("extrasJacket") === "true") extrasParts.push("Куртка");
+    if (searchParams.get("extrasBoots") === "true") extrasParts.push("Боты");
+    if (searchParams.get("extrasBackpack") === "true") extrasParts.push("Рюкзак");
+    if (searchParams.get("extrasCharger") === "true") extrasParts.push("Зарядка");
 
     const extrasSelection: Record<string, number | boolean> = {};
     if (helmetCount && Number(helmetCount) > 0) extrasSelection.helmet = Number(helmetCount);
@@ -831,7 +847,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         }),
       );
     }
-  }, [auctionTickOptions, items, searchParams]);
+  }, [auctionTickOptions, displayItems, searchParams]);
 
   useEffect(() => {
     const observers: IntersectionObserver[] = [];
@@ -891,7 +907,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   return (
     <>
       <section
-        className="relative mx-auto w-full max-w-7xl px-4 pb-6 pt-8 xl:max-w-[1440px] 2xl:max-w-[1800px]"
+        className="relative mx-auto min-w-0 w-full max-w-7xl overflow-x-clip px-4 pb-6 pt-8 xl:max-w-[1440px] 2xl:max-w-[1800px]"
         id="catalog-sections"
         style={{
           ["--catalog-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
@@ -912,6 +928,28 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           <p className="mb-4 rounded-xl border border-[var(--catalog-accent)] px-3 py-2 text-sm text-[var(--catalog-accent)]">
             Crew slug was not found. Rendering safe fallback shell.
           </p>
+        )}
+
+        {isVipBikeRental && paidRentalSegment && (
+          <div
+            className="mb-5 rounded-2xl border border-[var(--catalog-border)] bg-[var(--catalog-card-bg)] p-4 sm:p-5"
+            aria-labelledby="paid-rental-heading"
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--catalog-accent)]">
+              VIP Bike Rental
+            </p>
+            <h1
+              id="paid-rental-heading"
+              className="mt-1 text-2xl font-bold leading-tight text-[var(--catalog-text)] sm:text-3xl"
+            >
+              {paidRentalSegment === "electric"
+                ? "Электромотоциклы в аренду в Нижнем Новгороде"
+                : "Бензиновые мотоциклы в аренду в Нижнем Новгороде"}
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--catalog-muted)]">
+              Выбери модель и даты. Менеджер подтвердит доступность и условия аренды.
+            </p>
+          </div>
         )}
 
         <div id="catalog-search" className="relative mb-5" role="search" aria-label="Поиск по каталогу">
@@ -942,7 +980,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
               type="button"
               aria-label="Очистить поиск по каталогу"
               onClick={() => setSearchQuery("")}
-              className="absolute bottom-2 right-24 top-2 rounded-full px-3 text-xs font-medium transition active:scale-95"
+            className="absolute bottom-1 right-24 top-1 min-h-11 rounded-full px-3 text-xs font-medium transition active:scale-95"
               onFocus={() => setClearFocused(true)}
               onBlur={() => setClearFocused(false)}
               style={{
@@ -963,7 +1001,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
               firstResult?.scrollIntoView({ behavior: "smooth", block: "center" });
               firstResult?.focus({ preventScroll: true });
             }}
-            className="absolute bottom-1 right-1 top-1 rounded-full px-5 text-sm font-semibold transition active:scale-95"
+            className="absolute bottom-1 right-1 top-1 min-h-11 rounded-full px-5 text-sm font-semibold transition active:scale-95"
             onFocus={() => setSearchCtaFocused(true)}
             onBlur={() => setSearchCtaFocused(false)}
             style={{
@@ -977,7 +1015,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         </div>
 
         {promoModules.length > 0 && mode !== "electro" && (
-          <div className="mb-5 flex gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-1 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:bg-current/20] [&::-webkit-scrollbar-thumb:hover:bg-current/30] sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 sm:[&::-webkit-scrollbar]:hidden sm:[scrollbar-width:none]">
+          <div className="mb-5 flex min-w-0 max-w-full gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-1 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:bg-current/20] [&::-webkit-scrollbar-thumb:hover:bg-current/30] sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 sm:[&::-webkit-scrollbar]:hidden sm:[scrollbar-width:none]">
             {visiblePromoModules.map((module, index) => {
               const isExternal = /^(https?:|mailto:|tel:)/.test(module.href);
               return (
@@ -1015,7 +1053,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           Найдено позиций: {filteredItems.length}
         </p>
 
-        <div className="mb-5 flex gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-1 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:bg-current/20] [&::-webkit-scrollbar-thumb:hover:bg-current/30]" role="group" aria-label="Быстрые фильтры каталога">
+        <div className="mb-5 flex min-w-0 max-w-full gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-1 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:bg-current/20] [&::-webkit-scrollbar-thumb:hover:bg-current/30]" role="group" aria-label="Быстрые фильтры каталога">
           {QUICK_FILTERS.map((filter) => {
             const active = quickFilter === filter.key;
             return (
@@ -1024,7 +1062,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                 type="button"
                 onClick={() => setQuickFilter(filter.key)}
                 aria-pressed={active}
-                className="shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
+                className="min-h-11 shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
                 style={{
                   ["--quick-pill-bg" as string]: active
                     ? (filter.tierColor || (crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain))
@@ -1048,7 +1086,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                 setSearchQuery("");
               }}
               aria-label="Сбросить поиск и все быстрые фильтры"
-              className="shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
+              className="min-h-11 shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
               style={{
                 ["--quick-pill-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
                 ["--quick-pill-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary
@@ -1080,7 +1118,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           </section>
         ) : activeGroupsForCarousel.length === 0 && !isTransitioning ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="mb-4 text-6xl">🔍</div>
+            <Search className="mb-4 h-14 w-14 text-[var(--catalog-muted)]" aria-hidden />
             <h3 className="mb-2 text-lg font-semibold text-[var(--catalog-text)]">
               {displayMode === "service" ? "Нет услуг" : displayMode === "rent" ? "Нет байков в аренду" : "Нет байков для продажи"}
             </h3>
@@ -1096,7 +1134,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                   setSearchQuery("");
                   setQuickFilter("all");
                 }}
-                className="rounded-full bg-[var(--catalog-accent)] px-6 py-2 text-sm font-semibold text-[var(--catalog-accent-contrast)] transition hover:opacity-90"
+                className="min-h-11 rounded-full bg-[var(--catalog-accent)] px-6 py-2 text-sm font-semibold text-[var(--catalog-accent-contrast)] transition hover:opacity-90"
               >
                 Сбросить фильтры
               </button>
@@ -1202,7 +1240,6 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
                               {specChips.slice(0, 2).map((spec, si) => (
                                 <span key={`${item.id}-badge-${si}`} className="inline-flex items-center gap-1 rounded-lg bg-[var(--catalog-bg)]/65 px-1.5 py-1 text-[9px] font-semibold text-[var(--catalog-accent)] backdrop-blur-sm">
-                                  {spec.icon && <span className="text-[10px]">{spec.icon}</span>}
                                   {spec.text}
                                 </span>
                               ))}
@@ -1226,7 +1263,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               </span>
                             )}
                             {displayMode === "sale" && hasSalePrice(item) && <span className="inline-flex rounded-full border-2 border-[var(--catalog-accent)] bg-[var(--catalog-bg)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent)] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
-                            {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="text-[7px]">{tv.emoji}</span>{tv.label}</span> : null; })()}
+                            {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tv.color }} aria-hidden />{tv.label}</span> : null; })()}
                           </div>
 
                           {/* Title */}
@@ -1342,7 +1379,6 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
                               {visibleSpecs.slice(0, 3).map((spec, index) => (
                                 <span key={`${item.id}-spec-${index}`} className="inline-flex items-center gap-1 rounded-lg bg-[var(--catalog-bg)]/65 px-2 py-1 text-[10px] font-semibold text-[var(--catalog-accent)] backdrop-blur-sm">
-                                  {spec.icon && <span className="text-[11px]">{spec.icon}</span>}
                                   {spec.text}
                                 </span>
                               ))}
@@ -1369,7 +1405,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               </span>
                             )}
                             {displayMode === "sale" && hasSalePrice(item) && <span className="inline-flex rounded-full border-2 border-[var(--catalog-accent)] bg-[var(--catalog-bg)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent)] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
-                            {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="text-[7px]">{tv.emoji}</span>{tv.label}</span> : null; })()}
+                            {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tv.color }} aria-hidden />{tv.label}</span> : null; })()}
                           </div>
 
                           {/* Title */}
@@ -1411,12 +1447,12 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         )}
       </section>
 
-      {/* 🛒 Floating Cart: Hide when modal is open to avoid z-index overlap */}
+      {/* Floating Cart: hide when modal is open to avoid z-index overlap. */}
       {!selectedItem && showFloatingCart && (
         <FloatingCartIconLinkBySlug
           slug={resolvedSlug}
           href={`/franchize/${resolvedSlug}/cart`}
-          items={items}
+          items={displayItems}
           accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain}
           textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary}
           borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}
@@ -1427,13 +1463,16 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
 
       <ItemModal
         item={selectedItem}
-        items={items}
+        items={displayItems}
         slug={resolvedSlug}
         theme={crew.theme}
         pickupAddress={crew.contacts.address || crew.hqLocation}
         workingHours={crew.contacts.workingHours}
         flowType={displayMode === "service" ? "order" : displayMode === "rent" ? "rental" : "order"}
         displayMode={displayMode}
+        vipBikeRentalTrackingEnabled={
+          isVipBikeRentalTracking && displayItems.length > 0
+        }
         options={selectedOptions}
         auctionOptions={auctionTickOptions}
         onChangeOption={(key, value) => setSelectedOptions((prev) => ({ ...prev, [key]: value }))}

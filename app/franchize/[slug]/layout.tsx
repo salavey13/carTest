@@ -8,12 +8,56 @@ interface FranchizeSlugLayoutProps {
   params: Promise<{ slug: string }>;
 }
 
+function buildVipBikeMetadata(imageUrl = "/favicon.png"): Metadata {
+  const path = "/franchize/vip-bike";
+  const image = toAbsoluteFranchizeUrl(
+    "https://rental.vip-bike.ru",
+    imageUrl,
+  );
+  const title = "Аренда мотоциклов в Нижнем Новгороде | VIP BIKE";
+  const description =
+    "Раздельный каталог электрических и бензиновых мотоциклов в аренду. Выберите модель и даты — менеджер подтвердит доступность и условия.";
+  return {
+    metadataBase: new URL("https://rental.vip-bike.ru"),
+    title,
+    description,
+    keywords: [
+      "аренда мотоцикла Нижний Новгород",
+      "арендовать мото в Нижнем",
+      "прокат мотоциклов Нижний Новгород",
+      "аренда электромотоцикла",
+    ],
+    robots: { index: true, follow: true },
+    alternates: { canonical: path },
+    openGraph: {
+      siteName: "VIP BIKE",
+      title,
+      description,
+      url: path,
+      type: "website",
+      locale: "ru_RU",
+      images: [{ url: image, alt: "VIP BIKE Rental" }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [image],
+    },
+  };
+}
+
 export async function generateMetadata({ params }: Omit<FranchizeSlugLayoutProps, "children">): Promise<Metadata> {
   const { slug } = await params;
   const siteUrl = resolveFranchizeSiteUrl();
 
   try {
     const { crew, items } = await getFranchizeBySlug(slug);
+    if (slug === "vip-bike") {
+      return buildVipBikeMetadata(
+        items.find((item) => item.imageUrl)?.imageUrl,
+      );
+    }
     const title = `${crew.header.brandName} | oneSitePls`;
     const description = crew.header.subtitle?.trim() || `Каталог, аренда и покупка техники экипажа ${crew.header.brandName}.`;
     const image = toAbsoluteFranchizeUrl(siteUrl, crew.header.logoUrl || items.find((item) => item.imageUrl)?.imageUrl || "/favicon.png");
@@ -54,6 +98,7 @@ export async function generateMetadata({ params }: Omit<FranchizeSlugLayoutProps
       },
     };
   } catch {
+    if (slug === "vip-bike") return buildVipBikeMetadata();
     const fallbackTitle = `Franchize ${slug} | oneSitePls`;
     const fallbackDescription = `Витрина franchize ${slug}: каталог, аренда и покупка техники.`;
     const fallbackPath = `/franchize/${slug}`;

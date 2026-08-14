@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { CalendarCheck2, Clock3, ListChecks, MapPin, Phone, UserRoundCheck } from "lucide-react";
 import { CrewFooter } from "../components/CrewFooter";
 import { CrewHeader } from "../components/CrewHeader";
 import { CatalogClient } from "../components/CatalogClient";
@@ -21,7 +22,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
   const ctaPolicy = getFranchizeRouteCtaPolicy("catalog");
 
   return (
-    <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
+    <main className={`min-h-screen overflow-x-clip ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
       <ThemeInitializer defaultTheme="dark" />
       <Suspense>
         <JoinCrewBanner slug={slug} />
@@ -52,6 +53,64 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
         <CatalogClient crew={crew} slug={slug} items={items} ctaPolicy={ctaPolicy} />
       </FranchizeErrorBoundary>
 
+      {slug === "vip-bike" && (
+        <section
+          id="how"
+          className="mx-auto w-full max-w-7xl scroll-mt-20 px-4 py-10 2xl:max-w-[1600px]"
+          style={surface.page}
+          aria-labelledby="rental-how-heading"
+        >
+          <div className="rounded-3xl border p-5 md:p-8" style={surface.card}>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--franchize-accent-main)]">
+              Как арендовать
+            </p>
+            <h2
+              id="rental-how-heading"
+              className="mt-2 text-2xl font-bold tracking-tight md:text-3xl"
+              style={{ color: "var(--franchize-text-primary, inherit)" }}
+            >
+              От выбора до подтверждения
+            </h2>
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              {[
+                {
+                  title: "Выбери модель",
+                  text: "Открой отдельный каталог электро или бензина и сравни доступные варианты.",
+                  icon: ListChecks,
+                },
+                {
+                  title: "Укажи даты",
+                  text: "Выбери период и оставь имя с телефоном в карточке мотоцикла.",
+                  icon: CalendarCheck2,
+                },
+                {
+                  title: "Получи подтверждение",
+                  text: "Менеджер проверит доступность и сообщит дополнительные условия до бронирования.",
+                  icon: UserRoundCheck,
+                },
+              ].map((step) => {
+                const Icon = step.icon;
+                return (
+                  <article
+                    key={step.title}
+                    className="rounded-2xl border p-4"
+                    style={surface.card}
+                  >
+                    <Icon className="h-6 w-6 text-[var(--franchize-accent-main)]" aria-hidden />
+                    <h3 className="mt-3 font-semibold" style={{ color: "var(--franchize-text-primary, inherit)" }}>
+                      {step.title}
+                    </h3>
+                    <p className="mt-1 text-sm leading-6" style={{ color: "var(--franchize-text-secondary, inherit)" }}>
+                      {step.text}
+                    </p>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ── CTA Section ── Anchor target for /franchize/{slug}#test-drive */}
       <section
         id="test-drive"
@@ -66,19 +125,19 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
             <p className="mt-2 text-sm leading-relaxed md:text-base" style={{ color: "var(--franchize-text-secondary, inherit)" }}>
               {crew.cta.description}
             </p>
-            <div className="mt-4 flex flex-wrap gap-4 text-sm" style={{ color: "var(--franchize-text-secondary, inherit)" }}>
+            <div id="contacts" className="mt-4 flex scroll-mt-24 flex-wrap gap-4 text-sm" style={{ color: "var(--franchize-text-secondary, inherit)" }}>
               {crew.contacts.address && (
-                <span className="flex items-center gap-1.5">📍 {crew.contacts.address}</span>
+                <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" aria-hidden /> {crew.contacts.address}</span>
               )}
               {crew.contacts.workingHours && (
-                <span className="flex items-center gap-1.5">🕐 {crew.contacts.workingHours}</span>
+                <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" aria-hidden /> {crew.contacts.workingHours}</span>
               )}
               {crew.contacts.phone && (
-                <span className="flex items-center gap-1.5">📞 {crew.contacts.phone}</span>
+                <span className="flex items-center gap-1.5"><Phone className="h-4 w-4" aria-hidden /> {crew.contacts.phone}</span>
               )}
             </div>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row md:flex-col">
+          <div id="operator" className="flex scroll-mt-24 flex-col gap-3 sm:flex-row md:flex-col">
             {crew.cta.buttonHref && (
               <a
                 href={crew.cta.buttonHref}

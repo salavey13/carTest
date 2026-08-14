@@ -137,6 +137,8 @@ export function buildCatalogRentalStrip(
   const workingWindow = normalizeWorkingHours(crew.contacts.workingHours ?? "");
   const availabilityLabel = String(item.availabilityLabel ?? "").trim();
   const priceTiers = extractPriceTiers(item.rawSpecs);
+  const isCanonicalVipBikeRental =
+    item.rawSpecs?.vipBikeRentalCanonical === true;
 
   return {
     hasAvailability,
@@ -149,9 +151,11 @@ export function buildCatalogRentalStrip(
         : availabilityLabel || UNKNOWN_TELEGRAM_LABEL
       : UNKNOWN_TELEGRAM_LABEL,
     pickupHint: truncatePickupHint(pickupAddress),
-    priceTeaser: depositLabel
-      ? `Залог ${depositLabel} · ${item.rentPriceLabel}`
-      : `Залог обсудим · ${item.rentPriceLabel}`,
+    priceTeaser: isCanonicalVipBikeRental
+      ? item.rentPriceLabel
+      : depositLabel
+        ? `Залог ${depositLabel} · ${item.rentPriceLabel}`
+        : `Залог обсудим · ${item.rentPriceLabel}`,
     priceTiers,
   };
 }

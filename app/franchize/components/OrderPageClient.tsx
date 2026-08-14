@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar } from "lucide-react";
+import { Calendar, Camera, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -933,20 +933,20 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     setFieldSources(manualSources);
   };
 
-  const getFieldSourceIcon = (fieldName: string): string => {
+  const getFieldSourceIcon = (fieldName: string): React.ReactNode => {
     const source = fieldSources[fieldName];
-    if (!source) return "";
+    if (!source) return null;
     switch (source) {
       case "previous_rental":
-        return "🔄";
+        return <RotateCcw className="h-4 w-4" aria-hidden />;
       case "ocr":
-        return "📷";
+        return <Camera className="h-4 w-4" aria-hidden />;
       case "profile_prefill":
-        return "🔄";
+        return <RotateCcw className="h-4 w-4" aria-hidden />;
       case "manual":
-        return "✏️";
+        return <Pencil className="h-4 w-4" aria-hidden />;
       default:
-        return "";
+        return null;
     }
   };
 
@@ -1015,7 +1015,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           }}
         >
           <div className="flex items-start gap-3">
-            <div className="text-2xl">🔄</div>
+            <RotateCcw className="mt-0.5 h-6 w-6 shrink-0" style={{ color: accentMain }} aria-hidden />
             <div className="flex-1">
               <p className="text-sm font-semibold" style={{ color: textPrimary }}>
                 Использовать данные из предыдущей аренды?
@@ -1065,7 +1065,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               border: `1px solid ${borderSoft}`,
             }}
           >
-            <span>🗑️</span>
+            <Trash2 className="h-4 w-4" aria-hidden />
             <span>Очистить все поля</span>
           </button>
         </div>
@@ -1270,7 +1270,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               </p>
               {Object.keys(fieldSources).length > 0 && (
                 <p className="mt-1 text-[10px]" style={{ color: textSecondary }}>
-                  🔄 из предыдущей аренды · 📷 распознано с фото · ✏️ введено вручную
+                  Источник данных отмечен у каждого заполненного поля: предыдущая аренда, фото или ручной ввод.
                 </p>
               )}
               <div className="mt-3 space-y-3">

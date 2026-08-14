@@ -23,11 +23,13 @@ export interface Database {
       characters: LooseSupabaseTable
       coze_responses: LooseSupabaseTable
       feedback: LooseSupabaseTable
+      franchize_intents: LooseSupabaseTable
       invoices: LooseSupabaseTable
       page_visits: LooseSupabaseTable
       rentals: LooseSupabaseTable
       subscriptions: LooseSupabaseTable
       tasks: LooseSupabaseTable
+      temp_franchize_carts: LooseSupabaseTable
       user_activity: LooseSupabaseTable
       videos: LooseSupabaseTable
       lobbies: {
@@ -370,6 +372,31 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
+      capture_vip_bike_callback_intent: {
+        Args: {
+          p_intent_id: string
+          p_bike_id: string | null
+          p_phone: string
+          p_source_route: string
+          p_ip_hash: string
+          p_metadata: Json
+          p_notification_attempt_id: string
+        }
+        Returns: {
+          result_status: string
+          intent_id: string
+          intent_metadata: Json
+          retry_after_seconds: number
+        }[]
+      }
+      finalize_vip_bike_callback_notification: {
+        Args: {
+          p_intent_id: string
+          p_notification_attempt_id: string
+          p_notification_status: string
+        }
+        Returns: boolean
+      }
       get_public_crews: {
         Args: Record<string, unknown>
         Returns: {

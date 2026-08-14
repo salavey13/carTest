@@ -1,6 +1,23 @@
 "use client";
 
-import { Bike, Calendar, FileText, Info, Swords, X, Phone, Clock } from "lucide-react";
+import {
+  AlertTriangle,
+  BarChart3,
+  Bike,
+  Calendar,
+  CheckCircle2,
+  CircleDollarSign,
+  Clock,
+  FileText,
+  Info,
+  Package,
+  Phone,
+  Shield,
+  Star,
+  Swords,
+  X,
+  Zap,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
@@ -25,6 +42,11 @@ import { getTelegramWebAppAdaptiveHref } from "@/app/franchize/lib/telegram-link
 import { upsertFranchizeLead } from "@/app/franchize/lib/leads";
 import { useCrewTokens, type CrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import { addDaysISO, formatRuDateFromISO, todayISO, durationDaysFromDateTime } from "@/app/franchize/lib/date-utils";
+import { getBrowserMarketingAttribution } from "@/lib/marketing-attribution";
+import {
+  reachVipBikeGoal,
+  VIP_BIKE_METRIKA_GOALS,
+} from "@/lib/yandex-metrika";
 
 // ── Russian Label Helper (VIP Bike Landing & Catalog Improvements) ──
 // Helper to get Russian label from spec_labels in rawSpecs
@@ -94,6 +116,8 @@ interface ItemModalProps {
   isReturningUser?: boolean;
   /** Display mode from catalog filter — overrides flowType for content visibility */
   displayMode?: "rent" | "sale";
+  /** Restricts rental counter goals to the canonical VIP BIKE rental flow. */
+  vipBikeRentalTrackingEnabled?: boolean;
 }
 
 const packageOptions = ["Базовый", "Комфорт", "Максимум"];
@@ -230,7 +254,7 @@ function RentalDatePickers({
             value={startDate}
             min={today}
             onChange={(e) => onStartChange(e.target.value)}
-            className="w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+            className="min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
             style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
             aria-label="Дата начала аренды"
           />
@@ -246,7 +270,7 @@ function RentalDatePickers({
             type="time"
             value={startTime}
             onChange={(e) => onStartTimeChange(e.target.value)}
-            className="w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+            className="min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
             style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
             aria-label="Время выдачи"
           />
@@ -263,7 +287,7 @@ function RentalDatePickers({
             value={endDate}
             min={endMin}
             onChange={(e) => onEndChange(e.target.value)}
-            className="w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+            className="min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
             style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
             aria-label="Дата возврата"
           />
@@ -279,7 +303,7 @@ function RentalDatePickers({
             type="time"
             value={endTime}
             onChange={(e) => onEndTimeChange(e.target.value)}
-            className="w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+            className="min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
             style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
             aria-label="Время возврата"
           />
@@ -594,13 +618,13 @@ function PricingTable({
  *  Helmet price is dynamic: 500₽ for hourly (<24h), 1000₽ for daily+ (≥24h).
  *  The `price` field here is the daily rate (used as fallback). */
 export const ADDITIONAL_ITEMS = [
-  { key: "helmet", label: "Шлем", icon: "🪖", price: 1000, hourlyPrice: 500, type: "count" as const, max: 2 },
-  { key: "gloves", label: "Перчатки", icon: "🧤", price: 500, type: "toggle" as const },
-  { key: "jacket", label: "Куртка", icon: "🧥", price: 500, type: "toggle" as const },
-  { key: "boots", label: "Боты/Сапоги", icon: "👢", price: 500, type: "toggle" as const },
-  { key: "net", label: "Сетка", icon: "🌐", price: 500, type: "toggle" as const },
-  { key: "backpack", label: "Рюкзак", icon: "🎒", price: 500, type: "toggle" as const },
-  { key: "charger", label: "Зарядка", icon: "🔌", price: 0, type: "toggle" as const },
+  { key: "helmet", label: "Шлем", price: 1000, hourlyPrice: 500, type: "count" as const, max: 2 },
+  { key: "gloves", label: "Перчатки", price: 500, type: "toggle" as const },
+  { key: "jacket", label: "Куртка", price: 500, type: "toggle" as const },
+  { key: "boots", label: "Боты/Сапоги", price: 500, type: "toggle" as const },
+  { key: "net", label: "Сетка", price: 500, type: "toggle" as const },
+  { key: "backpack", label: "Рюкзак", price: 500, type: "toggle" as const },
+  { key: "charger", label: "Зарядка", price: 0, type: "toggle" as const },
 ];
 
 export type AdditionalItemsSelection = Record<string, number | boolean>;
@@ -630,9 +654,9 @@ export function extrasSummary(sel: AdditionalItemsSelection): string {
   for (const item of ADDITIONAL_ITEMS) {
     const val = sel[item.key];
     if (item.type === "count" && typeof val === "number" && val > 0) {
-      parts.push(`${item.icon} ${item.label} ×${val}`);
+      parts.push(`${item.label} ×${val}`);
     } else if (val === true) {
-      parts.push(`${item.icon} ${item.label}`);
+      parts.push(item.label);
     }
   }
   return parts.join(", ");
@@ -650,7 +674,7 @@ function AdditionalItems({
   return (
     <div className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3">
       <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
-        🎒 Доп. оборудование
+        <Package className="h-3.5 w-3.5" /> Доп. оборудование
       </p>
       <div className="space-y-2">
         {ADDITIONAL_ITEMS.map((item) => {
@@ -660,7 +684,7 @@ function AdditionalItems({
             return (
               <div key={item.key} className="flex items-center justify-between">
                 <span className="text-xs">
-                  {item.icon} {item.label}
+                  {item.label}
                   {effectivePrice > 0 && <span className="opacity-50"> +{effectivePrice}₽</span>}
                   {effectivePrice === 0 && <span className="opacity-50"> бесплатно</span>}
                 </span>
@@ -693,7 +717,7 @@ function AdditionalItems({
               style={{ borderColor: checked ? "var(--item-accent)" : "var(--item-border)" }}
             >
               <span className="text-xs">
-                {item.icon} {item.label}
+                {item.label}
                 {effectivePrice > 0 && <span className="opacity-50"> +{effectivePrice}₽</span>}
                 {effectivePrice === 0 && <span className="opacity-50"> бесплатно</span>}
               </span>
@@ -736,7 +760,7 @@ function HelmetBalloons({
   return (
     <div className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3">
       <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
-        🪖 Шлемы
+        <Shield className="h-3.5 w-3.5" /> Шлемы
       </p>
       <div className="flex flex-wrap gap-2">
         {options.map((opt) => (
@@ -831,7 +855,7 @@ function PriceCard({
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-lg">💰</span>
+          <CircleDollarSign className="h-5 w-5 text-[var(--item-accent)]" />
           <span className="text-lg font-bold text-[var(--item-accent)]">
             {fmt(grandTotal)} ₽
           </span>
@@ -855,7 +879,9 @@ function PriceCard({
 
       {isExpanded && (
         <div className="mt-3 space-y-2 text-xs">
-          <p className="font-medium text-[var(--item-accent)]">📊 Детали стоимости</p>
+          <p className="flex items-center gap-1.5 font-medium text-[var(--item-accent)]">
+            <BarChart3 className="h-4 w-4" /> Детали стоимости
+          </p>
           <div className="space-y-1">
             <p>• Период: {result.breakdown.period}</p>
             <p>• Тариф: {result.breakdown.ratePerPeriod}</p>
@@ -868,7 +894,7 @@ function PriceCard({
                   if (val !== true && val !== 1) return null;
                   return (
                     <p key={item.key}>
-                      • {item.icon} {item.label}: {item.price > 0 ? `${fmt(item.price)} ₽` : "бесплатно"}
+                      • {item.label}: {item.price > 0 ? `${fmt(item.price)} ₽` : "бесплатно"}
                     </p>
                   );
                 })}
@@ -904,22 +930,101 @@ function PriceCard({
 // ───────────────────────────────────────────────────────────────────────────────
 function CallbackRequestForm({
   bikeTitle,
-  accentColor,
   onSubmit,
+  trackingEnabled,
 }: {
   bikeTitle: string;
-  accentColor: string;
-  onSubmit: (name: string, phone: string) => void;
+  onSubmit: (
+    name: string,
+    phone: string,
+    website: string,
+  ) => Promise<{ notificationSent: boolean }>;
+  trackingEnabled: boolean;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [website, setWebsite] = useState("");
+  const [consent, setConsent] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const formStartedRef = useRef(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!trackingEnabled) return;
+    const attribution = getBrowserMarketingAttribution();
+    reachVipBikeGoal(
+      VIP_BIKE_METRIKA_GOALS.callbackFormView,
+      { bike_title: bikeTitle },
+      attribution,
+    );
+  }, [bikeTitle, trackingEnabled]);
+
+  const handleFormStart = () => {
+    if (!trackingEnabled || formStartedRef.current) return;
+    formStartedRef.current = true;
+    const attribution = getBrowserMarketingAttribution();
+    reachVipBikeGoal(
+      VIP_BIKE_METRIKA_GOALS.callbackFormStart,
+      { bike_title: bikeTitle },
+      attribution,
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim().length < 2 || phone.trim().length < 6) return;
-    onSubmit(name.trim(), phone.trim());
-    setSubmitted(true);
+    if (
+      submitting ||
+      !consent ||
+      name.trim().length < 2 ||
+      phone.trim().length < 10
+    ) return;
+
+    setSubmitting(true);
+    setErrorMessage("");
+    const attribution = getBrowserMarketingAttribution();
+    if (trackingEnabled) {
+      reachVipBikeGoal(
+        VIP_BIKE_METRIKA_GOALS.callbackSubmitAttempt,
+        { bike_title: bikeTitle },
+        attribution,
+      );
+    }
+
+    try {
+      const result = await onSubmit(name.trim(), phone.trim(), website);
+      if (trackingEnabled) {
+        reachVipBikeGoal(
+          VIP_BIKE_METRIKA_GOALS.leadDbSuccess,
+          { bike_title: bikeTitle },
+          attribution,
+        );
+        reachVipBikeGoal(
+          VIP_BIKE_METRIKA_GOALS.leadSubmitSuccess,
+          {
+            bike_title: bikeTitle,
+            notification_sent: result.notificationSent,
+          },
+          attribution,
+        );
+      }
+      setSubmitted(true);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Не удалось отправить заявку. Попробуйте ещё раз.",
+      );
+      if (trackingEnabled) {
+        reachVipBikeGoal(
+          VIP_BIKE_METRIKA_GOALS.leadSubmitError,
+          { bike_title: bikeTitle },
+          attribution,
+        );
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Theme-aware input style — explicit color/background/pointerEvents so
@@ -940,10 +1045,11 @@ function CallbackRequestForm({
   if (submitted) {
     return (
       <div className="rounded-2xl border px-3 py-3 text-center" style={{ borderColor: "var(--item-accent)", backgroundColor: "color-mix(in srgb, var(--item-accent) 10%, transparent)" }}>
-        <p className="text-sm font-semibold text-[var(--item-accent)]">✅ Заявка отправлена!</p>
+        <p className="flex items-center justify-center gap-1.5 text-sm font-semibold text-[var(--item-accent)]">
+          <CheckCircle2 className="h-4 w-4" /> Заявка сохранена
+        </p>
         <p className="mt-1 text-xs text-[var(--item-muted-text)]">
-          Менеджер перезвонит в течение 15 минут.
-          Документы можно показать при встрече.
+          Менеджер VIP BIKE свяжется с вами по указанному номеру.
         </p>
       </div>
     );
@@ -952,6 +1058,7 @@ function CallbackRequestForm({
   return (
     <form
       onSubmit={handleSubmit}
+      onFocusCapture={handleFormStart}
       onKeyDown={(e) => e.stopPropagation()}
       style={{
         borderColor: "var(--item-border)",
@@ -976,7 +1083,7 @@ function CallbackRequestForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.stopPropagation()}
-          className="w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
+          className="min-h-11 w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
           style={inputStyle}
           aria-label="Ваше имя"
           required
@@ -990,18 +1097,49 @@ function CallbackRequestForm({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           onKeyDown={(e) => e.stopPropagation()}
-          className="w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
+          className="min-h-11 w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
           style={inputStyle}
           aria-label="Номер телефона"
           required
-          minLength={6}
+          minLength={10}
         />
+        <label className="absolute -left-[10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">
+          Сайт
+          <input
+            type="text"
+            name="website"
+            value={website}
+            onChange={(event) => setWebsite(event.target.value)}
+            tabIndex={-1}
+            autoComplete="off"
+          />
+        </label>
+        <label className="flex min-h-11 cursor-pointer items-start gap-2 py-1 text-[11px] leading-5 text-[var(--item-muted-text)]">
+          <input
+            type="checkbox"
+            checked={consent}
+            onChange={(event) => setConsent(event.target.checked)}
+            className="mt-1 h-4 w-4 shrink-0 accent-[var(--item-accent)]"
+            required
+          />
+          <span>
+            Даю согласие ИП Воробьёву Р. В. на обработку имени и телефона для связи по этой заявке.
+          </span>
+        </label>
+        {errorMessage && (
+          <p className="flex items-start gap-1.5 text-xs text-red-400" role="alert">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {errorMessage}
+          </p>
+        )}
         <button
           type="submit"
-          className="w-full rounded-lg px-3 py-2 text-sm font-bold transition hover:brightness-110 active:scale-[0.99]"
+          disabled={submitting || !consent}
+          aria-busy={submitting}
+          className="min-h-11 w-full rounded-lg px-3 py-2 text-sm font-bold transition hover:brightness-110 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
           style={{ backgroundColor: "var(--item-accent)", color: "var(--item-accent-contrast)" }}
         >
-          Перезвоните мне
+          {submitting ? "Отправляем..." : "Перезвоните мне"}
         </button>
       </div>
     </form>
@@ -1034,7 +1172,9 @@ function RoundingWarning({
   return (
     <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-amber-300">⚠️ Округляем до {displayHours} ч</span>
+        <span className="inline-flex items-center gap-1 text-amber-300">
+          <AlertTriangle className="h-3.5 w-3.5" aria-hidden /> Округляем до {displayHours} ч
+        </span>
         <button
           type="button"
           onClick={onFixClick}
@@ -1064,11 +1204,13 @@ export function ItemModal({
   onTestdrive,
   isReturningUser = false,
   displayMode,
+  vipBikeRentalTrackingEnabled = false,
 }: ItemModalProps) {
   // Service items (vibe sessions, education, etc.) always use "order" flow — hide rental UI
   const isServiceItem = (item?.rawSpecs as Record<string, unknown>)?.service === true;
   const effectiveFlowType = isServiceItem ? "order" : flowType;
   const isRental = displayMode ? displayMode === "rent" : effectiveFlowType === "rental";
+  const isVipBikeRental = slug === "vip-bike" && isRental;
   const modalRef = useRef<HTMLDivElement>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
@@ -1190,7 +1332,7 @@ export function ItemModal({
 
   // Recalculate price when dates change
   useEffect(() => {
-    if (!item || !item.rawSpecs) {
+    if (!item || !item.rawSpecs || isVipBikeRental) {
       setCalculatedPrice(null);
       return;
     }
@@ -1198,7 +1340,7 @@ export function ItemModal({
     const specs = item.rawSpecs as BikePricingSpecs;
     const result = getDisplayPriceTier(specs, options.rentStartDate, options.rentEndDate);
     setCalculatedPrice(result);
-  }, [item, options.rentStartDate, options.rentEndDate]);
+  }, [isVipBikeRental, item, options.rentStartDate, options.rentEndDate]);
 
   useEffect(() => {
     if (!item) return;
@@ -1326,7 +1468,12 @@ export function ItemModal({
 
   // Dynamic pricing result (computed from dates, times, helmet count)
   const pricingResult = useMemo(() => {
-    if (!item || !options.rentStartDate || !options.rentEndDate) return null;
+    if (
+      !item ||
+      isVipBikeRental ||
+      !options.rentStartDate ||
+      !options.rentEndDate
+    ) return null;
 
     try {
       const { calculatePrice } = require("@/lib/rental-pricing-calculator");
@@ -1341,7 +1488,7 @@ export function ItemModal({
     } catch {
       return null;
     }
-  }, [item, options.rentStartDate, options.rentEndDate, rentStartTime, rentEndTime, helmetCount]);
+  }, [helmetCount, isVipBikeRental, item, options.rentStartDate, options.rentEndDate, rentStartTime, rentEndTime]);
 
   // Rounding fix handler — sets end time to rounded value
   const handleFixRounding = useCallback(() => {
@@ -1376,6 +1523,14 @@ export function ItemModal({
   // Track a browser user who clicked "continue in Telegram" as a lead.
   const trackContinueInTgLead = useCallback(
     (flowType: "rental" | "sale") => {
+      const attribution = getBrowserMarketingAttribution();
+      if (vipBikeRentalTrackingEnabled) {
+        reachVipBikeGoal(
+          VIP_BIKE_METRIKA_GOALS.telegramContinue,
+          { flow_type: flowType, bike_id: item?.id, bike_title: item?.title },
+          attribution,
+        );
+      }
       void upsertFranchizeLead({
         slug,
         userId: item?.id ? `${flowType}-${item.id}-${Date.now()}` : `browser-${Date.now()}`,
@@ -1396,11 +1551,12 @@ export function ItemModal({
           extrasSelection,
           package: options.package,
           perk: options.perk,
+          attribution,
         },
         ensureUser: true,
       });
     },
-    [slug, item?.id, item?.title, options.rentStartDate, options.rentEndDate, rentStartTime, rentEndTime, helmetCount, extrasSelection, options.package, options.perk]
+    [slug, item?.id, item?.title, options.rentStartDate, options.rentEndDate, rentStartTime, rentEndTime, helmetCount, extrasSelection, options.package, options.perk, vipBikeRentalTrackingEnabled]
   );
 
   // ── buildStartappLink — MUST be before early return (it's a hook) ──
@@ -1437,20 +1593,39 @@ export function ItemModal({
 
   // ── handleCallbackSubmit — MUST be before early return (it's a hook) ──
   const handleCallbackSubmit = useCallback(
-    (name: string, phone: string) => {
-      fetch("/api/franchize/callback-lead", {
+    async (name: string, phone: string, website: string) => {
+      const attribution = getBrowserMarketingAttribution();
+      const callbackEndpoint = vipBikeRentalTrackingEnabled
+        ? "/api/franchize/vip-bike/callback-lead"
+        : "/api/franchize/callback-lead";
+      const response = await fetch(callbackEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           slug,
           bikeId: item?.id,
-          bikeTitle: item?.title,
           name,
           phone,
+          consent: true,
+          website,
+          attribution,
         }),
-      }).catch(() => {});
+      });
+      const result = (await response.json().catch(() => null)) as {
+        success?: boolean;
+        error?: string;
+        notificationSent?: boolean;
+      } | null;
+
+      if (!response.ok || !result?.success) {
+        throw new Error(
+          result?.error || "Не удалось отправить заявку. Попробуйте ещё раз.",
+        );
+      }
+
+      return { notificationSent: result.notificationSent === true };
     },
-    [item?.id, item?.title, slug],
+    [item?.id, slug, vipBikeRentalTrackingEnabled],
   );
 
   if (!item) return null;
@@ -1513,13 +1688,13 @@ export function ItemModal({
   // ── CTA labels (browser vs Telegram) ──
   const rentCtaLabel = isInTelegram
     ? (isAdding ? "Бронируем..." : "Забронировать")
-    : "⚡ Забронировать в Telegram";
+    : "Забронировать в Telegram";
   const buyCtaLabel = isInTelegram
     ? (isBuying ? "Покупаем..." : "Купить")
-    : "⚡ Купить в Telegram";
+    : "Купить в Telegram";
   const singleCtaLabel = isInTelegram
     ? (isAdding ? "Добавляем..." : showRentCta ? "Забронировать" : "Выбрать")
-    : "⚡ Продолжить в Telegram";
+    : "Продолжить в Telegram";
 
   // Determine footer grid layout
   const footerCols = showRentCta && showBuyCta ? 3 : 2;
@@ -1557,7 +1732,7 @@ export function ItemModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/75 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/75 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 aria-label="Закрыть"
               >
                 <X className="h-4 w-4" />
@@ -1578,7 +1753,7 @@ export function ItemModal({
                   }}
                 role="status"
               >
-                <span aria-hidden>⚡</span>
+                <Zap className="h-4 w-4 shrink-0" aria-hidden />
                 <span>{startappBanner}</span>
               </div>
             )}
@@ -1668,7 +1843,9 @@ export function ItemModal({
                   <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.pickupHint}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">Залог / тариф</p>
+                  <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+                    {isVipBikeRental ? "Тариф" : "Залог / тариф"}
+                  </p>
                   <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.priceTeaser}</p>
                   {item.rawSpecs?.deposit_rub ? (
                     <p className="mt-0.5 text-[10px] text-[var(--item-muted-text)]">
@@ -1735,13 +1912,19 @@ export function ItemModal({
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-[var(--item-text)]">Отзывы</p>
                   <span className="rounded-full bg-[var(--item-accent)] px-2.5 py-1 text-xs font-bold text-[var(--item-accent-contrast)]">
-                    ★ {item.reviewSummary.average.toFixed(1)} · {item.reviewSummary.count}
+                    <span className="inline-flex items-center gap-1">
+                      <Star className="h-3.5 w-3.5" aria-hidden />
+                      {item.reviewSummary.average.toFixed(1)} · {item.reviewSummary.count}
+                    </span>
                   </span>
                 </div>
                 <div className="mt-3 space-y-2">
                   {item.reviewSummary.reviews.slice(0, 6).map((review) => (
                     <article key={review.id} className="rounded-xl border px-3 py-2" style={surface.subtleCard}>
-                      <p className="text-xs font-semibold text-[var(--item-accent)]">{`★`.repeat(review.rating)}<span className="text-[var(--item-muted-text)]"> / 5</span></p>
+                      <p className="flex items-center gap-1 text-xs font-semibold text-[var(--item-accent)]">
+                        <Star className="h-3.5 w-3.5" aria-hidden />
+                        {review.rating}<span className="text-[var(--item-muted-text)]"> / 5</span>
+                      </p>
                       {review.text && <p className="mt-1 text-sm leading-5" style={surface.mutedText}>{review.text}</p>}
                     </article>
                   ))}
@@ -1764,7 +1947,7 @@ export function ItemModal({
               <button
                 type="button"
                 onClick={() => onTestdrive?.()}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold uppercase tracking-wide transition hover:brightness-110 hover:scale-[1.01] active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold uppercase tracking-wide transition hover:brightness-110 hover:scale-[1.01] active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                 style={{
                   borderColor: "color-mix(in srgb, var(--item-accent) 40%, transparent)",
                   color: "var(--item-accent)",
@@ -1782,7 +1965,7 @@ export function ItemModal({
               <button
                 type="button"
                 onClick={() => setShowCallbackForm(true)}
-                className="flex w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-medium transition hover:opacity-80 active:scale-[0.99]"
+                className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-medium transition hover:opacity-80 active:scale-[0.99]"
                 style={{ borderColor: "color-mix(in srgb, var(--item-accent) 25%, transparent)", color: "var(--item-accent)" }}
               >
                 <Phone className="h-3 w-3" />
@@ -1808,7 +1991,7 @@ export function ItemModal({
                   value={options.rentStartDate || todayISO()}
                   min={todayISO()}
                   onChange={(e) => onChangeOption("rentStartDate", e.target.value)}
-                  className="w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+                  className="min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
                   style={{
                     backgroundColor: T.bgElevated,
                     borderColor: T.border,
@@ -1842,65 +2025,73 @@ export function ItemModal({
                   T={T}
                 />
 
-                {/* Full pricing table — shows ALL available rates (before quick selection) */}
-                <PricingTable
-                  specs={item.rawSpecs ?? {}}
-                  borderColor="var(--item-border)"
-                  accentColor="var(--item-accent)"
-                />
-
-                {/* Quick duration selection with prices */}
-                <DurationShortcuts
-                  startDate={options.rentStartDate ?? ""}
-                  endDate={options.rentEndDate ?? ""}
-                  startTime={options.rentStartTime ?? rentStartTime}
-                  endTime={options.rentEndTime ?? rentEndTime}
-                  onStartDateChange={(v) => onChangeOption("rentStartDate", v)}
-                  onEndDateChange={(v) => onChangeOption("rentEndDate", v)}
-                  onStartTimeChange={(v) => {
-                    setRentStartTime(v);
-                    onChangeOption("rentStartTime", v);
-                  }}
-                  onEndTimeChange={(v) => {
-                    setRentEndTime(v);
-                    onChangeOption("rentEndTime", v);
-                  }}
-                  T={T}
-                  specs={item.rawSpecs ?? {}}
-                />
-
-                <AdditionalItems
-                  selection={extrasSelection}
-                  rentalHours={pricingResult?.displayHours}
-                  onChange={(sel) => {
-                    setExtrasSelection(sel);
-                    // Sync helmetCount for backward compat with cart/pricing
-                    setHelmetCount(typeof sel.helmet === "number" ? sel.helmet : 0);
-                  }}
-                />
-
-                {pricingResult && (
+                {isVipBikeRental ? (
+                  <p
+                    className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3 text-sm leading-6 text-[var(--item-muted-text)]"
+                    role="note"
+                  >
+                    Стоимость по выбранным датам и дополнительные условия подтвердит менеджер.
+                  </p>
+                ) : (
                   <>
-                    <PriceCard
+                    <PricingTable
                       specs={item.rawSpecs ?? {}}
-                      startDate={options.rentStartDate ?? ""}
-                      endDate={options.rentEndDate ?? ""}
-                      startTime={rentStartTime}
-                      endTime={rentEndTime}
-                      helmetCount={helmetCount}
-                      extrasSelection={extrasSelection}
-                      isExpanded={priceCardExpanded}
-                      onToggleExpand={() => setPriceCardExpanded((v) => !v)}
-                  borderColor="var(--item-border)"
+                      borderColor="var(--item-border)"
+                      accentColor="var(--item-accent)"
                     />
 
-                    {pricingResult.rounded && (
-                      <RoundingWarning
-                        rounded={pricingResult.rounded}
-                        displayHours={pricingResult.displayHours}
-                        startTime={rentStartTime}
-                        onFixClick={handleFixRounding}
-                      />
+                    <DurationShortcuts
+                      startDate={options.rentStartDate ?? ""}
+                      endDate={options.rentEndDate ?? ""}
+                      startTime={options.rentStartTime ?? rentStartTime}
+                      endTime={options.rentEndTime ?? rentEndTime}
+                      onStartDateChange={(v) => onChangeOption("rentStartDate", v)}
+                      onEndDateChange={(v) => onChangeOption("rentEndDate", v)}
+                      onStartTimeChange={(v) => {
+                        setRentStartTime(v);
+                        onChangeOption("rentStartTime", v);
+                      }}
+                      onEndTimeChange={(v) => {
+                        setRentEndTime(v);
+                        onChangeOption("rentEndTime", v);
+                      }}
+                      T={T}
+                      specs={item.rawSpecs ?? {}}
+                    />
+
+                    <AdditionalItems
+                      selection={extrasSelection}
+                      rentalHours={pricingResult?.displayHours}
+                      onChange={(sel) => {
+                        setExtrasSelection(sel);
+                        setHelmetCount(typeof sel.helmet === "number" ? sel.helmet : 0);
+                      }}
+                    />
+
+                    {pricingResult && (
+                      <>
+                        <PriceCard
+                          specs={item.rawSpecs ?? {}}
+                          startDate={options.rentStartDate ?? ""}
+                          endDate={options.rentEndDate ?? ""}
+                          startTime={rentStartTime}
+                          endTime={rentEndTime}
+                          helmetCount={helmetCount}
+                          extrasSelection={extrasSelection}
+                          isExpanded={priceCardExpanded}
+                          onToggleExpand={() => setPriceCardExpanded((v) => !v)}
+                          borderColor="var(--item-border)"
+                        />
+
+                        {pricingResult.rounded && (
+                          <RoundingWarning
+                            rounded={pricingResult.rounded}
+                            displayHours={pricingResult.displayHours}
+                            startTime={rentStartTime}
+                            onFixClick={handleFixRounding}
+                          />
+                        )}
+                      </>
                     )}
                   </>
                 )}
@@ -1980,8 +2171,8 @@ export function ItemModal({
           {/* In browser mode (no TG), CTAs become deep-links to the Telegram bot */}
           {!isInTelegram && (
             <div className="shrink-0 border-t p-2 text-center" style={{ ...surface.card, borderColor: "var(--item-border)" }}>
-              <p className="mb-1 text-[10px] text-[var(--item-muted-text)]">
-                ⚡ Бронирование и оплата — в Telegram-боте
+              <p className="mb-1 inline-flex items-center gap-1 text-[10px] text-[var(--item-muted-text)]">
+                <Zap className="h-3 w-3" aria-hidden /> Бронирование и оплата — в Telegram-боте
               </p>
               <button
                 type="button"
@@ -2016,7 +2207,7 @@ export function ItemModal({
               type="button"
               onClick={onClose}
               aria-label="Закрыть карточку товара"
-              className="rounded-xl border-2 border-white/20 px-2.5 py-1.5 text-xs font-medium transition hover:border-white/40 hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+              className="min-h-11 rounded-xl border-2 border-white/20 px-2.5 py-1.5 text-xs font-medium transition hover:border-white/40 hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
               style={surface.subtleCard}
             >
               Закрыть
@@ -2031,7 +2222,7 @@ export function ItemModal({
                   disabled={isAdding}
                   aria-busy={isAdding}
                   aria-label="Забронировать аренду"
-                  className="rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                  className="min-h-11 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
                 >
                   {rentCtaLabel}
                 </button>
@@ -2042,7 +2233,7 @@ export function ItemModal({
                   rel="noopener noreferrer"
                   onClick={() => trackContinueInTgLead("rental")}
                   aria-label="Продолжить бронирование в Telegram"
-                  className="flex items-center justify-center gap-1 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                  className="flex min-h-11 items-center justify-center gap-1 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
                 >
                   {rentCtaLabel}
                 </a>
@@ -2113,8 +2304,8 @@ export function ItemModal({
           {showCallbackForm && (
             <CallbackRequestForm
               bikeTitle={item.title}
-              accentColor="var(--item-accent)"
               onSubmit={handleCallbackSubmit}
+              trackingEnabled={vipBikeRentalTrackingEnabled}
             />
           )}
         </div>

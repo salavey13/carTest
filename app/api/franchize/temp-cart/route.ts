@@ -20,7 +20,12 @@ export async function POST(request: NextRequest) {
     cartBySlug?: unknown;
   };
 
-  if (typeof cartId !== "string" || !cartId.trim()) {
+  if (
+    typeof cartId !== "string" ||
+    !cartId.trim() ||
+    cartId.trim().length > 160 ||
+    cartId.trim().startsWith("vip-bike-callback-")
+  ) {
     return NextResponse.json({ ok: false, error: "Missing cartId" }, { status: 400 });
   }
 
