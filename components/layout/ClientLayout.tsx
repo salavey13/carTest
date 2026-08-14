@@ -200,7 +200,7 @@ function AppInitializers() {
             "scrolled_like_a_maniac"
             );
             newAchievements?.forEach((ach) => {
-            addToast(`🏆 Ачивка: ${ach.name}!`, { description: ach.description });
+            addToast(`Ачивка: ${ach.name}!`, { description: ach.description });
             });
         } catch (error) {
             logger.error("[ClientLayout] Error unlocking achievement:", error);
@@ -268,6 +268,26 @@ function useThemeSync() {
   }, [dbUser, isLoading, hasSynced, resolvedTheme, setTheme]);
 }
 
+function shouldShowGlobalHeaderAndFooter(pathname: string) {
+  return !(
+    pathname === "/profile" ||
+    pathname === "/repo-xml" ||
+    pathname === "/sauna-rent" ||
+    pathname.startsWith("/wb") ||
+    pathname === "/wblanding" ||
+    pathname === "/wblanding/referral" ||
+    pathname === "/csv-compare" ||
+    pathname === "/streamer" ||
+    pathname === "/vipbikerental" ||
+    pathname === "/blogger" ||
+    pathname.startsWith("/optimapipe") ||
+    pathname.startsWith("/rules") ||
+    pathname.startsWith("/svarprofi") ||
+    pathname === "/" ||
+    pathname === "/admin/map-routes"
+  );
+}
+
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const {
@@ -275,7 +295,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   } = useAppContext();
   const { activeLobby } = useStrikeballLobbyContext();
 
-  const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
+  const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(() =>
+    shouldShowGlobalHeaderAndFooter(pathname),
+  );
   const theme = useMemo(() => getThemeForPath(pathname), [pathname]);
   const CurrentHeader = theme.Header;
   const CurrentFooter = theme.Footer;
@@ -318,25 +340,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     pathsToShowBottomNavForStartsWith.some((p) => pathname?.startsWith(p));
 
   useEffect(() => {
-    setShowHeaderAndFooter(
-      !(
-        pathname === "/profile" ||
-        pathname === "/repo-xml" ||
-        pathname === "/sauna-rent" ||
-        pathname?.startsWith("/wb") ||
-        pathname === "/wblanding" ||
-        pathname === "/wblanding/referral" ||
-        pathname === "/csv-compare" ||
-        pathname === "/streamer" ||
-        pathname === "/vipbikerental" ||
-        pathname === "/blogger" ||
-        pathname?.startsWith("/optimapipe") ||
-        pathname?.startsWith("/rules") ||
-        pathname?.startsWith("/svarprofi") ||   // PATCH: svarprofi has own header/footer
-        pathname === "/" ||                      // PATCH: landing page has own header/footer
-        pathname === "/admin/map-routes"
-      )
-    );
+    setShowHeaderAndFooter(shouldShowGlobalHeaderAndFooter(pathname));
   }, [pathname]);
 
   const TRANSPARENT_LAYOUT_PAGES = ["/rentals", "/crews", "/paddock", "/admin", "/leaderboard", "/wb", "/wblanding", "/strikeball"];
@@ -395,7 +399,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <TooltipProvider>
             <ErrorBoundaryForOverlay>
-              <Suspense fallback={<Loading variant="bike" text="🏴‍☠️ LOADING VIBE..." />}>
+              <Suspense fallback={<Loading variant="bike" text="Загрузка..." />}>
                 <LayoutLogicController>{children}</LayoutLogicController>
               </Suspense>
             </ErrorBoundaryForOverlay>
