@@ -10,7 +10,13 @@ import { cn } from '@/lib/utils';
 import { debugLogger as logger } from '@/lib/debugLogger';
 import { toast } from 'sonner';
 
-export function ThemeToggleButton({ size = 'md' }: { size?: 'sm' | 'md' }) {
+export function ThemeToggleButton({
+  size = 'md',
+  className,
+}: {
+  size?: 'sm' | 'md';
+  className?: string;
+}) {
   const { dbUser } = useAppContext();
   const { resolvedTheme, setTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
@@ -61,7 +67,7 @@ export function ThemeToggleButton({ size = 'md' }: { size?: 'sm' | 'md' }) {
   }, [resolvedTheme, dbUser, isMounted, setTheme]);
 
   if (!isMounted) {
-    return <div className={cn("bg-muted/20 rounded-full animate-pulse", size === 'md' ? "w-9 h-9" : "w-8 h-8")} />;
+    return <div className={cn("bg-muted/20 rounded-full animate-pulse", size === 'md' ? "w-9 h-9" : "w-8 h-8", className)} />;
   }
   
   const iconSizeClass = size === 'md' ? "h-5 w-5" : "h-4 w-4";
@@ -75,7 +81,8 @@ export function ThemeToggleButton({ size = 'md' }: { size?: 'sm' | 'md' }) {
       className={cn(
         "relative flex items-center justify-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background",
         "hover:bg-accent text-foreground active:scale-90",
-        size === 'md' ? "w-9 h-9" : "w-8 h-8"
+        size === 'md' ? "w-9 h-9" : "w-8 h-8",
+        className,
       )}
       title={isDark ? "Включить светлую тему" : "Включить темную тему"}
     >

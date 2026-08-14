@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { headers } from "next/headers";
 import { CalendarCheck2, Clock3, ListChecks, MapPin, Phone, UserRoundCheck } from "lucide-react";
 import { CrewFooter } from "../components/CrewFooter";
 import { CrewHeader } from "../components/CrewHeader";
@@ -17,6 +18,10 @@ interface FranchizeSlugPageProps {
 
 export default async function FranchizeSlugPage({ params }: FranchizeSlugPageProps) {
   const { slug } = await params;
+  const hostname = (headers().get("host") || "").split(":")[0].toLowerCase();
+  const isVipBikeRentalHost =
+    slug === "vip-bike" &&
+    (hostname === "rental.vip-bike.ru" || hostname === "www.rental.vip-bike.ru");
   const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteWithCssVars(crew.theme);
   const ctaPolicy = getFranchizeRouteCtaPolicy("catalog");
@@ -24,9 +29,11 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
   return (
     <main className={`min-h-screen overflow-x-clip ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
       <ThemeInitializer defaultTheme="dark" />
-      <Suspense>
-        <JoinCrewBanner slug={slug} />
-      </Suspense>
+      {!isVipBikeRentalHost && (
+        <Suspense>
+          <JoinCrewBanner slug={slug} />
+        </Suspense>
+      )}
       {/*
         FIX: Wrap CrewHeader in FranchizeErrorBoundary so that any runtime
         error inside the header (including FranchizeProfileButton's Radix
@@ -35,14 +42,22 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
         bubbling up to the page-level error.tsx which shows the full-screen
         "Экипаж временно недоступен" fallback.
       */}
-      <DisplayModeProvider>
+      <DisplayModeProvider lockMode={isVipBikeRentalHost ? "rent" : undefined}>
       <FranchizeErrorBoundary
         resetKey={slug}
         fallbackTitle="Шапка недоступна"
         fallbackHref={`/franchize/${crew.slug || slug}`}
         fallbackLinkLabel="Обновить страницу экипажа"
       >
-        <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}`} groupLinks={items.map((item) => item.category)} items={items} />
+        <CrewHeader
+          crew={crew}
+          activePath={`/franchize/${crew.slug || slug}`}
+          groupLinks={items.map((item) => item.category)}
+          items={items}
+          showRail={!isVipBikeRentalHost}
+          conversionHomeHref={isVipBikeRentalHost ? "/" : undefined}
+          conversionContactHref={isVipBikeRentalHost ? "https://t.me/I_O_S_NN" : undefined}
+        />
       </FranchizeErrorBoundary>
       <FranchizeErrorBoundary
         resetKey={slug}
@@ -211,14 +226,15 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
               className="text-xl font-bold uppercase tracking-tight md:text-2xl"
               style={{ color: "var(--franchize-text-primary, inherit)" }}
             >
-              Понравился тест-драйв?
+              {isVipBikeRentalHost ? "Уже арендовал мотоцикл?" : "Понравился тест-драйв?"}
             </h2>
             <p
               className="mx-auto mt-2 max-w-xl text-sm leading-relaxed md:text-base"
               style={{ color: "var(--franchize-text-secondary, inherit)" }}
             >
-              Расскажи на Яндекс Картах, как всё прошло. Твой отзыв помогает другим
-              байкерам выбрать свой электромотоцикл и мотивирует экипаж становиться лучше.
+              {isVipBikeRentalHost
+                ? "Расскажи на Яндекс Картах, как всё прошло. Отзыв поможет другим выбрать мотоцикл для аренды."
+                : "Расскажи на Яндекс Картах, как всё прошло. Твой отзыв помогает другим байкерам выбрать свой электромотоцикл и мотивирует экипаж становиться лучше."}
             </p>
 
             <a
@@ -268,7 +284,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
       )}
       </DisplayModeProvider>
 
-      <CrewFooter crew={crew} />
+      {!isVipBikeRentalHost && <CrewFooter crew={crew} />}
     </main>
   );
 }

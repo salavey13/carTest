@@ -3,7 +3,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Menu } from "lucide-react";
+import { ArrowLeft, Menu, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
@@ -38,9 +38,20 @@ interface CrewHeaderProps {
   sectionLinks?: FranchizeSectionLink[];
   items?: CatalogItemVM[];
   showRail?: boolean;
+  conversionHomeHref?: string;
+  conversionContactHref?: string;
 }
 
-export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [], items, showRail = true }: CrewHeaderProps) {
+export function CrewHeader({
+  crew,
+  activePath,
+  groupLinks = [],
+  sectionLinks = [],
+  items,
+  showRail = true,
+  conversionHomeHref,
+  conversionContactHref,
+}: CrewHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const pathname = usePathname();
@@ -49,7 +60,8 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
   const router = useRouter();
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const isOnCatalogPage = pathname === mainCatalogPath || pathname === `${mainCatalogPath}/`;
-  const headerLogoHref = crew.header.logoHref || mainCatalogPath;
+  const isConversionHeader = Boolean(conversionHomeHref && conversionContactHref);
+  const headerLogoHref = conversionHomeHref || crew.header.logoHref || mainCatalogPath;
   const prevPathnameRef = useRef<string | null>(null);
 
   // Apply franchize theme CSS variables
@@ -178,22 +190,38 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             pointerEvents: isCompact ? "none" : "auto",
           }}
         >
-          <button
-            type="button"
-            aria-label="Открыть меню экипажа"
-            aria-expanded={menuOpen}
-            aria-controls="franchize-header-menu"
-            onClick={() => setMenuOpen(true)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 pointer-events-auto"
-            style={{
-              backgroundColor: crew.theme.isAuto
-                ? "var(--franchize-bg-base)"
-                : withAlpha(palette.bgBase, 0.8),
-              color: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
-            }}
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+          {isConversionHeader ? (
+            <Link
+              href={conversionHomeHref!}
+              aria-label="Вернуться на главную страницу аренды"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 pointer-events-auto"
+              style={{
+                backgroundColor: crew.theme.isAuto
+                  ? "var(--franchize-bg-base)"
+                  : withAlpha(palette.bgBase, 0.8),
+                color: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
+              }}
+            >
+              <ArrowLeft className="h-5 w-5" aria-hidden />
+            </Link>
+          ) : (
+            <button
+              type="button"
+              aria-label="Открыть меню экипажа"
+              aria-expanded={menuOpen}
+              aria-controls="franchize-header-menu"
+              onClick={() => setMenuOpen(true)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 pointer-events-auto"
+              style={{
+                backgroundColor: crew.theme.isAuto
+                  ? "var(--franchize-bg-base)"
+                  : withAlpha(palette.bgBase, 0.8),
+                color: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
+              }}
+            >
+              <Menu className="h-5 w-5" aria-hidden />
+            </button>
+          )}
 
           {/* HEADER LOGO — PURE SPA LINK */}
           {/*
@@ -274,6 +302,24 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
             to click through to the invisible profile button.
             Now it respects the compact state.
           */}
+          {isConversionHeader ? (
+            <a
+              href={conversionContactHref!}
+              target="_blank"
+              rel="noreferrer noopener"
+              aria-label="Написать менеджеру в Telegram"
+              className="relative z-[2] inline-flex h-11 w-11 items-center justify-center justify-self-end rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+              style={{
+                backgroundColor: crew.theme.isAuto
+                  ? "var(--franchize-bg-base)"
+                  : withAlpha(palette.bgBase, 0.8),
+                color: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
+                pointerEvents: isCompact ? "none" : "auto",
+              }}
+            >
+              <Send className="h-5 w-5" aria-hidden />
+            </a>
+          ) : (
           <div className="flex items-center gap-2 justify-self-end relative z-[2] pointer-events-auto" style={{ pointerEvents: isCompact ? "none" : "auto" }}>
             <CrewButtonErrorBoundary
               bgColor={crew.theme.isAuto ? "var(--franchize-bg-base)" : withAlpha(palette.bgBase, 0.8)}
@@ -304,6 +350,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
               />
             )}
           </div>
+          )}
         </div>
       </div>
 
@@ -381,7 +428,9 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
         </div>
       )}
 
-      <HeaderMenu crew={crew} activePath={activePath} open={menuOpen} onOpenChange={setMenuOpen} />
+      {!isConversionHeader && (
+        <HeaderMenu crew={crew} activePath={activePath} open={menuOpen} onOpenChange={setMenuOpen} />
+      )}
     </header>
   );
 }
