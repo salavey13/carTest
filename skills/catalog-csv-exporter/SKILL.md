@@ -65,7 +65,7 @@ Or manually push via the standard push_file pattern (see push script).
 
 ## CSV schema
 
-### vip-bike-rent.csv columns (45)
+### vip-bike-rent.csv columns (47)
 
 ```
 id, make, model, bike_subtype, type, year, license_class, description,
@@ -76,10 +76,14 @@ power_kw, motor_peak_kw, motor_nominal_kw, power_hp, torque_nm, top_speed_kmh,
 range_km, battery, voltage_v, weight_kg, seat_height_mm,
 brake_type, suspension_type, frame_type, drive, color, charge_time_h,
 engine_cc, fuel_type, fuel_capacity_l, transmission, cooling,
-rent_link
+rent_link, webapp_link, vk_url
 ```
 
-### vip-bike-sale.csv columns (41)
+- `webapp_link`: direct Telegram WebApp link to rent this bike
+  (`https://t.me/oneBikePlsBot/app?startapp=rent_{bike_id}`)
+- `vk_url`: VK Market product URL (from `specs.vk_url` — empty if not set yet)
+
+### vip-bike-sale.csv columns (43)
 
 ```
 id, make, model, bike_subtype, type, year, license_class, description,
@@ -89,8 +93,12 @@ power_kw, motor_peak_kw, power_hp, torque_nm, top_speed_kmh,
 range_km, battery, voltage_v, weight_kg, seat_height_mm,
 brake_type, suspension_type, frame_type, drive, color, charge_time_h,
 engine_cc, fuel_type, fuel_capacity_l, transmission, cooling,
-buy_colors_json, buy_options_json, rent_link
+buy_colors_json, buy_options_json, rent_link, webapp_link, vk_url
 ```
+
+- `webapp_link`: direct Telegram WebApp link to buy this bike
+  (`https://t.me/oneBikePlsBot/app?startapp=buy_{bike_id}`)
+- `vk_url`: VK Market product URL (from `specs.vk_url` — empty if not set yet)
 
 ## Corruption prevention
 
