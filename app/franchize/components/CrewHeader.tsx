@@ -312,7 +312,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
           className="-mx-4 mt-1 border-t px-4 pt-2"
           style={{ borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft }}
         >
-          <div className="mx-auto flex w-full max-w-7xl gap-2 pb-1" role="tablist" aria-label="Навигация экипажа">
+          <div className="mx-auto flex w-full max-w-7xl gap-2 pb-1 overflow-x-auto scrollbar-hide" role="tablist" aria-label="Навигация экипажа" style={{ WebkitOverflowScrolling: 'touch' }}>
             {([
               { key: "rent" as const, label: "Аренда", count: items?.filter(hasRentPrice).length ?? 0 },
               { key: "sale" as const, label: "Продажа", count: items?.filter(hasSalePrice).length ?? 0 },
@@ -357,12 +357,14 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
                 </button>
               );
             })}
-            {/* Equipment link */}
-            <Link
-              href={`${mainCatalogPath}/${EQUIPMENT_PATH}`}
-              className={`shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 select-none active:scale-95 no-underline ${
-                pathname === `${mainCatalogPath}/${EQUIPMENT_PATH}` ? "ring-2 ring-offset-2" : "opacity-70 hover:opacity-100"
-              }`}
+            {/* Equipment pill */}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={pathname === `${mainCatalogPath}/${EQUIPMENT_PATH}`}
+              onClick={() => router.push(`${mainCatalogPath}/${EQUIPMENT_PATH}`)}
+              disabled={isTransitioning}
+              className="shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 select-none disabled:opacity-50 active:scale-95"
               style={{
                 backgroundColor: pathname === `${mainCatalogPath}/${EQUIPMENT_PATH}`
                   ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain)
@@ -374,7 +376,7 @@ export function CrewHeader({ crew, activePath, groupLinks = [], sectionLinks = [
               }}
             >
               Экипировка
-            </Link>
+            </button>
           </div>
         </div>
       )}
