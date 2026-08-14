@@ -196,6 +196,8 @@ RENT_CSV_COLUMNS = [
     "transmission",
     "cooling",
     "rent_link",
+    "webapp_link",         # https://t.me/oneBikePlsBot/app?startapp=rent_{bike_id}
+    "vk_url",              # VK Market product URL (from specs.vk_url, empty if not set)
 ]
 
 # Columns for SALE CSV — focused on sale-relevant info
@@ -241,6 +243,8 @@ SALE_CSV_COLUMNS = [
     "buy_colors_json",
     "buy_options_json",
     "rent_link",
+    "webapp_link",         # https://t.me/oneBikePlsBot/app?startapp=buy_{bike_id}
+    "vk_url",              # VK Market product URL (from specs.vk_url, empty if not set)
 ]
 
 
@@ -293,6 +297,8 @@ def build_rent_row(bike):
         "transmission": safe_str(get_spec(specs, "transmission")),
         "cooling": safe_str(get_spec(specs, "cooling")),
         "rent_link": bike.get("rent_link", ""),
+        "webapp_link": f"https://t.me/oneBikePlsBot/app?startapp=rent_{bike.get('id', '')}",
+        "vk_url": safe_str(get_spec(specs, "vk_url")),
     }
     return row
 
@@ -342,6 +348,8 @@ def build_sale_row(bike):
         "buy_colors_json": serialize_nested(get_spec(specs, "buy_colors")),
         "buy_options_json": serialize_nested(get_spec(specs, "buy_options")),
         "rent_link": bike.get("rent_link", ""),
+        "webapp_link": f"https://t.me/oneBikePlsBot/app?startapp=buy_{bike.get('id', '')}",
+        "vk_url": safe_str(get_spec(specs, "vk_url")),
     }
     return row
 
