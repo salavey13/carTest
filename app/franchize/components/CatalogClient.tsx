@@ -1014,7 +1014,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           </button>
         </div>
 
-        {promoModules.length > 0 && mode !== "electro" && (
+        {promoModules.length > 0 &&
+          mode !== "electro" &&
+          ctaPolicy?.intent !== "rental" && (
           <div className="mb-5 flex min-w-0 max-w-full gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-1 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:bg-current/20] [&::-webkit-scrollbar-thumb:hover:bg-current/30] sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 sm:[&::-webkit-scrollbar]:hidden sm:[scrollbar-width:none]">
             {visiblePromoModules.map((module, index) => {
               const isExternal = /^(https?:|mailto:|tel:)/.test(module.href);
