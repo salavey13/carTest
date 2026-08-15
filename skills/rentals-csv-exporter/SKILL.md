@@ -39,7 +39,7 @@ Export VIP Bike active rentals from Supabase `public.rentals` to a compact CSV f
 python3 scripts/export_vip_bike_rentals.py
 ```
 
-Generates: `<repo>/download/vip-bike-rentals.csv` (`<repo>` = repo root, e.g. `/opt/vip-bike-electro-factory/rental-repo`)
+Generates: `<repo>/public/docs/autoreply/vip-bike-rentals.csv` (`<repo>` = repo root, e.g. `/opt/vip-bike-electro-factory/rental-repo`)
 
 ### Step 2: Push CSV to repo
 
@@ -108,6 +108,6 @@ Hourly regeneration keeps the rental status current. More frequent than catalog 
 
 - Script: `scripts/export_vip_bike_rentals.py`
 - Push script: `scripts/push_rentals_csv.py`
-- Output (local): `<repo>/download/vip-bike-rentals.csv`
-- Output (repo): `docs/autoreply/vip-bike-rentals.csv`
+- Output: `<repo>/public/docs/autoreply/vip-bike-rentals.csv`
+- Public URL: `https://rental.vip-bike.ru/docs/autoreply/vip-bike-rentals.csv`
 - Companion skill: `skills/catalog-csv-exporter/SKILL.md` (bike catalog CSVs)

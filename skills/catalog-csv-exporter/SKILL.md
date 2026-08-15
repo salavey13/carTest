@@ -42,7 +42,7 @@ Export VIP Bike catalog from Supabase `public.cars` to clean, compact CSV files 
 python3 scripts/export_vip_bike_csv.py
 ```
 
-This generates 2 files in `<repo>/download/` (`<repo>` = repo root, e.g. `/opt/vip-bike-electro-factory/rental-repo`):
+This generates 2 files in `<repo>/public/docs/autoreply/` (`<repo>` = repo root, e.g. `/opt/vip-bike-electro-factory/rental-repo`):
 - `vip-bike-rent.csv` (21 rows, 46 columns)
 - `vip-bike-sale.csv` (19 rows, 42 columns)
 
@@ -153,6 +153,8 @@ To regenerate CSVs nightly:
 
 - Script: `scripts/export_vip_bike_csv.py`
 - Push script: `scripts/push_catalog_csvs.py`
-- Output (local): `<repo>/download/vip-bike-rent.csv`, `vip-bike-sale.csv`
-- Output (repo): `docs/autoreply/vip-bike-rent.csv`, `docs/autoreply/vip-bike-sale.csv`
+- Output: `<repo>/public/docs/autoreply/vip-bike-rent.csv`, `public/docs/autoreply/vip-bike-sale.csv`
+- Public URLs:
+  - `https://rental.vip-bike.ru/docs/autoreply/vip-bike-rent.csv`
+  - `https://rental.vip-bike.ru/docs/autoreply/vip-bike-sale.csv`
 - Supabase gold-standard schemas: `docs/gold-standard-ice-bike-spec-schema.md`, `docs/gold-standard-electro-bike-spec-schema.md`

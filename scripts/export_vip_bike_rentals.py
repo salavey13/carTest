@@ -3,7 +3,7 @@
 Export VIP Bike active rentals to CSV for agent use.
 
 Generates 1 CSV file:
-  - <repo>/download/vip-bike-rentals.csv  (active + upcoming rents)
+  - <repo>/public/docs/autoreply/vip-bike-rentals.csv  (active + upcoming rents)
 
 Source: Supabase public.rentals table
   - crew_id = vip-bike crew (2d5fde70-1dd3-4f0d-8d72-66ccf6908746)
@@ -41,7 +41,7 @@ def _load_service_key() -> str:
 SERVICE_KEY = _load_service_key()
 VIP_BIKE_CREW_ID = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746"
 
-OUTPUT_DIR = Path(__file__).resolve().parent.parent / "download"
+OUTPUT_DIR = Path(__file__).resolve().parent.parent / "public" / "docs" / "autoreply"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # How far ahead to look for upcoming rents (days)

@@ -3,8 +3,8 @@
 Export VIP Bike catalog to clean, compact CSV files for agent use.
 
 Generates 2 CSV files:
-  - <repo>/download/vip-bike-rent.csv  (bikes with specs.rent = truthy)
-  - <repo>/download/vip-bike-sale.csv  (bikes with specs.sale = truthy)
+  - <repo>/public/docs/autoreply/vip-bike-rent.csv  (bikes with specs.rent = truthy)
+  - <repo>/public/docs/autoreply/vip-bike-sale.csv  (bikes with specs.sale = truthy)
 
 Source: Supabase public.cars table
   - type = 'bike'
@@ -47,7 +47,7 @@ def _load_service_key() -> str:
 SERVICE_KEY = _load_service_key()
 VIP_BIKE_CREW_ID = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746"
 
-OUTPUT_DIR = Path(__file__).resolve().parent.parent / "download"
+OUTPUT_DIR = Path(__file__).resolve().parent.parent / "public" / "docs" / "autoreply"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ════════════════════════════════════════════════════════════
