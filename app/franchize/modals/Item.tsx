@@ -621,6 +621,7 @@ export const ADDITIONAL_ITEMS = [
   { key: "helmet", label: "Шлем", price: 1000, hourlyPrice: 500, type: "count" as const, max: 2 },
   { key: "gloves", label: "Перчатки", price: 500, type: "toggle" as const },
   { key: "jacket", label: "Куртка", price: 500, type: "toggle" as const },
+  { key: "pants", label: "Штаны", price: 500, type: "toggle" as const },
   { key: "boots", label: "Боты/Сапоги", price: 500, type: "toggle" as const },
   { key: "net", label: "Сетка", price: 500, type: "toggle" as const },
   { key: "backpack", label: "Рюкзак", price: 500, type: "toggle" as const },

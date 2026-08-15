@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "fs/promises";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 
 /**
  * Public API route to serve documentation files and CSVs.
@@ -17,12 +18,29 @@ import { join } from "path";
  * For cleaner URLs (without /api/), rewrites in next.config.mjs
  * map /docs/* → /api/docs/*
  */
+
+// Get project root from current file location
+// In Next.js API routes, we need to traverse up from the API route directory
+const getCurrentDirname = () => {
+  if (typeof __dirname !== 'undefined') return __dirname;
+  // For ESM modules
+  const __filename = fileURLToPath(import.meta.url);
+  return dirname(__filename);
+};
+
+const getProjectRoot = () => {
+  const currentDir = getCurrentDirname();
+  // From app/api/docs/[[...path]] go up 4 levels to project root
+  return join(currentDir, '..', '..', '..', '..');
+};
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path } = await params;
-  const filePath = join(process.cwd(), "docs", ...path);
+  const projectRoot = getProjectRoot();
+  const filePath = join(projectRoot, "docs", ...path);
 
   try {
     const file = await readFile(filePath);
