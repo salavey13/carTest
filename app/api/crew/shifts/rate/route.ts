@@ -1,7 +1,10 @@
 // app/api/crew/shifts/rate/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
-import { verifyTelegramActor } from "@/lib/telegram-actor-cookie";
+import { verifyTelegramActorCookieValue, TELEGRAM_ACTOR_COOKIE } from "@/lib/telegram-actor-cookie";
+
+// Force dynamic rendering because this route uses request.cookies for auth
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,8 +24,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the user is authenticated
-    const actorCookie = request.cookies.get("telegram_actor");
-    const actorUserId = actorCookie ? verifyTelegramActor(actorCookie.value) : null;
+    const actorCookie = request.cookies.get(TELEGRAM_ACTOR_COOKIE);
+    const actorUserId = actorCookie ? verifyTelegramActorCookieValue(actorCookie.value) : null;
     if (!actorUserId || actorUserId !== memberId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
