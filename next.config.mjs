@@ -74,14 +74,6 @@ const nextConfig = {
       },
     ]
   },
-  async rewrites() {
-    return [
-      {
-        source: '/docs/:path*',
-        destination: '/api/docs/:path*',
-      },
-    ]
-  },
   // I12 hotfix: REMOVED the beforeFiles rewrite { source: '/', destination: '/franchize/vip-bike' }.
   // Previously "/" was rewritten to the franchize catalog, which meant the
   // landing page (app/page.tsx) was never shown. Now "/" renders app/page.tsx

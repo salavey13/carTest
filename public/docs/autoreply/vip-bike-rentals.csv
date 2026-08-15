@@ -1,0 +1,1 @@
+"rental_id","vehicle_id","bike_make","bike_model","user_id","status","payment_status","start_date","end_date","duration_days","total_cost","deposit_amount","deposit_method","deposit_collected_at","deposit_returned","delivery_address","is_active_today","is_upcoming","created_at","crew_id"
