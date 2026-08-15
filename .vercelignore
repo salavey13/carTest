@@ -29,7 +29,7 @@ _tmp/
 # ===================================================================
 # Exclude large data files
 # ===================================================================
-*.csv
+# *.csv  <-- REMOVED: public/docs/autoreply/*.csv files need to be served
 seed.sql
 *.pdf
 
