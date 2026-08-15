@@ -519,6 +519,7 @@ function buildEquipmentKeyboard(context: DocFlowContext): KeyboardButton[][] {
   const helmets = context.helmets || 0;
   const gloves = context.gloves || 0;
   const jacket = context.jacket || false;
+  const pants = context.pants || false;
   const boots = context.boots || false;
   const net = context.net || false;
   const backpack = context.backpack || false;
@@ -531,6 +532,9 @@ function buildEquipmentKeyboard(context: DocFlowContext): KeyboardButton[][] {
     ],
     [
       { text: `${jacket ? "✅" : "⬜"} Куртка`, callback_data: "eq_jacket" },
+      { text: `${pants ? "✅" : "⬜"} Штаны`, callback_data: "eq_pants" },
+    ],
+    [
       { text: `${boots ? "✅" : "⬜"} Боты`, callback_data: "eq_boots" },
     ],
     [
@@ -742,10 +746,11 @@ interface DocFlowContext {
 
   // ── Equipment selection (added 2026-07-06) ────────────────────────────────
   // Additional equipment rented with the bike. Prices: helmet=500 (hourly <24h) or 1000 (daily ≥24h),
-  // gloves=500, net=500, backpack=500, bag=500, charger=0 (free but tracked for return).
+  // gloves=500, jacket=500, pants=500, boots=500, net=500, backpack=500, bag=500, charger=0 (free but tracked for return).
   helmets?: number;        // 0-2 helmets
   gloves?: number;         // 0-2 pairs of gloves
   jacket?: boolean;        // motorcycle jacket
+  pants?: boolean;         // motorcycle pants
   boots?: boolean;         // motorcycle boots
   net?: boolean;           // safety net
   backpack?: boolean;      // backpack
@@ -1456,11 +1461,12 @@ async function createRentalFromDocContract(
     const helmetsEq = context.helmets || 0;
     const glovesEq = context.gloves || 0;
     const jacketEq = context.jacket ? 1 : 0;
+    const pantsEq = context.pants ? 1 : 0;
     const bootsEq = context.boots ? 1 : 0;
     const netEq = context.net ? 1 : 0;
     const backpackEq = context.backpack ? 1 : 0;
     const bagEq = context.bag ? 1 : 0;
-    const equipmentCostTotal = helmetsEq * getHelmetPrice(hours) + glovesEq * 500 + jacketEq * 500 + bootsEq * 500 + netEq * 500 + backpackEq * 500 + bagEq * 500;
+    const equipmentCostTotal = helmetsEq * getHelmetPrice(hours) + glovesEq * 500 + jacketEq * 500 + pantsEq * 500 + bootsEq * 500 + netEq * 500 + backpackEq * 500 + bagEq * 500;
     // CR fix: if operator overrode the price, use the overridden value
     // (cashAmount + bankAmount) instead of the recalculated total.
     const totalCost = context.priceOverridden
@@ -1522,6 +1528,7 @@ async function createRentalFromDocContract(
           helmets: context.helmets || 0,
           gloves: context.gloves || 0,
           jacket: context.jacket || false,
+          pants: context.pants || false,
           boots: context.boots || false,
           net: context.net || false,
           backpack: context.backpack || false,
@@ -1671,6 +1678,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
           helmets: context.helmets || 0,
           gloves: context.gloves || 0,
           jacket: context.jacket || false,
+          pants: context.pants || false,
           boots: context.boots || false,
           net: context.net || false,
           backpack: context.backpack || false,
@@ -3738,6 +3746,14 @@ export async function handleDocCallback(
     return true;
   }
 
+  if (callbackData === "eq_pants") {
+    context.pants = !context.pants;
+    await setState(userId, "equipment", context);
+    logger.info(`[/doc] eq_pants: ${userId} → pants=${context.pants}`);
+    await sendComplexMessage(chatId, `👖 Штаны: ${context.pants ? "✅" : "⬜"}`, buildEquipmentKeyboard(context), { keyboardType: 'inline', parseMode: 'Markdown' });
+    return true;
+  }
+
   if (callbackData === "eq_boots") {
     context.boots = !context.boots;
     await setState(userId, "equipment", context);
@@ -3747,7 +3763,7 @@ export async function handleDocCallback(
   }
 
   if (callbackData === "eq_done") {
-    logger.info(`[/doc] eq_done: ${userId} → equipment done (helmets=${context.helmets || 0}, gloves=${context.gloves || 0}, jacket=${!!context.jacket}, boots=${!!context.boots}, net=${!!context.net}, backpack=${!!context.backpack}, bag=${!!context.bag}, charger=${!!context.charger}), moving to odometer`);
+    logger.info(`[/doc] eq_done: ${userId} → equipment done (helmets=${context.helmets || 0}, gloves=${context.gloves || 0}, jacket=${!!context.jacket}, pants=${!!context.pants}, boots=${!!context.boots}, net=${!!context.net}, backpack=${!!context.backpack}, bag=${!!context.bag}, charger=${!!context.charger}), moving to odometer`);
     await gotoOdometer(chatId, userId, context);
     return true;
   }
