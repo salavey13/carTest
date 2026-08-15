@@ -18,6 +18,7 @@ Designed to be run by cron job or skill. Output is compact and clean:
   - gallery joined with | (pipe)
   - Nested objects (buy_colors, buy_options, spec_labels) serialized as clean JSON
   - All fields properly CSV-quoted
+  - Image URLs swapped to public mirror (rental.vip-bike.ru/supabase-mirror/carpix/)
 
 Usage:
   python3 export_vip_bike_csv.py
@@ -26,6 +27,12 @@ Output files are also pushed to repo at docs/autoreply/ by the companion skill.
 """
 import json, csv, os, sys, urllib.request, datetime
 from pathlib import Path
+
+# Fix Unicode encoding on Windows
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # ════════════════════════════════════════════════════════════
 # CONFIG
@@ -86,10 +93,29 @@ def normalize_gallery(gallery):
     if not gallery:
         return ""
     if isinstance(gallery, list):
-        return "|".join(g for g in gallery if g)
+        # Swap URLs in each gallery item
+        swapped = [swap_supabase_url(g) for g in gallery if g]
+        return "|".join(swapped)
     if isinstance(gallery, str):
-        return gallery
+        # Swap URLs in string (pipe-separated)
+        return "|".join(swap_supabase_url(g) for g in gallery.split("|") if g)
     return ""
+
+
+def swap_supabase_url(url):
+    """
+    Swap Supabase storage URL to public mirror URL.
+    From: https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/...
+    To:   https://rental.vip-bike.ru/supabase-mirror/carpix/...
+    """
+    if not url or not isinstance(url, str):
+        return url
+    # Match the exact Supabase storage prefix
+    old_prefix = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/"
+    new_prefix = "https://rental.vip-bike.ru/supabase-mirror/carpix/"
+    if url.startswith(old_prefix):
+        return url.replace(old_prefix, new_prefix, 1)
+    return url
 
 
 def serialize_nested(obj):
@@ -281,7 +307,7 @@ def build_rent_row(bike):
         "rent_5_10d": safe_str(get_spec(specs, "rent_5_10d")),
         "rent_11_30d": safe_str(get_spec(specs, "rent_11_30d")),
         "deposit_rub": safe_str(get_spec(specs, "deposit_rub")),
-        "image_url": bike.get("image_url", ""),
+        "image_url": swap_supabase_url(bike.get("image_url", "")),
         "gallery": normalize_gallery(get_spec(specs, "gallery")),
         "features": normalize_features(get_spec(specs, "features")),
         "power_kw": safe_str(get_spec(specs, "power_kw")),
@@ -331,7 +357,7 @@ def build_sale_row(bike):
         "sold_count": safe_str(get_spec(specs, "sold_count")),
         "recommend_percent": safe_str(get_spec(specs, "recommend_percent")),
         "rating": safe_str(get_spec(specs, "rating")),
-        "image_url": bike.get("image_url", ""),
+        "image_url": swap_supabase_url(bike.get("image_url", "")),
         "gallery": normalize_gallery(get_spec(specs, "gallery")),
         "features": normalize_features(get_spec(specs, "features")),
         "power_kw": safe_str(get_spec(specs, "power_kw")),
