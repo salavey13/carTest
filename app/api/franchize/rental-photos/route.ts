@@ -7,6 +7,9 @@ import {
   verifyTelegramActorCookieValue,
 } from "@/lib/telegram-actor-cookie";
 
+// Force dynamic rendering because this route uses request.cookies for auth
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/franchize/rental-photos?rentalId=<uuid>[&photoType=start|end]
  *
