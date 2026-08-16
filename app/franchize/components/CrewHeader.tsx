@@ -18,7 +18,7 @@ import { useResolvedPalette } from "../lib/useResolvedPalette";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
-import { hasRentPrice, hasSalePrice, hasServicePrice } from "../lib/catalog-utils";
+import { hasRentPrice, hasSalePrice, hasServicePrice, hasEquipmentPrice } from "../lib/catalog-utils";
 import { readablePaletteTextOnColor, withAlpha } from "../lib/theme";
 
 const EQUIPMENT_PATH = "equipment";
@@ -359,14 +359,23 @@ export function CrewHeader({
           className="-mx-4 mt-1 border-t px-4 pt-2"
           style={{ borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft }}
         >
-          <div className="mx-auto flex w-full max-w-7xl gap-2 pb-1 overflow-x-auto scrollbar-hide" role="tablist" aria-label="Навигация экипажа" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="mx-auto flex w-full max-w-7xl gap-2 pb-1 overflow-x-auto" role="tablist" aria-label="Навигация экипажа" style={{ WebkitOverflowScrolling: 'touch' }}>
             {([
               { key: "rent" as const, label: "Аренда", count: items?.filter(hasRentPrice).length ?? 0 },
               { key: "sale" as const, label: "Продажа", count: items?.filter(hasSalePrice).length ?? 0 },
               { key: "service" as const, label: "Сервис", count: items?.filter(hasServicePrice).length ?? 0 },
+              { key: "equipment" as const, label: "Экипировка", count: items?.filter(hasEquipmentPrice).length ?? 0, isEquipment: true },
             ]).map((pill) => {
-              const isActive = displayMode === pill.key;
+              // Equipment uses pathname-based active state (separate route);
+              // rent/sale/service use displayMode-based active state
+              const isActive = pill.isEquipment
+                ? pathname === `${mainCatalogPath}/${EQUIPMENT_PATH}`
+                : displayMode === pill.key && !pathname.includes(`/${EQUIPMENT_PATH}`);
               const handlePillClick = () => {
+                if (pill.isEquipment) {
+                  router.push(`${mainCatalogPath}/${EQUIPMENT_PATH}`);
+                  return;
+                }
                 if (isOnCatalogPage) {
                   setDisplayMode(pill.key);
                 } else {
@@ -404,26 +413,6 @@ export function CrewHeader({
                 </button>
               );
             })}
-            {/* Equipment pill */}
-            <button
-              type="button"
-              role="tab"
-              aria-selected={pathname === `${mainCatalogPath}/${EQUIPMENT_PATH}`}
-              onClick={() => router.push(`${mainCatalogPath}/${EQUIPMENT_PATH}`)}
-              disabled={isTransitioning}
-              className="shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 select-none disabled:opacity-50 active:scale-95"
-              style={{
-                backgroundColor: pathname === `${mainCatalogPath}/${EQUIPMENT_PATH}`
-                  ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain)
-                  : (crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard),
-                color: pathname === `${mainCatalogPath}/${EQUIPMENT_PATH}`
-                  ? activePillText
-                  : (crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary),
-                transform: pathname === `${mainCatalogPath}/${EQUIPMENT_PATH}` ? "scale(1.05)" : "scale(1)",
-              }}
-            >
-              Экипировка
-            </button>
           </div>
         </div>
       )}
