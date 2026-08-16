@@ -360,6 +360,7 @@ export interface DocFlowEquipmentContext {
   helmets?: number;
   gloves?: number;
   jacket?: boolean;
+  pants?: boolean;
   boots?: boolean;
   net?: boolean;
   backpack?: boolean;
@@ -418,6 +419,15 @@ export async function createEquipmentRowsForRental(params: {
     if (context.jacket) {
       rowsToCreate.push({
         equipment_id: EQUIPMENT_FLAG_TO_CAR_ID.jacket,
+        daily_price: 300,
+        total_cost: 300,
+      });
+    }
+
+    // Pants (1 if true)
+    if (context.pants) {
+      rowsToCreate.push({
+        equipment_id: EQUIPMENT_FLAG_TO_CAR_ID.pants,
         daily_price: 300,
         total_cost: 300,
       });
