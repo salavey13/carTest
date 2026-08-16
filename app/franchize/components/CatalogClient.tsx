@@ -12,7 +12,7 @@ import { shouldShowFloatingCart } from "../lib/route-cta-policy";
 import { catalogCardVariantStyles, crewPaletteForSurface, getContrastingGlowStyle, interactionRingStyle, readableTextOnColor, withAlpha } from "../lib/theme";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { upsertFranchizeIntent } from "../actions";
-import { hasRentPrice, hasSalePrice, hasServicePrice } from "../lib/catalog-utils";
+import { hasRentPrice, hasSalePrice, hasServicePrice, hasEquipmentPrice } from "../lib/catalog-utils";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { useDisplayMode } from "./DisplayModeContext";
 import { SHOW_CART } from "@/lib/feature-flags";
@@ -534,6 +534,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       if (displayMode === "rent") return hasRentPrice(item);
       if (displayMode === "sale") return hasSalePrice(item);
       if (displayMode === "service") return hasServicePrice(item);
+      if (displayMode === "equipment") return hasEquipmentPrice(item);
       return true;
     });
     return QUICK_FILTERS.reduce<Record<QuickFilterKey, number>>(
@@ -555,6 +556,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       if (displayMode === "rent") return hasRentPrice(item);
       if (displayMode === "sale") return hasSalePrice(item);
       if (displayMode === "service") return hasServicePrice(item);
+      if (displayMode === "equipment") return hasEquipmentPrice(item);
       return true;
     });
 
@@ -607,6 +609,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       if (displayMode === "rent") return hasRentPrice(item);
       if (displayMode === "sale") return hasSalePrice(item);
       if (displayMode === "service") return hasServicePrice(item);
+      if (displayMode === "equipment") return hasEquipmentPrice(item);
       return true;
     });
 
