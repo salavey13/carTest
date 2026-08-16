@@ -315,7 +315,7 @@ export function FranchizeCrewShiftsClient({ crewSlug, crew }: { crewSlug: string
 
   // Calculate earnings for active shift
   const activeShiftEarnings = myActiveShift
-    ? (elapsedSec / 3600) * (myActiveShift.hourly_rate || myMemberInfo?.hourly_rate || 500)
+    ? (elapsedSec / 3600) * (myActiveShift.hourly_rate || myMemberInfo?.hourly_rate || 169)
     : 0;
 
   return (
@@ -513,7 +513,7 @@ export function FranchizeCrewShiftsClient({ crewSlug, crew }: { crewSlug: string
             </div>
             <div className="flex items-center gap-3">
               <span className="text-lg font-mono font-bold" style={{ color: T.accent }}>
-                {formatCurrency(myMemberInfo?.hourly_rate || 500)}
+                {formatCurrency(myMemberInfo?.hourly_rate || 169)}
                 <span className="text-xs font-normal" style={{ color: T.textMuted }}> /ч</span>
               </span>
               <Button
@@ -654,7 +654,7 @@ export function FranchizeCrewShiftsClient({ crewSlug, crew }: { crewSlug: string
                 type="number"
                 value={newHourlyRate}
                 onChange={(e) => setNewHourlyRate(e.target.value)}
-                placeholder={String(myMemberInfo?.hourly_rate || 500)}
+                placeholder={String(myMemberInfo?.hourly_rate || 169)}
                 className="font-mono"
               />
             </div>
