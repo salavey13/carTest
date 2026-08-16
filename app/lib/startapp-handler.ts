@@ -66,6 +66,7 @@ export async function handleStartappParam(
     if (state.extrasNet) params.set('extrasNet', 'true');
     if (state.extrasBag) params.set('extrasBag', 'true');
     if (state.extrasJacket) params.set('extrasJacket', 'true');
+    if (state.extrasPants) params.set('extrasPants', 'true');
     if (state.extrasBoots) params.set('extrasBoots', 'true');
     if (state.extrasBackpack) params.set('extrasBackpack', 'true');
     if (state.extrasCharger) params.set('extrasCharger', 'true');

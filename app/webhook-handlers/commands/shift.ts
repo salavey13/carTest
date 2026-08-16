@@ -71,23 +71,30 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                 }
                 break;
             case 'clock_out':
-                 if (live_status !== 'offline') {
+                // Always try to close the shift, regardless of live_status
+                // Handles case where status is already 'offline' but shift wasn't closed
+                shiftLogAction = async () => {
+                    const { data: latestShift } = await supabaseAnon.from('crew_member_shifts')
+                        .select('id')
+                        .eq('member_id', userId)
+                        .eq('crew_id', crew_id)
+                        .is('clock_out_time', null)
+                        .order('clock_in_time', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+                    if (latestShift) {
+                        return supabaseAnon.from('crew_member_shifts').update({ clock_out_time: new Date().toISOString() }).eq('id', latestShift.id);
+                    }
+                };
+                // Update status to offline only if currently online/riding
+                if (live_status !== 'offline') {
                     updateData = { live_status: 'offline', last_location: null };
                     userMessage = `✅ *Смена завершена\\.*\nХорошего отдыха\\!`;
                     ownerMessage = `🔴 @${safeUsername} завершил смену в экипаже *'${safeCrewName}'*\\.`;
-                    // FIX: Changed end_time and start_time to clock_out_time and clock_in_time
-                    shiftLogAction = async () => {
-                        const { data: latestShift } = await supabaseAnon.from('crew_member_shifts')
-                            .select('id')
-                            .eq('member_id', userId)
-                            .is('clock_out_time', null)
-                            .order('clock_in_time', { ascending: false })
-                            .limit(1)
-                            .single();
-                        if (latestShift) {
-                            return supabaseAnon.from('crew_member_shifts').update({ clock_out_time: new Date().toISOString() }).eq('id', latestShift.id);
-                        }
-                    };
+                } else {
+                    // Status already offline, just closing the zombie shift
+                    userMessage = `✅ *Остаточная смена закрыта\\.*\nСмена в базе данных была завершена\\.`;
+                    ownerMessage = `🔧 @${safeUsername}: закрыл остаточную смену в *'${safeCrewName}'*\\.`;
                 }
                 break;
             case 'toggle_ride':

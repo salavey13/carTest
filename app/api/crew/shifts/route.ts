@@ -74,10 +74,15 @@ export async function DELETE(request: Request) {
       .select("*")
       .eq("id", shiftId)
       .eq("crew_id", crew.id)
-      .single();
+      .maybeSingle();
 
     if (shiftError || !shift) {
       return NextResponse.json({ error: "Shift not found" }, { status: 404 });
+    }
+
+    // Check if already closed - handle gracefully
+    if (shift.clock_out_time) {
+      return NextResponse.json({ success: true, alreadyClosed: true, message: "Shift already closed" });
     }
 
     // End the shift
@@ -203,14 +208,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Crew not found" }, { status: 404 });
     }
 
-    // Get active shifts (no clock_out_time, started within last 24h to exclude zombies)
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    // Get ALL active shifts (no clock_out_time) - don't filter by age
+    // If a shift is >24h old, it's still real and needs to be closed properly
     const { data: shifts } = await supabaseAdmin
       .from("crew_member_shifts")
       .select("*")
       .eq("crew_id", crew.id)
       .is("clock_out_time", null)
-      .gte("clock_in_time", cutoff)
       .order("clock_in_time", { ascending: false });
 
     // Enrich shifts with member info including hourly_rate
