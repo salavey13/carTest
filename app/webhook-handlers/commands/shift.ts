@@ -14,12 +14,16 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
     logger.info(`[Shift Command EXEC] User ${userId}, Action: ${action || 'request_keyboard'}`);
     
     try {
-        const { data: crewMember, error: crewError } = await supabaseAnon
+        // Use .limit(1) instead of .single() — users can be active members of multiple crews.
+        // .single() throws PGRST116 when 2+ rows match, falsely rejecting valid members.
+        const { data: crewMembers, error: crewError } = await supabaseAnon
             .from("crew_members")
             .select("crew_id, live_status, crews(owner_id, name)")
             .eq("user_id", userId)
             .eq("membership_status", "active")
-            .single();
+            .order("joined_at", { ascending: false })
+            .limit(1);
+        const crewMember = crewMembers?.[0] ?? null;
 
         if (crewError || !crewMember) {
             await sendComplexMessage(chatId, "Вы не являетесь активным участником экипажа.");
@@ -102,7 +106,8 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
         }
         
         if (Object.keys(updateData).length > 0) {
-            await supabaseAnon.from("crew_members").update(updateData).eq("user_id", userId).eq("membership_status", "active");
+            // Scope update by crew_id to avoid cross-crew contamination when user is in multiple crews
+            await supabaseAnon.from("crew_members").update(updateData).eq("user_id", userId).eq("crew_id", crew_id).eq("membership_status", "active");
             if (shiftLogAction) await shiftLogAction();
             
             await sendComplexMessage(chatId, userMessage, [], { removeKeyboard: true, parseMode: 'MarkdownV2' });
