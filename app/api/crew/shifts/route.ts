@@ -234,7 +234,7 @@ export async function GET(request: Request) {
             ]);
 
             // Extract hourly_rate from metadata if available
-            const hourlyRate = memberData?.metadata?.hourly_rate || 500; // Default 500 RUB/hour
+            const hourlyRate = memberData?.metadata?.hourly_rate || 169; // Default 169 RUB/hour
 
             return {
               ...shift,
