@@ -17,7 +17,7 @@ import type { Database } from "@/types/database.types";
 
 type VehicleData = Partial<Database["public"]["Tables"]["cars"]["Row"]>;
 
-type CarType = "car" | "bike" | "cross" | "sauna" | "blog" | "stream" | "massage" | "massage_master";
+type CarType = "car" | "bike" | "cross" | "sauna" | "blog" | "stream" | "massage" | "massage_master" | "equipment" | "service";
 type SpecItem = { id: string; key: string; value: string };
 type GalleryItem = { id: string; url: string };
 
@@ -399,6 +399,8 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
             <option value="car">Car</option>
             <option value="bike">Bike</option>
             <option value="cross">Cross</option>
+            <option value="equipment">Equipment</option>
+            <option value="service">Service</option>
             <option value="sauna">Sauna</option>
             <option value="blog">Blog (post)</option>
             <option value="stream">Stream (overlay)</option>
