@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 
-type DisplayMode = "rent" | "sale" | "service";
+type DisplayMode = "rent" | "sale" | "service" | "equipment";
 
 interface DisplayModeContextValue {
   displayMode: DisplayMode;
@@ -43,7 +43,7 @@ export function DisplayModeProvider({
       return;
     }
     const urlMode = params.get("mode");
-    if (urlMode === "sale" || urlMode === "rent" || urlMode === "service") {
+    if (urlMode === "sale" || urlMode === "rent" || urlMode === "service" || urlMode === "equipment") {
       setDisplayModeState(urlMode);
     }
   }, [lockMode]);
