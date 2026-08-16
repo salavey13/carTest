@@ -148,6 +148,7 @@ export interface CatalogItemVM {
   specs: Array<{ label: string; value: string }>;
   rawSpecs?: Record<string, unknown>;
   reviewSummary: RentalReviewSummaryVM;
+  type?: string;
 }
 
 export interface FranchizeCrewVM {
@@ -691,7 +692,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       return { crew: emptyCrew(safeSlug), items: [] };
     }
 
-    const catalogTypes = ["bike", "accessories", "gear", "wbitem", "metal_stuff", "service"];
+    const catalogTypes = ["bike", "accessories", "gear", "wbitem", "metal_stuff", "service", "equipment"];
     const { data: cars, error: carsError } = await supabaseAdmin
       .from("cars")
       .select("id, make, model, description, image_url, daily_price, type, specs, availability_rules")
@@ -1064,6 +1065,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
               ? Number(readPath(specs, ["purchase_price"], 0))
               : null,
         rawSpecs: specs,
+        type: car.type,
         reviewSummary: buildReviewSummary(reviewsByBike.get(car.id) ?? []),
         specs: (() => {
           const labels = specs.spec_labels && typeof specs.spec_labels === "object" && !Array.isArray(specs.spec_labels)
