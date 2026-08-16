@@ -1577,6 +1577,7 @@ export function ItemModal({
           extrasNet: extrasSelection.net === true || undefined,
           extrasBag: extrasSelection.bag === true || undefined,
           extrasJacket: extrasSelection.jacket === true || undefined,
+          extrasPants: extrasSelection.pants === true || undefined,
           extrasBoots: extrasSelection.boots === true || undefined,
           extrasBackpack: extrasSelection.backpack === true || undefined,
           extrasCharger: extrasSelection.charger === true || undefined,

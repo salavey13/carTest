@@ -112,7 +112,8 @@ export function FranchizeCrewShiftsClient({ crewSlug, crew }: { crewSlug: string
 
   useEffect(() => {
     loadShifts();
-    const interval = setInterval(loadShifts, 15000);
+    // Poll every 5 seconds for better consistency with bot commands
+    const interval = setInterval(loadShifts, 5000);
     return () => clearInterval(interval);
   }, [crewSlug]);
 
@@ -245,8 +246,13 @@ export function FranchizeCrewShiftsClient({ crewSlug, crew }: { crewSlug: string
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ shiftId: myActiveShift.id, slug: crewSlug }),
       });
+      const data = await response.json();
       if (response.ok) {
-        toast.success("Смена завершена");
+        if (data.alreadyClosed) {
+          toast.info(data.message || "Смена уже была завершена");
+        } else {
+          toast.success("Смена завершена");
+        }
         loadShifts();
       } else {
         const error = await response.json();

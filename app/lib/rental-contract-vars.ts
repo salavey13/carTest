@@ -743,7 +743,7 @@ export function buildRentalContractVariables(
       if (g > 0) parts.push(`Перчатки ×${g}`);
       if (options.equipment?.jacket) parts.push('Куртка');
       if (options.equipment?.pants) parts.push('Штаны');
-      if (options.equipment?.boots) parts.push('Боты');
+      if (options.equipment?.boots) parts.push('Ботинки');
       if (options.equipment?.net) parts.push('Сетка');
       if (options.equipment?.backpack) parts.push('Рюкзак');
       if (options.equipment?.bag) parts.push('Сумка');

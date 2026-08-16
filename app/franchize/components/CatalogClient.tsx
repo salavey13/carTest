@@ -622,15 +622,19 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
 
     return [
       { category: "electric", title: "Электро", items: sortVipBikeItems(electric) },
-      { category: "ice", title: "ДВС", items: sortVipBikeItems(ice) },
+      { category: "ice", title: "Бензин", items: sortVipBikeItems(ice) },
     ].filter(g => g.items.length > 0);
   }, [filteredItems, displayMode]);
 
   // Active groups for carousel rendering + IntersectionObserver
-  // For vip-bike: use categorizedItems, for others: use itemsByCategory
+  // For vip-bike equipment mode: use itemsByCategory (actual item categories)
+  // For vip-bike rent/sale/service: use categorizedItems (Electric/ICE)
+  // For other crews: use itemsByCategory
   const activeGroupsForCarousel = useMemo(() => {
-    return (slug === "vip-bike" || crew.slug === "vip-bike") ? categorizedItems : itemsByCategory;
-  }, [slug, crew.slug, categorizedItems, itemsByCategory]);
+    const isVipBike = (slug === "vip-bike" || crew.slug === "vip-bike");
+    const isEquipmentMode = displayMode === "equipment";
+    return (isVipBike && !isEquipmentMode) ? categorizedItems : itemsByCategory;
+  }, [slug, crew.slug, categorizedItems, itemsByCategory, displayMode]);
 
   const recordRentIntent = useCallback((item: CatalogItemVM, stage: "viewed" | "configured", metadata: Record<string, unknown> = {}) => {
     const isServiceItem = hasServicePrice(item);
@@ -791,6 +795,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     if (searchParams.get("extrasNet") === "true") extrasParts.push("Сетка");
     if (searchParams.get("extrasBag") === "true") extrasParts.push("Сумка");
     if (searchParams.get("extrasJacket") === "true") extrasParts.push("Куртка");
+    if (searchParams.get("extrasPants") === "true") extrasParts.push("Штаны");
     if (searchParams.get("extrasBoots") === "true") extrasParts.push("Боты");
     if (searchParams.get("extrasBackpack") === "true") extrasParts.push("Рюкзак");
     if (searchParams.get("extrasCharger") === "true") extrasParts.push("Зарядка");
@@ -801,6 +806,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     if (searchParams.get("extrasNet") === "true") extrasSelection.net = true;
     if (searchParams.get("extrasBag") === "true") extrasSelection.bag = true;
     if (searchParams.get("extrasJacket") === "true") extrasSelection.jacket = true;
+    if (searchParams.get("extrasPants") === "true") extrasSelection.pants = true;
     if (searchParams.get("extrasBoots") === "true") extrasSelection.boots = true;
     if (searchParams.get("extrasBackpack") === "true") extrasSelection.backpack = true;
     if (searchParams.get("extrasCharger") === "true") extrasSelection.charger = true;
