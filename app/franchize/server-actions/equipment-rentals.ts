@@ -286,20 +286,28 @@ export async function listEquipmentRentals(params: {
  */
 export async function getEquipmentCatalog(params: {
   slug: string;
-  actorUserId: string;
+  actorUserId?: string;
 }): Promise<ActionResponse<EquipmentItem[]>> {
-  const { slug, actorUserId } = params;
+  const { slug } = params;
 
   try {
-    const access = await verifyCrewAccess(slug);
-    if (!access.allowed) {
-      return { success: false, error: access.error };
+    // Equipment catalog is publicly viewable — no crew membership gate.
+    // Look up crew_id from slug to filter equipment owned by this crew.
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id")
+      .eq("slug", slug)
+      .single();
+
+    if (!crew) {
+      return { success: false, error: "Экипаж не найден." };
     }
 
     const { data: equipment, error } = await supabaseAdmin
       .from("cars")
       .select("id, make, model, description, daily_price, type, specs")
       .eq("type", "equipment")
+      .eq("crew_id", crew.id)
       .order("make", { ascending: true });
 
     if (error) {
