@@ -10,10 +10,22 @@ const isSpecExplicitlyEnabled = (rawSpecs: Record<string, unknown> | undefined, 
   return value === 1 || value === true || String(value).toLowerCase() === "1" || String(value).toLowerCase() === "true";
 };
 
+/** True when item is an equipment item (type="equipment") */
+export const hasEquipmentPrice = (item: CatalogItemVM): boolean => {
+  // Check item.type for equipment
+  if ((item as any).type === "equipment") return true;
+  // Also check rawSpecs as fallback
+  const rs = item.rawSpecs as Record<string, unknown> | undefined;
+  if (rs && (rs.equipment === true || rs.equipment === 1)) return true;
+  return false;
+};
+
 /** True when item is available for rent (rent=1 or legacy pricePerDay>0 with no rent=0) */
 export const hasRentPrice = (item: CatalogItemVM): boolean => {
   // Service items are never rentable
   if (hasServicePrice(item)) return false;
+  // Equipment items are never in the rent tab
+  if (hasEquipmentPrice(item)) return false;
   const rs = item.rawSpecs as Record<string, unknown> | undefined;
   // If rent spec exists, it must be explicitly enabled
   if (rs && "rent" in rs) {
@@ -41,6 +53,8 @@ export const hasServicePrice = (item: CatalogItemVM): boolean => {
 export const hasSalePrice = (item: CatalogItemVM): boolean => {
   // Service items are never for sale
   if (hasServicePrice(item)) return false;
+  // Equipment items are never in the sale tab
+  if (hasEquipmentPrice(item)) return false;
   const rs = item.rawSpecs as Record<string, unknown> | undefined;
   // If sale spec exists, it must be explicitly enabled
   if (rs && "sale" in rs) {
