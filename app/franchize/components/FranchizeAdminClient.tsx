@@ -172,7 +172,7 @@ export function FranchizeAdminClient({
     }
 
     const scoped = (res.data || []).filter(
-      (item) => item.type === "bike" || item.type === "car",
+      (item) => item.type === "bike" || item.type === "car" || item.type === "equipment" || item.type === "service",
     );
 
     setFleet(scoped);
@@ -436,6 +436,14 @@ export function FranchizeAdminClient({
             id: "car",
             label: `Авто (${fleet.filter((v) => v.type === "car").length})`,
           },
+          {
+            id: "equipment",
+            label: `Экипировка (${fleet.filter((v) => v.type === "equipment").length})`,
+          },
+          {
+            id: "service",
+            label: `Услуги (${fleet.filter((v) => v.type === "service").length})`,
+          },
         ].map((filter) => {
           const active = filterType === filter.id;
           return (
@@ -494,6 +502,17 @@ export function FranchizeAdminClient({
         <FranchizeOperatorStatCard
           label="Авто"
           value={fleet.filter((v) => v.type === "car").length}
+        />
+      </div>
+
+      <div className="mt-2 grid gap-3 sm:grid-cols-2">
+        <FranchizeOperatorStatCard
+          label="Экипировка"
+          value={fleet.filter((v) => v.type === "equipment").length}
+        />
+        <FranchizeOperatorStatCard
+          label="Услуги"
+          value={fleet.filter((v) => v.type === "service").length}
         />
       </div>
 
