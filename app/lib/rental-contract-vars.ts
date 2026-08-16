@@ -506,6 +506,7 @@ export interface BuildRentalContractVariablesOptions {
     helmets?: number;
     gloves?: number;
     jacket?: boolean;
+    pants?: boolean;
     boots?: boolean;
     net?: boolean;
     backpack?: boolean;
@@ -606,6 +607,7 @@ export function buildRentalContractVariables(
     (eq.helmets || 0) * helmetUnitPrice +
     (eq.gloves || 0) * 500 +
     (eq.jacket ? 500 : 0) +
+    (eq.pants ? 500 : 0) +
     (eq.boots ? 500 : 0) +
     (eq.net ? 500 : 0) +
     (eq.backpack ? 500 : 0) +
@@ -725,6 +727,9 @@ export function buildRentalContractVariables(
     // Equipment
     equipment_helmets: String(options.equipment?.helmets || 0),
     equipment_gloves: String(options.equipment?.gloves || 0),
+    equipment_jacket: options.equipment?.jacket ? 'да' : 'нет',
+    equipment_pants: options.equipment?.pants ? 'да' : 'нет',
+    equipment_boots: options.equipment?.boots ? 'да' : 'нет',
     equipment_net: options.equipment?.net ? 'да' : 'нет',
     equipment_backpack: options.equipment?.backpack ? 'да' : 'нет',
     equipment_bag: options.equipment?.bag ? 'да' : 'нет',
@@ -736,6 +741,9 @@ export function buildRentalContractVariables(
       const g = options.equipment?.gloves || 0;
       if (h > 0) parts.push(`Шлем ×${h}`);
       if (g > 0) parts.push(`Перчатки ×${g}`);
+      if (options.equipment?.jacket) parts.push('Куртка');
+      if (options.equipment?.pants) parts.push('Штаны');
+      if (options.equipment?.boots) parts.push('Боты');
       if (options.equipment?.net) parts.push('Сетка');
       if (options.equipment?.backpack) parts.push('Рюкзак');
       if (options.equipment?.bag) parts.push('Сумка');
