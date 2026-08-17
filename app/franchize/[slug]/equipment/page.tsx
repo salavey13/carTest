@@ -1,13 +1,11 @@
 // app/franchize/[slug]/equipment/page.tsx
-import { Suspense } from "react";
 import { getFranchizeBySlug } from "../../actions";
 import { crewPaletteWithCssVars } from "../../lib/theme";
 import { CrewHeader } from "../../components/CrewHeader";
-import { FranchizePageShell } from "../../components/FranchizePageShell";
+import { CatalogClient } from "../../components/CatalogClient";
+import { DisplayModeProvider } from "../../components/DisplayModeContext";
 import { FranchizeErrorBoundary } from "../../components/ErrorBoundary";
 import { ThemeInitializer } from "../../components/ThemeInitializer";
-import { DisplayModeProvider } from "../../components/DisplayModeContext";
-import { CatalogClient } from "../../components/CatalogClient";
 import { buildFranchizeSectionMetadata } from "../metadata";
 import { getFranchizeRouteCtaPolicy } from "../../lib/route-cta-policy";
 
@@ -26,8 +24,6 @@ export default async function EquipmentPage({ params }: EquipmentPageProps) {
   const surface = crewPaletteWithCssVars(crew.theme);
   const ctaPolicy = getFranchizeRouteCtaPolicy("catalog");
 
-  // Equipment catalog is publicly viewable — no crew membership gate.
-  // Uses the SAME CatalogClient as rent/sale/service, locked to "equipment" mode.
   return (
     <main className={`min-h-screen overflow-x-clip ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
       <ThemeInitializer defaultTheme="dark" />
@@ -52,11 +48,7 @@ export default async function EquipmentPage({ params }: EquipmentPageProps) {
           fallbackHref={`/franchize/${crew.slug || slug}`}
           fallbackLinkLabel="Обновить каталог экипажа"
         >
-          <FranchizePageShell theme={crew.theme} contentClassName="space-y-4">
-            <Suspense fallback={<div className="text-center py-12">Загрузка...</div>}>
-              <CatalogClient crew={crew} slug={crew.slug || slug} items={items} ctaPolicy={ctaPolicy} />
-            </Suspense>
-          </FranchizePageShell>
+          <CatalogClient crew={crew} slug={crew.slug || slug} items={items} ctaPolicy={ctaPolicy} />
         </FranchizeErrorBoundary>
       </DisplayModeProvider>
     </main>
