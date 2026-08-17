@@ -1,7 +1,37 @@
 # Gold Standard Spec Schema — Equipment
 
 > Canonical spec-key mapping, categories, data types, and display rules for equipment items in the VIP BIKE catalog.
-> **v1** — initial release, based on 7 seeded equipment items (helmet, jacket, pants, gloves, boots, security, electronics).
+> **v2** — updated with Russian label requirements, sale pricing, and 21-item batch from PDF inventory.
+
+---
+
+## CRITICAL: Russian Labels
+
+All display-facing values (category labels, badge labels, spec_labels values, features, colors, sizes, materials, description) MUST be in **Russian**. The `specs.category` field uses English keys (e.g. `"jacket"`) for internal logic, but the catalog displays Russian labels via `EQUIPMENT_CATEGORY_LABELS` mapping in `actions-runtime.ts`.
+
+| English key (specs.category) | Russian label (displayed) |
+|---|---|
+| `helmet` | Шлемы |
+| `jacket` | Куртки |
+| `pants` | Штаны |
+| `gloves` | Перчатки |
+| `boots` | Боты |
+| `security` | Безопасность |
+| `electronics` | Электроника |
+| `suit` | Комбинезоны |
+
+The `spec_labels` sub-object maps each spec key to its Russian display label. Example:
+```json
+"spec_labels": {
+  "category": "Категория",
+  "badge": "Бейдж",
+  "brand": "Бренд",
+  "material": "Материал",
+  "sizes": "Размеры",
+  "colors": "Цвета",
+  "features": "Особенности"
+}
+```
 
 ---
 
