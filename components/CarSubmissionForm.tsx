@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import { supabaseAnon, uploadImage } from "@/hooks/supabase";
+import { reduceImageResolution } from "@/lib/client-image-compress";
 import type { Database } from "@/types/database.types";
 
 type VehicleData = Partial<Database["public"]["Tables"]["cars"]["Row"]>;
@@ -299,7 +300,10 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       // upload image if provided
       let finalImageUrl = imageUrl;
       if (imageFile) {
-        const up = await uploadImage("carpix", imageFile);
+        // Compress image client-side before upload (max 1400px, quality 0.70)
+        const compressedBlob = await reduceImageResolution(imageFile, { maxSize: 1400, quality: 0.70 });
+        const compressedFile = new File([compressedBlob], imageFile.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+        const up = await uploadImage("carpix", compressedFile);
         if (!up.success) throw new Error(up.error || "Image upload failed");
         finalImageUrl = up.publicUrl;
         toast.success("Изображение загружено");
