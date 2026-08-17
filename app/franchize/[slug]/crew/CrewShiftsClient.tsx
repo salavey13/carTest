@@ -562,10 +562,16 @@ export function FranchizeCrewShiftsClient({ crewSlug, crew }: { crewSlug: string
                     background: isMine ? `${T.accent}10` : "transparent",
                   }}
                 >
-                  {/* Status indicator */}
+                  {/* Status indicator - matches member live_status */}
                   <div className="flex flex-col items-center gap-0.5">
-                    <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
-                    <Activity className="h-3 w-3 text-green-500" />
+                    <div className={cn(
+                      "h-2.5 w-2.5 rounded-full animate-pulse",
+                      shift.member?.live_status === 'riding' ? "bg-primary" : "bg-green-500"
+                    )} />
+                    <Activity className={cn(
+                      "h-3 w-3",
+                      shift.member?.live_status === 'riding' ? "text-primary" : "text-green-500"
+                    )} />
                   </div>
 
                   {/* Member info */}
@@ -579,9 +585,21 @@ export function FranchizeCrewShiftsClient({ crewSlug, crew }: { crewSlug: string
                           Я
                         </span>
                       )}
-                      <span className="rounded-full border px-2 py-0.5 text-[9px]" style={{ borderColor: T.borderSoft, color: T.textMuted }}>
-                        {shift.shift_type}
+                      <span className={cn(
+                        "rounded-full px-2 py-0.5 text-[9px] font-medium",
+                        shift.member?.live_status === 'riding'
+                          ? "bg-primary text-primary-foreground"
+                          : shift.member?.live_status === 'online'
+                          ? "bg-green-500 text-white"
+                          : "border px-2 py-0.5 text-[9px]"
+                      )} style={shift.member?.live_status === 'offline' ? { borderColor: T.borderSoft, color: T.textMuted } : undefined}>
+                        {shift.member?.live_status === 'riding' ? 'В ПОЕЗДКЕ' : shift.member?.live_status === 'online' ? 'НА СМЕНЕ' : 'ОФЛАЙН'}
                       </span>
+                      {shift.shift_type && shift.shift_type !== 'default' && (
+                        <span className="rounded-full border px-2 py-0.5 text-[9px]" style={{ borderColor: T.borderSoft, color: T.textMuted }}>
+                          {shift.shift_type}
+                        </span>
+                      )}
                     </div>
                     <div className="mt-0.5 flex items-center gap-3 text-[11px]" style={{ color: T.textMuted }}>
                       <span className="flex items-center gap-1">
@@ -606,13 +624,30 @@ export function FranchizeCrewShiftsClient({ crewSlug, crew }: { crewSlug: string
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => {
+                      onClick={async () => {
                         setEndingShift(shift.id);
-                        fetch('/api/crew/shifts', {
-                          method: 'DELETE',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ shiftId: shift.id, slug: crewSlug }),
-                        }).then(() => loadShifts()).catch(console.error);
+                        try {
+                          const response = await fetch('/api/crew/shifts', {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ shiftId: shift.id, slug: crewSlug }),
+                          });
+                          const data = await response.json();
+                          if (response.ok) {
+                            if (data.alreadyClosed) {
+                              toast.info(data.message || "Смена уже была завершена");
+                            } else {
+                              toast.success("Смена завершена");
+                            }
+                            loadShifts();
+                          } else {
+                            toast.error(data.error || "Ошибка завершения смены");
+                          }
+                        } catch {
+                          toast.error("Ошибка завершения смены");
+                        } finally {
+                          setEndingShift(null);
+                        }
                       }}
                       disabled={endingShift === shift.id}
                       className="h-7 text-[10px] rounded-full"
