@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { getCrewLiveDetails } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
 import { Badge } from '@/components/ui/badge';
@@ -13,10 +13,23 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
     const { userCrewMemberships } = useAppContext();
     const [crew, setCrew] = useState<any>(initialCrew);
     const [loading, setLoading] = useState(false);
+    const [activeShiftsCount, setActiveShiftsCount] = useState(0);
 
     const isCrewAdmin = userCrewMemberships.some(
       (m) => m.slug === crewSlug && ["owner", "admin", "co_owner"].includes(m.role)
     );
+
+    const fetchActiveShifts = useCallback(async () => {
+        try {
+            const res = await fetch(`/api/crew/shifts?slug=${encodeURIComponent(crewSlug)}`);
+            if (res.ok) {
+                const data = await res.json();
+                setActiveShiftsCount(data.shifts?.length || 0);
+            }
+        } catch (e) {
+            // Silent fail — don't break the page for a counter
+        }
+    }, [crewSlug]);
 
     useEffect(() => {
         if (!crewSlug) return;
@@ -26,6 +39,10 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
             setLoading(false);
         });
     }, [crewSlug]);
+
+    useEffect(() => {
+        fetchActiveShifts();
+    }, [fetchActiveShifts]);
 
     if (loading && !crew) return <Loading variant="bike" text="Загрузка..." />;
 
@@ -91,7 +108,7 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
                         <div className="flex items-center gap-3">
                             <Clock className="h-5 w-5 text-primary" />
                             <div>
-                                <div className="text-2xl font-bold">{crew?.activeShifts ?? 0}</div>
+                                <div className="text-2xl font-bold">{activeShiftsCount}</div>
                                 <div className="text-xs text-muted-foreground">На смене</div>
                             </div>
                         </div>
