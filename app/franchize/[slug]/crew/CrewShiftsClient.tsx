@@ -328,19 +328,21 @@ export function FranchizeCrewShiftsClient({ crewSlug, crew }: { crewSlug: string
     <div className="space-y-4">
       {/* Header */}
       <FranchizeOperatorPanel>
-        <div className="flex items-center gap-4">
-          <Link href={`/franchize/${crewSlug}/crew`}>
-            <ArrowLeft className="h-5 w-5 transition-colors" style={{ color: T.textMuted }} />
-          </Link>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl font-semibold uppercase tracking-tight" style={{ color: T.text }}>
-              Смены
-            </h1>
-            <p className="text-sm truncate" style={{ color: T.textMuted }}>
-              Активные смены и статус экипажа
-            </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center gap-4">
+          <div className="flex items-center gap-3">
+            <Link href={`/franchize/${crewSlug}/crew`}>
+              <ArrowLeft className="h-5 w-5 transition-colors flex-shrink-0" style={{ color: T.textMuted }} />
+            </Link>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg sm:text-2xl font-semibold uppercase tracking-tight" style={{ color: T.text }}>
+                Смены
+              </h1>
+              <p className="text-xs sm:text-sm truncate" style={{ color: T.textMuted }}>
+                Активные смены и статус экипажа
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-auto">
             <span
               className="rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap"
               style={{ background: `${T.accent}20`, color: T.accent }}
