@@ -1133,7 +1133,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Search className="mb-4 h-14 w-14 text-[var(--catalog-muted)]" aria-hidden />
             <h3 className="mb-2 text-lg font-semibold text-[var(--catalog-text)]">
-              {displayMode === "service" ? "Нет услуг" : displayMode === "rent" ? "Нет байков в аренду" : "Нет байков для продажи"}
+              {displayMode === "service" ? "Нет услуг" : displayMode === "equipment" ? "Нет экипировки" : displayMode === "rent" ? "Нет байков в аренду" : "Нет байков для продажи"}
             </h3>
             <p className="mb-4 text-sm text-[var(--catalog-muted)]">
               {searchQuery
@@ -1288,7 +1288,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
                                 {item.rentPriceLabel}
                               </p>
-                            ) : displayMode === "rent" ? (
+                            ) : displayMode === "rent" || displayMode === "equipment" ? (
                               <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
                                 {item.rentPriceLabel}
                               </p>
@@ -1302,7 +1302,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           {/* CTA button inside same container (rentalbikes-style: bordered, accent color) */}
                           <div className="mt-3">
                             <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
-                              {displayMode === "service" ? "Выбрать" : displayMode === "rent" ? "Забронировать" : "Купить"}
+                              {displayMode === "service" ? "Выбрать" : displayMode === "rent" || displayMode === "equipment" ? "Забронировать" : "Купить"}
                             </span>
                           </div>
                         </div>
@@ -1434,7 +1434,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
                                 {item.rentPriceLabel}
                               </p>
-                            ) : displayMode === "rent" ? (
+                            ) : displayMode === "rent" || displayMode === "equipment" ? (
                               <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
                                 {item.rentPriceLabel}
                               </p>
@@ -1448,7 +1448,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           {/* CTA button inside same container (rentalbikes-style: bordered, accent color) */}
                           <div className="mt-3">
                             <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-2 py-2 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
-                              {displayMode === "service" ? "Выбрать" : displayMode === "rent" ? "Забронировать" : "Купить"}
+                              {displayMode === "service" ? "Выбрать" : displayMode === "rent" || displayMode === "equipment" ? "Забронировать" : "Купить"}
                             </span>
                           </div>
                         </div>
@@ -1485,7 +1485,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         theme={crew.theme}
         pickupAddress={crew.contacts.address || crew.hqLocation}
         workingHours={crew.contacts.workingHours}
-        flowType={displayMode === "service" ? "order" : displayMode === "rent" ? "rental" : "order"}
+        flowType={displayMode === "service" ? "order" : displayMode === "rent" || displayMode === "equipment" ? "rental" : "order"}
         displayMode={displayMode}
         vipBikeRentalTrackingEnabled={
           isVipBikeRentalTracking && displayItems.length > 0
