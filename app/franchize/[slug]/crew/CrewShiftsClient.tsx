@@ -332,20 +332,20 @@ export function FranchizeCrewShiftsClient({ crewSlug, crew }: { crewSlug: string
           <Link href={`/franchize/${crewSlug}/crew`}>
             <ArrowLeft className="h-5 w-5 transition-colors" style={{ color: T.textMuted }} />
           </Link>
-          <div className="flex-1">
-            <h1 className="text-2xl font-semibold uppercase tracking-tight" style={{ color: T.text }}>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-semibold uppercase tracking-tight" style={{ color: T.text }}>
               Смены
             </h1>
-            <p className="text-sm" style={{ color: T.textMuted }}>
+            <p className="text-sm truncate" style={{ color: T.textMuted }}>
               Активные смены и статус экипажа
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <span
-              className="rounded-full px-3 py-1 text-xs font-semibold"
+              className="rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap"
               style={{ background: `${T.accent}20`, color: T.accent }}
             >
-              {shifts.length} Активных
+              {shifts.length} Активн.
             </span>
           </div>
         </div>
