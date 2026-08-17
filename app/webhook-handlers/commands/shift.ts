@@ -1,22 +1,18 @@
 "use server";
 
 import { logger } from "@/lib/logger";
-import { supabaseAnon } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
-
-function escapeTelegramMarkdown(text: string): string {
-    if (!text) return "";
-    const charsToEscape = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
-    return text.replace(new RegExp(`([${charsToEscape.join('\\')}])`, 'g'), '\\$1');
-}
 
 export async function shiftCommand(chatId: number, userId: string, username?: string, action?: string) {
     logger.info(`[Shift Command EXEC] User ${userId}, Action: ${action || 'request_keyboard'}`);
     
     try {
+        // Use supabaseAdmin (service role) — this is a server-side webhook handler.
+        // supabaseAnon was used before, but RLS blocks anon writes to crew_members
+        // and crew_member_shifts, causing silent failures (shift not created, live_status not updated).
         // Use .limit(1) instead of .single() — users can be active members of multiple crews.
-        // .single() throws PGRST116 when 2+ rows match, falsely rejecting valid members.
-        const { data: crewMembers, error: crewError } = await supabaseAnon
+        const { data: crewMembers, error: crewError } = await supabaseAdmin
             .from("crew_members")
             .select("crew_id, live_status, crews(owner_id, name)")
             .eq("user_id", userId)
@@ -34,6 +30,7 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
         if (!crew) throw new Error(`Критическая ошибка: отсутствуют данные экипажа для участника ${userId}`);
         
         const { owner_id: ownerId, name: crewName } = crew;
+        const displayName = username || 'user';
 
         if (!action) {
             let buttons;
@@ -51,30 +48,26 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
         let updateData: any = {};
         let userMessage = "";
         let ownerMessage = "";
-        
-        const safeUsername = escapeTelegramMarkdown(username || 'user');
-        const safeCrewName = escapeTelegramMarkdown(crewName);
         let shiftLogAction: (() => Promise<any>) | null = null;
 
         switch (action) {
             case 'clock_in':
                 if (live_status === 'offline') {
                     updateData = { live_status: 'online' };
-                    userMessage = "✅ *Смена начата\\.* Время пошло\\.";
-                    ownerMessage = `🟢 @${safeUsername} начал смену в экипаже *'${safeCrewName}'*\\.`;
-                    // FIX: Changed start_time to clock_in_time to match schema
-                    shiftLogAction = () => supabaseAnon.from('crew_member_shifts').insert({
+                    userMessage = "✅ Смена начата. Время пошло.";
+                    ownerMessage = `🟢 @${displayName} начал смену в экипаже «${crewName}».`;
+                    shiftLogAction = () => supabaseAdmin.from('crew_member_shifts').insert({
                         member_id: userId,
                         crew_id: crew_id,
-                        clock_in_time: new Date().toISOString()
+                        clock_in_time: new Date().toISOString(),
+                        hourly_rate: 169,
                     });
                 }
                 break;
             case 'clock_out':
                 // Always try to close the shift, regardless of live_status
-                // Handles case where status is already 'offline' but shift wasn't closed
                 shiftLogAction = async () => {
-                    const { data: latestShift } = await supabaseAnon.from('crew_member_shifts')
+                    const { data: latestShift } = await supabaseAdmin.from('crew_member_shifts')
                         .select('id')
                         .eq('member_id', userId)
                         .eq('crew_id', crew_id)
@@ -83,18 +76,33 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                         .limit(1)
                         .maybeSingle();
                     if (latestShift) {
-                        return supabaseAnon.from('crew_member_shifts').update({ clock_out_time: new Date().toISOString() }).eq('id', latestShift.id);
+                        // Calculate duration and salary
+                        const { data: shiftData } = await supabaseAdmin.from('crew_member_shifts')
+                            .select('clock_in_time, hourly_rate')
+                            .eq('id', latestShift.id)
+                            .single();
+                        if (shiftData) {
+                            const clockIn = new Date(shiftData.clock_in_time).getTime();
+                            const clockOut = Date.now();
+                            const durationMinutes = Math.round((clockOut - clockIn) / 60000);
+                            const rate = shiftData.hourly_rate || 169;
+                            const salaryAmount = (durationMinutes / 60) * rate;
+                            return supabaseAdmin.from('crew_member_shifts').update({
+                                clock_out_time: new Date().toISOString(),
+                                duration_minutes: durationMinutes,
+                                salary_amount: Math.round(salaryAmount * 100) / 100,
+                            }).eq('id', latestShift.id);
+                        }
+                        return supabaseAdmin.from('crew_member_shifts').update({ clock_out_time: new Date().toISOString() }).eq('id', latestShift.id);
                     }
                 };
-                // Update status to offline only if currently online/riding
                 if (live_status !== 'offline') {
                     updateData = { live_status: 'offline', last_location: null };
-                    userMessage = `✅ *Смена завершена\\.*\nХорошего отдыха\\!`;
-                    ownerMessage = `🔴 @${safeUsername} завершил смену в экипаже *'${safeCrewName}'*\\.`;
+                    userMessage = "✅ Смена завершена.\nХорошего отдыха!";
+                    ownerMessage = `🔴 @${displayName} завершил смену в экипаже «${crewName}».`;
                 } else {
-                    // Status already offline, just closing the zombie shift
-                    userMessage = `✅ *Остаточная смена закрыта\\.*\nСмена в базе данных была завершена\\.`;
-                    ownerMessage = `🔧 @${safeUsername}: закрыл остаточную смену в *'${safeCrewName}'*\\.`;
+                    userMessage = "✅ Остаточная смена закрыта.\nСмена в базе данных была завершена.";
+                    ownerMessage = `🔧 @${displayName}: закрыл остаточную смену в «${crewName}».`;
                 }
                 break;
             case 'toggle_ride':
@@ -102,25 +110,30 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                     const newStatus = live_status === 'online' ? 'riding' : 'online';
                     updateData = { live_status: newStatus };
                     if (newStatus === 'riding') {
-                        userMessage = "🏍️ Статус: *На Байке*\\. Теперь отправьте свою геолокацию, чтобы появиться на карте экипажа\\.";
+                        userMessage = "🏍️ Статус: На Байке. Теперь отправьте свою геолокацию, чтобы появиться на карте экипажа.";
                     } else {
                         updateData.last_location = null;
-                        userMessage = "🏢 Статус: *Онлайн*\\. Снова в боксе, с карты убраны\\.";
+                        userMessage = "🏢 Статус: Онлайн. Снова в боксе, с карты убраны.";
                     }
-                    ownerMessage = `⚙️ Статус @${safeUsername} в *'${safeCrewName}'*: ${newStatus === 'riding' ? "На Байке" : "Онлайн"}`;
+                    ownerMessage = `⚙️ Статус @${displayName} в «${crewName}»: ${newStatus === 'riding' ? "На Байке" : "Онлайн"}`;
                 }
                 break;
         }
         
-        if (Object.keys(updateData).length > 0) {
-            // Scope update by crew_id to avoid cross-crew contamination when user is in multiple crews
-            await supabaseAnon.from("crew_members").update(updateData).eq("user_id", userId).eq("crew_id", crew_id).eq("membership_status", "active");
+        if (Object.keys(updateData).length > 0 || shiftLogAction) {
+            // Use supabaseAdmin for writes — RLS blocks anon writes
+            if (Object.keys(updateData).length > 0) {
+                await supabaseAdmin.from("crew_members").update(updateData).eq("user_id", userId).eq("crew_id", crew_id).eq("membership_status", "active");
+            }
             if (shiftLogAction) await shiftLogAction();
             
-            await sendComplexMessage(chatId, userMessage, [], { removeKeyboard: true, parseMode: 'MarkdownV2' });
+            // Send messages as plain text (no MarkdownV2 — avoids escaping bugs)
+            if (userMessage) {
+                await sendComplexMessage(chatId, userMessage, [], { removeKeyboard: true });
+            }
 
-            if (ownerId && ownerId !== userId) {
-                await sendComplexMessage(ownerId, ownerMessage, [], { parseMode: 'MarkdownV2' });
+            if (ownerId && ownerId !== userId && ownerMessage) {
+                await sendComplexMessage(ownerId, ownerMessage, []);
             }
         } else {
             await sendComplexMessage(chatId, "Действие не выполнено (статус уже актуален).", [], { removeKeyboard: true });
@@ -128,6 +141,6 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
 
     } catch (e: any) {
         logger.error(`[Shift Command FATAL] for user ${userId}:`, e);
-        await sendComplexMessage(chatId, `🚨 Критическая ошибка в системе смен: ${escapeTelegramMarkdown(e.message)}`);
+        await sendComplexMessage(chatId, `🚨 Критическая ошибка в системе смен: ${e.message}`);
     }
 }
