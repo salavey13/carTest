@@ -47,6 +47,19 @@ import {
 
 
 type UnknownRecord = Record<string, unknown>;
+
+// Russian labels for equipment categories (used in catalog display)
+const EQUIPMENT_CATEGORY_LABELS: Record<string, string> = {
+  helmet: "Шлемы",
+  jacket: "Куртки",
+  pants: "Штаны",
+  gloves: "Перчатки",
+  boots: "Боты",
+  security: "Безопасность",
+  electronics: "Электроника",
+  suit: "Комбинезоны",
+};
+
 const FRANCHIZE_RENTAL_DOCS_SAFE_ERROR =
   "Не удалось подготовить документы аренды. Мы уже передали заявку оператору — попробуйте ещё раз или напишите в Telegram.";
 
@@ -1046,7 +1059,9 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
           // 6. Fallback to daily_price (only for non-service)
           return `${Number(car.daily_price ?? 0).toLocaleString("ru-RU")} ₽ / день`;
         })(),
-        category: subtype,
+        category: car.type === "equipment"
+          ? EQUIPMENT_CATEGORY_LABELS[String(readPath(specs, ["category"], ""))] || subtype
+          : subtype,
         availabilityStatus: availabilityByVehicle.get(car.id)?.status ?? fallbackStatus,
         availabilityLabel: availabilityByVehicle.get(car.id)?.label ?? fallbackLabel,
         isHot:
