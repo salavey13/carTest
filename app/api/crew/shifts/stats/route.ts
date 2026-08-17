@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextParams;
+    const searchParams = request.nextUrl.searchParams;
     const slug = searchParams.get("slug");
     const userId = searchParams.get("userId");
 
