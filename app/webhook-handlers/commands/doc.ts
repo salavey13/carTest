@@ -911,7 +911,12 @@ async function generateAndSendContract(
     try {
       const { upsertFranchizeLead } = await import("@/app/franchize/lib/leads");
       const leadPhone = passport.phone || "";
-      const leadUserId = leadPhone || String(userId);
+      // BUG 11 fix: always use operator's Telegram chat ID as leadUserId, NEVER the phone.
+      // Was: leadUserId = leadPhone || String(userId) → phone stored as user_id in
+      // franchize_intents.telegram_user_id, crew_todos.lead_id and, via ensureUser,
+      // users.user_id — polluting the users table and breaking lead matching.
+      // Phone goes in the separate `phone` field (see upsertFranchizeLead).
+      const leadUserId = String(userId);
       await upsertFranchizeLead({
         slug: slug,
         userId: leadUserId,

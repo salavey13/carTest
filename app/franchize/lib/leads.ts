@@ -78,17 +78,31 @@ export async function upsertFranchizeLead(input: UpsertFranchizeLeadInput): Prom
       if (bikeId) userMeta.bikeId = bikeId;
       if (bikeTitle) userMeta.bikeTitle = bikeTitle;
 
-      await supabaseAdmin.from("users").upsert(
-        {
-          user_id: userId,
-          full_name: fullName,
-          username: username,
-          metadata: userMeta,
-          updated_at: now,
-          created_at: now,
-        },
-        { onConflict: "user_id" }
-      );
+      // IMPORTANT: never overwrite the profile of an existing real user.
+      // When an operator creates a contract for a client, userId is the operator's
+      // Telegram chat ID — writing the client's full_name/username into that row
+      // corrupts the operator's profile (evening digest, shift reports, etc).
+      // ensureUser is only meant to CREATE synthetic users for phone-based web
+      // leads (user_id = phone); existing rows stay untouched.
+      const { data: existingUser } = await supabaseAdmin
+        .from("users")
+        .select("user_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (!existingUser) {
+        await supabaseAdmin.from("users").upsert(
+          {
+            user_id: userId,
+            full_name: fullName,
+            username: username,
+            metadata: userMeta,
+            updated_at: now,
+            created_at: now,
+          },
+          { onConflict: "user_id" }
+        );
+      }
     }
 
     await upsertFranchizeIntent({
