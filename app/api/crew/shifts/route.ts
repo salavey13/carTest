@@ -146,6 +146,8 @@ export async function POST(request: Request) {
     }
 
     // Check no active shift already
+    // Single source of truth for "active shift" = row with clock_out_time IS NULL.
+    // Bot /shift command uses the same rule, so the page and the bot stay in tandem.
     const { data: existing } = await supabaseAdmin
       .from("crew_member_shifts")
       .select("id")
@@ -159,6 +161,10 @@ export async function POST(request: Request) {
     }
 
     // Create shift
+    // NOTE timezone: clock_in_time is stored as UTC (ISO-8601 +00:00). Moscow is
+    // UTC+3 — 09:00 UTC == 12:00 MSK. Consumers (page timer, salary trigger,
+    // history) parse it as UTC and render in the viewer's local timezone.
+    // Never pass local wall-clock time here.
     const { data: shift, error: insertError } = await supabaseAdmin
       .from("crew_member_shifts")
       .insert({
@@ -175,6 +181,8 @@ export async function POST(request: Request) {
     }
 
     // Update live status
+    // Syncs the secondary presence field so the crew list shows the member online.
+    // The "active shift" truth itself lives in crew_member_shifts (see above).
     await supabaseAdmin
       .from("crew_members")
       .update({ live_status: "online" })
@@ -208,8 +216,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Crew not found" }, { status: 404 });
     }
 
-    // Get ALL active shifts (no clock_out_time) - don't filter by age
-    // If a shift is >24h old, it's still real and needs to be closed properly
+    // Get ALL active shifts (no clock_out_time) - don't filter by age.
+    // If a shift is >24h old, it's still real and needs to be closed properly —
+    // filtering it out would hide a "zombie" shift that the bot still reports.
+    // NOTE timezone: comparisons are UTC (Supabase stores timestamptz as UTC).
+    // Display happens client-side in the viewer's local timezone (Moscow = UTC+3).
     const { data: shifts } = await supabaseAdmin
       .from("crew_member_shifts")
       .select("*")

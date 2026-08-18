@@ -32,11 +32,32 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
         const { owner_id: ownerId, name: crewName } = crew;
         const displayName = username || 'user';
 
+        // ── Single source of truth for "active shift" ───────────────────────────
+        // The web page (FranchizeCrewShiftsClient + GET /api/crew/shifts) considers
+        // a shift ACTIVE only if a row exists in crew_member_shifts with
+        // clock_out_time IS NULL. live_status in crew_members is a secondary
+        // "instant presence" field and can drift out of sync (e.g. when a shift
+        // was closed manually in the DB or via an admin script). To keep the bot
+        // and the web page in tandem, we must base the keyboard on the SAME rule.
+        const { data: activeShiftRows } = await supabaseAnon
+            .from("crew_member_shifts")
+            .select("id")
+            .eq("member_id", userId)
+            .eq("crew_id", crew_id)
+            .is("clock_out_time", null)
+            .limit(1);
+        const hasActiveShift = !!activeShiftRows && activeShiftRows.length > 0;
+
         if (!action) {
             let buttons;
-            if (live_status === 'offline') {
+            if (!hasActiveShift) {
+                // No row in crew_member_shifts → show "start" even if live_status
+                // was left 'online' by a manual DB edit (zombie status). The web
+                // page would also show "Нет активной смены" in that case.
                 buttons = [[{ text: "✅ Начать Смену" }]];
-            } else if (live_status === 'online') {
+            } else if (live_status === 'online' || live_status === 'offline') {
+                // online → normal flow; offline with an open row = reverse drift
+                // (row exists but presence says offline) — still allow ride/close.
                 buttons = [[{ text: "🏍️ На Байке" }], [{ text: "❌ Завершить Смену" }]];
             } else { // riding
                 buttons = [[{ text: "🏢 В Боксе" }], [{ text: "❌ Завершить Смену" }]];
@@ -52,10 +73,17 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
 
         switch (action) {
             case 'clock_in':
-                if (live_status === 'offline') {
+                // Allow start only when there is no active shift row. Relying on
+                // live_status alone would let a user "start" while an orphaned
+                // active row exists (double shift) — the API page guard does the same.
+                if (!hasActiveShift) {
                     updateData = { live_status: 'online' };
                     userMessage = "✅ Смена начата. Время пошло.";
                     ownerMessage = `🟢 @${displayName} начал смену в экипаже «${crewName}».`;
+                    // NOTE timezone: clock_in_time is stored in UTC (ISO-8601, +00:00).
+                    // Moscow is UTC+3: 09:00 UTC == 12:00 MSK. All consumers
+                    // (page client, API, salary trigger) treat it as UTC and render
+                    // in the browser's local timezone — do NOT pass local time here.
                     shiftLogAction = () => supabaseAdmin.from('crew_member_shifts').insert({
                         member_id: userId,
                         crew_id: crew_id,
@@ -77,6 +105,9 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                         .maybeSingle();
                     if (latestShift) {
                         // Calculate duration and salary
+                        // NOTE timezone: clock_out_time is UTC. Duration is computed
+                        // from clock_in_time → clock_out_time in UTC, then displayed
+                        // in MSK (UTC+3). 18:00 UTC == 21:00 MSK.
                         const { data: shiftData } = await supabaseAdmin.from('crew_member_shifts')
                             .select('clock_in_time, hourly_rate')
                             .eq('id', latestShift.id)
@@ -93,9 +124,15 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                                 salary_amount: Math.round(salaryAmount * 100) / 100,
                             }).eq('id', latestShift.id);
                         }
-                        return supabaseAdmin.from('crew_member_shifts').update({ clock_out_time: new Date().toISOString() }).eq('id', latestShift.id);
                     }
-                };
+                    return supabaseAdmin.from('crew_member_shifts').update({ clock_out_time: new Date().toISOString() }).eq('id', latestShift.id);
+                }
+            };
+            // Closing is allowed when there is an active shift row OR live_status is
+            // not offline. Two drift scenarios both converge on offline:
+            //   1) live_status online but no row (zombie) → just flip presence.
+            //   2) row exists but live_status offline (reverse drift) → close row.
+            if (hasActiveShift || live_status !== 'offline') {
                 if (live_status !== 'offline') {
                     updateData = { live_status: 'offline', last_location: null };
                     userMessage = "✅ Смена завершена.\nХорошего отдыха!";
@@ -104,7 +141,8 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                     userMessage = "✅ Остаточная смена закрыта.\nСмена в базе данных была завершена.";
                     ownerMessage = `🔧 @${displayName}: закрыл остаточную смену в «${crewName}».`;
                 }
-                break;
+            }
+            break;
             case 'toggle_ride':
                 if (live_status !== 'offline') {
                     const newStatus = live_status === 'online' ? 'riding' : 'online';

@@ -382,6 +382,10 @@ export function FranchizeCrewShiftsClient({ crewSlug, crew }: { crewSlug: string
               </p>
               {myActiveShift && (
                 <p className="text-xs" style={{ color: T.textMuted }}>
+                  {/* NOTE timezone: clock_in_time is UTC (ISO-8601 +00:00).
+                      new Date(iso) parses UTC and toLocaleTimeString('ru-RU') renders
+                      in the browser's local timezone. Moscow = UTC+3, so e.g.
+                      18:00 UTC displays as 21:00 MSK. Do not shift manually. */}
                   Начало: {new Date(myActiveShift.clock_in_time).toLocaleTimeString('ru-RU', {
                     hour: '2-digit',
                     minute: '2-digit',
