@@ -39,7 +39,7 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
         // "instant presence" field and can drift out of sync (e.g. when a shift
         // was closed manually in the DB or via an admin script). To keep the bot
         // and the web page in tandem, we must base the keyboard on the SAME rule.
-        const { data: activeShiftRows } = await supabaseAnon
+        const { data: activeShiftRows } = await supabaseAdmin
             .from("crew_member_shifts")
             .select("id")
             .eq("member_id", userId)
@@ -126,8 +126,7 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                         }
                     }
                     return supabaseAdmin.from('crew_member_shifts').update({ clock_out_time: new Date().toISOString() }).eq('id', latestShift.id);
-                }
-            };
+                };
             // Closing is allowed when there is an active shift row OR live_status is
             // not offline. Two drift scenarios both converge on offline:
             //   1) live_status online but no row (zombie) → just flip presence.
