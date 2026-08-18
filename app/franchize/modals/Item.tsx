@@ -57,6 +57,18 @@ function getRussianLabel(key: string, item: CatalogItemVM): string {
   return specLabels?.[key] || key;
 }
 
+// Equipment category labels in Russian
+const EQUIPMENT_CATEGORY_LABELS: Record<string, string> = {
+  helmet: "Шлемы",
+  jacket: "Куртки",
+  pants: "Штаны",
+  gloves: "Перчатки",
+  boots: "Боты",
+  security: "Безопасность",
+  electronics: "Электроника",
+  suit: "Комбинезоны",
+};
+
 // ─────────────────────────────────────────────────────
 // Item Modal — generalized for rental & order flows
 // ─────────────────────────────────────────────────────
@@ -115,7 +127,7 @@ interface ItemModalProps {
   /** Shows "С возвращением!" badge for returning users */
   isReturningUser?: boolean;
   /** Display mode from catalog filter — overrides flowType for content visibility */
-  displayMode?: "rent" | "sale";
+  displayMode?: "rent" | "sale" | "service" | "equipment";
   /** Restricts rental counter goals to the canonical VIP BIKE rental flow. */
   vipBikeRentalTrackingEnabled?: boolean;
 }
@@ -370,24 +382,24 @@ function DurationShortcuts({
   const getDailyPrice = (): number => {
     // Weekend override: rent_weekend when it's a Saturday/Sunday
     if (isWeekendDay(startDate)) {
-      return Number(specs.rent_weekend) || Number(specs.dailyPrice) || Number(specs.rent_weekday) || 0;
+      return Number(specs?.rent_weekend) || Number(specs?.dailyPrice) || Number(specs?.rent_weekday) || 0;
     }
-    return Number(specs.dailyPrice) || Number(specs.rent_weekday) || 0;
+    return Number(specs?.dailyPrice) || Number(specs?.rent_weekday) || 0;
   };
 
   const getPrice = (hours: number): number => {
     if (!specs) return 0;
-    if (hours <= 1) return Number(specs.price_per_hour) || 0;
-    if (hours === 2) return Number(specs.price_per_2h) || Math.round((Number(specs.price_per_hour) || 0) + ((Number(specs.price_per_3h) || 0) - (Number(specs.price_per_hour) || 0)) / 2) || (Number(specs.price_per_hour) || 0) * 2;
-    if (hours <= 3) return Number(specs.price_per_3h) || (Number(specs.price_per_hour) || 0) * 3;
-    if (hours <= 6) return Number(specs.price_per_6h) || (Number(specs.price_per_hour) || 0) * 6;
-    if (hours <= 12) return Number(specs.price_per_12h) || (Number(specs.price_per_hour) || 0) * 12;
+    if (hours <= 1) return Number(specs?.price_per_hour) || 0;
+    if (hours === 2) return Number(specs?.price_per_2h) || Math.round((Number(specs?.price_per_hour) || 0) + ((Number(specs?.price_per_3h) || 0) - (Number(specs?.price_per_hour) || 0)) / 2) || (Number(specs?.price_per_hour) || 0) * 2;
+    if (hours <= 3) return Number(specs?.price_per_3h) || (Number(specs?.price_per_hour) || 0) * 3;
+    if (hours <= 6) return Number(specs?.price_per_6h) || (Number(specs?.price_per_hour) || 0) * 6;
+    if (hours <= 12) return Number(specs?.price_per_12h) || (Number(specs?.price_per_hour) || 0) * 12;
     const days = Math.ceil(hours / 24);
     const dailyPrice = getDailyPrice();
     if (days === 1) return dailyPrice;
-    if (days <= 4) return (Number(specs.rent_2_4d) || dailyPrice) * days;
-    if (days <= 10) return (Number(specs.rent_5_10d) || dailyPrice) * days;
-    return (Number(specs.rent_11_30d) || dailyPrice) * days;
+    if (days <= 4) return (Number(specs?.rent_2_4d) || dailyPrice) * days;
+    if (days <= 10) return (Number(specs?.rent_5_10d) || dailyPrice) * days;
+    return (Number(specs?.rent_11_30d) || dailyPrice) * days;
   };
 
   const hourOptions = [
@@ -606,6 +618,101 @@ function PricingTable({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Equipment Pricing — simple daily rate with day 2+ 50% discount
+// ───────────────────────────────────────────────────────────────────────────────
+function EquipmentPricingCalculator({
+  dailyPrice,
+  startDate,
+  endDate,
+  borderColor,
+  accentColor,
+  T,
+}: {
+  dailyPrice: number;
+  startDate: string;
+  endDate: string;
+  borderColor: string;
+  accentColor: string;
+  T: CrewTokens;
+}) {
+  const fmt = (n: number) => n.toLocaleString("ru-RU");
+
+  const dayCount = (() => {
+    if (!startDate || !endDate) return 0;
+    try {
+      return durationDaysFromDateTime(startDate, "10:00", endDate, "10:00");
+    } catch {
+      return 0;
+    }
+  })();
+
+  // Equipment pricing: day 1 = full price, day 2+ = 50% discount
+  const basePrice = dailyPrice * dayCount;
+  const discount = dayCount > 1 ? (dailyPrice * (dayCount - 1)) * 0.5 : 0;
+  const totalPrice = basePrice - discount;
+
+  return (
+    <div
+      className="rounded-2xl border p-3 space-y-2"
+      style={{ borderColor, backgroundColor: T.bgElevated }}
+    >
+      <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em]" style={{ color: T.textMuted }}>
+        <CircleDollarSign className="h-3.5 w-3.5" />
+        Калькулятор стоимости
+      </p>
+
+      {dayCount > 0 ? (
+        <>
+          <div className="space-y-1">
+            {dayCount === 1 && (
+              <div className="flex justify-between text-sm">
+                <span style={{ color: T.textMuted }}>{dayCount} {ruPluralDays(dayCount)}</span>
+                <span className="font-medium" style={{ color: accentColor }}>
+                  {fmt(dailyPrice)} ₽
+                </span>
+              </div>
+            )}
+            {dayCount > 1 && (
+              <>
+                <div className="flex justify-between text-sm">
+                  <span style={{ color: T.textMuted }}>День 1 (полный)</span>
+                  <span className="font-medium" style={{ color: accentColor }}>
+                    {fmt(dailyPrice)} ₽
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span style={{ color: T.textMuted }}>Дни 2–{dayCount} (50% скидка)</span>
+                  <span className="font-medium" style={{ color: accentColor }}>
+                    {fmt((dailyPrice * (dayCount - 1)) / 2)} ₽
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border px-3 py-2" style={{ borderColor: `${borderColor}30` }}>
+            <span className="text-sm font-medium" style={{ color: T.textMuted }}>Итого:</span>
+            <span className="text-lg font-bold" style={{ color: accentColor }}>
+              {fmt(totalPrice)} ₽
+            </span>
+          </div>
+
+          <div className="rounded-lg bg-green-500/10 border border-green-500/30 px-2 py-1 text-center">
+            <p className="text-xs font-medium text-green-400">
+              {dayCount > 1 ? `Сэкономьте ${fmt(discount)} ₽ со второго дня` : "Выберите несколько дней для скидки 50%"}
+            </p>
+          </div>
+        </>
+      ) : (
+        <p className="text-sm text-center" style={{ color: T.textMuted }}>
+          Выберите даты для расчёта стоимости
+        </p>
+      )}
     </div>
   );
 }
@@ -1212,6 +1319,7 @@ export function ItemModal({
   const effectiveFlowType = isServiceItem ? "order" : flowType;
   const isRental = displayMode ? displayMode === "rent" : effectiveFlowType === "rental";
   const isVipBikeRental = slug === "vip-bike" && isRental;
+  const isEquipment = displayMode === "equipment" || (item?.type === "equipment");
   const modalRef = useRef<HTMLDivElement>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
@@ -1651,6 +1759,75 @@ export function ItemModal({
     specs?.rent_11_30d ? { label: "11-30 дней", value: `${Number(specs.rent_11_30d).toLocaleString("ru-RU")} ₽/день` } : null,
   ].filter(Boolean) as Array<{ label: string; value: string }>;
 
+  // Equipment-specific specs with Russian labels
+  const equipmentSpecs = isEquipment ? (() => {
+    const rs = item.rawSpecs as Record<string, unknown> | undefined;
+    const labels = rs?.spec_labels as Record<string, string> | undefined;
+    const equipmentSpecList: Array<{ label: string; value: string }> = [];
+
+    // Add category with Russian label
+    const category = (rs?.category as string) || "";
+    equipmentSpecList.push({
+      label: "Категория",
+      value: EQUIPMENT_CATEGORY_LABELS[category] || category,
+    });
+
+    // Add price (rental)
+    equipmentSpecList.push({
+      label: "Аренда",
+      value: item.rentPriceLabel || `${item.pricePerDay.toLocaleString("ru-RU")} ₽/день`,
+    });
+
+    // Add sale price if available
+    if (showSaleInSpecs && item.salePrice) {
+      equipmentSpecList.push({
+        label: "Покупка",
+        value: `${item.salePrice.toLocaleString("ru-RU")} ₽`,
+      });
+    }
+
+    // Add safety certification
+    const safety = rs?.safety as string[] | string | undefined;
+    if (safety) {
+      const safetyStr = Array.isArray(safety) ? safety.join(", ") : String(safety);
+      equipmentSpecList.push({
+        label: labels?.safety || "Сертификация",
+        value: safetyStr,
+      });
+    }
+
+    // Add materials
+    const materials = rs?.materials as string | undefined;
+    if (materials) {
+      equipmentSpecList.push({
+        label: labels?.materials || "Материалы",
+        value: materials,
+      });
+    }
+
+    // Add sizes
+    const sizes = rs?.sizes as string[] | string | undefined;
+    if (sizes) {
+      const sizesStr = Array.isArray(sizes) ? sizes.join(", ") : String(sizes);
+      equipmentSpecList.push({
+        label: labels?.sizes || "Размеры",
+        value: sizesStr,
+      });
+    }
+
+    // Add features
+    const features = rs?.features as string[] | string | undefined;
+    if (features) {
+      const featuresStr = Array.isArray(features) ? features.join(", ") : String(features);
+      equipmentSpecList.push({
+        label: labels?.features || "Особенности",
+        value: featuresStr,
+      });
+    }
+
+    return equipmentSpecList;
+  })() : null;
+
   const fallbackSpecs = isRental
     ? [
         { label: "Категория", value: item.category },
@@ -1679,7 +1856,12 @@ export function ItemModal({
         { label: "Статус", value: "Доступно для заказа" },
       ];
 
-  const normalizedSpecs = (item.specs.length > 0 ? item.specs : fallbackSpecs)
+  const normalizedSpecs = (
+    // For equipment items, use the equipment-specific specs with Russian labels
+    isEquipment ? equipmentSpecs :
+    // Otherwise, use item specs or fallback specs
+    (item.specs.length > 0 ? item.specs : fallbackSpecs)
+  )
     // Filter out internal fields like "id" and "rent" that shouldn't be shown to customers
     .filter((s) => {
       const excludeKeys = new Set(["id", "rent"]);
@@ -2027,7 +2209,16 @@ export function ItemModal({
                   T={T}
                 />
 
-                {isVipBikeRental ? (
+                {isEquipment ? (
+                  <EquipmentPricingCalculator
+                    dailyPrice={Number(item.rawSpecs?.dailyPrice) || item.pricePerDay || 0}
+                    startDate={options.rentStartDate ?? ""}
+                    endDate={options.rentEndDate ?? ""}
+                    borderColor="var(--item-border)"
+                    accentColor="var(--item-accent)"
+                    T={T}
+                  />
+                ) : isVipBikeRental ? (
                   <p
                     className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3 text-sm leading-6 text-[var(--item-muted-text)]"
                     role="note"

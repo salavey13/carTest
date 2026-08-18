@@ -12,8 +12,13 @@ function arg(name, fallback = '') { const i = process.argv.indexOf(`--${name}`);
 
 const RENTAL_DOC_TEMPLATE_MODE = String(process.env.RENTAL_DOC_TEMPLATE_MODE || 'md').trim().toLowerCase();
 const RENTAL_DOC_BASELINE_TEMPLATE_PATH = 'docs/RENTAL_DEAL_TEMPLATE.md';
+const EQUIPMENT_RENTAL_TEMPLATE_PATH = 'docs/EQUIPMENT_RENTAL_DEAL_TEMPLATE.md';
 const RENTAL_DOC_HTML_TEMPLATE_PATH = 'docs/RENTAL_DEAL_TEMPLATE.html';
 const RENTAL_TEMPLATE_VERSION_PATH = 'lib/rental-template-version.ts';
+
+// Detect equipment-only rental mode
+const rentalType = arg('type', 'bike').toLowerCase(); // 'bike' or 'equipment'
+const isEquipmentRental = rentalType === 'equipment';
 
 function readCurrentRentalTemplateVersion() {
   try {
@@ -397,9 +402,12 @@ if (!resolvedCrewSlug && bike.crew_id) {
 
 let mdTemplate = '';
 try {
-  mdTemplate = readFileSync(RENTAL_DOC_BASELINE_TEMPLATE_PATH, 'utf8');
+  // Use equipment template for equipment rentals, bike template otherwise
+  const templatePath = isEquipmentRental ? EQUIPMENT_RENTAL_TEMPLATE_PATH : RENTAL_DOC_BASELINE_TEMPLATE_PATH;
+  mdTemplate = readFileSync(templatePath, 'utf8');
 } catch (mdReadErr) {
   // MD template is optional — we only need it as a fallback if HTML fails
+  console.error(`[rental-doc] Failed to read template: ${mdReadErr.message}`);
 }
 const now = new Date();
 const phraseSchedule = extractScheduleFromPhrase(phrase);
@@ -631,8 +639,15 @@ const vars = {
   battery_level_start:'100 %', battery_level_end:'____ %',
   media_links:'телефон',
   renter_passport_issue_date: passportJson.issueDate || '', renter_registration: passportJson.registration || '',
-  damage_price_list:'мотоцикл в сборе / царапина на пластике / прочее по расчету',
-  document_key:`rental-${bike.id}-${Date.now()}`
+  damage_price_list: isEquipmentRental
+    ? 'Шлем / Куртка / Перчатки / Прочее по расчету'
+    : 'мотоцикл в сборе / царапина на пластике / прочее по расчету',
+  document_key: isEquipmentRental
+    ? `equipment-rental-${Date.now()}`
+    : `rental-${bike.id}-${Date.now()}`,
+  // Equipment mode flag
+  equipment_mode: isEquipmentRental ? '1' : '',
+  contract_type: isEquipmentRental ? 'ЭКИПИРОВКИ' : '',
 };
 
 // ── Build Document ──────────────────────────────────────────────────
@@ -840,9 +855,28 @@ if (!json.ok) {
   json = { ok: true, result: { message_id: null }, _warning: 'telegram_delivery_failed_file_saved', _localPath: localDocPath };
 }
 
-const result = {ok:true, requestedBikeId: bikeId, resolvedBikeId: bike.id, chatId: telegramChatId, messageId: json.result?.message_id, contractKey: vars.document_key, templateMode: RENTAL_DOC_TEMPLATE_MODE, docFileName, isElectric, isHourlyRental, rentalHours, rentalDays, subtotal: vars.subtotal_rub, localDocPath};
+const result = {
+  ok:true,
+  requestedBikeId: bikeId,
+  resolvedBikeId: bike.id,
+  chatId: telegramChatId,
+  messageId: json.result?.message_id,
+  contractKey: vars.document_key,
+  templateMode: RENTAL_DOC_TEMPLATE_MODE,
+  docFileName,
+  isElectric,
+  isHourlyRental,
+  rentalHours,
+  rentalDays,
+  subtotal: vars.subtotal_rub,
+  localDocPath,
+  rentalType, // 'bike' or 'equipment'
+  isEquipmentRental,
+};
 const saveMetadata = arg('saveMetadata', '0') !== '0';
-const metadataTable = arg('metadataTable', 'rental_contract_artifacts');
+const metadataTable = isEquipmentRental
+  ? 'equipment_rental_artifacts'
+  : arg('metadataTable', 'rental_contract_artifacts');
 
 // ── ALWAYS create rentals row for unified tracking ──────────────────────
 // Rentals entry is created regardless of saveMetadata flag, ensuring analytics visibility

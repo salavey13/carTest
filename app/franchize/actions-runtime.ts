@@ -2017,11 +2017,11 @@ function resolveAndValidateFranchizeDocVariables(
   };
 }
 
-type FranchizeOrderFlowType = "rental" | "sale" | "mixed" | "testdrive" | "service";
+type FranchizeOrderFlowType = "rental" | "sale" | "mixed" | "testdrive" | "service" | "equipment";
 
 async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderFlowType): Promise<{ template: string; templateMode: "md" | "html" }> {
   const crewSensitive = await getCrewSensitiveDataOrDefault(slug, { source: "loadFranchizeDealTemplate" });
-  const secureTemplateKey = flowType === "rental" ? "rentalDealTemplate" : flowType === "service" ? "serviceDealTemplate" : "saleDealTemplate";
+  const secureTemplateKey = flowType === "rental" ? "rentalDealTemplate" : flowType === "service" ? "serviceDealTemplate" : flowType === "equipment" ? "equipmentDealTemplate" : "saleDealTemplate";
   const secureTemplate = readPath(crewSensitive.docTemplates ?? {}, [secureTemplateKey], "");
   if (typeof secureTemplate === "string" && secureTemplate.trim().length > 0) {
     // Auto-detect mode from stored template content
@@ -2036,14 +2036,17 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
     const isRental = flowType === "rental";
     const isTestdrive = flowType === "testdrive";
     const isService = flowType === "service";
-    const localTemplateFile = isRental
-      ? "RENTAL_DEAL_TEMPLATE.html"
-      : isTestdrive
-        ? "TESTDRIVE_DEAL_TEMPLATE.html"
-        : isService
-          ? "SERVICE_DEAL_TEMPLATE.html"
-          : "SALE_DEAL_TEMPLATE.html";
-    const defaultTemplateMode = "html" as const;
+    const isEquipment = flowType === "equipment";
+    const localTemplateFile = isEquipment
+      ? "EQUIPMENT_RENTAL_DEAL_TEMPLATE.md"
+      : isRental
+        ? "RENTAL_DEAL_TEMPLATE.html"
+        : isTestdrive
+          ? "TESTDRIVE_DEAL_TEMPLATE.html"
+          : isService
+            ? "SERVICE_DEAL_TEMPLATE.html"
+            : "SALE_DEAL_TEMPLATE.html";
+    const defaultTemplateMode = isEquipmentOnly ? ("md" as const) : ("html" as const);
 
   // Check crew-specific template in crewDocs/ first
   const crewDocPath = path.join(process.cwd(), "docs", "crewDocs", `${slug}_${localTemplateFile}`);
@@ -2070,13 +2073,15 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
 
   // Fallback: fetch from GitHub (for Vercel ephemeral builds that might
     // not have the docs/ folder synced)
-    const remoteTemplateUrl = isRental
-      ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE.html"
-      : isTestdrive
-        ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/TESTDRIVE_DEAL_TEMPLATE.html"
-        : isService
-          ? "https://raw.githubusercontent.com/salavey13/cartTest/main/docs/SERVICE_DEAL_TEMPLATE.html"
-          : "https://raw.githubusercontent.com/salavey13/cartTest/main/docs/SALE_DEAL_TEMPLATE.html";
+    const remoteTemplateUrl = isEquipmentOnly
+      ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/EQUIPMENT_RENTAL_DEAL_TEMPLATE.md"
+      : isRental
+        ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE.html"
+        : isTestdrive
+          ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/TESTDRIVE_DEAL_TEMPLATE.html"
+          : isService
+            ? "https://raw.githubusercontent.com/salavey13/cartTest/main/docs/SERVICE_DEAL_TEMPLATE.html"
+            : "https://raw.githubusercontent.com/salavey13/cartTest/main/docs/SALE_DEAL_TEMPLATE.html";
   try {
     const response = await fetch(remoteTemplateUrl, { cache: "no-store" });
     if (!response.ok) {
@@ -2592,6 +2597,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         return { cashAmount: depositNum, bankAmount: lineTotal };
       })();
 
+      // Detect equipment-only rentals: no bike ID in the line or type='equipment'
+      const isEquipmentOnlyLine = !car.id || car.type === 'equipment';
+
       // Use shared builder for rental contracts
       const baseVariables = buildRentalContractVariables({
         renter: {
@@ -2631,13 +2639,13 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           // Sequential contract numbers for multi-bike: "11.7/falcon-pro-2025-1", "11.7/rerode-r1-plus-2"
           // Single bike: "11.7/falcon-pro-2025" (no suffix, matches /doc format)
           contractNumber: payload.cartLines.length > 1
-            ? `${new Date().getDate()}.${new Date().getMonth() + 1}/${car.id}-${bikeIndex + 1}`
-            : `${new Date().getDate()}.${new Date().getMonth() + 1}/${car.id}`,
+            ? `${new Date().getDate()}.${new Date().getMonth() + 1}/${car.id || 'equipment'}-${bikeIndex + 1}`
+            : `${new Date().getDate()}.${new Date().getMonth() + 1}/${car.id || 'equipment-' + bikeIndex}`,
           contractDate: new Date().toLocaleDateString("ru-RU"),
           signatureTimestamp: new Date().toLocaleString("ru-RU"),
           signatureFingerprint: payload.signatureFingerprint || "—",
           renterSignature: payload.signatureName || "электронное согласие в Telegram WebApp",
-          documentKey: `${isSaleFlow ? "sale" : "rental"}-${car.id}-${Date.now()}`,
+          documentKey: `${isSaleFlow ? "sale" : isEquipmentOnlyLine ? "equipment-rental" : "rental"}-${car.id || 'equipment-' + bikeIndex}-${Date.now()}`,
           verifiedAt: new Date().toISOString(),
         },
         extrasRows,
@@ -2646,6 +2654,17 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         priceBreakdown: (line as any).priceBreakdown,
         // ── Equipment selection parsed from perk string ──
         equipment,
+        // ── Equipment mode for standalone equipment rentals ──
+        equipmentMode: isEquipmentOnlyLine,
+        equipmentItems: isEquipmentOnlyLine ? [{
+          id: car.id,
+          make: car.make,
+          model: car.model,
+          description: car.description,
+          dailyPrice: Number(specs.dailyPrice || 500),
+          type: 'equipment',
+          specs: specs as any,
+        }] : undefined,
         // ── Payment split based on user-selected payment method ──
         paymentSplit,
       });

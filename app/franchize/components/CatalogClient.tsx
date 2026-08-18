@@ -44,10 +44,11 @@ interface CatalogClientProps {
   ctaPolicy?: FranchizeRouteCtaPolicy;
 }
 
-type QuickFilterKey = "all" | "budget" | "premium" | "newbie" | "topRated" | "entry" | "mid" | "pro";
+type QuickFilterKey = "all" | "budget" | "premium" | "newbie" | "topRated" | "entry" | "mid" | "pro" | "helmet" | "jacket" | "pants" | "gloves" | "boots" | "security" | "electronics";
 
-const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string; compactLabel?: string; tierColor?: string }> = [
+const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string; compactLabel?: string; tierColor?: string; equipmentOnly?: boolean }> = [
   { key: "all", label: "Все" },
+  // Bike filters
   { key: "entry", label: "Базовый", compactLabel: "Базов.", tierColor: "#22c55e" },
   { key: "mid", label: "Средний", compactLabel: "Средн.", tierColor: "#eab308" },
   { key: "pro", label: "Профи", tierColor: "#ef4444" },
@@ -55,6 +56,14 @@ const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string; compactLabel?: 
   { key: "premium", label: "Премиум 10000+" },
   { key: "newbie", label: "Для новичка", compactLabel: "Для новичков" },
   { key: "topRated", label: "Лучшие отзывы" },
+  // Equipment filters
+  { key: "helmet", label: "Шлемы", equipmentOnly: true },
+  { key: "jacket", label: "Куртки", equipmentOnly: true },
+  { key: "pants", label: "Штаны", equipmentOnly: true },
+  { key: "gloves", label: "Перчатки", equipmentOnly: true },
+  { key: "boots", label: "Боты", equipmentOnly: true },
+  { key: "security", label: "Безопасность", equipmentOnly: true },
+  { key: "electronics", label: "Электроника", equipmentOnly: true },
 ];
 
 const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
@@ -199,8 +208,9 @@ function formatSpecNum(raw: string | number): string {
 }
 
 /** Pull the Ah figure out of a battery string like "72V 120Ah (Li-ion, съёмная)". */
-function extractAh(raw: string): string | null {
-  const m = raw.match(/(\d+(?:[.,]\d+)?)\s*[AaАа]\s*[HhЧч]/);
+function extractAh(raw: string | number): string | null {
+  const s = typeof raw === "number" ? String(raw) : raw;
+  const m = s.match(/(\d+(?:[.,]\d+)?)\s*[AaАа]\s*[HhЧч]/);
   if (!m) return null;
   const ah = Number(m[1].replace(",", "."));
   return Number.isFinite(ah) ? `${Math.round(ah)} А·ч` : null;
@@ -229,7 +239,7 @@ const ELECTRIC_CHIP_DEFS: SpecChipDef[] = [
   { keys: ["power_kw", "motor_nominal_kw", "motor_kw", "motor_peak_kw"], icon: "", format: (v) => `${formatSpecNum(v)} кВт` },
   { keys: ["power_w"], icon: "", format: (v) => `${Math.round((Number(String(v).replace(/[^\d.]/g, "")) || 0) / 1000)} кВт` },
   { keys: ["range_km", "max_range_km"], icon: "", format: (v) => `${formatSpecNum(v)} км` },
-  { keys: ["battery", "battery_capacity", "battery_capacity_kwh"], icon: "", format: (v) => v, extract: extractAh },
+  { keys: ["battery", "battery_capacity", "battery_capacity_kwh"], icon: "", format: (v) => String(v), extract: extractAh },
   { keys: ["top_speed_kmh", "max_speed_kmh"], icon: "", format: (v) => `${formatSpecNum(v)} км/ч` },
   { keys: ["charge_time_h", "charging_time_h"], icon: "", format: (v) => `${formatSpecNum(v)} ч` },
 ];
@@ -262,6 +272,7 @@ function getVisibleSpecChips(item: CatalogItemVM): Array<{ icon: string; text: s
     specChips?: Array<{ icon: string; text: string }>;
     subtitle?: string;
     category?: string;
+    type?: string;
   };
 
   const withSpecs = item as ItemWithSpecs;
@@ -276,7 +287,60 @@ function getVisibleSpecChips(item: CatalogItemVM): Array<{ icon: string; text: s
       ? (withSpecs.rawSpecs as Record<string, unknown>)
       : {};
 
-  // 2. Propulsion-aware deliberate picks (power / range-or-cc / battery-or-speed)
+  // Equipment spec labels in Russian (for catalog cards)
+  const EQUIPMENT_SPEC_LABELS: Record<string, string> = {
+    size: "Размер",
+    sizes: "Размеры",
+    material: "Материал",
+    materials: "Материалы",
+    badge: "Особенность",
+    features: "Особенности",
+    safety: "Сертификация",
+    category: "Категория",
+    color: "Цвет",
+    colors: "Цвета",
+    weight: "Вес",
+    brand: "Бренд",
+  };
+
+  // Get Russian label from spec_labels in rawSpecs
+  const getRussianLabel = (key: string): string => {
+    const specLabels = (rawSpecs.spec_labels as Record<string, string> | undefined);
+    return specLabels?.[key] || EQUIPMENT_SPEC_LABELS[key] || key;
+  };
+
+  // 2. Equipment items: show size as highlighted spec
+  if (withSpecs.type === "equipment" || rawSpecs.category) {
+    const chips: Array<{ icon: string; text: string }> = [];
+
+    // Size is the most important spec for equipment
+    if (Array.isArray(rawSpecs.sizes) && rawSpecs.sizes.length > 0) {
+      const sizes = rawSpecs.sizes as string[];
+      chips.push({ icon: "", text: sizes.slice(0, 3).join(" / ") });
+    }
+
+    // Show badge if available (use Russian label)
+    if (typeof rawSpecs.badge === "string" && rawSpecs.badge) {
+      const badgeLabel = getRussianLabel("badge");
+      chips.push({ icon: "", text: `${badgeLabel}: ${rawSpecs.badge as string}` });
+    }
+
+    // Show material if available (use Russian label)
+    if (typeof rawSpecs.materials === "string" && rawSpecs.materials) {
+      const materialLabel = getRussianLabel("materials");
+      chips.push({ icon: "", text: rawSpecs.materials as string });
+    }
+
+    // Fallback to features array if we don't have 3 chips yet
+    if (chips.length < 3 && Array.isArray(rawSpecs.features) && rawSpecs.features.length > 0) {
+      const features = rawSpecs.features as string[];
+      chips.push(...features.slice(0, 3 - chips.length).map(f => ({ icon: "", text: f })));
+    }
+
+    return chips.slice(0, 3);
+  }
+
+  // 3. Propulsion-aware deliberate picks for bikes (power / range-or-cc / battery-or-speed)
   if (Object.keys(rawSpecs).length > 0) {
     const propulsion = getCatalogPropulsionSegment({
       title: item.title,
@@ -290,13 +354,13 @@ function getVisibleSpecChips(item: CatalogItemVM): Array<{ icon: string; text: s
     if (chips.length > 0) return chips;
   }
 
-  // 3. Last-resort fallback: structured specs array (label/value pairs)
+  // 4. Last-resort fallback: structured specs array (label/value pairs)
   if (Array.isArray(withSpecs.specs) && withSpecs.specs.length > 0) {
     return withSpecs.specs
       .filter((s) => s.value || s.label)
       .slice(0, 3)
       .map((s) => ({
-        icon: s.icon ?? specIconForKey(s.key ?? s.label ?? ""),
+        icon: ("icon" in s && typeof s.icon === "string") ? s.icon : specIconForKey(s.label ?? ""),
         text: s.value ?? s.label ?? "",
       }));
   }
@@ -499,6 +563,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   );
 
   const matchesQuickFilter = (item: CatalogItemVM, filter: QuickFilterKey) => {
+    // Equipment category filters - use equipmentOnly flag for cleaner domain separation
+    const filterDef = QUICK_FILTERS.find(f => f.key === filter);
+    if (filterDef?.equipmentOnly) {
+      const rs = item.rawSpecs as Record<string, unknown> | undefined;
+      return rs?.category === filter;
+    }
+
+    // Bike filters
     if (filter === "budget") {
       return item.pricePerDay <= 8000;
     }
@@ -542,9 +614,37 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         acc[filter.key] = modeFiltered.filter((item) => matchesQuickFilter(item, filter.key)).length;
         return acc;
       },
-      { all: 0, budget: 0, premium: 0, newbie: 0, topRated: 0, entry: 0, mid: 0, pro: 0 },
+      { all: 0, budget: 0, premium: 0, newbie: 0, topRated: 0, entry: 0, mid: 0, pro: 0, helmet: 0, jacket: 0, pants: 0, gloves: 0, boots: 0, security: 0, electronics: 0 },
     );
   }, [displayItems, searchQuery, displayMode]);
+
+  // Equipment category labels in Russian
+  const EQUIPMENT_CATEGORY_LABELS: Record<string, string> = {
+    helmet: "Шлемы",
+    jacket: "Куртки",
+    pants: "Штаны",
+    gloves: "Перчатки",
+    boots: "Боты",
+    security: "Безопасность",
+    electronics: "Электроника",
+    suit: "Комбинезоны",
+  };
+
+  // Equipment spec labels in Russian (for catalog cards)
+  const EQUIPMENT_SPEC_LABELS: Record<string, string> = {
+    size: "Размер",
+    sizes: "Размеры",
+    material: "Материал",
+    materials: "Материалы",
+    badge: "Особенность",
+    features: "Особенности",
+    safety: "Сертификация",
+    category: "Категория",
+    color: "Цвет",
+    colors: "Цвета",
+    weight: "Вес",
+    brand: "Бренд",
+  };
 
   const itemsByCategory = useMemo(() => {
     const sortedFilteredItems = quickFilter === "topRated"
@@ -560,12 +660,21 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       return true;
     });
 
+    // Group equipment items by category with Russian labels
+    const isEquipmentMode = displayMode === "equipment";
     const grouped = orderedCategories
-      .map((category) => ({
-        category,
-        title: "",
-        items: displayFiltered.filter((item) => item.category === category),
-      }))
+      .map((category) => {
+        const categoryItems = displayFiltered.filter((item) => item.category === category);
+        // For equipment, use Russian label as title
+        const title = isEquipmentMode && categoryItems.length > 0
+          ? (EQUIPMENT_CATEGORY_LABELS[category] || category)
+          : "";
+        return {
+          category,
+          title,
+          items: categoryItems,
+        };
+      })
       .filter((group) => group.items.length > 0);
 
     const saleGroup = displayFiltered.filter((item) => item.saleAvailable);
@@ -1067,7 +1176,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         </p>
 
         <div className="mb-5 flex min-w-0 max-w-full gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-1 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:bg-current/20] [&::-webkit-scrollbar-thumb:hover:bg-current/30]" role="group" aria-label="Быстрые фильтры каталога">
-          {QUICK_FILTERS.map((filter) => {
+          {QUICK_FILTERS.filter(f => {
+            // In equipment mode, show equipment filters + "all"
+            // In bike modes, show bike filters + "all"
+            if (displayMode === "equipment") {
+              return f.key === "all" || f.equipmentOnly === true;
+            }
+            return f.key === "all" || f.equipmentOnly !== true;
+          }).map((filter) => {
             const active = quickFilter === filter.key;
             return (
               <button

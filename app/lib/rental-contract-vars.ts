@@ -20,6 +20,36 @@ import { calculatePriceForDuration } from "@/app/franchize/lib/pricing-calculato
 // ─────────────────────────────────────────────────────────────────────────
 
 /**
+ * Equipment pricing constants (per day)
+ */
+const EQUIPMENT_DAILY_PRICES: Record<string, number> = {
+  helmet: 500,
+  gloves: 300,
+  jacket: 500,
+  pants: 500,
+  boots: 400,
+  net: 200,
+  backpack: 300,
+  bag: 200,
+  charger: 0,
+};
+
+/**
+ * Equipment replacement cost (for loss/damage)
+ */
+const EQUIPMENT_REPLACEMENT_COSTS: Record<string, number> = {
+  helmet: 5000,
+  gloves: 2500,
+  jacket: 8000,
+  pants: 7000,
+  boots: 6000,
+  net: 500,
+  backpack: 1500,
+  bag: 1000,
+  charger: 1500,
+};
+
+/**
  * Renter personal data from any source (manual input, OCR, web-app, user secrets)
  */
 export type RenterData = {
@@ -38,13 +68,32 @@ export type RenterData = {
 };
 
 /**
+ * Equipment item specifications from equipment_rentals or cars table
+ */
+export type EquipmentSpecs = {
+  id?: string;
+  make?: string;
+  model?: string;
+  description?: string;
+  dailyPrice?: number;
+  type?: string; // "equipment"
+  specs?: {
+    size?: string;
+    material?: string;
+    features?: string;
+    color?: string;
+    [key: string]: unknown;
+  };
+};
+
+/**
  * Bike specifications from any source (Supabase cars table, cart, etc.)
  */
 export type BikeSpecs = {
   id?: string | number;
   make?: string;
   model?: string;
-  type?: string; // "ebike" or "bike"
+  type?: string; // "ebike" or "bike" or "equipment"
   specs?: {
     plate?: string;
     vin?: string;
@@ -176,6 +225,8 @@ const DEFAULT_LATE_RETURN_PENALTY = 10000;
 const DEFAULT_LATE_RETURN_PENALTY_MAX_DAYS = 90;
 const DEFAULT_BIKE_VALUE = 850000;
 const DEFAULT_EQUIPMENT = "ключ(и) 1 шт.; шлем 1";
+const DEFAULT_EQUIPMENT_DEPOSIT = 5000;
+const DEFAULT_EQUIPMENT_DAILY_PRICE = 500;
 
 // ─────────────────────────────────────────────────────────────────────────
 // Helper functions
@@ -277,8 +328,9 @@ function buildEngineSpecLines(bike: BikeSpecs, isElectric: boolean): {
 
 /**
  * Resolve deposit value: explicit override > bike.specs.deposit_rub > default
+ * For equipment-only rentals, uses lower default deposit
  */
-function resolveDeposit(rentalPeriod: RentalPeriod, bikeSpecs: BikeSpecs["specs"]): string {
+function resolveDeposit(rentalPeriod: RentalPeriod, bikeSpecs: BikeSpecs["specs"], isEquipmentMode: boolean): string {
   // Validate depositOverride: must be positive finite number
   if (
     rentalPeriod.depositOverride != null &&
@@ -291,7 +343,7 @@ function resolveDeposit(rentalPeriod: RentalPeriod, bikeSpecs: BikeSpecs["specs"
   if (bikeSpecs?.deposit_rub && isFinite(bikeSpecs.deposit_rub) && bikeSpecs.deposit_rub > 0) {
     return String(bikeSpecs.deposit_rub);
   }
-  return String(DEFAULT_DEPOSIT);
+  return String(isEquipmentMode ? DEFAULT_EQUIPMENT_DEPOSIT : DEFAULT_DEPOSIT);
 }
 
 /**
@@ -488,6 +540,9 @@ export interface BuildRentalContractVariablesOptions {
   crewSecrets: CrewSecrets;
   stsPledge?: StsPledgeData;
   meta?: DocumentMeta;
+  // Equipment mode: standalone equipment rental (no bike)
+  equipmentMode?: boolean;
+  equipmentItems?: EquipmentSpecs[];
   // Web app specific: extras info (optional)
   extrasRows?: string;
   extrasTotalRub?: string;
@@ -549,7 +604,8 @@ export function buildRentalContractVariables(
   // Resolve prices and deposit
   const dailyPrice = resolveDailyPrice(period, bikeSpecs);
   const hourlyPrice = resolveHourlyPrice(period, bikeSpecs, dailyPrice);
-  const deposit = resolveDeposit(period, bikeSpecs);
+  const isEquipmentMode = options.equipmentMode || false;
+  const deposit = resolveDeposit(period, bikeSpecs, isEquipmentMode);
   const bikeValue = resolveBikeValue(bikeSpecs);
 
   // Calculate rental duration and subtotal
@@ -824,6 +880,51 @@ export function buildRentalContractVariables(
     // When СТС is used, record the cash deposit that was skipped (analytics)
     sts_deposit_amount_skipped: stsPledge.used ? deposit : "",
   };
+
+  // Equipment mode: standalone equipment rental contract variables
+  if (options.equipmentMode && options.equipmentItems) {
+    vars.equipment_mode = "1";
+    vars.contract_type = "ЭКИПИРОВКИ";
+
+    // Build equipment_list for section 1.2
+    const equipmentList = options.equipmentItems.map((item, index) => {
+      const size = item.specs?.size ? ` (${item.specs.size})` : "";
+      const material = item.specs?.material ? `, ${item.specs.material}` : "";
+      return `   ${index + 1}. ${item.make} ${item.model}${size}${material}`;
+    }).join('\n');
+    vars.equipment_list = equipmentList;
+
+    // Build equipment_price_list for appendix 2
+    const equipmentPriceList = options.equipmentItems.map((item) => {
+      const price = item.specs?.price || item.dailyPrice * 5 || 5000; // Default to 5 days rental value
+      return `     ${item.make} ${item.model}                    ${price}`;
+    }).join('\n     ');
+    vars.equipment_price_list = equipmentPriceList;
+
+    // Override equipment summary with full item list
+    vars.equipment_summary = options.equipmentItems.map((item) => {
+      return `${item.make} ${item.model}`;
+    }).join(', ');
+
+    // For equipment-only rentals, remove bike-specific variables
+    vars.bike_make = "не применимо";
+    vars.bike_model = "не применимо";
+    vars.bike_vin = "не применимо";
+    vars.bike_category = "не применимо";
+    vars.bike_color = "не применимо";
+    vars.bike_year = "не применимо";
+    vars.bike_engine_cc = "0";
+    vars.bike_power_hp = "0";
+    vars.bike_power_kw = "0";
+    vars.bike_max_speed = "0";
+    vars.bike_battery = "";
+    vars.bike_vehicle_type_label = "ЭКИПИРОВКИ";
+    vars.bike_vehicle_type_accusative = "экипировку";
+    vars.bike_vehicle_type_genitive = "экипировки";
+    vars.bike_engine_spec_line_1 = "";
+    vars.bike_engine_spec_line_2 = "";
+    vars.bike_engine_spec_line_3 = "";
+  }
 
   // Web app specific: verified_at, extras
   if (meta.verifiedAt) {
