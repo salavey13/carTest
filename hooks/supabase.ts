@@ -848,7 +848,7 @@ export const updateRentalPaymentStatus = async (
     }
 };
 
-export const uploadImage = async (bucketName: string, file: File, fileName?: string): Promise<{ success: boolean; publicUrl?: string; error?: string }> => {
+export const uploadImage = async (bucketName: string, file: File, fileName?: string, options?: { upsert?: boolean }): Promise<{ success: boolean; publicUrl?: string; error?: string }> => {
      if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
      if (!bucketName || !file) return { success: false, error: "Bucket name and file are required." };
 
@@ -866,7 +866,8 @@ export const uploadImage = async (bucketName: string, file: File, fileName?: str
             .from(bucketName)
             .upload(filePath, file, {
                 cacheControl: '3600', 
-                upsert: false         
+                // allow callers to override (e.g. editor re-saving to carpix/<id>/image_1.jpg)
+                upsert: options?.upsert ?? false
             });
 
         if (uploadError) {
