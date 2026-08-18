@@ -299,14 +299,28 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
 
       // upload image if provided
       let finalImageUrl = imageUrl;
+      let specsObject = buildSpecsObject();
+
+      // resolve target id BEFORE upload so the image lands in carpix/<id>/image_1.jpg
+      // (bikes use this pattern; the old behavior uploaded to the carpix root with a
+      // random UUID filename, making it impossible to find/reuse images by item id)
+      const rawMake = make || (type === "blog" ? (specsObject.title ?? "blog") : "unknown");
+      const rawModel = model || (type === "blog" ? (specsObject.slug ?? `blog-${Date.now()}`) : `item-${Date.now()}`);
+      const targetId = isEdit && vehicleToEdit?.id
+        ? vehicleToEdit.id
+        : `${String(rawMake).toLowerCase().replace(/\s+/g, "-")}-${String(rawModel).toLowerCase().replace(/\s+/g, "-")}-${uuidv4().slice(0, 8)}`;
+
       if (imageFile) {
         // Compress image client-side before upload (max 1400px, quality 0.70)
         const compressedBlob = await reduceImageResolution(imageFile, { maxSize: 1400, quality: 0.70 });
-        const compressedFile = new File([compressedBlob], imageFile.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
-        const up = await uploadImage("carpix", compressedFile);
+        const compressedFile = new File([compressedBlob], "image_1.jpg", { type: 'image/jpeg' });
+        const up = await uploadImage("carpix", compressedFile, `${targetId}/image_1.jpg`, { upsert: true });
         if (!up.success) throw new Error(up.error || "Image upload failed");
         finalImageUrl = up.publicUrl;
-        toast.success("Изображение загружено");
+        // keep the freshly uploaded photo first in specs.gallery
+        const galleryUrls = Array.isArray(specsObject.gallery) ? specsObject.gallery : [];
+        if (!galleryUrls.includes(finalImageUrl)) specsObject.gallery = [finalImageUrl, ...galleryUrls];
+        toast.success("Изображение загружено: carpix/" + targetId + "/image_1.jpg");
       }
 
       if (!finalImageUrl) {
@@ -314,11 +328,9 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       }
 
       // build payload
-      const specsObject = buildSpecsObject();
-
       const payload: Partial<Database["public"]["Tables"]["cars"]["Insert"]> = {
-        make: make || (type === "blog" ? (specsObject.title ?? "blog") : "unknown"),
-        model: model || (type === "blog" ? (specsObject.slug ?? `blog-${Date.now()}`) : `item-${Date.now()}`),
+        make: rawMake,
+        model: rawModel,
         description: description || (specsObject.excerpt ?? ""),
         specs: specsObject,
         daily_price: Number(dailyPrice || 0),
@@ -351,8 +363,9 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
         toast.success("Успешно обновлено");
         onSuccess?.(payload);
       } else {
-        // generate id if not provided
-        const id = `${(payload.make || "item").toString().toLowerCase().replace(/\s+/g, "-")}-${(payload.model || "x").toString().toLowerCase().replace(/\s+/g, "-")}-${uuidv4().slice(0, 8)}`;
+        // id was resolved BEFORE the upload so the image path could use it —
+        // reuse the same id for the DB row (carpix/<id>/image_1.jpg ↔ cars.id)
+        const id = targetId;
         // FIX: Same RLS issue — use /api/cars POST (uses supabaseAdmin) instead of supabaseAnon.insert()
         const response = await fetch("/api/cars", {
           method: "POST",

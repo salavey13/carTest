@@ -42,6 +42,13 @@ import {
 
 type Vehicle = Database["public"]["Tables"]["cars"]["Row"];
 
+// icon helper for the edit-select — so equipment isn't shown with a bike emoji
+const vehicleIcon = (type: string) =>
+  type === "car" ? "🚗"
+    : type === "equipment" ? "🧥"
+    : type === "service" ? "🛠️"
+    : "🏍️";
+
 const normalizeVin = (value: unknown) =>
   typeof value === "string" ? value.trim().toUpperCase() : "";
 
@@ -115,7 +122,7 @@ export function FranchizeAdminClient({
   const crew = initialCrew || fallbackCrew;
   const [fleet, setFleet] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
-  const [filterType, setFilterType] = useState<"all" | "bike" | "car">("all");
+  const [filterType, setFilterType] = useState<"all" | "bike" | "car" | "equipment" | "service">("all");
   const [loadingFleet, setLoadingFleet] = useState(false);
   // U1: track last refresh time for "обновлено Xс назад" display
   const [lastRefreshedAt, setLastRefreshedAt] = useState<number | null>(null);
@@ -450,7 +457,7 @@ export function FranchizeAdminClient({
             <Button
               key={filter.id}
               type="button"
-              onClick={() => setFilterType(filter.id as "all" | "bike" | "car")}
+              onClick={() => setFilterType(filter.id)}
               className="h-10 border text-sm font-semibold"
               style={{
                 borderColor: "var(--fr-admin-border)",
@@ -738,8 +745,8 @@ export function FranchizeAdminClient({
                   <SelectItem value="new">Создать новую запись</SelectItem>
                   {visible.map((vehicle) => (
                     <SelectItem key={vehicle.id} value={vehicle.id}>
-                      {vehicle.type === "car" ? "🚗" : "🏍️"} {vehicle.make}{" "}
-                      {vehicle.model}
+                      {vehicleIcon(vehicle.type)} {vehicle.make} {vehicle.model}
+                      {vehicle.type === "equipment" ? ` — ${vehicle.id}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
