@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Trophy, MapPin, ShoppingCart, Lock, CheckCircle, Wallet, Briefcase, Calendar } from "lucide-react";
+import { Trophy, MapPin, ShoppingCart, Lock, CheckCircle, Wallet, Briefcase, Calendar, Users, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
@@ -237,6 +238,34 @@ export function FranchizeProfileClient({
   } | null>(null);
   const [earningsLoading, setEarningsLoading] = useState(true);
   const [workLoading, setWorkLoading] = useState(true);
+
+  // Period earnings state
+  const [earningsPeriod, setEarningsPeriod] = useState({
+    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    to: new Date().toISOString().split('T')[0],
+  });
+  const [periodEarnings, setPeriodEarnings] = useState<{
+    shifts: number;
+    shiftIncome: number;
+    commissionIncome: number;
+    total: number;
+    breakdown: Array<{ date: string; description: string; amount: number }>;
+  } | null>(null);
+  const [periodEarningsLoading, setPeriodEarningsLoading] = useState(false);
+  const [periodEarningsError, setPeriodEarningsError] = useState<string | null>(null);
+
+  // Team earnings modal state (for owners)
+  const [showTeamEarningsModal, setShowTeamEarningsModal] = useState(false);
+  const [teamEarnings, setTeamEarnings] = useState<Array<{
+    memberId: string;
+    memberName: string;
+    shifts: number;
+    shiftIncome: number;
+    commissionIncome: number;
+    total: number;
+  }>>([]);
+  const [teamEarningsLoading, setTeamEarningsLoading] = useState(false);
+  const [teamEarningsError, setTeamEarningsError] = useState<string | null>(null);
   // Pre-entered rental docs (passport/license) from private.user_rental_secrets
   const [docsPrefill, setDocsPrefill] = useState<{
     fullName?: string; phone?: string; birthDate?: string;
@@ -316,6 +345,84 @@ export function FranchizeProfileClient({
     };
     void run();
   }, [dbUser?.user_id, slug]);
+
+  // Currency formatter helper (reused across component)
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("ru-RU", {
+      style: "currency",
+      currency: "RUB",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+
+  // Fetch earnings helper (shared between self and team)
+  const fetchEarnings = async (scope: "self" | "team") => {
+    if (!dbUser?.user_id) return { success: false, error: "Не авторизован" };
+
+    // Validate date range
+    const fromDate = new Date(earningsPeriod.from);
+    const toDate = new Date(earningsPeriod.to);
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      return { success: false, error: "Некорректный формат даты" };
+    }
+    if (fromDate > toDate) {
+      return { success: false, error: "Дата начала не может быть позже даты окончания" };
+    }
+
+    // Clone date to avoid mutation
+    const to = new Date(toDate);
+    to.setHours(23, 59, 59, 999);
+
+    const params = new URLSearchParams({
+      from: fromDate.toISOString(),
+      to: to.toISOString(),
+      scope,
+      actorUserId: dbUser.user_id,
+    });
+
+    try {
+      const res = await fetch(`/api/franchize/${slug}/earnings?${params}`);
+      return await res.json();
+    } catch (err) {
+      console.error(`Failed to fetch ${scope} earnings:`, err);
+      return { success: false, error: `Ошибка при загрузке ${scope === "team" ? "зарплат команды" : "дохода за период"}` };
+    }
+  };
+
+  // Fetch period earnings for self
+  const fetchPeriodEarnings = async () => {
+    setPeriodEarningsLoading(true);
+    setPeriodEarningsError(null);
+    const result = await fetchEarnings("self");
+    if (result.success && result.data) {
+      setPeriodEarnings(result.data);
+    } else {
+      setPeriodEarningsError(result.error || "Не удалось загрузить доход за период");
+    }
+    setPeriodEarningsLoading(false);
+  };
+
+  // Fetch team earnings for owners
+  const fetchTeamEarnings = async () => {
+    setTeamEarningsLoading(true);
+    setTeamEarningsError(null);
+    const result = await fetchEarnings("team");
+    if (result.success && result.data) {
+      setTeamEarnings(result.data);
+      setShowTeamEarningsModal(true);
+    } else {
+      setTeamEarningsError(result.error || "Не удалось загрузить зарплаты команды");
+    }
+    setTeamEarningsLoading(false);
+  };
+
+  // Auto-load period earnings on mount with default period
+  useEffect(() => {
+    if (dbUser?.user_id && !periodEarnings) {
+      void fetchPeriodEarnings();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbUser?.user_id]);
 
   const unlockedSet = useMemo(
     () => new Set(Object.keys(profile?.achievements || {})),
@@ -582,6 +689,156 @@ export function FranchizeProfileClient({
           <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
             <Wallet className="h-4 w-4" /> Мои доходы
           </h2>
+
+          {/* Period selector */}
+          <div className="mt-3 rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold" style={{ color: T.textMuted }}>
+                📅 Период расчёта
+              </p>
+              {canOpenCloserDashboard && (
+                <button
+                  onClick={fetchTeamEarnings}
+                  disabled={teamEarningsLoading}
+                  className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85 disabled:opacity-50"
+                  style={{
+                    backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 15%, transparent)",
+                    color: T.accent,
+                    border: `1px solid ${T.borderSoft}`,
+                  }}
+                >
+                  {teamEarningsLoading ? (
+                    <>
+                      <RotateCw className="h-3 w-3 animate-spin" />
+                      Загрузка...
+                    </>
+                  ) : (
+                    <>
+                      <Users className="h-3 w-3" />
+                      Зарплаты команды
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs" style={{ color: T.textMuted }}>с</span>
+                <input
+                  type="date"
+                  value={earningsPeriod.from}
+                  onChange={(e) => setEarningsPeriod((p) => ({ ...p, from: e.target.value }))}
+                  className="rounded border px-2 py-1 text-xs"
+                  style={{
+                    borderColor: T.borderSoft,
+                    backgroundColor: "color-mix(in srgb, var(--franchize-shell-card) 50%, transparent)",
+                    color: T.text,
+                  }}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs" style={{ color: T.textMuted }}>по</span>
+                <input
+                  type="date"
+                  value={earningsPeriod.to}
+                  onChange={(e) => setEarningsPeriod((p) => ({ ...p, to: e.target.value }))}
+                  className="rounded border px-2 py-1 text-xs"
+                  style={{
+                    borderColor: T.borderSoft,
+                    backgroundColor: "color-mix(in srgb, var(--franchize-shell-card) 50%, transparent)",
+                    color: T.text,
+                  }}
+                />
+              </div>
+              <button
+                onClick={fetchPeriodEarnings}
+                disabled={periodEarningsLoading}
+                className="flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85 disabled:opacity-50"
+                style={{
+                  backgroundColor: T.accent,
+                  color: T.accentContrast,
+                }}
+              >
+                {periodEarningsLoading ? (
+                  <>
+                    <RotateCw className="h-3 w-3 animate-spin" />
+                    Загрузка...
+                  </>
+                ) : (
+                  <>
+                    <RotateCw className="h-3 w-3" />
+                    Применить
+                  </>
+                )}
+              </button>
+            </div>
+            {/* Inline error for period */}
+            {periodEarningsError && (
+              <div className="mt-2 rounded px-2 py-1 text-xs" style={{ backgroundColor: "color-mix(in srgb, #ef4444 12%, transparent)", color: "#ef4444" }}>
+                ⚠️ {periodEarningsError}
+              </div>
+            )}
+          </div>
+
+          {/* Period earnings result */}
+          {periodEarnings && (
+            <div className="mt-3 rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div>
+                  <p className="text-xs" style={{ color: T.textMuted }}>Часы (смены)</p>
+                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
+                    {periodEarnings.shifts}ч
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs" style={{ color: T.textMuted }}>Смены</p>
+                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
+                    {formatCurrency(periodEarnings.shiftIncome)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs" style={{ color: T.textMuted }}>Комиссии</p>
+                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
+                    {formatCurrency(periodEarnings.commissionIncome)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs" style={{ color: T.textMuted }}>Итого за период</p>
+                  <p className="mt-1 text-lg font-semibold" style={{ color: T.accent }}>
+                    {formatCurrency(periodEarnings.total)}
+                  </p>
+                </div>
+              </div>
+              {periodEarnings.breakdown.length > 0 && (
+                <div className="mt-3 pt-3 border-t" style={{ borderColor: T.borderSoft }}>
+                  <p className="mb-2 text-xs font-semibold" style={{ color: T.textMuted }}>
+                    Детализация (последние 10 записей)
+                  </p>
+                  <div className="space-y-1">
+                    {periodEarnings.breakdown.slice(0, 10).map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between rounded px-2 py-1 text-xs"
+                        style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }}
+                      >
+                        <div className="flex-1">
+                          <p style={{ color: T.text }}>{item.description}</p>
+                          <p className="text-[10px]" style={{ color: T.textMuted }}>
+                            {new Date(item.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
+                        <span className="font-mono font-semibold" style={{ color: T.accent }}>
+                          {formatCurrency(item.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Legacy monthly earnings summary */}
           {earningsLoading ? (
             <div className="py-4 text-center text-sm" style={{ color: T.textMuted }}>
               Загрузка данных...
@@ -592,23 +849,13 @@ export function FranchizeProfileClient({
                 <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
                   <p className="text-xs" style={{ color: T.textMuted }}>Начислено (месяц)</p>
                   <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
-                    {new Intl.NumberFormat("ru-RU", {
-                      style: "currency",
-                      currency: "RUB",
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    }).format(earnings.currentPlan.accrued)}
+                    {formatCurrency(earnings.currentPlan.accrued)}
                   </p>
                 </div>
                 <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
                   <p className="text-xs" style={{ color: T.textMuted }}>К выплате</p>
                   <p className="mt-1 text-lg font-semibold" style={{ color: earnings.currentPlan.balanceDue > 0 ? "#f59e0b" : "#10b981" }}>
-                    {new Intl.NumberFormat("ru-RU", {
-                      style: "currency",
-                      currency: "RUB",
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    }).format(earnings.currentPlan.balanceDue)}
+                    {formatCurrency(earnings.currentPlan.balanceDue)}
                   </p>
                 </div>
                 <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
@@ -640,12 +887,7 @@ export function FranchizeProfileClient({
                           </p>
                         </div>
                         <span className="font-mono font-semibold" style={{ color: T.accent }}>
-                          {new Intl.NumberFormat("ru-RU", {
-                            style: "currency",
-                            currency: "RUB",
-                            minimumFractionDigits: 0,
-                            maximumFractionDigits: 0,
-                          }).format(comm.amount)}
+                          {formatCurrency(comm.amount)}
                         </span>
                       </div>
                     ))}
@@ -685,12 +927,7 @@ export function FranchizeProfileClient({
                     {myWork.rentals.count}
                   </p>
                   <p className="text-xs" style={{ color: T.textMuted }}>
-                    {new Intl.NumberFormat("ru-RU", {
-                      style: "currency",
-                      currency: "RUB",
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    }).format(myWork.rentals.total)}
+                    {formatCurrency(myWork.rentals.total)}
                   </p>
                 </div>
                 <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
@@ -699,12 +936,7 @@ export function FranchizeProfileClient({
                     {myWork.sales.count}
                   </p>
                   <p className="text-xs" style={{ color: T.textMuted }}>
-                    {new Intl.NumberFormat("ru-RU", {
-                      style: "currency",
-                      currency: "RUB",
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    }).format(myWork.sales.total)}
+                    {formatCurrency(myWork.sales.total)}
                   </p>
                 </div>
                 <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
@@ -713,12 +945,7 @@ export function FranchizeProfileClient({
                     {myWork.serviceReturns.count}
                   </p>
                   <p className="text-xs" style={{ color: T.textMuted }}>
-                    {new Intl.NumberFormat("ru-RU", {
-                      style: "currency",
-                      currency: "RUB",
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    }).format(myWork.serviceReturns.total)}
+                    {formatCurrency(myWork.serviceReturns.total)}
                   </p>
                 </div>
               </div>
@@ -1183,6 +1410,103 @@ export function FranchizeProfileClient({
           {!!error && <p className="text-xs text-red-400">{error}</p>}
         </FranchizeOperatorPanel>
       </motion.div>
+
+      {/* Team Earnings Modal (for owners) */}
+      <Dialog open={showTeamEarningsModal} onOpenChange={setShowTeamEarningsModal}>
+        <DialogContent className="max-w-2xl" style={{ backgroundColor: T.bgCard, borderColor: T.borderSoft }}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2" style={{ color: T.text }}>
+              <Users className="h-5 w-5" style={{ color: T.accent }} />
+              💰 Зарплаты команды
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Period display */}
+            <div className="flex items-center gap-2 text-sm" style={{ color: T.textMuted }}>
+              <Calendar className="h-4 w-4" />
+              <span>
+                Период: с {new Date(earningsPeriod.from).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}{" "}
+                по {new Date(earningsPeriod.to).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+              </span>
+            </div>
+
+            {/* Error message */}
+            {teamEarningsError && (
+              <div className="rounded px-3 py-2 text-sm" style={{ backgroundColor: "color-mix(in srgb, #ef4444 12%, transparent)", color: "#ef4444" }}>
+                ⚠️ {teamEarningsError}
+              </div>
+            )}
+
+            {/* Loading skeleton */}
+            {teamEarningsLoading && (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-12 animate-pulse rounded" style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }} />
+                ))}
+              </div>
+            )}
+
+            {/* Team earnings table */}
+            {!teamEarningsLoading && teamEarnings.length > 0 ? (
+              <div className="rounded-lg border overflow-hidden" style={{ borderColor: T.borderSoft }}>
+                {/* Responsive table with horizontal scroll on mobile */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b" style={{ borderColor: T.borderSoft, color: T.textMuted }}>
+                        <th className="px-3 py-2 text-left text-xs font-semibold">Сотрудник</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold">Смены</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold">Комиссии</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold">Итого</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y" style={{ borderColor: T.borderSoft }}>
+                      {teamEarnings.map((member) => (
+                        <tr
+                          key={member.memberId}
+                          className="hover:bg-opacity-50 transition"
+                          style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 4%, transparent)" }}
+                        >
+                          <td className="px-3 py-2 font-medium" style={{ color: T.text }}>
+                            {member.memberName}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono" style={{ color: T.text }}>
+                            {member.shifts}ч
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono" style={{ color: T.text }}>
+                            {formatCurrency(member.commissionIncome)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold" style={{ color: T.accent }}>
+                            {formatCurrency(member.total)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t font-semibold" style={{ borderColor: T.borderSoft, backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 10%, transparent)" }}>
+                        <td className="px-3 py-2" style={{ color: T.text }}>Всего</td>
+                        <td className="px-3 py-2 text-right font-mono" style={{ color: T.text }}>
+                          {teamEarnings.reduce((sum, m) => sum + m.shifts, 0).toFixed(1)}ч
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono" style={{ color: T.text }}>
+                          {formatCurrency(teamEarnings.reduce((sum, m) => sum + m.commissionIncome, 0))}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono font-semibold" style={{ color: T.accent }}>
+                          {formatCurrency(teamEarnings.reduce((sum, m) => sum + m.total, 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            ) : !teamEarningsLoading ? (
+                <div className="py-8 text-center text-sm" style={{ color: T.textMuted }}>
+                  Нет данных о зарплатах за выбранный период
+                </div>
+              ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
