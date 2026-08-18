@@ -15,11 +15,28 @@ Defaults to today's date, text format.
 import json, os, sys, urllib.request, datetime
 from pathlib import Path
 
+def _load_env():
+    """Load SUPABASE_SERVICE_ROLE_KEY from <repo>/.env.local if not already set."""
+    if os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
+        return
+    env_path = Path(__file__).resolve().parents[1] / ".env.local"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+_load_env()
+
 SUPABASE_URL = "https://inmctohsodgdohamhzag.supabase.co"
-SERVICE_KEY = os.environ.get(
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODMzOTU4NSwiZXhwIjoyMDUzOTE1NTg1fQ.xD91Es2o8T1vM-2Ok8iKCn4jGDA5TwBbapD5eqhblLM"
-)
+SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+if not SERVICE_KEY:
+    raise SystemExit(
+        "SUPABASE_SERVICE_ROLE_KEY не найден. Ожидается в <repo>/.env.local "
+        "(SUPABASE_SERVICE_ROLE_KEY=...) или в env. НЕ хардкодь ключ в коде."
+    )
 VIP_BIKE_CREW_ID = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746"
 
 def supabase_get(path, params=""):
