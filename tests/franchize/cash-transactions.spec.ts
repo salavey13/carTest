@@ -14,6 +14,33 @@ vi.mock("@/lib/logger", () => ({
   },
 }));
 
+// Recursive fallback chain — every method returns the chain itself, and
+// `await chain` resolves to `{ data, error }` (so production code that
+// destructures `const { data, error } = await chain` works).
+// Used as the default return from `mockFrom` for tables the test doesn't
+// explicitly mock (e.g. `crew_members` when verifyCrewAccess short-circuits).
+function fallbackChain(data: any = null, error: any = null) {
+  const chain: any = {
+    data,
+    error,
+    select: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    gte: vi.fn(() => chain),
+    lte: vi.fn(() => chain),
+    lt: vi.fn(() => chain),
+    gt: vi.fn(() => chain),
+    order: vi.fn(() => chain),
+    limit: vi.fn(() => chain),
+    maybeSingle: vi.fn(() => ({ data, error })),
+    single: vi.fn(() => ({ data, error })),
+    insert: vi.fn(() => chain),
+    update: vi.fn(() => chain),
+    upsert: vi.fn(() => chain),
+  };
+  chain.then = (resolve: (v: any) => any) => resolve({ data: chain.data, error: chain.error });
+  return chain;
+}
+
 vi.mock("next/headers", () => ({
   cookies: vi.fn(() => new Map()),
 }));
@@ -100,7 +127,7 @@ describe("cash-transactions actions", () => {
         if (table === "users") return userChain;
         if (table === "crews") return crewChain;
         if (table === "cash_transactions") return txChain;
-        return { select: vi.fn(), eq: vi.fn() };
+        return fallbackChain();
       });
 
       const res = await getCashTransactions({ slug: "vip-bike", actorUserId: "mock-user-id" });
@@ -161,7 +188,7 @@ describe("cash-transactions actions", () => {
         if (table === "crews") return crewChain;
         if (table === "users") return userChain;
         if (table === "cash_transactions") return insertChain;
-        return { select: vi.fn(), eq: vi.fn() };
+        return fallbackChain();
       });
 
       const res = await createManualCashTransaction({
@@ -203,7 +230,6 @@ describe("cash-transactions actions", () => {
       const viewChain: any = {
         select: vi.fn(() => viewChain),
         eq: vi.fn(() => viewChain),
-        eq: vi.fn(() => viewChain),
         maybeSingle: vi.fn().mockResolvedValue({
           data: { total_in: "5000", total_out: "1000", net_flow: "4000" },
           error: null,
@@ -226,7 +252,7 @@ describe("cash-transactions actions", () => {
         if (table === "crews") return crewChain;
         if (table === "daily_cash_flow") return viewChain;
         if (table === "cash_transactions") return txChain;
-        return { select: vi.fn(), eq: vi.fn() };
+        return fallbackChain();
       });
 
       const res = await getDailyCashReport({ slug: "vip-bike", actorUserId: "mock-user-id", date: "2026-08-12" });

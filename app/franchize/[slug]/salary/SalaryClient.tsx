@@ -13,7 +13,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   getFranchizeOperatorDashboardAccess,
@@ -200,21 +199,21 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
       });
 
       if (result.success && result.data) {
-        setPlans(prev => prev.map(p =>
-          p.id === plan.id
-            ? {
-                ...p,
-                breakdown: {
-                  shiftIncome: result.data!.shiftIncome,
-                  commissionIncome: result.data!.commissionIncome,
-                  bonusIncome: result.data!.bonusIncome,
-                  totalIncome: result.data!.totalIncome,
-                  details: result.data!.breakdown,
-                }
-              }
-            : p
-        ));
-        setBreakdownModal({ open: true, plan: plans.find(p => p.id === plan.id) || null });
+        const newBreakdown = {
+          shiftIncome: result.data.shiftIncome,
+          commissionIncome: result.data.commissionIncome,
+          bonusIncome: result.data.bonusIncome,
+          totalIncome: result.data.totalIncome,
+          details: result.data.breakdown,
+        };
+        // 2026-08-19 review: previously the modal opened with the OLD plan
+        // (closure capture) — `plans.find(p => p.id === plan.id)` returned
+        // the pre-update plan, so `breakdown === null` and the modal showed
+        // "Загрузка деталей..." forever. Use the updated plan object
+        // directly so the modal renders the breakdown immediately.
+        const updatedPlan: SalaryPlan = { ...plan, breakdown: newBreakdown };
+        setPlans(prev => prev.map(p => p.id === plan.id ? updatedPlan : p));
+        setBreakdownModal({ open: true, plan: updatedPlan });
       } else {
         setError(result.error || "Не удалось загрузить расчёт");
       }
@@ -412,8 +411,25 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
           </h2>
 
           {plans.length === 0 ? (
-            <div className="py-8 text-center text-sm" style={{ color: T.textMuted }}>
-              Нет данных за выбранный период. Измените период или дождитесь начислений.
+            <div
+              className="mt-3 flex flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center"
+              style={{ borderColor: T.borderSoft }}
+            >
+              <div
+                className="mb-3 flex h-14 w-14 items-center justify-center rounded-full"
+                style={{
+                  backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 12%, transparent)",
+                  color: T.accent,
+                }}
+              >
+                <Wallet className="h-6 w-6" />
+              </div>
+              <p className="text-sm font-semibold" style={{ color: T.text }}>
+                Нет начислений за выбранный период
+              </p>
+              <p className="mt-1 text-xs" style={{ color: T.textMuted }}>
+                Смены и комиссии появятся здесь автоматически — ведите учёт через профиль и кассовую книгу.
+              </p>
             </div>
           ) : (
             <div className="mt-3 overflow-x-auto">
@@ -467,18 +483,24 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
                       </td>
                       <td
                         className="px-3 py-3 text-right font-mono font-semibold"
-                        style={{ color: plan.balanceDue > 0 ? "#f59e0b" : "#10b981" }}
+                        style={{
+                          color: plan.balanceDue > 0
+                            ? T.styles.warningBadge.color
+                            : T.styles.successBadge.color,
+                        }}
                       >
                         {formatCurrency(plan.balanceDue)}
                       </td>
                       <td className="px-3 py-3 text-center">
                         <span
-                          className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
-                            plan.status === "paid" && "bg-green-500/10 text-green-400",
-                            plan.status === "partial" && "bg-yellow-500/10 text-yellow-400",
-                            plan.status === "pending" && "bg-gray-500/10 text-gray-400"
-                          )}
+                          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                          style={
+                            plan.status === "paid"
+                              ? T.styles.successBadge
+                              : plan.status === "partial"
+                                ? T.styles.warningBadge
+                                : T.styles.accentBadge
+                          }
                         >
                           {plan.status === "paid" && <CheckCircle className="h-3 w-3" />}
                           {plan.status === "partial" && <Clock className="h-3 w-3" />}
@@ -517,6 +539,34 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr
+                    className="border-t-2"
+                    style={{ borderColor: T.accent }}
+                  >
+                    <td className="px-3 py-3 font-semibold" style={{ color: T.text }}>
+                      Итого
+                    </td>
+                    <td className="px-3 py-3" />
+                    <td className="px-3 py-3 text-right font-mono font-semibold" style={{ color: T.text }}>
+                      {formatCurrency(plans.reduce((sum, p) => sum + p.accrued, 0))}
+                    </td>
+                    <td className="px-3 py-3 text-right font-mono font-semibold" style={{ color: T.textMuted }}>
+                      {formatCurrency(plans.reduce((sum, p) => sum + p.paid, 0))}
+                    </td>
+                    <td
+                      className="px-3 py-3 text-right font-mono font-bold"
+                      style={{
+                        color: plans.reduce((s, p) => s + p.balanceDue, 0) > 0
+                          ? T.styles.warningBadge.color
+                          : T.styles.successBadge.color,
+                      }}
+                    >
+                      {formatCurrency(plans.reduce((sum, p) => sum + p.balanceDue, 0))}
+                    </td>
+                    <td colSpan={2} />
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}

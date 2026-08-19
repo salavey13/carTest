@@ -32,6 +32,7 @@ type OperatorStatCardProps = {
   label: string;
   value: ReactNode;
   detail?: ReactNode;
+  icon?: ReactNode;
   className?: string;
 };
 
@@ -39,16 +40,20 @@ export function FranchizeOperatorStatCard({
   label,
   value,
   detail,
+  icon,
   className = "",
 }: OperatorStatCardProps) {
   return (
     <FranchizeOperatorPanel className={`min-w-0 ${className}`}>
-      <p
-        className="text-xs font-medium tracking-wide"
-        style={{ color: "var(--franchize-shell-muted)" }}
-      >
-        {label}
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p
+          className="text-xs font-medium tracking-wide"
+          style={{ color: "var(--franchize-shell-muted)" }}
+        >
+          {label}
+        </p>
+        {icon ? <span className="shrink-0">{icon}</span> : null}
+      </div>
       <p className="mt-2 break-words text-2xl font-semibold sm:text-3xl">
         {value}
       </p>
