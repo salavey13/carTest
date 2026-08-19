@@ -723,7 +723,7 @@ const vars = {
   signature_timestamp: now.toLocaleString('ru-RU'), signature_fingerprint:'offline-skill', renter_signature:'согласие через Telegram',
   bike_mileage: String(bike.specs?.mileage||''),
   equipment:'ключ(и) 1 шт.; шлем 1',
-  damage_notes_at_delivery:'от даты начала аренды', damage_notes_at_return:'от даты возврата тс',
+  damage_notes_at_delivery:'от даты начала аренды', damage_notes_at_return: isEquipmentRental ? 'от даты возврата экипировки' : 'от даты возврата тс',
   battery_level_start:'100 %', battery_level_end:'____ %',
   media_links:'телефон',
   renter_passport_issue_date: passportJson.issueDate || '', renter_registration: passportJson.registration || '',

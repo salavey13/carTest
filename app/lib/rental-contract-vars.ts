@@ -848,7 +848,7 @@ export function buildRentalContractVariables(
     // Delivery/return defaults
     equipment: getContractDefault(crewSecrets, "equipment", DEFAULT_EQUIPMENT),
     damage_notes_at_delivery: "от даты начала аренды",
-    damage_notes_at_return: "от даты возврата ТС",
+    damage_notes_at_return: isEquipmentMode ? "от даты возврата экипировки" : "от даты возврата ТС",
     battery_level_start: "100 %",
     battery_level_end: "____ %",
     media_links: "телефон",
