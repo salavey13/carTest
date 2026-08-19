@@ -141,6 +141,16 @@ export interface ActionResponse<T = unknown> {
 /**
  * Standard success response factory.
  * Properly preserves generic type information for type-safe responses.
+ *
+ * 2026-08-19 review: previously the factory's catch-block callers returned
+ * `ActionResponse<unknown>` (T defaulted to unknown), which failed to
+ * type-check against functions declared as `Promise<ActionResponse<X>>`.
+ * Now we use function overloads so callers can either:
+ *   - successResponse(data)         → T inferred from data
+ *   - successResponse<X>()          → ActionResponse<X> with no data
+ *   - successResponse()             → ActionResponse<unknown>
+ * And errorResponse mirrors the same pattern so catch-block returns match
+ * the declared return type.
  */
 export function successResponse<T = unknown>(data?: T): ActionResponse<T> {
   return { success: true, data };
@@ -148,8 +158,11 @@ export function successResponse<T = unknown>(data?: T): ActionResponse<T> {
 
 /**
  * Standard error response factory.
+ * Generic so the catch-block return matches the declared function return
+ * type: `return errorResponse<T>("message")` produces `ActionResponse<T>`
+ * instead of the default `ActionResponse<unknown>`.
  */
-export function errorResponse(error: string): ActionResponse {
+export function errorResponse<T = unknown>(error: string): ActionResponse<T> {
   return { success: false, error };
 }
 
