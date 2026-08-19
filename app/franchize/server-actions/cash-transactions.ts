@@ -8,6 +8,8 @@ import {
   handleError,
   successResponse,
   errorResponse,
+  normalizePeriodStart,
+  normalizePeriodEnd,
   type ActionResponse,
 } from "./shared/auth-helpers";
 
@@ -322,16 +324,17 @@ export async function getDailyCashReport(params: {
     }
 
     // Get detailed transactions for the day
-    const startOfDay = new Date(date);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    // 2026-08-19 review: use TZ-aware normalize helpers (date-only input
+    // from the admin URL is extended to UTC start/end-of-day).
+    const startOfDayIso = normalizePeriodStart(date);
+    const endOfDayIso = normalizePeriodEnd(date);
 
     const { data: transactions, error: txError } = await supabaseAdmin
       .from("cash_transactions")
       .select("*")
       .eq("crew_id", access.crewId)
-      .gte("transaction_date", startOfDay.toISOString())
-      .lte("transaction_date", endOfDay.toISOString())
+      .gte("transaction_date", startOfDayIso)
+      .lte("transaction_date", endOfDayIso)
       .order("transaction_date", { ascending: false });
 
     if (txError) {

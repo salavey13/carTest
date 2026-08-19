@@ -47,13 +47,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Crew not found" }, { status: 404 });
   }
 
-  const { data: membership } = await supabaseAdmin
-    .from("crew_members")
-    .select("role, membership_status")
-    .eq("crew_id", crew.id)
-    .eq("user_id", cookieUserId)
-    .maybeSingle();
-
   const isAdmin = await (async () => {
     const { data: user } = await supabaseAdmin
       .from("users")
@@ -65,8 +58,25 @@ export async function GET(request: NextRequest) {
   })();
 
   const isOwner = crew.owner_id === cookieUserId || isAdmin;
-  if (!isOwner && membership?.membership_status !== "active") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { data: membership } = await supabaseAdmin
+    .from("crew_members")
+    .select("role, membership_status")
+    .eq("crew_id", crew.id)
+    .eq("user_id", cookieUserId)
+    .maybeSingle();
+  // 2026-08-19 review: tighten deposit-list to owner-tier only. It returns
+  // aggregate deposit data for the entire crew (cash_collected, penalty,
+  // etc.) which is sensitive financial information; regular members should
+  // not see other members' deposit entries. Per-rental deposit-summary
+  // remains accessible to any active crew member (used on rental cards).
+  const isCoOwner =
+    membership?.membership_status === "active" &&
+    ["co_owner", "admin"].includes(membership?.role || "");
+  if (!isOwner && !isCoOwner) {
+    return NextResponse.json(
+      { error: "Forbidden: только владелец, со-владелец или администратор может видеть агрегированные депозиты команды" },
+      { status: 403 }
+    );
   }
 
   try {

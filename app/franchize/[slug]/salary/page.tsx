@@ -30,6 +30,28 @@ export default async function SalaryPage({ params }: SalaryPageProps) {
 
   let isCrewMember = false;
   if (callerUserId) {
+    // 2026-08-19 review: the salary page renders the owner-facing team
+    // salary table (getOwnerSalaryOverview enforces owner-tier). Allow
+    // owner / co_owner / admin only — regular members would otherwise
+    // load the page UI and then see an error toast from the server action.
+    // Members can still see their own earnings on their profile page.
+    const { data: user } = await supabaseAdmin
+      .from("users")
+      .select("metadata")
+      .eq("user_id", callerUserId)
+      .maybeSingle();
+    const userMetadata = user?.metadata as Record<string, unknown> | null;
+    const isAdmin = userMetadata?.role === "admin" || userMetadata?.status === "admin";
+
+    // FranchizeCrewVM doesn't expose owner_id — fetch it from the crews
+    // table directly.
+    const { data: crewRow } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id")
+      .eq("slug", crew.slug || slug)
+      .maybeSingle();
+    const isOwnerByCrew = crewRow?.owner_id === callerUserId;
+
     const { data: membership } = await supabaseAdmin
       .from("crew_members")
       .select("role, membership_status")
@@ -37,7 +59,9 @@ export default async function SalaryPage({ params }: SalaryPageProps) {
       .eq("user_id", callerUserId)
       .eq("membership_status", "active")
       .maybeSingle();
-    if (membership && ["owner", "admin", "co_owner", "member"].includes(membership.role)) {
+    const isCoOwner =
+      ["co_owner", "admin"].includes(membership?.role || "");
+    if (isOwnerByCrew || isAdmin || isCoOwner) {
       isCrewMember = true;
     }
   }
@@ -48,10 +72,10 @@ export default async function SalaryPage({ params }: SalaryPageProps) {
         <div className="text-center p-8">
           <p className="text-2xl mb-2">🔒</p>
           <p className="text-sm font-semibold" style={{ color: surface.card.color }}>
-            Доступ только для участников экипажа
+            Доступ только для владельца, со-владельца или администратора
           </p>
           <p className="mt-1 text-xs" style={{ color: surface.card.borderColor }}>
-            Откройте эту страницу через Telegram WebApp с привязанным аккаунтом.
+            Свои доходы смотрите на странице профиля. Расчёт зарплаты команды — только для владельца экипажа.
           </p>
         </div>
       </main>

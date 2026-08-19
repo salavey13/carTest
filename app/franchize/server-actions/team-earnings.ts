@@ -8,6 +8,8 @@ import {
   handleError,
   successResponse,
   errorResponse,
+  normalizePeriodStart,
+  normalizePeriodEnd,
   type ActionResponse,
 } from "./shared/auth-helpers";
 
@@ -49,12 +51,11 @@ export async function getTeamEarnings(params: {
     }
 
     const crewId = access.crewId;
-    const fromDate = new Date(from).toISOString();
-    const toDate = new Date(to);
-
-    // Set to end of day
-    toDate.setHours(23, 59, 59, 999);
-    const toDateIso = toDate.toISOString();
+    // 2026-08-19 review: use TZ-aware normalize helpers. Previously
+    // `toDate.setHours(23, 59, 59, 999)` shifted the boundary by ±3 hours
+    // on UTC servers because setHours uses server-local TZ.
+    const fromDate = normalizePeriodStart(from);
+    const toDateIso = normalizePeriodEnd(to);
 
     // Get all crew members
     const { data: members, error: membersError } = await supabaseAdmin
@@ -169,12 +170,9 @@ export async function getMemberEarnings(params: {
       return { success: false, error: "Недостаточно прав для просмотра чужих доходов." };
     }
     const crewId = access.crewId;
-    const fromDate = new Date(from).toISOString();
-    const toDate = new Date(to);
-
-    // Set to end of day
-    toDate.setHours(23, 59, 59, 999);
-    const toDateIso = toDate.toISOString();
+    // 2026-08-19 review: use TZ-aware normalize helpers.
+    const fromDate = normalizePeriodStart(from);
+    const toDateIso = normalizePeriodEnd(to);
 
     // Verify the member belongs to this crew
     const { data: memberCheck } = await supabaseAdmin
@@ -307,10 +305,9 @@ export async function getOwnerSalaryOverview(params: {
     }
 
     const crewId = access.crewId;
-    const fromDate = new Date(from).toISOString();
-    const toDate = new Date(to);
-    toDate.setHours(23, 59, 59, 999);
-    const toDateIso = toDate.toISOString();
+    // 2026-08-19 review: use TZ-aware normalize helpers.
+    const fromDate = normalizePeriodStart(from);
+    const toDateIso = normalizePeriodEnd(to);
 
     // Get all active crew members (with role for display)
     const { data: members, error: membersError } = await supabaseAdmin
