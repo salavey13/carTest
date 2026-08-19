@@ -81,10 +81,12 @@ export async function getTeamEarnings(params: {
         const metadata = member.users?.metadata || {};
         const memberName = metadata?.name || metadata?.username || `Member ${memberId.slice(0, 6)}`;
 
-        // Get shifts for period
+        // Get shifts for period — filter by crew_id too, otherwise shifts
+        // from another crew the member belongs to would leak in.
         const { data: shifts } = await supabaseAdmin
           .from("crew_member_shifts")
           .select("clock_in_time, clock_out_time, hourly_rate")
+          .eq("crew_id", crewId)
           .eq("member_id", memberId)
           .gte("clock_in_time", fromDate)
           .lte("clock_in_time", toDateIso);
@@ -102,9 +104,11 @@ export async function getTeamEarnings(params: {
         });
 
         // Get commissions for period (expense_commission: money flowing OUT to employees)
+        // Crew-scoped so commissions from another crew don't leak in.
         const { data: commissions } = await supabaseAdmin
           .from("cash_transactions")
           .select("amount")
+          .eq("crew_id", crewId)
           .eq("to_user_id", memberId)
           .eq("transaction_type", "expense_commission")
           .gte("transaction_date", fromDate)
@@ -186,10 +190,11 @@ export async function getMemberEarnings(params: {
       return { success: false, error: "Сотрудник не найден в этом экипаже." };
     }
 
-    // Get shifts for period
+    // Get shifts for period — crew-scoped to prevent multi-crew leak.
     const { data: shifts } = await supabaseAdmin
       .from("crew_member_shifts")
       .select("clock_in_time, clock_out_time, hourly_rate")
+      .eq("crew_id", crewId)
       .eq("member_id", targetMemberId)
       .gte("clock_in_time", fromDate)
       .lte("clock_in_time", toDateIso)
@@ -216,9 +221,11 @@ export async function getMemberEarnings(params: {
     });
 
     // Get commissions for period (expense_commission: money flowing OUT to employees)
+    // Crew-scoped to prevent multi-crew leak.
     const { data: commissions } = await supabaseAdmin
       .from("cash_transactions")
       .select("amount, transaction_date, description")
+      .eq("crew_id", crewId)
       .eq("to_user_id", targetMemberId)
       .eq("transaction_type", "expense_commission")
       .gte("transaction_date", fromDate)
@@ -340,10 +347,11 @@ export async function getOwnerSalaryOverview(params: {
         const memberName = metadata?.name || metadata?.username || `Member ${memberId.slice(0, 6)}`;
         const role = member.role || "member";
 
-        // Shifts for period — same logic as getMemberEarnings / my-work
+        // Shifts for period — crew-scoped to prevent multi-crew leak.
         const { data: shifts } = await supabaseAdmin
           .from("crew_member_shifts")
           .select("clock_in_time, clock_out_time, hourly_rate, salary_amount")
+          .eq("crew_id", crewId)
           .eq("member_id", memberId)
           .gte("clock_in_time", periodStartIso)
           .lte("clock_in_time", periodEndIso);
@@ -364,9 +372,11 @@ export async function getOwnerSalaryOverview(params: {
         });
 
         // Commissions for period (expense_commission to this member)
+        // Crew-scoped to prevent multi-crew leak.
         const { data: commissions } = await supabaseAdmin
           .from("cash_transactions")
           .select("amount")
+          .eq("crew_id", crewId)
           .eq("to_user_id", memberId)
           .eq("transaction_type", "expense_commission")
           .gte("transaction_date", periodStartIso)
@@ -376,10 +386,11 @@ export async function getOwnerSalaryOverview(params: {
           0,
         );
 
-        // Already-paid-out salary in same period
+        // Already-paid-out salary in same period — crew-scoped.
         const { data: payouts } = await supabaseAdmin
           .from("cash_transactions")
           .select("amount")
+          .eq("crew_id", crewId)
           .eq("to_user_id", memberId)
           .eq("transaction_type", "expense_salary")
           .gte("transaction_date", periodStartIso)
