@@ -620,6 +620,7 @@ export async function recordPayoutForPeriod(params: {
     const { data: commissions } = await supabaseAdmin
       .from("cash_transactions")
       .select("amount")
+      .eq("crew_id", access.crewId)
       .eq("to_user_id", memberId)
       .eq("transaction_type", "expense_commission")
       .gte("transaction_date", periodStartIso)
@@ -631,10 +632,11 @@ export async function recordPayoutForPeriod(params: {
 
     const accrued = Math.round(shiftAccrued + commissionAccrued);
 
-    // Already paid out for this period
+    // Already paid out for this period — crew-scoped.
     const { data: payouts } = await supabaseAdmin
       .from("cash_transactions")
       .select("amount")
+      .eq("crew_id", access.crewId)
       .eq("to_user_id", memberId)
       .eq("transaction_type", "expense_salary")
       .gte("transaction_date", periodStartIso)
