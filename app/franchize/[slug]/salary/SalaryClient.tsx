@@ -29,10 +29,10 @@ import {
   franchizeOperatorInputStyle,
 } from "../../components/FranchizeOperatorSurface";
 import {
-  getOrCreateSalaryPlan,
   calculateSalaryForPeriod,
-  recordPayout,
+  recordPayoutForPeriod,
 } from "../../server-actions/salary-calculations";
+import { getOwnerSalaryOverview } from "../../server-actions/team-earnings";
 import { fallbackCrew } from "@/app/franchize/lib/fallback-crew";
 
 interface SalaryMember {
@@ -42,7 +42,7 @@ interface SalaryMember {
 }
 
 interface SalaryPlan {
-  id: string;
+  id: string;          // memberId (computed; we render one row per member)
   memberId: string;
   memberName: string;
   periodStart: string;
@@ -122,107 +122,58 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
       }
 
       try {
-        // Check owner access
+        // Check owner access — UI only. The server action enforces auth
+        // independently via verifyCrewAccess.
         const accessCheck = await getFranchizeOperatorDashboardAccess({ slug });
         setIsOwner(Boolean(accessCheck.success && accessCheck.canOpen));
 
-        // Load crew members (using crew_members table)
-        const { supabaseAdmin } = await import("@/lib/supabase-server");
+        // 2026-08-19 review fix: previously this client component imported
+        // `supabaseAdmin` from "@/lib/supabase-server" and ran four raw
+        // queries directly. That module throws on the client (server-only
+        // guard) AND reads salary_calculations which is empty for this crew.
+        // Now we call the new getOwnerSalaryOverview server action which:
+        //   - verifies owner-tier access via the shared cookie helper
+        //   - computes accrued dynamically from crew_member_shifts +
+        //     cash_transactions.expense_commission (same logic as
+        //     getMemberEarnings / my-work / getMyEarnings)
+        //   - returns one row per member with paid + balanceDue + status
+        const startIso = new Date(periodStart).toISOString();
+        const endIso = new Date(periodEnd).toISOString();
 
-        // Get crew_id first
-        const { data: crewData } = await supabaseAdmin
-          .from("crews")
-          .select("id")
-          .eq("slug", slug)
-          .single();
+        const result = await getOwnerSalaryOverview({
+          slug,
+          from: startIso,
+          to: endIso,
+        });
 
-        if (!crewData) {
-          setError("Экипаж не найден");
-          setIsLoading(false);
+        if (!result.success || !result.data) {
+          if (result.error) setError(result.error);
+          setMembers([]);
+          setPlans([]);
           return;
         }
 
-        const { data: membersData, error: membersError } = await supabaseAdmin
-          .from("crew_members")
-          .select(`
-            id,
-            user_id,
-            role,
-            users!inner (
-              metadata
-            )
-          `)
-          .eq("crew_id", crewData.id)
-          .eq("membership_status", "active");
-
-        if (membersError) {
-          console.error("Failed to load members:", membersError);
-        }
-
-        const formattedMembers = (membersData || []).map((m: any) => ({
-          id: m.user_id,
-          name: m.users?.metadata?.name || m.users?.metadata?.username || `Member ${m.user_id.slice(0, 6)}`,
-          role: m.role,
+        // Derive a member list for any UI that uses it (currently unused
+        // beyond the table — kept for compatibility with future filters).
+        const formattedMembers: SalaryMember[] = result.data.map((row: any) => ({
+          id: row.memberId,
+          name: row.memberName,
+          role: row.role,
         }));
-
         setMembers(formattedMembers);
 
-        // Load salary plans for the period
-        const startPeriod = new Date(periodStart).toISOString();
-        const endPeriod = new Date(periodEnd).toISOString();
-
-        const { data: plansData, error: plansError } = await supabaseAdmin
-          .from("salary_calculations")
-          .select(`
-            id,
-            salary_plan_id,
-            period_start,
-            period_end,
-            total_income,
-            payout_status,
-            salary_plans!inner (
-              member_id,
-              crew_id
-            )
-          `)
-          .eq("salary_plans.crew_id", crewData.id)
-          .gte("period_start", startPeriod)
-          .lt("period_end", endPeriod);
-
-        if (plansError) {
-          console.error("Failed to load plans:", plansError);
-        }
-
-        // Format plans with member names
-        const formattedPlans = await Promise.all(
-          (plansData || []).map(async (plan: any) => {
-            const member = formattedMembers.find(m => m.id === plan.salary_plans.member_id);
-
-            // Get total paid
-            const { data: payments } = await supabaseAdmin
-              .from("cash_transactions")
-              .select("amount")
-              .eq("salary_calc_id", plan.id)
-              .eq("transaction_type", "expense_salary");
-
-            const totalPaid = (payments || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
-            const accrued = Number(plan.total_income || 0);
-            const balanceDue = accrued - totalPaid;
-
-            return {
-              id: plan.id,
-              memberId: plan.salary_plans.member_id,
-              memberName: member?.name || `Member ${plan.salary_plans.member_id.slice(0, 6)}`,
-              periodStart: plan.period_start,
-              periodEnd: plan.period_end,
-              accrued,
-              paid: totalPaid,
-              balanceDue,
-              status: balanceDue <= 0 ? "paid" : totalPaid > 0 ? "partial" : "pending",
-              breakdown: null, // Will load on demand
-            };
-          })
-        );
+        const formattedPlans: SalaryPlan[] = result.data.map((row: any) => ({
+          id: row.memberId, // used as React key
+          memberId: row.memberId,
+          memberName: row.memberName,
+          periodStart: row.periodStart,
+          periodEnd: row.periodEnd,
+          accrued: row.accrued,
+          paid: row.paid,
+          balanceDue: row.balanceDue,
+          status: row.status,
+          breakdown: null, // loaded on demand via calculateSalaryForPeriod
+        }));
 
         setPlans(formattedPlans);
       } catch (err) {
@@ -280,10 +231,16 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
     setError(null);
 
     try {
-      const result = await recordPayout({
+      // 2026-08-19 review fix: previously called recordPayout({ salaryCalcId })
+      // — but salary_calculations is empty for this crew (no snapshot rows
+      // are ever auto-created), so the button always failed with "Расчёт не
+      // найден." Now we use recordPayoutForPeriod which computes the balance
+      // dynamically and inserts an expense_salary transaction directly.
+      const result = await recordPayoutForPeriod({
         slug,
-        actorUserId: dbUser.user_id,
-        salaryCalcId: plan.id,
+        memberId: plan.memberId,
+        periodStart: plan.periodStart,
+        periodEnd: plan.periodEnd,
       });
 
       if (result.success) {

@@ -1,14 +1,21 @@
 // /app/api/franchize/[slug]/salary/[memberId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-server";
-import { verifyTelegramActorCookieValue } from "@/lib/telegram-actor-cookie";
-import { TELEGRAM_ACTOR_COOKIE } from "@/lib/telegram-actor-cookie";
 import { calculateSalaryForPeriod } from "@/app/franchize/server-actions/salary-calculations";
+import { verifyCrewAccess } from "@/app/franchize/server-actions/shared/auth-helpers";
 import { logger } from "@/lib/logger";
 
 /**
  * API route for salary calculations.
  * GET: Salary calculation for member and period
+ *
+ * 2026-08-19 review fix:
+ *   - Replaced 40+ lines of inline cookie+crew+membership check with a call
+ *     to the shared `verifyCrewAccess` helper. The inline check previously
+ *     didn't recognize `co_owner` / `admin` roles as owner-tier, and any
+ *     active `member` could read any other member's salary breakdown (IDOR).
+ *   - Now: owner / co_owner / admin can query any memberId; regular members
+ *     can only query their own memberId (defense-in-depth — the underlying
+ *     `calculateSalaryForPeriod` server action enforces the same rule).
  */
 export async function GET(
   request: NextRequest,
@@ -16,49 +23,25 @@ export async function GET(
 ) {
   try {
     const { slug, memberId } = await params;
-    const cookieStore = await import("next/headers").then(m => m.cookies());
 
-    const cookieUserId = verifyTelegramActorCookieValue(
-      cookieStore.get(TELEGRAM_ACTOR_COOKIE)?.value,
-    );
-
-    if (!cookieUserId) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    // Shared cookie-based auth: verifies the Telegram actor cookie and
+    // resolves crew + owner/co_owner/admin tier in one call.
+    const access = await verifyCrewAccess(slug);
+    if (!access.allowed) {
+      return NextResponse.json(
+        { success: false, error: access.error || "Unauthorized" },
+        { status: 401 }
+      );
     }
 
-    // Verify crew access
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("metadata")
-      .eq("user_id", cookieUserId)
-      .maybeSingle();
-
-    const userMetadata = user?.metadata as Record<string, unknown> | null;
-    const isAdmin = userMetadata?.role === "admin" || userMetadata?.status === "admin";
-
-    const { data: crew } = await supabaseAdmin
-      .from("crews")
-      .select("id, owner_id")
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (!crew) {
-      return NextResponse.json({ success: false, error: "Crew not found" }, { status: 404 });
-    }
-
-    const isOwner = crew.owner_id === cookieUserId || isAdmin;
-
-    if (!isOwner) {
-      const { data: membership } = await supabaseAdmin
-        .from("crew_members")
-        .select("role, membership_status")
-        .eq("crew_id", crew.id)
-        .eq("user_id", cookieUserId)
-        .maybeSingle();
-
-      if (membership?.membership_status !== "active") {
-        return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
-      }
+    // Owner-or-self: regular members can only query their own salary
+    // breakdown. Owners (incl. co_owner / admin per shared helper) can
+    // query any member.
+    if (!access.isOwner && memberId !== access.actorUserId) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: можно запрашивать только свой расчёт." },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(request.url);
@@ -74,16 +57,19 @@ export async function GET(
 
     const result = await calculateSalaryForPeriod({
       slug,
-      actorUserId: cookieUserId,
+      actorUserId: access.actorUserId || "",
       memberId,
       periodStart: from,
       periodEnd: to,
     });
 
     if (!result.success) {
+      const status = result.error?.includes("не найден") ? 404
+        : result.error?.includes("Недостаточно прав") ? 403
+        : 401;
       return NextResponse.json(
         { success: false, error: result.error },
-        { status: result.error?.includes("не найден") ? 404 : 401 }
+        { status }
       );
     }
 

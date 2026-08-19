@@ -3,69 +3,36 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
-import { handleError } from "./shared/auth-helpers";
+import {
+  verifyCrewAccess,
+  handleError,
+} from "./shared/auth-helpers";
 
 /**
  * I5 — My Work server actions for profile sections.
  * Plan: docs/superpowers/plans/2026-08-12-i5-commissions-salary.md (Task 5)
+ *
+ * 2026-08-19 code review fixes:
+ *  - Drop the local copy of `verifyCrewAccess` — use the shared helper from
+ *    `./shared/auth-helpers` so `co_owner` / `admin` roles get owner-tier
+ *    treatment consistent with every other salary-subsystem action.
+ *  - Use `access.actorUserId` (cookie-derived) instead of the client-supplied
+ *    `userId` param to prevent IDOR (any member could previously pass another
+ *    member's user_id to read their daily work totals).
+ *  - Query `crew_member_shifts` by the actual columns (`clock_in_time`,
+ *    `clock_out_time`, `hourly_rate`) — `shift_start` did not exist and the
+ *    query was silently failing, making `rentalsTotal` always 0.
+ *  - Compute salary for active shifts on the fly (duration × hourly_rate) so
+ *    an in-progress shift shows up in the "today's rentals" total instead of
+ *    zero (mirrors the fix already applied in `salary-calculations.ts`).
+ *  - Use UTC end-of-day literal (`<date>T23:59:59.999Z`) instead of
+ *    `setHours(23, 59, 59, 999)` which used the server's local timezone.
  */
-
-async function verifyCrewAccess(
-  slug: string,
-): Promise<{ allowed: boolean; crewId?: string; actorUserId?: string; isOwner?: boolean; error?: string }> {
-  const { cookies } = await import("next/headers");
-  const { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } = await import("@/lib/telegram-actor-cookie");
-
-  const cookieUserId = verifyTelegramActorCookieValue(
-    (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
-  );
-
-  if (cookieUserId) {
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("metadata")
-      .eq("user_id", cookieUserId)
-      .maybeSingle();
-
-    const userMetadata = user?.metadata as Record<string, unknown> | null;
-    const isAdmin = userMetadata?.role === "admin" || userMetadata?.status === "admin";
-
-    const { data: crew } = await supabaseAdmin
-      .from("crews")
-      .select("id, owner_id")
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (!crew) {
-      return { allowed: false, error: "Экипаж не найден." };
-    }
-
-    const isOwner = crew.owner_id === cookieUserId || isAdmin;
-
-    if (isOwner) {
-      return { allowed: true, crewId: crew.id, actorUserId: cookieUserId, isOwner: true };
-    }
-
-    const { data: membership } = await supabaseAdmin
-      .from("crew_members")
-      .select("role, membership_status")
-      .eq("crew_id", crew.id)
-      .eq("user_id", cookieUserId)
-      .maybeSingle();
-
-    if (membership?.membership_status === "active") {
-      return { allowed: true, crewId: crew.id, actorUserId: cookieUserId, isOwner: false };
-    }
-
-    return { allowed: false, error: "Недостаточно прав." };
-  }
-
-  return { allowed: false, error: "Не авторизовано." };
-}
 
 export async function getMyWorkTodayAction(params: {
   slug: string;
-  userId: string;
+  userId: string; // Deprecated: kept for backward compat. Cookie-derived
+                  // identity is used instead; this param is ignored.
 }): Promise<{
   success: boolean;
   data?: {
@@ -76,7 +43,7 @@ export async function getMyWorkTodayAction(params: {
   };
   error?: string;
 }> {
-  const { slug, userId } = params;
+  const { slug } = params;
 
   try {
     const access = await verifyCrewAccess(slug);
@@ -84,34 +51,61 @@ export async function getMyWorkTodayAction(params: {
       return { success: false, error: access.error };
     }
 
-    // Get today's date in Europe/Moscow timezone
-    const now = new Date();
-    const moscowDate = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Moscow" }));
-    const startOfDay = new Date(moscowDate.setHours(0, 0, 0, 0)).toISOString();
-    const endOfDay = new Date(moscowDate.setHours(23, 59, 59, 999)).toISOString();
+    // CR fix: ignore client-supplied `userId` — use cookie-derived identity
+    // so non-owners cannot query another member's daily work totals.
+    const secureUserId = access.actorUserId;
+    if (!secureUserId) {
+      return { success: false, error: "Не авторизовано." };
+    }
 
-    // Get rentals (from crew_member_shifts)
+    // Today's date in Europe/Moscow timezone (server runs UTC).
+    // We compute the day boundary in Moscow and then convert to UTC ISO
+    // strings so the Supabase query (which compares against UTC timestamptz)
+    // matches what the user considers "today".
+    const now = new Date();
+    const moscowOffsetMs = 3 * 60 * 60 * 1000; // UTC+3
+    const moscowNow = new Date(now.getTime() + moscowOffsetMs);
+    const y = moscowNow.getUTCFullYear();
+    const m = moscowNow.getUTCMonth();
+    const d = moscowNow.getUTCDate();
+    const startOfDay = new Date(Date.UTC(y, m, d, 0, 0, 0, 0)).toISOString();
+    const endOfDay = new Date(Date.UTC(y, m, d, 23, 59, 59, 999)).toISOString();
+
+    // Get shifts for today (from crew_member_shifts) — using correct columns.
     const { data: shifts, error: shiftError } = await supabaseAdmin
       .from("crew_member_shifts")
-      .select("id, salary_amount")
+      .select("id, clock_in_time, clock_out_time, hourly_rate, salary_amount")
       .eq("crew_id", access.crewId)
-      .eq("member_id", userId)
-      .gte("shift_start", startOfDay)
-      .lte("shift_start", endOfDay);
+      .eq("member_id", secureUserId)
+      .gte("clock_in_time", startOfDay)
+      .lte("clock_in_time", endOfDay);
 
     if (shiftError) {
       logger.warn("[getMyWorkTodayAction] Shifts query failed:", shiftError);
     }
 
     const rentalShifts = shifts || [];
-    const rentalsTotal = rentalShifts.reduce((sum: number, s: any) => sum + Number(s.salary_amount || 0), 0);
+    // Prefer stored salary_amount (already rounded for completed shifts).
+    // For active shifts where salary_amount is null, compute on the fly
+    // from duration × hourly_rate so an in-progress shift is reflected
+    // in today's rentals total.
+    const rentalsTotal = rentalShifts.reduce((sum: number, s: any) => {
+      const stored = Number(s.salary_amount || 0);
+      if (stored > 0) return sum + stored;
+      const start = s.clock_in_time ? new Date(s.clock_in_time) : null;
+      if (!start) return sum;
+      const end = s.clock_out_time ? new Date(s.clock_out_time) : new Date();
+      const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+      const rate = Number(s.hourly_rate || 0);
+      return sum + hours * rate;
+    }, 0);
 
-    // Get sales (from cash_transactions with commission)
+    // Get sales (from cash_transactions with commission + 'продажа' keyword)
     const { data: salesCommissions, error: salesError } = await supabaseAdmin
       .from("cash_transactions")
       .select("id, amount, description")
       .eq("crew_id", access.crewId)
-      .eq("to_user_id", userId)
+      .eq("to_user_id", secureUserId)
       .eq("transaction_type", "expense_commission")
       .gte("transaction_date", startOfDay)
       .lte("transaction_date", endOfDay)
@@ -123,12 +117,12 @@ export async function getMyWorkTodayAction(params: {
 
     const salesTotal = (salesCommissions || []).reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
 
-    // Get service returns (from cash_transactions with service/return)
+    // Get service returns (from cash_transactions with service/return keyword)
     const { data: serviceCommissions, error: serviceError } = await supabaseAdmin
       .from("cash_transactions")
       .select("id, amount, description")
       .eq("crew_id", access.crewId)
-      .eq("to_user_id", userId)
+      .eq("to_user_id", secureUserId)
       .eq("transaction_type", "expense_commission")
       .gte("transaction_date", startOfDay)
       .lte("transaction_date", endOfDay)
@@ -146,7 +140,7 @@ export async function getMyWorkTodayAction(params: {
         date: startOfDay.split('T')[0],
         rentals: {
           count: rentalShifts.length,
-          total: rentalsTotal,
+          total: Math.round(rentalsTotal),
         },
         sales: {
           count: salesCommissions?.length || 0,

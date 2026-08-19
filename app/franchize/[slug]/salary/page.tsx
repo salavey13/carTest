@@ -63,7 +63,7 @@ export default async function SalaryPage({ params }: SalaryPageProps) {
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/salary`} />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4">
         <Suspense fallback={<div className="text-center py-12">Загрузка...</div>}>
-          <SalaryClient slug={crew.slug || slug} crew={crew} />
+          <SalaryClient initialSlug={crew.slug || slug} initialCrew={crew} />
         </Suspense>
       </FranchizePageShell>
     </main>
