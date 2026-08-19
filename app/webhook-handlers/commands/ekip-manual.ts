@@ -788,6 +788,14 @@ export async function handleEkipText(userId: string, chatId: number, text: strin
   const ekipState = await getState(userId);
   if (!ekipState) return false;
 
+  // 2026-08-19 HOTFIX: only handle text input when the user is actually in
+  // the /ekip flow (mirrors the same fix in handleEkipCallback). The /doc
+  // flow shares state-name strings like "name", "passport", "birth", etc.
+  // — without this marker check, /ekip would intercept /doc's text input
+  // for the same step names and corrupt the /doc flow's state machine.
+  const isEkipState = (ekipState.context as any)?._ekip === true;
+  if (!isEkipState) return false;
+
   const { state, context } = ekipState;
 
   if (state === "name") {
@@ -1041,6 +1049,19 @@ export async function handleEkipCallback(
 
   const ekipState = await getState(userId);
   if (!ekipState) return false;
+
+  // 2026-08-19 HOTFIX: only handle callbacks when the user is actually in
+  // the /ekip flow. The /doc flow ALSO uses `eq_done` callback_data (and
+  // shared `eq_*` prefixes historically) — if we don't check the marker,
+  // the /ekip handler intercepts /doc's "✅ Готово" button and rejects it
+  // with "Сначала выберите оборудование" because the /doc context doesn't
+  // have ekip's `equipmentIds` field.
+  //
+  // The marker is set by ekip's setState() which writes
+  // `context: { ...context, _ekip: true }`. /doc's setState doesn't add
+  // this marker, so checking it reliably distinguishes the two flows.
+  const isEkipState = (ekipState.context as any)?._ekip === true;
+  if (!isEkipState) return false;
 
   const { state, context } = ekipState;
 
