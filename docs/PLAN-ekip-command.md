@@ -851,3 +851,116 @@ function calculateEquipmentPrice(
 ---
 
 **Document End**
+
+---
+
+## Appendix B: Future Enhancements (2026-08-19 review)
+
+### B.1 Subcategory preselection (leather/textile) for jackets, pants, suits
+
+**Status**: Planned for next iteration.
+
+Currently the /ekip flow shows a flat list of equipment items per category
+(helmet, jacket, pants, boots, etc.). For categories with many items of
+different materials (leather vs textile jackets), operators must scroll
+through pages to find the right one.
+
+**Proposed flow**: After selecting a category (e.g., "jacket"), show a
+subcategory selection step:
+```
+📦 Куртки — выберите тип:
+[🟤 Кожа] [🔵 Текстиль] [📦 Все]
+```
+
+Only items matching the selected subcategory are then shown in the item
+list. Falls back to "All" if no subcategory is selected.
+
+**Implementation notes**:
+- Use UNIQUE callback prefix `eksub_` (NOT `eq_`, `ecat_`, `epg_` which
+  are shared with /doc flow and already handled by the `_ekip` marker check)
+- New state: `equipment_subcategory` (stored in EkipFlowContext)
+- Filter: `item.specs?.subtype === context.equipmentSubcategory`
+- The meta_helmet item (`the-meta-helmet`) has `specs.materials` array
+  (["Текстиль", "Кожа"]) and `specs.sizes` array — these multi-variant
+  items need special handling (show size/color picker after selection)
+
+### B.2 Photo preview for selected equipment items
+
+**Status**: Planned for next iteration.
+
+After an operator selects an equipment item (clicks `eq_<id>`), the bot
+should optionally send a photo of the item so the operator can verify
+they selected the right one (hard to identify just by name + ID).
+
+**Proposed flow**: After toggling an item on, send a photo via
+`sendPhoto` API if `item.image_url` is set. If no photo exists, skip
+silently (don't error — many equipment items don't have photos yet).
+
+**Implementation notes**:
+- Check `item.image_url` — if empty/null, skip photo send
+- Use the existing Telegram `sendPhoto` API with the URL
+- Photo should be sent as a separate message (not inline keyboard)
+- Caption: "📷 {make} {model} — проверьте перед подтверждением"
+- Handle missing photo gracefully (some items don't have photos)
+
+### B.3 Size display in equipment item buttons
+
+**Status**: Planned for next iteration (quick fix).
+
+Currently the item button shows: `🧥 TCM Speed Level (L)` — the size
+comes from `item.specs?.size` (singular string). But the meta_helmet
+has `specs.sizes` (array: ["XS", "S", "M", "L", "XL", "XXL"]) instead
+of `specs.size` (singular).
+
+**Fix**: In `buildCategoryItemsKeyboard`, handle both:
+```typescript
+const size = item.specs?.size
+  ? ` (${item.specs.size})`
+  : item.specs?.sizes?.length
+    ? ` (${item.specs.sizes.join(", ")})`
+    : "";
+```
+
+This shows single-size items as `(L)` and multi-size items as
+`(XS, S, M, L, XL, XXL)`.
+
+### B.4 Color/material selection for multi-variant items
+
+**Status**: Planned for next iteration.
+
+For items like `the-meta-helmet` that have multiple sizes, colors, and
+materials, after selecting the item, show a selection keyboard:
+```
+Выберите размер:
+[XS] [S] [M] [L] [XL] [XXL]
+
+Выберите цвет:
+[⚫ Чёрный] [⚪ Белый] [🔴 Красный] [🔵 Бело-синий]
+
+Выберите материал:
+[🟤 Кожа] [🔵 Текстиль]
+```
+
+The selected variant is stored in `EkipFlowContext.selectedVariants`
+(array of `{ itemId, size, color, material }`).
+
+**Implementation notes**:
+- Use UNIQUE callback prefix `ekvar_` (e.g., `ekvar_size_XL`,
+  `ekvar_color_Чёрный`, `ekvar_material_Кожа`)
+- After all selections, show a summary and "✅ Готово" button
+- Prevents the "Занят" balloon for multi-variant items (quantity tracking
+  per variant, not per item ID)
+
+### B.5 Admin: equipment photo upload (mirror bikes-without-VIN)
+
+**Status**: Planned for next iteration.
+
+Mirror the existing "bikes without VIN" pattern in FranchizeAdminClient:
+- Add "Equipment without photos" section
+- Show items where `image_url` is empty/null
+- Click → scroll to bottom where CarSubmissionForm's photo upload field is
+- Verify photo compression + storage path (`carpix/<id>/image_N.jpg`)
+
+---
+
+**Document End (with appendix)**
