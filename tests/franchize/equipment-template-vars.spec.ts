@@ -147,6 +147,60 @@ describe("EQUIPMENT_RENTAL_DEAL_TEMPLATE.html variable coverage", () => {
     const leftover = rendered.match(/{{\s*[a-zA-Z0-9_]+\s*}}/g) || [];
     expect(leftover).toEqual([]);
   });
+
+  it("multi-item equipment (like /ekip multi-select) renders ALL items and summed total", () => {
+    const vars = buildRentalContractVariables({
+      renter: {
+        fullName: "Петров Пётр Петрович",
+        birthDate: "10.10.1990",
+        phone: "+7 911 111-11-11",
+        email: "",
+        passportSeries: "4510",
+        passportNumber: "654321",
+        passportIssueDate: "10.10.2020",
+        passportIssuedBy: "ОМВД",
+        registration: "г. Н.Новгород",
+      },
+      bike: {
+        id: "equip-jacket-1",
+        make: "VIP BIKE",
+        model: "Куртка зимняя",
+        type: "equipment",
+        specs: { category: "Куртка", dailyPrice: 500 },
+      },
+      period: {
+        startDate: "01.06.2026",
+        startTime: "18:00",
+        endDate: "03.06.2026",
+        endTime: "10:00",
+        dailyPrice: 1200,
+        depositOverride: 10000,
+      },
+      crewSecrets: CREW_SECRETS,
+      meta: { documentKey: "ekip-rental-equip-jacket-1-456", contractNumber: "1.6/equipment" },
+      equipmentMode: true,
+      equipmentItems: [
+        { id: "equip-jacket-1", make: "VIP BIKE", model: "Куртка зимняя", dailyPrice: 500, specs: { material: "Куртка", size: "L" } },
+        { id: "equip-pants-2", make: "VIP BIKE", model: "Штаны демисезонные", dailyPrice: 400, specs: { material: "Штаны", size: "M" } },
+        { id: "equip-suit-3", make: "VIP BIKE", model: "Комбинезон кожаный", dailyPrice: 300, specs: { material: "Комбинезон", size: "XL" } },
+      ],
+      paymentSplit: { cashAmount: 10000, bankAmount: 2000 },
+      // Total = (500+400+300) × 2 days = 2400
+      priceBreakdown: { totalRub: 2400, basePriceRub: 2400, helmetRub: 0, depositRub: 10000, savingsRub: 0, savingsPercent: 0, tier: "сутки" },
+    });
+
+    expect(vars.equipment_list).toContain("Куртка зимняя");
+    expect(vars.equipment_list).toContain("Штаны демисезонные");
+    expect(vars.equipment_list).toContain("Комбинезон кожаный");
+    expect(vars.equipment_price_list).toContain("Куртка зимняя");
+    expect(vars.equipment_price_list).toContain("Штаны демисезонные");
+    expect(vars.equipment_price_list).toContain("Комбинезон кожаный");
+    expect(vars.equipment_summary).toContain("Куртка зимняя");
+    expect(vars.equipment_summary).toContain("Штаны демисезонные");
+    expect(vars.equipment_summary).toContain("Комбинезон кожаный");
+    // Total from priceBreakdown: 2400 (sum of 3 items × 2 days)
+    expect(vars.subtotal_rub).toMatch(/2\s?400|2400|2 400/);
+  });
 });
 
 describe("EQUIPMENT_SALE_DEAL_TEMPLATE.html variable coverage", () => {

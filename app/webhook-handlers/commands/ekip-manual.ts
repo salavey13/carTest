@@ -14,26 +14,28 @@
  *
  * Flow (RENT) - 9 steps:
  *   1. Deal type → Rent/Sale
- *   2. Equipment → Select from catalog (helmets, jackets, gloves, etc.)
- *   3. Full name → "Иванов Иван Иванович"
- *   4. Passport → "4509 123456 15.03.2020 ОМВД"
- *   5. Birth → "15.03.1990"
- *   6. Address → free text
- *   7. Start → "сегодня 18" or inline keyboard
- *   8. End → "завтра 10" or inline keyboard
- *   9. Payment split → cash/bank/split
- *   10. Deposit choice → Confirm / Override
- *   → Done!
+ *   2. Equipment type → category (jacket, pants, suit, helmet, gloves...)
+ *   3. Items → multi-select by id (paginated, toggle ✅), then «Готово»
+ *   4. Full name → "Иванов Иван Иванович"
+ *   5. Passport → "4509 123456 15.03.2020 ОМВД"
+ *   6. Birth → "15.03.1990"
+ *   7. Address → free text
+ *   8. Start → "сегодня 18" or inline keyboard
+ *   9. End → "завтра 10" or inline keyboard
+ *   10. Payment split → cash/bank/split
+ *   11. Deposit choice → Confirm / Override
+ *   → Done! (ONE contract for ALL selected equipment — equipmentIds[])
  *
  * Flow (SALE) - 7 steps:
  *   1. Deal type → Rent/Sale
- *   2. Equipment → Select from catalog
- *   3. Full name
- *   4. Passport
- *   5. Birth
- *   6. Address
- *   7. Price → inline keyboard or custom
- *   → Done!
+ *   2. Equipment type → category (jacket, pants, suit...)
+ *   3. Items → multi-select by id (paginated, toggle ✅), then «Готово»
+ *   4. Full name
+ *   5. Passport
+ *   6. Birth
+ *   7. Address
+ *   8. Price → inline keyboard or custom
+ *   → Done! (ONE contract listing ALL equipment, total price = sum)
  */
 
 "use server";
@@ -61,6 +63,21 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026;
 const EKIP_STATE_EXPIRY_MINUTES = 30;
 
+// Russian labels for equipment categories (mirrors actions-runtime.ts)
+const EQUIPMENT_CATEGORY_LABELS: Record<string, string> = {
+  helmet: "Шлемы",
+  jacket: "Куртки",
+  pants: "Штаны",
+  gloves: "Перчатки",
+  boots: "Боты",
+  security: "Безопасность",
+  electronics: "Электроника",
+  suit: "Комбинезоны",
+};
+
+// Items per page in the equipment selection keyboard
+const EKIP_PAGE_SIZE = 10;
+
 // ── Equipment catalog ────────────────────────────────────────────────────────
 
 interface EquipmentItem {
@@ -75,6 +92,7 @@ interface EquipmentItem {
     category?: string;
     deposit_rub?: number;
     image_url?: string;
+    size?: string;
   };
   crew_id?: string;
 }
@@ -174,6 +192,88 @@ function buildEquipmentKeyboard(equipmentList: EquipmentItem[], selectedId?: str
 
   rows.push([
     { text: "✅ Готово", callback_data: "eq_done" },
+    { text: "❌ Отменить", callback_data: "cancel" },
+  ]);
+
+  return rows;
+}
+
+function categoryEmoji(category: string): string {
+  switch (category) {
+    case "helmet": return "🪖";
+    case "jacket": return "🧥";
+    case "pants": return "👖";
+    case "gloves": return "🧤";
+    case "boots": return "👢";
+    case "suit": return "🧥";
+    case "security": return "🔒";
+    case "electronics": return "📡";
+    default: return "📦";
+  }
+}
+
+function buildCategoryKeyboard(equipmentList: EquipmentItem[], selectedIds: string[]): KeyboardButton[][] {
+  // First step of equipment selection: pick a TYPE (jacket/pants/suit...) —
+  // showing 60+ items at once is useless, so we walk type → items.
+  const byCategory = new Map<string, EquipmentItem[]>();
+  for (const item of equipmentList) {
+    const category = item.specs?.category || "other";
+    if (!byCategory.has(category)) byCategory.set(category, []);
+    byCategory.get(category)!.push(item);
+  }
+
+  const rows: KeyboardButton[][] = [];
+  for (const [category, items] of byCategory.entries()) {
+    const label = EQUIPMENT_CATEGORY_LABELS[category] || category;
+    const counts = items.length > 0 ? ` (${items.length})` : "";
+    rows.push([{
+      text: `${categoryEmoji(category)} ${label}${counts}`,
+      callback_data: `ecat_${category}`,
+    }]);
+  }
+
+  rows.push([
+    { text: selectedIds.length > 0 ? `✅ Готово (${selectedIds.length})` : "✅ Готово", callback_data: "eq_done" },
+    { text: "❌ Отменить", callback_data: "cancel" },
+  ]);
+
+  return rows;
+}
+
+function buildCategoryItemsKeyboard(
+  equipmentList: EquipmentItem[],
+  category: string,
+  selectedIds: string[],
+  page: number,
+): KeyboardButton[][] {
+  const items = equipmentList.filter((i) => (i.specs?.category || "other") === category);
+  const label = EQUIPMENT_CATEGORY_LABELS[category] || category;
+  const pageCount = Math.max(1, Math.ceil(items.length / EKIP_PAGE_SIZE));
+  const safePage = Math.min(Math.max(0, page), pageCount - 1);
+  const pageItems = items.slice(safePage * EKIP_PAGE_SIZE, (safePage + 1) * EKIP_PAGE_SIZE);
+
+  const rows: KeyboardButton[][] = [];
+  for (const item of pageItems) {
+    const selected = selectedIds.includes(item.id);
+    const size = item.specs?.size ? ` (${item.specs.size})` : "";
+    rows.push([{
+      text: `${selected ? "✅ " : ""}${categoryEmoji(category)} ${item.make} ${item.model}${size}`,
+      callback_data: `eq_${item.id}`,
+    }]);
+  }
+
+  // Pagination row
+  const nav: KeyboardButton[] = [];
+  if (pageCount > 1) {
+    if (safePage > 0) nav.push({ text: "⬅️", callback_data: `epg_${category}_${safePage - 1}` });
+    nav.push({ text: `📄 ${safePage + 1}/${pageCount}`, callback_data: "eq_info" });
+    if (safePage < pageCount - 1) nav.push({ text: "➡️", callback_data: `epg_${category}_${safePage + 1}` });
+  }
+  if (nav.length > 0) rows.push(nav);
+
+  rows.push([
+    { text: "↩️ Категории", callback_data: "ecat_back" },
+    { text: selectedIds.length > 0 ? `✅ Готово (${selectedIds.length} шт.)` : "✅ Готово", callback_data: "eq_done" },
     { text: "❌ Отменить", callback_data: "cancel" },
   ]);
 
@@ -293,6 +393,9 @@ function buildPriceKeyboard(): KeyboardButton[][] {
 interface EkipFlowContext {
   dealType: "rent" | "sale";
   equipmentId: string;
+  equipmentIds?: string[];
+  equipmentCategory?: string;
+  equipmentPage?: number;
   equipmentMake?: string;
   equipmentModel?: string;
   mpFullName?: string;
@@ -485,7 +588,37 @@ function parseRuDateTime(dateStr: string | undefined, timeStr: string | undefine
 
 // ── Summary builders ─────────────────────────────────────────────────────────
 
-function buildRentSummary(context: EkipFlowContext): string {
+function selectedEquipmentIds(context: EkipFlowContext): string[] {
+  const ids = context.equipmentIds?.length ? context.equipmentIds : (context.equipmentId ? [context.equipmentId] : []);
+  return ids;
+}
+
+async function resolveAllEquipment(context: EkipFlowContext): Promise<EquipmentItem[]> {
+  const ids = selectedEquipmentIds(context);
+  const items: EquipmentItem[] = [];
+  for (const id of ids) {
+    const item = await resolveEquipmentById(id);
+    if (item) items.push(item);
+  }
+  return items;
+}
+
+function sumDailyPrices(items: EquipmentItem[]): number {
+  return items.reduce((acc, i) => acc + Number(i.specs?.daily_price || i.specs?.rent_weekday || 1000), 0);
+}
+
+function sumSalePrices(items: EquipmentItem[]): number {
+  return items.reduce((acc, i) => acc + Number(i.specs?.sale_price || 5000), 0);
+}
+
+function equipmentTitle(items: EquipmentItem[]): string {
+  if (items.length === 0) return "";
+  if (items.length === 1) return `${items[0].make} ${items[0].model}`;
+  return items.map((i) => `${i.make} ${i.model}`).join(", ");
+}
+
+function buildRentSummary(context: EkipFlowContext, items?: EquipmentItem[]): string {
+  const resolved = items || [];
   const lines = [
     "*📋 Проверьте:*",
     "",
@@ -493,7 +626,7 @@ function buildRentSummary(context: EkipFlowContext): string {
     `🪪 ${context.mpSeries} ${context.mpNumber} от ${context.mpIssueDate}`,
     `📅 ${context.mpBirthDate}`,
     "",
-    `📦 Оборудование: ${context.equipmentMake || ""} ${context.equipmentModel || ""}`,
+    `📦 Оборудование: ${equipmentTitle(resolved) || context.equipmentMake || ""}`,
     `📅 ${context.rentStartDate} ${context.rentStartTime} → ${context.rentEndDate} ${context.rentEndTime}`,
     "",
     `💰 Депозит: ${Number(context.depositOverride || "5000").toLocaleString("ru-RU")} ₽`,
@@ -503,7 +636,8 @@ function buildRentSummary(context: EkipFlowContext): string {
   return lines.join("\n");
 }
 
-function buildSaleSummary(context: EkipFlowContext, price: string | number): string {
+function buildSaleSummary(context: EkipFlowContext, price: string | number, items?: EquipmentItem[]): string {
+  const resolved = items || [];
   return [
     "*📋 Продажа — проверьте:*",
     "",
@@ -512,7 +646,7 @@ function buildSaleSummary(context: EkipFlowContext, price: string | number): str
     `📅 ${context.mpBirthDate}`,
     `🏠 ${context.mpRegistration}`,
     "",
-    `📦 Оборудование: ${context.equipmentMake || ""} ${context.equipmentModel || ""}`,
+    `📦 Оборудование: ${equipmentTitle(resolved) || context.equipmentMake || ""}`,
     "",
     `💰 ${Number(price).toLocaleString("ru-RU")} ₽`,
     "",
@@ -557,14 +691,14 @@ function withStep(message: string, state: string, dealType?: string): string {
 }
 
 async function gotoPaymentSplit(chatId: number, userId: string, context: EkipFlowContext): Promise<void> {
-  const equipment = await resolveEquipmentById(context.equipmentId);
-  if (!equipment) {
+  const equipmentItems = await resolveAllEquipment(context);
+  if (!equipmentItems.length) {
     logger.error(`[/ekip] gotoPaymentSplit: equipment not found for ${context.equipmentId}`);
     await sendComplexMessage(chatId, "❌ Оборудование не найдено", [], { removeKeyboard: true });
     return;
   }
 
-  // Calculate price based on duration
+  // Calculate price based on duration (sum of all selected items' daily rates)
   const startDate = context.rentStartDate;
   const startTime = context.rentStartTime || "10:00";
   const endDate = context.rentEndDate;
@@ -575,10 +709,10 @@ async function gotoPaymentSplit(chatId: number, userId: string, context: EkipFlo
   const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
   const days = Math.max(1, Math.ceil(hours / 24));
 
-  const dailyPrice = Number(equipment.specs?.daily_price || equipment.specs?.rent_weekday || 1000);
+  const dailyTotal = sumDailyPrices(equipmentItems);
   const totalAmount = context.priceOverridden
     ? (context.cashAmount || 0) + (context.bankAmount || 0)
-    : dailyPrice * days;
+    : dailyTotal * days;
 
   if (!context.priceOverridden) {
     context.cashAmount = totalAmount;
@@ -588,11 +722,15 @@ async function gotoPaymentSplit(chatId: number, userId: string, context: EkipFlo
   await setState(userId, "payment_split", context);
 
   const periodLabel = days === 1 ? "1 день" : `${days} дн.`;
+  const itemsLabel = equipmentItems.length > 1
+    ? `Выбрано: ${equipmentItems.length} шт.`
+    : equipmentTitle(equipmentItems);
 
   await sendComplexMessage(
     chatId,
     `*Расчёт стоимости*\n\n` +
-    `Аренда (${periodLabel}): *${(dailyPrice * days).toLocaleString("ru-RU")} ₽*\n\n` +
+    `${itemsLabel}\n` +
+    `Аренда (${periodLabel}): *${(dailyTotal * days).toLocaleString("ru-RU")} ₽*\n\n` +
     `💰 *Итого: ${totalAmount.toLocaleString("ru-RU")} ₽*\n\n` +
     `Как будет оплачено?`,
     buildPaymentSplitKeyboard(totalAmount),
@@ -601,17 +739,17 @@ async function gotoPaymentSplit(chatId: number, userId: string, context: EkipFlo
 }
 
 async function gotoDepositChoice(chatId: number, userId: string, context: EkipFlowContext): Promise<void> {
-  const equipment = await resolveEquipmentById(context.equipmentId);
-  const depositAmount = String(equipment?.specs?.deposit_rub || "5000");
+  const equipmentItems = await resolveAllEquipment(context);
+  const depositAmount = String(context.depositOverride || equipmentItems[0]?.specs?.deposit_rub || "5000");
   await setState(userId, "deposit_choice", context);
   const formatted = Number(depositAmount).toLocaleString("ru-RU");
   await sendComplexMessage(
     chatId,
     `*Депозит / обеспечительный платёж*\n\n` +
-    `Оборудование: ${equipment ? `${equipment.make} ${equipment.model}` : context.equipmentId}\n` +
+    `Оборудование: ${equipmentTitle(equipmentItems) || context.equipmentId}\n` +
     `Депозит: *${formatted} ₽*\n\n` +
     `Выберите вариант:`,
-    buildDepositChoiceKeyboard(depositAmount, equipment),
+    buildDepositChoiceKeyboard(depositAmount, equipmentItems[0]),
     { keyboardType: 'inline', parseMode: 'Markdown' },
   );
 }
@@ -750,14 +888,14 @@ export async function handleEkipText(userId: string, chatId: number, text: strin
       return true;
     }
     const cashAmount = parseInt(value);
-    const equipment = await resolveEquipmentById(context.equipmentId);
-    const dailyPrice = Number(equipment?.specs?.daily_price || equipment?.specs?.rent_weekday || 1000);
+    const items = await resolveAllEquipment(context);
+    const dailyTotal = sumDailyPrices(items);
 
     const start = parseRuDateTime(context.rentStartDate, context.rentStartTime);
     const end = parseRuDateTime(context.rentEndDate, context.rentEndTime);
     const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
     const days = Math.max(1, Math.ceil(hours / 24));
-    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : dailyPrice * days;
+    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : dailyTotal * days;
 
     context.cashAmount = Math.min(cashAmount, totalAmount);
     context.bankAmount = Math.max(0, totalAmount - cashAmount);
@@ -772,14 +910,14 @@ export async function handleEkipText(userId: string, chatId: number, text: strin
       return true;
     }
     const cashAmount = parseInt(value);
-    const equipment = await resolveEquipmentById(context.equipmentId);
-    const dailyPrice = Number(equipment?.specs?.daily_price || equipment?.specs?.rent_weekday || 1000);
+    const items = await resolveAllEquipment(context);
+    const dailyTotal = sumDailyPrices(items);
 
     const start = parseRuDateTime(context.rentStartDate, context.rentStartTime);
     const end = parseRuDateTime(context.rentEndDate, context.rentEndTime);
     const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
     const days = Math.max(1, Math.ceil(hours / 24));
-    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : dailyPrice * days;
+    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : dailyTotal * days;
 
     context.cashAmount = Math.min(cashAmount, totalAmount);
     context.bankAmount = Math.max(0, totalAmount - cashAmount);
@@ -820,7 +958,8 @@ export async function handleEkipText(userId: string, chatId: number, text: strin
       return true;
     }
     context.depositOverride = amount;
-    const summary = buildRentSummary(context);
+    const items = await resolveAllEquipment(context);
+    const summary = buildRentSummary(context, items);
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
@@ -833,7 +972,8 @@ export async function handleEkipText(userId: string, chatId: number, text: strin
       return true;
     }
     context.salePrice = price;
-    const summary = buildSaleSummary(context, price);
+    const items = await resolveAllEquipment(context);
+    const summary = buildSaleSummary(context, price, items);
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
@@ -894,15 +1034,77 @@ export async function handleEkipCallback(
 
   if (callbackData === "d_rent") {
     context.dealType = "rent";
-    await setState(userId, "name", context);
-    await sendComplexMessage(chatId, withStep("*Аренда - ФИО*", "name", "rent"), [], { removeKeyboard: true, parseMode: 'Markdown' });
+    // Deal type is chosen FIRST (like doc-manual) — then equipment type → items
+    await setState(userId, "equipment", context);
+    await sendComplexMessage(
+      chatId,
+      `📋 *Аренда*\n\n📦 *Выберите тип оборудования*`,
+      buildCategoryKeyboard(await getEquipmentCatalog(), selectedEquipmentIds(context)),
+      { keyboardType: 'inline', parseMode: 'Markdown' },
+    );
     return true;
   }
 
   if (callbackData === "d_sale") {
     context.dealType = "sale";
-    await setState(userId, "name", context);
-    await sendComplexMessage(chatId, withStep("*Продажа - ФИО*", "name", "sale"), [], { removeKeyboard: true, parseMode: 'Markdown' });
+    await setState(userId, "equipment", context);
+    await sendComplexMessage(
+      chatId,
+      `💰 *Продажа*\n\n📦 *Выберите тип оборудования*`,
+      buildCategoryKeyboard(await getEquipmentCatalog(), selectedEquipmentIds(context)),
+      { keyboardType: 'inline', parseMode: 'Markdown' },
+    );
+    return true;
+  }
+
+  // ── Equipment selection: category → items (multi-select, paginated) ──
+  if (callbackData.startsWith("ecat_")) {
+    const category = callbackData.slice(5);
+    if (category === "back") {
+      // Back to category list
+      context.equipmentCategory = undefined;
+      context.equipmentPage = 0;
+      await setState(userId, state, context);
+      await sendComplexMessage(
+        chatId,
+        `📦 *Выберите тип оборудования*`,
+        buildCategoryKeyboard(await getEquipmentCatalog(), selectedEquipmentIds(context)),
+        { keyboardType: 'inline', parseMode: 'Markdown' },
+      );
+      return true;
+    }
+
+    context.equipmentCategory = category;
+    context.equipmentPage = 0;
+    await setState(userId, state, context);
+    const label = EQUIPMENT_CATEGORY_LABELS[category] || category;
+    const items = await getEquipmentCatalog();
+    const chosen = selectedEquipmentIds(context).length;
+    const chosenNote = chosen > 0 ? `\n\n✅ Уже выбрано: ${chosen} шт. — кликните ещё или «Готово».` : "";
+    await sendComplexMessage(
+      chatId,
+      `📦 *${label}* — выберите предметы${chosenNote}`,
+      buildCategoryItemsKeyboard(items, category, selectedEquipmentIds(context), 0),
+      { keyboardType: 'inline', parseMode: 'Markdown' },
+    );
+    return true;
+  }
+
+  if (callbackData.startsWith("epg_")) {
+    // Pagination: epg_{category}_{page}
+    const parts = callbackData.split("_");
+    const page = Number(parts[parts.length - 1]) || 0;
+    const category = parts.slice(1, parts.length - 1).join("_");
+    context.equipmentCategory = category;
+    context.equipmentPage = page;
+    await setState(userId, state, context);
+    const label = EQUIPMENT_CATEGORY_LABELS[category] || category;
+    await sendComplexMessage(
+      chatId,
+      `📦 *${label}* — страница ${page + 1}`,
+      buildCategoryItemsKeyboard(await getEquipmentCatalog(), category, selectedEquipmentIds(context), page),
+      { keyboardType: 'inline', parseMode: 'Markdown' },
+    );
     return true;
   }
 
@@ -910,22 +1112,61 @@ export async function handleEkipCallback(
     const eqId = callbackData.slice(3);
     if (eqId === "done") {
       // Equipment selection done, proceed to name
-      if (!context.equipmentId) {
+      const ids = selectedEquipmentIds(context);
+      if (!ids.length) {
         await sendComplexMessage(chatId, "❌ Сначала выберите оборудование", [], { removeKeyboard: true });
         return true;
       }
+      const items = await resolveAllEquipment(context);
+      const picked = equipmentTitle(items);
       await setState(userId, "name", context);
-      await sendComplexMessage(chatId, withStep(`*Выбрано: ${context.equipmentMake || ""} ${context.equipmentModel || ""}*\n\n*ФИО*`, "name", context.dealType), [], { removeKeyboard: true, parseMode: 'Markdown' });
+      await sendComplexMessage(chatId, withStep(`*Выбрано: ${picked}*\n\n*ФИО*`, "name", context.dealType), [], { removeKeyboard: true, parseMode: 'Markdown' });
       return true;
     }
 
     const equipment = await resolveEquipmentById(eqId);
     if (equipment) {
-      context.equipmentId = equipment.id;
-      context.equipmentMake = equipment.make;
-      context.equipmentModel = equipment.model;
+      // Multi-select: toggle this item in equipmentIds
+      const ids = selectedEquipmentIds(context);
+      const idx = ids.indexOf(equipment.id);
+      const wasFirst = ids.length === 0;
+      if (idx >= 0) {
+        ids.splice(idx, 1); // deselect
+      } else {
+        ids.push(equipment.id); // select
+      }
+      context.equipmentIds = ids;
+      context.equipmentId = ids[0] || context.equipmentId;
+      if (ids.length === 1) {
+        context.equipmentMake = equipment.make;
+        context.equipmentModel = equipment.model;
+      } else if (ids.length === 0) {
+        context.equipmentMake = undefined;
+        context.equipmentModel = undefined;
+      }
       await setState(userId, state, context);
-      await sendComplexMessage(chatId, `📦 Выбрано: ${equipment.make} ${equipment.model}`, buildEquipmentKeyboard(await getEquipmentCatalog(), eqId), { keyboardType: 'inline' });
+
+      const category = context.equipmentCategory;
+      const page = context.equipmentPage || 0;
+      const catalog = await getEquipmentCatalog();
+      if (category) {
+        const label = EQUIPMENT_CATEGORY_LABELS[category] || category;
+        const added = idx >= 0 ? "➖ Убрано" : "➕ Добавлено";
+        const chosenNote = ids.length > 0 ? ` (выбрано: ${ids.length} шт.)` : "";
+        await sendComplexMessage(
+          chatId,
+          `${added}: ${equipment.make} ${equipment.model}${chosenNote}\n\n📦 *${label}*`,
+          buildCategoryItemsKeyboard(catalog, category, ids, page),
+          { keyboardType: 'inline', parseMode: 'Markdown' },
+        );
+      } else {
+        await sendComplexMessage(
+          chatId,
+          `📦 Выбрано: ${equipment.make} ${equipment.model}`,
+          buildCategoryKeyboard(catalog, ids),
+          { keyboardType: 'inline', parseMode: 'Markdown' },
+        );
+      }
     }
     return true;
   }
@@ -1031,14 +1272,14 @@ export async function handleEkipCallback(
   }
 
   if (callbackData === "pay_all_cash") {
-    const equipment = await resolveEquipmentById(context.equipmentId);
-    const dailyPrice = Number(equipment?.specs?.daily_price || equipment?.specs?.rent_weekday || 1000);
+    const items = await resolveAllEquipment(context);
+    const dailyTotal = sumDailyPrices(items);
 
     const start = parseRuDateTime(context.rentStartDate, context.rentStartTime);
     const end = parseRuDateTime(context.rentEndDate, context.rentEndTime);
     const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
     const days = Math.max(1, Math.ceil(hours / 24));
-    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : dailyPrice * days;
+    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : dailyTotal * days;
 
     context.cashAmount = totalAmount;
     context.bankAmount = 0;
@@ -1048,14 +1289,14 @@ export async function handleEkipCallback(
 
   if (callbackData === "paydest_tbank" || callbackData === "paydest_sber") {
     const dest = callbackData === "paydest_tbank" ? "tbank" : "sber";
-    const equipment = await resolveEquipmentById(context.equipmentId);
-    const dailyPrice = Number(equipment?.specs?.daily_price || equipment?.specs?.rent_weekday || 1000);
+    const items = await resolveAllEquipment(context);
+    const dailyTotal = sumDailyPrices(items);
 
     const start = parseRuDateTime(context.rentStartDate, context.rentStartTime);
     const end = parseRuDateTime(context.rentEndDate, context.rentEndTime);
     const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
     const days = Math.max(1, Math.ceil(hours / 24));
-    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : dailyPrice * days;
+    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : dailyTotal * days;
 
     context.cashAmount = 0;
     context.bankAmount = totalAmount;
@@ -1065,14 +1306,14 @@ export async function handleEkipCallback(
   }
 
   if (callbackData === "paydest_split") {
-    const equipment = await resolveEquipmentById(context.equipmentId);
-    const dailyPrice = Number(equipment?.specs?.daily_price || equipment?.specs?.rent_weekday || 1000);
+    const items = await resolveAllEquipment(context);
+    const dailyTotal = sumDailyPrices(items);
 
     const start = parseRuDateTime(context.rentStartDate, context.rentStartTime);
     const end = parseRuDateTime(context.rentEndDate, context.rentEndTime);
     const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
     const days = Math.max(1, Math.ceil(hours / 24));
-    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : dailyPrice * days;
+    const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : dailyTotal * days;
 
     await setState(userId, "payment_split_cash", context);
     await sendComplexMessage(
@@ -1092,9 +1333,9 @@ export async function handleEkipCallback(
 
   // Deposit callbacks
   if (callbackData === "dep_confirm") {
-    const equipment = await resolveEquipmentById(context.equipmentId);
-    context.depositOverride = String(equipment?.specs?.deposit_rub || "5000");
-    const summary = buildRentSummary(context);
+    const items = await resolveAllEquipment(context);
+    context.depositOverride = String(items[0]?.specs?.deposit_rub || "5000");
+    const summary = buildRentSummary(context, items);
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
@@ -1119,7 +1360,8 @@ export async function handleEkipCallback(
       return true;
     }
     context.salePrice = price;
-    const summary = buildSaleSummary(context, price);
+    const items = await resolveAllEquipment(context);
+    const summary = buildSaleSummary(context, price, items);
     await setState(userId, "confirm", context);
     await sendComplexMessage(chatId, summary, buildConfirmKeyboard(), { keyboardType: 'inline', parseMode: 'Markdown' });
     return true;
@@ -1217,11 +1459,12 @@ async function loadEkipCrewSecrets(crewSlug: string): Promise<RentalCrewSecrets>
 
 async function generateContract(chatId: number, userId: string, context: EkipFlowContext): Promise<boolean> {
   try {
-    const equipment = await resolveEquipmentById(context.equipmentId);
-    if (!equipment) {
+    const equipmentItems = await resolveAllEquipment(context);
+    if (!equipmentItems.length) {
       await sendComplexMessage(chatId, "🚨 Оборудование не найдено. Попробуйте /ekip", [], { removeKeyboard: true });
       return false;
     }
+    const firstEquipment = equipmentItems[0];
 
     const crewSlug = await getEkipCrewSlug(userId);
     const isRent = context.dealType === "rent";
@@ -1230,11 +1473,11 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
     let vars: Record<string, string>;
 
     if (isRent) {
-      const dailyPrice = Number(equipment.specs?.daily_price || equipment.specs?.rent_weekday || 1000);
+      const dailyTotal = sumDailyPrices(equipmentItems);
       // Use the shared builder (same as web-app and /doc) so the template
       // variables are always complete and consistent.
       const crewSecrets = await loadEkipCrewSecrets(crewSlug);
-      const depositNum = Number(context.depositOverride || equipment.specs?.deposit_rub || 5000);
+      const depositNum = Number(context.depositOverride || equipmentItems[0]?.specs?.deposit_rub || 5000);
 
       // Compute rental cost the same way the bot showed the operator (rent days × rate).
       let rentalDays = 1;
@@ -1248,7 +1491,11 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
       }
       const totalCost = context.priceOverridden
         ? (context.cashAmount || 0) + (context.bankAmount || 0)
-        : dailyPrice * rentalDays;
+        : dailyTotal * rentalDays;
+
+      const primaryKey = equipmentItems.length === 1
+        ? firstEquipment.id
+        : `equipment-${equipmentItems.length}`;
 
       vars = buildRentalContractVariables({
         renter: {
@@ -1263,18 +1510,18 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
           registration: context.mpRegistration,
         },
         bike: {
-          id: equipment.id,
-          make: equipment.make,
-          model: equipment.model,
+          id: firstEquipment.id,
+          make: firstEquipment.make,
+          model: firstEquipment.model,
           type: "equipment",
-          specs: equipment.specs,
+          specs: firstEquipment.specs,
         },
         period: {
           startDate: context.rentStartDate || "",
           startTime: context.rentStartTime || "10:00",
           endDate: context.rentEndDate || "",
           endTime: context.rentEndTime || "10:00",
-          dailyPrice,
+          dailyPrice: dailyTotal,
           depositOverride: context.depositOverride ? Number(context.depositOverride) : undefined,
         },
         crewSecrets,
@@ -1282,21 +1529,20 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
           signatureTimestamp: now.toLocaleString("ru-RU"),
           signatureFingerprint: "manual-telegram-ekip",
           renterSignature: "согласие через Telegram",
-          documentKey: `ekip-rental-${equipment.id}-${Date.now()}`,
-          contractNumber: `${now.getDate()}.${now.getMonth() + 1}/${equipment.id}`,
+          documentKey: `ekip-rental-${primaryKey}-${Date.now()}`,
+          contractNumber: `${now.getDate()}.${now.getMonth() + 1}/${primaryKey}`,
         },
         equipmentMode: true,
-        equipmentItems: [
-          {
-            id: equipment.id,
-            make: equipment.make,
-            model: equipment.model,
-            dailyPrice,
-            specs: {
-              material: equipment.specs?.category,
-            },
+        equipmentItems: equipmentItems.map((item) => ({
+          id: item.id,
+          make: item.make,
+          model: item.model,
+          dailyPrice: Number(item.specs?.daily_price || item.specs?.rent_weekday || 1000),
+          specs: {
+            material: item.specs?.category,
+            size: item.specs?.size,
           },
-        ],
+        })),
         paymentSplit: {
           cashAmount: context.cashAmount || 0,
           bankAmount: context.bankAmount || 0,
@@ -1313,9 +1559,12 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
         },
       });
     } else {
-      const salePrice = context.salePrice || String(equipment.specs?.sale_price || "5000");
+      const salePrice = context.salePrice || String(sumSalePrices(equipmentItems));
+      const primaryKey = equipmentItems.length === 1
+        ? firstEquipment.id
+        : `equipment-${equipmentItems.length}`;
       vars = {
-        contract_number: `${now.getDate()}.${now.getMonth() + 1}/${equipment.id}`,
+        contract_number: `${now.getDate()}.${now.getMonth() + 1}/${primaryKey}`,
         day: String(now.getDate()).padStart(2, "0"),
         month: now.toLocaleString("ru-RU", { month: "long" }),
         month_num: String(now.getMonth() + 1).padStart(2, "0"),
@@ -1327,11 +1576,11 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
         buyer_birth_date: context.mpBirthDate || "",
         buyer_registration: context.mpRegistration || "",
         buyer_phone: context.clientPhone || "",
-        equipment_name: `${equipment.make} ${equipment.model}`,
+        equipment_name: equipmentTitle(equipmentItems),
         price_digits: salePrice,
         price_words: numberToWords(Number(salePrice)),
         signature_timestamp: now.toLocaleString("ru-RU"),
-        document_key: `ekip-sale-${equipment.id}-${Date.now()}`,
+        document_key: `ekip-sale-${primaryKey}-${Date.now()}`,
       };
     }
 
@@ -1346,7 +1595,7 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
       return false;
     }
 
-    const docFileName = `${context.dealType}-equipment-${equipment.make}-${equipment.model}-${context.rentStartDate || now.toISOString().split('T')[0]}.docx`
+    const docFileName = `${context.dealType}-equipment-${equipmentItems.length}-${context.rentStartDate || now.toISOString().split('T')[0]}.docx`
       .replace(/[^a-zA-Zа-яА-Я0-9.\-]/g, "-")
       .replace(/-+/g, "-");
 
@@ -1373,7 +1622,8 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
         buffer: docxBuf,
         metadata: {
           source: `telegram-ekip-${isRent ? 'rental' : 'sale'}`,
-          equipment_id: equipment.id,
+          equipment_id: firstEquipment.id,
+          equipment_count: equipmentItems.length,
           client: context.mpFullName || "",
         },
       });
@@ -1392,13 +1642,16 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
     }
 
     // Success message
-    const equipmentTitle = `${equipment.make} ${equipment.model}`.trim();
+    const successItems = equipmentTitle(equipmentItems);
+    const successTotal = isRent
+      ? `${sumDailyPrices(equipmentItems) * Math.max(1, 0)} ₽/сутки` // placeholder replaced below
+      : `${Number(context.salePrice || sumSalePrices(equipmentItems)).toLocaleString("ru-RU")} ₽`;
     const successText = [
       `✅ *Договор ${isRent ? 'аренды' : 'продажи'} оборудования готов!*`,
       "",
-      `📦 ${equipmentTitle}`,
+      `📦 ${successItems}${equipmentItems.length > 1 ? ` (${equipmentItems.length} шт.)` : ""}`,
       `👤 ${context.mpFullName || ""}`,
-      isRent ? `📅 ${context.rentStartDate || ""} ${context.rentStartTime || ""} → ${context.rentEndDate || ""} ${context.rentEndTime || ""}` : `💰 ${Number(context.salePrice || 0).toLocaleString("ru-RU")} ₽`,
+      isRent ? `📅 ${context.rentStartDate || ""} ${context.rentStartTime || ""} → ${context.rentEndDate || ""} ${context.rentEndTime || ""}` : `💰 ${successTotal}`,
     ].join("\n");
 
     await sendComplexMessage(
@@ -1414,9 +1667,9 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
       const adminMessage = [
         `📦 *${isRent ? 'Аренда' : 'Продажа'} оборудования*`,
         "",
-        `📦 ${equipmentTitle}`,
+        `📦 ${successItems}${equipmentItems.length > 1 ? ` (${equipmentItems.length} шт.)` : ""}`,
         `👤 ${context.mpFullName || ""}`,
-        isRent ? `📅 ${context.rentStartDate || ""} ${context.rentStartTime || ""} → ${context.rentEndDate || ""} ${context.rentEndTime || ""}` : `💰 ${Number(context.salePrice || 0).toLocaleString("ru-RU")} ₽`,
+        isRent ? `📅 ${context.rentStartDate || ""} ${context.rentStartTime || ""} → ${context.rentEndDate || ""} ${context.rentEndTime || ""}` : `💰 ${successTotal}`,
       ].join("\n");
 
       await sendComplexMessage(
@@ -1484,7 +1737,7 @@ export async function ekipCommand(
   const parts = text.trim().split(/\s+/);
   const equipmentArg = parts.slice(1).join(" ").trim();
 
-  // Start with deal type selection
+  // Start with deal type selection (same as doc-manual quality bar)
   const context: EkipFlowContext = {
     dealType: "rent",
     equipmentId: "",
@@ -1503,18 +1756,7 @@ export async function ekipCommand(
     }
   }
 
-  // Show equipment catalog
-  const equipmentList = await getEquipmentCatalog(crewSlug);
-  if (!equipmentList.length) {
-    await sendComplexMessage(chatId, "📦 Нет оборудования в каталоге.", [], { removeKeyboard: true });
-    return;
-  }
-
-  await setState(userIdStr, "equipment", context);
-  await sendComplexMessage(
-    chatId,
-    "📦 *Выберите оборудование*",
-    buildEquipmentKeyboard(equipmentList),
-    { keyboardType: "inline", parseMode: 'Markdown' },
-  );
+  // No argument: always start from deal type, then category → items
+  await setState(userIdStr, "deal", context);
+  await sendComplexMessage(chatId, withStep("Тип сделки:", "deal"), buildDealKeyboard(), { keyboardType: 'inline' });
 }
