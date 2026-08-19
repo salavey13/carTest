@@ -227,6 +227,59 @@ and `clock_out` still flips live_status to offline to heal the drift.
 - Crew shifts page: `https://vip-bike.ru/franchize/vip-bike/crew`
 - Telegram `/shift` command: just type `/shift` in the bot
 
+## ⚠️ Important: per-member earnings in digests (2026-08-19 review)
+
+The user explicitly requested: when generating evening digests or shift
+reports, ALWAYS show per-member earnings (a breakdown row per crew member
+with their hours, rate, and earned amount), NOT just a crew total.
+
+**Why**: The owner pays out per-member salaries on the 10th and 25th of
+each month. A "Total: 4 845 ₽" line is useless for this purpose — the
+owner needs to know "Paul earned 1 437 ₽, Rustam earned 1 183 ₽, etc."
+to know how much to pay each person. A single total makes the digest
+un-actionable.
+
+**Required format** (mirror `scripts/export_shift_info.py`'s output):
+
+```
+📈 Итого за день:
+  • Завершённых смен: 3
+  • Активных смен: 1
+  • Отработано часов: 24.5ч (завершено) + 4.2ч (активно)
+  • Заработано: 4845₽ (по ставке 169₽/час)
+
+🟢 АКТИВНЫЕ СМЕНЫ:
+  • salavey13 (admin) — начало 18:00, длительность 4.2ч, ставка 169₽/ч, заработано 710₽
+
+✅ ЗАВЕРШЁННЫЕ СМЕНЫ:
+  • Roman (co_owner) — 09:00–17:30 (8.5ч), ставка 169₽/ч, заработано 1437₽
+  • I_O_S_NN (owner) — 10:00–14:00 (4.0ч), ставка 169₽/ч, заработано 676₽
+  • DJORUDJOV (member) — 12:00–19:00 (7.0ч), ставка 169₽/ч, заработано 1183₽
+```
+
+The `🟢 АКТИВНЫЕ СМЕНЫ` + `✅ ЗАВЕРШЁННЫЕ СМЕНЫ` sections give the per-member
+breakdown the owner needs. The `📈 Итого за день` section is a summary
+that includes the total — but the per-member rows MUST also be present.
+
+When generating a digest from any source (Telegram bot, cron job, custom
+skill), include BOTH:
+- The total summary line (for "how much did we earn overall?")
+- The per-member breakdown (for "how much to pay each person?")
+
+Skipping the per-member rows makes the digest useless for salary payout.
+
+The `/shift` command's clock_out reply (in `app/webhook-handlers/commands/shift.ts`)
+similarly includes the per-shift earned amount:
+```
+✅ Смена завершена.
+💰 Заработано: 1381 ₽ (8.2 ч × 169 ₽/ч)
+
+Хорошего отдыха!
+```
+
+This is the user-facing equivalent — when the operator closes their shift,
+they see how much they personally earned (not the crew total).
+
 ## Related Files
 - **Bot command**: `app/webhook-handlers/commands/shift.ts`
 - **Web page**: `app/franchize/[slug]/crew/CrewShiftsClient.tsx`
