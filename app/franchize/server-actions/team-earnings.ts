@@ -63,6 +63,8 @@ export async function getTeamEarnings(params: {
       .select(`
         user_id,
         users (
+          username,
+          full_name,
           metadata
         )
       `)
@@ -79,7 +81,18 @@ export async function getTeamEarnings(params: {
       (members || []).map(async (member: any) => {
         const memberId = member.user_id;
         const metadata = member.users?.metadata || {};
-        const memberName = metadata?.name || metadata?.username || `Member ${memberId.slice(0, 6)}`;
+        // 2026-08-19 review: prefer the top-level columns (full_name and
+        // username) which are populated by the Telegram auth flow. The
+        // metadata.name / metadata.username keys were previously the only
+        // fallback checked, but production users have those undefined —
+        // so the salary page was showing "Member <id-slice>" placeholders
+        // instead of actual nicknames.
+        const memberName =
+          member.users?.full_name ||
+          member.users?.username ||
+          metadata?.name ||
+          metadata?.username ||
+          `Member ${memberId.slice(0, 6)}`;
 
         // Get shifts for period — filter by crew_id too, otherwise shifts
         // from another crew the member belongs to would leak in.
@@ -323,6 +336,8 @@ export async function getOwnerSalaryOverview(params: {
         user_id,
         role,
         users (
+          username,
+          full_name,
           metadata
         )
       `)
@@ -344,7 +359,18 @@ export async function getOwnerSalaryOverview(params: {
       (members || []).map(async (member: any) => {
         const memberId = member.user_id;
         const metadata = member.users?.metadata || {};
-        const memberName = metadata?.name || metadata?.username || `Member ${memberId.slice(0, 6)}`;
+        // 2026-08-19 review: prefer the top-level columns (full_name and
+        // username) which are populated by the Telegram auth flow.
+        // metadata.name / metadata.username were previously the only
+        // fallback checked, but production users have those undefined —
+        // so the salary page was showing "Member <id-slice>" placeholders
+        // instead of actual nicknames.
+        const memberName =
+          member.users?.full_name ||
+          member.users?.username ||
+          metadata?.name ||
+          metadata?.username ||
+          `Member ${memberId.slice(0, 6)}`;
         const role = member.role || "member";
 
         // Shifts for period — crew-scoped to prevent multi-crew leak.
