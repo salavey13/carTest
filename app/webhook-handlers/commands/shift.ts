@@ -75,6 +75,9 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
         let shiftEarnedAmount = 0;
         let shiftEarnedHours = 0;
         let shiftEarnedRate = 0;
+        // Flag: set during clock_out case, used AFTER shiftLogAction() runs
+        // to construct the user/owner messages with the earned amount.
+        let needClockOutMessage = false;
 
         switch (action) {
             case 'clock_in':
@@ -144,17 +147,12 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
             if (hasActiveShift || live_status !== 'offline') {
                 if (live_status !== 'offline') {
                     updateData = { live_status: 'offline', last_location: null };
-                    // 2026-08-19 review: include earned amount in the close message
-                    // instead of just "Хорошего отдыха!" — user explicitly asked:
-                    // "reply not just 'good day, sir' but show how much money were earned".
-                    // shiftEarnedAmount will be populated by shiftLogAction() above
-                    // (runs before this message is sent). If shiftLogAction didn't
-                    // populate it (no shift row found), we fall back to no-money line.
-                    const moneyLine = shiftEarnedAmount > 0
-                      ? `\n💰 Заработано: ${shiftEarnedAmount.toLocaleString("ru-RU")} ₽ (${shiftEarnedHours} ч × ${shiftEarnedRate} ₽/ч)\n`
-                      : "\n";
-                    userMessage = `✅ Смена завершена.${moneyLine}\nХорошего отдыха!`;
-                    ownerMessage = `🔴 @${displayName} завершил смену в экипаже «${crewName}»${shiftEarnedAmount > 0 ? ` (заработал ${shiftEarnedAmount.toLocaleString("ru-RU")} ₽)` : ""}.`;
+                    // 2026-08-19 review: DON'T construct userMessage here —
+                    // shiftEarnedAmount is still 0 because shiftLogAction()
+                    // hasn't run yet. Set a flag and construct the message
+                    // AFTER shiftLogAction() completes (where shiftEarnedAmount
+                    // gets populated).
+                    needClockOutMessage = true;
                 } else {
                     userMessage = "✅ Остаточная смена закрыта.\nСмена в базе данных была завершена.";
                     ownerMessage = `🔧 @${displayName}: закрыл остаточную смену в «${crewName}».`;
@@ -182,7 +180,20 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                 await supabaseAdmin.from("crew_members").update(updateData).eq("user_id", userId).eq("crew_id", crew_id).eq("membership_status", "active");
             }
             if (shiftLogAction) await shiftLogAction();
-            
+
+            // 2026-08-19 review: construct clock_out message AFTER shiftLogAction()
+            // runs — that's when shiftEarnedAmount/Hours/Rate are populated.
+            // Previously the message was built in the switch case BEFORE
+            // shiftLogAction ran, so shiftEarnedAmount was always 0 and the
+            // money line was never shown.
+            if (needClockOutMessage) {
+                const moneyLine = shiftEarnedAmount > 0
+                  ? `\n💰 Заработано: ${shiftEarnedAmount.toLocaleString("ru-RU")} ₽ (${shiftEarnedHours} ч × ${shiftEarnedRate} ₽/ч)\n`
+                  : "\n";
+                userMessage = `✅ Смена завершена.${moneyLine}\nХорошего отдыха!`;
+                ownerMessage = `🔴 @${displayName} завершил смену в экипаже «${crewName}»${shiftEarnedAmount > 0 ? ` (заработал ${shiftEarnedAmount.toLocaleString("ru-RU")} ₽)` : ""}.`;
+            }
+
             // Send messages as plain text (no MarkdownV2 — avoids escaping bugs)
             if (userMessage) {
                 await sendComplexMessage(chatId, userMessage, [], { removeKeyboard: true });
