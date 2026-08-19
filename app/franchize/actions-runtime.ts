@@ -2038,7 +2038,7 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
     const isService = flowType === "service";
     const isEquipment = flowType === "equipment";
     const localTemplateFile = isEquipment
-      ? "EQUIPMENT_RENTAL_DEAL_TEMPLATE.md"
+      ? "EQUIPMENT_RENTAL_DEAL_TEMPLATE.html"
       : isRental
         ? "RENTAL_DEAL_TEMPLATE.html"
         : isTestdrive
@@ -2046,7 +2046,7 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
           : isService
             ? "SERVICE_DEAL_TEMPLATE.html"
             : "SALE_DEAL_TEMPLATE.html";
-    const defaultTemplateMode = isEquipmentOnly ? ("md" as const) : ("html" as const);
+    const defaultTemplateMode = "html" as const;
 
   // Check crew-specific template in crewDocs/ first
   const crewDocPath = path.join(process.cwd(), "docs", "crewDocs", `${slug}_${localTemplateFile}`);
@@ -2073,8 +2073,8 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
 
   // Fallback: fetch from GitHub (for Vercel ephemeral builds that might
     // not have the docs/ folder synced)
-    const remoteTemplateUrl = isEquipmentOnly
-      ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/EQUIPMENT_RENTAL_DEAL_TEMPLATE.md"
+    const remoteTemplateUrl = isEquipment
+      ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/EQUIPMENT_RENTAL_DEAL_TEMPLATE.html"
       : isRental
         ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/RENTAL_DEAL_TEMPLATE.html"
         : isTestdrive
