@@ -11,6 +11,7 @@ import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
 import { getCurrentPayPeriod } from "@/lib/salary-period";
+import { formatDateRu } from "@/app/franchize/components/DateInputRu";
 import {
   getFranchizeProfileBySlugAction,
   grantFranchizeAchievementAction,
@@ -693,6 +694,12 @@ export function FranchizeProfileClient({
                     color: T.text,
                   }}
                 />
+                {/* 2026-08-19 review: unambiguous Russian-format display */}
+                {earningsPeriod.from && (
+                  <span className="text-[10px] tabular-nums" style={{ color: T.textMuted }}>
+                    ({formatDateRu(earningsPeriod.from)})
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs" style={{ color: T.textMuted }}>по</span>
@@ -707,6 +714,11 @@ export function FranchizeProfileClient({
                     color: T.text,
                   }}
                 />
+                {earningsPeriod.to && (
+                  <span className="text-[10px] tabular-nums" style={{ color: T.textMuted }}>
+                    ({formatDateRu(earningsPeriod.to)})
+                  </span>
+                )}
               </div>
               <button
                 onClick={fetchPeriodEarnings}

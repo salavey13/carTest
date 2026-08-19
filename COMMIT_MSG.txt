@@ -1,99 +1,145 @@
-polish(salary): final verdict + pay-period date pickers + role badges + dedup fallbackCrew
+fix: deposit balance section + /ekip cancel bug + Russian date pickers + skill author guidance
 
-User rightly called out that I was being inconsistent about the
-crew_members.hourly_rate column — first wanting to drop it, then
-applying a migration that adds/queries it. This commit gives the
-final verdict and cleans up the migration mess.
+Four parallel fixes from the user's investigation feedback.
 
-# Final verdict on crew_members.hourly_rate
+# 1. deposit_entries timing verification — confirmed working
 
-  The column is dead weight — no app code reads it (verified via grep
-  across the entire app/ tree: CrewShiftsClient reads
-  memberData.metadata.hourly_rate, NOT crew_members.hourly_rate).
+  The user saw "Aug 8: -10000 ₽ returned, +0 ₽ collected" and wondered
+  why the collection wasn't shown. Verified via Supabase:
 
-  Actions taken:
-  - DELETED supabase/migrations/20260815000001_add_hourly_rate_to_crew_members.sql
-    (it adds a column nobody uses, was never applied to prod)
-  - DELETED supabase/migrations/20260819000002_consolidate_hourly_rate_sources.sql
-    (it tried to backfill from a column that doesn't exist on prod,
-     wrapped in IF EXISTS it became a no-op — pointless file)
-  - ADDED supabase/migrations/20260819000003_drop_crew_members_hourly_rate_if_exists.sql
-    (drops the column IF EXISTS — catches any dev env where the
-     original 20260815000001 migration WAS applied, so every
-     environment converges to the same clean state)
+    - rental 9c0ba304 was CREATED 2026-07-31 11:04:14 UTC
+    - deposit_entries deposit_collected row: 2026-07-31 11:04:14
+      (same second as rental creation — collected via /doc flow)
+    - deposit_entries deposit_returned row: 2026-08-08 17:44:03
+      (when rental status → completed)
 
-  Single source of truth now confirmed:
-    WRITE: users.metadata.hourly_rate (via /api/crew/shifts/rate POST)
-    SYNC:  crew_member_shifts.hourly_rate (via trg_sync_hourly_rate_on_shift_start)
-    READ:  either above depending on whether you want future/past rate
+  So the deposits page IS working correctly. The collection happened on
+  July 31 (rental creation day), the return on Aug 8 (rental completion day).
+  The user was checking Aug 7 expecting to see +10000 — that was the wrong
+  date. Page behavior confirmed correct.
 
-# Date pickers default to nearest payout boundary (10th / 25th)
+# 2. /ekip cancel button → "Неизвестная кнопка" bug
 
-  Previously both the profile page and the salary page defaulted their
-  date pickers to calendar-month boundaries (1st of month → today, or
-  1st of month → 1st of next month). That's the wrong default for a
-  salary subsystem where payouts happen on the 10th and 25th — on, say,
-  Aug 17, the picker showed "Aug 1 → Aug 17" which is half of two
-  different pay periods.
+  Root cause: handleEkipCallback in ekip-manual.ts checked
+  `if (!ekipState) return false;` BEFORE handling the "cancel" callback.
+  When the user's ekip state had been cleared (e.g. by an error in an
+  earlier step, or by eq_done moving state forward), clicking "❌ Отменить"
+  would fall through to handleDocCallback (no doc state either) → fall
+  through to the "unrouted callback_query" branch → "Неизвестная кнопка.
 
-  Added lib/salary-period.ts with three helpers:
-    - getCurrentPayPeriod(now) — the period containing `now`:
-        * day 10..24 → [this month 10, this month 25]
-        * day >= 25  → [this month 25, next month 10]
-        * day < 10   → [last month 25, this month 10]
-    - getPreviousPayPeriod(now) — the period immediately before current
-    - getCurrentCalendarMonth(now) — the old default (calendar month)
+  Используй /help или /doc."
 
-  Both ProfileClient.tsx (earningsPeriod) and SalaryClient.tsx
-  (periodStart/periodEnd) now default to getCurrentPayPeriod() so the
-  page opens with the actual pay period the owner will pay out next.
+  Fix in two places:
+    - ekip-manual.ts: moved the `cancel` and `restart` handlers ABOVE
+      the state check. Now they always succeed even with no state.
+    - command-handler.ts: added a top-level fallback — any unrouted
+      callback whose data is "cancel" or "restart" gets a graceful
+      "❌ Отменено." response + state cleanup, instead of the confusing
+      "Неизвестная кнопка" message. Catches the edge case where the
+      flow's state has been cleared by expiry or a prior error but the
+      user still sees a stale keyboard.
 
-# Quick period presets on the salary page
+# 3. Assistant-bot rental demoted to pending_confirmation
 
-  Added three quick-preset buttons above the date pickers on the salary
-  page so the owner doesn't have to manually type dates for the common
-  queries:
-    - "Текущий расчёт (10→25)" — accent-styled, calls getCurrentPayPeriod
-    - "Прошлый расчёт" — muted-styled, calls getPreviousPayPeriod
-    - "Этот месяц" — muted-styled, calls getCurrentCalendarMonth (old default)
+  Today's rental (a85eb52e-1dc5-496b-8e79-b6b075b75789, Kawasaki Ninja
+  650, "Александр") was created by an external assistant-bot skill with:
+    - status='active' (premature — no operator confirmed the booking)
+    - payment_status='fully_paid' (premature — no money exchanged)
+    - metadata.deposit_rub=20000 (correct, but rentals.deposit_amount=0
+      and no deposit_entries row was inserted)
 
-  Each button sets the date pickers AND triggers a re-load via setIsLoading(true).
+  Ran scripts/demote-assistant-bot-rental.mjs (committed for future
+  reference) to demote the rental to:
+    - status='pending_confirmation' (the canonical "awaiting operator
+      review" status, also used by the web checkout flow)
+    - payment_status='pending'
+    - metadata.status_correction = { corrected_at, corrected_by,
+      reason, original_status, original_payment_status }
 
-# Role badge next to member name in the salary table
+  Also added a 50-line warning docstring to
+  scripts/make-rental-contract-skill.mjs's createRentalFromBotContract
+  function, explaining:
+    - why skills MUST start rentals in pending_confirmation (not active)
+    - why skills MUST set payment_status='pending' (not fully_paid)
+    - why skills MUST include metadata.deposit_rub from bike.specs
+    - the SQL snippet to demote a prematurely-active rental
 
-  The salary table previously just showed the member's name. The owner
-  couldn't tell at a glance who is admin/co_owner/owner vs regular
-  member. Added a small badge (Russian labels) next to each name:
-    - Владелец (owner) — accent badge
-    - Со-влад.  (co_owner) — accent badge
-    - Админ    (admin) — warning badge
-    - Участник (member) — success badge
-    - Механик  (mechanic) — success badge
+  And updated the createRentalFromBotContract function itself to use
+  status='pending_confirmation' / payment_status='pending' (was
+  status='active' / payment_status='fully_paid').
 
-  SalaryPlan interface gained a `role?: string` field, formattedPlans
-  now stores row.role from getOwnerSalaryOverview's response, and a
-  ROLE_LABELS map renders the right label + style.
+  Also added the same warning to skills/rental-ops-text/SKILL.md as
+  "⚠️ Important for skill authors" section — since custom skills based
+  on this repo may not see the script docstring, the SKILL.md is more
+  discoverable.
 
-# Dedup'd the fallbackCrew constant (pre-existing TS error)
+# 4. Part 3: deposit-balance API + on-hand balance UI section
 
-  ProfileClient.tsx had a 50-line inline fallbackCrew that drifted from
-  the canonical version in lib/fallback-crew.ts — it was missing the
-  reservationHold, contentBlocks, and cta fields that FranchizeCrewVM
-  now requires (pre-existing TS2322 error at line 48).
+  New API route: GET /api/franchize/deposit-balance?slug=<slug>
+    - Returns all-time aggregate per destination (cash/tbank/sber):
+      collected - returned - penalty = onHand
+    - Auth: cookie-based, owner / co_owner / admin tier (deposits are
+      sensitive financial data).
+    - Filters by the crew's rental_ids (deposit_entries has no crew_id).
 
-  - Deleted the inline copy.
-  - Imported { fallbackCrew } from "@/app/franchize/lib/fallback-crew".
-  - Updated the canonical fallbackCrew to include the missing fields
-    (reservationHold empty default, contentBlocks = DEFAULT_FRANCHIZE_CONTENT_BLOCKS,
-     cta empty strings).
+  Updated DepositsAdminClient.tsx with a new "Сейчас на руках (за всё
+  время)" section at the TOP of the page (accent-colored to visually
+  distinguish it from the per-day section below). Shows:
+    - Per-destination card with the on-hand amount in big text
+    - Below: "Получено: +X / Возвращено: -Y / Удержания: -Z" small text
+    - Below all cards: "Итого на руках: <total>" if non-zero
+
+  The existing per-day section ("За день: 19.08.2026") remains below
+  for "what happened on this date" queries. The user can now answer
+  BOTH "how much do we currently hold?" (top) and "what happened today?"
+  (bottom).
+
+# 5. All franchize date pickers now show Russian dd.mm.yyyy hint
+
+  Native <input type=date> uses the browser's locale for display. Users
+  with en-US locale (e.g. Telegram WebApp in English) see "08/07/2026"
+  which a Russian user reads as "8th of July" instead of "7th of August".
+
+  Since we can't override the browser's date input display format, added
+  a small "(dd.mm.yyyy)" label next to each date input showing the
+  selected date in unambiguous Russian format. The user always knows
+  what date they're actually viewing/selecting.
+
+  Created app/franchize/components/DateInputRu.tsx with:
+    - formatDateRu(iso) helper: "2026-08-19" → "19.08.2026"
+    - formatDateRuLong(iso) helper: "2026-08-19" → "19 авг. 2026 г."
+    - DateInputRu component: wraps <input type=date> + shows the
+      Russian-format hint next to it
+
+  Applied the format-hint pattern (manually, since the existing date
+  inputs use different styling per page) to:
+    - app/franchize/[slug]/salary/SalaryClient.tsx (2 inputs)
+    - app/franchize/[slug]/profile/ProfileClient.tsx (2 inputs)
+    - app/franchize/[slug]/cash-ledger/CashLedgerClient.tsx (2 inputs)
+    - app/franchize/[slug]/admin/deposits/DepositsAdminClient.tsx (1 input + already used formatDateRu for the "За день" header)
+    - app/franchize/[slug]/equipment/EquipmentClient.tsx (1 input)
+    - app/franchize/[slug]/rentals-analytics/RentalsAnalyticsClient.tsx (1 input)
+    - app/franchize/[slug]/rentals-analytics/ExportModal.tsx (2 inputs)
+
+  The todos page already had its own formatDateInput doing dd.mm.yyyy
+  — no change needed.
+
+  Modals (Item.tsx, SubrentFlowClient.tsx) are operator-only flows
+  with less user impact — left as-is for now (can be patched in a
+  follow-up if needed).
 
 Files touched:
+  app/api/franchize/deposit-balance/route.ts (NEW)
+  app/franchize/components/DateInputRu.tsx (NEW)
+  app/franchize/[slug]/admin/deposits/DepositsAdminClient.tsx
+  app/franchize/[slug]/cash-ledger/CashLedgerClient.tsx
+  app/franchize/[slug]/equipment/EquipmentClient.tsx
   app/franchize/[slug]/profile/ProfileClient.tsx
+  app/franchize/[slug]/rentals-analytics/ExportModal.tsx
+  app/franchize/[slug]/rentals-analytics/RentalsAnalyticsClient.tsx
   app/franchize/[slug]/salary/SalaryClient.tsx
-  app/franchize/lib/fallback-crew.ts
-  lib/salary-period.ts (NEW)
-  supabase/migrations/20260815000001_add_hourly_rate_to_crew_members.sql (DELETED)
-  supabase/migrations/20260819000002_consolidate_hourly_rate_sources.sql (DELETED)
-  supabase/migrations/20260819000003_drop_crew_members_hourly_rate_if_exists.sql (NEW)
-
-Verified: 23 vitest tests pass, zero TS errors in the salary subsystem.
+  app/webhook-handlers/commands/command-handler.ts
+  app/webhook-handlers/commands/ekip-manual.ts
+  scripts/demote-assistant-bot-rental.mjs (NEW, one-shot utility)
+  scripts/make-rental-contract-skill.mjs
+  skills/rental-ops-text/SKILL.md

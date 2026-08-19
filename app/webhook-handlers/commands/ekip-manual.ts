@@ -1007,11 +1007,8 @@ export async function handleEkipCallback(
   callbackData: string,
   callbackQueryId?: string,
 ): Promise<boolean> {
-  const ekipState = await getState(userId);
-  if (!ekipState) return false;
-
-  const { state, context } = ekipState;
-
+  // Answer the callback query first so the button stops spinning,
+  // regardless of whether we have state.
   if (callbackQueryId) {
     try {
       await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery?callback_query_id=${callbackQueryId}`, { method: "POST" });
@@ -1020,6 +1017,16 @@ export async function handleEkipCallback(
     }
   }
 
+  // 2026-08-19 review: handle cancel + restart BEFORE the state check.
+  // Previously, if the ekip state had been cleared (e.g. by an error in
+  // an earlier step, or by the eq_done handler moving state forward to
+  // a stage that didn't expect further equipment clicks), clicking
+  // "❌ Отменить" would hit the `if (!ekipState) return false` guard,
+  // fall through to handleDocCallback (also no doc state) → fall through
+  // to "Неизвестная кнопка. Используй /help или /doc." This was confusing
+  // for users who just wanted to abort.
+  //
+  // Now: cancel + restart always succeed, even with no state.
   if (callbackData === "cancel") {
     await sendComplexMessage(chatId, "❌ Отменено. /ekip для начала.", [], { removeKeyboard: true });
     await clearState(userId);
@@ -1031,6 +1038,11 @@ export async function handleEkipCallback(
     await ekipCommand(chatId, parseInt(userId), undefined, "/ekip");
     return true;
   }
+
+  const ekipState = await getState(userId);
+  if (!ekipState) return false;
+
+  const { state, context } = ekipState;
 
   if (callbackData === "d_rent") {
     context.dealType = "rent";
