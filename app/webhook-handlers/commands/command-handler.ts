@@ -24,6 +24,7 @@ import { shiftCommand } from "./shift";
 import { wbCommand } from "./wb";
 import { codexCommand } from "./codex";
 import { docCommand, handleDocText, handleDocCallback } from "./doc-manual";
+import { ekipCommand, handleEkipText, handleEkipCallback } from "./ekip-manual";
 import { handleSubrentManualCommand } from "./subrent-manual";
 import { analyticsPassCommand } from "./analytics_pass";
 import { testDriveCommand, handleTestDriveText, handleTestDriveCallback } from "./testdrive-manual";
@@ -80,6 +81,14 @@ export async function handleCommand(update: any) {
         )) {
             await handleSubrentManualCommand({ userId: userIdStr, userName: username, text: undefined, callbackData: text, messageId: update.callback_query?.message?.message_id, callbackQueryId: update.callback_query?.id, crewId: undefined });
             return;
+        }
+
+        // Handle callback queries for /ekip flow (equipment rental)
+        // Must come BEFORE /doc routing because they share prefixes (s_, e_, p_, dep_, pay_)
+        // Uses same pattern as /doc: checks state internally, not by prefix
+        if (update.callback_query) {
+            const handled = await handleEkipCallback(userIdStr, chatId, text, update.callback_query.id);
+            if (handled) return;
         }
 
         // Handle callback queries for /doc flow
@@ -165,6 +174,9 @@ export async function handleCommand(update: any) {
             } else if (currentState.startsWith("pending_subrent_")) {
                 const { handleSubrentManualCommand: srCmd } = await import("./subrent-manual");
                 await srCmd({ userId: userIdStrLocal, userName: undefined, text: "/subrent", callbackData: undefined, crewId: crewSlug });
+            } else if (currentState.startsWith("pending_ekip_")) {
+                const { ekipCommand: ekipCmd } = await import("./ekip-manual");
+                await ekipCmd(chatIdLocal, Number(userIdStrLocal), undefined, "/ekip");
             } else {
                 await sendComplexMessage(chatIdLocal, "✅ Выбран экипаж. Используйте команду снова.", [], { removeKeyboard: true });
             }
@@ -327,6 +339,48 @@ export async function handleCommand(update: any) {
                 const documentFiles = update.message?.document ? [update.message.document] : [];
                 return codexCommand(chatId, userIdStr, username, text, bestPhotoVariant, documentFiles);
             },
+            "/ekip": async () => {
+                const crews = await getUserCrews(userIdStr);
+                if (crews.length === 0) {
+                    // General public — show ALL crews for selection
+                    const allCrews = await getAllCrews();
+                    if (allCrews.length === 0) {
+                        await sendComplexMessage(chatId, "🚫 Нет доступных экипажей.", [], { removeKeyboard: true });
+                        return;
+                    }
+                    await supabaseAdmin.from("user_states").upsert({
+                        user_id: userIdStr,
+                        state: `pending_ekip_${Date.now()}`,
+                        context: { pendingCommand: "/ekip" },
+                    }, { onConflict: "user_id" });
+                    await sendComplexMessage(
+                        chatId,
+                        "👥 Выберите экипаж для команды /ekip:",
+                        buildCrewSelectionKeyboard(allCrews, false),
+                        { keyboardType: "inline" },
+                    );
+                    return;
+                }
+                if (crews.length === 1) {
+                    await supabaseAdmin.from("user_states").upsert({
+                        user_id: userIdStr,
+                        state: `crew_selected_${crews[0].slug}`,
+                        context: { selectedCrew: crews[0].slug, selectedAt: Date.now() },
+                    }, { onConflict: "user_id" });
+                    return ekipCommand(chatId, userId, username, text);
+                }
+                await supabaseAdmin.from("user_states").upsert({
+                    user_id: userIdStr,
+                    state: `pending_ekip_${Date.now()}`,
+                    context: { pendingCommand: "/ekip" },
+                }, { onConflict: "user_id" });
+                await sendComplexMessage(
+                    chatId,
+                    "👥 Выберите экипаж для команды /ekip:",
+                    buildCrewSelectionKeyboard(crews),
+                    { keyboardType: "inline" },
+                );
+            },
             "/subrent": async () => {
                 const crews = await getUserCrews(userIdStr);
                 if (crews.length === 0) {
@@ -374,6 +428,7 @@ export async function handleCommand(update: any) {
         const commandFunction = commandMap[command]
             || (command.startsWith("/codex@") ? commandMap["/codex"] : undefined)
             || (command.startsWith("/doc@") ? commandMap["/doc"] : undefined)
+            || (command.startsWith("/ekip@") ? commandMap["/ekip"] : undefined)
             || (command.startsWith("/subrent@") ? commandMap["/subrent"] : undefined)
             || (command.startsWith("/testdrive@") ? commandMap["/testdrive"] : undefined);
 
@@ -398,6 +453,10 @@ export async function handleCommand(update: any) {
             // Check if user is in /doc flow (awaiting bike selection or schedule)
             const docHandled = await handleDocText(userIdStr, chatId, text);
             if (docHandled) return;
+
+            // Check if user is in /ekip flow (equipment rental)
+            const ekipHandled = await handleEkipText(userIdStr, chatId, text);
+            if (ekipHandled) return;
 
             // Check if user is in /testdrive flow
             // NOTE: no supabaseAnon pre-check — handleTestDriveText reads state internally

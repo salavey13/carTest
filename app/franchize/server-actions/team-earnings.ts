@@ -100,12 +100,12 @@ export async function getTeamEarnings(params: {
           shiftIncome += hours * (shift.hourly_rate || 169);
         });
 
-        // Get commissions for period
+        // Get commissions for period (expense_commission: money flowing OUT to employees)
         const { data: commissions } = await supabaseAdmin
           .from("cash_transactions")
           .select("amount")
-          .eq("from_user_id", memberId)
-          .eq("transaction_type", "income_commission")
+          .eq("to_user_id", memberId)
+          .eq("transaction_type", "expense_commission")
           .gte("transaction_date", fromDate)
           .lte("transaction_date", toDateIso);
 
@@ -163,6 +163,11 @@ export async function getMemberEarnings(params: {
     }
 
     const targetMemberId = memberId || access.actorUserId;
+
+    // For non-owners, only allow querying their own earnings
+    if (!access.isOwner && targetMemberId !== access.actorUserId) {
+      return { success: false, error: "Недостаточно прав для просмотра чужих доходов." };
+    }
     const crewId = access.crewId;
     const fromDate = new Date(from).toISOString();
     const toDate = new Date(to);
@@ -212,12 +217,12 @@ export async function getMemberEarnings(params: {
       });
     });
 
-    // Get commissions for period
+    // Get commissions for period (expense_commission: money flowing OUT to employees)
     const { data: commissions } = await supabaseAdmin
       .from("cash_transactions")
       .select("amount, transaction_date, description")
-      .eq("from_user_id", targetMemberId)
-      .eq("transaction_type", "income_commission")
+      .eq("to_user_id", targetMemberId)
+      .eq("transaction_type", "expense_commission")
       .gte("transaction_date", fromDate)
       .lte("transaction_date", toDateIso)
       .order("transaction_date", { ascending: false });

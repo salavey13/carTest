@@ -1,0 +1,289 @@
+<!-- /docs/crewDocs/vip-bike_EQUIPMENT_RENTAL_DEAL_TEMPLATE.html -->
+<!-- Equipment rental deal contract template for VIP Bike -->
+<!-- HTML conversion of EQUIPMENT_RENTAL_DEAL_TEMPLATE.md -->
+<style>
+  @page { size: A4; margin: 20mm 20mm 25mm 25mm; }
+  .doc-container { max-width: 17cm; margin: 0 auto; }
+  .doc-container p { max-width: 100%; overflow-wrap: break-word; }
+</style>
+<div class="doc-container" style="font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000;">
+
+<p style="text-align: center; font-weight: bold; font-size: 14pt; text-transform: uppercase;">ДОГОВОР № {{contract_number}}</p>
+<p style="text-align: center; font-weight: bold; font-size: 14pt; text-transform: uppercase;">ПРОКАТА (АРЕНДЫ) ЭКИПИРОВКИ</p>
+
+<table style="width: 100%; border: none; margin-top: 12pt;">
+<tr><td style="border: none; width: 50%;">г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">«{{day}}» {{month_num}} {{year}}г.</td></tr>
+</table>
+
+<!-- Quick-info box for fast verification -->
+<table style="width: 100%; border: 2px solid #333; margin-top: 12pt; margin-bottom: 12pt; font-size: 11pt;">
+<tr><td style="border: 1px solid #999; padding: 4pt 8pt; font-weight: bold; background: #f0f0f0;" colspan="2">КРАТКАЯ ИНФОРМАЦИЯ</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; width: 40%;">Арендатор:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{renter_full_name}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Период:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{rent_start_date}} {{rent_start_time}} — {{rent_end_date}} {{rent_end_time}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Тариф:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{daily_price_rub}} ₽/сутки</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Итого к оплате:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{subtotal_rub}} ₽</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Залог (депозит):</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{deposit_rub}} ₽</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Телефон:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{renter_phone}}</td></tr>
+</table>
+
+<p style="text-align: justify;">Мотосалон ВипБайкЭлектро, именуемый в дальнейшем «Арендодатель», в лице ИП Воробьева Р.В., действующий на основании ОГРНИП: 326527500025145, с одной стороны, и {{renter_full_name}}, именуемый в дальнейшем «Арендатор», с другой стороны, совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:</p>
+
+<p style="text-align: center; font-weight: bold;">1. Термины и предмет договора</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">1.1. По настоящему Договору Арендодатель предоставляет Арендатору за плату во временное владение и пользование экипировку и защитные средства (далее – «Экипировка»), перечисленные в Приложении № 1, а Арендатор принимает Экипировку и обязуется уплачивать арендную плату и соблюдать условия Договора.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">1.2. Экипировка, предоставляемая по настоящему Договору:</p>
+{{equipment_list}}
+
+<p style="text-indent: 1.25cm; text-align: justify;">1.3. Арендатор уведомлен и согласен, что Экипировка предоставляется без оказания услуг по управлению транспортным средством. Настоящий Договор является договором проката (в части отношений с потребителем) и договором аренды.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">1.4. Арендатор подтверждает, что Экипировка получена в исправном состоянии, пригодном для использования, а все выявленные при приемке видимые недостатки/повреждения/износ отражены в Акте приема-передачи (Приложение № 1).</p>
+
+<p style="text-align: center; font-weight: bold;">2. Срок аренды</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">2.1. Срок аренды: с «{{rent_start_date}}» {{rent_start_time}} по «{{rent_end_date}}» {{rent_end_time}}.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">2.2. Продление срока аренды допускается по согласованию Сторон, в том числе посредством сообщений в мессенджерах/СМС, при условии внесения оплаты за продление.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">2.3. Возврат Экипировки осуществляется по адресу: {{return_address}}, если Стороны письменно не согласовали иное.</p>
+
+<p style="text-align: center; font-weight: bold;">3. Порядок передачи и возврата. Осмотр</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">3.1. Передача Экипировки осуществляется по Акту приема – передачи и осмотра (Приложение №1) с фото- и/или видеофиксацией состояния Экипировки.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">3.2. Подписывая Акт приема – передачи, Арендатор подтверждает, что Экипировка получена в исправном состоянии, пригодном для использования, а все выявленные при приемке видимые недостатки/повреждения/износ отражены в Акте. Повреждения, не указанные в Акте передачи, презюмируются возникшими в период аренды, если Арендатор не докажет иное.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">3.3. Возврат Экипировки оформляется Актом возврата (в составе Приложения № 1) с осмотром и фиксацией состояния. Арендодатель вправе выявить скрытые повреждения при последующем осмотре.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">3.4. В случае отказа/уклонения Арендатора от подписания Акта возврата/осмотра, Арендодатель вправе составить односторонний акт с фото- и/или видеофиксацией.</p>
+
+<p style="text-align: center; font-weight: bold;">4. Арендная плата и обеспечительный платеж</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">4.1. Размер арендной платы: {{daily_price_rub}} руб. за сутки. Итого к оплате: {{subtotal_rub}} руб.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">4.2. Арендная плата оплачивается авансом до передачи Экипировки, если Стороны не согласовали иное.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">4.3. Обеспечительный платеж (депозит): {{deposit_rub}} руб., вносится до передачи Экипировки. Обеспечительный платеж является обеспечением денежного обязательства, включая обязанность возместить убытки и/или уплатить неустойку.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">4.4. При наступлении обстоятельств, предусмотренных Договором (в т.ч. повреждение/утрата Экипировки, просрочка возврата, задолженность по арендной плате), Арендодатель вправе зачесть обеспечительный платеж в счет соответствующих требований.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">4.5. При отсутствии оснований для зачета обеспечительный платеж возвращается Арендатору в течение 3 (трех) рабочих дней после подписания Акта возврата.</p>
+
+<p style="text-align: center; font-weight: bold;">5. Обязанности и запреты для Арендатора</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">5.1. Арендатор обязуется использовать Экипировку бережно, соблюдать требования безопасности и инструкции по эксплуатации (при наличии).</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">5.2. Запрещается:</p>
+<ul style="margin: 0 0 0 2.5cm; padding: 0; text-align: justify; list-style-type: '- ';">
+<li>передавать Экипировку третьим лицам;</li>
+<li>использовать Экипировку не по назначению;</li>
+<li>выполнять разборку, ремонт, изменение конструкции Экипировки;</li>
+<li>использовать агрессивные химические средства для чистки;</li>
+<li>оставлять Экипировку без присмотра на длительное время.</li>
+</ul>
+
+<p style="text-indent: 1.25cm; text-align: justify;">5.3. Арендатор обязан принимать меры против утраты (не оставлять без присмотра, хранить в надлежащем месте).</p>
+
+<p style="text-align: center; font-weight: bold;">6. Ответственность Арендатора</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">6.1. Арендатор несет ответственность за нарушение обязательств по Договору и обязан возместить Арендодателю убытки в полном объеме.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">6.2. С момента подписания Акта передачи и до подписания Акта возврата риск случайной гибели, утраты или повреждения Экипировки несет Арендатор.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">6.3. При любом повреждении Экипировки в период аренды Арендатор обязан по требованию Арендодателя возместить:</p>
+<ul style="margin: 0 0 0 2.5cm; padding: 0; text-align: justify; list-style-type: '- ';">
+<li>стоимость восстановительного ремонта (работы и запчасти);</li>
+<li>стоимость диагностики;</li>
+<li>расходы на экспертизу/оценку;</li>
+<li>иные документально подтвержденные расходы Арендодателя.</li>
+</ul>
+
+<p style="text-indent: 1.25cm; text-align: justify;">6.4. Размер подлежащих оплате сумм определяется по выбору Арендодателя:</p>
+<ul style="margin: 0 0 0 2.5cm; padding: 0; text-align: justify; list-style-type: '- ';">
+<li>по прайсу типовых повреждений/утрат (Приложение № 2);</li>
+<li>по счету/заказ-наряду;</li>
+<li>по калькуляции независимого эксперта.</li>
+</ul>
+
+<p style="text-indent: 1.25cm; text-align: justify;">6.5. При утрате Экипировки или ее тотальной гибели (ремонт экономически нецелесообразен), Арендатор обязан возместить стоимость Экипировки, указанную в Приложении № 2.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">6.6. Если вследствие действий/риска Арендатора Экипировка не может быть сдана в аренду (в ремонте, ожидании запчастей), Арендатор уплачивает убытки в виде упущенной выгоды/платы за простой по тарифу {{daily_price_rub}} руб. за сутки.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">6.7. Все штрафы и расходы, возникшие в период аренды в связи с действиями/бездействием Арендатора, оплачиваются Арендатором в полном объеме.</p>
+
+<p style="text-align: center; font-weight: bold;">7. Ответственность Арендодателя</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">7.1. Арендодатель отвечает за передачу Экипировки в состоянии, пригодном для использования по назначению, и за недостатки Экипировки, существовавшие до передачи.</p>
+
+<p style="text-align: center; font-weight: bold;">8. Форс-мажор</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">8.1. Стороны освобождаются от ответственности за частичное или полное неисполнение обязательств по Договору, если оно явилось следствием обстоятельств непреодолимой силы.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">8.2. Отсутствие денежных средств у Арендатора не является форс–мажором.</p>
+
+<p style="text-align: center; font-weight: bold;">9. Расторжение и односторонний отказ</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">9.1. Арендодатель вправе потребовать немедленного возврата Экипировки и отказаться от исполнения Договора при существенном нарушении Арендатором условий.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">9.2. При досрочном прекращении аренды по вине Арендатора арендная плата за фактически использованный период не возвращается.</p>
+
+<p style="text-align: center; font-weight: bold;">10. Персональные данные</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">10.1. Арендатор дает согласие на обработку персональных данных для целей заключения и исполнения Договора, взыскания задолженности/убытков.</p>
+
+<p style="text-align: center; font-weight: bold;">11. Урегулирование споров</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">11.1. Претензионный порядок обязателен: срок рассмотрения претензии – 10 календарных дней со дня получения.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">11.2. Споры подлежат рассмотрению судом в соответствии с правилами подсудности, установленными законодательством РФ.</p>
+
+<p style="text-align: center; font-weight: bold;">12. Заключительные положения</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">12.1. Договор заключен в письменной форме. Электронная переписка в мессенджерах/СМС/e-mail признается юридически значимой.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">12.2. Приложения №1 – 2 являются неотъемлемой частью Договора.</p>
+
+<p style="text-align: center; font-weight: bold;">13. Реквизиты и подписи сторон</p>
+
+<table style="width: 100%; border: none; margin-top: 12pt;">
+<tr>
+<td style="border: none; width: 50%; vertical-align: top;"><b>Арендодатель:</b><br>
+Мотосалон ВипБайкЭлектро<br>
+ИП Воробьев Р. В.<br>
+Адрес: {{lessor_address}}<br>
+ОГРНИП: 326527500025145<br>
+ИНН: 525813643035<br>
+р/сч 40802810942710013083<br>
+Волго-Вятский Банк ПАО Сбербанк<br>
+г. Нижний Новгород<br>
+к/сч 30101810900000000603<br>
+Менеджер Мотосалона</td>
+<td style="border: none; width: 50%; vertical-align: top;"><b>Арендатор:</b><br>
+ФИО: {{renter_full_name}}<br>
+Паспорт: {{renter_passport}}<br>
+Дата выдачи: {{renter_passport_issue_date}}<br>
+Прописка: {{renter_registration}}</td>
+</tr>
+</table>
+
+<table style="width: 100%; border: none; margin-top: 6pt;">
+<tr>
+<td style="border: none; width: 50%; text-align: center;">_________________ / _______________</td>
+<td style="border: none; width: 50%; text-align: center;">_________________ / _______________</td>
+</tr>
+<tr>
+<td style="border: none; width: 50%; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О.)</td>
+<td style="border: none; width: 50%; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О. Арендатора)</td>
+</tr>
+</table>
+
+<hr style="border: none; border-top: 1px solid #000; margin: 24pt 0 12pt 0;">
+
+<div style="page-break-before: always;"></div>
+<p style="text-align: right;">ПРИЛОЖЕНИЕ №1</p>
+<p style="text-align: right;">к Договору проката (аренды) экипировки от {{day}}.{{month_num}}.{{year}}г.</p>
+
+<p style="text-align: center; font-weight: bold;">АКТ</p>
+<p style="text-align: center; font-weight: bold;">приема-передачи и осмотра экипировки (выдача/возврат)</p>
+
+<table style="width: 100%; border: none; margin-top: 12pt;">
+<tr><td style="border: none; width: 50%;">г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">«{{day}}» {{month_num}} {{year}}г.</td></tr>
+</table>
+
+<p style="text-align: justify;">Мотосалон ВипБайкЭлектро, именуемый в дальнейшем «Арендодатель», в лице ИП Воробьева Р.В., действующий на основании ОГРНИП: 326527500025145, с одной стороны, и {{renter_full_name}}, именуемый в дальнейшем «Арендатор», с другой стороны, совместно именуемые «Стороны», составили настоящий Акт о нижеследующем:</p>
+
+<p style="text-align: justify;">1. Дата и время передачи: «{{rent_start_date}}» {{rent_start_time}}</p>
+<p style="text-align: justify;">2. Дата и время возврата: «{{rent_end_date}}» {{rent_end_time}}</p>
+<p style="text-align: justify;">3. Передаваемая экипировка: {{equipment_summary}}</p>
+<p style="text-align: justify;">4. Повреждения при передаче: ____________________________</p>
+<p style="text-align: justify;">5. Состояние при передаче (описать, приложить фото/видео): {{damage_notes_at_delivery}}</p>
+<p style="text-align: justify;">6. Состояние при возврате (описать, приложить фото/видео): {{damage_notes_at_return}}</p>
+<p style="text-align: justify;">7. Фото/видео материалы: {{media_links}}</p>
+
+<p style="font-weight: bold; text-align: center;">Подписи сторон:</p>
+<table style="width: 100%; border: none; margin-top: 6pt;">
+<tr>
+<td style="border: none; width: 50%; text-align: center;">АРЕНДОДАТЕЛЬ</td>
+<td style="border: none; width: 50%; text-align: center;">АРЕНДАТОР</td>
+</tr>
+<tr>
+<td style="border: none; width: 50%;">_____________________/_______________/</td>
+<td style="border: none; width: 50%;">_____________________/_______________/</td>
+</tr>
+<tr>
+<td style="border: none; width: 50%;">(подпись)&emsp;(ФИО)</td>
+<td style="border: none; width: 50%;">(подпись)&emsp;(ФИО)</td>
+</tr>
+</table>
+
+<hr style="border: none; border-top: 1px solid #000; margin: 24pt 0 12pt 0;">
+
+<div style="page-break-before: always;"></div>
+<p style="text-align: right;">ПРИЛОЖЕНИЕ №2</p>
+<p style="text-align: right;">к Договору проката (аренды) экипировки от {{day}}.{{month_num}}.{{year}}г.</p>
+
+<p style="text-align: center; font-weight: bold;">Стоимость экипировки и прайс типовых повреждений/утрат</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">1. Стоимость экипировки для целей возмещения при утрате/тотальной гибели определяется по прайсу-стоимости каждого предмета.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">2. Тарифы аренды: {{daily_price_rub}} руб./сутки</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">3. Прайс типовых повреждений/утрат:</p>
+
+<table style="width: 100%; border-collapse: collapse; margin-left: 1.25cm;">
+<tr style="border: 1px solid #000;"><th style="border: 1px solid #000; padding: 4pt; width: 60%;">Предмет</th><th style="border: 1px solid #000; padding: 4pt; width: 40%;">Стоимость (руб.)</th></tr>
+{{equipment_price_list}}
+</table>
+
+<p style="text-indent: 1.25cm; text-align: justify;">4. Арендодатель вправе дополнять прайс при появлении новых позиций. Если повреждение не отражено в прайсе, расчет производится по п. 6.4 Договора.</p>
+
+<p style="text-align: justify;">С настоящим приложением ознакомлен</p>
+<table style="width: 100%; border: none; margin-top: 6pt;">
+<tr>
+<td style="border: none; width: 50%; text-align: right; padding-right: 12pt;">_____________/_______________&emsp;</td>
+<td style="border: none; width: 50%;">(подпись)&emsp;(ФИО)</td>
+</tr>
+</table>
+
+<hr style="border: none; border-top: 1px solid #000; margin: 24pt 0 12pt 0;">
+
+<div style="page-break-before: always;"></div>
+<p style="text-align: right;">ПРИЛОЖЕНИЕ №2 (продолжение)</p>
+<p style="text-align: right;">к Договору проката (аренды) экипировки {{contract_number}} от {{day}}.{{month_num}}.{{year}}г.</p>
+
+<p style="text-align: center; font-weight: bold;">СОГЛАСИЕ</p>
+<p style="text-align: center; font-weight: bold;">на обработку персональных данных</p>
+
+<table style="width: 100%; border: none; margin-top: 12pt;">
+<tr><td style="border: none; width: 50%;">&emsp;&emsp;&emsp;г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">«{{day}}» {{month_num}} {{year}}г.</td></tr>
+</table>
+
+<p style="text-align: justify;">&emsp;&emsp;&emsp;Я, {{renter_full_name}}, дата рождения: {{renter_birth_date}}, паспорт: {{renter_passport}},</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;Дата выдачи: {{renter_passport_issue_date}}г., телефон: {{renter_phone}}, e-mail: {{renter_email}}, даю свое согласие Оператору персональных данных – ИП Воробьев Р. В., ОГРНИП 326527500025145, ИНН 525813643035, адрес: {{lessor_address}}, далее – «Оператор», – на обработку моих персональных данных в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных» свободно, своей волей и в своем интересе.</p>
+
+<p style="text-align: justify;">&emsp;&emsp;&emsp;<b>Цели обработки персональных данных:</b></p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;1. Заключение и исполнение Договора проката (аренды) экипировки, включая выдачу/возврат, идентификацию Арендатора, учет платежей.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;2. Обеспечение сохранности имущества Оператора (экипировки), фиксация нарушений условий Договора.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;3. Исполнение обязанностей Оператора по законодательству РФ.</p>
+
+<p style="text-align: justify;">&emsp;&emsp;&emsp;<b>Согласие дается на обработку следующих персональных данных:</b></p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;1. Фамилия, имя, отчество; дата и место рождения.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;2. Паспортные данные, адрес регистрации/проживания.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;3. Контактные данные: телефон, e-mail.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;4. Сведения об использовании Экипировки, фото/видео материалы.</p>
+
+<p style="text-align: justify;">&emsp;&emsp;&emsp;Согласие дается на совершение следующих действий с персональными данными: сбор, запись, систематизация, накопление, хранение, уточнение, извлечение, использование, передача, обезличивание, блокирование, удаление, уничтожение.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;Обработка осуществляется с использованием средств автоматизации и без их использования.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;Я даю согласие на передачу моих персональных данных следующим категориям получателей: сервисы приема платежей/банки; юристы/представители; бухгалтерские и IT-подрядчики.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;Настоящее согласие действует в течение срока действия Договора и в течение 5 (пяти) лет после его прекращения.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;Согласие может быть отозвано мной путем направления Оператору письменного заявления.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;Подпись подтверждает согласие с изложенными условиями.</p>
+
+<table style="width: 100%; border: none; margin-top: 12pt; margin-left: auto; margin-right: auto; max-width: 500px;">
+<tr>
+<td style="border: none; width: 50%; text-align: right; padding-right: 12pt;">_______________________ / _________________________&emsp;</td>
+<td style="border: none; width: 50%; text-align: left;">(подпись)&emsp;(ФИО)</td>
+</tr>
+</table>
+
+</div>
