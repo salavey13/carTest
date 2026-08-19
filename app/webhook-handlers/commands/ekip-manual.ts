@@ -41,11 +41,10 @@
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
-import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
+import { sendTelegramDocument } from "@/app/actions";
 import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
-import { randomUUID } from "crypto";
-import { convertTextDateToTimestamp, resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
 import { loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrew } from "../lib/crew-access";
+import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets } from "@/app/lib/rental-contract-vars";
 
 // Reuse utilities from doc-manual
 function escapeHtml(s: unknown): string {
@@ -254,7 +253,7 @@ function buildPaymentSplitKeyboard(totalAmount: number): KeyboardButton[][] {
   ];
 }
 
-function buildDepositChoiceKeyboard(depositAmount: string, equipment?: EquipmentItem): KeyboardButton[][] {
+function buildDepositChoiceKeyboard(depositAmount: string, equipment?: EquipmentItem | null): KeyboardButton[][] {
   const amount = Number(depositAmount) || 5000;
   const formatted = amount.toLocaleString("ru-RU");
   const eqLabel = equipment ? ` (${equipment.make} ${equipment.model})` : "";
@@ -1172,6 +1171,50 @@ export async function handleEkipCallback(
 
 // ── Contract generation ─────────────────────────────────────────────────────
 
+/**
+ * Load crew secrets for contract defaults with fallbacks (mirrors doc-manual).
+ */
+async function loadEkipCrewSecrets(crewSlug: string): Promise<RentalCrewSecrets> {
+  const fallbacks: Record<string, string> = {
+    organizationName: "Мотосалон ВипБайкЭлектро",
+    organizationShort: "ИП Воробьев Р.В.",
+    organizationRepresentative: "ИП Воробьев Р.В.",
+    issuerRepresentative: "Сидоров Илья Олегович",
+    ogrnip: "326527500025145",
+    inn: "525813643035",
+    bankAccount: "40802810942710013083",
+    bankName: "Волго-Вятский Банк ПАО Сбербанк",
+    bankCity: "г. Нижний Новгород",
+    bankCorrAccount: "30101810900000000603",
+    email: "vip_bike@mail.ru",
+    legalAddress: "г. Нижний Новгород, пл. Комсомольская 2",
+    issuerName: "Воробьев Р.В.",
+    signatoryRole: "Менеджер Мотосалона",
+    returnAddress: "г. Нижний Новгород, пл. Комсомольская 2",
+  };
+
+  const merged = await loadCrewSecretsShared(crewSlug, fallbacks);
+
+  return {
+    organizationName: merged.organizationName || fallbacks.organizationName,
+    organizationShort: merged.organizationShort || fallbacks.organizationShort,
+    ogrnip: merged.ogrnip || fallbacks.ogrnip,
+    inn: merged.inn || fallbacks.inn,
+    bankAccount: merged.bankAccount || fallbacks.bankAccount,
+    bankName: merged.bankName || fallbacks.bankName,
+    bankCity: merged.bankCity || fallbacks.bankCity,
+    bankCorrAccount: merged.bankCorrAccount || fallbacks.bankCorrAccount,
+    email: merged.email || fallbacks.email,
+    legalAddress: merged.legalAddress || fallbacks.legalAddress,
+    issuerName: merged.issuerName || fallbacks.issuerName,
+    signatoryRole: merged.signatoryRole || fallbacks.signatoryRole,
+    organizationRepresentative: merged.organizationRepresentative || fallbacks.organizationRepresentative,
+    issuerRepresentative: merged.issuerRepresentative || merged.organizationRepresentative || fallbacks.organizationRepresentative,
+    returnAddress: merged.returnAddress || fallbacks.returnAddress,
+    contractDefaults: merged,
+  };
+}
+
 async function generateContract(chatId: number, userId: string, context: EkipFlowContext): Promise<boolean> {
   try {
     const equipment = await resolveEquipmentById(context.equipmentId);
@@ -1188,37 +1231,87 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
 
     if (isRent) {
       const dailyPrice = Number(equipment.specs?.daily_price || equipment.specs?.rent_weekday || 1000);
-      const start = parseRuDateTime(context.rentStartDate, context.rentStartTime);
-      const end = parseRuDateTime(context.rentEndDate, context.rentEndTime);
-      const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60) * 10) / 10);
-      const days = Math.max(1, Math.ceil(hours / 24));
+      // Use the shared builder (same as web-app and /doc) so the template
+      // variables are always complete and consistent.
+      const crewSecrets = await loadEkipCrewSecrets(crewSlug);
+      const depositNum = Number(context.depositOverride || equipment.specs?.deposit_rub || 5000);
+
+      // Compute rental cost the same way the bot showed the operator (rent days × rate).
+      let rentalDays = 1;
+      try {
+        const s = parseRuDateTime(context.rentStartDate, context.rentStartTime);
+        const e = parseRuDateTime(context.rentEndDate, context.rentEndTime);
+        const hours = Math.max(1, Math.round(((e.getTime() - s.getTime()) / (1000 * 60 * 60)) * 10) / 10);
+        rentalDays = Math.max(1, Math.ceil(hours / 24));
+      } catch {
+        rentalDays = 1;
+      }
       const totalCost = context.priceOverridden
         ? (context.cashAmount || 0) + (context.bankAmount || 0)
-        : dailyPrice * days;
+        : dailyPrice * rentalDays;
 
-      vars = {
-        contract_number: `${now.getDate()}.${now.getMonth() + 1}/${equipment.id}`,
-        day: String(now.getDate()).padStart(2, "0"),
-        month: now.toLocaleString("ru-RU", { month: "long" }),
-        month_num: String(now.getMonth() + 1).padStart(2, "0"),
-        year: String(now.getFullYear()),
-        renter_full_name: context.mpFullName || "",
-        renter_passport: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim(),
-        renter_passport_issued_by: context.mpIssuedBy || "",
-        renter_passport_issue_date: context.mpIssueDate || "",
-        renter_birth_date: context.mpBirthDate || "",
-        renter_registration: context.mpRegistration || "",
-        equipment_name: `${equipment.make} ${equipment.model}`,
-        rent_start_date: context.rentStartDate || "",
-        rent_start_time: context.rentStartTime || "10:00",
-        rent_end_date: context.rentEndDate || "",
-        rent_end_time: context.rentEndTime || "10:00",
-        daily_price: String(dailyPrice),
-        total_sum: String(totalCost),
-        deposit_rub: context.depositOverride || "5000",
-        signature_timestamp: now.toLocaleString("ru-RU"),
-        document_key: `ekip-rental-${equipment.id}-${Date.now()}`,
-      };
+      vars = buildRentalContractVariables({
+        renter: {
+          fullName: context.mpFullName || "",
+          birthDate: context.mpBirthDate || "",
+          phone: context.clientPhone || "",
+          email: "",
+          passportSeries: context.mpSeries,
+          passportNumber: context.mpNumber,
+          passportIssueDate: context.mpIssueDate,
+          passportIssuedBy: context.mpIssuedBy,
+          registration: context.mpRegistration,
+        },
+        bike: {
+          id: equipment.id,
+          make: equipment.make,
+          model: equipment.model,
+          type: "equipment",
+          specs: equipment.specs,
+        },
+        period: {
+          startDate: context.rentStartDate || "",
+          startTime: context.rentStartTime || "10:00",
+          endDate: context.rentEndDate || "",
+          endTime: context.rentEndTime || "10:00",
+          dailyPrice,
+          depositOverride: context.depositOverride ? Number(context.depositOverride) : undefined,
+        },
+        crewSecrets,
+        meta: {
+          signatureTimestamp: now.toLocaleString("ru-RU"),
+          signatureFingerprint: "manual-telegram-ekip",
+          renterSignature: "согласие через Telegram",
+          documentKey: `ekip-rental-${equipment.id}-${Date.now()}`,
+          contractNumber: `${now.getDate()}.${now.getMonth() + 1}/${equipment.id}`,
+        },
+        equipmentMode: true,
+        equipmentItems: [
+          {
+            id: equipment.id,
+            make: equipment.make,
+            model: equipment.model,
+            dailyPrice,
+            specs: {
+              material: equipment.specs?.category,
+            },
+          },
+        ],
+        paymentSplit: {
+          cashAmount: context.cashAmount || 0,
+          bankAmount: context.bankAmount || 0,
+        },
+        // Keep contract total consistent with what the operator confirmed
+        priceBreakdown: {
+          totalRub: totalCost,
+          basePriceRub: totalCost,
+          helmetRub: 0,
+          depositRub: depositNum,
+          savingsRub: 0,
+          savingsPercent: 0,
+          tier: "сутки",
+        },
+      });
     } else {
       const salePrice = context.salePrice || String(equipment.specs?.sale_price || "5000");
       vars = {
@@ -1233,6 +1326,7 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
         buyer_passport_issue_date: context.mpIssueDate || "",
         buyer_birth_date: context.mpBirthDate || "",
         buyer_registration: context.mpRegistration || "",
+        buyer_phone: context.clientPhone || "",
         equipment_name: `${equipment.make} ${equipment.model}`,
         price_digits: salePrice,
         price_words: numberToWords(Number(salePrice)),
