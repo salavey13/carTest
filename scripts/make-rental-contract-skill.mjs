@@ -634,10 +634,19 @@ const vars = {
   equipment_net: arg('net') === '1' ? 'да' : 'нет',
   equipment_backpack: arg('backpack') === '1' ? 'да' : 'нет',
   equipment_bag: arg('bag') === '1' ? 'да' : 'нет',
-  // Equipment cost
+  // 2026-08-19 review: added jacket/pants/boots flags (were missing —
+  // the /doc flow has them but the skill script didn't). Also added
+  // priceOverride flag so the skill can reproduce the /doc override flow.
+  equipment_jacket: arg('jacket') === '1' ? 'да' : 'нет',
+  equipment_pants: arg('pants') === '1' ? 'да' : 'нет',
+  equipment_boots: arg('boots') === '1' ? 'да' : 'нет',
+  // Equipment cost (jacket/pants/boots = 500₽ each, same as gloves)
   equipment_total_cost: String(
     Number(arg('helmets', '0')) * 1000 +
     Number(arg('gloves', '0')) * 500 +
+    (arg('jacket') === '1' ? 500 : 0) +
+    (arg('pants') === '1' ? 500 : 0) +
+    (arg('boots') === '1' ? 500 : 0) +
     (arg('charger') === '1' ? 0 : 0) +
     (arg('net') === '1' ? 500 : 0) +
     (arg('backpack') === '1' ? 500 : 0) +
@@ -649,27 +658,50 @@ const vars = {
     const g = Number(arg('gloves', '0'));
     if (h > 0) parts.push(`Шлем ×${h}`);
     if (g > 0) parts.push(`Перчатки ×${g}`);
+    if (arg('jacket') === '1') parts.push('Куртка');
+    if (arg('pants') === '1') parts.push('Штаны');
+    if (arg('boots') === '1') parts.push('Ботинки');
     if (arg('charger') === '1') parts.push('Зарядка');
     if (arg('net') === '1') parts.push('Сетка');
     if (arg('backpack') === '1') parts.push('Рюкзак');
     if (arg('bag') === '1') parts.push('Сумка');
     return parts.length > 0 ? parts.join(', ') : '—';
   })(),
-  // totalPayable = base rent + equipment + deposit
+  // 2026-08-19 review: priceOverride — when set, overrides rent+equipment total.
+  // deposit is added on top. Total = override + deposit.
+  price_override_note: arg('priceOverride') ? 'Цена аренды изменена оператором вручную.' : '',
+  deposit_payment_method: arg('depositMethod', 'наличными'),
+  // totalPayable = base rent + equipment + deposit (or override + deposit)
   subtotal_rub: String(
-    subtotalRounded +
-    Number(arg('helmets', '0')) * 1000 +
-    Number(arg('gloves', '0')) * 500 +
-    (arg('charger') === '1' ? 0 : 0) +
-    (arg('net') === '1' ? 500 : 0) +
-    (arg('backpack') === '1' ? 500 : 0) +
-    (arg('bag') === '1' ? 500 : 0) +
-    Number(bikeDeposit)
+    arg('priceOverride')
+      ? Number(arg('priceOverride')) + Number(bikeDeposit)
+      : subtotalRounded +
+        Number(arg('helmets', '0')) * 1000 +
+        Number(arg('gloves', '0')) * 500 +
+        (arg('jacket') === '1' ? 500 : 0) +
+        (arg('pants') === '1' ? 500 : 0) +
+        (arg('boots') === '1' ? 500 : 0) +
+        (arg('charger') === '1' ? 0 : 0) +
+        (arg('net') === '1' ? 500 : 0) +
+        (arg('backpack') === '1' ? 500 : 0) +
+        (arg('bag') === '1' ? 500 : 0) +
+        Number(bikeDeposit)
   ),
   deposit_rub: bikeDeposit,
-  // Payment split — default: cash = deposit, bank = rent + equipment
-  payment_cash_rub: String(Number(bikeDeposit)),
-  payment_bank_rub: String(subtotalRounded + Number(arg('helmets', '0')) * 1000 + Number(arg('gloves', '0')) * 500 + (arg('charger') === '1' ? 0 : 0) + (arg('net') === '1' ? 500 : 0) + (arg('backpack') === '1' ? 500 : 0) + (arg('bag') === '1' ? 500 : 0)),
+  // Payment split — when overridden: all cash (override + deposit); else: deposit=cash, rent+equipment=bank
+  payment_cash_rub: String(
+    arg('priceOverride')
+      ? Number(arg('priceOverride')) + Number(bikeDeposit)
+      : Number(bikeDeposit)
+  ),
+  payment_bank_rub: String(
+    arg('priceOverride')
+      ? 0
+      : subtotalRounded + Number(arg('helmets', '0')) * 1000 + Number(arg('gloves', '0')) * 500 +
+        (arg('jacket') === '1' ? 500 : 0) + (arg('pants') === '1' ? 500 : 0) + (arg('boots') === '1' ? 500 : 0) +
+        (arg('charger') === '1' ? 0 : 0) + (arg('net') === '1' ? 500 : 0) +
+        (arg('backpack') === '1' ? 500 : 0) + (arg('bag') === '1' ? 500 : 0)
+  ),
   included_mileage:'200', overage_rate:'35', included_km_per_day:'200', extra_km_fee_rub:'35',
   late_return_penalty_rub: arg('latePenalty','10000'),
   late_return_penalty_max_days: arg('latePenaltyMaxDays','90'),
