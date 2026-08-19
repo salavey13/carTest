@@ -1,1 +1,2 @@
 "rental_id","vehicle_id","bike_make","bike_model","user_id","status","payment_status","start_date","end_date","duration_days","total_cost","deposit_amount","deposit_method","deposit_collected_at","deposit_returned","delivery_address","is_active_today","is_upcoming","created_at","crew_id"
+"a85eb52e-1dc5-496b-8e79-b6b075b75789","kawasaki-ex650k","Kawasaki","EX650K (Ninja 650)","356282674","active","fully_paid","2026-08-19 16:00","2026-08-20 16:00","1.0","10000","0","","","false","","true","","2026-08-19 10:42","2d5fde70-1dd3-4f0d-8d72-66ccf6908746"
