@@ -1,0 +1,177 @@
+<!-- /docs/EQUIPMENT_SALE_DEAL_TEMPLATE.html -->
+<!-- Equipment sale deal contract template for VIP Bike -->
+<!-- Used by /ekip (Telegram) sale flow and web-app equipment purchase -->
+<style>
+  @page { size: A4; margin: 20mm 20mm 25mm 25mm; }
+  .doc-container { max-width: 17cm; margin: 0 auto; }
+  .doc-container p { max-width: 100%; overflow-wrap: break-word; }
+</style>
+<div class="doc-container" style="font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000;">
+
+<p style="text-align: center; font-weight: bold; font-size: 14pt; text-transform: uppercase;">ДОГОВОР № {{contract_number}}</p>
+<p style="text-align: center; font-weight: bold; font-size: 14pt; text-transform: uppercase;">КУПЛИ-ПРОДАЖИ ЭКИПИРОВКИ</p>
+
+<table style="width: 100%; border: none; margin-top: 12pt;">
+<tr><td style="border: none; width: 50%;">г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">«{{day}}» {{month_num}} {{year}}г.</td></tr>
+</table>
+
+<!-- Quick-info box for fast verification -->
+<table style="width: 100%; border: 2px solid #333; margin-top: 12pt; margin-bottom: 12pt; font-size: 11pt;">
+<tr><td style="border: 1px solid #999; padding: 4pt 8pt; font-weight: bold; background: #f0f0f0;" colspan="2">КРАТКАЯ ИНФОРМАЦИЯ</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt; width: 40%;">Покупатель:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{buyer_full_name}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Товар:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{equipment_name}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Цена:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{price_digits}} ₽ ({{price_words}})</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Телефон:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{buyer_phone}}</td></tr>
+</table>
+
+<p style="text-align: justify;">Мотосалон ВипБайкЭлектро, именуемый в дальнейшем «Продавец», в лице ИП Воробьева Р.В., действующий на основании ОГРНИП: 326527500025145, с одной стороны, и {{buyer_full_name}}, именуемый в дальнейшем «Покупатель», с другой стороны, совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:</p>
+
+<p style="text-align: center; font-weight: bold;">1. Предмет договора</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">1.1. По настоящему Договору Продавец обязуется передать в собственность Покупателя, а Покупатель обязуется принять и оплатить экипировку и защитные средства (далее – «Экипировка»): {{equipment_name}}.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">1.2. Экипировка принадлежит Продавцу на праве собственности, не является предметом залога, право требования третьих лиц на нее отсутствует.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">1.3. Вместе с Экипировкой Продавец передает Покупателю документы и принадлежности, указанные в Акте приема-передачи.</p>
+
+<p style="text-align: center; font-weight: bold;">2. Цена и порядок расчетов</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">2.1. Стоимость Экипировки по настоящему Договору составляет {{price_digits}} ({{price_words}}) рублей 00 копеек, НДС – не облагается.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">2.2. Покупатель оплачивает стоимость Экипировки полностью наличными денежными средствами либо переводом на счет Продавца до момента передачи Экипировки, если Стороны не согласовали иной порядок.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">2.3. С момента полной оплаты Экипировка считается оплаченной и переходит в собственность Покупателя после подписания Акта приема-передачи (Приложение №1).</p>
+
+<p style="text-align: center; font-weight: bold;">3. Качество Экипировки</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">3.1. Продавец гарантирует, что Экипировка находится в исправном состоянии, пригодном для использования по назначению, и передает Покупателю всю известную информацию о характеристиках, особенностях эксплуатации и ограничениях.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">3.2. Покупатель подтверждает, что осмотрел Экипировку до заключения Договора, претензий по внешнему виду и комплектности не имеет. Возможные видимые недостатки, выявленные при осмотре, отражаются в Акте приема-передачи.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">3.3. Гарантийные обязательства устанавливаются изготовителем Экипировки. По вопросам гарантийного обслуживания Продавец оказывает Покупателю содействие в пределах гарантийного срока.</p>
+
+<p style="text-align: center; font-weight: bold;">4. Передача Экипировки</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">4.1. Передача Экипировки от Продавца к Покупателю осуществляется по Акту приема-передачи (Приложение №1) в день подписания Договора.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">4.2. Право собственности на Экипировку переходит к Покупателю с момента подписания Сторонами Акта приема-передачи. Риск случайной гибели или повреждения Экипировки переходит к Покупателю с того же момента.</p>
+
+<p style="text-align: center; font-weight: bold;">5. Ответственность Сторон</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">5.1. За неисполнение или ненадлежащее исполнение обязательств по Договору Стороны несут ответственность в соответствии с законодательством РФ.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">5.2. Споры, возникающие при исполнении Договора, разрешаются путем переговоров, при недостижении согласия – в суде в соответствии с подсудностью, установленной законодательством РФ.</p>
+
+<p style="text-align: center; font-weight: bold;">6. Заключительные положения</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">6.1. Договор заключен в письменной форме и вступает в силу с момента подписания. Электронная переписка в мессенджерах/СМС/e-mail признается юридически значимой.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">6.2. Приложения №1 – 2 являются неотъемлемой частью Договора.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">6.3. Договор составлен в двух экземплярах, имеющих равную юридическую силу.</p>
+
+<p style="text-align: center; font-weight: bold;">7. Реквизиты и подписи сторон</p>
+
+<table style="width: 100%; border: none; margin-top: 12pt;">
+<tr>
+<td style="border: none; width: 50%; vertical-align: top;"><b>Продавец:</b><br>
+Мотосалон ВипБайкЭлектро<br>
+ИП Воробьев Р. В.<br>
+Адрес: г. Нижний Новгород, пл. Комсомольская 2<br>
+ОГРНИП: 326527500025145<br>
+ИНН: 525813643035<br>
+Менеджер Мотосалона</td>
+<td style="border: none; width: 50%; vertical-align: top;"><b>Покупатель:</b><br>
+ФИО: {{buyer_full_name}}<br>
+Паспорт: {{buyer_passport}}<br>
+Дата выдачи: {{buyer_passport_issue_date}}<br>
+Кем выдан: {{buyer_passport_issued_by}}<br>
+Прописка: {{buyer_registration}}</td>
+</tr>
+</table>
+
+<table style="width: 100%; border: none; margin-top: 6pt;">
+<tr>
+<td style="border: none; width: 50%; text-align: center;">_________________ / _______________</td>
+<td style="border: none; width: 50%; text-align: center;">_________________ / _______________</td>
+</tr>
+<tr>
+<td style="border: none; width: 50%; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О.)</td>
+<td style="border: none; width: 50%; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О. Покупателя)</td>
+</tr>
+</table>
+
+<hr style="border: none; border-top: 1px solid #000; margin: 24pt 0 12pt 0;">
+
+<div style="page-break-before: always;"></div>
+<p style="text-align: right;">ПРИЛОЖЕНИЕ №1</p>
+<p style="text-align: right;">к Договору купли-продажи экипировки от {{day}}.{{month_num}}.{{year}}г.</p>
+
+<p style="text-align: center; font-weight: bold;">АКТ</p>
+<p style="text-align: center; font-weight: bold;">приема-передачи и осмотра экипировки</p>
+
+<table style="width: 100%; border: none; margin-top: 12pt;">
+<tr><td style="border: none; width: 50%;">г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">«{{day}}» {{month_num}} {{year}}г.</td></tr>
+</table>
+
+<p style="text-align: justify;">Мотосалон ВипБайкЭлектро, именуемый в дальнейшем «Продавец», в лице ИП Воробьева Р.В., действующий на основании ОГРНИП: 326527500025145, с одной стороны, и {{buyer_full_name}}, именуемый в дальнейшем «Покупатель», с другой стороны, составили настоящий Акт о нижеследующем:</p>
+
+<p style="text-align: justify;">1. Продавец передал, а Покупатель принял экипировку: {{equipment_name}}.</p>
+<p style="text-align: justify;">2. Стоимость экипировки: {{price_digits}} ({{price_words}}) рублей 00 копеек.</p>
+<p style="text-align: justify;">3. Экипировка осмотрена Покупателем, техническое состояние и комплектность проверены, претензий не имеется.</p>
+<p style="text-align: justify;">4. Расчеты между Сторонами произведены полностью.</p>
+
+<p style="font-weight: bold; text-align: center;">Подписи сторон:</p>
+<table style="width: 100%; border: none; margin-top: 6pt;">
+<tr>
+<td style="border: none; width: 50%; text-align: center;">ПРОДАВЕЦ</td>
+<td style="border: none; width: 50%; text-align: center;">ПОКУПАТЕЛЬ</td>
+</tr>
+<tr>
+<td style="border: none; width: 50%;">_____________________/_______________/</td>
+<td style="border: none; width: 50%;">_____________________/_______________/</td>
+</tr>
+<tr>
+<td style="border: none; width: 50%;">(подпись)&emsp;(ФИО)</td>
+<td style="border: none; width: 50%;">(подпись)&emsp;(ФИО)</td>
+</tr>
+</table>
+
+<hr style="border: none; border-top: 1px solid #000; margin: 24pt 0 12pt 0;">
+
+<div style="page-break-before: always;"></div>
+<p style="text-align: right;">ПРИЛОЖЕНИЕ №2</p>
+<p style="text-align: right;">к Договору купли-продажи экипировки {{contract_number}} от {{day}}.{{month_num}}.{{year}}г.</p>
+
+<p style="text-align: center; font-weight: bold;">СОГЛАСИЕ</p>
+<p style="text-align: center; font-weight: bold;">на обработку персональных данных</p>
+
+<table style="width: 100%; border: none; margin-top: 12pt;">
+<tr><td style="border: none; width: 50%;">&emsp;&emsp;&emsp;г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">«{{day}}» {{month_num}} {{year}}г.</td></tr>
+</table>
+
+<p style="text-align: justify;">&emsp;&emsp;&emsp;Я, {{buyer_full_name}}, дата рождения: {{buyer_birth_date}}, паспорт: {{buyer_passport}},</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;Дата выдачи: {{buyer_passport_issue_date}}г., телефон: {{buyer_phone}}, даю свое согласие Оператору персональных данных – ИП Воробьев Р. В., ОГРНИП 326527500025145, ИНН 525813643035, адрес: г. Нижний Новгород, пл. Комсомольская 2, далее – «Оператор», – на обработку моих персональных данных в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных» свободно, своей волей и в своем интересе.</p>
+
+<p style="text-align: justify;">&emsp;&emsp;&emsp;<b>Цели обработки персональных данных:</b></p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;1. Заключение и исполнение Договора купли-продажи экипировки, включая передачу/приемку, идентификацию Покупателя, учет платежей.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;2. Исполнение обязанностей Оператора по законодательству РФ.</p>
+
+<p style="text-align: justify;">&emsp;&emsp;&emsp;<b>Согласие дается на обработку следующих персональных данных:</b></p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;1. Фамилия, имя, отчество; дата и место рождения.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;2. Паспортные данные, адрес регистрации/проживания.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;3. Контактные данные: телефон, e-mail.</p>
+
+<p style="text-align: justify;">&emsp;&emsp;&emsp;Согласие дается на совершение следующих действий с персональными данными: сбор, запись, систематизация, накопление, хранение, уточнение, извлечение, использование, передача, обезличивание, блокирование, удаление, уничтожение.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;Обработка осуществляется с использованием средств автоматизации и без их использования.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;Настоящее согласие действует в течение 5 (пяти) лет после прекращения обязательств по Договору.</p>
+<p style="text-align: justify;">&emsp;&emsp;&emsp;Согласие может быть отозвано мной путем направления Оператору письменного заявления.</p>
+
+<table style="width: 100%; border: none; margin-top: 12pt; margin-left: auto; margin-right: auto; max-width: 500px;">
+<tr>
+<td style="border: none; width: 50%; text-align: right; padding-right: 12pt;">_______________________ / _________________________&emsp;</td>
+<td style="border: none; width: 50%; text-align: left;">(подпись)&emsp;(ФИО)</td>
+</tr>
+</table>
+
+</div>

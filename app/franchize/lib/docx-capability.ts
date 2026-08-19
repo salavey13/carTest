@@ -27,7 +27,7 @@ export interface BuildFranchizeDocxInput {
   fileName: string;
   template: string;
   variables: TemplateVariables;
-  flowType?: "rental" | "sale" | "subrental" | "mixed";
+  flowType?: "rental" | "sale" | "subrental" | "mixed" | "equipment_rental" | "equipment_sale";
   templateMode?: "md" | "html";
 }
 
