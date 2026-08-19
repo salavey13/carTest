@@ -391,6 +391,11 @@ const fetchAllBikeCandidates = async () => {
   const pageSize = 1000;
   let from = 0;
   const all = [];
+  // 2026-08-19 review: when --type equipment, also fetch 'equipment' items.
+  // Previously only fetched type IN ['bike', 'ebike'] — equipment items like
+  // the-meta-helmet (type='equipment') were never in the candidate list,
+  // causing the fuzzy matcher to pick the wrong bike.
+  const typeFilter = isEquipmentRental ? ['bike', 'ebike', 'equipment'] : ['bike', 'ebike'];
 
   while (true) {
     const to = from + pageSize - 1;
@@ -401,7 +406,7 @@ const fetchAllBikeCandidates = async () => {
       const response = await supabase
         .from('cars')
         .select('id,make,model,specs,type,crew_id')
-        .in('type', ['bike', 'ebike'])
+        .in('type', typeFilter)
         .range(from, to);
       data = response.data;
       error = response.error;
@@ -571,7 +576,12 @@ const bikeDailyPriceNum = Number(bikeDailyPrice);
 const bikeHourlyPrice = Number(explicitHourlyPrice) > 0 ? explicitHourlyPrice
   : Number(bike.specs?.price_per_hour) > 0 ? String(bike.specs.price_per_hour)
   : String(bikeDailyPriceNum > 0 ? Math.round(bikeDailyPriceNum / 8) : DEFAULT_HOURLY_PRICE);
-const bikeDeposit = Number(explicitDeposit) > 0 ? explicitDeposit
+// 2026-08-19 review: equipment rentals have NO deposit — user explicitly
+// said "there is no such thing as deposit for equipment". Set to '0'
+// when --type equipment is used, regardless of bike.specs.deposit_rub.
+const bikeDeposit = isEquipmentRental
+  ? '0'
+  : Number(explicitDeposit) > 0 ? explicitDeposit
   : Number(bike.specs?.deposit_rub) > 0 ? String(bike.specs.deposit_rub)
   : '20000';
 // Bike value for loss/total-loss compensation = sale price or market price
@@ -734,7 +744,24 @@ let doc;
 if (RENTAL_DOC_TEMPLATE_MODE === 'html') {
   let htmlTemplate;
   try {
-    htmlTemplate = readFileSync(RENTAL_DOC_HTML_TEMPLATE_PATH, 'utf8');
+    // 2026-08-19 review: check crew-specific template FIRST (has quick table
+    // at the top with period/tariff/equipment/total/payment/deposit/odometer/phone).
+    // Falls back to general template if crew-specific doesn't exist.
+    // For equipment rentals, use the EQUIPMENT_RENTAL template variant.
+    const templateSuffix = isEquipmentRental ? '_EQUIPMENT_RENTAL_DEAL_TEMPLATE.html' : '_RENTAL_DEAL_TEMPLATE.html';
+    const generalFallback = isEquipmentRental ? 'docs/EQUIPMENT_RENTAL_DEAL_TEMPLATE.html' : RENTAL_DOC_HTML_TEMPLATE_PATH;
+    if (resolvedCrewSlug) {
+      const crewTemplatePath = `docs/crewDocs/${resolvedCrewSlug}${templateSuffix}`;
+      try {
+        htmlTemplate = readFileSync(crewTemplatePath, 'utf8');
+        console.error(`[rental-doc] Using crew-specific HTML template: ${crewTemplatePath}`);
+      } catch {
+        htmlTemplate = readFileSync(generalFallback, 'utf8');
+        console.error(`[rental-doc] No crew-specific template for ${resolvedCrewSlug}, using general: ${generalFallback}`);
+      }
+    } else {
+      htmlTemplate = readFileSync(generalFallback, 'utf8');
+    }
   } catch (readError) {
     console.warn(`[rental-doc] html template read failed, fallback to md: ${String(readError?.message || readError)}`);
   }
