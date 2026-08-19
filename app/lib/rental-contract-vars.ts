@@ -575,6 +575,12 @@ export interface BuildRentalContractVariablesOptions {
     cashAmount: number;
     bankAmount: number;
   };
+  // 2026-08-19 review: when true, paymentSplit represents the operator's
+  // manual override of the rent+equipment total (excluding deposit). The
+  // template should use this value instead of recalculating from tiers.
+  priceOverridden?: boolean;
+  // Deposit payment method info (how the deposit was collected)
+  depositPaymentMethod?: string;
 }
 
 /**
@@ -671,8 +677,14 @@ export function buildRentalContractVariables(
     0;  // charger is free — tracked for return only, not priced
 
   // Total payable = base rent + equipment + deposit
+  // 2026-08-19 review: when operator overrode the price, use the override
+  // (cashAmount + bankAmount) as the rent+equipment total instead of
+  // recalculating from tiers. Deposit is added on top either way.
   const depositNum = Number(deposit);
-  const totalPayable = subtotalRounded + equipmentCostTotal + depositNum;
+  const rentAndEquipment = options.priceOverridden
+    ? (options.paymentSplit?.cashAmount || 0) + (options.paymentSplit?.bankAmount || 0)
+    : subtotalRounded + equipmentCostTotal;
+  const totalPayable = rentAndEquipment + depositNum;
 
   // Contract number - use meta or default format
   const contractNumber = meta.contractNumber || `${now.getDate()}.${now.getMonth() + 1}/${bike.id || "unknown"}`;
@@ -775,7 +787,12 @@ export function buildRentalContractVariables(
     daily_price_rub: dailyPrice,
     hourly_price_rub: hourlyPrice,
     deposit_rub: deposit,
-    subtotal_rub: String(totalPayable), // Rent + equipment + deposit
+    subtotal_rub: String(totalPayable), // Rent + equipment + deposit (uses override if priceOverridden)
+    // 2026-08-19 review: deposit payment method + override note
+    deposit_payment_method: options.depositPaymentMethod || '',
+    price_override_note: options.priceOverridden
+      ? 'Цена аренды изменена оператором вручную.'
+      : '',
     // Tier-aware pricing (for quick-info and section 4.1)
     pricing_tier_label: tierLabel || 'сутки',
     pricing_tier_price_rub: String(Math.round(tierPrice || subtotalRounded)),

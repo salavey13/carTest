@@ -28,9 +28,9 @@
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Тариф:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{pricing_tier_price_rub}} ₽ {{pricing_tier_unit}}</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Оборудование:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{equipment_summary}}</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Стоимость оборудования:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{equipment_total_cost}} ₽</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Итого к оплате:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{subtotal_rub}} ₽</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Итого к оплате:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{subtotal_rub}} ₽{{#if price_override_note}} ({{price_override_note}}){{/if}}</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Оплата:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">Наличные: {{payment_cash_rub}} ₽, Безнал: {{payment_bank_rub}} ₽</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Залог:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{deposit_rub}} ₽</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Залог:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{deposit_rub}} ₽{{#if deposit_payment_method}}, внесён {{deposit_payment_method}}{{/if}}</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Одометр (до):</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{odometer_before}} км</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Телефон:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{renter_phone}}</td></tr>
 </table>
