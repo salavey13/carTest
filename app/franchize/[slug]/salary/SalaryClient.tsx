@@ -22,6 +22,11 @@ import { withAlpha } from "@/app/franchize/lib/theme";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import {
+  getCurrentPayPeriod,
+  getPreviousPayPeriod,
+  getCurrentCalendarMonth,
+} from "@/lib/salary-period";
+import {
   FranchizeOperatorPanel,
   FranchizeOperatorStatCard,
   franchizeOperatorInputClassName,
@@ -44,6 +49,7 @@ interface SalaryPlan {
   id: string;          // memberId (computed; we render one row per member)
   memberId: string;
   memberName: string;
+  role?: string;        // 'owner' | 'admin' | 'co_owner' | 'member' — shown as a badge
   periodStart: string;
   periodEnd: string;
   accrued: number;
@@ -58,6 +64,16 @@ interface SalaryPlan {
     details: Array<{ type: string; amount: number; description: string }>;
   } | null;
 }
+
+// 2026-08-19 review: small role badge shown next to the member name so the
+// owner can immediately see who is admin/co_owner/owner vs regular member.
+const ROLE_LABELS: Record<string, { label: string; style: "accent" | "warning" | "success" }> = {
+  owner: { label: "Владелец", style: "accent" },
+  co_owner: { label: "Со-влад.", style: "accent" },
+  admin: { label: "Админ", style: "warning" },
+  member: { label: "Участник", style: "success" },
+  mechanic: { label: "Механик", style: "success" },
+};
 
 type SalaryClientProps = {
   initialSlug?: string;
@@ -95,15 +111,14 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
   const [error, setError] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
 
-  // Period filter
-  const [periodStart, setPeriodStart] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  });
-  const [periodEnd, setPeriodEnd] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0];
-  });
+  // Period filter.
+  // 2026-08-19 review: default to the CURRENT PAY PERIOD (10th → 25th, or
+  // 25th → next 10th) instead of "first-of-month → first-of-next-month".
+  // Matches the owner's actual payout cycle so the table shows what will
+  // be paid out on the next payout date.
+  const initialPeriod = getCurrentPayPeriod();
+  const [periodStart, setPeriodStart] = useState(initialPeriod.from);
+  const [periodEnd, setPeriodEnd] = useState(initialPeriod.to);
 
   // Modal states
   const [breakdownModal, setBreakdownModal] = useState<{
@@ -165,6 +180,7 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
           id: row.memberId, // used as React key
           memberId: row.memberId,
           memberName: row.memberName,
+          role: row.role,
           periodStart: row.periodStart,
           periodEnd: row.periodEnd,
           accrued: row.accrued,
@@ -362,6 +378,64 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
           <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: T.text }}>
             <Calendar className="h-4 w-4" /> Период расчёта
           </div>
+
+          {/* Quick presets — saves the owner from manually typing dates for
+              common queries. Payout schedule is the 10th and 25th of each
+              month, so the "pay period" presets match the actual cycle. */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const p = getCurrentPayPeriod();
+                setPeriodStart(p.from);
+                setPeriodEnd(p.to);
+                setIsLoading(true);
+              }}
+              className="rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 15%, transparent)",
+                color: T.accent,
+                border: `1px solid ${T.borderSoft}`,
+              }}
+            >
+              Текущий расчёт (10→25)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const p = getPreviousPayPeriod();
+                setPeriodStart(p.from);
+                setPeriodEnd(p.to);
+                setIsLoading(true);
+              }}
+              className="rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--franchize-shell-card) 80%, transparent)",
+                color: T.textMuted,
+                border: `1px solid ${T.borderSoft}`,
+              }}
+            >
+              Прошлый расчёт
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const p = getCurrentCalendarMonth();
+                setPeriodStart(p.from);
+                setPeriodEnd(p.to);
+                setIsLoading(true);
+              }}
+              className="rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--franchize-shell-card) 80%, transparent)",
+                color: T.textMuted,
+                border: `1px solid ${T.borderSoft}`,
+              }}
+            >
+              Этот месяц
+            </button>
+          </div>
+
           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs" style={{ color: T.textMuted }}>
@@ -467,7 +541,23 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
                       style={{ borderColor: T.borderSoft }}
                     >
                       <td className="px-3 py-3 font-medium" style={{ color: T.text }}>
-                        {plan.memberName}
+                        <div className="flex items-center gap-2">
+                          <span>{plan.memberName}</span>
+                          {plan.role && ROLE_LABELS[plan.role] && (
+                            <span
+                              className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                              style={
+                                ROLE_LABELS[plan.role].style === "accent"
+                                  ? T.styles.accentBadge
+                                  : ROLE_LABELS[plan.role].style === "warning"
+                                    ? T.styles.warningBadge
+                                    : T.styles.successBadge
+                              }
+                            >
+                              {ROLE_LABELS[plan.role].label}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-3" style={{ color: T.textMuted }}>
                         <div className="flex flex-col">

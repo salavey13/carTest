@@ -1,0 +1,99 @@
+polish(salary): final verdict + pay-period date pickers + role badges + dedup fallbackCrew
+
+User rightly called out that I was being inconsistent about the
+crew_members.hourly_rate column — first wanting to drop it, then
+applying a migration that adds/queries it. This commit gives the
+final verdict and cleans up the migration mess.
+
+# Final verdict on crew_members.hourly_rate
+
+  The column is dead weight — no app code reads it (verified via grep
+  across the entire app/ tree: CrewShiftsClient reads
+  memberData.metadata.hourly_rate, NOT crew_members.hourly_rate).
+
+  Actions taken:
+  - DELETED supabase/migrations/20260815000001_add_hourly_rate_to_crew_members.sql
+    (it adds a column nobody uses, was never applied to prod)
+  - DELETED supabase/migrations/20260819000002_consolidate_hourly_rate_sources.sql
+    (it tried to backfill from a column that doesn't exist on prod,
+     wrapped in IF EXISTS it became a no-op — pointless file)
+  - ADDED supabase/migrations/20260819000003_drop_crew_members_hourly_rate_if_exists.sql
+    (drops the column IF EXISTS — catches any dev env where the
+     original 20260815000001 migration WAS applied, so every
+     environment converges to the same clean state)
+
+  Single source of truth now confirmed:
+    WRITE: users.metadata.hourly_rate (via /api/crew/shifts/rate POST)
+    SYNC:  crew_member_shifts.hourly_rate (via trg_sync_hourly_rate_on_shift_start)
+    READ:  either above depending on whether you want future/past rate
+
+# Date pickers default to nearest payout boundary (10th / 25th)
+
+  Previously both the profile page and the salary page defaulted their
+  date pickers to calendar-month boundaries (1st of month → today, or
+  1st of month → 1st of next month). That's the wrong default for a
+  salary subsystem where payouts happen on the 10th and 25th — on, say,
+  Aug 17, the picker showed "Aug 1 → Aug 17" which is half of two
+  different pay periods.
+
+  Added lib/salary-period.ts with three helpers:
+    - getCurrentPayPeriod(now) — the period containing `now`:
+        * day 10..24 → [this month 10, this month 25]
+        * day >= 25  → [this month 25, next month 10]
+        * day < 10   → [last month 25, this month 10]
+    - getPreviousPayPeriod(now) — the period immediately before current
+    - getCurrentCalendarMonth(now) — the old default (calendar month)
+
+  Both ProfileClient.tsx (earningsPeriod) and SalaryClient.tsx
+  (periodStart/periodEnd) now default to getCurrentPayPeriod() so the
+  page opens with the actual pay period the owner will pay out next.
+
+# Quick period presets on the salary page
+
+  Added three quick-preset buttons above the date pickers on the salary
+  page so the owner doesn't have to manually type dates for the common
+  queries:
+    - "Текущий расчёт (10→25)" — accent-styled, calls getCurrentPayPeriod
+    - "Прошлый расчёт" — muted-styled, calls getPreviousPayPeriod
+    - "Этот месяц" — muted-styled, calls getCurrentCalendarMonth (old default)
+
+  Each button sets the date pickers AND triggers a re-load via setIsLoading(true).
+
+# Role badge next to member name in the salary table
+
+  The salary table previously just showed the member's name. The owner
+  couldn't tell at a glance who is admin/co_owner/owner vs regular
+  member. Added a small badge (Russian labels) next to each name:
+    - Владелец (owner) — accent badge
+    - Со-влад.  (co_owner) — accent badge
+    - Админ    (admin) — warning badge
+    - Участник (member) — success badge
+    - Механик  (mechanic) — success badge
+
+  SalaryPlan interface gained a `role?: string` field, formattedPlans
+  now stores row.role from getOwnerSalaryOverview's response, and a
+  ROLE_LABELS map renders the right label + style.
+
+# Dedup'd the fallbackCrew constant (pre-existing TS error)
+
+  ProfileClient.tsx had a 50-line inline fallbackCrew that drifted from
+  the canonical version in lib/fallback-crew.ts — it was missing the
+  reservationHold, contentBlocks, and cta fields that FranchizeCrewVM
+  now requires (pre-existing TS2322 error at line 48).
+
+  - Deleted the inline copy.
+  - Imported { fallbackCrew } from "@/app/franchize/lib/fallback-crew".
+  - Updated the canonical fallbackCrew to include the missing fields
+    (reservationHold empty default, contentBlocks = DEFAULT_FRANCHIZE_CONTENT_BLOCKS,
+     cta empty strings).
+
+Files touched:
+  app/franchize/[slug]/profile/ProfileClient.tsx
+  app/franchize/[slug]/salary/SalaryClient.tsx
+  app/franchize/lib/fallback-crew.ts
+  lib/salary-period.ts (NEW)
+  supabase/migrations/20260815000001_add_hourly_rate_to_crew_members.sql (DELETED)
+  supabase/migrations/20260819000002_consolidate_hourly_rate_sources.sql (DELETED)
+  supabase/migrations/20260819000003_drop_crew_members_hourly_rate_if_exists.sql (NEW)
+
+Verified: 23 vitest tests pass, zero TS errors in the salary subsystem.
