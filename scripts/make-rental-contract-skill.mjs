@@ -248,6 +248,46 @@ async function verifyMetadataWithFallback(table, contractKey) {
  * Create a rentals row when bot generates a rental contract.
  * This unifies bot and web-app rentals in a single table for availability tracking.
  *
+ * 2026-08-19 IMPORTANT GUIDANCE FOR SKILL AUTHORS (custom skills based on
+ * this script, including any assistant-bot quick-entry skill):
+ *
+ *   Rentals created by skill authors MUST start in status='pending_confirmation'
+ *   (NOT 'active') and payment_status='pending' (NOT 'fully_paid'). The
+ *   /doc Telegram flow and the web checkout flow both start in pending_confirmation
+ *   — only a human operator can confirm the booking by physically handing over
+ *   the bike + collecting the deposit.
+ *
+ *   Why this matters:
+ *     - The /ekip and /doc deposit tracking flows fire on status transitions
+ *       to 'completed'. A skill-created rental in 'active' state skips the
+ *       operator confirmation step — when it eventually closes, no deposit
+ *       was tracked (deposit_entries stays empty, rentals.deposit_amount
+ *       stays 0), so the deposits admin page shows zeros.
+ *     - The rentals analytics page counts 'active' rentals in "currently out"
+ *       metrics. A skill-created 'active' rental pollutes the active list.
+ *     - The salary subsystem's getMyEarnings/getMemberEarnings include
+ *       'active' shifts in current-month totals, which can make the owner
+ *       pay out money that wasn't actually earned yet.
+ *
+ *   Skills should also:
+ *     - NOT set payment_status='fully_paid' — that's set by the actual
+ *       payment processor or by the operator confirming cash receipt.
+ *     - Include metadata.deposit_rub (from bike.specs.deposit_rub) so a
+ *       downstream operator can collect the deposit via /doc or the
+ *       admin page.
+ *     - Set metadata.source='bot_contract' (already done) and
+ *       metadata.created_by='<your-skill-name>' so the rental's provenance
+ *       is auditable.
+ *
+ *   If a skill DID prematurely create a rental in 'active' state, demote it:
+ *     UPDATE rentals
+ *     SET status='pending_confirmation', payment_status='pending',
+ *         updated_at=NOW(),
+ *         metadata = metadata || '{"status_correction":{"reason":"...",
+ *             "corrected_at":"...","original_status":"active",
+ *             "original_payment_status":"fully_paid"}}'::jsonb
+ *     WHERE rental_id = '<uuid>';
+ *
  * @param supabase - Supabase client
  * @param bike - Bike object from catalog
  * @param startDateText - TEXT date in DD.MM.YYYY format
@@ -294,13 +334,19 @@ async function createRentalFromBotContract(
         requested_end_date: endDateIso,
         agreed_start_date: startDateIso,
         agreed_end_date: endDateIso,
-        status: 'active',
-        payment_status: 'fully_paid',
+        // 2026-08-19 review: start in 'pending_confirmation' (NOT 'active')
+        // — a human operator must confirm the booking, collect the deposit,
+        // and hand over the bike before the rental goes active. Same for
+        // payment_status: 'pending' (NOT 'fully_paid'). See the docstring
+        // above for why this matters.
+        status: 'pending_confirmation',
+        payment_status: 'pending',
         total_cost: totalCost,
         metadata: {
           source: 'bot_contract',
           daily_price: dailyPrice,
           created_by: 'skill-script',
+          deposit_rub: bike.specs?.deposit_rub || null,
         },
       })
       .select('rental_id')

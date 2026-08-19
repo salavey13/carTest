@@ -444,7 +444,28 @@ export async function handleCommand(update: any) {
             // wasn't in any whitelist), DON'T feed its data into text handlers —
             // they would silently store the callback_data string as user input
             // and corrupt the flow state. Show "unknown command" instead.
+            //
+            // 2026-08-19 review: but if the unrouted callback is "cancel",
+            // graceful-exit instead of "unknown button". The user clicked
+            // "❌ Отменить" — they want out, not a lecture. This catches the
+            // case where the flow's state has been cleared (e.g. via expiry
+            // or an earlier error) but the user still sees a stale keyboard
+            // with the cancel button on it.
             if (update.callback_query) {
+                if (text === "cancel" || text === "restart") {
+                    // Best-effort state cleanup, then acknowledge.
+                    try {
+                        await supabaseAdmin.from("user_states").delete().eq("user_id", userIdStr);
+                    } catch (e) {
+                        logger.warn(`[Command Handler] Failed to clear state on cancel:`, e);
+                    }
+                    if (text === "restart") {
+                        await sendComplexMessage(chatId, "🔄 Начните заново командой /ekip, /doc или /subrent.", [], { removeKeyboard: true });
+                    } else {
+                        await sendComplexMessage(chatId, "❌ Отменено.", [], { removeKeyboard: true });
+                    }
+                    return;
+                }
                 logger.warn(`[Command Handler] Unrouted callback_query: ${text} (user ${userIdStr})`);
                 await sendComplexMessage(chatId, "Неизвестная кнопка. Используй /help или /doc.", []);
                 return;

@@ -21,11 +21,8 @@ import {
 import { withAlpha } from "@/app/franchize/lib/theme";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
-import {
-  getCurrentPayPeriod,
-  getPreviousPayPeriod,
-  getCurrentCalendarMonth,
-} from "@/lib/salary-period";
+import { getCurrentPayPeriod, getPreviousPayPeriod, getCurrentCalendarMonth } from "@/lib/salary-period";
+import { formatDateRu } from "@/app/franchize/components/DateInputRu";
 import {
   FranchizeOperatorPanel,
   FranchizeOperatorStatCard,
@@ -448,6 +445,13 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
                 className={franchizeOperatorInputClassName}
                 style={franchizeOperatorInputStyle}
               />
+              {/* 2026-08-19 review: unambiguous Russian-format display so the
+                  owner doesn't misread "08.07" as July 8 when it's August 7. */}
+              {periodStart && (
+                <p className="mt-1 text-[10px] tabular-nums" style={{ color: T.textMuted }}>
+                  ({formatDateRu(periodStart)})
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs" style={{ color: T.textMuted }}>
@@ -460,6 +464,11 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
                 className={franchizeOperatorInputClassName}
                 style={franchizeOperatorInputStyle}
               />
+              {periodEnd && (
+                <p className="mt-1 text-[10px] tabular-nums" style={{ color: T.textMuted }}>
+                  ({formatDateRu(periodEnd)})
+                </p>
+              )}
             </div>
           </div>
         </FranchizeOperatorPanel>

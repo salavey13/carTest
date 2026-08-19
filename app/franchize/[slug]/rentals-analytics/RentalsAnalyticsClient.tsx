@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { useAppContext } from "@/contexts/AppContext";
+import { formatDateRu } from "@/app/franchize/components/DateInputRu";
 import {
   getRentalsDashboard,
   getRentalsDateRange,
@@ -982,6 +983,12 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                       fontFamily: "'Onest', sans-serif",
                     }}
                   />
+                  {/* 2026-08-19 review: Russian-format display hint */}
+                  {selectedDate && (
+                    <p className="mt-1 text-center text-[10px] tabular-nums" style={{ color: textSecondary }}>
+                      ({formatDateRu(selectedDate)})
+                    </p>
+                  )}
                   <div className="flex gap-2 mt-2">
                     <button
                       onClick={() => setDatePickerOpen(false)}
