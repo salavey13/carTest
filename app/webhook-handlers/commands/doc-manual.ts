@@ -1523,6 +1523,10 @@ async function createRentalFromDocContract(
         daily_price: dailyPrice,
         created_by: 'doc-manual',
         doc_sha256: docSha256,
+        // Store renter name + phone in metadata so the admin page can display
+        // the actual renter (not the crew owner placeholder user_id).
+        renter_name: context.mpFullName || '',
+        renter_phone: context.clientPhone || '',
         // CR fix: store equipment in metadata so getRentalReturnTodos can
         // generate accessory return-checklist items for this rental.
         equipment: {

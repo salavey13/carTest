@@ -3943,7 +3943,8 @@ export async function getFranchizeSuccessfulRentals(input: unknown): Promise<{ s
       const bikeName = `${typeof vehicle?.make === "string" ? vehicle.make : ""} ${typeof vehicle?.model === "string" ? vehicle.model : ""}`.trim();
       const fallbackUserId = String(row.user_id ?? "").trim();
       const renterNameCandidates = [
-        metadata.renter_full_name,
+        metadata.renter_name,        // stored by /doc flow + manual rentals
+        metadata.renter_full_name,   // stored by some skill scripts
         metadata.recipientName,
         metadata.recipient,
         metadata.customerName,

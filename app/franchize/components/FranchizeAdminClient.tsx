@@ -726,9 +726,10 @@ export function FranchizeAdminClient({
             </div>
             <div className="divide-y" style={{ borderColor: "var(--fr-admin-border)" }}>
               {successfulRentals.slice(0, 10).map((rental) => (
-                <div
+                <Link
                   key={rental.rentalId}
-                  className="grid gap-2 px-3 py-3 text-sm md:grid-cols-[1.2fr_1fr_1fr_0.9fr] md:items-center"
+                  href={`/franchize/${slug}/rental/${rental.rentalId}`}
+                  className="grid gap-2 px-3 py-3 text-sm transition hover:bg-white/5 md:grid-cols-[1.2fr_1fr_1fr_0.9fr] md:items-center"
                   style={{ borderColor: "var(--fr-admin-border)" }}
                 >
                   <div>
@@ -756,7 +757,7 @@ export function FranchizeAdminClient({
                   >
                     {contractStatusLabel(rental.contractStatus)}
                   </span>
-                </div>
+                </Link>
               ))}
             </div>
           </div>
