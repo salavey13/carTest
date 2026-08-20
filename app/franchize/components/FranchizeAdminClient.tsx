@@ -667,7 +667,13 @@ export function FranchizeAdminClient({
                 Без фото: {photoAudit.missing.length} — нажмите чтобы загрузить:
               </p>
               <div className="mt-2 space-y-1">
-                {photoAudit.missing.map((vehicle) => (
+                {photoAudit.missing.map((vehicle) => {
+                  const specs = (vehicle.specs || {}) as Record<string, unknown>;
+                  const matKey = typeof specs.materials === "string" ? String(specs.materials) : "";
+                  const sizeStr = typeof specs.size === "string" ? String(specs.size) : "";
+                  const sizesArr = Array.isArray(specs.sizes) ? (specs.sizes as string[]) : [];
+                  const sizeDisplay = sizeStr || (sizesArr.length ? sizesArr.join(", ") : "");
+                  return (
                   <button
                     key={vehicle.id}
                     type="button"
@@ -682,13 +688,16 @@ export function FranchizeAdminClient({
                     <span className="shrink-0 text-amber-400">📷</span>
                     <span className="min-w-0 flex-1 truncate">
                       <span className="font-medium">{vehicle.make} {vehicle.model}</span>
+                      {matKey && <span className="ml-1 text-[var(--fr-admin-muted)]">[{matKey}]</span>}
+                      {sizeDisplay && <span className="ml-1 text-[var(--fr-admin-muted)]">({sizeDisplay})</span>}
                       <span className="ml-1 opacity-60">({vehicle.id})</span>
                     </span>
                     <span className="shrink-0 text-[10px] font-semibold" style={{ color: resolvedPalette.accentMain }}>
                       Загрузить фото →
                     </span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
