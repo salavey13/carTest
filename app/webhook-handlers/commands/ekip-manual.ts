@@ -84,6 +84,7 @@ interface EquipmentItem {
   id: string;
   make: string;
   model: string;
+  image_url?: string;
   specs: {
     daily_price?: number;
     rent_weekday?: number;
@@ -93,6 +94,12 @@ interface EquipmentItem {
     deposit_rub?: number;
     image_url?: string;
     size?: string;
+    sizes?: string[];      // B.3: multi-size items (array per gold standard)
+    colors?: string[];     // B.4: multi-color items
+    materials?: string;    // B.1: material string per gold standard (e.g., "Текстиль", "Кожа")
+    features?: string[];
+    badge?: string;
+    [key: string]: unknown; // allow arbitrary JSONB fields
   };
   crew_id?: string;
 }
@@ -245,8 +252,13 @@ function buildCategoryItemsKeyboard(
   category: string,
   selectedIds: string[],
   page: number,
+  subcategory?: string, // B.1: filter by material (e.g., "Кожа", "Текстиль")
 ): KeyboardButton[][] {
-  const items = equipmentList.filter((i) => (i.specs?.category || "other") === category);
+  // B.1: filter by category + optional subcategory (specs.materials)
+  let items = equipmentList.filter((i) => (i.specs?.category || "other") === category);
+  if (subcategory) {
+    items = items.filter(i => i.specs?.materials === subcategory);
+  }
   const label = EQUIPMENT_CATEGORY_LABELS[category] || category;
   const pageCount = Math.max(1, Math.ceil(items.length / EKIP_PAGE_SIZE));
   const safePage = Math.min(Math.max(0, page), pageCount - 1);
@@ -255,9 +267,17 @@ function buildCategoryItemsKeyboard(
   const rows: KeyboardButton[][] = [];
   for (const item of pageItems) {
     const selected = selectedIds.includes(item.id);
-    const size = item.specs?.size ? ` (${item.specs.size})` : "";
+    // B.3: handle both specs.size (string) and specs.sizes (array).
+    // Gold standard: sizes is an array of strings, size is singular string.
+    const sizeInfo = item.specs?.size
+      ? ` (${item.specs.size})`
+      : item.specs?.sizes?.length
+        ? ` (${item.specs.sizes.join(", ")})`
+        : "";
+    // B.1 prep: show material if available (specs.materials is a string per gold standard)
+    const materialInfo = item.specs?.materials ? ` [${item.specs.materials}]` : "";
     rows.push([{
-      text: `${selected ? "✅ " : ""}${categoryEmoji(category)} ${item.make} ${item.model}${size}`,
+      text: `${selected ? "✅ " : ""}${categoryEmoji(category)} ${item.make} ${item.model}${sizeInfo}${materialInfo}`,
       callback_data: `eq_${item.id}`,
     }]);
   }
@@ -396,6 +416,7 @@ interface EkipFlowContext {
   equipmentIds?: string[];
   equipmentCategory?: string;
   equipmentPage?: number;
+  equipmentSubcategory?: string; // B.1: filter by material ("Кожа", "Текстиль", etc.)
   equipmentMake?: string;
   equipmentModel?: string;
   mpFullName?: string;
@@ -1109,15 +1130,69 @@ export async function handleEkipCallback(
 
     context.equipmentCategory = category;
     context.equipmentPage = 0;
+    context.equipmentSubcategory = undefined; // B.1: reset subcategory on new category
     await setState(userId, state, context);
+
+    // B.1: Subcategory preselection — check if items in this category have
+    // different materials (specs.materials string per gold standard). If 2+
+    // distinct materials found, show subcategory picker. If 0-1, go straight
+    // to items (skip subcategory step).
     const label = EQUIPMENT_CATEGORY_LABELS[category] || category;
-    const items = await getEquipmentCatalog();
+    const allItems = await getEquipmentCatalog();
+    const categoryItems = allItems.filter(i => i.specs?.category === category);
+    const distinctMaterials = [...new Set(
+      categoryItems
+        .map(i => i.specs?.materials)
+        .filter(m => m && typeof m === 'string')
+    )];
+
+    if (distinctMaterials.length >= 2) {
+      // Show subcategory picker (leather/textile/all)
+      const subRows: KeyboardButton[][] = distinctMaterials.map(m => [{
+        text: `${m === 'Кожа' ? '🟤' : m === 'Текстиль' ? '🔵' : '📦'} ${m}`,
+        callback_data: `eksub_${m}`,
+      }]);
+      subRows.push([{ text: "📦 Все", callback_data: "eksub_all" }]);
+      subRows.push([{ text: "↩️ Категории", callback_data: "ecat_back" }]);
+      await sendComplexMessage(
+        chatId,
+        `📦 *${label}* — выберите тип:`,
+        subRows,
+        { keyboardType: 'inline', parseMode: 'Markdown' },
+      );
+      return true;
+    }
+
+    // Only one material (or none) — skip subcategory, go straight to items
     const chosen = selectedEquipmentIds(context).length;
     const chosenNote = chosen > 0 ? `\n\n✅ Уже выбрано: ${chosen} шт. — кликните ещё или «Готово».` : "";
     await sendComplexMessage(
       chatId,
       `📦 *${label}* — выберите предметы${chosenNote}`,
-      buildCategoryItemsKeyboard(items, category, selectedEquipmentIds(context), 0),
+      buildCategoryItemsKeyboard(allItems, category, selectedEquipmentIds(context), 0, context.equipmentSubcategory),
+      { keyboardType: 'inline', parseMode: 'Markdown' },
+    );
+    return true;
+  }
+
+  // B.1: Subcategory selection handler — eksub_<material> or eksub_all
+  if (callbackData.startsWith("eksub_")) {
+    const sub = callbackData.slice(6); // "Кожа", "Текстиль", "all"
+    context.equipmentSubcategory = sub === "all" ? undefined : sub;
+    context.equipmentPage = 0;
+    await setState(userId, state, context);
+
+    const category = context.equipmentCategory;
+    if (!category) return true;
+    const label = EQUIPMENT_CATEGORY_LABELS[category] || category;
+    const allItems = await getEquipmentCatalog();
+    const chosen = selectedEquipmentIds(context).length;
+    const chosenNote = chosen > 0 ? `\n\n✅ Уже выбрано: ${chosen} шт. — кликайте ещё или «Готово».` : "";
+    const subNote = sub === "all" ? "" : ` (${sub})`;
+    await sendComplexMessage(
+      chatId,
+      `📦 *${label}*${subNote} — выберите предметы${chosenNote}`,
+      buildCategoryItemsKeyboard(allItems, category, selectedEquipmentIds(context), 0, context.equipmentSubcategory),
       { keyboardType: 'inline', parseMode: 'Markdown' },
     );
     return true;
@@ -1135,7 +1210,7 @@ export async function handleEkipCallback(
     await sendComplexMessage(
       chatId,
       `📦 *${label}* — страница ${page + 1}`,
-      buildCategoryItemsKeyboard(await getEquipmentCatalog(), category, selectedEquipmentIds(context), page),
+      buildCategoryItemsKeyboard(await getEquipmentCatalog(), category, selectedEquipmentIds(context), page, context.equipmentSubcategory),
       { keyboardType: 'inline', parseMode: 'Markdown' },
     );
     return true;
@@ -1163,6 +1238,7 @@ export async function handleEkipCallback(
       const ids = selectedEquipmentIds(context);
       const idx = ids.indexOf(equipment.id);
       const wasFirst = ids.length === 0;
+      const isSelecting = idx < 0; // true = adding, false = removing
       if (idx >= 0) {
         ids.splice(idx, 1); // deselect
       } else {
@@ -1179,6 +1255,22 @@ export async function handleEkipCallback(
       }
       await setState(userId, state, context);
 
+      // B.2: Photo preview — send a photo of the selected item so the
+      // operator can verify they picked the right one. Silent if no
+      // image_url (many equipment items don't have photos yet). Only
+      // send when SELECTING (not deselecting) to avoid spam.
+      if (isSelecting && equipment.image_url && equipment.image_url.trim()) {
+        try {
+          await fetch(
+            `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto?chat_id=${chatId}&photo=${encodeURIComponent(equipment.image_url)}&caption=${encodeURIComponent(`📷 ${equipment.make} ${equipment.model} — проверьте перед подтверждением`)}`,
+            { method: 'POST', signal: AbortSignal.timeout(5000) }
+          );
+        } catch (photoErr) {
+          // Silent — don't break the flow if photo URL is broken
+          logger.warn('[/ekip] Photo preview failed (non-fatal):', photoErr);
+        }
+      }
+
       const category = context.equipmentCategory;
       const page = context.equipmentPage || 0;
       const catalog = await getEquipmentCatalog();
@@ -1189,7 +1281,7 @@ export async function handleEkipCallback(
         await sendComplexMessage(
           chatId,
           `${added}: ${equipment.make} ${equipment.model}${chosenNote}\n\n📦 *${label}*`,
-          buildCategoryItemsKeyboard(catalog, category, ids, page),
+          buildCategoryItemsKeyboard(catalog, category, ids, page, context.equipmentSubcategory),
           { keyboardType: 'inline', parseMode: 'Markdown' },
         );
       } else {

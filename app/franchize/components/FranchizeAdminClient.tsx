@@ -364,6 +364,20 @@ export function FranchizeAdminClient({
     };
   }, [fleet]);
 
+  // B.5: Photo audit — equipment items without image_url.
+  // Mirrors the VIN audit pattern. Photos stored at carpix/<id>/image_1.jpg.
+  const photoAudit = useMemo(() => {
+    const target = fleet.filter((item) => item.type === "equipment");
+    const missing = target.filter(
+      (item) => !item.image_url || item.image_url.trim() === "",
+    );
+    return {
+      total: target.length,
+      withPhoto: target.length - missing.length,
+      missing,
+    };
+  }, [fleet]);
+
   // VIN quick-edit: clicking a bike in the missing-VIN list selects it for editing
   // in the CarSubmissionForm below. No bogus VIN generation — the operator must
   // enter the real VIN manually.
@@ -638,6 +652,48 @@ export function FranchizeAdminClient({
           )}
         </div>
       </FranchizeOperatorPanel>
+
+      {/* B.5: Photo audit — equipment items without photos.
+          Mirrors the VIN audit panel above. Photos stored at carpix/<id>/image_1.jpg. */}
+      {photoAudit.total > 0 && (
+        <FranchizeOperatorPanel className="mt-4 text-sm leading-relaxed">
+          <p className="text-xs text-[var(--fr-admin-text)]">
+            Фото экипировки: <span className="font-semibold">{photoAudit.withPhoto}</span>{" "}
+            / {photoAudit.total} заполнено
+          </p>
+          {photoAudit.missing.length > 0 && (
+            <>
+              <p className="mt-1 text-xs text-amber-300">
+                Без фото: {photoAudit.missing.length} — нажмите чтобы загрузить:
+              </p>
+              <div className="mt-2 space-y-1">
+                {photoAudit.missing.map((vehicle) => (
+                  <button
+                    key={vehicle.id}
+                    type="button"
+                    onClick={() => handleQuickEditMissingVin(vehicle.id)}
+                    className="flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left text-xs transition hover:opacity-80"
+                    style={{
+                      borderColor: "var(--fr-admin-border)",
+                      backgroundColor: withAlpha(resolvedPalette.accentMain, 0.06),
+                      color: "var(--fr-admin-text)",
+                    }}
+                  >
+                    <span className="shrink-0 text-amber-400">📷</span>
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="font-medium">{vehicle.make} {vehicle.model}</span>
+                      <span className="ml-1 opacity-60">({vehicle.id})</span>
+                    </span>
+                    <span className="shrink-0 text-[10px] font-semibold" style={{ color: resolvedPalette.accentMain }}>
+                      Загрузить фото →
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </FranchizeOperatorPanel>
+      )}
 
       <FranchizeOperatorPanel className="mt-4">
         <div className="flex items-center justify-between gap-3">
