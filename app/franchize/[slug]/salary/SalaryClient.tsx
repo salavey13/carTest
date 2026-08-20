@@ -13,7 +13,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   getFranchizeOperatorDashboardAccess,
@@ -22,6 +21,8 @@ import {
 import { withAlpha } from "@/app/franchize/lib/theme";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
+import { getCurrentPayPeriod, getPreviousPayPeriod, getCurrentCalendarMonth } from "@/lib/salary-period";
+import { formatDateRu } from "@/app/franchize/components/DateInputRu";
 import {
   FranchizeOperatorPanel,
   FranchizeOperatorStatCard,
@@ -29,10 +30,10 @@ import {
   franchizeOperatorInputStyle,
 } from "../../components/FranchizeOperatorSurface";
 import {
-  getOrCreateSalaryPlan,
   calculateSalaryForPeriod,
-  recordPayout,
+  recordPayoutForPeriod,
 } from "../../server-actions/salary-calculations";
+import { getOwnerSalaryOverview } from "../../server-actions/team-earnings";
 import { fallbackCrew } from "@/app/franchize/lib/fallback-crew";
 
 interface SalaryMember {
@@ -42,9 +43,10 @@ interface SalaryMember {
 }
 
 interface SalaryPlan {
-  id: string;
+  id: string;          // memberId (computed; we render one row per member)
   memberId: string;
   memberName: string;
+  role?: string;        // 'owner' | 'admin' | 'co_owner' | 'member' — shown as a badge
   periodStart: string;
   periodEnd: string;
   accrued: number;
@@ -59,6 +61,16 @@ interface SalaryPlan {
     details: Array<{ type: string; amount: number; description: string }>;
   } | null;
 }
+
+// 2026-08-19 review: small role badge shown next to the member name so the
+// owner can immediately see who is admin/co_owner/owner vs regular member.
+const ROLE_LABELS: Record<string, { label: string; style: "accent" | "warning" | "success" }> = {
+  owner: { label: "Владелец", style: "accent" },
+  co_owner: { label: "Со-влад.", style: "accent" },
+  admin: { label: "Админ", style: "warning" },
+  member: { label: "Участник", style: "success" },
+  mechanic: { label: "Механик", style: "success" },
+};
 
 type SalaryClientProps = {
   initialSlug?: string;
@@ -96,15 +108,14 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
   const [error, setError] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
 
-  // Period filter
-  const [periodStart, setPeriodStart] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  });
-  const [periodEnd, setPeriodEnd] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0];
-  });
+  // Period filter.
+  // 2026-08-19 review: default to the CURRENT PAY PERIOD (10th → 25th, or
+  // 25th → next 10th) instead of "first-of-month → first-of-next-month".
+  // Matches the owner's actual payout cycle so the table shows what will
+  // be paid out on the next payout date.
+  const initialPeriod = getCurrentPayPeriod();
+  const [periodStart, setPeriodStart] = useState(initialPeriod.from);
+  const [periodEnd, setPeriodEnd] = useState(initialPeriod.to);
 
   // Modal states
   const [breakdownModal, setBreakdownModal] = useState<{
@@ -122,107 +133,59 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
       }
 
       try {
-        // Check owner access
+        // Check owner access — UI only. The server action enforces auth
+        // independently via verifyCrewAccess.
         const accessCheck = await getFranchizeOperatorDashboardAccess({ slug });
         setIsOwner(Boolean(accessCheck.success && accessCheck.canOpen));
 
-        // Load crew members (using crew_members table)
-        const { supabaseAdmin } = await import("@/lib/supabase-server");
+        // 2026-08-19 review fix: previously this client component imported
+        // `supabaseAdmin` from "@/lib/supabase-server" and ran four raw
+        // queries directly. That module throws on the client (server-only
+        // guard) AND reads salary_calculations which is empty for this crew.
+        // Now we call the new getOwnerSalaryOverview server action which:
+        //   - verifies owner-tier access via the shared cookie helper
+        //   - computes accrued dynamically from crew_member_shifts +
+        //     cash_transactions.expense_commission (same logic as
+        //     getMemberEarnings / my-work / getMyEarnings)
+        //   - returns one row per member with paid + balanceDue + status
+        const startIso = new Date(periodStart).toISOString();
+        const endIso = new Date(periodEnd).toISOString();
 
-        // Get crew_id first
-        const { data: crewData } = await supabaseAdmin
-          .from("crews")
-          .select("id")
-          .eq("slug", slug)
-          .single();
+        const result = await getOwnerSalaryOverview({
+          slug,
+          from: startIso,
+          to: endIso,
+        });
 
-        if (!crewData) {
-          setError("Экипаж не найден");
-          setIsLoading(false);
+        if (!result.success || !result.data) {
+          if (result.error) setError(result.error);
+          setMembers([]);
+          setPlans([]);
           return;
         }
 
-        const { data: membersData, error: membersError } = await supabaseAdmin
-          .from("crew_members")
-          .select(`
-            id,
-            user_id,
-            role,
-            users!inner (
-              metadata
-            )
-          `)
-          .eq("crew_id", crewData.id)
-          .eq("membership_status", "active");
-
-        if (membersError) {
-          console.error("Failed to load members:", membersError);
-        }
-
-        const formattedMembers = (membersData || []).map((m: any) => ({
-          id: m.user_id,
-          name: m.users?.metadata?.name || m.users?.metadata?.username || `Member ${m.user_id.slice(0, 6)}`,
-          role: m.role,
+        // Derive a member list for any UI that uses it (currently unused
+        // beyond the table — kept for compatibility with future filters).
+        const formattedMembers: SalaryMember[] = result.data.map((row: any) => ({
+          id: row.memberId,
+          name: row.memberName,
+          role: row.role,
         }));
-
         setMembers(formattedMembers);
 
-        // Load salary plans for the period
-        const startPeriod = new Date(periodStart).toISOString();
-        const endPeriod = new Date(periodEnd).toISOString();
-
-        const { data: plansData, error: plansError } = await supabaseAdmin
-          .from("salary_calculations")
-          .select(`
-            id,
-            salary_plan_id,
-            period_start,
-            period_end,
-            total_income,
-            payout_status,
-            salary_plans!inner (
-              member_id,
-              crew_id
-            )
-          `)
-          .eq("salary_plans.crew_id", crewData.id)
-          .gte("period_start", startPeriod)
-          .lt("period_end", endPeriod);
-
-        if (plansError) {
-          console.error("Failed to load plans:", plansError);
-        }
-
-        // Format plans with member names
-        const formattedPlans = await Promise.all(
-          (plansData || []).map(async (plan: any) => {
-            const member = formattedMembers.find(m => m.id === plan.salary_plans.member_id);
-
-            // Get total paid
-            const { data: payments } = await supabaseAdmin
-              .from("cash_transactions")
-              .select("amount")
-              .eq("salary_calc_id", plan.id)
-              .eq("transaction_type", "expense_salary");
-
-            const totalPaid = (payments || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
-            const accrued = Number(plan.total_income || 0);
-            const balanceDue = accrued - totalPaid;
-
-            return {
-              id: plan.id,
-              memberId: plan.salary_plans.member_id,
-              memberName: member?.name || `Member ${plan.salary_plans.member_id.slice(0, 6)}`,
-              periodStart: plan.period_start,
-              periodEnd: plan.period_end,
-              accrued,
-              paid: totalPaid,
-              balanceDue,
-              status: balanceDue <= 0 ? "paid" : totalPaid > 0 ? "partial" : "pending",
-              breakdown: null, // Will load on demand
-            };
-          })
-        );
+        const formattedPlans: SalaryPlan[] = result.data.map((row: any) => ({
+          id: row.memberId, // used as React key
+          memberId: row.memberId,
+          memberName: row.memberName,
+          role: row.role,
+          periodStart: row.periodStart,
+          periodEnd: row.periodEnd,
+          accrued: row.accrued,
+          paid: row.paid,
+          balanceDue: row.balanceDue,
+          status: row.status,
+          breakdown: null, // loaded on demand via calculateSalaryForPeriod
+        }));
 
         setPlans(formattedPlans);
       } catch (err) {
@@ -249,21 +212,21 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
       });
 
       if (result.success && result.data) {
-        setPlans(prev => prev.map(p =>
-          p.id === plan.id
-            ? {
-                ...p,
-                breakdown: {
-                  shiftIncome: result.data!.shiftIncome,
-                  commissionIncome: result.data!.commissionIncome,
-                  bonusIncome: result.data!.bonusIncome,
-                  totalIncome: result.data!.totalIncome,
-                  details: result.data!.breakdown,
-                }
-              }
-            : p
-        ));
-        setBreakdownModal({ open: true, plan: plans.find(p => p.id === plan.id) || null });
+        const newBreakdown = {
+          shiftIncome: result.data.shiftIncome,
+          commissionIncome: result.data.commissionIncome,
+          bonusIncome: result.data.bonusIncome,
+          totalIncome: result.data.totalIncome,
+          details: result.data.breakdown,
+        };
+        // 2026-08-19 review: previously the modal opened with the OLD plan
+        // (closure capture) — `plans.find(p => p.id === plan.id)` returned
+        // the pre-update plan, so `breakdown === null` and the modal showed
+        // "Загрузка деталей..." forever. Use the updated plan object
+        // directly so the modal renders the breakdown immediately.
+        const updatedPlan: SalaryPlan = { ...plan, breakdown: newBreakdown };
+        setPlans(prev => prev.map(p => p.id === plan.id ? updatedPlan : p));
+        setBreakdownModal({ open: true, plan: updatedPlan });
       } else {
         setError(result.error || "Не удалось загрузить расчёт");
       }
@@ -280,10 +243,16 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
     setError(null);
 
     try {
-      const result = await recordPayout({
+      // 2026-08-19 review fix: previously called recordPayout({ salaryCalcId })
+      // — but salary_calculations is empty for this crew (no snapshot rows
+      // are ever auto-created), so the button always failed with "Расчёт не
+      // найден." Now we use recordPayoutForPeriod which computes the balance
+      // dynamically and inserts an expense_salary transaction directly.
+      const result = await recordPayoutForPeriod({
         slug,
-        actorUserId: dbUser.user_id,
-        salaryCalcId: plan.id,
+        memberId: plan.memberId,
+        periodStart: plan.periodStart,
+        periodEnd: plan.periodEnd,
       });
 
       if (result.success) {
@@ -406,6 +375,64 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
           <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: T.text }}>
             <Calendar className="h-4 w-4" /> Период расчёта
           </div>
+
+          {/* Quick presets — saves the owner from manually typing dates for
+              common queries. Payout schedule is the 10th and 25th of each
+              month, so the "pay period" presets match the actual cycle. */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const p = getCurrentPayPeriod();
+                setPeriodStart(p.from);
+                setPeriodEnd(p.to);
+                setIsLoading(true);
+              }}
+              className="rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 15%, transparent)",
+                color: T.accent,
+                border: `1px solid ${T.borderSoft}`,
+              }}
+            >
+              Текущий расчёт (10→25)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const p = getPreviousPayPeriod();
+                setPeriodStart(p.from);
+                setPeriodEnd(p.to);
+                setIsLoading(true);
+              }}
+              className="rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--franchize-shell-card) 80%, transparent)",
+                color: T.textMuted,
+                border: `1px solid ${T.borderSoft}`,
+              }}
+            >
+              Прошлый расчёт
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const p = getCurrentCalendarMonth();
+                setPeriodStart(p.from);
+                setPeriodEnd(p.to);
+                setIsLoading(true);
+              }}
+              className="rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--franchize-shell-card) 80%, transparent)",
+                color: T.textMuted,
+                border: `1px solid ${T.borderSoft}`,
+              }}
+            >
+              Этот месяц
+            </button>
+          </div>
+
           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs" style={{ color: T.textMuted }}>
@@ -418,6 +445,13 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
                 className={franchizeOperatorInputClassName}
                 style={franchizeOperatorInputStyle}
               />
+              {/* 2026-08-19 review: unambiguous Russian-format display so the
+                  owner doesn't misread "08.07" as July 8 when it's August 7. */}
+              {periodStart && (
+                <p className="mt-1 text-[10px] tabular-nums" style={{ color: T.textMuted }}>
+                  ({formatDateRu(periodStart)})
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs" style={{ color: T.textMuted }}>
@@ -430,6 +464,11 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
                 className={franchizeOperatorInputClassName}
                 style={franchizeOperatorInputStyle}
               />
+              {periodEnd && (
+                <p className="mt-1 text-[10px] tabular-nums" style={{ color: T.textMuted }}>
+                  ({formatDateRu(periodEnd)})
+                </p>
+              )}
             </div>
           </div>
         </FranchizeOperatorPanel>
@@ -455,8 +494,25 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
           </h2>
 
           {plans.length === 0 ? (
-            <div className="py-8 text-center text-sm" style={{ color: T.textMuted }}>
-              Нет данных за выбранный период. Измените период или дождитесь начислений.
+            <div
+              className="mt-3 flex flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center"
+              style={{ borderColor: T.borderSoft }}
+            >
+              <div
+                className="mb-3 flex h-14 w-14 items-center justify-center rounded-full"
+                style={{
+                  backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 12%, transparent)",
+                  color: T.accent,
+                }}
+              >
+                <Wallet className="h-6 w-6" />
+              </div>
+              <p className="text-sm font-semibold" style={{ color: T.text }}>
+                Нет начислений за выбранный период
+              </p>
+              <p className="mt-1 text-xs" style={{ color: T.textMuted }}>
+                Смены и комиссии появятся здесь автоматически — ведите учёт через профиль и кассовую книгу.
+              </p>
             </div>
           ) : (
             <div className="mt-3 overflow-x-auto">
@@ -494,7 +550,23 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
                       style={{ borderColor: T.borderSoft }}
                     >
                       <td className="px-3 py-3 font-medium" style={{ color: T.text }}>
-                        {plan.memberName}
+                        <div className="flex items-center gap-2">
+                          <span>{plan.memberName}</span>
+                          {plan.role && ROLE_LABELS[plan.role] && (
+                            <span
+                              className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                              style={
+                                ROLE_LABELS[plan.role].style === "accent"
+                                  ? T.styles.accentBadge
+                                  : ROLE_LABELS[plan.role].style === "warning"
+                                    ? T.styles.warningBadge
+                                    : T.styles.successBadge
+                              }
+                            >
+                              {ROLE_LABELS[plan.role].label}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-3" style={{ color: T.textMuted }}>
                         <div className="flex flex-col">
@@ -510,18 +582,24 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
                       </td>
                       <td
                         className="px-3 py-3 text-right font-mono font-semibold"
-                        style={{ color: plan.balanceDue > 0 ? "#f59e0b" : "#10b981" }}
+                        style={{
+                          color: plan.balanceDue > 0
+                            ? T.styles.warningBadge.color
+                            : T.styles.successBadge.color,
+                        }}
                       >
                         {formatCurrency(plan.balanceDue)}
                       </td>
                       <td className="px-3 py-3 text-center">
                         <span
-                          className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
-                            plan.status === "paid" && "bg-green-500/10 text-green-400",
-                            plan.status === "partial" && "bg-yellow-500/10 text-yellow-400",
-                            plan.status === "pending" && "bg-gray-500/10 text-gray-400"
-                          )}
+                          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                          style={
+                            plan.status === "paid"
+                              ? T.styles.successBadge
+                              : plan.status === "partial"
+                                ? T.styles.warningBadge
+                                : T.styles.accentBadge
+                          }
                         >
                           {plan.status === "paid" && <CheckCircle className="h-3 w-3" />}
                           {plan.status === "partial" && <Clock className="h-3 w-3" />}
@@ -560,6 +638,34 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr
+                    className="border-t-2"
+                    style={{ borderColor: T.accent }}
+                  >
+                    <td className="px-3 py-3 font-semibold" style={{ color: T.text }}>
+                      Итого
+                    </td>
+                    <td className="px-3 py-3" />
+                    <td className="px-3 py-3 text-right font-mono font-semibold" style={{ color: T.text }}>
+                      {formatCurrency(plans.reduce((sum, p) => sum + p.accrued, 0))}
+                    </td>
+                    <td className="px-3 py-3 text-right font-mono font-semibold" style={{ color: T.textMuted }}>
+                      {formatCurrency(plans.reduce((sum, p) => sum + p.paid, 0))}
+                    </td>
+                    <td
+                      className="px-3 py-3 text-right font-mono font-bold"
+                      style={{
+                        color: plans.reduce((s, p) => s + p.balanceDue, 0) > 0
+                          ? T.styles.warningBadge.color
+                          : T.styles.successBadge.color,
+                      }}
+                    >
+                      {formatCurrency(plans.reduce((sum, p) => sum + p.balanceDue, 0))}
+                    </td>
+                    <td colSpan={2} />
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}

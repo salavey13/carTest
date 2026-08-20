@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Download, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatDateRu } from "@/app/franchize/components/DateInputRu";
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -79,6 +80,12 @@ export function ExportModal({
               onChange={(e) => setStartDate(e.target.value)}
               className="w-full mt-1 rounded-md border px-3 py-2 text-sm"
             />
+            {/* 2026-08-19 review: Russian-format display */}
+            {startDate && (
+              <p className="mt-1 text-[10px] tabular-nums text-muted-foreground">
+                ({formatDateRu(startDate)})
+              </p>
+            )}
           </div>
 
           <div>
@@ -91,6 +98,11 @@ export function ExportModal({
               onChange={(e) => setEndDate(e.target.value)}
               className="w-full mt-1 rounded-md border px-3 py-2 text-sm"
             />
+            {endDate && (
+              <p className="mt-1 text-[10px] tabular-nums text-muted-foreground">
+                ({formatDateRu(endDate)})
+              </p>
+            )}
           </div>
 
           {!isDateRangeValid && startDate && endDate && (

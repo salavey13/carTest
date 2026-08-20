@@ -2151,7 +2151,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
   try {
     const { data: cars, error: carsError } = await supabaseAdmin
       .from("cars")
-      .select("id, make, model, specs")
+      .select("id, make, model, specs, type, description")
       .in("id", payload.cartLines.map((line) => line.itemId));
 
     if (carsError) {
@@ -2311,10 +2311,23 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     };
 
     // === MULTI-BIKE DOCUMENT GENERATION ===
-    // Generate one DOCX per bike in cart
-    const bikeDocs: Array<{ bytes: Uint8Array; fileName: string; bikeName: string; bikeId: string; documentKey: string; sha256: string }> = [];
+    // Generate one DOCX per bike in cart (equipment-only lines are merged
+    // into a SINGLE equipment document — see equipmentLineIndices below).
+    const bikeDocs: Array<{ bytes: Uint8Array; fileName: string; bikeName: string; bikeId: string; documentKey: string; sha256: string; cartLineIndex: number }> = [];
     // Collect per-bike equipment data for todo creation after the loop
     const bikeEquipment: Array<{ bikeId: string; bikeName: string; equipment: { helmets: number; gloves: number; jacket: boolean; boots: boolean; net: boolean; backpack: boolean; bag: boolean; charger: boolean } }> = [];
+
+    // ── Equipment-only cart lines (no bike id in catalog or type='equipment') ──
+    // are merged into ONE consolidated rental document instead of one doc per
+    // line. The first equipment line builds the doc with ALL items in its
+    // equipmentItems array; subsequent equipment-only lines are skipped.
+    const equipmentLineIndices = payload.cartLines
+      .map((l, idx) => ({ l, idx }))
+      .filter(({ l }) => {
+        const c = byId.get(l.itemId);
+        return !c || c.type === "equipment";
+      })
+      .map(({ idx }) => idx);
 
     // ── SERVICE flow: generate a SINGLE consolidated document ──
     // Unlike rental/sale (one doc per bike), service creates one doc
@@ -2369,7 +2382,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         });
         bikeDocs.push({
           bytes, fileName: svDocFileName, bikeName: "service", bikeId: "service",
-          documentKey: svVariables.document_key, sha256,
+          documentKey: svVariables.document_key, sha256, cartLineIndex: 0,
         });
       } catch (svErr) {
         logger.error("[franchize] service doc generation failed", { error: svErr instanceof Error ? svErr.message : String(svErr) });
@@ -2494,6 +2507,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           bikeId: car.id,
           documentKey: saleVariables.document_key,
           sha256,
+          cartLineIndex: bikeIndex,
         });
 
         continue; // Skip the rental builder below
@@ -2559,7 +2573,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           });
           bikeDocs.push({
             bytes, fileName: tdDocFileName, bikeName: `${car.make} ${car.model}`, bikeId: car.id,
-            documentKey: tdVariables.document_key, sha256,
+            documentKey: tdVariables.document_key, sha256, cartLineIndex: bikeIndex,
           });
         } catch (tdErr) {
           logger.error("[franchize] testdrive doc generation failed", { error: tdErr instanceof Error ? tdErr.message : String(tdErr) });
@@ -2600,6 +2614,38 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       // Detect equipment-only rentals: no bike ID in the line or type='equipment'
       const isEquipmentOnlyLine = !car.id || car.type === 'equipment';
 
+      // ── Merged equipment document (first equipment line only) ────────────
+      // Equipment-only cart lines produce ONE document listing ALL items in
+      // equipmentItems (like /ekip multi-select). Lines after the first are
+      // skipped here and their data is picked up via equipmentLineIndices.
+      const equipmentDocIndex = isEquipmentOnlyLine ? equipmentLineIndices.indexOf(bikeIndex) : -1;
+      if (equipmentDocIndex > 0) {
+        continue; // already included in the consolidated equipment doc
+      }
+
+      // All equipment-only lines merged into a single items array.
+      const mergedEquipmentItems = isEquipmentOnlyLine
+        ? equipmentLineIndices.map((eqIdx) => {
+            const eqLine = payload.cartLines[eqIdx];
+            const eqCar = byId.get(eqLine.itemId);
+            const eqSpecs = (eqCar?.specs as Record<string, unknown> | null) || {};
+            return {
+              id: eqCar?.id || eqLine.itemId,
+              make: eqCar?.make || "",
+              model: eqCar?.model || String((eqLine as any).itemName || "Оборудование"),
+              description: eqCar?.description,
+              dailyPrice: Number(eqSpecs.dailyPrice || eqLine.pricePerDay || 500),
+              type: 'equipment',
+              specs: eqSpecs as any,
+            };
+          })
+        : undefined;
+
+      // Sum of all equipment-only lines (for the merged document's total).
+      const mergedEquipmentTotal = isEquipmentOnlyLine
+        ? equipmentLineIndices.reduce((sum, eqIdx) => sum + (payload.cartLines[eqIdx]?.lineTotal || 0), 0)
+        : 0;
+
       // Use shared builder for rental contracts
       const baseVariables = buildRentalContractVariables({
         renter: {
@@ -2637,15 +2683,20 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         crewSecrets,
         meta: {
           // Sequential contract numbers for multi-bike: "11.7/falcon-pro-2025-1", "11.7/rerode-r1-plus-2"
-          // Single bike: "11.7/falcon-pro-2025" (no suffix, matches /doc format)
-          contractNumber: payload.cartLines.length > 1
-            ? `${new Date().getDate()}.${new Date().getMonth() + 1}/${car.id || 'equipment'}-${bikeIndex + 1}`
-            : `${new Date().getDate()}.${new Date().getMonth() + 1}/${car.id || 'equipment-' + bikeIndex}`,
+          // Single bike: "11.7/falcon-pro-2025" (no suffix, matches /doc format).
+          // Merged equipment doc: "11.7/equipment" (single doc for all items).
+          contractNumber: isEquipmentOnlyLine
+            ? `${new Date().getDate()}.${new Date().getMonth() + 1}/equipment`
+            : payload.cartLines.length > 1
+              ? `${new Date().getDate()}.${new Date().getMonth() + 1}/${car.id || 'equipment'}-${bikeIndex + 1}`
+              : `${new Date().getDate()}.${new Date().getMonth() + 1}/${car.id || 'equipment-' + bikeIndex}`,
           contractDate: new Date().toLocaleDateString("ru-RU"),
           signatureTimestamp: new Date().toLocaleString("ru-RU"),
           signatureFingerprint: payload.signatureFingerprint || "—",
           renterSignature: payload.signatureName || "электронное согласие в Telegram WebApp",
-          documentKey: `${isSaleFlow ? "sale" : isEquipmentOnlyLine ? "equipment-rental" : "rental"}-${car.id || 'equipment-' + bikeIndex}-${Date.now()}`,
+          documentKey: isEquipmentOnlyLine
+            ? `equipment-rental-equipment-${Date.now()}`
+            : `${isSaleFlow ? "sale" : isEquipmentOnlyLine ? "equipment-rental" : "rental"}-${car.id || 'equipment-' + bikeIndex}-${Date.now()}`,
           verifiedAt: new Date().toISOString(),
         },
         extrasRows,
@@ -2656,15 +2707,8 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         equipment,
         // ── Equipment mode for standalone equipment rentals ──
         equipmentMode: isEquipmentOnlyLine,
-        equipmentItems: isEquipmentOnlyLine ? [{
-          id: car.id,
-          make: car.make,
-          model: car.model,
-          description: car.description,
-          dailyPrice: Number(specs.dailyPrice || 500),
-          type: 'equipment',
-          specs: specs as any,
-        }] : undefined,
+        // Merged: all equipment-only cart lines in ONE contract (like /ekip)
+        equipmentItems: mergedEquipmentItems,
         // ── Payment split based on user-selected payment method ──
         paymentSplit,
       });
@@ -2672,15 +2716,19 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       // Merge with web-app specific overrides
       // FIX: Use per-bike line.lineTotal instead of payload.totalAmount
       // so each bike's contract shows its own price, not the order total.
+      // For merged equipment docs use the SUM of all equipment-only lines.
+      const effectiveLineTotal = isEquipmentOnlyLine && mergedEquipmentTotal > 0
+        ? mergedEquipmentTotal
+        : (line.lineTotal || 0);
       const variables: RentalContractVariables = {
         ...baseVariables,
         // Web app specific overrides that aren't in the shared builder
         rent_days: String(rentDays),
-        total_price_rub: formatMoney(line.lineTotal || payload.totalAmount),
+        total_price_rub: formatMoney(effectiveLineTotal || payload.totalAmount),
         // Use formatMoney for price fields that expect formatted strings
         hourly_price_rub: formatMoney(Number(specs.price_per_hour || 0)),
         daily_price_rub: formatMoney(dailyPriceRub),
-        subtotal_rub: formatMoney(line.lineTotal || payload.subtotal),
+        subtotal_rub: formatMoney(effectiveLineTotal || payload.subtotal),
         // Include renter_phone explicitly (shared builder has it but ensure it's present)
         renter_phone: docIdentity.renterPhone || "",
         // FIX: Don't override equipment with "—" — the shared builder already
@@ -2708,7 +2756,12 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           || "указывается при выдаче",
       };
 
-      const docFileName = `rental-${car.make}-${car.model}-${rentStartDate || new Date().toISOString().slice(0, 10)}.docx`.replace(/\s+/g, '-');
+      const equipmentDocName = isEquipmentOnlyLine
+        ? `rental-equipment-${equipmentLineIndices.map((i) => payload.cartLines[i]?.itemId || i).join("-")}-${rentStartDate || new Date().toISOString().slice(0, 10)}.docx`.replace(/\s+/g, '-')
+        : null;
+      const docFileName = isEquipmentOnlyLine && equipmentDocName
+        ? equipmentDocName
+        : `rental-${car.make}-${car.model}-${rentStartDate || new Date().toISOString().slice(0, 10)}.docx`.replace(/\s+/g, '-');
       const verifierScope = `${flowType}:${payload.slug}:${payload.orderId}:bike${bikeIndex}`;
       const { bytes, renderedMarkdown, verifierRecordId, sha256 } = await buildFranchizeDocxFromTemplate({
         integrationScope: verifierScope,
@@ -2724,10 +2777,13 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       bikeDocs.push({
         bytes,
         fileName: docFileName,
-        bikeName: `${car.make} ${car.model}`,
-        bikeId: car.id,
+        bikeName: isEquipmentOnlyLine
+          ? `Оборудование (${equipmentLineIndices.length} шт.)`
+          : `${car.make} ${car.model}`,
+        bikeId: isEquipmentOnlyLine ? "equipment" : car.id,
         documentKey: variables.document_key,
         sha256,
+        cartLineIndex: bikeIndex,
       });
     }
 
@@ -2931,7 +2987,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         if (flowType === "sale") {
           // ── Sale contract artifacts (aligned with /doc command) ──────────
           // Use per-bike price from cart line (not order total)
-          const bikeIndex = bikeDocs.indexOf(doc);
+          const bikeIndex = doc.cartLineIndex;
           const cartLine = payload.cartLines[bikeIndex];
           const salePrice = String(cartLine?.lineTotal || payload.totalAmount || "0");
 
@@ -3001,10 +3057,13 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           }
         } else {
           // ── Rental/testdrive contract artifacts ────────────────────────────
-          // Use per-bike price from cart line (aligned with sale artifacts)
-          const bikeIndex = bikeDocs.indexOf(doc);
+          // Use per-bike price from cart line (aligned with sale artifacts).
+          // Merged equipment doc: sum ALL equipment-only lines' totals.
+          const bikeIndex = doc.cartLineIndex;
           const cartLine = payload.cartLines[bikeIndex];
-          const bikePrice = cartLine?.lineTotal || payload.totalAmount;
+          const bikePrice = equipmentLineIndices.length > 0 && bikeIndex === equipmentLineIndices[0]
+            ? equipmentLineIndices.reduce((sum, eqIdx) => sum + (payload.cartLines[eqIdx]?.lineTotal || 0), 0)
+            : (cartLine?.lineTotal || payload.totalAmount);
 
           // Dedup by semantic key: same renter + same bike + same start date = duplicate (retry)
           const { data: existingRental } = await supabaseAdmin
@@ -3190,9 +3249,15 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
         for (const doc of bikeDocs) {
           // For mixed flow, only create rental rows for rental bikes (not sale bikes)
-          const bikeIndex = bikeDocs.indexOf(doc);
+          const bikeIndex = doc.cartLineIndex;
           const bikeFlowType = bikeFlowTypes[bikeIndex];
           if (bikeFlowType === "sale") continue; // Skip sale bikes in mixed flow
+
+          // Merged equipment document: sum ALL equipment-only lines' totals
+          const docTotal =
+            equipmentLineIndices.length > 0 && bikeIndex === equipmentLineIndices[0]
+              ? equipmentLineIndices.reduce((sum, eqIdx) => sum + (payload.cartLines[eqIdx]?.lineTotal || 0), 0)
+              : (payload.cartLines[bikeIndex]?.lineTotal || 0);
 
           try {
             const { data: rentalRow, error: rentalInsertError } = await supabaseAdmin
@@ -3208,7 +3273,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                 agreed_end_date: endIso,
                 status: "pending_confirmation", // 2-step: operator activates via LEADS page → active
                 payment_status: payload.payment === "telegram_xtr" ? "interest_paid" : "pending",
-                total_cost: Math.round(payload.cartLines[bikeIndex]?.lineTotal || payload.totalAmount),
+                total_cost: Math.round(docTotal || payload.totalAmount),
                 metadata: {
                   source: "franchize_web_order",
                   order_id: payload.orderId,
@@ -3310,7 +3375,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
         for (let bikeIndex = 0; bikeIndex < bikeDocs.length; bikeIndex++) {
           const doc = bikeDocs[bikeIndex];
-          const line = payload.cartLines[bikeIndex];
+          const line = payload.cartLines[doc.cartLineIndex];
           const car = byId.get(line?.itemId);
           const bikeMake = car?.make || doc.bikeName.split(" ")[0] || "Байк";
           const bikeModel = car?.model || doc.bikeName.split(" ").slice(1).join(" ") || "";
@@ -3398,7 +3463,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
           for (let bikeIndex = 0; bikeIndex < bikeDocs.length; bikeIndex++) {
             const doc = bikeDocs[bikeIndex];
-            const line = payload.cartLines[bikeIndex];
+            const line = payload.cartLines[doc.cartLineIndex];
             const car = byId.get(line?.itemId);
             const bikeMake = car?.make || doc.bikeName.split(" ")[0] || "Байк";
             const bikeModel = car?.model || doc.bikeName.split(" ").slice(1).join(" ") || "";

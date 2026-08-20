@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
+import { getCurrentPayPeriod } from "@/lib/salary-period";
+import { formatDateRu } from "@/app/franchize/components/DateInputRu";
 import {
   getFranchizeProfileBySlugAction,
   grantFranchizeAchievementAction,
@@ -44,59 +46,11 @@ import {
 import { getMyEarnings } from "../../server-actions/salary-calculations";
 import { getMyWorkTodayAction } from "../../server-actions/my-work";
 
-const fallbackCrew: FranchizeCrewVM = {
-  id: "",
-  slug: "vip-bike",
-  name: "VIP BIKE",
-  description: "Crew profile",
-  logoUrl: "",
-  hqLocation: "",
-  isFound: false,
-  theme: {
-    mode: "pepperolli_dark",
-    palette: {
-      bgBase: "#0B0C10",
-      bgCard: "#111217",
-      accentMain: "#D99A00",
-      accentMainHover: "#E2A812",
-      textPrimary: "#F2F2F3",
-      textSecondary: "#A7ABB4",
-      borderSoft: "#24262E",
-    },
-  },
-  header: {
-    brandName: "VIP BIKE",
-    tagline: "Ride the vibe",
-    logoUrl: "",
-    logoHref: "",
-    menuLinks: [],
-  },
-  contacts: {
-    phone: "",
-    email: "",
-    address: "",
-    telegram: "",
-    telegramBotUsername: "",
-    workingHours: "",
-    map: {
-      gps: "",
-      publicTransport: "",
-      carDirections: "",
-      imageUrl: "",
-      bounds: { top: 0, bottom: 0, left: 0, right: 0 },
-    },
-  },
-  catalog: {
-    categories: [],
-    quickLinks: [],
-    tickerItems: [],
-    promoBanners: [],
-    adCards: [],
-    showcaseGroups: [],
-  },
-  ratingSummary: { average: 0, count: 0 },
-  footer: { socialLinks: [], columns: [], textColor: "#16130A" },
-};
+// 2026-08-19 review: use the shared fallbackCrew constant from
+// lib/fallback-crew.ts — was duplicated inline here, which meant it
+// drifted from the canonical version (missing reservationHold,
+// contentBlocks, cta fields after the type was extended).
+import { fallbackCrew } from "@/app/franchize/lib/fallback-crew";
 
 type FranchizeProfileClientProps = {
   initialCrew?: FranchizeCrewVM;
@@ -239,10 +193,15 @@ export function FranchizeProfileClient({
   const [earningsLoading, setEarningsLoading] = useState(true);
   const [workLoading, setWorkLoading] = useState(true);
 
-  // Period earnings state
-  const [earningsPeriod, setEarningsPeriod] = useState({
-    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    to: new Date().toISOString().split('T')[0],
+  // Period earnings state.
+  // 2026-08-19 review: default to the CURRENT PAY PERIOD (10th → 25th, or
+  // 25th → next 10th) instead of "first of month → today". Matches the
+  // owner's actual payout cycle so the totals match what gets paid out.
+  // Helper lives in lib/salary-period.ts and is shared with SalaryClient.
+  const [earningsPeriod, setEarningsPeriod] = useState(() => {
+    // Inline the import-time compute so we don't recompute every render.
+    const period = getCurrentPayPeriod();
+    return period;
   });
   const [periodEarnings, setPeriodEarnings] = useState<{
     shifts: number;
@@ -735,6 +694,12 @@ export function FranchizeProfileClient({
                     color: T.text,
                   }}
                 />
+                {/* 2026-08-19 review: unambiguous Russian-format display */}
+                {earningsPeriod.from && (
+                  <span className="text-[10px] tabular-nums" style={{ color: T.textMuted }}>
+                    ({formatDateRu(earningsPeriod.from)})
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs" style={{ color: T.textMuted }}>по</span>
@@ -749,6 +714,11 @@ export function FranchizeProfileClient({
                     color: T.text,
                   }}
                 />
+                {earningsPeriod.to && (
+                  <span className="text-[10px] tabular-nums" style={{ color: T.textMuted }}>
+                    ({formatDateRu(earningsPeriod.to)})
+                  </span>
+                )}
               </div>
               <button
                 onClick={fetchPeriodEarnings}

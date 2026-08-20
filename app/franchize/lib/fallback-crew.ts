@@ -1,4 +1,5 @@
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
+import { DEFAULT_FRANCHIZE_CONTENT_BLOCKS } from "@/app/franchize/lib/content-blocks";
 
 /**
  * Fallback crew object used by admin & dashboard clients
@@ -56,4 +57,24 @@ export const fallbackCrew: FranchizeCrewVM = {
   },
   ratingSummary: { average: 0, count: 0 },
   footer: { socialLinks: [], columns: [], textColor: "#16130A" },
+  // 2026-08-19 review: the FranchizeCrewVM interface was extended to
+  // require reservationHold, contentBlocks, and cta — but the fallbackCrew
+  // constant hadn't been updated, so ProfileClient (and other consumers)
+  // silently failed the typecheck. Use the canonical defaults.
+  reservationHold: {
+    amountRub: 0,
+    amountXtr: 0,
+    percent: null,
+    label: "",
+    invoiceLabel: "",
+    pickupAddress: "",
+    requiredDocs: [],
+  },
+  contentBlocks: DEFAULT_FRANCHIZE_CONTENT_BLOCKS,
+  cta: {
+    title: "",
+    description: "",
+    buttonLabel: "",
+    buttonHref: "",
+  },
 };

@@ -8,6 +8,8 @@ import {
   handleError,
   successResponse,
   errorResponse,
+  normalizePeriodStart,
+  normalizePeriodEnd,
   type ActionResponse,
 } from "./shared/auth-helpers";
 
@@ -49,12 +51,11 @@ export async function getTeamEarnings(params: {
     }
 
     const crewId = access.crewId;
-    const fromDate = new Date(from).toISOString();
-    const toDate = new Date(to);
-
-    // Set to end of day
-    toDate.setHours(23, 59, 59, 999);
-    const toDateIso = toDate.toISOString();
+    // 2026-08-19 review: use TZ-aware normalize helpers. Previously
+    // `toDate.setHours(23, 59, 59, 999)` shifted the boundary by ±3 hours
+    // on UTC servers because setHours uses server-local TZ.
+    const fromDate = normalizePeriodStart(from);
+    const toDateIso = normalizePeriodEnd(to);
 
     // Get all crew members
     const { data: members, error: membersError } = await supabaseAdmin
@@ -62,6 +63,8 @@ export async function getTeamEarnings(params: {
       .select(`
         user_id,
         users (
+          username,
+          full_name,
           metadata
         )
       `)
@@ -78,12 +81,25 @@ export async function getTeamEarnings(params: {
       (members || []).map(async (member: any) => {
         const memberId = member.user_id;
         const metadata = member.users?.metadata || {};
-        const memberName = metadata?.name || metadata?.username || `Member ${memberId.slice(0, 6)}`;
+        // 2026-08-19 review: prefer the top-level columns (full_name and
+        // username) which are populated by the Telegram auth flow. The
+        // metadata.name / metadata.username keys were previously the only
+        // fallback checked, but production users have those undefined —
+        // so the salary page was showing "Member <id-slice>" placeholders
+        // instead of actual nicknames.
+        const memberName =
+          member.users?.full_name ||
+          member.users?.username ||
+          metadata?.name ||
+          metadata?.username ||
+          `Member ${memberId.slice(0, 6)}`;
 
-        // Get shifts for period
+        // Get shifts for period — filter by crew_id too, otherwise shifts
+        // from another crew the member belongs to would leak in.
         const { data: shifts } = await supabaseAdmin
           .from("crew_member_shifts")
           .select("clock_in_time, clock_out_time, hourly_rate")
+          .eq("crew_id", crewId)
           .eq("member_id", memberId)
           .gte("clock_in_time", fromDate)
           .lte("clock_in_time", toDateIso);
@@ -101,9 +117,11 @@ export async function getTeamEarnings(params: {
         });
 
         // Get commissions for period (expense_commission: money flowing OUT to employees)
+        // Crew-scoped so commissions from another crew don't leak in.
         const { data: commissions } = await supabaseAdmin
           .from("cash_transactions")
           .select("amount")
+          .eq("crew_id", crewId)
           .eq("to_user_id", memberId)
           .eq("transaction_type", "expense_commission")
           .gte("transaction_date", fromDate)
@@ -169,12 +187,9 @@ export async function getMemberEarnings(params: {
       return { success: false, error: "Недостаточно прав для просмотра чужих доходов." };
     }
     const crewId = access.crewId;
-    const fromDate = new Date(from).toISOString();
-    const toDate = new Date(to);
-
-    // Set to end of day
-    toDate.setHours(23, 59, 59, 999);
-    const toDateIso = toDate.toISOString();
+    // 2026-08-19 review: use TZ-aware normalize helpers.
+    const fromDate = normalizePeriodStart(from);
+    const toDateIso = normalizePeriodEnd(to);
 
     // Verify the member belongs to this crew
     const { data: memberCheck } = await supabaseAdmin
@@ -188,10 +203,11 @@ export async function getMemberEarnings(params: {
       return { success: false, error: "Сотрудник не найден в этом экипаже." };
     }
 
-    // Get shifts for period
+    // Get shifts for period — crew-scoped to prevent multi-crew leak.
     const { data: shifts } = await supabaseAdmin
       .from("crew_member_shifts")
       .select("clock_in_time, clock_out_time, hourly_rate")
+      .eq("crew_id", crewId)
       .eq("member_id", targetMemberId)
       .gte("clock_in_time", fromDate)
       .lte("clock_in_time", toDateIso)
@@ -218,9 +234,11 @@ export async function getMemberEarnings(params: {
     });
 
     // Get commissions for period (expense_commission: money flowing OUT to employees)
+    // Crew-scoped to prevent multi-crew leak.
     const { data: commissions } = await supabaseAdmin
       .from("cash_transactions")
       .select("amount, transaction_date, description")
+      .eq("crew_id", crewId)
       .eq("to_user_id", targetMemberId)
       .eq("transaction_type", "expense_commission")
       .gte("transaction_date", fromDate)
@@ -254,5 +272,182 @@ export async function getMemberEarnings(params: {
   } catch (err) {
     logger.error("[getMemberEarnings] Exception:", err);
     return errorResponse(handleError(err, "getMemberEarnings"));
+  }
+}
+
+/**
+ * Get the owner-facing salary overview for a period — same data shape the
+ * salary page table renders, computed dynamically (NOT from
+ * salary_calculations which is empty for this crew). For each member we
+ * also fetch their already-paid-out amount so we can show balanceDue.
+ *
+ * Auth: owner / co_owner / admin only (per shared verifyCrewAccess).
+ *
+ * This action was added in the 2026-08-19 review to remove the broken
+ * `supabaseAdmin` import from SalaryClient.tsx ("use client" file that
+ * can't import the server-only module at runtime) and to compute the
+ * table from live data instead of the never-populated salary_calculations
+ * snapshot table.
+ */
+export async function getOwnerSalaryOverview(params: {
+  slug: string;
+  actorUserId?: string; // Deprecated: unused, derived from cookie
+  from: string;
+  to: string;
+}): Promise<ActionResponse<Array<{
+  memberId: string;
+  memberName: string;
+  role: string;
+  periodStart: string;
+  periodEnd: string;
+  accrued: number;
+  paid: number;
+  balanceDue: number;
+  status: "pending" | "partial" | "paid";
+}>>> {
+  const { slug, from, to } = params;
+
+  // Validate dates
+  if (!from || isNaN(new Date(from).getTime())) {
+    return { success: false, error: "Некорректная дата начала." };
+  }
+  if (!to || isNaN(new Date(to).getTime())) {
+    return { success: false, error: "Некорректная дата окончания." };
+  }
+
+  try {
+    const access = await verifyCrewAccess(slug);
+    if (!access.allowed) {
+      return { success: false, error: access.error };
+    }
+    if (!access.isOwner) {
+      return { success: false, error: "Только владелец, со-владелец или администратор может видеть зарплаты команды." };
+    }
+
+    const crewId = access.crewId;
+    // 2026-08-19 review: use TZ-aware normalize helpers.
+    const fromDate = normalizePeriodStart(from);
+    const toDateIso = normalizePeriodEnd(to);
+
+    // Get all active crew members (with role for display)
+    const { data: members, error: membersError } = await supabaseAdmin
+      .from("crew_members")
+      .select(`
+        user_id,
+        role,
+        users (
+          username,
+          full_name,
+          metadata
+        )
+      `)
+      .eq("crew_id", crewId)
+      .eq("membership_status", "active");
+
+    if (membersError) {
+      logger.error("[getOwnerSalaryOverview] Failed to load members:", membersError);
+      return { success: false, error: "Не удалось загрузить сотрудников." };
+    }
+
+    const periodStartIso = fromDate;
+    const periodEndIso = toDateIso;
+
+    // For each member: compute shifts + commissions in parallel, then fetch
+    // their already-paid-out amount (cash_transactions.expense_salary) for
+    // the same period.
+    const overview = await Promise.all(
+      (members || []).map(async (member: any) => {
+        const memberId = member.user_id;
+        const metadata = member.users?.metadata || {};
+        // 2026-08-19 review: prefer the top-level columns (full_name and
+        // username) which are populated by the Telegram auth flow.
+        // metadata.name / metadata.username were previously the only
+        // fallback checked, but production users have those undefined —
+        // so the salary page was showing "Member <id-slice>" placeholders
+        // instead of actual nicknames.
+        const memberName =
+          member.users?.full_name ||
+          member.users?.username ||
+          metadata?.name ||
+          metadata?.username ||
+          `Member ${memberId.slice(0, 6)}`;
+        const role = member.role || "member";
+
+        // Shifts for period — crew-scoped to prevent multi-crew leak.
+        const { data: shifts } = await supabaseAdmin
+          .from("crew_member_shifts")
+          .select("clock_in_time, clock_out_time, hourly_rate, salary_amount")
+          .eq("crew_id", crewId)
+          .eq("member_id", memberId)
+          .gte("clock_in_time", periodStartIso)
+          .lte("clock_in_time", periodEndIso);
+
+        let shiftIncome = 0;
+        (shifts || []).forEach((shift: any) => {
+          const stored = Number(shift.salary_amount || 0);
+          if (stored > 0) {
+            shiftIncome += stored;
+            return;
+          }
+          const start = shift.clock_in_time ? new Date(shift.clock_in_time) : null;
+          if (!start) return;
+          const end = shift.clock_out_time ? new Date(shift.clock_out_time) : new Date();
+          const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+          const rate = Number(shift.hourly_rate || 0);
+          shiftIncome += hours * rate;
+        });
+
+        // Commissions for period (expense_commission to this member)
+        // Crew-scoped to prevent multi-crew leak.
+        const { data: commissions } = await supabaseAdmin
+          .from("cash_transactions")
+          .select("amount")
+          .eq("crew_id", crewId)
+          .eq("to_user_id", memberId)
+          .eq("transaction_type", "expense_commission")
+          .gte("transaction_date", periodStartIso)
+          .lte("transaction_date", periodEndIso);
+        const commissionIncome = (commissions || []).reduce(
+          (sum: number, c: any) => sum + (Number(c.amount) > 0 ? Number(c.amount) : 0),
+          0,
+        );
+
+        // Already-paid-out salary in same period — crew-scoped.
+        const { data: payouts } = await supabaseAdmin
+          .from("cash_transactions")
+          .select("amount")
+          .eq("crew_id", crewId)
+          .eq("to_user_id", memberId)
+          .eq("transaction_type", "expense_salary")
+          .gte("transaction_date", periodStartIso)
+          .lte("transaction_date", periodEndIso);
+        const paid = (payouts || []).reduce(
+          (sum: number, p: any) => sum + (Number(p.amount) > 0 ? Number(p.amount) : 0),
+          0,
+        );
+
+        const accrued = Math.round(shiftIncome + commissionIncome);
+        const balanceDue = Math.max(0, accrued - paid);
+        const status: "pending" | "partial" | "paid" =
+          balanceDue <= 0 ? "paid" : paid > 0 ? "partial" : "pending";
+
+        return {
+          memberId,
+          memberName,
+          role,
+          periodStart: periodStartIso,
+          periodEnd: periodEndIso,
+          accrued,
+          paid,
+          balanceDue,
+          status,
+        };
+      }),
+    );
+
+    return successResponse(overview);
+  } catch (err) {
+    logger.error("[getOwnerSalaryOverview] Exception:", err);
+    return errorResponse(handleError(err, "getOwnerSalaryOverview"));
   }
 }

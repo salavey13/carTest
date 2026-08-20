@@ -560,23 +560,48 @@ export async function getEditableVehiclesForUser(userId: string): Promise<{
     }
 
     try {
-        const { data: memberData, error: memberError } = await supabaseAdmin
+        // 2026-08-19 review HOTFIX: previously used .single() which throws
+        // PGRST116 when the user has MULTIPLE active memberships (e.g.
+        // salavey13 is admin in vip-bike AND owner in sly13). The error was
+        // silently caught → memberData = null → fallback to owner_id filter
+        // → user saw only their personally-owned cars (11 bikes) instead of
+        // the full crew fleet (100+ items). This was the root cause of the
+        // "admin page shows only 11 bikes" bug.
+        //
+        // Now: fetch ALL active memberships, then query cars from ALL the
+        // user's crews (member crews OR owned crews) + their personally
+        // owned cars (owner_id match).
+        const { data: memberships, error: memberError } = await supabaseAdmin
             .from('crew_members')
             .select('crew_id')
             .eq('user_id', userId)
-            .eq('membership_status', 'active') 
-            .single();
+            .eq('membership_status', 'active');
 
-        if (memberError && memberError.code !== 'PGRST116') {
+        if (memberError) {
             throw new Error(`Failed to check crew membership: ${memberError.message}`);
         }
-        
-        const userCrewId = memberData?.crew_id || null;
+
+        const memberCrewIds = (memberships || []).map((m) => m.crew_id);
+
+        // Also fetch crews owned by the user (owner_id) — these may not
+        // have a crew_members row for the owner.
+        const { data: ownedCrews } = await supabaseAdmin
+            .from('crews')
+            .select('id')
+            .eq('owner_id', userId);
+        const ownedCrewIds = (ownedCrews || []).map((c) => c.id);
+
+        const allCrewIds = Array.from(new Set([...memberCrewIds, ...ownedCrewIds]));
+
         let query = supabaseAdmin.from('cars').select('*');
 
-        if (userCrewId) {
-            query = query.or(`owner_id.eq.${userId},crew_id.eq.${userCrewId}`);
+        if (allCrewIds.length > 0) {
+            // Cars from any of the user's crews OR personally owned by user.
+            // Use or() to combine the crew_id.in() with owner_id.eq().
+            const crewFilter = `crew_id.in.(${allCrewIds.join(',')})`;
+            query = query.or(`${crewFilter},owner_id.eq.${userId}`);
         } else {
+            // No crew memberships — fall back to personally-owned cars only.
             query = query.eq('owner_id', userId);
         }
 

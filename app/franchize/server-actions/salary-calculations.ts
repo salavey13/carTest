@@ -94,13 +94,48 @@ export async function getOrCreateSalaryPlan(params: {
     }
 
     // Проверка на пересечение периодов с улучшенным сообщением (Priority 2 Fix 5)
-    const { data: overlappingPlans } = await supabaseAdmin
-      .rpc("check_period_overlap", {
-        p_crew_id: access.crewId,
-        p_member_id: memberId,
-        p_period_start: periodStart,
-        p_period_end: periodEnd,
-      });
+    // Defensive (2026-08-19 review): the check_period_overlap RPC may be
+    // missing on environments where migration 20260814000001_fix_salary_commission_flow.sql
+    // wasn't applied (same class of issue as has_commission_rates). Fall back
+    // to a direct query against salary_plans when the RPC errors out.
+    let overlappingPlans: any[] | null = null;
+    try {
+      const { data, error: rpcErr } = await supabaseAdmin
+        .rpc("check_period_overlap", {
+          p_crew_id: access.crewId,
+          p_member_id: memberId,
+          p_period_start: periodStart,
+          p_period_end: periodEnd,
+        });
+      if (rpcErr) {
+        logger.warn("[getOrCreateSalaryPlan] check_period_overlap RPC failed, falling back to direct query:", rpcErr);
+      } else {
+        overlappingPlans = data;
+      }
+    } catch (rpcException) {
+      logger.warn("[getOrCreateSalaryPlan] check_period_overlap RPC threw, falling back to direct query:", rpcException);
+    }
+
+    if (overlappingPlans === null) {
+      // Fallback: a period overlaps if there's an existing plan for this
+      // member where period_start < newEnd AND period_end > newStart.
+      const startDate = new Date(periodStart);
+      const endDate = new Date(periodEnd);
+      const { data: fallback, error: fallbackErr } = await supabaseAdmin
+        .from("salary_plans")
+        .select("id, period_start, period_end")
+        .eq("crew_id", access.crewId)
+        .eq("member_id", memberId)
+        .lt("period_start", endDate.toISOString())
+        .gt("period_end", startDate.toISOString());
+      if (fallbackErr) {
+        logger.warn("[getOrCreateSalaryPlan] Fallback overlap query failed:", fallbackErr);
+      }
+      overlappingPlans = (fallback || []).map((p: any) => ({
+        ...p,
+        conflict_description: `Период пересекается с планом ${p.period_start} → ${p.period_end}`,
+      }));
+    }
 
     if (overlappingPlans && overlappingPlans.length > 0) {
       const overlap = overlappingPlans[0];
@@ -183,9 +218,52 @@ export async function calculateSalaryForPeriod(params: {
       return { success: false, error: access.error };
     }
 
+    // CR fix (2026-08-19 review): owner-or-self check. Previously any active
+    // crew member could call calculateSalaryForPeriod with any memberId and
+    // read another member's full salary breakdown (IDOR). Owners (incl.
+    // co_owner / admin roles per shared verifyCrewAccess) can query anyone;
+    // regular members can only query their own.
+    if (!access.isOwner && memberId !== access.actorUserId) {
+      return {
+        success: false,
+        error: "Недостаточно прав для просмотра чужого расчёта зарплаты.",
+      };
+    }
+
+    // Check if crew has commission rates configured (Priority 1 Fix 3)
+    // Defensive: the has_commission_rates RPC may not be present on all
+    // environments (migration 20260814000001 not yet applied). Fall back to
+    // a direct count query on commission_rates instead of crashing.
+    let useRateCalculation = false;
+    try {
+      const { data: hasRates, error: rpcError } = await supabaseAdmin
+        .rpc("has_commission_rates", { p_crew_id: access.crewId });
+      if (rpcError) {
+        logger.warn("[calculateSalaryForPeriod] has_commission_rates RPC failed, falling back to direct count:", rpcError);
+      } else {
+        useRateCalculation = hasRates === true;
+      }
+      if (!useRateCalculation) {
+        // Fallback: check commission_rates table directly
+        const { count, error: countErr } = await supabaseAdmin
+          .from("commission_rates")
+          .select("id", { count: "exact", head: true })
+          .eq("crew_id", access.crewId)
+          .eq("is_active", true);
+        if (!countErr && (count || 0) > 0) {
+          useRateCalculation = true;
+        }
+      }
+    } catch (err) {
+      logger.warn("[calculateSalaryForPeriod] Failed to detect commission rates, defaulting to recorded method:", err);
+    }
+
     // Get shift income
     // Проверяем кеш для расчётов зарплаты (оптимизация повторных запросов)
-    // Priority 1 Fix 3: Include calculation method in cache key
+    // Priority 1 Fix 3: Include calculation method in cache key.
+    // NOTE: cacheKey must be constructed AFTER `useRateCalculation` is
+    // determined, otherwise referencing the const here triggers a
+    // Temporal Dead Zone ReferenceError.
     const cacheKey = `${access.crewId}-${memberId}-${periodStart}-${periodEnd}-${useRateCalculation}`;
     const cached = salaryCalcCache.get(cacheKey);
     if (cached && cached.expiry > Date.now()) {
@@ -193,28 +271,35 @@ export async function calculateSalaryForPeriod(params: {
       return successResponse(cached.data);
     }
 
+    // Query shifts using correct columns (clock_in_time / clock_out_time /
+    // hourly_rate). `shift_start` and `bike_id` do NOT exist on
+    // crew_member_shifts and previously caused the query to fail.
     const { data: shifts, error: shiftError } = await supabaseAdmin
       .from("crew_member_shifts")
-      .select("salary_amount, shift_start, bike_id")
+      .select("clock_in_time, clock_out_time, hourly_rate, salary_amount")
       .eq("crew_id", access.crewId)
       .eq("member_id", memberId)
-      .gte("shift_start", periodStart)
-      .lt("shift_start", periodEnd);
+      .gte("clock_in_time", periodStart)
+      .lt("clock_in_time", periodEnd);
 
     if (shiftError) {
       logger.warn("[calculateSalaryForPeriod] Shifts query failed:", shiftError);
     }
 
     const shiftIncome = (shifts || []).reduce((sum: number, s: any) => {
-      const amount = Number(s.salary_amount || 0);
-      return sum + (amount > 0 ? amount : 0); // Защита от отрицательных значений
+      // Prefer stored salary_amount (already rounded for completed shifts).
+      // For active shifts where salary_amount is null, compute on the fly
+      // from duration * hourly_rate so we don't report zero income.
+      const stored = Number(s.salary_amount || 0);
+      if (stored > 0) return sum + stored;
+
+      const start = s.clock_in_time ? new Date(s.clock_in_time) : null;
+      if (!start) return sum;
+      const end = s.clock_out_time ? new Date(s.clock_out_time) : new Date();
+      const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+      const rate = Number(s.hourly_rate || 0);
+      return sum + (hours * rate);
     }, 0);
-
-    // Check if crew has commission rates configured (Priority 1 Fix 3)
-    const { data: hasRates } = await supabaseAdmin
-      .rpc("has_commission_rates", { p_crew_id: access.crewId });
-
-    const useRateCalculation = hasRates === true;
 
     // Get commission rates for this crew if using rate calculation
     let commissionRates: any[] | null = null;
@@ -335,11 +420,19 @@ export async function calculateSalaryForPeriod(params: {
       breakdown,
     };
 
-    // Кэшируем результат на 24 часа
-    salaryCalcCache.set(cacheKey, {
-      data: result,
-      expiry: Date.now() + 24 * 60 * 60 * 1000, // 24 часа
-    });
+    // Кэшируем результат на 24 часа — но НЕ если there's an active (in-progress)
+    // shift in the result. Active shifts compute their salary using `new Date()`
+    // as the end time, so the cached value would freeze the live number for
+    // 24h. Better to recompute on each request when a shift is still running.
+    const hasActiveShift = (shifts || []).some((s: any) => !s.clock_out_time);
+    if (!hasActiveShift) {
+      salaryCalcCache.set(cacheKey, {
+        data: result,
+        expiry: Date.now() + 24 * 60 * 60 * 1000, // 24 часа
+      });
+    } else {
+      logger.debug("[calculateSalaryForPeriod] Skipping cache (active shift present)", { cacheKey });
+    }
 
     return successResponse(result);
   } catch (err) {
@@ -417,7 +510,11 @@ export async function recordPayout(params: {
         description: `Выплата зарплаты за период ${calc.period_start}`,
         transaction_date: new Date().toISOString(),
         to_user_id: plan.member_id,
-        created_by: actorUserId,
+        // CR fix (2026-19 review): use cookie-derived access.actorUserId for
+        // created_by, NOT the client-supplied actorUserId param. Otherwise
+        // an owner can attribute a payout to a different user in the audit
+        // trail (c.f. CR fix H1 in createManualCashTransaction).
+        created_by: access.actorUserId,
       })
       .select("id")
       .single();
@@ -453,6 +550,144 @@ export async function recordPayout(params: {
   } catch (err) {
     logger.error("[recordPayout] Exception:", err);
     return errorResponse(handleError(err, "recordPayout"));
+  }
+}
+
+/**
+ * Records a salary payout for a member+period WITHOUT requiring a pre-existing
+ * salary_calculations snapshot row. Computes the accrued amount dynamically
+ * (same logic as getOwnerSalaryOverview / getMyEarnings), subtracts already-paid
+ * amounts in the same period, and inserts an expense_salary transaction for the
+ * remaining balance.
+ *
+ * Added 2026-08-19 review: previously the salary page's "Выплатить" button
+ * called `recordPayout({ salaryCalcId })` — but salary_calculations is empty
+ * for this crew, so the button always failed with "Расчёт не найден."
+ *
+ * Auth: owner / co_owner / admin only.
+ */
+export async function recordPayoutForPeriod(params: {
+  slug: string;
+  actorUserId?: string; // Deprecated: cookie-derived access.actorUserId is used
+  memberId: string;
+  periodStart: string;
+  periodEnd: string;
+}): Promise<ActionResponse<{ transactionId: string; paidAmount: number }>> {
+  const { slug, memberId, periodStart, periodEnd } = params;
+
+  // Validate period
+  const startDate = new Date(periodStart);
+  const endDate = new Date(periodEnd);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    return { success: false, error: "Некорректный формат дат периода." };
+  }
+  if (startDate >= endDate) {
+    return { success: false, error: "Дата начала должна быть раньше даты окончания." };
+  }
+
+  try {
+    const access = await verifyCrewAccess(slug);
+    if (!access.allowed || !access.isOwner) {
+      return {
+        success: false,
+        error: access.error || "Только владелец может выплачивать зарплату.",
+      };
+    }
+
+    const periodStartIso = startDate.toISOString();
+    const periodEndIso = endDate.toISOString();
+
+    // Compute accrued for this member in this period (shifts + commissions)
+    const { data: shifts } = await supabaseAdmin
+      .from("crew_member_shifts")
+      .select("clock_in_time, clock_out_time, hourly_rate, salary_amount")
+      .eq("crew_id", access.crewId)
+      .eq("member_id", memberId)
+      .gte("clock_in_time", periodStartIso)
+      .lt("clock_in_time", periodEndIso);
+
+    const shiftAccrued = (shifts || []).reduce((sum: number, s: any) => {
+      const stored = Number(s.salary_amount || 0);
+      if (stored > 0) return sum + stored;
+      const start = s.clock_in_time ? new Date(s.clock_in_time) : null;
+      if (!start) return sum;
+      const end = s.clock_out_time ? new Date(s.clock_out_time) : new Date();
+      const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+      const rate = Number(s.hourly_rate || 0);
+      return sum + hours * rate;
+    }, 0);
+
+    const { data: commissions } = await supabaseAdmin
+      .from("cash_transactions")
+      .select("amount")
+      .eq("crew_id", access.crewId)
+      .eq("to_user_id", memberId)
+      .eq("transaction_type", "expense_commission")
+      .gte("transaction_date", periodStartIso)
+      .lt("transaction_date", periodEndIso);
+    const commissionAccrued = (commissions || []).reduce(
+      (sum: number, c: any) => sum + (Number(c.amount) > 0 ? Number(c.amount) : 0),
+      0,
+    );
+
+    const accrued = Math.round(shiftAccrued + commissionAccrued);
+
+    // Already paid out for this period — crew-scoped.
+    const { data: payouts } = await supabaseAdmin
+      .from("cash_transactions")
+      .select("amount")
+      .eq("crew_id", access.crewId)
+      .eq("to_user_id", memberId)
+      .eq("transaction_type", "expense_salary")
+      .gte("transaction_date", periodStartIso)
+      .lt("transaction_date", periodEndIso);
+    const alreadyPaid = (payouts || []).reduce(
+      (sum: number, p: any) => sum + (Number(p.amount) > 0 ? Number(p.amount) : 0),
+      0,
+    );
+
+    const balanceDue = Math.max(0, accrued - alreadyPaid);
+    if (balanceDue <= 0) {
+      return {
+        success: false,
+        error: "Баланс к выплате равен нулю — payout уже зарегистрирован.",
+      };
+    }
+
+    // Insert expense_salary transaction (no salary_calc_id — there's no
+    // snapshot row, and the FK is nullable per migration 20260812000009).
+    const { data: tx, error: txError } = await supabaseAdmin
+      .from("cash_transactions")
+      .insert({
+        crew_id: access.crewId,
+        transaction_type: "expense_salary",
+        flow_direction: "out",
+        amount: balanceDue,
+        payment_method: "cash",
+        category: "Зарплата",
+        description: `Выплата зарплаты за период ${periodStartIso}`,
+        transaction_date: new Date().toISOString(),
+        to_user_id: memberId,
+        created_by: access.actorUserId, // cookie-derived, not client-supplied
+      })
+      .select("id")
+      .single();
+
+    if (txError || !tx) {
+      logger.error("[recordPayoutForPeriod] Failed to create transaction:", txError);
+      return { success: false, error: "Не удалось создать транзакцию." };
+    }
+
+    logger.info("[recordPayoutForPeriod] Recorded payout", {
+      memberId,
+      amount: balanceDue,
+      transactionId: tx.id,
+    });
+
+    return successResponse({ transactionId: tx.id, paidAmount: balanceDue });
+  } catch (err) {
+    logger.error("[recordPayoutForPeriod] Exception:", err);
+    return errorResponse(handleError(err, "recordPayoutForPeriod"));
   }
 }
 
@@ -505,17 +740,95 @@ export async function getMyEarnings(params: {
       .eq("period_start", periodStart)
       .maybeSingle();
 
-    const currentPlan = plan
-      ? {
-          accrued: Number(plan.total_accrued || 0),
-          balanceDue: Number(plan.balance_due || 0),
-          nextPayoutDate: getNextPayoutDate(plan.payout_schedule),
-        }
-      : {
-          accrued: 0,
-          balanceDue: 0,
-          nextPayoutDate: getNextPayoutDate(["10", "25"]),
-        };
+    // ── Compute current-month accrued DYNAMICALLY ──────────────────────────
+    // The `salary_plans.total_accrued` column is only kept in sync by a trigger
+    // that fires when `salary_calculations` records are inserted (which is a
+    // manual owner action and rarely happens). As a result the profile page
+    // was showing "Начислено (месяц) 0 ₽" and "К выплате 0 ₽" even when real
+    // shifts existed in `crew_member_shifts` for the current month.
+    //
+    // We now compute the month-to-date accrued from `crew_member_shifts`
+    // (using salary_amount when present, falling back to duration × hourly_rate
+    // for active shifts without a stored amount) + recorded commissions
+    // (expense_commission) in the same period. This mirrors the logic used by
+    // `getMemberEarnings` in `team-earnings.ts`, so the monthly total and the
+    // period-total shown in the date picker stay consistent.
+    const { data: monthShifts, error: monthShiftErr } = await supabaseAdmin
+      .from("crew_member_shifts")
+      .select("clock_in_time, clock_out_time, hourly_rate, salary_amount")
+      .eq("crew_id", access.crewId)
+      .eq("member_id", secureUserId)
+      .gte("clock_in_time", periodStart)
+      .lt("clock_in_time", periodEnd);
+    if (monthShiftErr) {
+      logger.warn("[getMyEarnings] Shifts query failed:", monthShiftErr);
+    }
+    const dynamicShiftAccrued = (monthShifts || []).reduce((sum: number, s: any) => {
+      const stored = Number(s.salary_amount || 0);
+      if (stored > 0) return sum + stored;
+      const start = s.clock_in_time ? new Date(s.clock_in_time) : null;
+      if (!start) return sum;
+      const end = s.clock_out_time ? new Date(s.clock_out_time) : new Date();
+      const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+      const rate = Number(s.hourly_rate || 0);
+      return sum + hours * rate;
+    }, 0);
+
+    // Month-to-date commissions recorded against this member.
+    const { data: monthCommissions, error: monthCommErr } = await supabaseAdmin
+      .from("cash_transactions")
+      .select("amount")
+      .eq("crew_id", access.crewId)
+      .eq("to_user_id", secureUserId)
+      .eq("transaction_type", "expense_commission")
+      .gte("transaction_date", periodStart)
+      .lt("transaction_date", periodEnd);
+    if (monthCommErr) {
+      logger.warn("[getMyEarnings] Commissions query failed:", monthCommErr);
+    }
+    const dynamicCommissionAccrued = (monthCommissions || []).reduce(
+      (sum: number, c: any) => sum + (Number(c.amount) > 0 ? Number(c.amount) : 0),
+      0,
+    );
+
+    // Already-paid-out salary for this plan (so balanceDue excludes it).
+    // Sums all `expense_salary` transactions for the member in the plan's
+    // period (if a plan exists) — falls back to 0 if no plan.
+    let alreadyPaidThisPeriod = 0;
+    if (plan) {
+      const { data: payouts, error: payoutsErr } = await supabaseAdmin
+        .from("cash_transactions")
+        .select("amount")
+        .eq("crew_id", access.crewId)
+        .eq("to_user_id", secureUserId)
+        .eq("transaction_type", "expense_salary")
+        .gte("transaction_date", periodStart)
+        .lt("transaction_date", periodEnd);
+      if (payoutsErr) {
+        logger.warn("[getMyEarnings] Payouts query failed:", payoutsErr);
+      }
+      alreadyPaidThisPeriod = (payouts || []).reduce(
+        (sum: number, p: any) => sum + (Number(p.amount) > 0 ? Number(p.amount) : 0),
+        0,
+      );
+    }
+
+    const dynamicAccrued = Math.round(dynamicShiftAccrued + dynamicCommissionAccrued);
+    // balance_due reflects what the owner still owes for this period: the
+    // higher of (dynamicAccrued − already paid, plan.balance_due). We prefer
+    // the dynamic calc when it is non-zero (live data); otherwise fall back to
+    // whatever the plan recorded.
+    const dynamicBalanceDue = Math.max(0, dynamicAccrued - alreadyPaidThisPeriod);
+    const planBalanceDue = plan ? Number(plan.balance_due || 0) : 0;
+    const balanceDue = dynamicAccrued > 0 ? dynamicBalanceDue : planBalanceDue;
+
+    const currentPlan = {
+      accrued: dynamicAccrued > 0
+        ? dynamicAccrued
+        : (plan ? Number(plan.total_accrued || 0) : 0),
+      balanceDue,
+      nextPayoutDate: getNextPayoutDate(plan?.payout_schedule || ["10", "25"]),
+    };
 
     // Get recent commissions
     const { data: commissions } = await supabaseAdmin

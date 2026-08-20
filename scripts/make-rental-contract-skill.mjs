@@ -248,6 +248,46 @@ async function verifyMetadataWithFallback(table, contractKey) {
  * Create a rentals row when bot generates a rental contract.
  * This unifies bot and web-app rentals in a single table for availability tracking.
  *
+ * 2026-08-19 IMPORTANT GUIDANCE FOR SKILL AUTHORS (custom skills based on
+ * this script, including any assistant-bot quick-entry skill):
+ *
+ *   Rentals created by skill authors MUST start in status='pending_confirmation'
+ *   (NOT 'active') and payment_status='pending' (NOT 'fully_paid'). The
+ *   /doc Telegram flow and the web checkout flow both start in pending_confirmation
+ *   — only a human operator can confirm the booking by physically handing over
+ *   the bike + collecting the deposit.
+ *
+ *   Why this matters:
+ *     - The /ekip and /doc deposit tracking flows fire on status transitions
+ *       to 'completed'. A skill-created rental in 'active' state skips the
+ *       operator confirmation step — when it eventually closes, no deposit
+ *       was tracked (deposit_entries stays empty, rentals.deposit_amount
+ *       stays 0), so the deposits admin page shows zeros.
+ *     - The rentals analytics page counts 'active' rentals in "currently out"
+ *       metrics. A skill-created 'active' rental pollutes the active list.
+ *     - The salary subsystem's getMyEarnings/getMemberEarnings include
+ *       'active' shifts in current-month totals, which can make the owner
+ *       pay out money that wasn't actually earned yet.
+ *
+ *   Skills should also:
+ *     - NOT set payment_status='fully_paid' — that's set by the actual
+ *       payment processor or by the operator confirming cash receipt.
+ *     - Include metadata.deposit_rub (from bike.specs.deposit_rub) so a
+ *       downstream operator can collect the deposit via /doc or the
+ *       admin page.
+ *     - Set metadata.source='bot_contract' (already done) and
+ *       metadata.created_by='<your-skill-name>' so the rental's provenance
+ *       is auditable.
+ *
+ *   If a skill DID prematurely create a rental in 'active' state, demote it:
+ *     UPDATE rentals
+ *     SET status='pending_confirmation', payment_status='pending',
+ *         updated_at=NOW(),
+ *         metadata = metadata || '{"status_correction":{"reason":"...",
+ *             "corrected_at":"...","original_status":"active",
+ *             "original_payment_status":"fully_paid"}}'::jsonb
+ *     WHERE rental_id = '<uuid>';
+ *
  * @param supabase - Supabase client
  * @param bike - Bike object from catalog
  * @param startDateText - TEXT date in DD.MM.YYYY format
@@ -294,13 +334,19 @@ async function createRentalFromBotContract(
         requested_end_date: endDateIso,
         agreed_start_date: startDateIso,
         agreed_end_date: endDateIso,
-        status: 'active',
-        payment_status: 'fully_paid',
+        // 2026-08-19 review: start in 'pending_confirmation' (NOT 'active')
+        // — a human operator must confirm the booking, collect the deposit,
+        // and hand over the bike before the rental goes active. Same for
+        // payment_status: 'pending' (NOT 'fully_paid'). See the docstring
+        // above for why this matters.
+        status: 'pending_confirmation',
+        payment_status: 'pending',
         total_cost: totalCost,
         metadata: {
           source: 'bot_contract',
           daily_price: dailyPrice,
           created_by: 'skill-script',
+          deposit_rub: bike.specs?.deposit_rub || null,
         },
       })
       .select('rental_id')
@@ -345,6 +391,11 @@ const fetchAllBikeCandidates = async () => {
   const pageSize = 1000;
   let from = 0;
   const all = [];
+  // 2026-08-19 review: when --type equipment, also fetch 'equipment' items.
+  // Previously only fetched type IN ['bike', 'ebike'] — equipment items like
+  // the-meta-helmet (type='equipment') were never in the candidate list,
+  // causing the fuzzy matcher to pick the wrong bike.
+  const typeFilter = isEquipmentRental ? ['bike', 'ebike', 'equipment'] : ['bike', 'ebike'];
 
   while (true) {
     const to = from + pageSize - 1;
@@ -355,7 +406,7 @@ const fetchAllBikeCandidates = async () => {
       const response = await supabase
         .from('cars')
         .select('id,make,model,specs,type,crew_id')
-        .in('type', ['bike', 'ebike'])
+        .in('type', typeFilter)
         .range(from, to);
       data = response.data;
       error = response.error;
@@ -525,7 +576,12 @@ const bikeDailyPriceNum = Number(bikeDailyPrice);
 const bikeHourlyPrice = Number(explicitHourlyPrice) > 0 ? explicitHourlyPrice
   : Number(bike.specs?.price_per_hour) > 0 ? String(bike.specs.price_per_hour)
   : String(bikeDailyPriceNum > 0 ? Math.round(bikeDailyPriceNum / 8) : DEFAULT_HOURLY_PRICE);
-const bikeDeposit = Number(explicitDeposit) > 0 ? explicitDeposit
+// 2026-08-19 review: equipment rentals have NO deposit — user explicitly
+// said "there is no such thing as deposit for equipment". Set to '0'
+// when --type equipment is used, regardless of bike.specs.deposit_rub.
+const bikeDeposit = isEquipmentRental
+  ? '0'
+  : Number(explicitDeposit) > 0 ? explicitDeposit
   : Number(bike.specs?.deposit_rub) > 0 ? String(bike.specs.deposit_rub)
   : '20000';
 // Bike value for loss/total-loss compensation = sale price or market price
@@ -588,10 +644,19 @@ const vars = {
   equipment_net: arg('net') === '1' ? 'да' : 'нет',
   equipment_backpack: arg('backpack') === '1' ? 'да' : 'нет',
   equipment_bag: arg('bag') === '1' ? 'да' : 'нет',
-  // Equipment cost
+  // 2026-08-19 review: added jacket/pants/boots flags (were missing —
+  // the /doc flow has them but the skill script didn't). Also added
+  // priceOverride flag so the skill can reproduce the /doc override flow.
+  equipment_jacket: arg('jacket') === '1' ? 'да' : 'нет',
+  equipment_pants: arg('pants') === '1' ? 'да' : 'нет',
+  equipment_boots: arg('boots') === '1' ? 'да' : 'нет',
+  // Equipment cost (jacket/pants/boots = 500₽ each, same as gloves)
   equipment_total_cost: String(
     Number(arg('helmets', '0')) * 1000 +
     Number(arg('gloves', '0')) * 500 +
+    (arg('jacket') === '1' ? 500 : 0) +
+    (arg('pants') === '1' ? 500 : 0) +
+    (arg('boots') === '1' ? 500 : 0) +
     (arg('charger') === '1' ? 0 : 0) +
     (arg('net') === '1' ? 500 : 0) +
     (arg('backpack') === '1' ? 500 : 0) +
@@ -603,27 +668,50 @@ const vars = {
     const g = Number(arg('gloves', '0'));
     if (h > 0) parts.push(`Шлем ×${h}`);
     if (g > 0) parts.push(`Перчатки ×${g}`);
+    if (arg('jacket') === '1') parts.push('Куртка');
+    if (arg('pants') === '1') parts.push('Штаны');
+    if (arg('boots') === '1') parts.push('Ботинки');
     if (arg('charger') === '1') parts.push('Зарядка');
     if (arg('net') === '1') parts.push('Сетка');
     if (arg('backpack') === '1') parts.push('Рюкзак');
     if (arg('bag') === '1') parts.push('Сумка');
     return parts.length > 0 ? parts.join(', ') : '—';
   })(),
-  // totalPayable = base rent + equipment + deposit
+  // 2026-08-19 review: priceOverride — when set, overrides rent+equipment total.
+  // deposit is added on top. Total = override + deposit.
+  price_override_note: arg('priceOverride') ? 'Цена аренды изменена оператором вручную.' : '',
+  deposit_payment_method: arg('depositMethod', 'наличными'),
+  // totalPayable = base rent + equipment + deposit (or override + deposit)
   subtotal_rub: String(
-    subtotalRounded +
-    Number(arg('helmets', '0')) * 1000 +
-    Number(arg('gloves', '0')) * 500 +
-    (arg('charger') === '1' ? 0 : 0) +
-    (arg('net') === '1' ? 500 : 0) +
-    (arg('backpack') === '1' ? 500 : 0) +
-    (arg('bag') === '1' ? 500 : 0) +
-    Number(bikeDeposit)
+    arg('priceOverride')
+      ? Number(arg('priceOverride')) + Number(bikeDeposit)
+      : subtotalRounded +
+        Number(arg('helmets', '0')) * 1000 +
+        Number(arg('gloves', '0')) * 500 +
+        (arg('jacket') === '1' ? 500 : 0) +
+        (arg('pants') === '1' ? 500 : 0) +
+        (arg('boots') === '1' ? 500 : 0) +
+        (arg('charger') === '1' ? 0 : 0) +
+        (arg('net') === '1' ? 500 : 0) +
+        (arg('backpack') === '1' ? 500 : 0) +
+        (arg('bag') === '1' ? 500 : 0) +
+        Number(bikeDeposit)
   ),
   deposit_rub: bikeDeposit,
-  // Payment split — default: cash = deposit, bank = rent + equipment
-  payment_cash_rub: String(Number(bikeDeposit)),
-  payment_bank_rub: String(subtotalRounded + Number(arg('helmets', '0')) * 1000 + Number(arg('gloves', '0')) * 500 + (arg('charger') === '1' ? 0 : 0) + (arg('net') === '1' ? 500 : 0) + (arg('backpack') === '1' ? 500 : 0) + (arg('bag') === '1' ? 500 : 0)),
+  // Payment split — when overridden: all cash (override + deposit); else: deposit=cash, rent+equipment=bank
+  payment_cash_rub: String(
+    arg('priceOverride')
+      ? Number(arg('priceOverride')) + Number(bikeDeposit)
+      : Number(bikeDeposit)
+  ),
+  payment_bank_rub: String(
+    arg('priceOverride')
+      ? 0
+      : subtotalRounded + Number(arg('helmets', '0')) * 1000 + Number(arg('gloves', '0')) * 500 +
+        (arg('jacket') === '1' ? 500 : 0) + (arg('pants') === '1' ? 500 : 0) + (arg('boots') === '1' ? 500 : 0) +
+        (arg('charger') === '1' ? 0 : 0) + (arg('net') === '1' ? 500 : 0) +
+        (arg('backpack') === '1' ? 500 : 0) + (arg('bag') === '1' ? 500 : 0)
+  ),
   included_mileage:'200', overage_rate:'35', included_km_per_day:'200', extra_km_fee_rub:'35',
   late_return_penalty_rub: arg('latePenalty','10000'),
   late_return_penalty_max_days: arg('latePenaltyMaxDays','90'),
@@ -635,7 +723,7 @@ const vars = {
   signature_timestamp: now.toLocaleString('ru-RU'), signature_fingerprint:'offline-skill', renter_signature:'согласие через Telegram',
   bike_mileage: String(bike.specs?.mileage||''),
   equipment:'ключ(и) 1 шт.; шлем 1',
-  damage_notes_at_delivery:'от даты начала аренды', damage_notes_at_return:'от даты возврата тс',
+  damage_notes_at_delivery:'от даты начала аренды', damage_notes_at_return: isEquipmentRental ? 'от даты возврата экипировки' : 'от даты возврата тс',
   battery_level_start:'100 %', battery_level_end:'____ %',
   media_links:'телефон',
   renter_passport_issue_date: passportJson.issueDate || '', renter_registration: passportJson.registration || '',
@@ -656,7 +744,24 @@ let doc;
 if (RENTAL_DOC_TEMPLATE_MODE === 'html') {
   let htmlTemplate;
   try {
-    htmlTemplate = readFileSync(RENTAL_DOC_HTML_TEMPLATE_PATH, 'utf8');
+    // 2026-08-19 review: check crew-specific template FIRST (has quick table
+    // at the top with period/tariff/equipment/total/payment/deposit/odometer/phone).
+    // Falls back to general template if crew-specific doesn't exist.
+    // For equipment rentals, use the EQUIPMENT_RENTAL template variant.
+    const templateSuffix = isEquipmentRental ? '_EQUIPMENT_RENTAL_DEAL_TEMPLATE.html' : '_RENTAL_DEAL_TEMPLATE.html';
+    const generalFallback = isEquipmentRental ? 'docs/EQUIPMENT_RENTAL_DEAL_TEMPLATE.html' : RENTAL_DOC_HTML_TEMPLATE_PATH;
+    if (resolvedCrewSlug) {
+      const crewTemplatePath = `docs/crewDocs/${resolvedCrewSlug}${templateSuffix}`;
+      try {
+        htmlTemplate = readFileSync(crewTemplatePath, 'utf8');
+        console.error(`[rental-doc] Using crew-specific HTML template: ${crewTemplatePath}`);
+      } catch {
+        htmlTemplate = readFileSync(generalFallback, 'utf8');
+        console.error(`[rental-doc] No crew-specific template for ${resolvedCrewSlug}, using general: ${generalFallback}`);
+      }
+    } else {
+      htmlTemplate = readFileSync(generalFallback, 'utf8');
+    }
   } catch (readError) {
     console.warn(`[rental-doc] html template read failed, fallback to md: ${String(readError?.message || readError)}`);
   }

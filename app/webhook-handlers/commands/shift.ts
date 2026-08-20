@@ -70,6 +70,14 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
         let userMessage = "";
         let ownerMessage = "";
         let shiftLogAction: (() => Promise<any>) | null = null;
+        // 2026-08-19 review: populated inside shiftLogAction for clock_out so
+        // the user-facing message can include the earned amount per shift.
+        let shiftEarnedAmount = 0;
+        let shiftEarnedHours = 0;
+        let shiftEarnedRate = 0;
+        // Flag: set during clock_out case, used AFTER shiftLogAction() runs
+        // to construct the user/owner messages with the earned amount.
+        let needClockOutMessage = false;
 
         switch (action) {
             case 'clock_in':
@@ -118,6 +126,11 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                             const durationMinutes = Math.round((clockOut - clockIn) / 60000);
                             const rate = shiftData.hourly_rate || 169;
                             const salaryAmount = (durationMinutes / 60) * rate;
+                            // 2026-08-19 review: stash the earned amount + duration
+                            // so we can include it in the user-facing message.
+                            shiftEarnedAmount = Math.round(salaryAmount);
+                            shiftEarnedHours = Math.round((durationMinutes / 60) * 10) / 10;
+                            shiftEarnedRate = rate;
                             return supabaseAdmin.from('crew_member_shifts').update({
                                 clock_out_time: new Date().toISOString(),
                                 duration_minutes: durationMinutes,
@@ -134,8 +147,12 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
             if (hasActiveShift || live_status !== 'offline') {
                 if (live_status !== 'offline') {
                     updateData = { live_status: 'offline', last_location: null };
-                    userMessage = "✅ Смена завершена.\nХорошего отдыха!";
-                    ownerMessage = `🔴 @${displayName} завершил смену в экипаже «${crewName}».`;
+                    // 2026-08-19 review: DON'T construct userMessage here —
+                    // shiftEarnedAmount is still 0 because shiftLogAction()
+                    // hasn't run yet. Set a flag and construct the message
+                    // AFTER shiftLogAction() completes (where shiftEarnedAmount
+                    // gets populated).
+                    needClockOutMessage = true;
                 } else {
                     userMessage = "✅ Остаточная смена закрыта.\nСмена в базе данных была завершена.";
                     ownerMessage = `🔧 @${displayName}: закрыл остаточную смену в «${crewName}».`;
@@ -163,7 +180,20 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                 await supabaseAdmin.from("crew_members").update(updateData).eq("user_id", userId).eq("crew_id", crew_id).eq("membership_status", "active");
             }
             if (shiftLogAction) await shiftLogAction();
-            
+
+            // 2026-08-19 review: construct clock_out message AFTER shiftLogAction()
+            // runs — that's when shiftEarnedAmount/Hours/Rate are populated.
+            // Previously the message was built in the switch case BEFORE
+            // shiftLogAction ran, so shiftEarnedAmount was always 0 and the
+            // money line was never shown.
+            if (needClockOutMessage) {
+                const moneyLine = shiftEarnedAmount > 0
+                  ? `\n💰 Заработано: ${shiftEarnedAmount.toLocaleString("ru-RU")} ₽ (${shiftEarnedHours} ч × ${shiftEarnedRate} ₽/ч)\n`
+                  : "\n";
+                userMessage = `✅ Смена завершена.${moneyLine}\nХорошего отдыха!`;
+                ownerMessage = `🔴 @${displayName} завершил смену в экипаже «${crewName}»${shiftEarnedAmount > 0 ? ` (заработал ${shiftEarnedAmount.toLocaleString("ru-RU")} ₽)` : ""}.`;
+            }
+
             // Send messages as plain text (no MarkdownV2 — avoids escaping bugs)
             if (userMessage) {
                 await sendComplexMessage(chatId, userMessage, [], { removeKeyboard: true });

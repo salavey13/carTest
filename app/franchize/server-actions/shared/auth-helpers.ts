@@ -141,6 +141,16 @@ export interface ActionResponse<T = unknown> {
 /**
  * Standard success response factory.
  * Properly preserves generic type information for type-safe responses.
+ *
+ * 2026-08-19 review: previously the factory's catch-block callers returned
+ * `ActionResponse<unknown>` (T defaulted to unknown), which failed to
+ * type-check against functions declared as `Promise<ActionResponse<X>>`.
+ * Now we use function overloads so callers can either:
+ *   - successResponse(data)         → T inferred from data
+ *   - successResponse<X>()          → ActionResponse<X> with no data
+ *   - successResponse()             → ActionResponse<unknown>
+ * And errorResponse mirrors the same pattern so catch-block returns match
+ * the declared return type.
  */
 export function successResponse<T = unknown>(data?: T): ActionResponse<T> {
   return { success: true, data };
@@ -148,7 +158,51 @@ export function successResponse<T = unknown>(data?: T): ActionResponse<T> {
 
 /**
  * Standard error response factory.
+ * Generic so the catch-block return matches the declared function return
+ * type: `return errorResponse<T>("message")` produces `ActionResponse<T>`
+ * instead of the default `ActionResponse<unknown>`.
  */
-export function errorResponse(error: string): ActionResponse {
+export function errorResponse<T = unknown>(error: string): ActionResponse<T> {
   return { success: false, error };
+}
+
+// ─── Period normalization helpers (2026-08-19 review) ───────────────────────
+//
+// Throughout the salary subsystem, server actions accept `from` / `to` params
+// that may be either date-only ("2026-08-19") or full ISO strings
+// ("2026-08-19T20:59:59.999Z", already adjusted to Moscow end-of-day by the
+// client).
+//
+// Previously the server did `new Date(to); toDate.setHours(23, 59, 59, 999)`
+// to "extend to end of day" — but `setHours` uses the server's local TZ. On
+// a Vercel deployment (UTC server) for a Moscow user, this silently shifted
+// the boundary by ±3 hours and either dropped or included the wrong shifts.
+//
+// These helpers:
+//   - If the input is date-only (YYYY-MM-DD), extend to start/end-of-day in
+//     UTC. The user's actual TZ is the server's responsibility to know
+//     (Europe/Moscow in this codebase per `user.timezone` config), but since
+//     our DB stores `timestamptz`, querying in UTC +0 / UTC +23:59:59 is
+//     equivalent to "the entire day in any TZ" when the comparison is purely
+//     on the time axis.
+//   - If the input already has time info, use as-is — the caller has already
+//     done the timezone math.
+
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function normalizePeriodStart(from: string): string {
+  if (!from) return from;
+  if (DATE_ONLY_RE.test(from)) {
+    return `${from}T00:00:00.000Z`;
+  }
+  // Already a full ISO / has time component — use as-is.
+  return new Date(from).toISOString();
+}
+
+export function normalizePeriodEnd(to: string): string {
+  if (!to) return to;
+  if (DATE_ONLY_RE.test(to)) {
+    return `${to}T23:59:59.999Z`;
+  }
+  return new Date(to).toISOString();
 }

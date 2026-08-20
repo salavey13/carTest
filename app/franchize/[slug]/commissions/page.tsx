@@ -13,6 +13,7 @@ import { verifyTelegramActorCookieValue, TELEGRAM_ACTOR_COOKIE } from "@/lib/tel
 export const metadata = buildFranchizeSectionMetadata("vip-bike", {
   sectionTitle: "Комиссионные ставки",
   sectionDescription: "Управление комиссионными ставками экипажа",
+  pathSuffix: "/commissions",
 });
 
 interface CommissionsPageProps {

@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Calendar, DollarSign, Package, CheckCircle, Shield, Star } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { catalogCardVariantStyles, interactionRingStyle } from "@/app/franchize/lib/theme";
+import { formatDateRu } from "@/app/franchize/components/DateInputRu";
 
 interface EquipmentItem {
   id: string;
@@ -659,6 +660,12 @@ export function EquipmentClient({ slug, crew }: EquipmentClientProps) {
                     className="w-full px-3 py-2 rounded-xl border"
                     style={{ background: T.bg, borderColor: T.borderSoft, color: T.text }}
                   />
+                  {/* 2026-08-19 review: Russian-format display hint */}
+                  {rentalForm.expectedReturnDate && (
+                    <p className="mt-1 text-[10px] tabular-nums" style={{ color: T.textMuted }}>
+                      ({formatDateRu(rentalForm.expectedReturnDate)})
+                    </p>
+                  )}
                 </div>
 
                 <div>

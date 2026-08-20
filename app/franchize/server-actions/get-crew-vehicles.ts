@@ -10,6 +10,12 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 /**
  * Fetch all vehicles belonging to a crew by its slug.
  * Used by the admin page to show the correct fleet per crew.
+ *
+ * 2026-08-19 review: use .maybeSingle() instead of .single() so we
+ * gracefully handle the (impossible-by-constraint but defensively
+ * possible) case of duplicate slugs. .single() would throw and the
+ * admin page would silently fall back to getEditableVehiclesForUser
+ * (showing only the user's personally-owned cars).
  */
 export async function getCrewVehicles(
   crewSlug: string
@@ -18,11 +24,16 @@ export async function getCrewVehicles(
 
   try {
     // Resolve crew id from slug
-    const { data: crew } = await supabase
+    const { data: crew, error: crewError } = await supabase
       .from("crews")
       .select("id")
       .eq("slug", crewSlug)
-      .single();
+      .maybeSingle();
+
+    if (crewError) {
+      logger.error("Error resolving crew by slug:", crewError);
+      return { success: false, error: `Ошибка поиска экипажа: ${crewError.message}` };
+    }
 
     if (!crew) {
       return { success: false, error: "Экипаж не найден" };

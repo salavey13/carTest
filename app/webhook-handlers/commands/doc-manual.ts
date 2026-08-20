@@ -1509,6 +1509,7 @@ async function createRentalFromDocContract(
       user_id: crewOwnerChatId,
       owner_id: crewOwnerChatId,
       created_by_operator_chat_id: crewOwnerChatId,
+      crew_id: effectiveCrewId,  // 2026-08-19 review: was MISSING — rental insert failed silently because crew_id is required
       vehicle_id: bike.id,
       requested_start_date: startDateIso,
       requested_end_date: endDateIso,
@@ -1692,6 +1693,26 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
           cashAmount: context.cashAmount || 0,
           bankAmount: context.bankAmount || 0,
         },
+        // 2026-08-19 review: pass the override flag so buildRentalContractVariables
+        // uses the operator's custom price instead of recalculating from tiers.
+        priceOverridden: context.priceOverridden || false,
+        // Deposit payment method (how the deposit was collected — cash/card)
+        depositPaymentMethod: (() => {
+          const depCash = context.depositCashAmount || 0;
+          const depCard = context.depositCardAmount || 0;
+          const depDest = context.depositCardDestination;
+          if (depCash > 0 && depCard > 0) {
+            return `наличными ${depCash} ₽ + на карту (${depDest === 'tbank' ? 'Тинькофф' : 'Сбербанк'}) ${depCard} ₽`;
+          }
+          if (depCard > 0) {
+            return `на карту (${depDest === 'tbank' ? 'Тинькофф' : 'Сбербанк'})`;
+          }
+          if (depCash > 0) {
+            return 'наличными';
+          }
+          // Default: if no deposit payment info, just say "наличными"
+          return 'наличными';
+        })(),
       });
     } else {
       // Sale contract still uses manual construction (TODO: could be extracted too)

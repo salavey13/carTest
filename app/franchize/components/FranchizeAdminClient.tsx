@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Loading } from "@/components/Loading";
@@ -199,6 +199,29 @@ export function FranchizeAdminClient({
   useEffect(() => {
     loadFleet();
   }, [loadFleet]);
+
+  // 2026-08-19 review HOTFIX: explicit re-load when userCrewMemberships
+  // arrives. The chain `userCrewMemberships → isCrewFleetAdmin (useMemo)
+  // → loadFleet (useCallback) → useEffect` SHOULD work via React's dep
+  // tracking, but in practice the initial render runs loadFleet with
+  // isCrewFleetAdmin=false (memberships not yet fetched) → calls
+  // getEditableVehiclesForUser → user sees only their personally-owned
+  // cars (11 in salavey13's case). When memberships arrive a few hundred
+  // ms later, isCrewFleetAdmin becomes true, but the re-load sometimes
+  // doesn't trigger reliably (React 18 batching). This explicit effect
+  // forces a re-load whenever userCrewMemberships changes from empty to
+  // populated, ensuring the second loadFleet call actually runs.
+  const prevMembershipsLen = useRef(0);
+  useEffect(() => {
+    const len = userCrewMemberships.length;
+    // Only trigger if memberships went from 0 to >0 (initial load).
+    if (prevMembershipsLen.current === 0 && len > 0 && crew?.slug && dbUser?.user_id) {
+      prevMembershipsLen.current = len;
+      void loadFleet();
+    } else {
+      prevMembershipsLen.current = len;
+    }
+  }, [userCrewMemberships, crew?.slug, dbUser?.user_id, loadFleet]);
 
   const loadFailedNotifications = useCallback(async () => {
     if (!dbUser?.user_id) return;

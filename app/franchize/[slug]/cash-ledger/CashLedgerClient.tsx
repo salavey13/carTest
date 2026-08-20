@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react";
 import { DollarSign, TrendingUp, TrendingDown, Plus, Filter } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
+import { formatDateRu } from "@/app/franchize/components/DateInputRu";
 
 interface CashTransaction {
   id: string;
@@ -224,21 +225,36 @@ export function CashLedgerClient({ slug, crew }: CashLedgerClientProps) {
           <Filter className="w-4 h-4" style={{ color: T.textMuted }} />
           <span className="text-sm" style={{ color: T.textMuted }}>Фильтры:</span>
         </div>
-        <input
-          type="date"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
-          className="px-3 py-2 rounded-lg border text-sm"
-          style={{ background: T.bgCard, borderColor: T.borderSoft, color: T.text }}
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="px-3 py-2 rounded-lg border text-sm"
+            style={{ background: T.bgCard, borderColor: T.borderSoft, color: T.text }}
+          />
+          {/* 2026-08-19 review: unambiguous Russian-format display */}
+          {fromDate && (
+            <span className="text-[10px] tabular-nums" style={{ color: T.textMuted }}>
+              ({formatDateRu(fromDate)})
+            </span>
+          )}
+        </div>
         <span style={{ color: T.textMuted }}>—</span>
-        <input
-          type="date"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
-          className="px-3 py-2 rounded-lg border text-sm"
-          style={{ background: T.bgCard, borderColor: T.borderSoft, color: T.text }}
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="px-3 py-2 rounded-lg border text-sm"
+            style={{ background: T.bgCard, borderColor: T.borderSoft, color: T.text }}
+          />
+          {toDate && (
+            <span className="text-[10px] tabular-nums" style={{ color: T.textMuted }}>
+              ({formatDateRu(toDate)})
+            </span>
+          )}
+        </div>
         <select
           value={transactionType}
           onChange={(e) => setTransactionType(e.target.value)}
