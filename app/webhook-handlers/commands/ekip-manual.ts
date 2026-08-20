@@ -78,6 +78,50 @@ const EQUIPMENT_CATEGORY_LABELS: Record<string, string> = {
 // Items per page in the equipment selection keyboard
 const EKIP_PAGE_SIZE = 10;
 
+// B.1 review fix: normalize materials to short English keys for callback_data
+// (Telegram 64-byte limit + case-insensitive matching). Maps Russian material
+// strings to stable short keys used in callback_data and filtering.
+const MATERIAL_KEY_MAP: Record<string, string> = {
+  "кожа": "leather",
+  "текстиль": "textile",
+  "эндуро": "enduro",
+  "полиэстер": "polyester",
+};
+const MATERIAL_LABEL_MAP: Record<string, { label: string; emoji: string }> = {
+  leather: { label: "Кожа", emoji: "🟤" },
+  textile: { label: "Текстиль", emoji: "🔵" },
+  enduro: { label: "Эндуро", emoji: "🟢" },
+  polyester: { label: "Полиэстер", emoji: "🟣" },
+  other: { label: "Другое", emoji: "📦" },
+};
+
+/**
+ * Normalize a Russian material string to a short English key.
+ * "Кожа" → "leather", "Текстиль" → "textile", etc.
+ * Strings containing "кожа" but also "текстиль" → "combo" (composite).
+ * Unknown strings → "other".
+ */
+function normalizeMaterialKey(material: string | undefined | null): string {
+  if (!material || typeof material !== "string") return "other";
+  const lower = material.toLowerCase();
+  const hasLeather = lower.includes("кож");
+  const hasTextile = lower.includes("текстил") || lower.includes("полиэстер") || lower.includes("polyester");
+  if (hasLeather && hasTextile) return "combo";
+  if (hasLeather) return "leather";
+  if (hasTextile) return "textile";
+  if (lower.includes("эндуро") || lower.includes("enduro")) return "enduro";
+  // Try exact map match
+  for (const [ru, key] of Object.entries(MATERIAL_KEY_MAP)) {
+    if (lower === ru || lower.includes(ru)) return key;
+  }
+  return "other";
+}
+
+/** Get display label + emoji for a material key */
+function materialDisplay(key: string): { label: string; emoji: string } {
+  return MATERIAL_LABEL_MAP[key] || MATERIAL_LABEL_MAP.other;
+}
+
 // ── Equipment catalog ────────────────────────────────────────────────────────
 
 interface EquipmentItem {
@@ -108,7 +152,7 @@ async function getEquipmentCatalog(crewSlug?: string): Promise<EquipmentItem[]> 
   try {
     const { data, error } = await supabaseAdmin
       .from("cars")
-      .select("id, make, model, specs, crew_id")
+      .select("id, make, model, specs, crew_id, image_url")
       .eq("type", "equipment")
       .order("make, model");
 
@@ -128,7 +172,7 @@ async function resolveEquipmentById(equipmentId: string): Promise<EquipmentItem 
   try {
     const { data, error } = await supabaseAdmin
       .from("cars")
-      .select("id, make, model, specs, crew_id")
+      .select("id, make, model, specs, crew_id, image_url")
       .eq("type", "equipment")
       .eq("id", equipmentId)
       .maybeSingle();
@@ -254,10 +298,13 @@ function buildCategoryItemsKeyboard(
   page: number,
   subcategory?: string, // B.1: filter by material (e.g., "Кожа", "Текстиль")
 ): KeyboardButton[][] {
-  // B.1: filter by category + optional subcategory (specs.materials)
+  // B.1: filter by category + optional subcategory (normalized material key)
   let items = equipmentList.filter((i) => (i.specs?.category || "other") === category);
   if (subcategory) {
-    items = items.filter(i => i.specs?.materials === subcategory);
+    // Review fix: use normalizeMaterialKey for case-insensitive matching.
+    // subcategory is now a short English key (e.g., "leather"), not the raw
+    // Russian string. Items are filtered by their normalized material key.
+    items = items.filter(i => normalizeMaterialKey(i.specs?.materials) === subcategory);
   }
   const label = EQUIPMENT_CATEGORY_LABELS[category] || category;
   const pageCount = Math.max(1, Math.ceil(items.length / EKIP_PAGE_SIZE));
@@ -274,8 +321,9 @@ function buildCategoryItemsKeyboard(
       : item.specs?.sizes?.length
         ? ` (${item.specs.sizes.join(", ")})`
         : "";
-    // B.1 prep: show material if available (specs.materials is a string per gold standard)
-    const materialInfo = item.specs?.materials ? ` [${item.specs.materials}]` : "";
+    // B.1 prep: show material if available (normalized display from specs.materials)
+    const matKey = normalizeMaterialKey(item.specs?.materials);
+    const materialInfo = matKey !== "other" ? ` [${materialDisplay(matKey).label}]` : "";
     rows.push([{
       text: `${selected ? "✅ " : ""}${categoryEmoji(category)} ${item.make} ${item.model}${sizeInfo}${materialInfo}`,
       callback_data: `eq_${item.id}`,
@@ -1118,6 +1166,7 @@ export async function handleEkipCallback(
       // Back to category list
       context.equipmentCategory = undefined;
       context.equipmentPage = 0;
+      context.equipmentSubcategory = undefined; // LOW fix: reset subcategory too
       await setState(userId, state, context);
       await sendComplexMessage(
         chatId,
@@ -1137,21 +1186,26 @@ export async function handleEkipCallback(
     // different materials (specs.materials string per gold standard). If 2+
     // distinct materials found, show subcategory picker. If 0-1, go straight
     // to items (skip subcategory step).
+    // Review fix: use normalizeMaterialKey() for case-insensitive matching +
+    // short English keys in callback_data (avoids Telegram 64-byte limit).
     const label = EQUIPMENT_CATEGORY_LABELS[category] || category;
     const allItems = await getEquipmentCatalog();
     const categoryItems = allItems.filter(i => i.specs?.category === category);
-    const distinctMaterials = [...new Set(
+    // Collect distinct material keys (normalized)
+    const distinctKeys = [...new Set(
       categoryItems
-        .map(i => i.specs?.materials)
-        .filter(m => m && typeof m === 'string')
-    )];
+        .map(i => normalizeMaterialKey(i.specs?.materials))
+    )].filter(k => k !== "other" || categoryItems.some(i => normalizeMaterialKey(i.specs?.materials) === "other" && i.specs?.materials));
 
-    if (distinctMaterials.length >= 2) {
-      // Show subcategory picker (leather/textile/all)
-      const subRows: KeyboardButton[][] = distinctMaterials.map(m => [{
-        text: `${m === 'Кожа' ? '🟤' : m === 'Текстиль' ? '🔵' : '📦'} ${m}`,
-        callback_data: `eksub_${m}`,
-      }]);
+    if (distinctKeys.length >= 2) {
+      // Show subcategory picker with normalized keys
+      const subRows: KeyboardButton[][] = distinctKeys.map(k => {
+        const d = materialDisplay(k);
+        return [{
+          text: `${d.emoji} ${d.label}`,
+          callback_data: `eksub_${k}`,
+        }];
+      });
       subRows.push([{ text: "📦 Все", callback_data: "eksub_all" }]);
       subRows.push([{ text: "↩️ Категории", callback_data: "ecat_back" }]);
       await sendComplexMessage(
@@ -1175,10 +1229,12 @@ export async function handleEkipCallback(
     return true;
   }
 
-  // B.1: Subcategory selection handler — eksub_<material> or eksub_all
+  // B.1: Subcategory selection handler — eksub_<key> or eksub_all
+  // Review fix: callback_data now uses short English keys (leather/textile/enduro/all)
+  // instead of raw Russian strings (avoids Telegram 64-byte limit + case issues).
   if (callbackData.startsWith("eksub_")) {
-    const sub = callbackData.slice(6); // "Кожа", "Текстиль", "all"
-    context.equipmentSubcategory = sub === "all" ? undefined : sub;
+    const subKey = callbackData.slice(6); // "leather", "textile", "enduro", "all"
+    context.equipmentSubcategory = subKey === "all" ? undefined : subKey;
     context.equipmentPage = 0;
     await setState(userId, state, context);
 
@@ -1188,10 +1244,10 @@ export async function handleEkipCallback(
     const allItems = await getEquipmentCatalog();
     const chosen = selectedEquipmentIds(context).length;
     const chosenNote = chosen > 0 ? `\n\n✅ Уже выбрано: ${chosen} шт. — кликайте ещё или «Готово».` : "";
-    const subNote = sub === "all" ? "" : ` (${sub})`;
+    const subDisplay = subKey === "all" ? "" : ` (${materialDisplay(subKey).label})`;
     await sendComplexMessage(
       chatId,
-      `📦 *${label}*${subNote} — выберите предметы${chosenNote}`,
+      `📦 *${label}*${subDisplay} — выберите предметы${chosenNote}`,
       buildCategoryItemsKeyboard(allItems, category, selectedEquipmentIds(context), 0, context.equipmentSubcategory),
       { keyboardType: 'inline', parseMode: 'Markdown' },
     );
