@@ -1,0 +1,1656 @@
+     1→"use client";
+     2→
+     3→import Image from "next/image";
+     4→import Link from "next/link";
+     5→import { useSearchParams } from "next/navigation";
+     6→import { Search, ShoppingCart, Wrench } from "lucide-react";
+     7→import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+     8→import { useAppContext } from "@/contexts/AppContext";
+     9→import { toCategoryId } from "../lib/navigation";
+    10→import type { FranchizeRouteCtaPolicy } from "../lib/route-cta-policy";
+    11→import { shouldShowFloatingCart } from "../lib/route-cta-policy";
+    12→import { catalogCardVariantStyles, crewPaletteForSurface, getContrastingGlowStyle, interactionRingStyle, readableTextOnColor, withAlpha } from "../lib/theme";
+    13→import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
+    14→import { upsertFranchizeIntent } from "../actions";
+    15→import { hasRentPrice, hasSalePrice, hasServicePrice, hasEquipmentPrice } from "../lib/catalog-utils";
+    16→import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
+    17→import { useDisplayMode } from "./DisplayModeContext";
+    18→import { SHOW_CART } from "@/lib/feature-flags";
+    19→import { ItemModal, type FlowType } from "../modals/Item";
+    20→import { useFranchizeCart } from "../hooks/useFranchizeCart";
+    21→import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
+    22→import { useResolvedPalette } from "../lib/useResolvedPalette";
+    23→import { todayISO } from "../lib/date-utils";
+    24→import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
+    25→import { getCatalogPropulsionSegment } from "../lib/catalog-propulsion";
+    26→import { localImageSrc, handleImageError } from "@/lib/image-fallback";
+    27→import { logger } from "@/lib/logger";
+    28→import { decodeStartappState, isStartappStateFresh } from "@/lib/startapp-state";
+    29→import { getBrowserMarketingAttribution } from "@/lib/marketing-attribution";
+    30→import {
+    31→  reachVipBikeGoal,
+    32→  VIP_BIKE_METRIKA_GOALS,
+    33→} from "@/lib/yandex-metrika";
+    34→import {
+    35→  buildVipBikeRentalCatalog,
+    36→  parseVipBikeRentalSegment,
+    37→} from "@/lib/vip-bike-rental-catalog";
+    38→
+    39→interface CatalogClientProps {
+    40→  crew: FranchizeCrewVM;
+    41→  slug: string;
+    42→  items: CatalogItemVM[];
+    43→  mode?: "rental" | "electro";
+    44→  ctaPolicy?: FranchizeRouteCtaPolicy;
+    45→}
+    46→
+    47→type QuickFilterKey = "all" | "budget" | "premium" | "newbie" | "topRated" | "entry" | "mid" | "pro" | "helmet" | "jacket" | "pants" | "gloves" | "boots" | "security" | "electronics";
+    48→
+    49→const QUICK_FILTERS: Array<{ key: QuickFilterKey; label: string; compactLabel?: string; tierColor?: string; equipmentOnly?: boolean }> = [
+    50→  { key: "all", label: "Все" },
+    51→  // Bike filters
+    52→  { key: "entry", label: "Базовый", compactLabel: "Базов.", tierColor: "#22c55e" },
+    53→  { key: "mid", label: "Средний", compactLabel: "Средн.", tierColor: "#eab308" },
+    54→  { key: "pro", label: "Профи", tierColor: "#ef4444" },
+    55→  { key: "budget", label: "До 8000" },
+    56→  { key: "premium", label: "Премиум 10000+" },
+    57→  { key: "newbie", label: "Для новичка", compactLabel: "Для новичков" },
+    58→  { key: "topRated", label: "Лучшие отзывы" },
+    59→  // Equipment filters
+    60→  { key: "helmet", label: "Шлемы", equipmentOnly: true },
+    61→  { key: "jacket", label: "Куртки", equipmentOnly: true },
+    62→  { key: "pants", label: "Штаны", equipmentOnly: true },
+    63→  { key: "gloves", label: "Перчатки", equipmentOnly: true },
+    64→  { key: "boots", label: "Боты", equipmentOnly: true },
+    65→  { key: "security", label: "Безопасность", equipmentOnly: true },
+    66→  { key: "electronics", label: "Электроника", equipmentOnly: true },
+    67→];
+    68→
+    69→const sortWbItemLast = <T extends { category: string }>(groups: T[]) => {
+    70→  const regular = groups.filter((group) => !group.category.toLowerCase().includes("wbitem"));
+    71→  const wbItems = groups.filter((group) => group.category.toLowerCase().includes("wbitem"));
+    72→  return [...regular, ...wbItems];
+    73→};
+    74→
+    75→type AccessTier = "entry" | "mid" | "pro" | "none";
+    76→
+    77→/** Extract access_tier from item's rawSpecs */
+    78→function getItemAccessTier(item: CatalogItemVM): AccessTier {
+    79→  const tier = (item.rawSpecs as Record<string, unknown> | undefined)?.access_tier;
+    80→  if (tier === "entry" || tier === "mid" || tier === "pro") return tier;
+    81→  return "none";
+    82→}
+    83→
+    84→/** Get tier color + label for a given access tier. */
+    85→function tierVisuals(tier: AccessTier): { color: string; label: string } {
+    86→  switch (tier) {
+    87→    case "entry": return { color: "#22c55e", label: "Базовый" };
+    88→    case "mid":   return { color: "#eab308", label: "Средний" };
+    89→    case "pro":   return { color: "#ef4444", label: "Профи" };
+    90→    default:      return { color: "#9ca3af", label: "" };
+    91→  }
+    92→}
+    93→
+    94→// ── Priority Spec Helper (VIP Bike Landing & Catalog Improvements) ──
+    95→// Extract consistent 3 priority specs with Russian labels based on bike type
+    96→// Electrics: Power (кВт), Speed (км/ч), Range (км)
+    97→// ICE: Power (л.с.), Speed (км/ч), Engine (см³)
+    98→function getPrioritySpecs(item: CatalogItemVM): Array<{ label: string; value: string; unit: string }> {
+    99→  const rs = item.rawSpecs;
+   100→  // Type guard: ensure rawSpecs is a plain object before accessing properties
+   101→  const isObject = rs !== null && typeof rs === 'object' && !Array.isArray(rs);
+   102→  const safeRs = isObject ? rs as Record<string, unknown> : {};
+   103→  const isElectric = safeRs?.type === "Electric";
+   104→
+   105→  if (isElectric) {
+   106→    return [
+   107→      { label: "Мощность", value: String(safeRs?.power_kw ?? ""), unit: "кВт" },
+   108→      { label: "Скорость", value: String(safeRs?.top_speed_kmh ?? ""), unit: "км/ч" },
+   109→      { label: "Запас хода", value: String(safeRs?.range_km ?? ""), unit: "км" },
+   110→    ].filter(s => s.value !== "" && s.value !== "undefined" && s.value !== "null");
+   111→  } else {
+   112→    return [
+   113→      { label: "Мощность", value: String(safeRs?.power_hp ?? safeRs?.bike_power_hp ?? ""), unit: "л.с." },
+   114→      { label: "Скорость", value: String(safeRs?.top_speed_kmh ?? ""), unit: "км/ч" },
+   115→      { label: "Объём", value: String(safeRs?.engine_cc ?? safeRs?.bike_engine_cc ?? ""), unit: "см³" },
+   116→    ].filter(s => s.value !== "" && s.value !== "undefined" && s.value !== "null");
+   117→  }
+   118→}
+   119→
+   120→// Check if a rawSpecs flag is truthy (same logic as electro-enduro page)
+   121→const isSpecEnabled = (value: unknown) =>
+   122→  value === 1 || value === true ||
+   123→  String(value).toLowerCase() === "1" ||
+   124→  String(value).toLowerCase() === "true";
+   125→
+   126→// Derive flow type per-item from pricing + rawSpecs rent/sale flags
+   127→// "rental" → shows 1/3/7 days, packages, auction, rental strip
+   128→// "order"  → simple select/purchase flow, no rental UI
+   129→function getItemFlowType(item: CatalogItemVM): FlowType {
+   130→  const rs = item.rawSpecs;
+   131→  const hasExplicitRent = rs != null && "rent" in rs;
+   132→  const hasExplicitSale = rs != null && "sale" in rs;
+   133→  const rentEnabled = hasExplicitRent ? isSpecEnabled(rs!.rent) : true;
+   134→  const saleEnabled = hasExplicitSale ? isSpecEnabled(rs!.sale) : false;
+   135→
+   136→  // rent explicitly disabled → order flow (even if daily_price column has legacy value)
+   137→  if (!rentEnabled) return "order";
+   138→  // sale explicitly enabled but rent NOT explicitly set → sale-only
+   139→  // (prevents "Забронировать" on bikes where daily_price exists from import
+   140→  // but the bike is actually only for sale per operator flag)
+   141→  if (saleEnabled && !hasExplicitRent) return "order";
+   142→  // Items with rental pricing and rent enabled → rental flow
+   143→  return item.pricePerDay > 0 ? "rental" : "order";
+   144→}
+   145→
+   146→// Derive CTA label per-item from flow type + rent/sale availability
+   147→// NOTE: In the ItemModal, dual CTAs are shown when both rent+sale are available.
+   148→// This label is used on the catalog card CTA — keeps a single button per card.
+   149→function getItemCtaLabel(item: CatalogItemVM): string {
+   150→  const rs = item.rawSpecs;
+   151→  const hasExplicitRent = rs != null && "rent" in rs;
+   152→  const rentEnabled = hasExplicitRent ? isSpecEnabled(rs!.rent) : true;
+   153→  const flow = getItemFlowType(item);
+   154→
+   155→  // Rent disabled (sale-only) → show "Купить" if sale price exists, else "Выбрать"
+   156→  if (!rentEnabled || flow === "order") {
+   157→    return hasSalePrice(item) ? "Купить" : "Выбрать";
+   158→  }
+   159→  // Rental flow → "Забронировать"
+   160→  return "Забронировать";
+   161→}
+   162→
+   163→// ── RESTORED: Helper function deleted by agent but still referenced in grid path ──
+   164→
+   165→// NOTE: getVisiblePriceLines was removed — price rendering is now inline (rentalbikes-style)
+   166→// with hasRentPrice/hasSalePrice from shared catalog-utils.ts
+   167→
+   168→// Icons inside specification data are intentionally not rendered: public
+   169→// storefront icons are SVG components, never Unicode pictograms.
+   170→function specIconForKey(_key: string): string {
+   171→  return "";
+   172→}
+   173→
+   174→// ── Spec chip builders ──
+   175→// The catalog card shows up to 3 spec chips. The OLD logic just took
+   176→// Object.entries(rawSpecs).slice(0,3) — which landed on whatever fields
+   177→// happened to be first in the JSON (year, chain type, rental count, …)
+   178→// regardless of how informative they were. These builders deliberately
+   179→// pick the three most decision-relevant specs, split by propulsion:
+   180→//   electric → power (kW), range (km), battery (А·ч)
+   181→//   gas/ICE  → power (л.с.), engine (см³), top speed (км/ч)
+   182→// Fallbacks fill the remaining slots so we still show 3 chips when a
+   183→// primary field is missing (e.g. electric bike with no range → show
+   184→// top speed instead). Falls back to the raw specs array only if the
+   185→// bike has none of the known keys at all.
+   186→
+   187→type SpecChipDef = {
+   188→  keys: string[];
+   189→  icon: string;
+   190→  /** format the matched value into chip text */
+   191→  format: (raw: string | number) => string;
+   192→  /** optional: extract a sub-value from a rich string (e.g. "120Ah" out of "72V 120Ah (Li-ion)") */
+   193→  extract?: (raw: string) => string | null;
+   194→};
+   195→
+   196→/** Parse a numeric spec, tolerating Russian units / ranges. Returns the
+   197→ *  rounded integer as a string, or — for range-like values like "90-150"
+   198→ *  or unparseable strings — the original string unchanged. */
+   199→function formatSpecNum(raw: string | number): string {
+   200→  if (typeof raw === "number" && Number.isFinite(raw)) return String(Math.round(raw));
+   201→  const s = String(raw).trim();
+   202→  if (!s) return s;
+   203→  // Range-like ("90-150", "70–110", "90 to 150") → keep verbatim
+   204→  if (/[-–]\d/.test(s) || /\s(to|до)\s/i.test(s)) return s;
+   205→  const cleaned = s.replace(",", ".").replace(/[^\d.]/g, "");
+   206→  const n = Number(cleaned);
+   207→  return cleaned && Number.isFinite(n) ? String(Math.round(n)) : s;
+   208→}
+   209→
+   210→/** Pull the Ah figure out of a battery string like "72V 120Ah (Li-ion, съёмная)". */
+   211→function extractAh(raw: string | number): string | null {
+   212→  const s = typeof raw === "number" ? String(raw) : raw;
+   213→  const m = s.match(/(\d+(?:[.,]\d+)?)\s*[AaАа]\s*[HhЧч]/);
+   214→  if (!m) return null;
+   215→  const ah = Number(m[1].replace(",", "."));
+   216→  return Number.isFinite(ah) ? `${Math.round(ah)} А·ч` : null;
+   217→}
+   218→
+   219→function pickChip(rawSpecs: Record<string, unknown>, def: SpecChipDef): { icon: string; text: string } | null {
+   220→  for (const key of def.keys) {
+   221→    if (!(key in rawSpecs)) continue;
+   222→    const v = rawSpecs[key];
+   223→    if (v === undefined || v === null || v === "") continue;
+   224→    if (typeof v === "object") continue; // skip nested (battery_options, etc.)
+   225→    const s = typeof v === "string" ? v.trim() : String(v);
+   226→    if (!s) continue;
+   227→    if (def.extract) {
+   228→      const extracted = def.extract(s);
+   229→      if (extracted) return { icon: def.icon, text: extracted };
+   230→      continue; // extraction failed → try next key
+   231→    }
+   232→    return { icon: def.icon, text: def.format(s) };
+   233→  }
+   234→  return null;
+   235→}
+   236→
+   237→// Electric: power → range → battery, with top speed / charge time as fillers.
+   238→const ELECTRIC_CHIP_DEFS: SpecChipDef[] = [
+   239→  { keys: ["power_kw", "motor_nominal_kw", "motor_kw", "motor_peak_kw"], icon: "", format: (v) => `${formatSpecNum(v)} кВт` },
+   240→  { keys: ["power_w"], icon: "", format: (v) => `${Math.round((Number(String(v).replace(/[^\d.]/g, "")) || 0) / 1000)} кВт` },
+   241→  { keys: ["range_km", "max_range_km"], icon: "", format: (v) => `${formatSpecNum(v)} км` },
+   242→  { keys: ["battery", "battery_capacity", "battery_capacity_kwh"], icon: "", format: (v) => String(v), extract: extractAh },
+   243→  { keys: ["top_speed_kmh", "max_speed_kmh"], icon: "", format: (v) => `${formatSpecNum(v)} км/ч` },
+   244→  { keys: ["charge_time_h", "charging_time_h"], icon: "", format: (v) => `${formatSpecNum(v)} ч` },
+   245→];
+   246→
+   247→// Gas/ICE: power → displacement → top speed, with torque as filler.
+   248→const GAS_CHIP_DEFS: SpecChipDef[] = [
+   249→  { keys: ["power_hp", "horsepower", "hp", "bike_power_hp"], icon: "", format: (v) => `${formatSpecNum(v)} л.с.` },
+   250→  { keys: ["engine_cc", "bike_engine_cc", "displacement_cc", "cc"], icon: "", format: (v) => `${formatSpecNum(v)} см³` },
+   251→  { keys: ["top_speed_kmh", "max_speed_kmh"], icon: "", format: (v) => `${formatSpecNum(v)} км/ч` },
+   252→  { keys: ["torque_nm"], icon: "", format: (v) => `${formatSpecNum(v)} Н·м` },
+   253→];
+   254→
+   255→function buildChipsFromDefs(rawSpecs: Record<string, unknown>, defs: SpecChipDef[]): Array<{ icon: string; text: string }> {
+   256→  const chips: Array<{ icon: string; text: string }> = [];
+   257→  for (const def of defs) {
+   258→    if (chips.length >= 3) break;
+   259→    const chip = pickChip(rawSpecs, def);
+   260→    // Skip if extraction failed, OR if an earlier def already produced the
+   261→    // same text (e.g. a bike exposes BOTH power_kw=3 and power_w=3000, which
+   262→    // both render as "3 кВт" — keep only the first).
+   263→    if (chip && !chips.some((c) => c.text === chip.text)) chips.push(chip);
+   264→  }
+   265→  return chips;
+   266→}
+   267→
+   268→function getVisibleSpecChips(item: CatalogItemVM): Array<{ icon: string; text: string }> {
+   269→  type ItemWithSpecs = CatalogItemVM & {
+   270→    specs?: Array<{ key?: string; label?: string; value?: string; icon?: string }>;
+   271→    rawSpecs?: Record<string, unknown>;
+   272→    specChips?: Array<{ icon: string; text: string }>;
+   273→    subtitle?: string;
+   274→    category?: string;
+   275→    type?: string;
+   276→  };
+   277→
+   278→  const withSpecs = item as ItemWithSpecs;
+   279→
+   280→  // 1. Pre-formatted specChips (explicit override from the data pipeline)
+   281→  if (Array.isArray(withSpecs.specChips) && withSpecs.specChips.length > 0) {
+   282→    return withSpecs.specChips.slice(0, 3);
+   283→  }
+   284→
+   285→  const rawSpecs =
+   286→    withSpecs.rawSpecs && typeof withSpecs.rawSpecs === "object"
+   287→      ? (withSpecs.rawSpecs as Record<string, unknown>)
+   288→      : {};
+   289→
+   290→  // Equipment spec labels in Russian (for catalog cards)
+   291→  const EQUIPMENT_SPEC_LABELS: Record<string, string> = {
+   292→    size: "Размер",
+   293→    sizes: "Размеры",
+   294→    material: "Материал",
+   295→    materials: "Материалы",
+   296→    badge: "Особенность",
+   297→    features: "Особенности",
+   298→    safety: "Сертификация",
+   299→    category: "Категория",
+   300→    color: "Цвет",
+   301→    colors: "Цвета",
+   302→    weight: "Вес",
+   303→    brand: "Бренд",
+   304→  };
+   305→
+   306→  // Get Russian label from spec_labels in rawSpecs
+   307→  const getRussianLabel = (key: string): string => {
+   308→    const specLabels = (rawSpecs.spec_labels as Record<string, string> | undefined);
+   309→    return specLabels?.[key] || EQUIPMENT_SPEC_LABELS[key] || key;
+   310→  };
+   311→
+   312→  // 2. Equipment items: show size as highlighted spec
+   313→  if (withSpecs.type === "equipment" || rawSpecs.category) {
+   314→    const chips: Array<{ icon: string; text: string }> = [];
+   315→
+   316→    // Size is the most important spec for equipment
+   317→    if (Array.isArray(rawSpecs.sizes) && rawSpecs.sizes.length > 0) {
+   318→      const sizes = rawSpecs.sizes as string[];
+   319→      chips.push({ icon: "", text: sizes.slice(0, 3).join(" / ") });
+   320→    }
+   321→
+   322→    // Show badge if available (use Russian label)
+   323→    if (typeof rawSpecs.badge === "string" && rawSpecs.badge) {
+   324→      const badgeLabel = getRussianLabel("badge");
+   325→      chips.push({ icon: "", text: `${badgeLabel}: ${rawSpecs.badge as string}` });
+   326→    }
+   327→
+   328→    // Show material if available (use Russian label)
+   329→    if (typeof rawSpecs.materials === "string" && rawSpecs.materials) {
+   330→      const materialLabel = getRussianLabel("materials");
+   331→      chips.push({ icon: "", text: rawSpecs.materials as string });
+   332→    }
+   333→
+   334→    // Fallback to features array if we don't have 3 chips yet
+   335→    if (chips.length < 3 && Array.isArray(rawSpecs.features) && rawSpecs.features.length > 0) {
+   336→      const features = rawSpecs.features as string[];
+   337→      chips.push(...features.slice(0, 3 - chips.length).map(f => ({ icon: "", text: f })));
+   338→    }
+   339→
+   340→    return chips.slice(0, 3);
+   341→  }
+   342→
+   343→  // 3. Propulsion-aware deliberate picks for bikes (power / range-or-cc / battery-or-speed)
+   344→  if (Object.keys(rawSpecs).length > 0) {
+   345→    const propulsion = getCatalogPropulsionSegment({
+   346→      title: item.title,
+   347→      subtitle: withSpecs.subtitle,
+   348→      description: item.description,
+   349→      category: withSpecs.category,
+   350→      rawSpecs,
+   351→    });
+   352→    const defs = propulsion === "gas" ? GAS_CHIP_DEFS : ELECTRIC_CHIP_DEFS;
+   353→    const chips = buildChipsFromDefs(rawSpecs, defs);
+   354→    if (chips.length > 0) return chips;
+   355→  }
+   356→
+   357→  // 4. Last-resort fallback: structured specs array (label/value pairs)
+   358→  if (Array.isArray(withSpecs.specs) && withSpecs.specs.length > 0) {
+   359→    return withSpecs.specs
+   360→      .filter((s) => s.value || s.label)
+   361→      .slice(0, 3)
+   362→      .map((s) => ({
+   363→        icon: ("icon" in s && typeof s.icon === "string") ? s.icon : specIconForKey(s.label ?? ""),
+   364→        text: s.value ?? s.label ?? "",
+   365→      }));
+   366→  }
+   367→
+   368→  return [];
+   369→}
+   370→
+   371→// ──────────────────────────────────────────────────────────────────────────────────
+   372→
+   373→function CatalogCardSkeleton({ index }: { index: number }) {
+   374→  return (
+   375→    <article className="overflow-hidden rounded-2xl border border-[var(--catalog-border)] bg-[var(--catalog-card-bg)]" aria-hidden="true">
+   376→      <div className="relative aspect-[9/16] overflow-hidden bg-[var(--catalog-card-bg)]">
+   377→        <div
+   378→          className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent"
+   379→          style={{ animationDelay: `${index * 120}ms` }}
+   380→        />
+   381→      </div>
+   382→      <div className="space-y-3 p-3">
+   383→        <div className="h-4 w-2/3 rounded-full bg-[var(--catalog-muted)]/25" />
+   384→        <div className="h-3 w-full rounded-full bg-[var(--catalog-muted)]/20" />
+   385→        <div className="h-3 w-4/5 rounded-full bg-[var(--catalog-muted)]/20" />
+   386→        <div className="h-10 rounded-xl border-2 border-[var(--catalog-accent)]/30 bg-[var(--catalog-accent)]/10" />
+   387→      </div>
+   388→    </article>
+   389→  );
+   390→}
+   391→
+   392→export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }: CatalogClientProps) {
+   393→  // Apply franchize theme CSS variables
+   394→  useFranchizeTheme(crew.theme);
+   395→
+   396→  const palette = useResolvedPalette(crew.theme);
+   397→  const surface = crewPaletteForSurface(crew.theme);
+   398→  // Get accent color for price glow computation
+   399→  const accentColor = palette.accentMain;
+   400→  const priceGlowStyle = getContrastingGlowStyle(accentColor);
+   401→  const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
+   402→  const { addItem } = useFranchizeCart(crew.slug || slug);
+   403→  const [selectedOptions, setSelectedOptions] = useState({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона", rentStartDate: todayISO(), rentEndDate: todayISO(), rentStartTime: "10:00", rentEndTime: "10:00" });
+   404→  const [searchQuery, setSearchQuery] = useState("");
+   405→  const [searchFocused, setSearchFocused] = useState(false);
+   406→  const [searchCtaFocused, setSearchCtaFocused] = useState(false);
+   407→  const [clearFocused, setClearFocused] = useState(false);
+   408→  const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
+   409→  const [quickFilter, setQuickFilter] = useState<QuickFilterKey>("all");
+   410→  const [campaignIndex, setCampaignIndex] = useState(0);
+   411→  const [carouselActiveByCategory, setCarouselActiveByCategory] = useState<Record<string, number>>({});
+   412→  const [carouselParallaxByItem, setCarouselParallaxByItem] = useState<Record<string, { x: number; y: number }>>({});
+   413→  const [carouselLoadedByItem, setCarouselLoadedByItem] = useState<Record<string, true>>({});
+   414→  const searchParams = useSearchParams();
+   415→  const { displayMode, isTransitioning } = useDisplayMode();
+   416→  const { user, dbUser } = useAppContext();
+   417→  const lastQueryViewedVehicleRef = useRef<string>("");
+   418→  const catalogGoalSentRef = useRef(false);
+   419→  const recordRentIntentRef = useRef<
+   420→    (item: CatalogItemVM, stage: "viewed" | "configured", metadata?: Record<string, unknown>) => Promise<unknown>
+   421→  >();
+   422→  const resolvedSlug = crew.slug || slug;
+   423→  const paidRentalSegment = parseVipBikeRentalSegment(
+   424→    searchParams.get("propulsion"),
+   425→  );
+   426→  const requestedMode = searchParams.get("mode");
+   427→  const isVipBikeRental =
+   428→    resolvedSlug === "vip-bike" && displayMode === "rent";
+   429→  const isVipBikeRentalTracking =
+   430→    isVipBikeRental && (requestedMode === null || requestedMode === "rent");
+   431→  const displayItems = useMemo(
+   432→    () =>
+   433→      isVipBikeRental
+   434→        ? buildVipBikeRentalCatalog(items, paidRentalSegment)
+   435→        : items,
+   436→    [isVipBikeRental, items, paidRentalSegment],
+   437→  );
+   438→  const showFloatingCart = SHOW_CART && (ctaPolicy ? shouldShowFloatingCart(ctaPolicy, { cartRelevant: true }) : true);
+   439→  const carouselRefs = useRef<Record<string, HTMLDivElement | null>>({});
+   440→
+   441→  const promoModules = useMemo(() => {
+   442→    const now = Date.now();
+   443→    const parseDate = (value: string) => {
+   444→      if (!value) return Number.NaN;
+   445→      const ts = Date.parse(value);
+   446→      return Number.isNaN(ts) ? Number.NaN : ts;
+   447→    };
+   448→
+   449→    const campaignPool = [
+   450→      ...(crew.catalog.promoBanners ?? []).map((item, index) => ({
+   451→        id: `${item.id}-${index}` ,
+   452→        title: item.title,
+   453→        subtitle: item.subtitle,
+   454→        href: item.href,
+   455→        imageUrl: item.imageUrl,
+   456→        badge: item.code || "Промо",
+   457→        priority: item.priority ?? 50,
+   458→        activeFrom: item.activeFrom ?? "",
+   459→        activeTo: item.activeTo ?? "",
+   460→        ctaLabel: item.ctaLabel || "Открыть",
+   461→      })),
+   462→      ...(crew.catalog.adCards ?? []).map((item, index) => ({
+   463→        id: `${item.id}-${index}` ,
+   464→        title: item.title,
+   465→        subtitle: item.subtitle,
+   466→        href: item.href,
+   467→        imageUrl: item.imageUrl,
+   468→        badge: item.badge || "Анонс",
+   469→        priority: item.priority ?? 40,
+   470→        activeFrom: item.activeFrom ?? "",
+   471→        activeTo: item.activeTo ?? "",
+   472→        ctaLabel: item.ctaLabel || "Подробнее",
+   473→      })),
+   474→    ];
+   475→
+   476→    const activeCampaigns = campaignPool
+   477→      .filter((item) => item.title.trim().length > 0)
+   478→      .filter((item) => {
+   479→        const fromTs = parseDate(item.activeFrom);
+   480→        const toTs = parseDate(item.activeTo);
+   481→        const afterFrom = Number.isNaN(fromTs) ? true : now >= fromTs;
+   482→        const beforeTo = Number.isNaN(toTs) ? true : now <= toTs;
+   483→        return afterFrom && beforeTo;
+   484→      })
+   485→      .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+   486→
+   487→    if (activeCampaigns.length > 0) {
+   488→      return activeCampaigns.slice(0, 5).map((item) => ({
+   489→        ...item,
+   490→        title: item.title.length > 84 ? `${item.title.slice(0, 81)}...` : item.title,
+   491→        href: item.href?.trim() || `/franchize/${crew.slug || slug}#catalog-sections`,
+   492→      }));
+   493→    }
+   494→
+   495→    return crew.catalog.tickerItems.slice(0, 3).map((item, index) => ({
+   496→      id: `${item.id}-${index}`,
+   497→      title: item.text,
+   498→      subtitle: "",
+   499→      href: item.href?.trim() || `/franchize/${crew.slug || slug}#catalog-sections`,
+   500→      imageUrl: "",
+   501→      badge: "Промо",
+   502→      priority: 0,
+   503→      activeFrom: "",
+   504→      activeTo: "",
+   505→      ctaLabel: "Открыть",
+   506→    }));
+   507→  }, [crew.catalog.adCards, crew.catalog.promoBanners, crew.catalog.tickerItems, crew.slug, slug]);
+   508→
+   509→  useEffect(() => {
+   510→    if (promoModules.length <= 3) {
+   511→      setCampaignIndex(0);
+   512→      return;
+   513→    }
+   514→
+   515→    const timer = window.setInterval(() => {
+   516→      setCampaignIndex((prev) => (prev + 1) % promoModules.length);
+   517→    }, 4500);
+   518→
+   519→    return () => window.clearInterval(timer);
+   520→  }, [promoModules]);
+   521→
+   522→  const visiblePromoModules = useMemo(() => {
+   523→    if (promoModules.length <= 3) return promoModules;
+   524→    const windowed = [];
+   525→    for (let i = 0; i < 3; i += 1) {
+   526→      windowed.push(promoModules[(campaignIndex + i) % promoModules.length]);
+   527→    }
+   528→    return windowed;
+   529→  }, [campaignIndex, promoModules]);
+   530→
+   531→  const auctionTickOptions = useMemo(() => {
+   532→    const fromCampaigns = promoModules
+   533→      .map((module) => module.badge?.trim() || module.title?.trim())
+   534→      .filter((value): value is string => Boolean(value && value.length > 0));
+   535→
+   536→    return ["Без аукциона", ...Array.from(new Set(fromCampaigns)).slice(0, 6)];
+   537→  }, [promoModules]);
+   538→
+   539→  const promoGradientByIndex = (index: number) => {
+   540→    const isLight = crew.theme.mode.toLowerCase().includes("light");
+   541→    const accentMain = palette.accentMain;
+   542→    const gradients = isLight
+   543→      ? [
+   544→          `linear-gradient(130deg, ${accentMain}E0, #FF7F50D0)`,
+   545→          `linear-gradient(130deg, #8B5CF6D9, ${accentMain}D8)`,
+   546→          `linear-gradient(130deg, #F59E0BD1, #EF4444CC)`,
+   547→        ]
+   548→      : [
+   549→          `linear-gradient(130deg, ${accentMain}E0, #FF7F50D0)`,
+   550→          `linear-gradient(130deg, #8B5CF6D9, ${accentMain}D8)`,
+   551→          `linear-gradient(130deg, #22C55ED1, #06B6D4CC)`,
+   552→        ];
+   553→
+   554→    return gradients[index % gradients.length];
+   555→  };
+   556→
+   557→  const orderedCategories = useMemo(
+   558→    () =>
+   559→      Array.from(
+   560→        new Set(displayItems.map((item) => item.category).filter(Boolean)),
+   561→      ),
+   562→    [displayItems],
+   563→  );
+   564→
+   565→  const matchesQuickFilter = (item: CatalogItemVM, filter: QuickFilterKey) => {
+   566→    // Equipment category filters - use equipmentOnly flag for cleaner domain separation
+   567→    const filterDef = QUICK_FILTERS.find(f => f.key === filter);
+   568→    if (filterDef?.equipmentOnly) {
+   569→      const rs = item.rawSpecs as Record<string, unknown> | undefined;
+   570→      return rs?.category === filter;
+   571→    }
+   572→
+   573→    // Bike filters
+   574→    if (filter === "budget") {
+   575→      return item.pricePerDay <= 8000;
+   576→    }
+   577→    if (filter === "premium") {
+   578→      return item.pricePerDay >= 10000;
+   579→    }
+   580→    if (filter === "newbie") {
+   581→      return getItemAccessTier(item) === "entry";
+   582→    }
+   583→    if (filter === "topRated") {
+   584→      return item.reviewSummary.count > 0 && item.reviewSummary.average >= 4.5;
+   585→    }
+   586→    if (filter === "entry" || filter === "mid" || filter === "pro") {
+   587→      return getItemAccessTier(item) === filter;
+   588→    }
+   589→    return true;
+   590→  };
+   591→
+   592→  const filteredItems = useMemo(() => {
+   593→    const query = searchQuery.toLowerCase().trim();
+   594→    return displayItems.filter((item) => {
+   595→      const matchesSearch = !query || [item.title, item.subtitle, item.description, item.category].join(" ").toLowerCase().includes(query);
+   596→      if (!matchesSearch) return false;
+   597→      return matchesQuickFilter(item, quickFilter);
+   598→    });
+   599→  }, [displayItems, quickFilter, searchQuery]);
+   600→
+   601→  const quickFilterCounts = useMemo(() => {
+   602→    const query = searchQuery.toLowerCase().trim();
+   603→    const searchFiltered = displayItems.filter((item) => !query || [item.title, item.subtitle, item.description, item.category].join(" ").toLowerCase().includes(query));
+   604→    // Also respect header filter (rent vs sale mode)
+   605→    const modeFiltered = searchFiltered.filter(item => {
+   606→      if (displayMode === "rent") return hasRentPrice(item);
+   607→      if (displayMode === "sale") return hasSalePrice(item);
+   608→      if (displayMode === "service") return hasServicePrice(item);
+   609→      if (displayMode === "equipment") return hasEquipmentPrice(item);
+   610→      return true;
+   611→    });
+   612→    return QUICK_FILTERS.reduce<Record<QuickFilterKey, number>>(
+   613→      (acc, filter) => {
+   614→        acc[filter.key] = modeFiltered.filter((item) => matchesQuickFilter(item, filter.key)).length;
+   615→        return acc;
+   616→      },
+   617→      { all: 0, budget: 0, premium: 0, newbie: 0, topRated: 0, entry: 0, mid: 0, pro: 0, helmet: 0, jacket: 0, pants: 0, gloves: 0, boots: 0, security: 0, electronics: 0 },
+   618→    );
+   619→  }, [displayItems, searchQuery, displayMode]);
+   620→
+   621→  // Equipment category labels in Russian
+   622→  const EQUIPMENT_CATEGORY_LABELS: Record<string, string> = {
+   623→    helmet: "Шлемы",
+   624→    jacket: "Куртки",
+   625→    pants: "Штаны",
+   626→    gloves: "Перчатки",
+   627→    boots: "Боты",
+   628→    security: "Безопасность",
+   629→    electronics: "Электроника",
+   630→    suit: "Комбинезоны",
+   631→  };
+   632→
+   633→  // Equipment spec labels in Russian (for catalog cards)
+   634→  const EQUIPMENT_SPEC_LABELS: Record<string, string> = {
+   635→    size: "Размер",
+   636→    sizes: "Размеры",
+   637→    material: "Материал",
+   638→    materials: "Материалы",
+   639→    badge: "Особенность",
+   640→    features: "Особенности",
+   641→    safety: "Сертификация",
+   642→    category: "Категория",
+   643→    color: "Цвет",
+   644→    colors: "Цвета",
+   645→    weight: "Вес",
+   646→    brand: "Бренд",
+   647→  };
+   648→
+   649→  const itemsByCategory = useMemo(() => {
+   650→    const sortedFilteredItems = quickFilter === "topRated"
+   651→      ? [...filteredItems].sort((a, b) => (b.reviewSummary.average - a.reviewSummary.average) || (b.reviewSummary.count - a.reviewSummary.count))
+   652→      : filteredItems;
+   653→
+   654→    // Filter by display mode (rent vs sale)
+   655→    const displayFiltered = sortedFilteredItems.filter(item => {
+   656→      if (displayMode === "rent") return hasRentPrice(item);
+   657→      if (displayMode === "sale") return hasSalePrice(item);
+   658→      if (displayMode === "service") return hasServicePrice(item);
+   659→      if (displayMode === "equipment") return hasEquipmentPrice(item);
+   660→      return true;
+   661→    });
+   662→
+   663→    // Group equipment items by category with Russian labels
+   664→    const isEquipmentMode = displayMode === "equipment";
+   665→    const grouped = orderedCategories
+   666→      .map((category) => {
+   667→        const categoryItems = displayFiltered.filter((item) => item.category === category);
+   668→        // For equipment, use Russian label as title
+   669→        const title = isEquipmentMode && categoryItems.length > 0
+   670→          ? (EQUIPMENT_CATEGORY_LABELS[category] || category)
+   671→          : "";
+   672→        return {
+   673→          category,
+   674→          title,
+   675→          items: categoryItems,
+   676→        };
+   677→      })
+   678→      .filter((group) => group.items.length > 0);
+   679→
+   680→    const saleGroup = displayFiltered.filter((item) => item.saleAvailable);
+   681→    const saleCategory = mode === "electro" ? "Электроэндуро в продаже" : "В продаже";
+   682→    const baseGroups = grouped.filter((group) => group.category !== saleCategory);
+   683→    const normalized = sortWbItemLast(baseGroups);
+   684→    if (saleGroup.length === 0) return normalized;
+   685→    return [{ category: saleCategory, title: "", items: saleGroup }, ...normalized];
+   686→  }, [filteredItems, mode, orderedCategories, quickFilter, displayMode]);
+   687→
+   688→  // ── VIP Bike Categorization (VIP Bike Landing & Catalog Improvements) ──
+   689→  // Categorize bikes by type + sale status for vip-bike franchize
+   690→  // Sort: R7 first (client's wish), then by year (newer first), then by price
+   691→  const sortVipBikeItems = (items: CatalogItemVM[]) => {
+   692→    return [...items].sort((a, b) => {
+   693→      // R7 always first (client's explicit wish)
+   694→      const aIsR7 = a.id.toLowerCase().includes('r7') || a.title.toLowerCase().includes('r7');
+   695→      const bIsR7 = b.id.toLowerCase().includes('r7') || b.title.toLowerCase().includes('r7');
+   696→      if (aIsR7 && !bIsR7) return -1;
+   697→      if (!aIsR7 && bIsR7) return 1;
+   698→
+   699→      // Then by year (newer first)
+   700→      const rsA = a.rawSpecs as Record<string, unknown> | undefined;
+   701→      const rsB = b.rawSpecs as Record<string, unknown> | undefined;
+   702→      const yearA = Number(rsA?.year) || 0;
+   703→      const yearB = Number(rsB?.year) || 0;
+   704→      if (yearA !== yearB) return yearB - yearA;
+   705→
+   706→      // Then by price (expensive first)
+   707→      if (b.pricePerDay !== a.pricePerDay) return b.pricePerDay - a.pricePerDay;
+   708→
+   709→      // Then by rating
+   710→      return (b.reviewSummary.average || 0) - (a.reviewSummary.average || 0);
+   711→    });
+   712→  };
+   713→
+   714→  const categorizedItems = useMemo(() => {
+   715→    // First apply search + quickFilter (filteredItems has them), then split by display mode
+   716→    // FIX: was `items` — quickFilter/search had no effect on vip-bike crew
+   717→    const filtered = filteredItems.filter(item => {
+   718→      if (displayMode === "rent") return hasRentPrice(item);
+   719→      if (displayMode === "sale") return hasSalePrice(item);
+   720→      if (displayMode === "service") return hasServicePrice(item);
+   721→      if (displayMode === "equipment") return hasEquipmentPrice(item);
+   722→      return true;
+   723→    });
+   724→
+   725→    const electric = filtered.filter(i =>
+   726→      (i.rawSpecs as Record<string, unknown> | undefined)?.type === "Electric"
+   727→    );
+   728→    const ice = filtered.filter(i =>
+   729→      (i.rawSpecs as Record<string, unknown> | undefined)?.type !== "Electric"
+   730→    );
+   731→
+   732→    return [
+   733→      { category: "electric", title: "Электро", items: sortVipBikeItems(electric) },
+   734→      { category: "ice", title: "Бензин", items: sortVipBikeItems(ice) },
+   735→    ].filter(g => g.items.length > 0);
+   736→  }, [filteredItems, displayMode]);
+   737→
+   738→  // Active groups for carousel rendering + IntersectionObserver
+   739→  // For vip-bike equipment mode: use itemsByCategory (actual item categories)
+   740→  // For vip-bike rent/sale/service: use categorizedItems (Electric/ICE)
+   741→  // For other crews: use itemsByCategory
+   742→  const activeGroupsForCarousel = useMemo(() => {
+   743→    const isVipBike = (slug === "vip-bike" || crew.slug === "vip-bike");
+   744→    const isEquipmentMode = displayMode === "equipment";
+   745→    return (isVipBike && !isEquipmentMode) ? categorizedItems : itemsByCategory;
+   746→  }, [slug, crew.slug, categorizedItems, itemsByCategory, displayMode]);
+   747→
+   748→  const recordRentIntent = useCallback((item: CatalogItemVM, stage: "viewed" | "configured", metadata: Record<string, unknown> = {}) => {
+   749→    const isServiceItem = hasServicePrice(item);
+   750→    const strip = buildCatalogRentalStrip(item, crew);
+   751→    const attribution = getBrowserMarketingAttribution();
+   752→    if (stage === "configured" && isVipBikeRentalTracking) {
+   753→      reachVipBikeGoal(
+   754→        VIP_BIKE_METRIKA_GOALS.bikeConfigured,
+   755→        { bike_id: item.id, bike_title: item.title },
+   756→        attribution,
+   757→      );
+   758→    }
+   759→    return upsertFranchizeIntent({
+   760→      slug: resolvedSlug,
+   761→      bikeId: item.id,
+   762→      intentType: isServiceItem ? "service" : "rent",
+   763→      stage,
+   764→      sourceRoute: `/franchize/${resolvedSlug}`,
+   765→      contactChannel: "catalog_card",
+   766→      urgencyScore: stage === "configured" ? (isServiceItem ? 60 : 68) : 42,
+   767→      telegramUserId: user?.id ? String(user.id) : dbUser?.user_id ? String(dbUser.user_id) : undefined,
+   768→      phone: typeof (dbUser as { phone?: unknown } | null)?.phone === "string" ? (dbUser as { phone?: string } | null)?.phone : undefined,
+   769→      metadata: {
+   770→        itemTitle: item.title,
+   771→        availabilityStatus: item.availabilityStatus,
+   772→        availabilityLabel: strip.availabilityLabel,
+   773→        nearestStartWindow: strip.nearestStartWindow,
+   774→        pickupHint: strip.pickupHint,
+   775→        priceTeaser: strip.priceTeaser,
+   776→        attribution,
+   777→        ...metadata,
+   778→      },
+   779→    }).catch((error) => console.warn("rent intent tracking failed", error));
+   780→  }, [crew, dbUser, isVipBikeRentalTracking, resolvedSlug, user]);
+   781→
+   782→  useEffect(() => {
+   783→    recordRentIntentRef.current = recordRentIntent;
+   784→  }, [recordRentIntent]);
+   785→
+   786→  useEffect(() => {
+   787→    if (
+   788→      !isVipBikeRentalTracking ||
+   789→      catalogGoalSentRef.current ||
+   790→      displayItems.length === 0
+   791→    ) return;
+   792→    catalogGoalSentRef.current = true;
+   793→    const attribution = getBrowserMarketingAttribution();
+   794→    reachVipBikeGoal(
+   795→      VIP_BIKE_METRIKA_GOALS.catalogOpen,
+   796→      {
+   797→        slug: resolvedSlug,
+   798→        items_count: displayItems.length,
+   799→        propulsion: paidRentalSegment ?? "all",
+   800→      },
+   801→      attribution,
+   802→    );
+   803→  }, [displayItems.length, isVipBikeRentalTracking, paidRentalSegment, resolvedSlug]);
+   804→
+   805→  const openItem = (item: CatalogItemVM) => {
+   806→    setSelectedItem(item);
+   807→    // Focus the modal's close button after it renders
+   808→    setTimeout(() => {
+   809→      const closeButton = document.querySelector('[data-modal-close="true"]') as HTMLElement;
+   810→      closeButton?.focus();
+   811→    }, 100);
+   812→    const defaultOptions = {
+   813→      package: "Базовый",
+   814→      duration: "1 день",
+   815→      perk: "Стандарт",
+   816→      auction: auctionTickOptions[0] ?? "Без аукциона",
+   817→    };
+   818→    setSelectedOptions(defaultOptions);
+   819→    void recordRentIntent(item, "viewed", { trigger: "catalog_card", options: defaultOptions });
+   820→  };
+   821→
+   822→  // Check for edit context from cart page
+   823→  useEffect(() => {
+   824→    const editContextStr = sessionStorage.getItem("franchize-edit-cart-line");
+   825→    if (!editContextStr) return;
+   826→
+   827→    try {
+   828→      const editContext = JSON.parse(editContextStr);
+   829→      const item = displayItems.find((i) => i.id === editContext.itemId);
+   830→      if (!item) return;
+   831→
+   832→      // Open modal with the item and pre-filled options
+   833→      setSelectedItem(item);
+   834→      setSelectedOptions({
+   835→        package: editContext.options.package ?? "Базовый",
+   836→        duration: editContext.options.duration ?? "1 день",
+   837→        perk: editContext.options.perk ?? "Стандарт",
+   838→        auction: editContext.options.auction ?? "Без аукциона",
+   839→        rentStartDate: editContext.options.rentStartDate ?? todayISO(),
+   840→        rentEndDate: editContext.options.rentEndDate ?? todayISO(),
+   841→        rentStartTime: editContext.options.rentStartTime ?? "10:00",
+   842→        rentEndTime: editContext.options.rentEndTime ?? "10:00",
+   843→      });
+   844→
+   845→      // Clear the edit context
+   846→      sessionStorage.removeItem("franchize-edit-cart-line");
+   847→    } catch (error) {
+   848→      console.warn("Failed to parse edit context:", error);
+   849→      sessionStorage.removeItem("franchize-edit-cart-line");
+   850→    }
+   851→  }, [displayItems]);
+   852→
+   853→  useEffect(() => {
+   854→    const focusedVehicle = (searchParams.get("vehicle") || "").trim().toLowerCase();
+   855→    if (!focusedVehicle) return;
+   856→    const target = displayItems.find((item) => item.id.toLowerCase() === focusedVehicle);
+   857→    if (target && lastQueryViewedVehicleRef.current !== target.id) {
+   858→      lastQueryViewedVehicleRef.current = target.id;
+   859→      setSelectedItem(target);
+   860→      const defaultOptions = {
+   861→        package: "Базовый",
+   862→        duration: "1 день",
+   863→        perk: "Стандарт",
+   864→        auction: auctionTickOptions[0] ?? "Без аукциона",
+   865→      };
+   866→      setSelectedOptions(defaultOptions);
+   867→      void recordRentIntentRef.current?.(target, "viewed", { trigger: "vehicle_query", options: defaultOptions });
+   868→    }
+   869→  }, [auctionTickOptions, displayItems, searchParams]);
+   870→
+   871→  /**
+   872→   * Handle deep-link from Telegram bot (startapp state payload).
+   873→   *
+   874→   * When a bot (/doc, /buy, etc.) has already collected some user choices
+   875→   * (bike, dates, helmet, package), it encodes them in `startapp` and sends
+   876→   * a link. The redirect lands here with `?startappState=…` and companion
+   877→   * query params. We open the modal for the right bike and pre-fill the
+   878→   * already-known options so the user only needs to provide what's left
+   879→   * (e.g. personal info, payment).
+   880→   *
+   881→   * See: app/lib/startapp-state.ts for the encoding format.
+   882→   */
+   883→  useEffect(() => {
+   884→    const startappBikeId = (searchParams.get("startappBikeId") || "").trim();
+   885→    if (!startappBikeId) return;
+   886→
+   887→    // Guard against re-triggering on every re-render — only run once per param set.
+   888→    if (lastQueryViewedVehicleRef.current === startappBikeId) return;
+   889→
+   890→    const target = displayItems.find((item) => item.id === startappBikeId);
+   891→    if (!target) {
+   892→      logger.warn("[startapp-state] bike not found in catalog", { bikeId: startappBikeId });
+   893→      return;
+   894→    }
+   895→
+   896→    lastQueryViewedVehicleRef.current = startappBikeId;
+   897→    setSelectedItem(target);
+   898→
+   899→    // Build pre-filled options from the query params.
+   900→    const extrasParts: string[] = [];
+   901→    const helmetCount = searchParams.get("helmetCount");
+   902→    if (helmetCount && Number(helmetCount) > 0) extrasParts.push(`Шлем ×${helmetCount}`);
+   903→    if (searchParams.get("extrasGloves") === "true") extrasParts.push("Перчатки");
+   904→    if (searchParams.get("extrasNet") === "true") extrasParts.push("Сетка");
+   905→    if (searchParams.get("extrasBag") === "true") extrasParts.push("Сумка");
+   906→    if (searchParams.get("extrasJacket") === "true") extrasParts.push("Куртка");
+   907→    if (searchParams.get("extrasPants") === "true") extrasParts.push("Штаны");
+   908→    if (searchParams.get("extrasBoots") === "true") extrasParts.push("Боты");
+   909→    if (searchParams.get("extrasBackpack") === "true") extrasParts.push("Рюкзак");
+   910→    if (searchParams.get("extrasCharger") === "true") extrasParts.push("Зарядка");
+   911→
+   912→    const extrasSelection: Record<string, number | boolean> = {};
+   913→    if (helmetCount && Number(helmetCount) > 0) extrasSelection.helmet = Number(helmetCount);
+   914→    if (searchParams.get("extrasGloves") === "true") extrasSelection.gloves = true;
+   915→    if (searchParams.get("extrasNet") === "true") extrasSelection.net = true;
+   916→    if (searchParams.get("extrasBag") === "true") extrasSelection.bag = true;
+   917→    if (searchParams.get("extrasJacket") === "true") extrasSelection.jacket = true;
+   918→    if (searchParams.get("extrasPants") === "true") extrasSelection.pants = true;
+   919→    if (searchParams.get("extrasBoots") === "true") extrasSelection.boots = true;
+   920→    if (searchParams.get("extrasBackpack") === "true") extrasSelection.backpack = true;
+   921→    if (searchParams.get("extrasCharger") === "true") extrasSelection.charger = true;
+   922→
+   923→    const prefill: typeof selectedOptions & {
+   924→      rentStartTime?: string;
+   925→      rentEndTime?: string;
+   926→      extrasSelection?: Record<string, number | boolean>;
+   927→    } = {
+   928→      package: (searchParams.get("package") || "Базовый") as never,
+   929→      duration: "1 день",
+   930→      perk: (extrasParts.length > 0 ? extrasParts.join(", ") : (searchParams.get("perk") || "Стандарт")) as never,
+   931→      auction: auctionTickOptions[0] ?? "Без аукциона",
+   932→      rentStartDate: searchParams.get("startDate") || "",
+   933→      rentEndDate: searchParams.get("endDate") || "",
+   934→      rentStartTime: searchParams.get("startTime") || "",
+   935→      rentEndTime: searchParams.get("endTime") || "",
+   936→      extrasSelection: Object.keys(extrasSelection).length > 0 ? extrasSelection : undefined,
+   937→    };
+   938→
+   939→    // Derive a duration label from the dates so the chip looks consistent.
+   940→    if (prefill.rentStartDate && prefill.rentEndDate) {
+   941→      const start = new Date(prefill.rentStartDate + "T00:00:00");
+   942→      const end = new Date(prefill.rentEndDate + "T00:00:00");
+   943→      const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+   944→      if (days === 1) prefill.duration = "1 день";
+   945→      else if (days <= 3) prefill.duration = "3 дня";
+   946→      else if (days <= 7) prefill.duration = "7 дней";
+   947→      else if (days <= 14) prefill.duration = "2 недели";
+   948→      else prefill.duration = "1 месяц";
+   949→    }
+   950→
+   951→    setSelectedOptions(prefill);
+   952→    void recordRentIntentRef.current?.(target, "viewed", {
+   953→      trigger: "startapp_state",
+   954→      options: prefill,
+   955→    });
+   956→
+   957→    // Show a one-time banner in the modal explaining the deep-link.
+   958→    if (typeof window !== "undefined") {
+   959→      sessionStorage.setItem(
+   960→        "franchize-startapp-banner",
+   961→        JSON.stringify({
+   962→          ts: Date.now(),
+   963→          bikeId: startappBikeId,
+   964→          source: "telegram_bot",
+   965→        }),
+   966→      );
+   967→    }
+   968→  }, [auctionTickOptions, displayItems, searchParams]);
+   969→
+   970→  useEffect(() => {
+   971→    const observers: IntersectionObserver[] = [];
+   972→    const rafByCategory: Record<string, number | undefined> = {};
+   973→    const cleanupByCategory: Array<() => void> = [];
+   974→
+   975→    activeGroupsForCarousel.forEach((group) => {
+   976→      if (group.items.length > 8) return;
+   977→      const root = carouselRefs.current[group.category || group.title || "section"];
+   978→      if (!root) return;
+   979→      const cards = Array.from(root.querySelectorAll<HTMLElement>("[data-carousel-card='true']"));
+   980→      if (cards.length === 0) return;
+   981→
+   982→      const groupKey = group.category || group.title || "section";
+   983→
+   984→      const observer = new IntersectionObserver(
+   985→        (entries) => {
+   986→          const visible = entries
+   987→            .filter((entry) => entry.isIntersecting)
+   988→            .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+   989→          if (!visible) return;
+   990→          const nextIndex = Number((visible.target as HTMLElement).dataset.carouselIndex ?? "0");
+   991→          setCarouselActiveByCategory((prev) => (prev[groupKey] === nextIndex ? prev : { ...prev, [groupKey]: nextIndex }));
+   992→        },
+   993→        { root, threshold: [0.55, 0.75] },
+   994→      );
+   995→
+   996→      cards.forEach((card) => observer.observe(card));
+   997→      observers.push(observer);
+   998→
+   999→      const onScroll = () => {
+  1000→        if (rafByCategory[groupKey]) {
+  1001→          window.cancelAnimationFrame(rafByCategory[groupKey] as number);
+  1002→        }
+  1003→        rafByCategory[groupKey] = window.requestAnimationFrame(() => {
+  1004→          const slotWidth = cards[0]?.offsetWidth || 1;
+  1005→          const gap = 12; // gap-3 = 0.75rem = 12px
+  1006→          const nextIndex = Math.round(root.scrollLeft / (slotWidth + gap));
+  1007→          setCarouselActiveByCategory((prev) => (prev[groupKey] === nextIndex ? prev : { ...prev, [groupKey]: nextIndex }));
+  1008→          rafByCategory[groupKey] = undefined;
+  1009→        });
+  1010→      };
+  1011→
+  1012→      root.addEventListener("scroll", onScroll, { passive: true });
+  1013→      cleanupByCategory.push(() => root.removeEventListener("scroll", onScroll));
+  1014→    });
+  1015→
+  1016→    return () => {
+  1017→      observers.forEach((observer) => observer.disconnect());
+  1018→      Object.values(rafByCategory).forEach((id) => {
+  1019→        if (id) window.cancelAnimationFrame(id);
+  1020→      });
+  1021→      cleanupByCategory.forEach((cleanup) => cleanup());
+  1022→    };
+  1023→  }, [activeGroupsForCarousel]);
+  1024→
+  1025→  return (
+  1026→    <>
+  1027→      <section
+  1028→        className="relative mx-auto min-w-0 w-full max-w-7xl overflow-x-clip px-4 pb-6 pt-8 xl:max-w-[1440px] 2xl:max-w-[1800px]"
+  1029→        id="catalog-sections"
+  1030→        style={{
+  1031→          ["--catalog-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
+  1032→          ["--catalog-accent-hover" as string]: crew.theme.isAuto ? "var(--franchize-accent-hover)" : palette.accentMainHover,
+  1033→          ["--catalog-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
+  1034→          ["--catalog-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
+  1035→          ["--catalog-muted" as string]: crew.theme.isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary,
+  1036→          ["--catalog-card-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
+  1037→          ["--catalog-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-base)" : palette.bgBase,
+  1038→          ["--catalog-accent-contrast" as string]: readableTextOnColor(palette.accentMain),
+  1039→          ["--catalog-accent-muted-contrast" as string]: withAlpha(readableTextOnColor(palette.accentMain), 0.7),
+  1040→          ["--catalog-accent-subtle" as string]: crew.theme.isAuto
+  1041→            ? "var(--franchize-accent-main)"
+  1042→            : withAlpha(palette.accentMain, 0.12),
+  1043→        }}
+  1044→      >
+  1045→        {!crew.isFound && (
+  1046→          <p className="mb-4 rounded-xl border border-[var(--catalog-accent)] px-3 py-2 text-sm text-[var(--catalog-accent)]">
+  1047→            Crew slug was not found. Rendering safe fallback shell.
+  1048→          </p>
+  1049→        )}
+  1050→
+  1051→        {isVipBikeRental && paidRentalSegment && (
+  1052→          <div
+  1053→            className="mb-5 rounded-2xl border border-[var(--catalog-border)] bg-[var(--catalog-card-bg)] p-4 sm:p-5"
+  1054→            aria-labelledby="paid-rental-heading"
+  1055→          >
+  1056→            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--catalog-accent)]">
+  1057→              VIP Bike Rental
+  1058→            </p>
+  1059→            <h1
+  1060→              id="paid-rental-heading"
+  1061→              className="mt-1 text-2xl font-bold leading-tight text-[var(--catalog-text)] sm:text-3xl"
+  1062→            >
+  1063→              {paidRentalSegment === "electric"
+  1064→                ? "Электромотоциклы в аренду в Нижнем Новгороде"
+  1065→                : "Бензиновые мотоциклы в аренду в Нижнем Новгороде"}
+  1066→            </h1>
+  1067→            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--catalog-muted)]">
+  1068→              {paidRentalSegment === "electric"
+  1069→                ? "Выбери модель и даты. Требования к категории зависят от модели — менеджер проверит их до подтверждения брони."
+  1070→                : "Выбери модель и даты. Для аренды бензинового мотоцикла обязательна категория А."}
+  1071→            </p>
+  1072→          </div>
+  1073→        )}
+  1074→
+  1075→        <div id="catalog-search" className="relative mb-5" role="search" aria-label="Поиск по каталогу">
+  1076→          <label htmlFor="catalog-search-input" className="sr-only">
+  1077→            Поиск по каталогу
+  1078→          </label>
+  1079→          <input
+  1080→            id="catalog-search-input"
+  1081→            type="text"
+  1082→            placeholder="Найдите по названию"
+  1083→            autoComplete="off"
+  1084→            aria-describedby="catalog-results-status"
+  1085→            value={searchQuery}
+  1086→            onChange={(event) => setSearchQuery(event.target.value)}
+  1087→            className="w-full rounded-full border py-3 pl-5 pr-24 text-sm outline-none transition focus:border-transparent focus:ring-2 md:pr-36"
+  1088→            onFocus={() => setSearchFocused(true)}
+  1089→            onBlur={() => setSearchFocused(false)}
+  1090→            style={{
+  1091→              boxShadow: `0 0 0 1px ${crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}`,
+  1092→              borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
+  1093→              backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-card)" : `${palette.bgCard}99`,
+  1094→              color: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
+  1095→              ...(searchFocused ? interactionRingStyle(crew.theme) : {}),
+  1096→            }}
+  1097→          />
+  1098→          {searchQuery.trim().length > 0 && (
+  1099→            <button
+  1100→              type="button"
+  1101→              aria-label="Очистить поиск по каталогу"
+  1102→              onClick={() => setSearchQuery("")}
+  1103→            className="absolute bottom-1 right-24 top-1 min-h-11 rounded-full px-3 text-xs font-medium transition active:scale-95"
+  1104→              onFocus={() => setClearFocused(true)}
+  1105→              onBlur={() => setClearFocused(false)}
+  1106→              style={{
+  1107→                backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-base)" : `${palette.bgBase}F0`,
+  1108→                color: crew.theme.isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary,
+  1109→                border: `1px solid ${crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}`,
+  1110→                ...(clearFocused ? interactionRingStyle(crew.theme) : {}),
+  1111→              }}
+  1112→            >
+  1113→              Сброс
+  1114→            </button>
+  1115→          )}
+  1116→          <button
+  1117→            type="button"
+  1118→            aria-label="Перейти к первой найденной позиции"
+  1119→            onClick={() => {
+  1120→              const firstResult = document.querySelector("[data-catalog-item-button='true']") as HTMLButtonElement | null;
+  1121→              firstResult?.scrollIntoView({ behavior: "smooth", block: "center" });
+  1122→              firstResult?.focus({ preventScroll: true });
+  1123→            }}
+  1124→            className="absolute bottom-1 right-1 top-1 min-h-11 rounded-full px-5 text-sm font-semibold transition active:scale-95"
+  1125→            onFocus={() => setSearchCtaFocused(true)}
+  1126→            onBlur={() => setSearchCtaFocused(false)}
+  1127→            style={{
+  1128→              backgroundColor: crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
+  1129→              color: readableTextOnColor(palette.accentMain),
+  1130→              ...(searchCtaFocused ? interactionRingStyle(crew.theme) : {}),
+  1131→            }}
+  1132→          >
+  1133→            Показать
+  1134→          </button>
+  1135→        </div>
+  1136→
+  1137→        {promoModules.length > 0 &&
+  1138→          mode !== "electro" &&
+  1139→          ctaPolicy?.intent !== "rental" && (
+  1140→          <div className="mb-5 flex min-w-0 max-w-full gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-1 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:bg-current/20] [&::-webkit-scrollbar-thumb:hover:bg-current/30] sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 sm:[&::-webkit-scrollbar]:hidden sm:[scrollbar-width:none]">
+  1141→            {visiblePromoModules.map((module, index) => {
+  1142→              const isExternal = /^(https?:|mailto:|tel:)/.test(module.href);
+  1143→              return (
+  1144→                <Link
+  1145→                  key={module.id}
+  1146→                  title={module.title}
+  1147→                  href={module.href}
+  1148→                  aria-label={`${module.ctaLabel}: ${module.title}`}
+  1149→                  className="w-[85vw] shrink-0 rounded-2xl border p-3 transition hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)] sm:w-auto"
+  1150→                  style={{
+  1151→                    borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
+  1152→                    background: promoGradientByIndex(index),
+  1153→                  }}
+  1154→                  prefetch={!isExternal}
+  1155→                  target={isExternal ? "_blank" : undefined}
+  1156→                  rel={isExternal ? "noreferrer noopener" : undefined}
+  1157→                >
+  1158→                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--catalog-accent-contrast)]">
+  1159→                    {module.badge}
+  1160→                  </p>
+  1161→                  <p className="mt-1 text-sm font-semibold leading-5 text-[var(--catalog-accent-contrast)]">
+  1162→                    {module.title}
+  1163→                  </p>
+  1164→                  {module.subtitle && <p className="mt-1 text-xs text-[var(--catalog-accent-muted-contrast)]">{module.subtitle}</p>}
+  1165→                  <p className="mt-2 text-xs font-semibold text-[var(--catalog-accent-contrast)]">
+  1166→                    {module.ctaLabel} →
+  1167→                  </p>
+  1168→                </Link>
+  1169→              );
+  1170→            })}
+  1171→          </div>
+  1172→        )}
+  1173→
+  1174→        <p id="catalog-results-status" className="sr-only" aria-live="polite">
+  1175→          Найдено позиций: {filteredItems.length}
+  1176→        </p>
+  1177→
+  1178→        <div className="mb-5 flex min-w-0 max-w-full gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-1 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:bg-current/20] [&::-webkit-scrollbar-thumb:hover:bg-current/30]" role="group" aria-label="Быстрые фильтры каталога">
+  1179→          {QUICK_FILTERS.filter(f => {
+  1180→            // In equipment mode, show equipment filters + "all"
+  1181→            // In bike modes, show bike filters + "all"
+  1182→            if (displayMode === "equipment") {
+  1183→              return f.key === "all" || f.equipmentOnly === true;
+  1184→            }
+  1185→            return f.key === "all" || f.equipmentOnly !== true;
+  1186→          }).map((filter) => {
+  1187→            const active = quickFilter === filter.key;
+  1188→            return (
+  1189→              <button
+  1190→                key={filter.key}
+  1191→                type="button"
+  1192→                onClick={() => setQuickFilter(filter.key)}
+  1193→                aria-pressed={active}
+  1194→                className="min-h-11 shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
+  1195→                style={{
+  1196→                  ["--quick-pill-bg" as string]: active
+  1197→                    ? (filter.tierColor || (crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain))
+  1198→                    : (crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard),
+  1199→                  ["--quick-pill-text" as string]: active
+  1200→                    ? readableTextOnColor(filter.tierColor || palette.accentMain)
+  1201→                    : (crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary),
+  1202→                  ...(active && filter.tierColor ? { boxShadow: `0 0 8px ${filter.tierColor}60` } : {}),
+  1203→                }}
+  1204→              >
+  1205→                {filter.tierColor && <span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: filter.tierColor }} />}
+  1206→                {(filter.compactLabel ?? filter.label)} · {quickFilterCounts[filter.key]}
+  1207→              </button>
+  1208→            );
+  1209→          })}
+  1210→          {(quickFilter !== "all" || searchQuery.trim().length > 0) && (
+  1211→            <button
+  1212→              type="button"
+  1213→              onClick={() => {
+  1214→                setQuickFilter("all");
+  1215→                setSearchQuery("");
+  1216→              }}
+  1217→              aria-label="Сбросить поиск и все быстрые фильтры"
+  1218→              className="min-h-11 shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
+  1219→              style={{
+  1220→                ["--quick-pill-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
+  1221→                ["--quick-pill-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary
+  1222→              }}
+  1223→            >
+  1224→              Сбросить всё
+  1225→            </button>
+  1226→          )}
+  1227→        </div>
+  1228→
+  1229→        {isTransitioning && (
+  1230→          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--catalog-bg)]/80 backdrop-blur-sm">
+  1231→            <div className="flex flex-col items-center gap-3">
+  1232→              <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--catalog-accent)] border-t-transparent" />
+  1233→              <p className="text-sm text-[var(--catalog-muted)]">Переключаем режим...</p>
+  1234→            </div>
+  1235→          </div>
+  1236→        )}
+  1237→
+  1238→        {items.length === 0 ? (
+  1239→          <section aria-label="Загружаем каталог" className="space-y-4">
+  1240→            <div className="flex items-center justify-between gap-3">
+  1241→              <h2 className="text-2xl font-bold uppercase leading-tight tracking-tight text-[var(--catalog-text)]">Каталог готовых выездов</h2>
+  1242→              <span className="inline-flex rounded-full bg-[var(--catalog-card-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--catalog-muted)]">синхронизируем наличие</span>
+  1243→            </div>
+  1244→            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+  1245→              {[0, 1, 2, 3].map((index) => <CatalogCardSkeleton key={index} index={index} />)}
+  1246→            </div>
+  1247→          </section>
+  1248→        ) : activeGroupsForCarousel.length === 0 && !isTransitioning ? (
+  1249→          <div className="flex flex-col items-center justify-center py-16 text-center">
+  1250→            <Search className="mb-4 h-14 w-14 text-[var(--catalog-muted)]" aria-hidden />
+  1251→            <h3 className="mb-2 text-lg font-semibold text-[var(--catalog-text)]">
+  1252→              {displayMode === "service" ? "Нет услуг" : displayMode === "equipment" ? "Нет экипировки" : displayMode === "rent" ? "Нет байков в аренду" : "Нет байков для продажи"}
+  1253→            </h3>
+  1254→            <p className="mb-4 text-sm text-[var(--catalog-muted)]">
+  1255→              {searchQuery
+  1256→                ? "Попробуйте изменить поисковый запрос или сбросить фильтры"
+  1257→                : "В этом режиме пока нет доступных байков"}
+  1258→            </p>
+  1259→            {(searchQuery || quickFilter !== "all") && (
+  1260→              <button
+  1261→                type="button"
+  1262→                onClick={() => {
+  1263→                  setSearchQuery("");
+  1264→                  setQuickFilter("all");
+  1265→                }}
+  1266→                className="min-h-11 rounded-full bg-[var(--catalog-accent)] px-6 py-2 text-sm font-semibold text-[var(--catalog-accent-contrast)] transition hover:opacity-90"
+  1267→              >
+  1268→                Сбросить фильтры
+  1269→              </button>
+  1270→            )}
+  1271→          </div>
+  1272→        ) : (
+  1273→          <div className="space-y-6">
+  1274→            {activeGroupsForCarousel.map((group) => (
+  1275→              <section key={group.title || group.category || "section"} id={toCategoryId(group.title || group.category || "section")} data-category={group.title || group.category} data-count={group.items.length}>
+  1276→                {group.title && (
+  1277→                <div className="mb-4 flex items-center justify-between gap-3">
+  1278→                  <h2 className="text-2xl font-bold uppercase leading-tight tracking-tight text-[var(--catalog-text)]">
+  1279→                    {group.title || group.category}
+  1280→                  </h2>
+  1281→                  <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--catalog-card-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--catalog-muted)]">
+  1282→                    {group.items.length} шт.
+  1283→                  </span>
+  1284→                </div>
+  1285→                )}
+  1286→                {group.items.length <= 8 ? (
+  1287→                  <>
+  1288→                    {/* ── CAROUSEL MODE (≤8 items) ── Cards aligned with reference design:
+  1289→                        Image → Badges → Title → Specs (icon+text) → Price (large bold) → CTA */}
+  1290→                    <div
+  1291→                      ref={(node) => {
+  1292→                        carouselRefs.current[group.category || group.title || "section"] = node;
+  1293→                      }}
+  1294→                      className="flex snap-x snap-mandatory gap-3 overflow-x-auto [overflow-y:clip] pt-1 pb-2 [touch-action:pan-y_pan-x] overscroll-behavior-x-contain [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:bg-current/20] [&::-webkit-scrollbar-thumb:hover:bg-current/30] sm:[&::-webkit-scrollbar]:h-2 sm:[&::-webkit-scrollbar-track]:rounded-full sm:[&::-webkit-scrollbar-track]:bg-transparent sm:[&::-webkit-scrollbar-thumb]:rounded-full sm:[&::-webkit-scrollbar-thumb:bg-current/20] sm:[&::-webkit-scrollbar-thumb:hover:bg-current/30]"
+  1295→                      style={{ scrollbarWidth: "auto" }}
+  1296→                      tabIndex={0}
+  1297→                      role="region"
+  1298→                      aria-label={`Карусель категории ${group.category}`}
+  1299→                      onKeyDown={(event) => {
+  1300→                        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+  1301→                        const root = carouselRefs.current[group.category || group.title || "section"];
+  1302→                        if (!root) return;
+  1303→                        const step = root.clientWidth * 0.9;
+  1304→                        root.scrollBy({ left: event.key === "ArrowRight" ? step : -step, behavior: "smooth" });
+  1305→                      }}
+  1306→                    >
+  1307→                      {group.items.map((item, index) => {
+  1308→                        const rentalStrip = buildCatalogRentalStrip(item, crew);
+  1309→                        const parallax = carouselParallaxByItem[item.id] ?? { x: 0, y: 0 };
+  1310→                        const specChips = getVisibleSpecChips(item);
+  1311→                        const isService = hasServicePrice(item);
+  1312→                        return (
+  1313→                    <article
+  1314→                      key={item.id}
+  1315→                      data-catalog-item="true"
+  1316→                      data-carousel-card="true"
+  1317→                      data-carousel-index={index}
+  1318→                      className="group w-[calc(50vw-14px)] shrink-0 snap-start overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-[border-color] duration-300 hover:!border-[var(--catalog-accent)] sm:w-[220px] sm:max-w-[240px]"
+  1319→                      style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
+  1320→                    >
+  1321→                      <button
+  1322→                        type="button"
+  1323→                        aria-label={`Открыть карточку ${item.title}: ${item.rentPriceLabel}`}
+  1324→                        data-catalog-item-button="true"
+  1325→                        className="flex h-full w-full flex-col text-left"
+  1326→                        onClick={() => openItem(item)}
+  1327→                        onFocus={() => setFocusedItemId(item.id)}
+  1328→                        onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
+  1329→                        style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
+  1330→                        onPointerMove={(event) => {
+  1331→                          if (event.pointerType === 'touch') return;
+  1332→                          const rect = event.currentTarget.getBoundingClientRect();
+  1333→                          const dx = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
+  1334→                          const dy = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
+  1335→                          setCarouselParallaxByItem((prev) => ({ ...prev, [item.id]: { x: dx, y: dy } }));
+  1336→                        }}
+  1337→                        onPointerLeave={() => {
+  1338→                          setCarouselParallaxByItem((prev) => ({ ...prev, [item.id]: { x: 0, y: 0 } }));
+  1339→                        }}
+  1340→                      >
+  1341→                        {/* ── Image area (9:16 for bikes, square for services) ── */}
+  1342→                        <div className={`relative w-full overflow-hidden ${isService ? 'aspect-square' : 'aspect-[9/16]'}`}>
+  1343→                          {item.imageUrl && !carouselLoadedByItem[item.id] && (
+  1344→                            <div className="absolute inset-0 overflow-hidden bg-[var(--catalog-bg)]/30">
+  1345→                              <div className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+  1346→                            </div>
+  1347→                          )}
+  1348→                          {item.imageUrl ? (
+  1349→                            <Image
+  1350→                              src={localImageSrc(item.imageUrl)}
+  1351→                              alt={item.title}
+  1352→                              fill
+  1353→                              sizes="(max-width: 1279px) 46vw, 220px"
+  1354→                              className="object-cover transition-transform duration-300 ease-out"
+  1355→                              style={{ transform: `scale(1.04) translate3d(${parallax.x * 4}px, ${parallax.y * 4}px, 0)` }}
+  1356→                              onLoad={() => setCarouselLoadedByItem((prev) => ({ ...prev, [item.id]: true }))}
+  1357→                              onError={handleImageError(item.imageUrl)}
+  1358→                            />
+  1359→                          ) : isService ? (
+  1360→                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-center transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]" style={{ backgroundColor: withAlpha(accentColor, 0.06), color: surface.mutedText.color }}>
+  1361→                              <Wrench className="h-10 w-10 opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" />
+  1362→                              <span className="text-[10px] font-medium opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</span>
+  1363→                            </div>
+  1364→                          ) : (
+  1365→                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается</div>
+  1366→                          )}
+  1367→                          {/* Speed / spec badge on image (rentalbikes-style) */}
+  1368→                          {specChips.length > 0 && (
+  1369→                            <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
+  1370→                              {specChips.slice(0, 2).map((spec, si) => (
+  1371→                                <span key={`${item.id}-badge-${si}`} className="inline-flex items-center gap-1 rounded-lg bg-[var(--catalog-bg)]/65 px-1.5 py-1 text-[9px] font-semibold text-[var(--catalog-accent)] backdrop-blur-sm">
+  1372→                                  {spec.text}
+  1373→                                </span>
+  1374→                              ))}
+  1375→                            </div>
+  1376→                          )}
+  1377→                          {/* Availability dot on image top-right */}
+  1378→                          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-[var(--catalog-bg)]/60 px-2 py-0.5 text-[9px] font-semibold backdrop-blur-sm" style={{ color: rentalStrip.isAvailable ? "#4ade80" : "#f87171" }}>
+  1379→                            <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: rentalStrip.isAvailable ? "#4ade80" : "#f87171" }} />
+  1380→                            {rentalStrip.availabilityLabel}
+  1381→                          </span>
+  1382→                        </div>
+  1383→
+  1384→                        {/* ── Info + CTA area (rentalbikes-style: highlight on hover, unified container to avoid gap) ── */}
+  1385→                        {/* flex-1 + flex-col fills the card height so the hover border aligns. */}
+  1386→                        <div className="flex flex-1 flex-col rounded-b-2xl bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]">
+  1387→                          {/* Badges row */}
+  1388→                          <div className="mb-1 flex flex-wrap gap-1">
+  1389→                            {item.isHot && (
+  1390→                              <span className="inline-flex items-center rounded-full bg-[var(--catalog-accent)] px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.06em] text-[var(--catalog-accent-contrast)] group-hover:bg-[var(--catalog-bg)]/20">
+  1391→                                Хит
+  1392→                              </span>
+  1393→                            )}
+  1394→                            {displayMode === "sale" && hasSalePrice(item) && <span className="inline-flex rounded-full border-2 border-[var(--catalog-accent)] bg-[var(--catalog-bg)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent)] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
+  1395→                            {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tv.color }} aria-hidden />{tv.label}</span> : null; })()}
+  1396→                          </div>
+  1397→
+  1398→                          {/* Title */}
+  1399→                          <h3 className="text-sm font-bold leading-5 text-[var(--catalog-text)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</h3>
+  1400→
+  1401→                          {/* Price — conditional on displayMode */}
+  1402→                          <div className="mt-1.5">
+  1403→                            {displayMode === "service" ? (
+  1404→                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
+  1405→                                {item.rentPriceLabel}
+  1406→                              </p>
+  1407→                            ) : displayMode === "rent" || displayMode === "equipment" ? (
+  1408→                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
+  1409→                                {item.rentPriceLabel}
+  1410→                              </p>
+  1411→                            ) : (
+  1412→                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
+  1413→                                {item.salePrice?.toLocaleString("ru-RU")} ₽
+  1414→                              </p>
+  1415→                            )}
+  1416→                          </div>
+  1417→
+  1418→                          {/* CTA button inside same container (rentalbikes-style: bordered, accent color) */}
+  1419→                          <div className="mt-3">
+  1420→                            <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
+  1421→                              {displayMode === "service" ? "Выбрать" : displayMode === "rent" || displayMode === "equipment" ? "Забронировать" : "Купить"}
+  1422→                            </span>
+  1423→                          </div>
+  1424→                        </div>
+  1425→                      </button>
+  1426→                    </article>
+  1427→                        );
+  1428→                      })}
+  1429→                    </div>
+  1430→                    <div className="mt-1 flex flex-wrap items-center justify-center" aria-label={`Пагинация карусели ${group.category}`}>
+  1431→                      {(() => {
+  1432→                        const groupKey = group.category || group.title || "section";
+  1433→                        const activeIndex = carouselActiveByCategory[groupKey] ?? 0;
+  1434→                        return group.items.map((item, index) => {
+  1435→                          const isActive = activeIndex === index;
+  1436→                          return (
+  1437→                            <button
+  1438→                              key={`${item.id}-dot`}
+  1439→                              type="button"
+  1440→                              aria-label={`Показать карточку ${index + 1}`}
+  1441→                              aria-current={isActive ? "true" : undefined}
+  1442→                              className="grid h-11 min-w-11 place-items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
+  1443→                              onClick={() => {
+  1444→                                const root = carouselRefs.current[groupKey];
+  1445→                                if (!root) return;
+  1446→                                const slotWidth = root.querySelector<HTMLElement>("[data-carousel-card='true']")?.offsetWidth || root.clientWidth;
+  1447→                                const gap = 12; // gap-3 = 0.75rem = 12px
+  1448→                                root.scrollTo({ left: (slotWidth + gap) * index, behavior: "smooth" });
+  1449→                              }}
+  1450→                            >
+  1451→                              <span
+  1452→                                className="h-2.5 rounded-full transition-all duration-300"
+  1453→                                style={{
+  1454→                                  width: isActive ? "24px" : "10px",
+  1455→                                  backgroundColor: isActive
+  1456→                                    ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain)
+  1457→                                    : (crew.theme.isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary),
+  1458→                                  opacity: isActive ? 1 : 0.4,
+  1459→                                }}
+  1460→                                aria-hidden
+  1461→                              />
+  1462→                            </button>
+  1463→                          );
+  1464→                        });
+  1465→                      })()}
+  1466→                    </div>
+  1467→                  </>
+  1468→                ) : (
+  1469→                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+  1470→                  {group.items.map((item) => {
+  1471→                    const rentalStrip = buildCatalogRentalStrip(item, crew);
+  1472→                    const visibleSpecs = getVisibleSpecChips(item);
+  1473→                    const isService = hasServicePrice(item);
+  1474→                    return (
+  1475→                    <article
+  1476→                      key={item.id}
+  1477→                      data-catalog-item="true"
+  1478→                      className="group overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-[border-color] duration-300 hover:!border-[var(--catalog-accent)]"
+  1479→                      style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
+  1480→                    >
+  1481→                      <button
+  1482→                        type="button"
+  1483→                        aria-label={`Открыть карточку ${item.title}: ${item.rentPriceLabel}`}
+  1484→                        data-catalog-item-button="true"
+  1485→                        className="flex h-full w-full flex-col text-left"
+  1486→                        onClick={() => openItem(item)}
+  1487→                        onFocus={() => setFocusedItemId(item.id)}
+  1488→                        onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
+  1489→                        style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
+  1490→                      >
+  1491→                        {/* ── Image area (9:16 for bikes, square for services) ── */}
+  1492→                        <div className={`relative w-full ${isService ? 'aspect-square' : 'aspect-[9/16]'}`}>
+  1493→                          {item.imageUrl ? (
+  1494→                            <Image
+  1495→                              src={localImageSrc(item.imageUrl)}
+  1496→                              alt={item.title}
+  1497→                              fill
+  1498→                              sizes="(max-width: 767px) 50vw, (max-width: 1023px) 33vw, (max-width: 1279px) 25vw, (max-width: 1535px) 20vw, 16vw"
+  1499→                              className="object-cover"
+  1500→                              onError={handleImageError(item.imageUrl)}
+  1501→                            />
+  1502→                          ) : isService ? (
+  1503→                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-center transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]" style={{ backgroundColor: withAlpha(accentColor, 0.06), color: surface.mutedText.color }}>
+  1504→                              <Wrench className="h-10 w-10 opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" />
+  1505→                              <span className="text-[10px] font-medium opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</span>
+  1506→                            </div>
+  1507→                          ) : (
+  1508→                            <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается</div>
+  1509→                          )}
+  1510→                          {/* Spec badges on image (rentalbikes-style speedometer) */}
+  1511→                          {visibleSpecs.length > 0 && (
+  1512→                            <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
+  1513→                              {visibleSpecs.slice(0, 3).map((spec, index) => (
+  1514→                                <span key={`${item.id}-spec-${index}`} className="inline-flex items-center gap-1 rounded-lg bg-[var(--catalog-bg)]/65 px-2 py-1 text-[10px] font-semibold text-[var(--catalog-accent)] backdrop-blur-sm">
+  1515→                                  {spec.text}
+  1516→                                </span>
+  1517→                              ))}
+  1518→                            </div>
+  1519→                          )}
+  1520→                          {/* Availability dot on image top-right */}
+  1521→                          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-[var(--catalog-bg)]/60 px-2 py-0.5 text-[9px] font-semibold backdrop-blur-sm" style={{ color: rentalStrip.isAvailable ? "#4ade80" : "#f87171" }}>
+  1522→                            <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: rentalStrip.isAvailable ? "#4ade80" : "#f87171" }} />
+  1523→                            {rentalStrip.availabilityLabel}
+  1524→                          </span>
+  1525→                        </div>
+  1526→
+  1527→                        {/* ── Info + CTA area (rentalbikes-style: highlight on hover, unified container) ── */}
+  1528→                        {/* flex-1 + flex-col so this area grows to fill the card height (the
+  1529→                            image is fixed aspect-[9/16]). Without this, shorter cards left a
+  1530→                            gap between the content and the article border, so the hover border
+  1531→                            looked misaligned on shorter cards in a stretched grid/carousel row. */}
+  1532→                        <div className="flex flex-1 flex-col rounded-b-2xl bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]">
+  1533→                          {/* Badges row */}
+  1534→                          <div className="mb-1 flex flex-wrap gap-1">
+  1535→                            {item.isHot && (
+  1536→                              <span className="inline-flex items-center rounded-full bg-[var(--catalog-accent)] px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.06em] text-[var(--catalog-accent-contrast)] group-hover:bg-[var(--catalog-bg)]/20">
+  1537→                                Хит
+  1538→                              </span>
+  1539→                            )}
+  1540→                            {displayMode === "sale" && hasSalePrice(item) && <span className="inline-flex rounded-full border-2 border-[var(--catalog-accent)] bg-[var(--catalog-bg)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent)] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
+  1541→                            {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tv.color }} aria-hidden />{tv.label}</span> : null; })()}
+  1542→                          </div>
+  1543→
+  1544→                          {/* Title */}
+  1545→                          <h3 className="text-sm font-bold leading-5 text-[var(--catalog-text)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</h3>
+  1546→
+  1547→                          {/* Price — conditional on displayMode */}
+  1548→                          <div className="mt-1.5">
+  1549→                            {displayMode === "service" ? (
+  1550→                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
+  1551→                                {item.rentPriceLabel}
+  1552→                              </p>
+  1553→                            ) : displayMode === "rent" || displayMode === "equipment" ? (
+  1554→                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
+  1555→                                {item.rentPriceLabel}
+  1556→                              </p>
+  1557→                            ) : (
+  1558→                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
+  1559→                                {item.salePrice?.toLocaleString("ru-RU")} ₽
+  1560→                              </p>
+  1561→                            )}
+  1562→                          </div>
+  1563→
+  1564→                          {/* CTA button inside same container (rentalbikes-style: bordered, accent color) */}
+  1565→                          <div className="mt-3">
+  1566→                            <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-2 py-2 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
+  1567→                              {displayMode === "service" ? "Выбрать" : displayMode === "rent" || displayMode === "equipment" ? "Забронировать" : "Купить"}
+  1568→                            </span>
+  1569→                          </div>
+  1570→                        </div>
+  1571→                      </button>
+  1572→                    </article>
+  1573→                    );
+  1574→                  })}
+  1575→                </div>
+  1576→                )}
+  1577→              </section>
+  1578→            ))}
+  1579→          </div>
+  1580→        )}
+  1581→      </section>
+  1582→
+  1583→      {/* Floating Cart: hide when modal is open to avoid z-index overlap. */}
+  1584→      {!selectedItem && showFloatingCart && (
+  1585→        <FloatingCartIconLinkBySlug
+  1586→          slug={resolvedSlug}
+  1587→          href={`/franchize/${resolvedSlug}/cart`}
+  1588→          items={displayItems}
+  1589→          accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain}
+  1590→          textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary}
+  1591→          borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}
+  1592→          theme={crew.theme}
+  1593→          className={ctaPolicy?.floatingCartClassName}
+  1594→        />
+  1595→      )}
+  1596→
+  1597→      <ItemModal
+  1598→        item={selectedItem}
+  1599→        items={displayItems}
+  1600→        slug={resolvedSlug}
+  1601→        theme={crew.theme}
+  1602→        pickupAddress={crew.contacts.address || crew.hqLocation}
+  1603→        workingHours={crew.contacts.workingHours}
+  1604→        flowType={displayMode === "service" ? "order" : displayMode === "rent" || displayMode === "equipment" ? "rental" : "order"}
+  1605→        displayMode={displayMode}
+  1606→        vipBikeRentalTrackingEnabled={
+  1607→          isVipBikeRentalTracking && displayItems.length > 0
+  1608→        }
+  1609→        options={selectedOptions}
+  1610→        auctionOptions={auctionTickOptions}
+  1611→        onChangeOption={(key, value) => setSelectedOptions((prev) => ({ ...prev, [key]: value }))}
+  1612→        onBuyItem={() => {
+  1613→          if (!selectedItem) return;
+  1614→          void recordRentIntent(selectedItem, "configured", {
+  1615→            trigger: "modal_buy_cta",
+  1616→            options: { ...selectedOptions, action: "buy" },
+  1617→          });
+  1618→          addItem(selectedItem.id, { action: "buy" }, 1);
+  1619→          setSelectedItem(null);
+  1620→        }}
+  1621→        onClose={() => setSelectedItem(null)}
+  1622→        onTestdrive={() => {
+  1623→          if (!selectedItem) return;
+  1624→          void recordRentIntent(selectedItem, "configured", {
+  1625→            trigger: "modal_testdrive_cta",
+  1626→            options: { ...selectedOptions, action: "testdrive" },
+  1627→          });
+  1628→          // Testdrive: add to cart with testdrive action — duration is 10min (hardcoded)
+  1629→          addItem(selectedItem.id, {
+  1630→            ...selectedOptions,
+  1631→            action: "testdrive",
+  1632→            duration: "10 минут",
+  1633→          }, 1);
+  1634→          setSelectedItem(null);
+  1635→        }}
+  1636→        onAddToCart={(extrasStr) => {
+  1637→          if (!selectedItem) return;
+  1638→          const isServiceItem = hasServicePrice(selectedItem);
+  1639→          const cartOptions = {
+  1640→            ...selectedOptions,
+  1641→            action: isServiceItem ? "service" : "rent",
+  1642→            // FIX: extrasStr from handler bypasses stale selectedOptions.perk
+  1643→            perk: extrasStr || selectedOptions.perk || "стандарт",
+  1644→          };
+  1645→          void recordRentIntent(selectedItem, "configured", {
+  1646→            trigger: "modal_rent_cta",
+  1647→            options: cartOptions,
+  1648→          });
+  1649→          addItem(selectedItem.id, cartOptions, 1);
+  1650→          setSelectedItem(null);
+  1651→        }}
+  1652→      />
+  1653→    </>
+  1654→  );
+  1655→}
+  1656→
