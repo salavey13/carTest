@@ -99,14 +99,19 @@ node skills/qr-deeplink-on-demand/scripts/generate-qr.mjs \
 
 ## Поддерживаемые типы deep-link (--type)
 
+> 📚 **Канонический справочник по всем deep-link'ам:** [`docs/DEEP_LINKS_REFERENCE.md`](../../docs/DEEP_LINKS_REFERENCE.md)
+> (формат `https://t.me/oneBikePlsBot/app?startapp=<payload>`, все префиксы `rent_`/`rental_`/`analytics_`/
+> `lead_`/`leads_`/`buy_`/`testdrive_`/`crew_`/`cart_`/`mapriders_` + порядок обработки в роутере).
+> Перед генерацией QR сверяй payload с этим справочником — таблица ниже может отставать от кода.
+
 | Type | Payload | Target route (useStartParamRouter.ts) |
 |------|---------|----------------------------------------|
-| `create_crew` | `create_crew` | `/wblanding#create-crew-form` (real create form) |
+| `create_crew` | `create_crew` | `/franchize/create#create-crew-form` (inline create form) |
 | `join_crew` | `crew_<slug>_join_crew` | `/franchize/<slug>?join_crew=true` (auto-join) |
 | `profile` | `franchize/<slug>/profile` | `/franchize/<slug>/profile` (user profile page) |
 | `lead` | `lead_<userId>` | `/franchize/<slug>/leads?leadId=<userId>` (lead detail) |
-| `rental` | `rental_<rentalId>` | `/franchize/<slug>/rentals-analytics?rentalId=<rentalId>` |
-| `analytics` | `analytics_<tab>_<date>` | `/franchize/<slug>/rentals-analytics?tab=<tab>&date=<date>` |
+| `rental` | `rental_<rentalId>` | `/franchize/<slug>/rental/<rentalId>` (dedicated closure UI, NOT analytics) |
+| `analytics` | `analytics_<tab>_<date>` | `/franchize/<slug>/rentals-analytics?ui=v2&tab=<tab>&date=<date>` |
 | `custom` | (значение `--payload`) | Любой кастомный startapp payload |
 
 ## Required flags

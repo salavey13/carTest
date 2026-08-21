@@ -428,6 +428,7 @@ analytics_web_url "rentals" "2026-07-24"
 - `app/franchize/[slug]/leads/lib/` — pipeline-stages, sla-signals, lead-history, dismiss-reasons
 - `supabase/migrations/` — SQL migrations
 - `docs/skills/fk-pasha-admin.md` — Pasha's admin runbook (complementary write-side skill)
+- `docs/DEEP_LINKS_REFERENCE.md` — 📚 канонический справочник Telegram WebApp deep-links (`t.me/oneBikePlsBot/app?startapp=<payload>`): все префиксы `rent_`/`rental_`/`analytics_`/`lead_`/`leads_`/`buy_`/`testdrive_`/`crew_`/`cart_`/`mapriders_`, QR-клейм механика, порядок обработки. Использовать ПЕРЕД генерацией QR (skill `qr-deeplink-on-demand`) или отправкой deep-link в уведомлениях.
 
 ## ⚠️ Known limitations
 
