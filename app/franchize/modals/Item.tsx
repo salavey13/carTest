@@ -12,7 +12,6 @@ import {
   Info,
   Package,
   Phone,
-  Shield,
   Star,
   Swords,
   X,
@@ -843,53 +842,6 @@ function AdditionalItems({
       {calcExtrasTotal(selection, rentalHours) > 0 && (
         <p className="mt-2 text-right text-xs font-bold text-[var(--item-accent)]">
           +{calcExtrasTotal(selection, rentalHours).toLocaleString("ru-RU")} ₽
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────────────────────────
-// Helmet Balloons — DEPRECATED, replaced by AdditionalItems above
-// Kept for backward compatibility with existing cart code
-// ───────────────────────────────────────────────────────────────────────────────
-function HelmetBalloons({
-  selected,
-  onSelect,
-}: {
-  selected: number;
-  onSelect: (count: number) => void;
-}) {
-  const options = [
-    { count: 1, label: "+1 шлем" },
-    { count: 2, label: "+2 шлема" },
-  ];
-
-  return (
-    <div className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3">
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
-        <Shield className="h-3.5 w-3.5" /> Шлемы
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {options.map((opt) => (
-          <button
-            key={opt.count}
-            type="button"
-            onClick={() => onSelect(opt.count === selected ? 0 : opt.count)}
-            aria-pressed={selected === opt.count}
-            className={`rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] ${
-              selected === opt.count
-                ? "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
-                : "border-[var(--item-border)] text-[var(--item-text)]"
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-      {selected === 0 && (
-        <p className="mt-2 text-[10px] text-[var(--item-muted-text)]">
-          (ни один не выбран = есть свой)
         </p>
       )}
     </div>
