@@ -10,13 +10,13 @@ function item(
 ): CatalogItemVM {
   return {
     id,
-    title: "Old title",
+    title: `${id} title`,
     subtitle: "Old subtitle",
     description: "Old description with a bad deposit",
     imageUrl: "/bike.jpg",
     mediaUrls: ["/bike.jpg"],
-    pricePerDay: 99_999,
-    rentPriceLabel: "99 999 ₽",
+    pricePerDay: 12_000,
+    rentPriceLabel: "12 000 ₽",
     category: "Old",
     availabilityStatus: "available",
     availabilityLabel: "Доступен",
@@ -28,11 +28,12 @@ function item(
       { label: "Залог", value: "20 000 ₽" },
     ],
     rawSpecs: {
-      rent: false,
-      sale: true,
-      dailyPrice: 99_999,
-      rent_weekday: 99_999,
-      rent_weekend: 199_999,
+      rent: 1,
+      sale: false,
+      type: "Electric",
+      dailyPrice: 12_000,
+      rent_weekday: 12_000,
+      rent_weekend: 15_000,
       deposit_rub: 20_000,
       price_per_hour: 1_000,
       rent_2_4d: 8_000,
@@ -42,51 +43,71 @@ function item(
   };
 }
 
-describe("VIP BIKE canonical rental catalog", () => {
-  test("normalizes Falcon GT and strips unconfirmed pricing", () => {
-    const [falcon] = buildVipBikeRentalCatalog([item("falcon-gt-2026")]);
+describe("VIP BIKE rental catalog (no allowlist — DB-driven)", () => {
+  test("normalizes electric bike and strips unconfirmed pricing", () => {
+    const [bike] = buildVipBikeRentalCatalog([item("falcon-gt-2026")]);
 
-    expect(falcon).toMatchObject({
-      title: "Falcon GT",
-      pricePerDay: 12_000,
-      rentPriceLabel: "12 000 ₽/сутки",
-      saleAvailable: false,
-      salePrice: null,
-    });
-    expect(falcon.rawSpecs).toMatchObject({
-      rent: 1,
-      sale: 0,
-      dailyPrice: 12_000,
-      rent_weekday: 12_000,
+    // pricePerDay comes from item.pricePerDay (cars.daily_price)
+    // Note: ru-RU locale uses \u00A0 (non-breaking space) as thousands separator
+    const rub = (n: number) => n.toLocaleString("ru-RU");
+    expect(bike.pricePerDay).toBe(12_000);
+    expect(bike.rentPriceLabel).toBe(`${rub(12_000)} ₽/сутки`);
+    expect(bike.saleAvailable).toBe(false);
+    expect(bike.salePrice).toBeNull();
+    expect(bike.category).toBe("Электромотоциклы");
+    expect(bike.rawSpecs).toMatchObject({
       vipBikeRentalCanonical: true,
       vipBikeRentalSegment: "electric",
     });
-    expect(falcon.rawSpecs).not.toHaveProperty("deposit_rub");
-    expect(falcon.rawSpecs).not.toHaveProperty("price_per_hour");
-    expect(falcon.rawSpecs).not.toHaveProperty("rent_2_4d");
-    expect(falcon.rawSpecs).not.toHaveProperty("rent_weekend");
-    expect(falcon.specs.some((spec) => /залог/i.test(spec.label))).toBe(false);
+    // Unconfirmed price keys (deposit, hourly, multi-day tiers) should be
+    // stripped from rawSpecs — they're internal pricing, not for the public
+    // landing page. rent_weekend IS preserved if set in DB (it's the only
+    // tier shown publicly via the "Выходной день" spec row).
+    expect(bike.rawSpecs).not.toHaveProperty("deposit_rub");
+    expect(bike.rawSpecs).not.toHaveProperty("price_per_hour");
+    expect(bike.rawSpecs).not.toHaveProperty("rent_2_4d");
+    expect(bike.rawSpecs).toHaveProperty("rent_weekend");
+    // Private spec labels (deposit, hourly, etc.) should be stripped from specs list
+    expect(bike.specs.some((spec) => /залог/i.test(spec.label))).toBe(false);
+    // Should have "Аренда" + "Выходной день" spec rows added
+    expect(bike.specs.some((spec) => spec.label === "Аренда")).toBe(true);
+    expect(bike.specs.some((spec) => spec.label === "Выходной день")).toBe(true);
   });
 
-  test("keeps the only confirmed weekend tariff for Y-VOLT", () => {
+  test("keeps weekend tariff from specs.rent_weekend", () => {
     const [yvolt] = buildVipBikeRentalCatalog([item("y-volt-surge-v")]);
-
     expect(yvolt.pricePerDay).toBe(12_000);
+    // rent_weekend is in the strip list (because it's a "private" tariff),
+    // but normalizeRentalItem re-adds it from the original rawSpecs before
+    // stripping — so the public landing shows it via the "Выходной день" spec.
     expect(yvolt.rawSpecs?.rent_weekend).toBe(15_000);
   });
 
-  test("filters paid landings by propulsion and excludes non-SSOT items", () => {
-    const result = buildVipBikeRentalCatalog(
-      [
-        item("falcon-gt-2026"),
-        item("yamaha-r7"),
-        item("livewire-one"),
-        item("aprilia-shiver"),
-      ],
-      "petrol",
-    );
+  test("filters by propulsion segment (electric vs petrol)", () => {
+    // Build 4 bikes: 2 electric, 2 petrol
+    const bikes = [
+      item("falcon-gt-2026", { rawSpecs: { type: "Electric" } }),
+      item("y-volt-surge-v", { rawSpecs: { type: "Electric" } }),
+      item("yamaha-r7", { rawSpecs: { type: "Gas" } }),
+      item("kawasaki-ex650k", { rawSpecs: { type: "ICE" } }),
+    ];
 
-    expect(result.map((entry) => entry.id)).toEqual(["yamaha-r7"]);
+    const petrolOnly = buildVipBikeRentalCatalog(bikes, "petrol");
+    expect(petrolOnly.map((b) => b.id)).toEqual(["yamaha-r7", "kawasaki-ex650k"]);
+
+    const electricOnly = buildVipBikeRentalCatalog(bikes, "electric");
+    expect(electricOnly.map((b) => b.id)).toEqual(["falcon-gt-2026", "y-volt-surge-v"]);
+
+    // No segment filter — all 4 pass through
+    const allBikes = buildVipBikeRentalCatalog(bikes);
+    expect(allBikes.length).toBe(4);
+  });
+
+  test("defaults to petrol when specs.type is missing", () => {
+    const bike = item("mystery-bike", { rawSpecs: {} });
+    const [result] = buildVipBikeRentalCatalog([bike]);
+    expect(result.rawSpecs?.vipBikeRentalSegment).toBe("petrol");
+    expect(result.category).toBe("Бензиновые мотоциклы");
   });
 
   test("accepts only explicit paid landing segments", () => {
@@ -94,5 +115,15 @@ describe("VIP BIKE canonical rental catalog", () => {
     expect(parseVipBikeRentalSegment("petrol")).toBe("petrol");
     expect(parseVipBikeRentalSegment("gas")).toBeNull();
     expect(parseVipBikeRentalSegment(null)).toBeNull();
+  });
+
+  test("does NOT filter by allowlist membership (DB is source of truth)", () => {
+    // A bike with an unknown id should still pass through — the only filter
+    // is `specs.hidden`, which happens server-side. Previously the allowlist
+    // would have dropped these.
+    const unknownBike = item("never-seen-before-bike");
+    const [result] = buildVipBikeRentalCatalog([unknownBike]);
+    expect(result.id).toBe("never-seen-before-bike");
+    expect(result.rawSpecs?.vipBikeRentalCanonical).toBe(true);
   });
 });

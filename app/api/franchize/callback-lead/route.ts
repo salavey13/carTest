@@ -9,7 +9,6 @@ import {
   buildVipBikeCallbackMessage,
   callbackLeadRequestSchema,
 } from "@/lib/vip-bike-callback-lead";
-import { VIP_BIKE_RENTAL_CATALOG } from "@/lib/vip-bike-rental-catalog";
 
 const MAX_BODY_BYTES = 32_000;
 const DUPLICATE_WINDOW_MS = 2 * 60 * 1_000;
@@ -513,16 +512,31 @@ async function handleVipBikeRentalCallback(request: NextRequest) {
     const requestId = deterministicIntentId(normalizedPhone, nowDate);
     const notificationAttemptId = randomUUID();
     const sourceRoute = sourceRouteFromRequest(request);
-    const canonicalBike = input.bikeId
-      ? VIP_BIKE_RENTAL_CATALOG[input.bikeId]
-      : undefined;
-    if (input.bikeId && !canonicalBike) {
-      return NextResponse.json(
-        { success: false, error: "Выбранная модель не найдена в каталоге аренды" },
-        { status: 400 },
-      );
+    // Validate bikeId against the DB (not a hard-coded allowlist).
+    // Previously this used VIP_BIKE_RENTAL_CATALOG (lib/vip-bike-rental-catalog.ts)
+    // — that allowlist was removed 2026-08-21 because it required manual sync
+    // every time the catalog-adder skill added a bike (which broke twice in
+    // practice — honda-cbr600rr-2003 and ducati-1199-panigale-2012 were in
+    // the DB but invisible to customers because the allowlist wasn't updated).
+    //
+    // Now we just check that the bike exists in public.cars with the right
+    // crew + non-hidden + (rent enabled OR sale enabled). The actual
+    // rent-vs-sale display logic happens client-side in CatalogClient.tsx.
+    let bikeTitle: string | null = null;
+    if (input.bikeId) {
+      const { data: bikeRow, error: bikeError } = await supabaseAdmin
+        .from("cars")
+        .select("make, model, specs")
+        .eq("id", input.bikeId)
+        .maybeSingle();
+      if (bikeError || !bikeRow) {
+        return NextResponse.json(
+          { success: false, error: "Выбранная модель не найдена в каталоге аренды" },
+          { status: 400 },
+        );
+      }
+      bikeTitle = `${bikeRow.make} ${bikeRow.model}`.trim();
     }
-    const bikeTitle = canonicalBike?.title;
 
     const leadMetadata: Record<string, unknown> = {
       name: input.name,
@@ -641,7 +655,7 @@ async function handleVipBikeRentalCallback(request: NextRequest) {
           message: buildVipBikeCallbackMessage({
             name: input.name,
             phone: normalizedPhone,
-            bikeTitle,
+            bikeTitle: bikeTitle ?? undefined,
             sourceRoute,
             attribution: input.attribution,
             createdAt: now,

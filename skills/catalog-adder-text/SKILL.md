@@ -86,34 +86,30 @@ bash ~/.claude/skills/catalog-adder-text/catalog-add.sh get-reference falcon-lit
 ```
 Открыть в браузере: `https://vip-bike.ru/rent/falcon-lite-2026` (или на фронте каталога `/franchize/vip-bike`).
 
-### 5b. ⚠️ VIP-BIKE RENTAL ALLOWLIST — обязательный шаг для rent-режима
+### 5b. ⚠️ JSON типы — строго boolean/number, не строки
 
-Если байк добавляется в экипаж `vip-bike` и должен отображаться в **rent-режиме** каталога
-(`/franchize/vip-bike` или `rental.vip-bike.ru`), его `id` нужно добавить в **allowlist**
-в файле `lib/vip-bike-rental-catalog.ts` (маппинг `VIP_BIKE_RENTAL_CATALOG`).
+В `specs` jsonb используй **настоящие** JSON типы, НЕ строки:
 
-**Без этого шага байк будет в БД, но НЕ появится в каталоге** — фильтр `buildVipBikeRentalCatalog`
-проходит по allowlist'у и дропает всё, чего там нет.
+| Поле | ❌ НЕ правильно (string) | ✅ Правильно (boolean/number) |
+|---|---|---|
+| `rent` | `"1"` / `"true"` / `"false"` | `1` (number) для включения, `0` для выключения |
+| `sale` | `"true"` / `"false"` | `true` / `false` (boolean) |
+| `hidden` | `"false"` / `"true"` | `false` / `true` (boolean) |
+| `rent_weekend`, `price_per_hour`, etc. | `"15000"` | `15000` (number) |
 
-```ts
-// lib/vip-bike-rental-catalog.ts — добавить запись по алфавиту в свою секцию (electric/petrol):
-"<bike-id>": {
-  title: "<Human-readable title>",
-  pricePerDay: <суточная цена в ₽>,  // должна совпадать с cars.daily_price
-  segment: "electric" | "petrol",   // electric = электро, petrol = ДВС
-  weekendPrice: <опц.>,             // только если отличается
-},
+Код в `app/franchize/lib/catalog-utils.ts:isSpecExplicitlyEnabled` ДЕЛАЕТ fallback на строки (через `String(value).toLowerCase() === "1"`), но это defensive coding, не повод писать кривые данные. Строковые значения ломают:
+- строгие `=== true` / `=== 1` проверки (встречаются в нескольких местах)
+- JSON Schema валидацию (если добавим)
+- API контракты для будущих потребителей
+
+Если увидишь в `specs` строковые булевы/числа — нормализуй через:
+```bash
+node scripts/normalize-bike-specs.js  # (см. пример в репозитории)
 ```
 
-**Когда НЕ нужно добавлять в allowlist:**
-- Sale-only байки (rent=0) — они показываются в sale-режиме, allowlist не нужен
-- Байки других экипажей (не vip-bike) — allowlist применяется только к vip-bike
-- Сервисы / equipment — они не проходят через `buildVipBikeRentalCatalog`
+### 5c. `rent_link` — устаревшая колонка (legacy)
 
-**Что проверить:**
-- ✅ `pricePerDay` в allowlist совпадает с `cars.daily_price` (иначе клиент увидит цену из allowlist'а)
-- ✅ `segment` правильный (electric/petrol) — иначе фильтр по propulsion сломается
-- ✅ Commit + push (файл либный, не в БД)
+Колонка `cars.rent_link` была частью старой не-franchize версии сайта аренды. **Сейчас не используется** — `/rent/{bikeId}` роут резолвится динамически через `[slug]` + `bikeId`. Можно оставлять `null` или не трогать. Не добавляй в новые INSERT'ы.
 
 ## Supabase Access
 

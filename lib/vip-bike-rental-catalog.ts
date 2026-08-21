@@ -2,125 +2,15 @@ import type { CatalogItemVM } from "@/app/franchize/actions";
 
 export type VipBikeRentalSegment = "electric" | "petrol";
 
-type CanonicalRental = {
-  title: string;
-  pricePerDay: number;
-  segment: VipBikeRentalSegment;
-  weekendPrice?: number;
-};
-
-// Public rental prices are deliberately kept in one small allowlist. Items
-// missing from the rental SSOT stay out of paid rental landings even when an
-// old price still exists in the shared catalog database.
-export const VIP_BIKE_RENTAL_CATALOG: Readonly<Record<string, CanonicalRental>> = {
-  "ducati-panigale-s-electro-black-aero": {
-    title: "Ducati Panigale S Electro Black Aero",
-    pricePerDay: 10_000,
-    segment: "electric",
-  },
-  "ducati-panigale-s-electro-black-chain": {
-    title: "Ducati Panigale S Electro Black",
-    pricePerDay: 10_000,
-    segment: "electric",
-  },
-  "ducati-panigale-s-electro-gold": {
-    title: "Ducati Panigale S Electro Gold",
-    pricePerDay: 10_000,
-    segment: "electric",
-  },
-  "falcon-gt-2026": {
-    title: "Falcon GT",
-    pricePerDay: 12_000,
-    segment: "electric",
-  },
-  "falcon-lynx-purple": {
-    title: "Falcon LYNX Purple",
-    pricePerDay: 11_000,
-    segment: "electric",
-  },
-  "falcon-pro-2026": {
-    title: "Falcon PRO",
-    pricePerDay: 10_000,
-    segment: "electric",
-  },
-  "hmd-m02": {
-    title: "HMD M02",
-    pricePerDay: 6_000,
-    segment: "electric",
-  },
-  "rerode-r1-plus": {
-    title: "Rerode R1+",
-    pricePerDay: 12_000,
-    segment: "electric",
-  },
-  "sotion-em01": {
-    title: "Sotion EM01",
-    pricePerDay: 5_000,
-    segment: "electric",
-  },
-  "y-volt-surge-v": {
-    title: "Y-VOLT Surge V",
-    pricePerDay: 12_000,
-    weekendPrice: 15_000,
-    segment: "electric",
-  },
-  "bmw-f800r": {
-    title: "BMW F800R",
-    pricePerDay: 12_000,
-    segment: "petrol",
-  },
-  // Added 2026-08-21: was missing from allowlist → bike appeared in DB but was
-  // filtered out by buildVipBikeRentalCatalog (lib/vip-bike-rental-catalog.ts:184).
-  // The catalog-adder skill inserts the row in public.cars but doesn't update
-  // this allowlist — operator must add the entry manually.
-  "ducati-1199-panigale-2012": {
-    title: "Ducati 1199 Panigale",
-    pricePerDay: 18_000,
-    segment: "petrol",
-  },
-  // Added 2026-08-21: same as above.
-  "honda-cbr600rr-2003": {
-    title: "Honda CBR600RR",
-    pricePerDay: 10_000,
-    segment: "petrol",
-  },
-  "jilang-max-pro": {
-    title: "Jilang Max Pro",
-    pricePerDay: 8_000,
-    segment: "petrol",
-  },
-  "kawasaki-ex650k": {
-    title: "Kawasaki EX650K Ninja 650",
-    pricePerDay: 10_000,
-    segment: "petrol",
-  },
-  "kayo-tsd110": {
-    title: "Kayo TSD 110",
-    pricePerDay: 4_000,
-    segment: "petrol",
-  },
-  "motoland-breakout": {
-    title: "Motoland Breakout 300",
-    pricePerDay: 6_000,
-    segment: "petrol",
-  },
-  "nibbler-regumoto-4v": {
-    title: "Regulmoto Nibbler 300 4V",
-    pricePerDay: 6_000,
-    segment: "petrol",
-  },
-  "suzuki-gsx-s1000f": {
-    title: "Suzuki GSX-S1000F",
-    pricePerDay: 14_000,
-    segment: "petrol",
-  },
-  "yamaha-r7": {
-    title: "Yamaha R7",
-    pricePerDay: 10_000,
-    segment: "petrol",
-  },
-};
-
+// Spec keys that should NOT appear on the public rental landing page.
+// These are internal pricing tiers (hourly, deposit, weekend tariffs, etc.)
+// that the catalog-adder skill writes for operator use but shouldn't be
+// surfaced to the public. The daily price is shown separately as
+// `pricePerDay` + `rentPriceLabel`.
+//
+// Note: `rent_weekend` IS in this strip list — the public landing page
+// shows the daily price as the main CTA. Weekend pricing is handled in the
+// cart / checkout flow, not on the catalog card.
 const UNCONFIRMED_PRICE_KEYS = [
   "deposit",
   "deposit_label",
@@ -148,45 +38,73 @@ function formatRub(value: number) {
   return value.toLocaleString("ru-RU");
 }
 
-function normalizeRentalItem(
-  item: CatalogItemVM,
-  canonical: CanonicalRental,
-): CatalogItemVM {
+// Derive propulsion segment from `specs.type` (set by catalog-adder skill).
+// "Electric" → electric; everything else (Gas, ICE, Hybrid, Petrol) → petrol.
+// If specs.type is missing, default to "petrol" (most bikes in the catalog
+// are petrol — electric is the exception, not the rule).
+function deriveSegment(rawSpecs: Record<string, unknown> | null | undefined): VipBikeRentalSegment {
+  const t = rawSpecs?.type;
+  if (typeof t === "string" && t.toLowerCase() === "electric") return "electric";
+  return "petrol";
+}
+
+// Optional weekend price from specs.rent_weekend (catalog-adder writes it
+// as one of the 11 tiers). Returns undefined if not set / not a number.
+function readWeekendPrice(rawSpecs: Record<string, unknown> | null | undefined): number | undefined {
+  const v = rawSpecs?.rent_weekend;
+  if (typeof v === "number" && v > 0) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    if (!Number.isNaN(n) && n > 0) return n;
+  }
+  return undefined;
+}
+
+// Normalize a single rental item for the public vip-bike rental landing.
+// No allowlist — relies on the server-side `specs.hidden` filter (see
+// app/franchize/actions-runtime.ts:971-980) to drop hidden bikes.
+// All canonical values come directly from the DB row (cars.daily_price,
+// specs.rent_weekend, specs.type).
+function normalizeRentalItem(item: CatalogItemVM): CatalogItemVM {
   const rawSpecs: Record<string, unknown> = { ...(item.rawSpecs ?? {}) };
   for (const key of UNCONFIRMED_PRICE_KEYS) delete rawSpecs[key];
 
-  rawSpecs.rent = 1;
-  rawSpecs.sale = 0;
-  rawSpecs.dailyPrice = canonical.pricePerDay;
-  rawSpecs.rent_weekday = canonical.pricePerDay;
-  rawSpecs.type = canonical.segment === "electric" ? "Electric" : "Petrol";
+  // Mark this item as "rental canonical" so downstream UI can detect that
+  // we went through the normalizer (e.g. to show "Аренда" badge).
   rawSpecs.vipBikeRentalCanonical = true;
-  rawSpecs.vipBikeRentalSegment = canonical.segment;
-  if (canonical.weekendPrice) rawSpecs.rent_weekend = canonical.weekendPrice;
 
+  const segment = deriveSegment(item.rawSpecs);
+  rawSpecs.vipBikeRentalSegment = segment;
+
+  // Don't override dailyPrice/rent_weekday from the DB — trust cars.daily_price.
+  // (Previously the allowlist would override stale DB prices with "canonical"
+  // ones, but the user trusts the DB to be correct after catalog-adder writes.)
+  const pricePerDay = item.pricePerDay;
+  const weekendPrice = readWeekendPrice(item.rawSpecs);
+  if (weekendPrice) rawSpecs.rent_weekend = weekendPrice;
+
+  // Strip private spec labels from the public spec list (deposit, hourly
+  // prices, etc.) and add the canonical daily + weekend rows.
   const publicSpecs = item.specs.filter(
     (spec) => !PRIVATE_SPEC_LABEL_RE.test(spec.label),
   );
   publicSpecs.push({
     label: "Аренда",
-    value: `${formatRub(canonical.pricePerDay)} ₽/сутки`,
+    value: `${formatRub(pricePerDay)} ₽/сутки`,
   });
-  if (canonical.weekendPrice) {
+  if (weekendPrice) {
     publicSpecs.push({
       label: "Выходной день",
-      value: `${formatRub(canonical.weekendPrice)} ₽/сутки`,
+      value: `${formatRub(weekendPrice)} ₽/сутки`,
     });
   }
 
   return {
     ...item,
-    title: canonical.title,
     subtitle: "Аренда в Нижнем Новгороде",
-    description: `${canonical.title} доступен для аренды в VIP Bike Rental. Оставь заявку — менеджер подтвердит даты и условия.`,
-    pricePerDay: canonical.pricePerDay,
-    rentPriceLabel: `${formatRub(canonical.pricePerDay)} ₽/сутки`,
+    rentPriceLabel: `${formatRub(pricePerDay)} ₽/сутки`,
     category:
-      canonical.segment === "electric"
+      segment === "electric"
         ? "Электромотоциклы"
         : "Бензиновые мотоциклы",
     saleAvailable: false,
@@ -196,14 +114,23 @@ function normalizeRentalItem(
   };
 }
 
+// Build the public vip-bike rental catalog.
+//
+// No allowlist — every non-hidden bike in the crew is included.
+// Optional `segment` filter narrows to electric or petrol (driven by
+// specs.type — see deriveSegment).
+//
+// Hidden-bike filtering happens server-side (actions-runtime.ts:971-980),
+// so by the time items reach this function, all hidden bikes are already
+// gone. We just normalize + optionally filter by segment.
 export function buildVipBikeRentalCatalog(
   items: CatalogItemVM[],
   segment?: VipBikeRentalSegment | null,
 ) {
   return items.flatMap((item) => {
-    const canonical = VIP_BIKE_RENTAL_CATALOG[item.id];
-    if (!canonical || (segment && canonical.segment !== segment)) return [];
-    return [normalizeRentalItem(item, canonical)];
+    const itemSegment = deriveSegment(item.rawSpecs);
+    if (segment && itemSegment !== segment) return [];
+    return [normalizeRentalItem(item)];
   });
 }
 
