@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
-import { supabaseAnon, uploadImage } from "@/hooks/supabase";
 import { reduceImageResolution } from "@/lib/client-image-compress";
 import type { Database } from "@/types/database.types";
 
@@ -314,8 +313,21 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
         // Compress image client-side before upload (max 1400px, quality 0.70)
         const compressedBlob = await reduceImageResolution(imageFile, { maxSize: 1400, quality: 0.70 });
         const compressedFile = new File([compressedBlob], "image_1.jpg", { type: 'image/jpeg' });
-        const up = await uploadImage("carpix", compressedFile, `${targetId}/image_1.jpg`, { upsert: true });
-        if (!up.success) throw new Error(up.error || "Image upload failed");
+        // Route through server-side /api/cars/upload-image (uses supabaseAdmin with
+        // SUPABASE_SERVICE_ROLE_KEY — the client-side hooks/supabase.ts:uploadImage
+        // throws "supabaseAdmin is unavailable" because the env var is stripped
+        // from the client bundle).
+        const fd = new FormData();
+        fd.append("file", compressedFile);
+        fd.append("bucket", "carpix");
+        fd.append("path", `${targetId}/image_1.jpg`);
+        fd.append("upsert", "true");
+        const upResp = await fetch("/api/cars/upload-image", { method: "POST", body: fd });
+        let up: { success: boolean; publicUrl?: string; error?: string } | null = null;
+        try { up = upResp.ok ? await upResp.json() : null; } catch { up = null; }
+        if (!upResp.ok || !up?.success || !up.publicUrl) {
+          throw new Error(up?.error || `Image upload failed (HTTP ${upResp.status})`);
+        }
         finalImageUrl = up.publicUrl;
         // keep the freshly uploaded photo first in specs.gallery
         const galleryUrls = Array.isArray(specsObject.gallery) ? specsObject.gallery : [];

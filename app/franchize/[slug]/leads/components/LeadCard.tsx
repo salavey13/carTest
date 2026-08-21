@@ -1,7 +1,14 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CheckCircle2, ChevronRight, Phone, Clock, MoreVertical } from "lucide-react";
+import { CheckCircle2, ChevronRight, Phone, Clock, MoreVertical, X } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import type {LeadRow} from "../leads-types";
 import type { LeadSignal, StageKey } from "../leads-constants";
 import type { ThemeTokens } from "../hooks/useTheme";
@@ -189,19 +196,70 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
             >
               {stageLabel}
             </span>
-            {/* Dismiss button — separate from name row so it doesn't squeeze the name on mobile */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDismiss(lead.user_id);
-              }}
-              className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition"
-              style={{ color: T.textFaint, minHeight: "28px", minWidth: "28px" }}
-              aria-label="Закрыть лид"
-            >
-              <MoreVertical className="h-3.5 w-3.5" />
-            </button>
+            {/* Overflow menu — wraps the "more options" three-dots icon in a
+                proper dropdown so a click opens a menu instead of immediately
+                dismissing the lead (which was destructive and irreversible).
+                Previously the ⋮ icon called onDismiss() directly with no
+                confirmation, which led users to accidentally delete leads. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    // Prevent the parent motion.article's onSelect from firing
+                    // when the user clicks the overflow trigger.
+                    e.stopPropagation();
+                  }}
+                  className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition hover:bg-black/5"
+                  style={{ color: T.textFaint, minHeight: "28px", minWidth: "28px" }}
+                  aria-label="Действия с лидом"
+                >
+                  <MoreVertical className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-56"
+                // Stop click propagation so menu-item clicks don't bubble up
+                // to the parent motion.article's onSelect handler.
+                onClick={(e) => e.stopPropagation()}
+              >
+                {lead.phone && (
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      try {
+                        navigator.clipboard?.writeText(lead.phone as string);
+                      } catch {}
+                    }}
+                  >
+                    <Phone className="mr-2 h-4 w-4" />
+                    Скопировать телефон
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem
+                  onSelect={() => {
+                    onSelect();
+                  }}
+                >
+                  <ChevronRight className="mr-2 h-4 w-4" />
+                  Открыть детали
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  // Destructive — red text. onSelect fires AFTER the menu
+                  // closes (radix pattern), so we don't need to manage open
+                  // state ourselves.
+                  className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                  onSelect={() => {
+                    // Defer to next tick so the menu can close first
+                    setTimeout(() => onDismiss(lead.user_id), 0);
+                  }}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Закрыть лид
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Source + temperature tags */}

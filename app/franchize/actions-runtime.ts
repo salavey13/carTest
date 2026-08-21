@@ -3939,7 +3939,22 @@ export async function getFranchizeSuccessfulRentals(input: unknown): Promise<{ s
         ? franchizeFormPrefill[normalizeCrewSlug(slug)]
         : {}) as UnknownRecord;
       const verifier = (metadata.contract_verifier && typeof metadata.contract_verifier === "object" ? metadata.contract_verifier : {}) as UnknownRecord;
-      const contractStatus = typeof verifier.status === "string" && verifier.status.trim() ? verifier.status.trim() : "none";
+      // Backfill: rentals created via the /doc Telegram operator flow do NOT write
+      // metadata.contract_verifier (only the web-app checkout flow does). But /doc
+      // rentals DO have metadata.doc_sha256 (the SHA256 of the generated contract
+      // docx). When that hash is present, the contract was generated and the
+      // operator collected all required docs — treat it as "verified" so the
+      // admin page shows something useful instead of "нет данных".
+      //
+      // Same logic is mirrored in:
+      //   - app/franchize/[slug]/leads/lib/pipeline-stages.ts:100
+      //   - app/franchize/server-actions/rentals-dashboard.ts:740-747
+      // (which still need to be patched separately — this is a local fix only).
+      const hasExplicitStatus = typeof verifier.status === "string" && verifier.status.trim().length > 0;
+      const hasDocSha256 = typeof metadata.doc_sha256 === "string" && metadata.doc_sha256.trim().length > 0;
+      const contractStatus = hasExplicitStatus
+        ? (verifier.status as string).trim()
+        : (hasDocSha256 ? "verified" : "none");
       const bikeName = `${typeof vehicle?.make === "string" ? vehicle.make : ""} ${typeof vehicle?.model === "string" ? vehicle.model : ""}`.trim();
       const fallbackUserId = String(row.user_id ?? "").trim();
       const renterNameCandidates = [

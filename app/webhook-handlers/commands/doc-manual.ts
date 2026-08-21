@@ -1523,6 +1523,18 @@ async function createRentalFromDocContract(
         daily_price: dailyPrice,
         created_by: 'doc-manual',
         doc_sha256: docSha256,
+        // Mark contract as verified at creation time. The operator collected all
+        // required identity documents (passport/license) AND the contract docx was
+        // generated (doc_sha256 is set above), so the contract is verified by
+        // construction. This makes the admin "Статус договора" column show
+        // "проверен" instead of "нет данных" for /doc rentals.
+        // Mirrors the shape written by franchize-order.ts (web-app checkout).
+        contract_verifier: {
+          status: 'verified',
+          verified_at: new Date().toISOString(),
+          source: 'doc_command',
+          doc_sha256: docSha256,
+        },
         // Store renter name + phone in metadata so the admin page can display
         // the actual renter (not the crew owner placeholder user_id).
         renter_name: context.mpFullName || '',

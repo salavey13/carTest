@@ -20,6 +20,7 @@ import { LeadDetailContent } from "./components/LeadDetailContent";
 import { Avatar } from "./components/Avatar";
 import { SourceBadge } from "./components/SourceBadge";
 import { IdentityBadge } from "./components/IdentityBadge";
+import { DismissLeadDialog, type DismissReason } from "./components/DismissLeadDialog";
 
 // Import constants
 import {
@@ -72,6 +73,25 @@ export function LeadsClient({
   const [segment, setSegment] = useState<Segment>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [hidePlaceholders, setHidePlaceholders] = useState(false); // Show all leads by default — hiding placeholders was hiding everything when identityState wasn't set
+
+  // Dismiss-lead confirmation dialog state. The ⋮ button on a LeadCard opens
+  // a dropdown menu (see LeadCard.tsx); clicking "Закрыть лид" in that menu
+  // opens THIS dialog so the operator must confirm (with reason + optional
+  // note) before the lead is actually dismissed. Previously the ⋮ button
+  // dismissed the lead immediately with no confirmation — destructive and
+  // irreversible (the lead's stage becomes "dismissed" and the user is
+  // flagged is_dismissed_lead=true).
+  const [dismissTarget, setDismissTarget] = useState<LeadRow | null>(null);
+
+  // Dismiss reasons — currently a static list, but the dialog accepts any
+  // DismissReason[]. In the future these could come from crew settings.
+  const DISMISS_REASONS: DismissReason[] = [
+    { value: "duplicate", label: "Дубликат", requiresNote: false },
+    { value: "spam", label: "Спам", requiresNote: false },
+    { value: "client_refused", label: "Клиент отказался", requiresNote: false },
+    { value: "wrong_phone", label: "Неверный телефон", requiresNote: false },
+    { value: "other", label: "Другая причина", requiresNote: true },
+  ];
 
   const router = useRouter();
   const { dbUser } = useAppContext();
@@ -242,8 +262,20 @@ export function LeadsClient({
     return () => clearTimeout(timer);
   }, [selectedId]);
 
-  // Dismiss lead — pass auth headers so the server can verify crew membership
+  // Dismiss lead — opens the DismissLeadDialog confirmation modal first.
+  // The actual DELETE call happens in `confirmDismissLead` after the operator
+  // picks a reason + optional note. This prevents accidental dismissals from
+  // the (misleadingly-iconed) ⋮ dropdown button.
   const handleDismissLead = async (leadId: string) => {
+    const target = leadsState.find((l) => l.user_id === leadId) || null;
+    if (!target) return;
+    setDismissTarget(target);
+  };
+
+  // Confirm + execute the dismissal — called by DismissLeadDialog onSubmit.
+  const confirmDismissLead = async (reason: string, note: string) => {
+    const leadId = dismissTarget?.user_id;
+    if (!leadId) return;
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (dbUser?.user_id) {
@@ -254,14 +286,32 @@ export function LeadsClient({
       const resp = await fetch("/api/franchize/lead-todo", {
         method: "DELETE",
         headers,
-        body: JSON.stringify({ leadId, dismissLead: true, slug, crewId }),
+        body: JSON.stringify({
+          leadId,
+          dismissLead: true,
+          slug,
+          crewId,
+          // Pass reason + note through so the server-side handler can record
+          // them in the franchize_intents.metadata for audit trail.
+          dismissReason: reason,
+          dismissNote: note,
+        }),
       });
-      if (!resp.ok) { alert("Не удалось убрать лид. Попробуйте позже."); return; }
+      if (!resp.ok) {
+        const errBody = await resp.json().catch(() => null);
+        const msg = errBody?.error || `HTTP ${resp.status}`;
+        alert(`Не удалось убрать лид: ${msg}`);
+        return;
+      }
       // Optimistic remove from local state, then re-sync with server
       setLeadsState((prev) => prev.filter((l) => l.user_id !== leadId));
       setSelectedId((prev) => prev === leadId ? null : prev);
+      // Close the dialog
+      setDismissTarget(null);
       router.refresh();
-    } catch { alert("Ошибка сети."); }
+    } catch (e) {
+      alert("Ошибка сети.");
+    }
   };
 
   // Password gate render — only show if NOT in Telegram AND no dbUser AND not password-authed
@@ -425,6 +475,19 @@ export function LeadsClient({
           </MobileLeadSheet>
         );
       })()}
+
+      {/* Dismiss confirmation dialog — opened from LeadCard ⋮ menu "Закрыть лид".
+          Shows reason dropdown + optional note + analytics-impact preview.
+          z-[60] so it sits above MobileLeadSheet (also z-[60] but rendered later)
+          and above CrewHeader (z-50). */}
+      <DismissLeadDialog
+        open={!!dismissTarget}
+        lead={dismissTarget}
+        reasons={DISMISS_REASONS}
+        T={T}
+        onSubmit={confirmDismissLead}
+        onCancel={() => setDismissTarget(null)}
+      />
     </div>
   );
 }

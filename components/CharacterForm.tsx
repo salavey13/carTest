@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { supabaseAnon, uploadImage } from "@/hooks/supabase";
+import { supabaseAnon } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
@@ -52,12 +52,25 @@ export function CharacterForm({ character }: CharacterFormProps) {
       let imageUrl = formData.image_url;
       if (imageFile) {
         const bucketName = "character-images";
-        const { data: buckets, error: bucketError } = await supabaseAnon.storage.listBuckets();
-        if (bucketError) throw bucketError;
-        if (!buckets.some((b) => b.name === bucketName)) {
-          await supabaseAnon.storage.createBucket(bucketName, { public: true });
+        // Route through server-side /api/cars/upload-image (uses supabaseAdmin with
+        // SUPABASE_SERVICE_ROLE_KEY — the client-side hooks/supabase.ts:uploadImage
+        // throws "supabaseAdmin is unavailable" because the env var is stripped
+        // from the client bundle).
+        const characterSlug = (formData.name || `char-${Date.now()}`)
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "");
+        const fd = new FormData();
+        fd.append("file", imageFile);
+        fd.append("bucket", bucketName);
+        fd.append("path", `${characterSlug}/image_1.jpg`);
+        fd.append("upsert", "true");
+        const upResp = await fetch("/api/cars/upload-image", { method: "POST", body: fd });
+        const up = upResp.ok ? await upResp.json().catch(() => null) : null;
+        if (!upResp.ok || !up?.success || !up.publicUrl) {
+          throw new Error(up?.error || `Image upload failed (HTTP ${upResp.status})`);
         }
-        imageUrl = await uploadImage(bucketName, imageFile);
+        imageUrl = up.publicUrl;
       }
 
       if (character) {

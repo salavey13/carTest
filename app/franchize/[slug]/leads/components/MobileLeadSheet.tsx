@@ -13,11 +13,13 @@ interface MobileLeadSheetProps {
   T: any;
 }
 
-// 80% of viewport height — leaves a 20% gap at the top so Telegram's native
-// back/close button (which sits at the very top of the WebApp viewport) is
-// always visible and tappable. Previous 85% was still too tall and the
-// sheet's drag handle / X button got cropped by the TG native button.
-const SHEET_HEIGHT_VH = 80;
+// 72% of viewport height — leaves a 28% gap at the top so:
+//   - The CrewHeader (sticky top-0 z-50) doesn't overlap the sheet
+//   - The close (X) button at the top of the sheet is always visible + tappable
+// Previously 80% which was too tall — on small screens (≤700px tall) the
+// sheet's top edge ended up underneath the CrewHeader and the close button
+// became unreachable.
+const SHEET_HEIGHT_VH = 72;
 
 const sheetVariants = {
   hidden: { y: "100%" },
@@ -102,12 +104,18 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: MobileLea
     <AnimatePresence>
       {open && (
         <div
-          className="fixed inset-0 z-40 flex items-end lg:hidden"
+          // z-[60]: above CrewHeader (z-50), above other page chrome, below
+          // toasts (z-[70]). The previous z-40 was UNDER the CrewHeader's z-50,
+          // which is why the sheet's top (close button) was hidden behind it.
+          className="fixed inset-0 z-[60] flex items-end lg:hidden"
           style={{
-            // Leave a visible gap at the top — TG native back/close button
-            // lives in the top-right of the WebApp viewport. Without this
-            // gap the sheet covers it and the user can't exit.
-            paddingTop: "max(env(safe-area-inset-top, 0px), 28px)",
+            // Leave a visible gap at the top so:
+            //   - the CrewHeader (sticky z-50) stays visible behind the sheet
+            //     but doesn't overlap the close (X) button
+            //   - the user can always see and tap the close button
+            // 80px is enough to clear the CrewHeader's full height (~76px on
+            // most TG WebApp contexts) plus a small breathing margin.
+            paddingTop: "max(env(safe-area-inset-top, 0px), 80px)",
           }}
         >
           {/* Backdrop */}
