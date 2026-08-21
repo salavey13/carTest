@@ -33,6 +33,25 @@ import { getUserCrews, getAllCrews, buildCrewSelectionKeyboard } from "../lib/cr
 
 import { escapeTelegramMarkdown } from "@/lib/utils"; // Helper для Markdown escape
 
+// Expiry for transient user_states rows (pending_* + crew_selected_*).
+// These are intermediate states used by the crew-selection keyboard flow —
+// the user types /doc, sees the crew-selection keyboard, picks a crew, then
+// the actual /doc command runs and replaces this row with its own state.
+//
+// 5 minutes is generous: the operator just needs to tap a crew button.
+// Previously these rows had NO expires_at → they accumulated in user_states
+// forever (one per abandoned /doc, /testdrive, /ekip, /subrent attempt).
+// Now they auto-expire and the next /doc starts clean.
+//
+// NOTE: this matches the DOC/TESTDRIVE/EKIP command-level expiry of 30 min,
+// but is shorter because pending_* states are SO transient. If the user
+// takes >5 min to pick a crew, they should re-type the command.
+const PENDING_STATE_EXPIRY_MS = 5 * 60 * 1000;
+
+function pendingExpiryIso(): string {
+  return new Date(Date.now() + PENDING_STATE_EXPIRY_MS).toISOString();
+}
+
 export async function handleCommand(update: any) {
     if (update.message?.text || update.message?.caption || update.callback_query) {
         const text: string = update.message?.text || update.message?.caption || update.callback_query?.data;
@@ -156,6 +175,7 @@ export async function handleCommand(update: any) {
                     user_id: userIdStrLocal,
                     state: `crew_selected_${crewSlug}`,
                     context: { selectedCrew: crewSlug, selectedAt: Date.now() },
+                    expires_at: pendingExpiryIso(),
                     updated_at: new Date().toISOString(),
                 }, { onConflict: "user_id" });
 
@@ -255,6 +275,7 @@ export async function handleCommand(update: any) {
                         user_id: userIdStr,
                         state: `pending_td_${Date.now()}`,
                         context: { pendingCommand: "/testdrive" },
+                        expires_at: pendingExpiryIso(),
                     }, { onConflict: "user_id" });
                     await sendComplexMessage(
                         chatId,
@@ -270,6 +291,7 @@ export async function handleCommand(update: any) {
                         user_id: userIdStr,
                         state: `crew_selected_${crews[0].slug}`,
                         context: { selectedCrew: crews[0].slug, selectedAt: Date.now() },
+                        expires_at: pendingExpiryIso(),
                     }, { onConflict: "user_id" });
                     return testDriveCommand(chatId, userId, username, text);
                 }
@@ -278,6 +300,7 @@ export async function handleCommand(update: any) {
                     user_id: userIdStr,
                     state: `pending_td_${Date.now()}`,
                     context: { pendingCommand: "/testdrive" },
+                    expires_at: pendingExpiryIso(),
                 }, { onConflict: "user_id" });
                 await sendComplexMessage(
                     chatId,
@@ -299,6 +322,7 @@ export async function handleCommand(update: any) {
                         user_id: userIdStr,
                         state: `pending_doc_${Date.now()}`,
                         context: { pendingCommand: "/doc" },
+                        expires_at: pendingExpiryIso(),
                     }, { onConflict: "user_id" });
                     await sendComplexMessage(
                         chatId,
@@ -313,6 +337,7 @@ export async function handleCommand(update: any) {
                         user_id: userIdStr,
                         state: `crew_selected_${crews[0].slug}`,
                         context: { selectedCrew: crews[0].slug, selectedAt: Date.now() },
+                        expires_at: pendingExpiryIso(),
                     }, { onConflict: "user_id" });
                     const bestPhotoVariant = update.message?.photo?.length
                         ? [update.message.photo[update.message.photo.length - 1]]
@@ -324,6 +349,7 @@ export async function handleCommand(update: any) {
                     user_id: userIdStr,
                     state: `pending_doc_${Date.now()}`,
                     context: { pendingCommand: "/doc" },
+                    expires_at: pendingExpiryIso(),
                 }, { onConflict: "user_id" });
                 await sendComplexMessage(
                     chatId,
@@ -352,6 +378,7 @@ export async function handleCommand(update: any) {
                         user_id: userIdStr,
                         state: `pending_ekip_${Date.now()}`,
                         context: { pendingCommand: "/ekip" },
+                        expires_at: pendingExpiryIso(),
                     }, { onConflict: "user_id" });
                     await sendComplexMessage(
                         chatId,
@@ -366,6 +393,7 @@ export async function handleCommand(update: any) {
                         user_id: userIdStr,
                         state: `crew_selected_${crews[0].slug}`,
                         context: { selectedCrew: crews[0].slug, selectedAt: Date.now() },
+                        expires_at: pendingExpiryIso(),
                     }, { onConflict: "user_id" });
                     return ekipCommand(chatId, userId, username, text);
                 }
@@ -373,6 +401,7 @@ export async function handleCommand(update: any) {
                     user_id: userIdStr,
                     state: `pending_ekip_${Date.now()}`,
                     context: { pendingCommand: "/ekip" },
+                    expires_at: pendingExpiryIso(),
                 }, { onConflict: "user_id" });
                 await sendComplexMessage(
                     chatId,
@@ -394,6 +423,7 @@ export async function handleCommand(update: any) {
                         user_id: userIdStr,
                         state: `pending_subrent_${Date.now()}`,
                         context: { pendingCommand: "/subrent" },
+                        expires_at: pendingExpiryIso(),
                     }, { onConflict: "user_id" });
                     await sendComplexMessage(
                         chatId,
@@ -408,6 +438,7 @@ export async function handleCommand(update: any) {
                         user_id: userIdStr,
                         state: `crew_selected_${crews[0].slug}`,
                         context: { selectedCrew: crews[0].slug, selectedAt: Date.now() },
+                        expires_at: pendingExpiryIso(),
                     }, { onConflict: "user_id" });
                     return handleSubrentManualCommand({ userId: userIdStr, userName: username, text, callbackData: undefined, crewId: crews[0].slug });
                 }
@@ -415,6 +446,7 @@ export async function handleCommand(update: any) {
                     user_id: userIdStr,
                     state: `pending_subrent_${Date.now()}`,
                     context: { pendingCommand: "/subrent" },
+                    expires_at: pendingExpiryIso(),
                 }, { onConflict: "user_id" });
                 await sendComplexMessage(
                     chatId,

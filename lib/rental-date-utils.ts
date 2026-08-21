@@ -119,15 +119,32 @@ export async function resolveCrewOwnerChatId(
 
     if (!crew?.slug) return null;
 
-    // Get crew owner (user with 'owner' role in this crew)
-    const { data: member } = await supabase
+    // Get crew owner (user with 'owner' role in this crew).
+    //
+    // ⚠️ MULTIPLE-OWNER GUARD (added 2026-08-21):
+    // Previously used `.maybeSingle()` which THROWS `PGRST116` ("JSON object
+    // requested, multiple (or no) rows returned") when there's >1 owner in
+    // crew_members. This caused two /doc rentals to fail silently on
+    // 2026-08-21 because someone had accidentally promoted 3 members to
+    // role='owner'. The throw was caught by the outer try/catch and returned
+    // null, which propagated up as "No crew owner found for crew_id: ..." —
+    // and the operator saw a misleading "✅ Contract generated!" success
+    // message while the rental was never actually created.
+    //
+    // Fix: use `.limit(1)` + sort by `joined_at` ASC (oldest owner wins,
+    // matching the semantic of "original founder"). Even if multiple owners
+    // exist due to a future accident, we still resolve to one and the
+    // /doc flow keeps working. A separate audit can detect the multi-owner
+    // state and surface it for cleanup.
+    const { data: members } = await supabase
       .from('crew_members')
       .select('user_id')
       .eq('crew_id', crewId)
       .eq('role', 'owner')
-      .maybeSingle();
+      .order('joined_at', { ascending: true })
+      .limit(1);
 
-    return member?.user_id || null;
+    return members?.[0]?.user_id || null;
   } catch (error) {
     console.error('[resolveCrewOwnerChatId] Failed:', error);
     return null;

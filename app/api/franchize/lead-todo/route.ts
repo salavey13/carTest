@@ -127,20 +127,76 @@ export async function DELETE(request: NextRequest) {
       if (!body.slug) {
         return NextResponse.json({ success: false, error: "Missing slug for dismiss" }, { status: 400 });
       }
-      // Also dismiss the user (mark as not a lead) so they disappear from all lead sources
+
+      // Persist the operator's dismiss reason + note for audit trail.
+      // (Previously the client passed these but the server dropped them — making
+      // it impossible to track WHY leads were dismissed.)
+      const dismissReason = typeof body.dismissReason === "string" ? body.dismissReason.trim() : null;
+      const dismissNote = typeof body.dismissNote === "string" ? body.dismissNote.trim() : null;
+      const dismissedAt = new Date().toISOString();
+      const dismissedBy = auth.userId || null;
+
+      // Also dismiss the user (mark as not a lead) so they disappear from all lead sources.
+      // We need to read the existing user.metadata first so we can MERGE our new fields
+      // instead of overwriting the whole metadata object (which would wipe things like
+      // the user's phone, bikeId, franchizeFormPrefill, etc.).
+      const { data: existingUser } = await supabaseAdmin
+        .from("users")
+        .select("metadata")
+        .eq("user_id", leadId)
+        .maybeSingle();
+      const existingUserMeta = (existingUser?.metadata as Record<string, unknown> | null) || {};
       await supabaseAdmin.from("users").update({
-        metadata: { is_dismissed_lead: true, dismissed_at: new Date().toISOString() },
+        metadata: {
+          ...existingUserMeta,
+          is_dismissed_lead: true,
+          dismissed_at: dismissedAt,
+          dismissed_by: dismissedBy,
+          ...(dismissReason ? { dismiss_reason: dismissReason } : {}),
+          ...(dismissNote ? { dismiss_note: dismissNote } : {}),
+        },
       }).eq("user_id", leadId);
 
-      const { error } = await supabaseAdmin.from("franchize_intents").update({
-        stage: "dismissed",
-        updated_at: new Date().toISOString(),
-      }).eq("telegram_user_id", leadId).eq("slug", body.slug);
+      // Same merge pattern for franchize_intents — read each intent's metadata,
+      // merge in the dismiss fields, then update.
+      // PostgREST doesn't support JSONB merge natively, so we do it in two steps.
+      const { data: existingIntents } = await supabaseAdmin
+        .from("franchize_intents")
+        .select("id, metadata")
+        .eq("telegram_user_id", leadId)
+        .eq("slug", body.slug);
 
-      if (error) {
-        logger.error("[lead-todo] dismiss lead failed", error);
-        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      if (existingIntents && existingIntents.length > 0) {
+        await Promise.all(existingIntents.map((intent: { id: string; metadata: Record<string, unknown> | null }) => {
+          const intentMeta = intent.metadata || {};
+          return supabaseAdmin
+            .from("franchize_intents")
+            .update({
+              stage: "dismissed",
+              updated_at: dismissedAt,
+              metadata: {
+                ...intentMeta,
+                dismiss_reason: dismissReason,
+                dismiss_note: dismissNote,
+                dismissed_at: dismissedAt,
+                dismissed_by: dismissedBy,
+              },
+            })
+            .eq("id", intent.id);
+        }));
+      } else {
+        // Fallback: no existing intents found — just do the bare update (matches old behavior)
+        const { error } = await supabaseAdmin.from("franchize_intents").update({
+          stage: "dismissed",
+          updated_at: dismissedAt,
+        }).eq("telegram_user_id", leadId).eq("slug", body.slug);
+
+        if (error) {
+          logger.error("[lead-todo] dismiss lead failed", error);
+          return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+        }
       }
+
       return NextResponse.json({ success: true });
     }
 

@@ -1975,6 +1975,7 @@ ${qrDeepLink}`);
     }
 
     let rentalId: string | null = null;
+    let rentalCreationError: string | null = null;
     if (isRent) {
       // Create rentals row for unified tracking (before artifact)
       try {
@@ -1984,10 +1985,59 @@ ${qrDeepLink}`);
           // Insert deposit_entries rows (tracks WHERE deposit was collected: cash/tbank/sber/split)
           await insertDepositEntries(rentalId, String(userId), context);
         } else {
-          logger.warn('[/doc] Failed to create rental, continuing without rental_id');
+          // createRentalFromDocContract returned null — capture the reason so we
+          // can warn the operator below. Previously this was logged as
+          // 'continuing without rental_id' and the operator saw a misleading
+          // "✅ Contract generated!" success message — no indication that the
+          // rental row was missing. The user then scanned the QR and got
+          // "rental not found" because claim_rental_by_qr has no rental to link.
+          // (This is what happened on 2026-08-21: 2 rentals silently failed
+          // due to multiple owners in crew_members.)
+          rentalCreationError = 'createRentalFromDocContract returned null (check logs above for the reason)';
+          logger.error('[/doc] Failed to create rental — operator will be warned in Telegram:', rentalCreationError);
         }
-      } catch (rentalErr) {
+      } catch (rentalErr: any) {
+        rentalCreationError = rentalErr?.message || String(rentalErr);
         logger.error('[/doc] Rental creation exception:', rentalErr);
+      }
+
+      // ⚠️ SURFACE THE FAILURE TO THE OPERATOR (added 2026-08-21):
+      // Send a ⚠️ warning message to BOTH the operator's chat AND the admin
+      // chat so the issue can't go unnoticed. The contract docx was generated
+      // and emailed, but without a rental row the QR claim flow will fail and
+      // the rental won't appear on /leads or the dashboard. The operator
+      // needs to either re-run /doc (after fixing the root cause) or contact
+      // support to manually create the rental.
+      if (!rentalId) {
+        const warnMsg =
+          `⚠️ *ВНИМАНИЕ: договор создан, но аренда НЕ сохранена!*\n\n` +
+          `🛵 ${bike.make} ${bike.model}\n` +
+          `👤 ${context.mpFullName || '—'}\n` +
+          `📱 ${context.clientPhone || '—'}\n` +
+          `📄 Договор: ${docFileName}\n\n` +
+          `📋 _Что нужно сделать:_\n` +
+          `• Клик QR-кода клиентом не сработает (нет аренды для привязки).\n` +
+          `• Проверь логи Vercel — ищи "Failed to create rental".\n` +
+          `• После исправления — перезапусти /doc для того же клиента.\n\n` +
+          `🔍 _Ошибка:_ ${rentalCreationError || 'неизвестна'}`;
+        try {
+          await sendComplexMessage(chatId, warnMsg, [], { parseMode: 'Markdown' });
+        } catch (e) {
+          logger.error('[/doc] Failed to send rental-failure warning to operator:', e);
+        }
+        // Also notify admin chat so it doesn't get lost
+        try {
+          await notifyAdmin(
+            `⚠️ [/doc] Аренда не создана\n` +
+            `Operator: ${userId}\n` +
+            `Bike: ${bike.make} ${bike.model}\n` +
+            `Renter: ${context.mpFullName || '—'} (${context.clientPhone || '—'})\n` +
+            `Error: ${rentalCreationError || 'unknown'}\n` +
+            `Action required: rental row missing, QR claim will fail.`
+          );
+        } catch (e) {
+          logger.error('[/doc] Failed to notify admin of rental failure:', e);
+        }
       }
     }
 
@@ -2982,20 +3032,10 @@ export async function handleDocText(userId: string, chatId: number, text: string
     return true;
   }
 
-  if (state === "license") {
-    const l = parseLicense(text);
-    if (!l) {
-      await sendComplexMessage(chatId, "❌ Формат: 99 76 123456 15.03 или 99 76 123456 15.03 15.03.2028", [], { removeKeyboard: true });
-      return true;
-    }
-    context.mlSeries = l.series;
-    context.mlNumber = l.number;
-    context.mlIssueDate = l.issueDate;
-    context.mlExpiryDate = l.expiryDate;
-    await setState(userId, "categories", context);
-    await sendComplexMessage(chatId, `✅ ВУ ${l.series} ${l.number}\n\n*Категории*`, buildCategoryKeyboard(), { keyboardType: 'inline' });
-    return true;
-  }
+  // NOTE: A `state === "license"` branch used to live here (text input for
+  // license series/number/dates), but no `setState(userId, "license", ...)`
+  // call existed anywhere in this file — so the branch was unreachable dead
+  // code. Removed 2026-08-21 during cleanup.
 
   if (state === "schedule_start" || state === "schedule") {
     // Parse start date from free text, then ask for end date

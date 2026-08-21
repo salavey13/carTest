@@ -730,20 +730,42 @@ export async function getRentalDocumentDetails(input: {
       console.error("[rental-document-details] Secret query error:", secretError);
     }
 
-    // Get contract verifier info from rental metadata
+    // Get contract verifier info from rental metadata.
+    // Also fetch created_at so we can backfill verifiedAt for /doc rentals
+    // (which don't write contract_verifier.verified_at — we use rental.created_at
+    // as the proxy for when the operator verified the physical docs).
     const { data: rentalWithMetadata } = await supabaseAdmin
       .from("rentals")
-      .select("metadata")
+      .select("metadata, created_at")
       .eq("rental_id", rentalId)
       .maybeSingle();
 
     const metadata = rentalWithMetadata?.metadata as Record<string, unknown> | null;
     const contractVerifier = metadata?.contract_verifier as Record<string, unknown> | null;
 
-    const verifierData = contractVerifier ? {
-      status: typeof contractVerifier.status === "string" ? contractVerifier.status : "none",
-      originalSha256: typeof contractVerifier.originalSha256 === "string" ? contractVerifier.originalSha256 : null,
-      verifiedAt: typeof contractVerifier.verifiedAt === "string" ? contractVerifier.verifiedAt : null,
+    // Backfill: rentals created via /doc TG operator flow before 2026-08-21 didn't
+    // write metadata.contract_verifier (only web-app checkout wrote it). They DO
+    // have metadata.doc_sha256 (the SHA256 of the generated contract docx). When
+    // that hash is present, the contract was generated and the operator collected
+    // all required docs — treat it as "verified" so the dashboard shows something
+    // useful instead of "нет данных". Mirrors the same backfill in
+    // app/franchize/actions-runtime.ts:getFranchizeSuccessfulRentals.
+    const hasExplicitStatus = typeof contractVerifier?.status === "string" && (contractVerifier.status as string).trim().length > 0;
+    const hasDocSha256 = typeof metadata?.doc_sha256 === "string" && (metadata.doc_sha256 as string).trim().length > 0;
+    const effectiveStatus = hasExplicitStatus
+      ? (contractVerifier!.status as string).trim()
+      : (hasDocSha256 ? "verified" : "none");
+
+    const verifierData = (contractVerifier || hasDocSha256) ? {
+      status: effectiveStatus,
+      originalSha256: typeof contractVerifier?.originalSha256 === "string"
+        ? contractVerifier.originalSha256
+        : (typeof metadata?.doc_sha256 === "string" ? metadata.doc_sha256 : null),
+      verifiedAt: typeof contractVerifier?.verifiedAt === "string"
+        ? contractVerifier.verifiedAt
+        : (typeof metadata?.source === "string" && metadata.source === "doc_command"
+            ? (rentalWithMetadata?.created_at as string | undefined) ?? null
+            : null),
     } : null;
 
     return {
