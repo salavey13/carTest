@@ -1,0 +1,26 @@
+# /home/z/my-project/scripts/repo-cleanup-paths.txt
+# Paths to remove from git history via `git filter-repo`.
+# Each non-empty line is treated as a path (glob patterns supported).
+#
+# Two paths to remove per user request (Aug 2026):
+#   1. Configame/dist/  — 74 MB of Windows installer binaries (4 .exe + .rar files)
+#      Not used by the Next.js app at all.
+#   2. skills/design/design-templates/  — 54 MB of HTML design templates
+#      (waitlist-page 20 MB, xianying-tool 12 MB, digital-eguide 7.5 MB, etc.)
+#      Skill assets, not runtime web assets.
+#
+# After running filter-repo, .git should shrink by ~128 MB (objects) plus
+# pack-file overhead.
+#
+# RUNBOOK:
+#   git filter-repo --paths-from-file scripts/repo-cleanup-paths.txt --force
+#   git reflog expire --expire=now --all
+#   git gc --prune=now --aggressive
+#   du -sh .git
+#   git push --force origin main
+#
+# Note: this rewrites ALL history. The remote must be force-pushed.
+# A backup tag (backup-2026-08-21-before-cleanup) was created before running.
+
+Configame/dist/
+skills/design/design-templates/
