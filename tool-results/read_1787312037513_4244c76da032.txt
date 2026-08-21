@@ -1,0 +1,1298 @@
+     1→"use server";
+     2→
+     3→import { supabaseAdmin } from "@/lib/supabase-server";
+     4→import { logger } from "@/lib/logger";
+     5→import { unstable_noStore as noStore } from "next/cache";
+     6→import { computeLeadStage, computeQrStatus, computeAssignee, STAGE_NEXT_ACTION, matchTodosToLead } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
+     7→import { normalizePhone } from "@/app/franchize/lib/phone-utils";
+     8→// NOTE: privateSchema (from @/lib/private-secrets) + cookies + telegram-actor-cookie
+     9→// are ALL imported DYNAMICALLY inside functions to avoid `import "server-only"`
+    10→// poisoning the client bundle. private-secrets.ts has `import "server-only"` too.
+    11→
+    12→// ── Auth helper ─────────────────────────────────────────────────────────────
+    13→// Verifies that the caller has access to the given crew.
+    14→// Uses TWO verification paths (both server-side, no client-supplied booleans):
+    15→//
+    16→// 1. Telegram WebApp: reads TELEGRAM_ACTOR_COOKIE (signed HMAC-SHA256) → gets real userId
+    17→//    → checks crew owner / admin / active crew member
+    18→// 2. Password auth: caller passes actorUserId (the crew owner's ID from validateAnalyticsPassword)
+    19→//    → server verifies actorUserId === crew.owner_id (only the real owner would know this UUID)
+    20→//
+    21→// LA-001 FIX: was trusting a client-supplied isPasswordAuth boolean — anyone could bypass
+    22→// auth by passing isPasswordAuth=true. Now the server verifies identity in both paths.
+    23→async function verifyCrewAccess(
+    24→  crewId: string,
+    25→): Promise<{ allowed: boolean; actorUserId?: string; error?: string }> {
+    26→  // Dynamic imports to avoid module-level server-only chain
+    27→  const { cookies } = await import("next/headers");
+    28→  const { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } = await import("@/lib/telegram-actor-cookie");
+    29→
+    30→  // Path 1: Telegram WebApp — read signed cookie
+    31→  const cookieUserId = verifyTelegramActorCookieValue(
+    32→    (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
+    33→  );
+    34→
+    35→  if (cookieUserId) {
+    36→    // Telegram auth — verify crew access via DB
+    37→    const { data: user, error: userErr } = await supabaseAdmin
+    38→      .from("users")
+    39→      .select("metadata")
+    40→      .eq("user_id", cookieUserId)
+    41→      .maybeSingle();
+    42→
+    43→    if (userErr) logger.warn("[verifyCrewAccess] users query failed:", userErr.message);
+    44→
+    45→    const userMetadata = user?.metadata as Record<string, unknown> | null;
+    46→    const isAdmin = userMetadata?.role === "admin" || userMetadata?.status === "admin";
+    47→
+    48→    // Check crew owner
+    49→    const { data: crew, error: crewErr } = await supabaseAdmin
+    50→      .from("crews")
+    51→      .select("owner_id")
+    52→      .eq("id", crewId)
+    53→      .maybeSingle();
+    54→
+    55→    if (crewErr) logger.warn("[verifyCrewAccess] crews query failed:", crewErr.message);
+    56→    const isOwner = crew?.owner_id === cookieUserId;
+    57→
+    58→    // Check crew member (LR3-006 FIX: filter by membership_status='active' — was missing,
+    59→    // so removed/inactive members retained access indefinitely)
+    60→    const { data: crewMember, error: memberErr } = await supabaseAdmin
+    61→      .from("crew_members")
+    62→      .select("user_id")
+    63→      .eq("crew_id", crewId)
+    64→      .eq("user_id", cookieUserId)
+    65→      .eq("membership_status", "active")
+    66→      .maybeSingle();
+    67→
+    68→    if (memberErr) logger.warn("[verifyCrewAccess] crew_members query failed:", memberErr.message);
+    69→    const isCrewMember = !!crewMember;
+    70→
+    71→    if (isOwner || isAdmin || isCrewMember) {
+    72→      return { allowed: true, actorUserId: cookieUserId };
+    73→    }
+    74→    return { allowed: false, error: "Недостаточно прав для просмотра данных этого экипажа." };
+    75→  }
+    76→
+    77→  // Path 2: No Telegram cookie — not authenticated via WebApp
+    78→  // (Password auth is handled by the caller passing actorUserId, which is verified
+    79→  //  by checking actorUserId === crew.owner_id. This is done in the calling function
+    80→  //  because it needs the crew owner_id which is fetched there.)
+    81→  return { allowed: false, error: "Не авторизован." };
+    82→}
+    83→
+    84→// ── Auth helper for password-authenticated users ────────────────────────────
+    85→// Verifies that the provided actorUserId is the OWNER of the given crew.
+    86→// This is the password-auth path: validateAnalyticsPassword returns the crew owner's
+    87→// ID, and only the real owner would know this UUID. We verify ownership server-side.
+    88→async function verifyCrewOwnerAccess(
+    89→  actorUserId: string,
+    90→  crewId: string,
+    91→): Promise<{ allowed: boolean; error?: string }> {
+    92→  const { data: crew, error: crewErr } = await supabaseAdmin
+    93→    .from("crews")
+    94→    .select("owner_id")
+    95→    .eq("id", crewId)
+    96→    .maybeSingle();
+    97→
+    98→  if (crewErr) logger.warn("[verifyCrewOwnerAccess] crews query failed:", crewErr.message);
+    99→  if (!crew) return { allowed: false, error: "Экипаж не найден." };
+   100→
+   101→  if (crew.owner_id === actorUserId) {
+   102→    return { allowed: true };
+   103→  }
+   104→
+   105→  // Also check if actorUserId is a global admin (in case the password was
+   106→  // generated by an admin for a crew they don't own)
+   107→  const { data: user } = await supabaseAdmin
+   108→    .from("users")
+   109→    .select("metadata")
+   110→    .eq("user_id", actorUserId)
+   111→    .maybeSingle();
+   112→
+   113→  const userMetadata = user?.metadata as Record<string, unknown> | null;
+   114→  if (userMetadata?.role === "admin" || userMetadata?.status === "admin") {
+   115→    return { allowed: true };
+   116→  }
+   117→
+   118→  return { allowed: false, error: "Недостаточно прав для просмотра данных этого экипажа." };
+   119→}
+   120→
+   121→// Re-export types from the shared leads-types.ts (no server-only imports).
+   122→// Client components should import types from leads-types.ts directly to avoid
+   123→// pulling in server-only code. Server code can still import from here.
+   124→export type { LeadRentalRow, LeadSaleRow, LeadRow, LeadTodoRow, GetFranchizeLeadsResult, DocVerificationData, GetRentalDocVerificationResult } from "@/app/franchize/[slug]/leads/leads-types";
+   125→
+   126→/**
+   127→ * Fetch the set of operator Telegram IDs for a crew (owner + active members),
+   128→ * and return the crew id so callers don't need a separate lookup.
+   129→ *
+   130→ * BUG FIX (previously): this function selected only `owner_id` from `crews`,
+   131→ * then queried `crew_members` with `crew?.id` which was always `undefined` —
+   132→ * so only the owner was ever detected as an operator. Active members who are
+   133→ * co-owners/admins/mechanics were treated as real renters.
+   134→ */
+   135→async function getCrewOperatorIds(
+   136→  slug: string,
+   137→): Promise<{ ids: Set<string>; crewId: string | null; ownerId: string | null }> {
+   138→  const ids = new Set<string>();
+   139→  try {
+   140→    const { data: crew } = await supabaseAdmin
+   141→      .from("crews")
+   142→      .select("id, owner_id")
+   143→      .eq("slug", slug)
+   144→      .maybeSingle();
+   145→
+   146→    if (crew?.owner_id) ids.add(crew.owner_id);
+   147→    if (crew?.id) {
+   148→      const { data: members } = await supabaseAdmin
+   149→        .from("crew_members")
+   150→        .select("user_id")
+   151→        .eq("crew_id", crew.id)
+   152→        .eq("membership_status", "active");
+   153→
+   154→      if (members) {
+   155→        for (const m of members) {
+   156→          if (m.user_id) ids.add(m.user_id);
+   157→        }
+   158→      }
+   159→    }
+   160→    return { ids, crewId: crew?.id ?? null, ownerId: crew?.owner_id ?? null };
+   161→  } catch (error) {
+   162→    logger.warn("[getCrewOperatorIds] Failed to fetch crew operators:", error);
+   163→    return { ids, crewId: null, ownerId: null };
+   164→  }
+   165→}
+   166→
+   167→/** Check if a chat ID is a numeric Telegram ID (not a phone number or operator). */
+   168→function isNumericTelegramId(id: string | null | undefined): boolean {
+   169→  if (!id) return false;
+   170→  // Telegram IDs are up to 10 digits today; allow up to 12 for future-proofing.
+   171→  return /^\d{1,12}$/.test(id);
+   172→}
+   173→
+   174→/** Check if a string looks like a phone number. */
+   175→function isPhoneString(id: string | null | undefined): boolean {
+   176→  if (!id) return false;
+   177→  return /^(\+7|8|7)\d{10}$/.test(id.replace(/[\s\-\(\)]/g, ""));
+   178→}
+   179→
+   180→/**
+   181→ * Build a stable per-renter identity key from a full name, e.g.
+   182→ * "Рудометов Михаил Сергеевич." → "name:рудометов михаил сергеевич".
+   183→ *
+   184→ * WHY: when an operator creates a contract via /doc-manual and SKIPS the optional
+   185→ * client phone, the lead used to be keyed by the operator's telegram_chat_id.
+   186→ * That collapsed ALL of one operator's renters into a single franchize_intents /
+   187→ * lead row (last write wins on name), so only ONE renter was ever visible on the
+   188→ * leads page and the other 44+ were invisible. Keying by normalized name instead
+   189→ * gives every renter a distinct, stable lead identity even without a phone.
+   190→ *
+   191→ * Normalization is intentionally minimal (lowercase, strip trailing dots/punct,
+   192→ * collapse whitespace) and MUST stay identical here and in leads-query.mjs so the
+   193→ * web page and the text skill surface the same identities. Returns "" for empty.
+   194→ */
+   195→function nameIdentityKey(fullName: string | null | undefined): string {
+   196→  const n = (fullName || "")
+   197→    .trim()
+   198→    .toLowerCase()
+   199→    .replace(/[.\s]+/g, " ")
+   200→    .replace(/[.]/g, "")
+   201→    .trim();
+   202→  return n ? `name:${n}` : "";
+   203→}
+   204→
+   205→/**
+   206→ * Normalize a phone number to canonical E.164-ish form (+7XXXXXXXXXX for RU).
+   207→ * Accepts +7/7/8 prefix, spaces, dashes, parentheses.
+   208→ * Returns null if input is empty or unparseable.
+   209→ *
+   210→ * BUG FIX: previously, leads were keyed by the raw phone string as typed by the
+   211→ * operator in /doc-manual ("8 999 123-45-67"), while todos were keyed by the
+   212→ * raw leadPhone passed to createLeadFollowupTodos ("+79991234567").
+   213→ * Same person → two different lead cards. Normalizing at every read & write
+   214→ * path collapses them into one canonical identity.
+   215→ */
+   216→/**
+   217→ * Classify identity state for a lead.
+   218→ *
+   219→ * BUG FIX: previously, after QR claim overwrote telegram_user_id with the renter's
+   220→ * id, the operator origin was lost and the lead was misclassified as 'claimed_user'.
+   221→ * Now we consult `originalOperatorChatId` (preserved across QR claim from
+   222→ * rentals.created_by_operator_chat_id, rental_contract_artifacts.created_by_operator_chat_id,
+   223→ * or franchize_intents.metadata.operatorId) to detect 'merged' state — operator
+   224→ * created it, renter claimed it.
+   225→ */
+   226→function classifyIdentityState(
+   227→  lead: { user_id: string; phone: string | null; telegramChatId?: string | null; sourceCount?: number; originalOperatorChatId?: string | null },
+   228→  crewOperatorIds: Set<string>,
+   229→): 'claimed_user' | 'phone_only' | 'operator_placeholder' | 'merged' {
+   230→  const userId = lead.user_id;
+   231→  const originalOp = lead.originalOperatorChatId || null;
+   232→
+   233→  // Operator placeholder: the visible id IS the operator (pre-claim state).
+   234→  if (crewOperatorIds.has(userId)) return 'operator_placeholder';
+   235→
+   236→  // Merged: original creator was an operator, but the visible id is now someone else
+   237→  // (post-QR-claim). Treat as merged so the UI can show "originally operator-placeholder".
+   238→  if (originalOp && crewOperatorIds.has(originalOp) && originalOp !== userId) {
+   239→    return 'merged';
+   240→  }
+   241→
+   242→  // Check if identity is a phone number (no Telegram user linked)
+   243→  if (isPhoneString(userId) || (lead.phone && userId === lead.phone)) return 'phone_only';
+   244→
+   245→  // Has a real Telegram user_id AND it's not an operator
+   246→  if (isNumericTelegramId(userId)) return 'claimed_user';
+   247→
+   248→  // If merged from multiple source types
+   249→  if ((lead.sourceCount || 0) >= 2) return 'merged';
+   250→
+   251→  // Fallback: look at telegramChatId
+   252→  if (lead.telegramChatId && isNumericTelegramId(lead.telegramChatId) && !crewOperatorIds.has(lead.telegramChatId)) {
+   253→    return 'claimed_user';
+   254→  }
+   255→
+   256→  // Default: phone-only by elimination
+   257→  if (lead.phone) return 'phone_only';
+   258→
+   259→  return 'operator_placeholder';
+   260→}
+   261→
+   262→export async function getFranchizeLeads(
+   263→  slug: string,
+   264→  actorUserId?: string,
+   265→  isPasswordAuth?: boolean,
+   266→): Promise<GetFranchizeLeadsResult> {
+   267→  noStore();
+   268→  const safeSlug = slug.trim();
+   269→  try {
+   270→    const { privateSchema } = await import("@/lib/private-secrets");
+   271→    // ── Auth check (LA-001 FIX: no more trusting isPasswordAuth boolean) ──
+   272→    // Path 1: Telegram WebApp — verifyCrewAccess reads the signed cookie
+   273→    // Path 2: Password auth — verify actorUserId is the crew owner (server-side)
+   274→    // Previously: NO auth at all, then isPasswordAuth boolean bypass — both fixed.
+   275→    const { ids: crewOperatorIds, crewId } = await getCrewOperatorIds(safeSlug);
+   276→    if (!crewId) {
+   277→      return { success: false, error: "Экипаж не найден" };
+   278→    }
+   279→
+   280→    // Try Telegram cookie auth first
+   281→    const access = await verifyCrewAccess(crewId);
+   282→    if (!access.allowed) {
+   283→      // Cookie auth failed — try password auth (actorUserId must be crew owner)
+   284→      if (actorUserId && isPasswordAuth) {
+   285→        const ownerAccess = await verifyCrewOwnerAccess(actorUserId, crewId);
+   286→        if (!ownerAccess.allowed) {
+   287→          return { success: false, error: ownerAccess.error || "Недостаточно прав." };
+   288→        }
+   289→        // Password auth OK — proceed with actorUserId
+   290→      } else {
+   291→        return { success: false, error: access.error || "Не авторизован." };
+   292→      }
+   293→    }
+   294→
+   295→    /** Check if a chat ID is a crew operator (not a real renter). */
+   296→    const isOperatorPlaceholder = (id: string | null | undefined): boolean => {
+   297→      if (!id) return false;
+   298→      return crewOperatorIds.has(id);
+   299→    };
+   300→
+   301→    /** Check if a rental user_id belongs to a crew operator. */
+   302→    const isCrewOwnerId = (id: string | null | undefined): boolean => {
+   303→      if (!id) return false;
+   304→      return crewOperatorIds.has(id);
+   305→    };
+   306→    type MutableLead = Omit<LeadRow, "rentals" | "sales"> & { rentals: LeadRentalRow[]; sales: LeadSaleRow[] };
+   307→    const leadMap = new Map<string, MutableLead>();
+   308→
+   309→    // Cache: rental_id → artifact renter_phone (built from step 2 for step 4 lookups).
+   310→    // Stores NORMALIZED phones so rentals step can match against operator-placeholder rentals.
+   311→    const artifactPhoneByRentalId = new Map<string, string | null>();
+   312→    // renter_full_name by rental_id — lets the rentals step fall back to a NAME
+   313→    // identity key (nameIdentityKey) for operator-placeholder rentals that have no
+   314→    // phone, so they merge with the matching artifact lead instead of collapsing
+   315→    // under the crew-owner placeholder user_id.
+   316→    const artifactNameByRentalId = new Map<string, string | null>();
+   317→    // Cache: renter_phone (normalized) → set of rental_ids — helps with old artifacts
+   318→    // that don't have rental_id backfilled (audit §4).
+   319→    const rentalIdsByNormalizedPhone = new Map<string, Set<string>>();
+   320→    // Cache: bike_id → bike title — populated from artifacts & sales after main fetch.
+   321→    const bikeTitleMap = new Map<string, string>();
+   322→
+   323→    const addOrMerge = (row: MutableLead) => {
+   324→      const existing = leadMap.get(row.user_id);
+   325→      if (!existing) {
+   326→        // First entry for this key — init sourceCount
+   327→        leadMap.set(row.user_id, { ...row, sourceCount: 1 });
+   328→        return;
+   329→      }
+   330→      // Merge — increment sourceCount
+   331→      existing.sourceCount = (existing.sourceCount || 1) + 1;
+   332→      if (row.verified) existing.verified = true;
+   333→      if (row.full_name && !existing.full_name) existing.full_name = row.full_name;
+   334→      if (row.username && !existing.username) existing.username = row.username;
+   335→      if (row.phone && !existing.phone) existing.phone = row.phone;
+   336→      if (row.bikeTitle && !existing.bikeTitle) existing.bikeTitle = row.bikeTitle;
+   337→      if (row.intentType && !existing.intentType) existing.intentType = row.intentType;
+   338→      if (row.intentStage && !existing.intentStage) existing.intentStage = row.intentStage;
+   339→      if ((row.urgencyScore ?? 0) > (existing.urgencyScore ?? 0)) existing.urgencyScore = row.urgencyScore;
+   340→      if (row.createdAt && (!existing.createdAt || row.createdAt > existing.createdAt)) existing.createdAt = row.createdAt;
+   341→      if (row.lastSeenAt && (!existing.lastSeenAt || row.lastSeenAt > existing.lastSeenAt)) existing.lastSeenAt = row.lastSeenAt;
+   342→      if (row.telegramChatId && !existing.telegramChatId) existing.telegramChatId = row.telegramChatId;
+   343→      if (row.sourceRoute && !existing.sourceRoute) existing.sourceRoute = row.sourceRoute;
+   344→      if (row.contactChannel && !existing.contactChannel) existing.contactChannel = row.contactChannel;
+   345→      // Preserve operator origin across merges — keep the first non-null value we see.
+   346→      if (row.originalOperatorChatId && !existing.originalOperatorChatId) {
+   347→        existing.originalOperatorChatId = row.originalOperatorChatId;
+   348→      }
+   349→      // Append rentals/sales from the new row into the existing lead.
+   350→      if (row.rentals.length > 0) existing.rentals.push(...row.rentals);
+   351→      if (row.sales.length > 0) existing.sales.push(...row.sales);
+   352→    };
+   353→
+   354→    // ── Parallel fetch of independent lead sources (steps 1-5) ──
+   355→    // NOTE: `users` table is NOT a primary source (no crew filter available).
+   356→    // Users are enriched later from public.users by user_id (step 7).
+   357→    //
+   358→    // BUG FIX (previously): three of these five queries selected columns that do
+   359→    // NOT exist in the schema — they silently 400'd, returned null data, and whole
+   360→    // sections of the lead map were skipped. Specifically:
+   361→    //   - rental_contract_artifacts: bike_make/bike_model/total_amount don't exist
+   362→    //     (use requested_bike_id/resolved_bike_id + total_sum)
+   363→    //   - sale_contract_artifacts: sale_id/bike_make/bike_model don't exist
+   364→    //     (use id + requested_bike_id/resolved_bike_id + total_sum)
+   365→    //   - public.users: phone is not a column (it's in metadata->>phone)
+   366→    // We also select created_by_operator_chat_id on rentals and rental_contract_artifacts
+   367→    // (where the column exists) so classifyIdentityState can detect operator-placeholder
+   368→    // leads even after QR claim overwrites user_id. franchize_intents does NOT have this
+   369→    // column — for intents, we fall back to metadata.operatorId (set by /doc-manual).
+   370→    const [
+   371→      intentLeadsResult,
+   372→      artifactUsersResult,
+   373→      secretUsersResult,
+   374→      rentalsResult,
+   375→      saleArtifactsResult,
+   376→      testdriveArtifactsResult,
+   377→    ] = await Promise.all([
+   378→      // 1. franchize_intents (the canonical lead ledger — crew-filtered by slug)
+   379→      // NOTE: franchize_intents does NOT have a created_by_operator_chat_id column —
+   380→      // that column lives on rentals and rental_contract_artifacts only.
+   381→      // For intents created by /doc-manual, the operator id is stored in
+   382→      // metadata.operatorId (see /doc-manual.ts ~L1765). We read it as a fallback
+   383→      // so classifyIdentityState can still detect operator-origin for intent-only leads.
+   384→      supabaseAdmin
+   385→        .from("franchize_intents")
+   386→        .select("telegram_user_id, phone, intent_type, stage, urgency_score, source_route, contact_channel, last_seen_at, created_at, metadata, bike_id")
+   387→        .eq("slug", safeSlug)
+   388→        .neq("stage", "dismissed")
+   389→        .order("last_seen_at", { ascending: false })
+   390→        .limit(800),
+   391→      // 2. Rental contract artifacts (crew-filtered by crew_slug).
+   392→      // Schema columns: telegram_chat_id, renter_full_name, renter_phone, rental_id,
+   393→      //   rent_start_date, rent_end_date, requested_bike_id, resolved_bike_id,
+   394→      //   total_sum (numeric), created_at, created_by_operator_chat_id.
+   395→      // bike title is resolved later via a cars lookup using requested_bike_id / resolved_bike_id.
+   396→      privateSchema()
+   397→        .from("rental_contract_artifacts")
+   398→        .select("telegram_chat_id, renter_full_name, renter_phone, rental_id, rent_start_date, rent_end_date, requested_bike_id, resolved_bike_id, total_sum, created_at, created_by_operator_chat_id")
+   399→        .eq("crew_slug", safeSlug)
+   400→        .order("created_at", { ascending: false })
+   401→        .limit(300),
+   402→      // 3. Rental secrets (crew-filtered by crew_slug)
+   403→      privateSchema()
+   404→        .from("user_rental_secrets")
+   405→        .select("chat_id, renter_full_name, renter_phone, verification_status, source_doc_key, created_at")
+   406→        .eq("crew_slug", safeSlug)
+   407→        .order("created_at", { ascending: false })
+   408→        .limit(300),
+   409→      // 4. Active/past rentals (crew-filtered by crew_id). Selects
+   410→      // created_by_operator_chat_id so we can detect operator-origin rentals
+   411→      // even after the renter's QR claim replaces rentals.user_id.
+   412→      supabaseAdmin
+   413→        .from("rentals")
+   414→        .select("rental_id, user_id, status, payment_status, requested_start_date, requested_end_date, total_cost, metadata, passport_mainpage_photo, passport_registration_photo, drivers_licence_frontal_photo, crew_id, created_by_operator_chat_id, vehicle:cars(make, model)")
+   415→        .eq("crew_id", crewId)
+   416→        .order("created_at", { ascending: false })
+   417→        .limit(500),
+   418→      // 5. Sale contract artifacts (crew-filtered by crew_slug).
+   419→      // Schema columns: id (uuid PK), telegram_chat_id, buyer_phone, requested_bike_id,
+   420→      //   resolved_bike_id, sale_price (text), total_sum (numeric), created_at.
+   421→      privateSchema()
+   422→        .from("sale_contract_artifacts")
+   423→        .select("id, telegram_chat_id, buyer_phone, requested_bike_id, resolved_bike_id, sale_price, total_sum, created_at")
+   424→        .eq("crew_slug", safeSlug)
+   425→        .order("created_at", { ascending: false })
+   426→        .limit(200),
+   427→      // 6. Testdrive contract artifacts (crew-filtered by crew_slug).
+   428→      // Schema columns: id (uuid PK), telegram_chat_id, customer_phone, customer_full_name,
+   429→      //   requested_bike_id, resolved_bike_id, testdrive_date, total_sum (numeric),
+   430→      //   created_at, created_by_operator_chat_id, license_categories.
+   431→      // Used to show testdrive leads on the /leads page + pre-fill data for future rentals.
+   432→      privateSchema()
+   433→        .from("testdrive_contract_artifacts")
+   434→        .select("id, telegram_chat_id, customer_phone, customer_full_name, requested_bike_id, resolved_bike_id, testdrive_date, total_sum, created_at, created_by_operator_chat_id, license_categories, customer_passport, customer_driver_license")
+   435→        .eq("crew_slug", safeSlug)
+   436→        .order("created_at", { ascending: false })
+   437→        .limit(200),
+   438→    ]);
+   439→
+   440→    // Surface query errors so future bugs are visible (previously: silent failures
+   441→    // made the matching layer look broken when in fact the queries were 400'ing).
+   442→    if (intentLeadsResult.error) logger.error("[getFranchizeLeads] franchize_intents query failed:", intentLeadsResult.error);
+   443→    if (artifactUsersResult.error) logger.error("[getFranchizeLeads] rental_contract_artifacts query failed:", artifactUsersResult.error);
+   444→    if (secretUsersResult.error) logger.error("[getFranchizeLeads] user_rental_secrets query failed:", secretUsersResult.error);
+   445→    if (rentalsResult.error) logger.error("[getFranchizeLeads] rentals query failed:", rentalsResult.error);
+   446→    if (saleArtifactsResult.error) logger.error("[getFranchizeLeads] sale_contract_artifacts query failed:", saleArtifactsResult.error);
+   447→    if (testdriveArtifactsResult.error) logger.error("[getFranchizeLeads] testdrive_contract_artifacts query failed:", testdriveArtifactsResult.error);
+   448→
+   449→    const intentLeads = intentLeadsResult.data;
+   450→    const artifactUsers = artifactUsersResult.data;
+   451→    const secretUsers = secretUsersResult.data;
+   452→    const rentals = rentalsResult.data;
+   453→    const saleArtifacts = saleArtifactsResult.data;
+   454→    const testdriveArtifacts = testdriveArtifactsResult.data;
+   455→
+   456→    // Pre-fetch bike titles for artifacts + sales so we can build human-readable bikeTitle.
+   457→    // The rentals step already joins cars via vehicle:cars(make, model), so it doesn't need this.
+   458→    //
+   459→    // IMPORTANT: this MUST happen BEFORE the artifact/sale ingestion loops below, because
+   460→    // those loops call bikeTitleMap.get(bikeId) to set bikeTitle on each rental/sale row.
+   461→    // Previously this was deferred to the enrichment phase, which meant bikeTitleMap was
+   462→    // empty when artifact rows were built — artifact-based deals showed generic "Байк"
+   463→    // instead of the real title, and the later backfill couldn't recover them because
+   464→    // the rows only store bikeTitle (not bike_id).
+   465→    const artifactBikeIds = new Set<string>();
+   466→    for (const a of artifactUsers ?? []) {
+   467→      const bid = a.resolved_bike_id || a.requested_bike_id;
+   468→      if (bid) artifactBikeIds.add(bid);
+   469→    }
+   470→    for (const s of saleArtifacts ?? []) {
+   471→      const bid = s.resolved_bike_id || s.requested_bike_id;
+   472→      if (bid) artifactBikeIds.add(bid);
+   473→    }
+   474→    for (const t of testdriveArtifacts ?? []) {
+   475→      const bid = t.resolved_bike_id || t.requested_bike_id;
+   476→      if (bid) artifactBikeIds.add(bid);
+   477→    }
+   478→    if (artifactBikeIds.size > 0) {
+   479→      const { data: bikeRows, error: bikeErr } = await supabaseAdmin
+   480→        .from("cars")
+   481→        .select("id, make, model")
+   482→        .in("id", Array.from(artifactBikeIds));
+   483→      if (bikeErr) {
+   484→        logger.error("[getFranchizeLeads] cars (bike titles) pre-fetch failed:", bikeErr);
+   485→      } else if (bikeRows) {
+   486→        for (const b of bikeRows) {
+   487→          const title = `${b.make || ""} ${b.model || ""}`.trim();
+   488→          if (title) bikeTitleMap.set(b.id, title);
+   489→        }
+   490→      }
+   491→    }
+   492→
+   493→    // ── Franchize intents
+   494→    if (intentLeads) {
+   495→      for (const i of intentLeads) {
+   496→        if (!i.telegram_user_id && !i.phone) continue;
+   497→        // Normalize phone so a lead keyed by "+79991234567" matches a todo keyed by "89991234567".
+   498→        const normalizedIntentPhone = normalizePhone(i.phone) || normalizePhone((i.metadata as any)?.phone);
+   499→        const id = i.telegram_user_id || normalizedIntentPhone || "";
+   500→        if (!id) continue;
+   501→        const meta = i.metadata as Record<string, unknown> | null;
+   502→        // franchize_intents has no created_by_operator_chat_id column, but /doc-manual
+   503→        // stores the operator id in metadata.operatorId. Read it as a fallback so
+   504→        // classifyIdentityState can still detect operator-origin for intent-only leads
+   505→        // (leads with no rental/artifact yet).
+   506→        const originalOp =
+   507→          (meta?.operatorId as string | null) || null;
+   508→        addOrMerge({
+   509→          user_id: id,
+   510→          full_name: (meta?.name as string) || null,
+   511→          username: (meta?.username as string) || null,
+   512→          phone: normalizedIntentPhone,
+   513→          source: i.intent_type || "unknown",
+   514→          bikeTitle: (meta?.bikeTitle as string) || null,
+   515→          createdAt: i.created_at,
+   516→          lastSeenAt: i.last_seen_at,
+   517→          verified: ["rent", "sale", "test_drive"].includes(i.intent_type || "") && i.stage === "contract_generated",
+   518→          intentType: i.intent_type,
+   519→          intentStage: i.stage,
+   520→          urgencyScore: i.urgency_score ?? undefined,
+   521→          telegramChatId: i.telegram_user_id || null,
+   522→          sourceRoute: i.source_route,
+   523→          contactChannel: i.contact_channel,
+   524→          originalOperatorChatId: originalOp,
+   525→          rentals: [],
+   526→          sales: [],
+   527→        });
+   528→      }
+   529→    }
+   530→
+   531→    // 2. Rental contract artifacts (crew-filtered)
+   532→    // IMPORTANT: artifact telegram_chat_id is often the OPERATOR's ID (set by /doc-manual).
+   533→    // When it matches a known operator, prefer renter_phone as the lead identity key
+   534→    // so the lead groups under the real renter's phone, not the operator placeholder.
+   535→    //
+   536→    // BUG FIX (previously): the query selected bike_make/bike_model/total_amount which
+   537→    // don't exist on rental_contract_artifacts, so this entire step silently 400'd and
+   538→    // no artifact ever reached leadMap. Now we select the real columns and resolve
+   539→    // bike title via the pre-fetched bikeTitleMap.
+   540→    if (artifactUsers) {
+   541→      for (const a of artifactUsers) {
+   542→        if (!a.telegram_chat_id && !a.renter_phone) continue;
+   543→        // Normalize phone ("8 999 ..." → "+7999...") so it can match other sources.
+   544→        const normalizedArtifactPhone = normalizePhone(a.renter_phone);
+   545→        // Cache phone by rental_id for rental-step lookups (use the normalized form).
+   546→        if (a.rental_id) {
+   547→          artifactPhoneByRentalId.set(a.rental_id, normalizedArtifactPhone);
+   548→          artifactNameByRentalId.set(a.rental_id, a.renter_full_name || null);
+   549→          // Also index by normalized phone → rental_ids (helps old artifacts without rental_id).
+   550→          if (normalizedArtifactPhone) {
+   551→            const set = rentalIdsByNormalizedPhone.get(normalizedArtifactPhone) ?? new Set<string>();
+   552→            set.add(a.rental_id);
+   553→            rentalIdsByNormalizedPhone.set(normalizedArtifactPhone, set);
+   554→          }
+   555→        }
+   556→        // Determine whether this artifact is still in the pre-claim state (operator
+   557→        // owns it, renter hasn't scanned QR yet).
+   558→        //
+   559→        // /doc-manual L1614-1615 sets:
+   560→        //   telegram_chat_id = String(userId)              // operator's TG id
+   561→        //   created_by_operator_chat_id = String(userId)   // same, preserved forever
+   562→        // After QR claim, telegram_chat_id is overwritten with the renter's TG id,
+   563→        // but created_by_operator_chat_id is never touched.
+   564→        //
+   565→        // So: telegram_chat_id === created_by_operator_chat_id ⟺ pre-claim.
+   566→        // This is more robust than isOperatorPlaceholder() because it catches
+   567→        // operators who are no longer in crew_members, were never added, or were
+   568→        // added with membership_status != 'active'. It also catches the case where
+   569→        // crewOperatorIds is stale (e.g. owner just changed but old owner still
+   570→        // appears on historical artifacts).
+   571→        const isPreClaimByOperatorColumn =
+   572→          !!a.created_by_operator_chat_id &&
+   573→          a.telegram_chat_id === a.created_by_operator_chat_id;
+   574→        const isOperatorFromCrew = isOperatorPlaceholder(a.telegram_chat_id);
+   575→        const preferPhone =
+   576→          (isPreClaimByOperatorColumn || isOperatorFromCrew) && !!normalizedArtifactPhone;
+   577→        // When operator placeholder + no phone, use the NORMALIZED renter name as
+   578→        // the identity key so each renter is a distinct lead (not collapsed under
+   579→        // the operator's chat id). Normalization matters: "…Кириллович." (trailing
+   580→        // dot) and "…Кириллович" must resolve to the SAME key, otherwise the same
+   581→        // person shows up twice. See nameIdentityKey().
+   582→        const fallbackName = (!preferPhone && !normalizedArtifactPhone && a.renter_full_name)
+   583→          ? nameIdentityKey(a.renter_full_name)
+   584→          : null;
+   585→        const id = preferPhone
+   586→          ? normalizedArtifactPhone!
+   587→          : (fallbackName || a.telegram_chat_id || normalizedArtifactPhone || "");
+   588→        if (!id) continue;
+   589→        // Resolve bike title from the pre-fetched cars map.
+   590→        const bikeId = a.resolved_bike_id || a.requested_bike_id;
+   591→        const bikeTitle = (bikeId && bikeTitleMap.get(bikeId)) || null;
+   592→        // Preserve the original operator chat id so classifyIdentityState can detect
+   593→        // operator-origin even after QR claim replaces telegram_chat_id with renter id.
+   594→        const originalOp = a.created_by_operator_chat_id || null;
+   595→        const rentalRow: LeadRentalRow = {
+   596→          rentalId: a.rental_id || "",
+   597→          status: "confirmed",
+   598→          paymentStatus: "interest_paid",
+   599→          startDate: a.rent_start_date,
+   600→          endDate: a.rent_end_date,
+   601→          bikeTitle,
+   602→          totalCost: Number(a.total_sum) || 0,
+   603→        };
+   604→        addOrMerge({
+   605→          user_id: id,
+   606→          full_name: a.renter_full_name,
+   607→          username: null,
+   608→          phone: normalizedArtifactPhone,
+   609→          source: "rental_contract",
+   610→          bikeTitle,
+   611→          createdAt: a.created_at,
+   612→          lastSeenAt: a.created_at,
+   613→          verified: true,
+   614→          // goodmorning-fixes: set intentType so mode filter ("rent") includes artifact leads.
+   615→          // Was: no intentType → mode filter rejected them → leads list empty.
+   616→          intentType: "rent",
+   617→          // Store the operator's telegram_chat_id separately (not as lead key)
+   618→          telegramChatId: preferPhone ? null : (a.telegram_chat_id || null),
+   619→          originalOperatorChatId: originalOp,
+   620→          rentals: [rentalRow],
+   621→          sales: [],
+   622→        });
+   623→      }
+   624→    }
+   625→
+   626→    // 3. Rental secrets (crew-filtered)
+   627→    if (secretUsers) {
+   628→      for (const s of secretUsers) {
+   629→        if (!s.chat_id) continue;
+   630→        const normalizedSecretPhone = normalizePhone(s.renter_phone);
+   631→        const existing = leadMap.get(s.chat_id);
+   632→        if (!existing) {
+   633→          leadMap.set(s.chat_id, {
+   634→            user_id: s.chat_id,
+   635→            full_name: s.renter_full_name,
+   636→            username: null,
+   637→            phone: normalizedSecretPhone,
+   638→            source: s.source_doc_key === "profile_prefill" ? "profile_prefill" : "rental_secret",
+   639→            bikeTitle: null,
+   640→            createdAt: s.created_at,
+   641→            lastSeenAt: s.created_at,
+   642→            verified: s.verification_status === "verified",
+   643→            // goodmorning-fixes: set intentType so mode filter ("rent") includes secret leads.
+   644→            intentType: "rent",
+   645→            telegramChatId: s.chat_id,
+   646→            rentals: [],
+   647→            sales: [],
+   648→            sourceCount: 1,
+   649→          });
+   650→        } else {
+   651→          existing.sourceCount = (existing.sourceCount || 1) + 1;
+   652→          if (s.verification_status === "verified") existing.verified = true;
+   653→          if (!existing.full_name) existing.full_name = s.renter_full_name;
+   654→          if (!existing.phone && normalizedSecretPhone) existing.phone = normalizedSecretPhone;
+   655→        }
+   656→      }
+   657→    }
+   658→
+   659→    // 4. Active/past rentals (crew-filtered)
+   660→    //
+   661→    // BUG FIX: previously, when rentals.user_id was the crew owner (placeholder),
+   662→    // we tried to re-key the lead by artifact renter_phone — but only when the
+   663→    // artifact had a rental_id. For old artifacts without rental_id, the lookup
+   664→    // returned nothing and the rental stayed grouped under the operator (and was
+   665→    // then hidden client-side by hidePlaceholders=true). Now we also try matching
+   666→    // by normalized renter_phone pulled from rental.metadata.renter_phone as a
+   667→    // secondary fallback.
+   668→    if (rentals) {
+   669→      for (const r of rentals) {
+   670→        if (!r.user_id) continue;
+   671→        // Determine whether this rental is still in the pre-claim state (operator
+   672→        // owns it, renter hasn't scanned QR yet).
+   673→        //
+   674→        // /doc-manual L1191-1193 sets:
+   675→        //   user_id = crewOwnerChatId                       // operator's TG id
+   676→        //   owner_id = crewOwnerChatId                      // same
+   677→        //   created_by_operator_chat_id = crewOwnerChatId   // preserved forever
+   678→        // After QR claim, user_id is overwritten with the renter's TG id, but
+   679→        // created_by_operator_chat_id is never touched.
+   680→        //
+   681→        // So: user_id === created_by_operator_chat_id ⟺ pre-claim.
+   682→        // More robust than isCrewOwnerId() because it catches former operators,
+   683→        // never-added operators, and stale crewOperatorIds caches.
+   684→        const rentalCreatedByOp = (r as any).created_by_operator_chat_id || null;
+   685→        const isPreClaimByOperatorColumn =
+   686→          !!rentalCreatedByOp && r.user_id === rentalCreatedByOp;
+   687→        const isOperatorFromCrew = isCrewOwnerId(r.user_id);
+   688→        const prefersPhone = isPreClaimByOperatorColumn || isOperatorFromCrew;
+   689→        const artifactPhone = artifactPhoneByRentalId.get(r.rental_id) || null;
+   690→        // Secondary fallback: pull renter_phone out of rental.metadata (some older
+   691→        // rentals were created with it stored there).
+   692→        const metaRenterPhone = (r.metadata && typeof r.metadata === 'object')
+   693→          ? normalizePhone((r.metadata as Record<string, unknown>).renter_phone as string | undefined)
+   694→          : null;
+   695→        const effectivePhone = artifactPhone || metaRenterPhone || null;
+   696→        // Identity for this rental: phone if we have one; otherwise, for operator-
+   697→        // placeholder (pre-claim) rentals, fall back to the renter NAME (looked up
+   698→        // via the artifact for this rental_id) so the rental merges with the
+   699→        // matching artifact lead instead of collapsing under the crew-owner
+   700→        // placeholder user_id (which hid 22 operator-created rentals behind one id).
+   701→        const rentalName = (r.rental_id && artifactNameByRentalId.get(r.rental_id)) || null;
+   702→        const rentalNameKey = prefersPhone ? nameIdentityKey(rentalName) : "";
+   703→        const effectiveId = (prefersPhone && effectivePhone)
+   704→          ? effectivePhone
+   705→          : (rentalNameKey || r.user_id);
+   706→
+   707→        const existing = leadMap.get(effectiveId) ||
+   708→          // Fallback: try matching by renter_phone from metadata (handles existing rentals
+   709→          // whose user_id is telegramUserId while the lead key is phone)
+   710→          (metaRenterPhone ? leadMap.get(metaRenterPhone) || null : null) ||
+   711→          // Fallback: try matching by name key (rental merged to artifact by name)
+   712→          (rentalNameKey ? leadMap.get(rentalNameKey) || null : null);
+   713→        const vehicle = r.vehicle as { make?: string; model?: string } | null;
+   714→        const bikeTitle = `${vehicle?.make || ""} ${vehicle?.model || ""}`.trim() || null;
+   715→        // rentals.created_by_operator_chat_id preserves who originally created the rental
+   716→        // (the operator). Use it to detect operator-origin even after QR claim replaces
+   717→        // rentals.user_id with the renter's id.
+   718→        const originalOp = rentalCreatedByOp;
+   719→        const rentalRow: LeadRentalRow = {
+   720→          rentalId: r.rental_id,
+   721→          status: r.status || "pending_confirmation",
+   722→          paymentStatus: r.payment_status || "interest_paid",
+   723→          startDate: r.requested_start_date,
+   724→          endDate: r.requested_end_date,
+   725→          bikeTitle,
+   726→          totalCost: Number(r.total_cost) || 0,
+   727→          metadata: r.metadata ? (r.metadata as Record<string, unknown>) : null,
+   728→          passportMainpagePhoto: (r as any).passport_mainpage_photo || null,
+   729→          passportRegistrationPhoto: (r as any).passport_registration_photo || null,
+   730→          driversLicenceFrontalPhoto: (r as any).drivers_licence_frontal_photo || null,
+   731→        };
+   732→        if (!existing) {
+   733→          leadMap.set(effectiveId, {
+   734→            user_id: effectiveId,
+   735→            full_name: rentalName || null,
+   736→            username: null,
+   737→            phone: effectivePhone,
+   738→            source: "rental",
+   739→            bikeTitle,
+   740→            createdAt: r.requested_start_date,
+   741→            lastSeenAt: r.requested_start_date,
+   742→            verified: ["active", "completed", "confirmed"].includes(r.status || ""),
+   743→            // goodmorning-fixes: set intentType so mode filter ("rent") includes rental leads.
+   744→            intentType: "rent",
+   745→            // BUG 4+5 fix: default sourceRoute/contactChannel for /doc-flow leads.
+   746→            // These leads don't have a matching franchize_intent (different identity key),
+   747→            // so sourceRoute and contactChannel are null. For /doc-flow leads (detected
+   748→            // via originalOperatorChatId), default to "/doc-manual" and "telegram_bot".
+   749→            sourceRoute: originalOp ? "/doc-manual" : null,
+   750→            contactChannel: originalOp ? "telegram_bot" : null,
+   751→            telegramChatId: /^\d+$/.test(r.user_id) ? r.user_id : null,
+   752→            originalOperatorChatId: originalOp,
+   753→            rentals: [rentalRow],
+   754→            sales: [],
+   755→            sourceCount: 1,
+   756→          });
+   757→        } else {
+   758→          existing.sourceCount = (existing.sourceCount || 1) + 1;
+   759→          existing.rentals.push(rentalRow);
+   760→          if (!existing.phone && effectivePhone) existing.phone = effectivePhone;
+   761→          if (originalOp && !existing.originalOperatorChatId) existing.originalOperatorChatId = originalOp;
+   762→          if (["active", "completed", "confirmed"].includes(r.status || "")) existing.verified = true;
+   763→        }
+   764→      }
+   765→    }
+   766→
+   767→    // 5. Sale contract artifacts (crew-filtered)
+   768→    // Same operator-phone preference: if telegram_chat_id is an operator, use buyer_phone.
+   769→    //
+   770→    // BUG FIX (previously): the query selected sale_id/bike_make/bike_model which
+   771→    // don't exist on sale_contract_artifacts, so sales NEVER appeared on the leads
+   772→    // page. Now we use the real columns: `id` (uuid PK), requested_bike_id,
+   773→    // resolved_bike_id, total_sum (numeric — preferred over sale_price text).
+   774→    if (saleArtifacts) {
+   775→      for (const s of saleArtifacts) {
+   776→        const normalizedBuyerPhone = normalizePhone(s.buyer_phone);
+   777→        // Sale artifacts have NO created_by_operator_chat_id column and NO QR claim
+   778→        // flow (audit §10 #5 — open question, currently sales are always operator-
+   779→        // created). So telegram_chat_id is always the operator's id, never the
+   780→        // buyer's. Always prefer buyer_phone when present — this is safe because:
+   781→        //   - If telegram_chat_id is the operator → lead groups under buyer's phone (correct)
+   782→        //   - If telegram_chat_id is somehow the buyer (rare edge case) → lead still
+   783→        //     groups under buyer's phone (still correct, just keyed differently)
+   784→        //   - buyer_phone is a stable identifier that doesn't change post-creation
+   785→        // This also catches the case where the operator isn't in crewOperatorIds
+   786→        // (former member, never-added, stale cache) — isOperatorPlaceholder would
+   787→        // miss those, but we don't need it here.
+   788→        const preferPhone = !!normalizedBuyerPhone;
+   789→        const id = preferPhone
+   790→          ? normalizedBuyerPhone!
+   791→          : (s.telegram_chat_id || "");
+   792→        if (!id) continue;
+   793→        // Resolve bike title from the pre-fetched cars map.
+   794→        const bikeId = s.resolved_bike_id || s.requested_bike_id;
+   795→        const bikeTitle = (bikeId && bikeTitleMap.get(bikeId)) || null;
+   796→        const saleRow: LeadSaleRow = {
+   797→          saleId: s.id,  // sale_contract_artifacts.id is the uuid PK; the old "sale_id" column never existed
+   798→          bikeTitle,
+   799→          salePrice: Number(s.total_sum ?? s.sale_price) || 0,
+   800→          createdAt: s.created_at,
+   801→        };
+   802→        addOrMerge({
+   803→          user_id: id,
+   804→          full_name: null,
+   805→          username: null,
+   806→          phone: normalizedBuyerPhone,
+   807→          source: "sale_contract",
+   808→          bikeTitle,
+   809→          createdAt: s.created_at,
+   810→          lastSeenAt: s.created_at,
+   811→          verified: true,
+   812→          // goodmorning-fixes: set intentType so mode filter ("sale") includes sale leads.
+   813→          intentType: "sale",
+   814→          telegramChatId: s.telegram_chat_id || null,
+   815→          rentals: [],
+   816→          sales: [saleRow],
+   817→        });
+   818→      }
+   819→    }
+   820→
+   821→    // 6. Testdrive contract artifacts (crew-filtered)
+   822→    // Testdrive artifacts use customer_* field naming (not renter_*).
+   823→    // telegram_chat_id starts as the operator's chat_id and is updated to the
+   824→    // renter's chat_id when they scan the QR (via claim_testdrive_by_qr RPC).
+   825→    // The lead appears on /leads with intentType "test_drive" and a bikeTitle
+   826→    // so operators can see who test-drove what.
+   827→    if (testdriveArtifacts) {
+   828→      for (const t of testdriveArtifacts) {
+   829→        if (!t.telegram_chat_id && !t.customer_phone) continue;
+   830→        const normalizedCustomerPhone = normalizePhone(t.customer_phone);
+   831→        // Prefer customer_phone as the lead identity key when the artifact is
+   832→        // still in pre-claim state (telegram_chat_id is the operator).
+   833→        const isOperator = t.created_by_operator_chat_id && t.telegram_chat_id === t.created_by_operator_chat_id;
+   834→        const preferPhone = !!normalizedCustomerPhone && isOperator;
+   835→        const id = preferPhone
+   836→          ? normalizedCustomerPhone!
+   837→          : (t.telegram_chat_id || normalizedCustomerPhone || "");
+   838→        if (!id) continue;
+   839→        const bikeId = t.resolved_bike_id || t.requested_bike_id;
+   840→        const bikeTitle = (bikeId && bikeTitleMap.get(bikeId)) || null;
+   841→        addOrMerge({
+   842→          user_id: id,
+   843→          full_name: t.customer_full_name || null,
+   844→          username: null,
+   845→          phone: normalizedCustomerPhone,
+   846→          source: "testdrive_contract",
+   847→          bikeTitle,
+   848→          createdAt: t.created_at,
+   849→          lastSeenAt: t.created_at,
+   850→          verified: true,
+   851→          intentType: "test_drive",
+   852→          intentStage: "contract_generated",
+   853→          telegramChatId: t.telegram_chat_id || null,
+   854→          originalOperatorChatId: t.created_by_operator_chat_id || null,
+   855→          rentals: [],
+   856→          sales: [],
+   857→        });
+   858→      }
+   859→    }
+   860→
+   861→    // ── Parallel enrichment (steps 7-9, 11) ──
+   862→    //
+   863→    // BUG FIX (previously): three more silent failures here:
+   864→    //   - public.users select included `phone` which is NOT a column (it's in metadata->>phone).
+   865→    //     The whole query 400'd → no telegram username/full_name enrichment ever happened.
+   866→    //   - crew_todos was filtered to category=lead_followup only, dropping rental_verification
+   867→    //     todos (passport check, return checklist) which are tied to the same rental_id.
+   868→    // Bike titles are now pre-fetched BEFORE the artifact/sale loops (see above), so they
+   869→    // are no longer part of this enrichment batch.
+   870→    const allUserIds = Array.from(leadMap.keys()).filter((id) => /^\d+$/.test(id));
+   871→    const leadPhones = Array.from(leadMap.values()).map((l) => l.phone).filter(Boolean) as string[];
+   872→
+   873→    // privateSchema already dynamically imported at line 270 (same function scope)
+   874→    const [tgUsersResult, secretByPhoneResult, troubledUsersResult, todosResult] = await Promise.all([
+   875→      // 7. Enrich from public.users — drop the non-existent `phone` column; phone is in metadata.
+   876→      allUserIds.length > 0
+   877→        ? supabaseAdmin.from("users").select("user_id, username, full_name, metadata").in("user_id", allUserIds)
+   878→        : { data: [], error: null },
+   879→      // 8. Enrich from secrets by phone (crew-filtered)
+   880→      leadPhones.length > 0
+   881→        ? privateSchema().from("user_rental_secrets").select("chat_id, renter_phone").eq("crew_slug", safeSlug).in("renter_phone", leadPhones) as Promise<{ data: Array<{ chat_id: string | null; renter_phone: string | null }> | null }>
+   882→        : { data: [], error: null },
+   883→      // 9. Troubled users
+   884→      supabaseAdmin.from("users").select("user_id, metadata").not("metadata->>troubled", "is", null),
+   885→      // 11. Lead-linked todos (filtered by crew_id on DB side).
+   886→      // BUG FIX: include both `lead_followup` AND `rental_verification` — the latter
+   887→      // covers passport/odometer/return-checklist todos which are tied to the same
+   888→      // rental_id and absolutely belong on the lead's card.
+   889→      supabaseAdmin
+   890→        .from("crew_todos")
+   891→        .select("id, lead_id, user_id, phone, rental_id, title, description, status, priority, category, created_at, completed_at, assigned_to, due_date")
+   892→        .eq("crew_id", crewId)
+   893→        .in("category", ["lead_followup", "rental_verification"])
+   894→        .order("created_at", { ascending: false }),
+   895→    ]);
+   896→
+   897→    // Surface enrichment query errors so future bugs are visible.
+   898→    if (tgUsersResult.error) logger.error("[getFranchizeLeads] users enrichment query failed:", tgUsersResult.error);
+   899→    if (secretByPhoneResult.error) logger.error("[getFranchizeLeads] secrets-by-phone enrichment query failed:", secretByPhoneResult.error);
+   900→    if (troubledUsersResult.error) logger.error("[getFranchizeLeads] troubled-users query failed:", troubledUsersResult.error);
+   901→    if (todosResult.error) logger.error("[getFranchizeLeads] crew_todos query failed:", todosResult.error);
+   902→
+   903→    const tgUsers = tgUsersResult.data;
+   904→    const secretByPhone = secretByPhoneResult.data;
+   905→    const troubledUsers = troubledUsersResult.data;
+   906→    const todos = todosResult.data;
+   907→
+   908→    // Backfill top-level bikeTitle on leads that didn't get one set during the
+   909→    // artifact/sale step (e.g. leads whose only source is franchize_intents or
+   910→    // user_rental_secrets). bikeTitleMap is already fully populated from the
+   911→    // pre-fetch above, but rentals/sales rows already carry their own bikeTitle.
+   912→    for (const l of leadMap.values()) {
+   913→      if (!l.bikeTitle) {
+   914→        const firstRentalWithTitle = l.rentals.find((r) => r.bikeTitle);
+   915→        const firstSaleWithTitle = l.sales.find((s) => s.bikeTitle);
+   916→        if (firstRentalWithTitle) l.bikeTitle = firstRentalWithTitle.bikeTitle;
+   917→        else if (firstSaleWithTitle) l.bikeTitle = firstSaleWithTitle.bikeTitle;
+   918→      }
+   919→    }
+   920→
+   921→    // 7. Enrich telegramChatId and username from public.users.
+   922→    // Phone is read from metadata->>phone (the users table has no phone column).
+   923→    if (tgUsers) {
+   924→      for (const l of leadMap.values()) {
+   925→        const match = tgUsers.find((u) => u.user_id === l.user_id);
+   926→        if (match) {
+   927→          l.telegramChatId = l.user_id;
+   928→          if (match.username && !l.username) l.username = match.username;
+   929→          if (match.full_name && !l.full_name) l.full_name = match.full_name;
+   930→          const meta = match.metadata as Record<string, unknown> | null;
+   931→          const metaPhone = normalizePhone(meta?.phone as string | undefined);
+   932→          if (metaPhone && !l.phone) l.phone = metaPhone;
+   933→        }
+   934→      }
+   935→    }
+   936→
+   937→    // 8. Enrich telegramChatId from secrets by phone match
+   938→    if (secretByPhone) {
+   939→      for (const l of leadMap.values()) {
+   940→        if (!l.telegramChatId && l.phone) {
+   941→          // Compare normalized phones so "8 999..." in secrets matches "+7999..." in leads.
+   942→          const match = secretByPhone.find((s) =>
+   943→            s.chat_id &&
+   944→            s.renter_phone &&
+   945→            normalizePhone(s.renter_phone) === l.phone,
+   946→          );
+   947→          if (match) l.telegramChatId = match.chat_id;
+   948→        }
+   949→      }
+   950→    }
+   951→
+   952→    // 9. Troubled users
+   953→    const troubledMap = new Map<string, string | null>();
+   954→    if (troubledUsers) {
+   955→      for (const u of troubledUsers) {
+   956→        const meta = u.metadata as Record<string, unknown> | null;
+   957→        if (meta?.troubled === true) {
+   958→          troubledMap.set(u.user_id, (meta.troubled_reason as string) || null);
+   959→        }
+   960→      }
+   961→    }
+   962→    for (const l of leadMap.values()) {
+   963→      if (troubledMap.has(l.user_id)) {
+   964→        l.troubled = true;
+   965→        l.troubledReason = troubledMap.get(l.user_id) || null;
+   966→      }
+   967→    }
+   968→
+   969→    // 10. Aggregate totals and refs
+   970→    for (const l of leadMap.values()) {
+   971→      l.contractCount = l.rentals.length;
+   972→      l.saleCount = l.sales.length;
+   973→      const rentalTotal = l.rentals.reduce((s, r) => s + (Number(r.totalCost) || 0), 0);
+   974→      const saleTotal = l.sales.reduce((s, sale) => s + (Number(sale.salePrice) || 0), 0);
+   975→      l.totalSpent = rentalTotal + saleTotal;
+   976→      const lastRental = l.rentals
+   977→        .filter((r) => r.startDate)
+   978→        .sort((a, b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime())[0];
+   979→      l.lastRentalDate = lastRental?.startDate || null;
+   980→      l.contractRef = lastRental?.rentalId || l.sales[0]?.saleId || null;
+   981→    }
+   982→
+   983→    // ── Identity state classification ──
+   984→    // Classify each lead so the UI can show operator placeholders, phone-only leads, etc.
+   985→    for (const l of leadMap.values()) {
+   986→      l.identityState = classifyIdentityState(l, crewOperatorIds);
+   987→      // Compute pipeline stage, QR status, next action
+   988→      l.stageKey = computeLeadStage(l);
+   989→      l.qrStatus = computeQrStatus(l);
+   990→      l.nextAction = (STAGE_NEXT_ACTION as Record<string, string>)[l.stageKey] || null;
+   991→      l.ownerId = l.originalOperatorChatId || null;
+   992→    }
+   993→
+   994→    // ── Filter out pure operator-placeholder leads with no activity ──
+   995→    // If a lead's only source is operator artifacts with no renter phone, no rentals,
+   996→    // no todos — it's noise. Keep leads with activity for operator visibility.
+   997→    for (const [key, l] of leadMap.entries()) {
+   998→      if (
+   999→        l.identityState === 'operator_placeholder' &&
+  1000→        l.rentals.length === 0 &&
+  1001→        l.sales.length === 0 &&
+  1002→        (l.sourceCount || 0) <= 1
+  1003→      ) {
+  1004→        // Still keep — they'll be filtered on client if user picks "hide placeholders"
+  1005→        // But flag them explicitly
+  1006→      }
+  1007→    }
+  1008→
+  1009→    // ── Server-side filtering: return todos matching loaded leads ──
+  1010→    //
+  1011→    // Matching strategy (Phase 1 identity fix):
+  1012→    //  1. rental_id from description JSON → if leadMap has a lead whose rental includes this rental_id
+  1013→    //  2. user_id column (canonical Telegram chat_id)
+  1014→    //  3. phone column (phone-only leads)
+  1015→    //  4. lead_id column (legacy)
+  1016→    //  5. description JSON identity fields (legacy)
+  1017→    //
+  1018→    // This ensures operator-created todos (which have user_id=operator in description)
+  1019→    // can still be matched by rental_id BEFORE the QR claim propagates the real renter ID.
+  1020→    const leadUserIds = new Set(Array.from(leadMap.keys()));
+  1021→
+  1022→    // Build rental_id → lead user_id lookup for rental_id-based todo matching
+  1023→    const rentalIdToLeadId = new Map<string, string>();
+  1024→    for (const [leadId, lead] of leadMap.entries()) {
+  1025→      for (const r of lead.rentals) {
+  1026→        if (r.rentalId) rentalIdToLeadId.set(r.rentalId, leadId);
+  1027→      }
+  1028→    }
+  1029→
+  1030→    /**
+  1031→     * Extract rental_id from todo (direct column preferred, fall back to description JSON).
+  1032→     */
+  1033→    const getTodoRentalId = (t: typeof todos[number]): string | null => {
+  1034→      // 1. Direct rental_id column (Phase 3c — real FK, no parsing needed)
+  1035→      if (t.rental_id) return t.rental_id;
+  1036→      // 2. Legacy: parse from description JSON
+  1037→      if (!t.description) return null;
+  1038→      try {
+  1039→        const desc = JSON.parse(t.description);
+  1040→        if (desc.rental_id && typeof desc.rental_id === 'string') return desc.rental_id;
+  1041→      } catch { /* ignore */ }
+  1042→      return null;
+  1043→    };
+  1044→
+  1045→    /**
+  1046→     * Get the lead identifier from a todo.
+  1047→     *
+  1048→     * BUG FIX: previously used /^\d{1,9}$/ which rejects 10-digit Telegram IDs
+  1049→     * (e.g. 7813830016, one of the operators in the audit). Most modern users have
+  1050→     * 10-digit IDs, so this regex silently dropped their todos. Now allows up to 12 digits.
+  1051→     * Also normalizes phones so a todo keyed by "8999..." matches a lead keyed by "+7999...".
+  1052→     */
+  1053→    const getTodoLeadId = (t: typeof todos[number]): string | null => {
+  1054→      // 1. user_id column — canonical Telegram chat_id
+  1055→      if (t.user_id && /^\d{1,12}$/.test(t.user_id)) return t.user_id;
+  1056→      // 2. phone column — phone-only leads (normalize for cross-source matching)
+  1057→      if (t.phone) {
+  1058→        const normalized = normalizePhone(t.phone);
+  1059→        if (normalized) return normalized;
+  1060→      }
+  1061→      // 3. lead_id column — legacy fallback
+  1062→      if (t.lead_id) {
+  1063→        if (/^\d{1,12}$/.test(t.lead_id)) return t.lead_id;
+  1064→        // Phone-shaped lead_id (legacy) — normalize.
+  1065→        const normalizedLead = normalizePhone(t.lead_id);
+  1066→        if (normalizedLead) return normalizedLead;
+  1067→        if (t.lead_id.includes('-')) return t.lead_id;
+  1068→      }
+  1069→      // 4. description JSON — legacy fallback
+  1070→      if (t.description) {
+  1071→        try {
+  1072→          const desc = JSON.parse(t.description);
+  1073→          if (desc.user_id && typeof desc.user_id === 'string' && /^\d{1,12}$/.test(desc.user_id)) return desc.user_id;
+  1074→          if (desc.phone && typeof desc.phone === 'string') {
+  1075→            const normalized = normalizePhone(desc.phone);
+  1076→            if (normalized) return normalized;
+  1077→          }
+  1078→          if (desc.lead_id && typeof desc.lead_id === 'string') {
+  1079→            if (/^\d{1,12}$/.test(desc.lead_id)) return desc.lead_id;
+  1080→            const normalizedLead = normalizePhone(desc.lead_id);
+  1081→            if (normalizedLead) return normalizedLead;
+  1082→            if (desc.lead_id.includes('-')) return desc.lead_id;
+  1083→          }
+  1084→        } catch { /* ignore */ }
+  1085→      }
+  1086→      return null;
+  1087→    };
+  1088→
+  1089→    const filteredTodos = (todos || []).filter((t) => {
+  1090→      // 1. Match by rental_id from description (strongest link — works before QR claim)
+  1091→      const todoRentalId = getTodoRentalId(t);
+  1092→      if (todoRentalId && rentalIdToLeadId.has(todoRentalId)) return true;
+  1093→
+  1094→      // 2-5. Match by identity fallback chain
+  1095→      const todoLeadId = getTodoLeadId(t);
+  1096→      if (todoLeadId && leadUserIds.has(todoLeadId)) return true;
+  1097→
+  1098→      return false;
+  1099→    });
+  1100→
+  1101→    // Deduplicate by todo id — each todo row should appear only once
+  1102→    const seenTodoId = new Set<string>();
+  1103→    const dedupedTodos: typeof filteredTodos = [];
+  1104→    for (const t of filteredTodos) {
+  1105→      if (t.id && seenTodoId.has(t.id)) continue;
+  1106→      if (t.id) seenTodoId.add(t.id);
+  1107→      // Fallback dedup by lead_id|title for todos without id
+  1108→      const key = `${t.lead_id || '?'}|${t.title}`;
+  1109→      if (seenTodoId.has(key)) continue;
+  1110→      seenTodoId.add(key);
+  1111→      dedupedTodos.push(t);
+  1112→    }
+  1113→
+  1114→    // Compute assignee for each lead from its todos
+  1115→    const assigneeIds = new Set<string>();
+  1116→    for (const t of dedupedTodos) {
+  1117→      if (t.assigned_to) assigneeIds.add(t.assigned_to);
+  1118→    }
+  1119→    const assigneeIdsList = Array.from(assigneeIds);
+  1120→    if (assigneeIdsList.length > 0) {
+  1121→      const { data: assigneeUsers } = await supabaseAdmin
+  1122→        .from("users")
+  1123→        .select("user_id, username, full_name")
+  1124→        .in("user_id", assigneeIdsList);
+  1125→      const assigneeMap = new Map<string, { username: string | null; full_name: string | null }>();
+  1126→      for (const u of assigneeUsers ?? []) {
+  1127→        assigneeMap.set(u.user_id, { username: u.username, full_name: u.full_name });
+  1128→      }
+  1129→      for (const l of leadMap.values()) {
+  1130→        l.assigneeId = computeAssignee(l, dedupedTodos);
+  1131→        if (l.assigneeId) {
+  1132→          const a = assigneeMap.get(l.assigneeId);
+  1133→          l.assigneeName = a?.full_name || a?.username || null;
+  1134→        }
+  1135→        if (l.ownerId) {
+  1136→          const o = assigneeMap.get(l.ownerId) || (tgUsers as any[])?.find((u: any) => u.user_id === l.ownerId);
+  1137→          l.ownerName = (o as any)?.full_name || (o as any)?.username || null;
+  1138→        }
+  1139→      }
+  1140→    }
+  1141→
+  1142→    return {
+  1143→      success: true,
+  1144→      leads: Array.from(leadMap.values()),
+  1145→      todos: dedupedTodos.map((t) => ({ ...t, description: t.description })),
+  1146→    };
+  1147→  } catch (error) {
+  1148→    logger.error("[getFranchizeLeads] failed:", error);
+  1149→    return { success: false, error: "Не удалось загрузить лиды" };
+  1150→  }
+  1151→}
+  1152→
+  1153→// ── Document Verification ──────────────────────────────────────────────────────
+  1154→// Types (DocVerificationData, GetRentalDocVerificationResult) are re-exported
+  1155→// from leads-types.ts at the top of this file.
+  1156→
+  1157→/**
+  1158→ * Get document verification data for a rental.
+  1159→ * Returns signed URLs for photos, OCR data from user_rental_secrets, and checklist status.
+  1160→ * Auth: actorUserId must be the rental owner, a crew operator, or a global admin
+  1161→ * (or authenticated via analytics password).
+  1162→ */
+  1163→export async function getRentalDocVerification(
+  1164→  rentalId: string,
+  1165→  actorUserId?: string,
+  1166→  isPasswordAuth?: boolean,
+  1167→): Promise<GetRentalDocVerificationResult> {
+  1168→  const { privateSchema } = await import("@/lib/private-secrets");
+  1169→  noStore();
+  1170→  if (!rentalId) {
+  1171→    return { success: false, error: "rentalId is required" };
+  1172→  }
+  1173→
+  1174→  try {
+  1175→    // 1. Fetch rental with photo paths and metadata
+  1176→    const { data: rental, error: rentalError } = await supabaseAdmin
+  1177→      .from("rentals")
+  1178→      .select("rental_id, user_id, crew_id, owner_id, metadata, passport_mainpage_photo, passport_registration_photo, drivers_licence_frontal_photo")
+  1179→      .eq("rental_id", rentalId)
+  1180→      .single();
+  1181→
+  1182→    if (rentalError || !rental) {
+  1183→      return { success: false, error: "Rental not found" };
+  1184→    }
+  1185→
+  1186→    // ── Auth check (LA-002 FIX: no more isPasswordAuth boolean bypass) ──
+  1187→    // Dynamic imports to avoid module-level server-only chain
+  1188→    const { cookies } = await import("next/headers");
+  1189→    const { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } = await import("@/lib/telegram-actor-cookie");
+  1190→    const cookieUserId = verifyTelegramActorCookieValue(
+  1191→      (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
+  1192→    );
+  1193→
+  1194→    if (cookieUserId) {
+  1195→      // Telegram auth — check if this is the rental owner or renter
+  1196→      const isRentalOwner = rental.owner_id === cookieUserId;
+  1197→      const isRenter = rental.user_id === cookieUserId;
+  1198→
+  1199→      if (!isRentalOwner && !isRenter && rental.crew_id) {
+  1200→        // Not their rental — verify crew access
+  1201→        const access = await verifyCrewAccess(rental.crew_id);
+  1202→        if (!access.allowed) {
+  1203→          return { success: false, error: access.error || "Недостаточно прав." };
+  1204→        }
+  1205→      } else if (!isRentalOwner && !isRenter) {
+  1206→        return { success: false, error: "Недостаточно прав." };
+  1207→      }
+  1208→    } else if (actorUserId && isPasswordAuth) {
+  1209→      // LR3-008 FIX: check rental ownership FIRST (handles null crew_id case).
+  1210→      // Was: only checked crew_id, so rentals with null crew_id always failed
+  1211→      // even for the legitimate owner.
+  1212→      const isRentalOwner = rental.owner_id === actorUserId;
+  1213→      const isRenter = rental.user_id === actorUserId;
+  1214→
+  1215→      if (isRentalOwner || isRenter) {
+  1216→        // Owner/renter always has access — proceed
+  1217→      } else if (rental.crew_id) {
+  1218→        // Not the owner — verify crew ownership
+  1219→        const ownerAccess = await verifyCrewOwnerAccess(actorUserId, rental.crew_id);
+  1220→        if (!ownerAccess.allowed) {
+  1221→          return { success: false, error: ownerAccess.error || "Недостаточно прав." };
+  1222→        }
+  1223→      } else {
+  1224→        return { success: false, error: "Недостаточно прав." };
+  1225→      }
+  1226→    } else {
+  1227→      // No valid auth
+  1228→      return { success: false, error: "Не авторизован." };
+  1229→    }
+  1230→
+  1231→    // 2. Generate signed URLs for photos (5 min expiry)
+  1232→    const photoPaths = {
+  1233→      passportMainpage: (rental as any).passport_mainpage_photo as string | null,
+  1234→      passportRegistration: (rental as any).passport_registration_photo as string | null,
+  1235→      driversLicence: (rental as any).drivers_licence_frontal_photo as string | null,
+  1236→    };
+  1237→
+  1238→    const signedUrls: Record<string, string | null> = {};
+  1239→    for (const [key, path] of Object.entries(photoPaths)) {
+  1240→      if (path) {
+  1241→        const { data: urlData, error: urlError } = await supabaseAdmin.storage
+  1242→          .from("docpix")
+  1243→          .createSignedUrl(path, 300); // 5 minutes
+  1244→        if (urlError || !urlData?.signedUrl) {
+  1245→          logger.warn(`[getRentalDocVerification] Failed to create signed URL for ${key}: ${urlError?.message || "no URL"}`);
+  1246→          signedUrls[key] = null;
+  1247→        } else {
+  1248→          signedUrls[key] = urlData.signedUrl;
+  1249→        }
+  1250→      } else {
+  1251→        signedUrls[key] = null;
+  1252→      }
+  1253→    }
+  1254→
+  1255→    // 3. Fetch OCR data from user_rental_secrets
+  1256→    const { data: secrets } = await privateSchema()
+  1257→      .from("user_rental_secrets")
+  1258→      .select("renter_full_name, renter_passport, renter_passport_issued_by, renter_passport_issue_date, renter_birth_date, renter_registration, renter_driver_license")
+  1259→      .eq("source_rental_id", rentalId)
+  1260→      .maybeSingle();
+  1261→
+  1262→    // 4. Extract checklist from metadata
+  1263→    const metadata = (rental.metadata || {}) as Record<string, any>;
+  1264→    const checklist = metadata.checklist || {};
+  1265→
+  1266→    return {
+  1267→      success: true,
+  1268→      data: {
+  1269→        rentalId,
+  1270→        photos: {
+  1271→          passportMainpage: { path: photoPaths.passportMainpage, signedUrl: signedUrls.passportMainpage || null },
+  1272→          passportRegistration: { path: photoPaths.passportRegistration, signedUrl: signedUrls.passportRegistration || null },
+  1273→          driversLicence: { path: photoPaths.driversLicence, signedUrl: signedUrls.driversLicence || null },
+  1274→        },
+  1275→        ocrData: {
+  1276→          fullName: secrets?.renter_full_name || null,
+  1277→          passport: secrets?.renter_passport || null,
+  1278→          passportIssuedBy: secrets?.renter_passport_issued_by || null,
+  1279→          passportIssueDate: secrets?.renter_passport_issue_date || null,
+  1280→          birthDate: secrets?.renter_birth_date || null,
+  1281→          registration: secrets?.renter_registration || null,
+  1282→          driverLicense: secrets?.renter_driver_license || null,
+  1283→        },
+  1284→        checklist: {
+  1285→          passportVerified: !!checklist.passport_verified,
+  1286→          licenseVerified: !!checklist.license_verified,
+  1287→          equipmentHandover: !!(checklist.equipment_handover?.keys && checklist.equipment_handover?.helmet),
+  1288→          odometerBefore: !!checklist.odometer_before,
+  1289→          datesConfirmed: !!checklist.dates_confirmed,
+  1290→          paymentVerified: !!checklist.payment_verified,
+  1291→        },
+  1292→      },
+  1293→    };
+  1294→  } catch (error) {
+  1295→    logger.error("[getRentalDocVerification] failed:", error);
+  1296→    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+  1297→  }
+  1298→}
