@@ -1,0 +1,1023 @@
+     1→import { createClient, SupabaseClient } from "@supabase/supabase-js";
+     2→import { generateJwtToken } from "@/lib/auth";
+     3→import type { WebAppUser } from "@/types/telegram";
+     4→import { logger } from "@/lib/logger"; 
+     5→import type { Database } from "@/types/database.types"; 
+     6→
+     7→
+     8→type DbUser = Database["public"]["Tables"]["users"]["Row"];
+     9→type DbCar = Database["public"]["Tables"]["cars"]["Row"];
+    10→type DbInvoice = Database["public"]["Tables"]["invoices"]["Row"];
+    11→type DbRental = Database["public"]["Tables"]["rentals"]["Row"];
+    12→type DbTask = Database["public"]["Tables"]["tasks"]["Row"];
+    13→type DbCharacter = Database["public"]["Tables"]["characters"]["Row"];
+    14→type DbVideo = Database["public"]["Tables"]["videos"]["Row"];
+    15→type DbSubscription = Database["public"]["Tables"]["subscriptions"]["Row"];
+    16→type DbArticle = Database["public"]["Tables"]["articles"]["Row"];
+    17→type DbArticleSection = Database["public"]["Tables"]["article_sections"]["Row"];
+    18→type DbUserResult = Database["public"]["Tables"]["user_results"]["Row"];
+    19→type DbFeedback = Database["public"]["Tables"]["feedback"]["Row"];
+    20→type DbPageVisit = Database["public"]["Tables"]["page_visits"]["Row"];
+    21→type DbUserActivity = Database["public"]["Tables"]["user_activity"]["Row"];
+    22→type DbCozeResponse = Database["public"]["Tables"]["coze_responses"]["Row"];
+    23→type DbArbitrageUserSettings = Database["public"]["Tables"]["arbitrage_user_settings"]["Row"];
+    24→ 
+    25→
+    26→const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://inmctohsodgdohamhzag.supabase.co";
+    27→const supabaseAnonKey =
+    28→  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    29→  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzMzk1ODUsImV4cCI6MjA1MzkxNTU4NX0.AdNu5CBn6pp-P5M2lZ6LjpcqTXrhOdTOYMCiQrM_Ud4";
+    30→
+    31→if (!supabaseUrl || !supabaseAnonKey) {
+    32→    logger.error("Supabase URL or Anon Key is missing from environment variables.");
+    33→}
+    34→
+    35→export const supabaseAnon: SupabaseClient<Database> = createClient<Database>(supabaseUrl, supabaseAnonKey);
+    36→
+    37→
+    38→const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    39→let adminClientInitError: string | null = null;
+    40→
+    41→export const supabaseAdmin: SupabaseClient<Database> = (() => {
+    42→  if (!serviceRoleKey) {
+    43→    const warning = "SUPABASE_SERVICE_ROLE_KEY is missing. Admin operations will fail.";
+    44→    adminClientInitError = warning;
+    45→    logger.warn(warning);
+    46→
+    47→    return new Proxy({} as SupabaseClient<Database>, {
+    48→      get() {
+    49→        throw new Error(
+    50→          "supabaseAdmin is unavailable: SUPABASE_SERVICE_ROLE_KEY is missing. " +
+    51→            "Use server-only actions/handlers for privileged operations.",
+    52→        );
+    53→      },
+    54→    });
+    55→  }
+    56→
+    57→  return createClient<Database>(supabaseUrl, serviceRoleKey, {
+    58→    auth: {
+    59→      persistSession: false,
+    60→      autoRefreshToken: false,
+    61→      detectSessionInUrl: false,
+    62→    },
+    63→  });
+    64→})();
+    65→
+    66→export function isSupabaseAdminAvailable(): boolean {
+    67→  return !!serviceRoleKey;
+    68→}
+    69→
+    70→export function getSupabaseAdminError(): string | null {
+    71→  return adminClientInitError;
+    72→}
+    73→
+    74→export function getServiceRoleKey(): string | null {
+    75→  return serviceRoleKey ?? null;
+    76→}
+    77→
+    78→export async function withSupabaseAdmin<T>(
+    79→  operation: (client: SupabaseClient<Database>) => Promise<T>,
+    80→): Promise<{ success: boolean; data?: T; error?: string }> {
+    81→  if (!isSupabaseAdminAvailable()) {
+    82→    return { success: false, error: getSupabaseAdminError() ?? "Admin client unavailable." };
+    83→  }
+    84→
+    85→  try {
+    86→    const result = await operation(supabaseAdmin);
+    87→    return { success: true, data: result };
+    88→  } catch (error) {
+    89→    const message = error instanceof Error ? error.message : "Unknown error";
+    90→    logger.error("Supabase admin operation failed:", error);
+    91→    return { success: false, error: message };
+    92→  }
+    93→}
+    94→
+    95→export const createAuthenticatedClient = async (userId: string): Promise<SupabaseClient<Database> | null> => {
+    96→    if (!userId) {
+    97→        logger.warn("Attempted to create authenticated client without a user ID.");
+    98→        return null;
+    99→    }
+   100→     if (!supabaseUrl || !supabaseAnonKey) {
+   101→        logger.error("Cannot create authenticated client: Supabase URL or Anon Key missing.");
+   102→        return null;
+   103→    }
+   104→    try {
+   105→        const token = await generateJwtToken(userId); 
+   106→        if (!token) {
+   107→            logger.warn(`Failed to generate JWT for user ${userId}. Cannot create authenticated client.`);
+   108→            return null;
+   109→        }
+   110→        return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+   111→            global: { headers: { Authorization: `Bearer ${token}` } },
+   112→            auth: { persistSession: false } 
+   113→        });
+   114→    } catch (error) {
+   115→        logger.error(`Error creating authenticated client for user ${userId}:`, error);
+   116→        return null;
+   117→    }
+   118→};
+   119→
+   120→export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
+   121→    if (!userId) {
+   122→        logger.warn("fetchUserData called with empty userId");
+   123→        return null;
+   124→    }
+   125→    logger.info(`Fetching user data for userId: ${userId}`);
+   126→    if (!supabaseAdmin) { 
+   127→        logger.error("[SupabaseHook] fetchUserData: Admin client unavailable.");
+   128→        return null;
+   129→    }
+   130→
+   131→    try {
+   132→        const { data, error } = await supabaseAdmin
+   133→            .from("users") 
+   134→            .select("*, metadata") 
+   135→            .eq("user_id", userId) 
+   136→            .maybeSingle();
+   137→
+   138→        if (error) {
+   139→            logger.error(`[SupabaseHook] Error fetching user data for ${userId}:`, error);
+   140→            return null;
+   141→        }
+   142→
+   143→        logger.info(`[SupabaseHook] Fetched user data for ${userId}: ${data ? 'User found' : 'User not found'}`);
+   144→        return data;
+   145→    } catch (catchError) {
+   146→        logger.error(`[SupabaseHook] Exception in fetchUserData for ${userId}:`, catchError);
+   147→        return null;
+   148→    }
+   149→};
+   150→
+   151→export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAppUser & { role?: DbUser['role']; status?: DbUser['status']; metadata?: Record<string, any> }>): Promise<DbUser | null> => {
+   152→     if (!userId) {
+   153→        logger.error("[SupabaseHook] createOrUpdateUser called with empty userId");
+   154→        return null;
+   155→    }
+   156→     if (!supabaseAdmin) {
+   157→         logger.error("[SupabaseHook] createOrUpdateUser: Admin client unavailable.");
+   158→         return null;
+   159→     }
+   160→
+   161→    logger.info("[SupabaseHook] Attempting to create or update user:", { userId, username: userInfo.username });
+   162→
+   163→    try {
+   164→        const userData: Partial<DbUser> = { 
+   165→            user_id: userId, 
+   166→            username: userInfo.username || null,
+   167→            full_name: `${userInfo.first_name || ""} ${userInfo.last_name || ""}`.trim() || null,
+   168→            avatar_url: userInfo.photo_url || null,
+   169→            language_code: userInfo.language_code || null,
+   170→            ...(userInfo.role && { role: userInfo.role }),
+   171→            ...(userInfo.status && { status: userInfo.status }),
+   172→            ...(userInfo.metadata !== undefined && { metadata: userInfo.metadata }), 
+   173→            updated_at: new Date().toISOString(),
+   174→        };
+   175→        
+   176→        Object.keys(userData).forEach(key => {
+   177→            const k = key as keyof typeof userData;
+   178→            if (userData[k] === undefined && k !== 'metadata') {
+   179→                 delete userData[k];
+   180→            }
+   181→        });
+   182→        
+   183→        const { data, error } = await supabaseAdmin
+   184→            .from("users") 
+   185→            .upsert(userData as Database["public"]["Tables"]["users"]["Insert"], { 
+   186→                onConflict: 'user_id', 
+   187→            })
+   188→            .select("*, metadata") 
+   189→            .single();
+   190→
+   191→        if (error) {
+   192→            logger.error(`[SupabaseHook] Error upserting user ${userId}:`, error);
+   193→            throw error;
+   194→        }
+   195→
+   196→        if (!data) {
+   197→             logger.error(`[SupabaseHook] Upsert for user ${userId} returned no data.`);
+   198→            throw new Error("Failed to get user data after upsert.");
+   199→        }
+   200→
+   201→        logger.info(`[SupabaseHook] User ${userId} upserted successfully.`);
+   202→        return data;
+   203→    } catch (catchError) {
+   204→        logger.error(`[SupabaseHook] Exception in createOrUpdateUser for ${userId}:`, catchError);
+   205→        return null;
+   206→    }
+   207→};
+   208→
+   209→export async function updateUserMetadata(
+   210→  userId: string,
+   211→  metadata: Record<string, any> | null 
+   212→): Promise<{ success: boolean; data?: DbUser; error?: string }> {
+   213→  if (!userId) {
+   214→    logger.error("[SupabaseHook updateUserMetadata] User ID is required.");
+   215→    return { success: false, error: "User ID is required." };
+   216→  }
+   217→  
+   218→  if (!supabaseAdmin) {
+   219→    logger.error("[SupabaseHook updateUserMetadata] Supabase admin client is not available.");
+   220→    return { success: false, error: "Database admin client is not available." };
+   221→  }
+   222→
+   223→  logger.info(`[SupabaseHook updateUserMetadata] Updating metadata for user ${userId} using supabaseAdmin.`);
+   224→  try {
+   225→    const { data, error } = await supabaseAdmin
+   226→      .from("users") 
+   227→      .update({ metadata: metadata, updated_at: new Date().toISOString() })
+   228→      .eq("user_id", userId) 
+   229→      .select("*, metadata") 
+   230→      .single();
+   231→
+   232→    if (error) {
+   233→      logger.error(`[SupabaseHook updateUserMetadata] Error updating metadata for user ${userId} with supabaseAdmin:`, error);
+   234→      if (error.code === 'PGRST116') return { success: false, error: `User ${userId} not found.` };
+   235→      throw error; 
+   236→    }
+   237→    if (!data) {
+   238→        logger.warn(`[SupabaseHook updateUserMetadata] User ${userId} not found after metadata update attempt, or update returned no data.`);
+   239→        return { success: false, error: `User ${userId} not found after metadata update attempt.` };
+   240→    }
+   241→
+   242→    logger.info(`[SupabaseHook updateUserMetadata] Successfully updated metadata for user ${userId} with supabaseAdmin.`);
+   243→    return { success: true, data };
+   244→  } catch (catchError) {
+   245→    logger.error(`[SupabaseHook updateUserMetadata] Exception for user ${userId} (using supabaseAdmin):`, catchError);
+   246→    return { success: false, error: catchError instanceof Error ? catchError.message : "Failed to update user metadata due to an unexpected error." };
+   247→  }
+   248→}
+   249→
+   250→const VECTOR_DIMENSIONS = 384; 
+   251→
+   252→function generateSimplifiedFallbackEmbedding(text: string): number[] {
+   253→   logger.warn("Generating simplified FALLBACK embedding for text:", text.substring(0, 50) + "...");
+   254→   const embedding = new Array(VECTOR_DIMENSIONS).fill(0);
+   255→   if (!text) return embedding;
+   256→   const words = text.toLowerCase().split(/\W+/).filter(Boolean);
+   257→   words.forEach((word, i) => {
+   258→       let hash = 0;
+   259→       for (let j = 0; j < word.length; j++) {
+   260→           hash = (hash * 31 + word.charCodeAt(j)) | 0;
+   261→       }
+   262→       embedding[Math.abs(hash + i) % VECTOR_DIMENSIONS] += 1;
+   263→   });
+   264→    const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+   265→    return magnitude > 0 ? embedding.map(val => val / magnitude) : embedding;
+   266→}
+   267→
+   268→export async function generateCarEmbedding(
+   269→  mode: 'single' | 'batch' | 'create' = 'batch',
+   270→  payload?: {
+   271→    carId?: string; 
+   272→    carData?: {
+   273→        make: string; model: string; description: string; specs: Record<string, any>; 
+   274→        owner_id?: string; daily_price?: number; image_url?: string; rent_link?: string; status?: string;
+   275→    };
+   276→  }
+   277→): Promise<{ success: boolean; message: string; carId?: string; error?: string }> {
+   278→    const serviceRoleKey = getServiceRoleKey();
+   279→    if (!serviceRoleKey || !supabaseUrl) {
+   280→        return { success: false, message: "Service role key or Supabase URL missing.", error:"Configuration error." };
+   281→    }
+   282→    if (!supabaseAdmin) {
+   283→        return { success: false, message: "Admin client is not available.", error: "Configuration error." };
+   284→    }
+   285→
+   286→    let endpoint: string;
+   287→    let requestBody: any = {};
+   288→    const headers = {
+   289→        Authorization: `Bearer ${serviceRoleKey}`,
+   290→        "Content-Type": "application/json",
+   291→    };
+   292→
+   293→    try {
+   294→        switch (mode) {
+   295→            case 'single':
+   296→                if (!payload?.carId) throw new Error("carId is required for single mode");
+   297→                endpoint = `${supabaseUrl}/functions/v1/generate-embeddings`;
+   298→                requestBody = { mode: 'single', carId: payload.carId };
+   299→                break;
+   300→            case 'create':
+   301→                if (!payload?.carData) throw new Error("carData is required for create mode");
+   302→                endpoint = `${supabaseUrl}/functions/v1/generate-embeddings`;
+   303→                requestBody = {
+   304→                    mode: 'create',
+   305→                    make: payload.carData.make,
+   306→                    model: payload.carData.model,
+   307→                    description: payload.carData.description,
+   308→                    specs: payload.carData.specs,
+   309→                 };
+   310→                break;
+   311→            case 'batch':
+   312→            default:
+   313→                endpoint = `${supabaseUrl}/functions/v1/generate-embeddings`;
+   314→                requestBody = { mode: 'batch' };
+   315→                break;
+   316→        }
+   317→
+   318→        logger.info(`Calling Edge Function 'generate-embeddings' (mode: ${mode})...`);
+   319→        const response = await fetch(endpoint, {
+   320→            method: "POST",
+   321→            headers,
+   322→            body: JSON.stringify(requestBody),
+   323→        });
+   324→
+   325→        const responseText = await response.text();
+   326→        if (!response.ok) {
+   327→            logger.error(`Edge Function 'generate-embeddings' (${mode}) failed (${response.status}): ${responseText}`);
+   328→            throw new Error(`Edge Function failed (${response.status}): ${responseText}`);
+   329→        }
+   330→
+   331→        const result = JSON.parse(responseText);
+   332→        logger.info(`Edge Function 'generate-embeddings' (${mode}) success: ${result.message}`);
+   333→
+   334→        let createdCarId = result.carId; 
+   335→        if (mode === 'create' && createdCarId && payload?.carData) {
+   336→            const { owner_id, daily_price, image_url, rent_link, status } = payload.carData;
+   337→            const fieldsToUpdate: Partial<DbCar> = {};
+   338→            if (owner_id !== undefined) fieldsToUpdate.owner_id = owner_id;
+   339→            if (daily_price !== undefined) fieldsToUpdate.daily_price = daily_price;
+   340→            if (image_url !== undefined) fieldsToUpdate.image_url = image_url;
+   341→            if (rent_link !== undefined) fieldsToUpdate.rent_link = rent_link;
+   342→            if (status !== undefined) fieldsToUpdate.status = status;
+   343→
+   344→            if (Object.keys(fieldsToUpdate).length > 0) {
+   345→                logger.info(`Updating additional fields for new car ${createdCarId}...`, fieldsToUpdate);
+   346→                const { error: updateError } = await supabaseAdmin
+   347→                    .from("cars")
+   348→                    .update(fieldsToUpdate)
+   349→                    .eq("id", createdCarId);
+   350→
+   351→                 if (updateError) {
+   352→                     logger.error(`Failed to update additional fields for car ${createdCarId}: ${updateError.message}`);
+   353→                     result.message += ` (Warning: Failed to update some additional fields: ${updateError.message})`;
+   354→                 } else {
+   355→                     logger.info(`Successfully updated additional fields for car ${createdCarId}.`);
+   356→                 }
+   357→            }
+   358→        }
+   359→        return { success: true, message: result.message, carId: createdCarId };
+   360→
+   361→    } catch (error) {
+   362→        logger.error(`generateCarEmbedding (${mode}) failed, attempting fallback:`, error);
+   363→        try {
+   364→            let combinedText: string | null = null;
+   365→            let carIdToUpdate: string | undefined = undefined;
+   366→
+   367→            if (mode === 'single' && payload?.carId) {
+   368→                const { data: car, error: fetchError } = await supabaseAdmin.from("cars").select("make, model, description, specs").eq("id", payload.carId).single();
+   369→                if (fetchError || !car) { throw new Error(`Fallback failed: Cannot fetch car ${payload.carId}. ${fetchError?.message}`); }
+   370→                combinedText = `${car.make} ${car.model} ${car.description || ''} ${JSON.stringify(car.specs || {})}`;
+   371→                carIdToUpdate = payload.carId;
+   372→            } else if (mode === 'create' && payload?.carData) {
+   373→                 combinedText = `${payload.carData.make} ${payload.carData.model} ${payload.carData.description || ''} ${JSON.stringify(payload.carData.specs || {})}`;
+   374→            } else {
+   375→                 return { success: false, message: "Edge function failed, fallback not supported for batch mode.", error: error instanceof Error ? error.message : String(error) };
+   376→            }
+   377→
+   378→            if (!combinedText) {
+   379→                throw new Error("Fallback failed: Could not generate combined text for embedding.");
+   380→            }
+   381→            const embedding = generateSimplifiedFallbackEmbedding(combinedText);
+   382→
+   383→            if (carIdToUpdate) {
+   384→                 const { error: updateError } = await supabaseAdmin.from("cars").update({ embedding }).eq("id", carIdToUpdate);
+   385→                 if (updateError) throw new Error(`Fallback failed: Cannot update embedding for ${carIdToUpdate}. ${updateError.message}`);
+   386→                 logger.info(`Successfully updated car ${carIdToUpdate} with fallback embedding.`);
+   387→                 return { success: true, message: "Edge function failed, fallback embedding generated and updated.", carId: carIdToUpdate };
+   388→            } else if (mode === 'create' && payload?.carData) {
+   389→                 const carInsertData: Database["public"]["Tables"]["cars"]["Insert"] = {
+   390→                        make: payload.carData.make, model: payload.carData.model, description: payload.carData.description,
+   391→                        specs: payload.carData.specs, owner_id: payload.carData.owner_id, daily_price: payload.carData.daily_price,
+   392→                        image_url: payload.carData.image_url, rent_link: payload.carData.rent_link,
+   393→                        embedding, is_test_result: false, 
+   394→                        status: payload.carData.status || 'available', 
+   395→                 };
+   396→                 const { data: newCar, error: insertError } = await supabaseAdmin
+   397→                    .from("cars")
+   398→                    .insert(carInsertData)
+   399→                    .select("id")
+   400→                    .single();
+   401→                 if (insertError || !newCar) throw new Error(`Fallback failed: Cannot create car. ${insertError?.message}`);
+   402→                 logger.info(`Successfully created car ${newCar.id} with fallback embedding.`);
+   403→                 return { success: true, message: "Edge function failed, fallback embedding generated and car created.", carId: newCar.id };
+   404→            }
+   405→             return { success: false, message: "Edge function failed, and fallback logic path unclear.", error: error instanceof Error ? error.message : String(error) };
+   406→        } catch (fallbackError) {
+   407→            logger.error("Fallback embedding generation also failed:", fallbackError);
+   408→            return { success: false, message: "Edge function and fallback embedding failed.", error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError) };
+   409→        }
+   410→    }
+   411→}
+   412→
+   413→export interface CarResult { 
+   414→  id: string;
+   415→  make: string;
+   416→  model: string;
+   417→  similarity: number;
+   418→  description?: string | null;
+   419→  image_url?: string | null;
+   420→  rent_link?: string | null;
+   421→  daily_price?: number | null;
+   422→}
+   423→
+   424→export const searchCars = async (embedding: number[], limit: number = 5): Promise<{ success: boolean; data?: CarResult[]; error?: string }> => { 
+   425→    if (!embedding || embedding.length !== VECTOR_DIMENSIONS) {
+   426→        return { success: false, error: `Invalid embedding provided (length ${embedding?.length}, expected ${VECTOR_DIMENSIONS})` };
+   427→    }
+   428→    if (!supabaseAnon) {
+   429→        return { success: false, error: "Anon client is not available for search." };
+   430→    }
+   431→    try {
+   432→        const { data, error } = await supabaseAnon.rpc("search_cars", {
+   433→            query_embedding: embedding,
+   434→            match_count: limit,
+   435→        });
+   436→
+   437→        if (error) {
+   438→            logger.error("Error calling search_cars RPC:", error);
+   439→            throw error;
+   440→        }
+   441→        const formattedData: CarResult[] = (data || []).map((item: any) => ({
+   442→            id: item.id,
+   443→            make: item.make,
+   444→            model: item.model,
+   445→            similarity: item.similarity,
+   446→            description: item.description,
+   447→            image_url: item.image_url,
+   448→            daily_price: item.daily_price,
+   449→            rent_link: item.rent_link || `/rent/${item.id}`,
+   450→        }));
+   451→        return { success: true, data: formattedData };
+   452→    } catch (error) {
+   453→        logger.error("Error searching cars:", error);
+   454→        return { success: false, error: error instanceof Error ? error.message : "Failed to search cars" };
+   455→    }
+   456→};
+   457→
+   458→export const getSimilarCars = async (carId: string, matchCount: number = 3): Promise<{ success: boolean; data?: DbCar[]; error?: string }> => { 
+   459→     if (!carId) return { success: false, error: "Car ID is required." };
+   460→     if (!supabaseAnon) return { success: false, error: "Anon client not available."};
+   461→     try {
+   462→        const { data, error } = await supabaseAnon.rpc("similar_cars", {
+   463→            p_car_id: carId,
+   464→            p_match_count: matchCount,
+   465→        });
+   466→        if (error) {
+   467→             logger.error(`Error calling similar_cars RPC for car ${carId}:`, error);
+   468→            throw error;
+   469→        }
+   470→         return { success: true, data: data || [] };
+   471→    } catch (error) {
+   472→         logger.error(`Error finding similar cars for ${carId}:`, error);
+   473→        return { success: false, error: error instanceof Error ? error.message : "Failed to find similar cars" };
+   474→    }
+   475→};
+   476→
+   477→export const fetchArticles = async (): Promise<{ success: boolean; data?: DbArticle[]; error?: string }> => {
+   478→  if (!supabaseAnon) return { success: false, error: "Anon client not available." };
+   479→  try {
+   480→    const { data, error } = await supabaseAnon
+   481→      .from("articles")
+   482→      .select("*")
+   483→      .order("title", { ascending: true }); 
+   484→
+   485→    if (error) throw error;
+   486→    logger.info(`Fetched ${data?.length || 0} articles.`);
+   487→    return { success: true, data: data || [] };
+   488→  } catch (error) {
+   489→    logger.error("Error fetching articles:", error);
+   490→    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch articles" };
+   491→  }
+   492→};
+   493→
+   494→export const fetchArticleSections = async (articleId: string): Promise<{ success: boolean; data?: DbArticleSection[]; error?: string }> => {
+   495→  if (!articleId) return { success: false, error: "Article ID is required." };
+   496→  if (!supabaseAnon) return { success: false, error: "Anon client not available." };
+   497→
+   498→  try {
+   499→    const { data, error } = await supabaseAnon
+   500→      .from("article_sections")
+   501→      .select("*")
+   502→      .eq("article_id", articleId)
+   503→      .order("section_order", { ascending: true }); 
+   504→
+   505→    if (error) throw error;
+   506→    logger.info(`Fetched ${data?.length || 0} sections for article ${articleId}.`);
+   507→    return { success: true, data: data || [] };
+   508→  } catch (error) {
+   509→    logger.error(`Error fetching sections for article ${articleId}:`, error);
+   510→    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch article sections" };
+   511→  }
+   512→};
+   513→
+   514→export const saveTestProgress = async (userId: string, progress: any): Promise<{ success: boolean; error?: string }> => {
+   515→    const client = await createAuthenticatedClient(userId);
+   516→    if (!client) return { success: false, error: "Failed to create authenticated client." };
+   517→
+   518→    try {
+   519→        const { error } = await client
+   520→            .from("users") 
+   521→            .update({ test_progress: progress, updated_at: new Date().toISOString() })
+   522→            .eq("user_id", userId); 
+   523→
+   524→        if (error) throw error;
+   525→        logger.info(`Saved test progress for user ${userId}.`);
+   526→        return { success: true };
+   527→    } catch (error) {
+   528→        logger.error(`Exception saving test progress for user ${userId}:`, error);
+   529→        return { success: false, error: error instanceof Error ? error.message : "Failed to save progress" };
+   530→    }
+   531→};
+   532→
+   533→export const loadTestProgress = async (userId: string): Promise<{ success: boolean; data?: any; error?: string }> => {
+   534→    const client = await createAuthenticatedClient(userId);
+   535→    if (!client) return { success: false, error: "Failed to create authenticated client." };
+   536→
+   537→    try {
+   538→        const { data, error } = await client
+   539→            .from("users") 
+   540→            .select("test_progress")
+   541→            .eq("user_id", userId) 
+   542→            .maybeSingle();
+   543→
+   544→        if (error) {
+   545→            logger.error(`Error loading test progress for user ${userId}:`, error);
+   546→             if (error.code === 'PGRST116') return { success: true, data: null }; 
+   547→            throw error;
+   548→        }
+   549→
+   550→        logger.info(`Loaded test progress for user ${userId}.`);
+   551→        return { success: true, data: data?.test_progress ?? null };
+   552→    } catch (error) {
+   553→        logger.error(`Exception loading test progress for user ${userId}:`, error);
+   554→        return { success: false, error: error instanceof Error ? error.message : "Failed to load progress" };
+   555→    }
+   556→};
+   557→
+   558→export const updateUserSubscription = async (
+   559→  userId: string,
+   560→  subscriptionId: string | null 
+   561→): Promise<{ success: boolean; data?: DbUser; error?: string }> => {
+   562→    if (!userId) return { success: false, error: "User ID is required." };
+   563→    if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
+   564→
+   565→    logger.info(`Attempting to update subscription-related info for user ${userId}. New subscription_id: ${subscriptionId}`);
+   566→    try {
+   567→        const updatePayload: Partial<DbUser> = { 
+   568→            updated_at: new Date().toISOString(),
+   569→            subscription_id: subscriptionId, 
+   570→        };
+   571→        
+   572→        const { data, error } = await supabaseAdmin
+   573→            .from("users") 
+   574→            .update(updatePayload)
+   575→            .eq("user_id", userId) 
+   576→            .select("*, metadata") 
+   577→            .single();
+   578→
+   579→        if (error) {
+   580→            logger.error(`Error updating user ${userId} subscription info:`, error);
+   581→            if (error.code === 'PGRST116') return { success: false, error: `User ${userId} not found.` };
+   582→            throw error;
+   583→        }
+   584→         if (!data) return { success: false, error: `User ${userId} not found after update attempt.` };
+   585→
+   586→        logger.info(`Successfully updated user ${userId} subscription_id to ${data.subscription_id}.`);
+   587→        return { success: true, data };
+   588→    } catch (error) {
+   589→        logger.error(`Exception in updateUserSubscription for user ${userId}:`, error);
+   590→        return { success: false, error: error instanceof Error ? error.message : "Failed to update subscription-related info" };
+   591→    }
+   592→};
+   593→
+   594→export const createInvoice = async (
+   595→    type: string,
+   596→    id: string, 
+   597→    userId: string,
+   598→    amount: number,
+   599→    subscriptionId?: number, 
+   600→    metadata: Record<string, any> = {}
+   601→): Promise<{ success: boolean; data?: DbInvoice; error?: string }> => {
+   602→    if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
+   603→    if (!id || !userId || amount == null || !type) return { success: false, error: "Missing required parameters for invoice creation." };
+   604→
+   605→    try {
+   606→        const { data, error } = await supabaseAdmin
+   607→            .from("invoices")
+   608→            .insert({
+   609→                id: id,
+   610→                user_id: userId,
+   611→                type: type,
+   612→                amount: amount, 
+   613→                status: 'pending', 
+   614→                subscription_id: subscriptionId, 
+   615→                metadata: metadata,
+   616→                created_at: new Date().toISOString(),
+   617→                updated_at: new Date().toISOString()
+   618→             })
+   619→            .select() 
+   620→            .single(); 
+   621→
+   622→        if (error) {
+   623→            if (error.code === '23505') { 
+   624→                 logger.warn(`Invoice with ID ${id} already exists.`);
+   625→                 const existing = await getInvoiceById(id);
+   626→                 if (existing.success && existing.data) return { success: true, data: existing.data };
+   627→                 return { success: false, error: `Invoice ID ${id} already exists, but failed to retrieve it.` };
+   628→            }
+   629→            logger.error(`Error inserting invoice ${id}:`, {
+   630→              message: error.message,
+   631→              details: error.details,
+   632→              hint: error.hint,
+   633→              code: error.code,
+   634→            });
+   635→            throw error; 
+   636→        }
+   637→        if (!data) return { success: false, error: "Invoice creation returned no data." };
+   638→
+   639→        logger.info(`Invoice ${id} created successfully for user ${userId}.`);
+   640→        return { success: true, data };
+   641→    } catch (error) {
+   642→        const castError = error as any;
+   643→        logger.error(`Exception creating invoice ${id} for user ${userId}:`, {
+   644→            message: castError.message,
+   645→            details: castError.details,
+   646→            hint: castError.hint,
+   647→            code: castError.code,
+   648→            fullError: castError,
+   649→          });
+   650→        return { success: false, error: castError instanceof Error ? castError.message : "Failed to create invoice" };
+   651→    }
+   652→};
+   653→
+   654→export const updateInvoiceStatus = async (
+   655→    invoiceId: string,
+   656→    status: DbInvoice['status'] 
+   657→): Promise<{ success: boolean; data?: DbInvoice; error?: string }> => {
+   658→     if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
+   659→     if (!invoiceId || !status) return { success: false, error: "Invoice ID and status are required." };
+   660→
+   661→     try {
+   662→        const { data, error } = await supabaseAdmin
+   663→            .from("invoices")
+   664→            .update({ status: status, updated_at: new Date().toISOString() })
+   665→            .eq("id", invoiceId)
+   666→            .select() 
+   667→            .single(); 
+   668→
+   669→        if (error) {
+   670→            if (error.code === 'PGRST116') return { success: false, error: `Invoice ${invoiceId} not found.` }; 
+   671→            throw error;
+   672→        }
+   673→        if (!data) return { success: false, error: "Invoice not found after update attempt." };
+   674→
+   675→         logger.info(`Invoice ${invoiceId} status updated to ${status}.`);
+   676→        return { success: true, data };
+   677→    } catch (error) {
+   678→        logger.error(`Error updating invoice ${invoiceId} status to ${status}:`, error);
+   679→        return { success: false, error: error instanceof Error ? error.message : "Failed to update invoice status" };
+   680→    }
+   681→};
+   682→
+   683→export const getInvoiceById = async (invoiceId: string): Promise<{ success: boolean; data?: DbInvoice; error?: string }> => {
+   684→     if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
+   685→     if (!invoiceId) return { success: false, error: "Invoice ID is required." };
+   686→
+   687→      try {
+   688→        const { data, error } = await supabaseAdmin
+   689→            .from("invoices")
+   690→            .select("*")
+   691→            .eq("id", invoiceId)
+   692→            .maybeSingle(); 
+   693→
+   694→        if (error) {
+   695→            throw error;
+   696→        }
+   697→        if (!data) {
+   698→            return { success: false, error: `Invoice ${invoiceId} not found.` };
+   699→        }
+   700→
+   701→        logger.info(`Fetched invoice ${invoiceId}.`);
+   702→        return { success: true, data };
+   703→    } catch (error) {
+   704→        logger.error(`Error fetching invoice ${invoiceId}:`, error);
+   705→        return { success: false, error: error instanceof Error ? error.message : "Failed to fetch invoice" };
+   706→    }
+   707→};
+   708→
+   709→export const getUserInvoices = async (userId: string): Promise<{ success: boolean; data?: DbInvoice[]; error?: string }> => {
+   710→    if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
+   711→    const client = supabaseAdmin;
+   712→
+   713→    if (!userId) return { success: false, error: "User ID is required." };
+   714→
+   715→    try {
+   716→        const { data, error } = await client
+   717→            .from("invoices")
+   718→            .select("*")
+   719→            .eq("user_id", userId)
+   720→            .order("created_at", { ascending: false }); 
+   721→
+   722→        if (error) throw error;
+   723→
+   724→        logger.info(`Fetched ${data?.length || 0} invoices for user ${userId}.`);
+   725→        return { success: true, data: data || [] };
+   726→    } catch (error) {
+   727→        logger.error(`Error fetching invoices for user ${userId}:`, error);
+   728→        return { success: false, error: error instanceof Error ? error.message : "Failed to fetch user invoices" };
+   729→    }
+   730→};
+   731→
+   732→export interface RentalWithCarDetails extends DbRental {
+   733→  car_make?: string | null;
+   734→  car_model?: string | null;
+   735→  car_image_url?: string | null;
+   736→}
+   737→
+   738→export const createRental = async (
+   739→    userId: string,
+   740→    carId: string, 
+   741→    startDate: string, 
+   742→    endDate: string,   
+   743→    totalCost: number
+   744→): Promise<{ success: boolean; data?: DbRental; error?: string }> => {
+   745→     if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
+   746→     if (!userId || !carId || !startDate || !endDate || totalCost == null || totalCost < 0) {
+   747→         return { success: false, error: "Missing or invalid parameters for rental creation." };
+   748→     }
+   749→
+   750→    try {
+   751→        const { data, error } = await supabaseAdmin
+   752→            .from("rentals")
+   753→            .insert({
+   754→                user_id: userId,
+   755→                car_id: carId, 
+   756→                start_date: startDate,
+   757→                end_date: endDate,
+   758→                total_cost: totalCost,
+   759→                status: 'pending', 
+   760→                payment_status: 'pending', 
+   761→                created_at: new Date().toISOString(),
+   762→                updated_at: new Date().toISOString(),
+   763→            })
+   764→            .select() 
+   765→            .single(); 
+   766→
+   767→        if (error) {
+   768→            if (error.code === '23503') { 
+   769→                 const { data: carExists } = await supabaseAdmin.from("cars").select("id").eq("id", carId).maybeSingle();
+   770→                 if (!carExists) return { success: false, error: `Invalid car ID: ${carId}`};
+   771→                 const { data: userExists } = await supabaseAdmin.from("users").select("user_id").eq("user_id", userId).maybeSingle();
+   772→                 if (!userExists) return { success: false, error: `Invalid user ID: ${userId}`};
+   773→                 return { success: false, error: "Invalid user ID or car ID provided." };
+   774→            }
+   775→            throw error;
+   776→        }
+   777→        if (!data) return { success: false, error: "Rental creation returned no data." };
+   778→        logger.info(`Rental created successfully for user ${userId}, car ${carId}. ID: ${data.rental_id}`);
+   779→        return { success: true, data };
+   780→    } catch (error) {
+   781→        logger.error(`Error creating rental for user ${userId}, car ${carId}:`, error);
+   782→        return { success: false, error: error instanceof Error ? error.message : "Failed to create rental" };
+   783→    }
+   784→};
+   785→
+   786→export const getUserRentals = async (userId: string): Promise<{ success: boolean; data?: RentalWithCarDetails[]; error?: string }> => {
+   787→     if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
+   788→     const client = supabaseAdmin;
+   789→
+   790→     if (!userId) return { success: false, error: "User ID is required." };
+   791→
+   792→      try {
+   793→        const { data, error } = await client
+   794→            .from("rentals")
+   795→            .select(`
+   796→                *,
+   797→                cars ( make, model, image_url ) 
+   798→            `) 
+   799→            .eq("user_id", userId)
+   800→            .order("start_date", { ascending: false }); 
+   801→
+   802→        if (error) throw error;
+   803→        
+   804→        const formattedData: RentalWithCarDetails[] = (data || []).map((rental: any) => ({ 
+   805→            ...rental, 
+   806→            car_make: rental.cars?.make || null,
+   807→            car_model: rental.cars?.model || null,
+   808→            car_image_url: rental.cars?.image_url || null,
+   809→            cars: undefined, 
+   810→        }));
+   811→
+   812→        logger.info(`Fetched ${formattedData.length} rentals for user ${userId}.`);
+   813→        return { success: true, data: formattedData };
+   814→    } catch (error) {
+   815→        logger.error(`Error fetching rentals for user ${userId}:`, error);
+   816→        return { success: false, error: error instanceof Error ? error.message : "Failed to fetch user rentals" };
+   817→    }
+   818→};
+   819→
+   820→export const updateRentalPaymentStatus = async (
+   821→    rentalId: number, 
+   822→    paymentStatus: DbRental['payment_status'] 
+   823→): Promise<{ success: boolean; data?: DbRental; error?: string }> => {
+   824→     if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
+   825→     if (rentalId === undefined || rentalId === null || !paymentStatus) {
+   826→        return { success: false, error: "Rental ID and payment status are required." };
+   827→     }
+   828→
+   829→      try {
+   830→        const { data, error } = await supabaseAdmin
+   831→            .from("rentals")
+   832→            .update({ payment_status: paymentStatus, updated_at: new Date().toISOString() })
+   833→            .eq("rental_id", rentalId) 
+   834→            .select() 
+   835→            .single(); 
+   836→
+   837→        if (error) {
+   838→             if (error.code === 'PGRST116') return { success: false, error: `Rental ${rentalId} not found.` }; 
+   839→            throw error;
+   840→        }
+   841→         if (!data) return { success: false, error: "Rental not found after update attempt." };
+   842→
+   843→         logger.info(`Rental ${rentalId} payment status updated to ${paymentStatus}.`);
+   844→        return { success: true, data };
+   845→    } catch (error) {
+   846→        logger.error(`Error updating rental ${rentalId} payment status to ${paymentStatus}:`, error);
+   847→        return { success: false, error: error instanceof Error ? error.message : "Failed to update rental payment status" };
+   848→    }
+   849→};
+   850→
+   851→export const uploadImage = async (bucketName: string, file: File, fileName?: string, options?: { upsert?: boolean }): Promise<{ success: boolean; publicUrl?: string; error?: string }> => {
+   852→     if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
+   853→     if (!bucketName || !file) return { success: false, error: "Bucket name and file are required." };
+   854→
+   855→    try {
+   856→        const fileExt = file.name.split(".").pop();
+   857→        if (!fileExt) {
+   858→            return { success: false, error: "Invalid file name (no extension)." };
+   859→        }
+   860→        const finalFileName = fileName || `${crypto.randomUUID()}.${fileExt}`;
+   861→        const filePath = `${finalFileName}`; 
+   862→
+   863→        logger.info(`Uploading file '${file.name}' to bucket '${bucketName}' as '${filePath}'...`);
+   864→
+   865→        const { error: uploadError } = await supabaseAdmin.storage
+   866→            .from(bucketName)
+   867→            .upload(filePath, file, {
+   868→                cacheControl: '3600', 
+   869→                // allow callers to override (e.g. editor re-saving to carpix/<id>/image_1.jpg)
+   870→                upsert: options?.upsert ?? false
+   871→            });
+   872→
+   873→        if (uploadError) {
+   874→            logger.error(`Error uploading image to ${bucketName}/${filePath}:`, uploadError);
+   875→            throw uploadError;
+   876→        }
+   877→
+   878→        const { data: urlData } = supabaseAdmin.storage
+   879→            .from(bucketName)
+   880→            .getPublicUrl(filePath);
+   881→
+   882→        if (!urlData?.publicUrl) {
+   883→             logger.error(`Failed to get public URL for ${bucketName}/${filePath} after upload.`);
+   884→            throw new Error("Failed to get public URL after upload");
+   885→        }
+   886→
+   887→         logger.info(`Image uploaded successfully: ${urlData.publicUrl}`);
+   888→        return { success: true, publicUrl: urlData.publicUrl };
+   889→
+   890→    } catch (error) {
+   891→        logger.error(`Error uploading image to bucket ${bucketName}:`, error);
+   892→        return { success: false, error: error instanceof Error ? error.message : "Failed to upload image" };
+   893→    }
+   894→};
+   895→
+   896→export const fetchQuestions = async () => {
+   897→    if (!supabaseAnon) throw new Error("Anon client not available.");
+   898→    const { data, error } = await supabaseAnon.from("questions").select("*");
+   899→    if (error) { logger.error("Error fetching questions:", error); throw error; }
+   900→    return data;
+   901→};
+   902→
+   903→export const fetchAnswers = async () => {
+   904→    if (!supabaseAnon) throw new Error("Anon client not available.");
+   905→    const { data, error } = await supabaseAnon.from("answers").select("*");
+   906→     if (error) { logger.error("Error fetching answers:", error); throw error; }
+   907→    return data;
+   908→};
+   909→
+   910→export const fetchCars = async (): Promise<{ success: boolean; data?: DbCar[]; error?: string }> => {
+   911→  if (!supabaseAnon) return { success: false, error: "Anon client not available." };
+   912→  try {
+   913→    const { data, error } = await supabaseAnon
+   914→        .from("cars")
+   915→        .select("*")
+   916→        .order("model", { ascending: true }); 
+   917→    if (error) throw error;
+   918→    return { success: true, data: data || [] };
+   919→  } catch (error) {
+   920→    logger.error("Error fetching cars:", error);
+   921→    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch cars" };
+   922→  }
+   923→}
+   924→
+   925→export const fetchCarById = async (id: string): Promise<{ success: boolean; data?: DbCar; error?: string }> => {
+   926→  if (!id) return { success: false, error: "Car ID is required." };
+   927→  if (!supabaseAnon) return { success: false, error: "Anon client not available." };
+   928→  try {
+   929→    const { data, error } = await supabaseAnon
+   930→        .from("cars")
+   931→        .select("*")
+   932→        .eq("id", id)
+   933→        .maybeSingle();
+   934→
+   935→    if (error) {
+   936→        // CORRECTED LOGIC: Return the error in the object instead of throwing it.
+   937→        logger.error(`Error fetching car by ID ${id} from Supabase:`, error);
+   938→        return { success: false, error: error.message };
+   939→    }
+   940→    if (!data) {
+   941→        return { success: false, error: `Car with ID ${id} not found.` };
+   942→    }
+   943→    return { success: true, data };
+   944→  } catch (catchError) {
+   945→    logger.error(`Exception in fetchCarById for ${id}:`, catchError);
+   946→    return { success: false, error: catchError instanceof Error ? catchError.message : "Failed to fetch car" };
+   947→  }
+   948→}
+   949→
+   950→export const saveUserResult = async (userId: string, carId: string): Promise<{ success: boolean; error?: string }> => {
+   951→    const client = await createAuthenticatedClient(userId);
+   952→    if (!client) return { success: false, error: "Failed to create authenticated client." };
+   953→
+   954→    try {
+   955→        const { error } = await client
+   956→            .from("user_results")
+   957→            .insert({ user_id: userId, car_id: carId, created_at: new Date().toISOString() });
+   958→
+   959→        if (error) {
+   960→             if (error.code === '23505') { 
+   961→                 logger.warn(`User ${userId} already has a result for car ${carId}. Ignoring duplicate.`);
+   962→                 return { success: true };
+   963→             }
+   964→             if (error.code === '23503') {
+   965→                  return { success: false, error: "Invalid user ID or car ID." };
+   966→             }
+   967→             throw error;
+   968→        }
+   969→        logger.info(`Saved user result for user ${userId}, car ${carId}.`);
+   970→        return { success: true };
+   971→    } catch (error) {
+   972→        logger.error(`Error saving user result for ${userId}:`, error);
+   973→        return { success: false, error: error instanceof Error ? error.message : "Failed to save user result" };
+   974→    }
+   975→};
+   976→
+   977→export const getUserSubscription = async (
+   978→  userId: string
+   979→): Promise<{ success: boolean; data?: string | null; error?: string }> => { 
+   980→    if (!userId) return { success: false, error: "User ID is required." };
+   981→    if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
+   982→
+   983→    try {
+   984→        const { data: userData, error: userError } = await supabaseAdmin
+   985→            .from("users")
+   986→            .select("subscription_id")
+   987→            .eq("user_id", userId)
+   988→            .maybeSingle();
+   989→
+   990→        if (userError) {
+   991→            logger.error(`[getUserSubscription] Error fetching user ${userId} for subscription_id:`, userError);
+   992→            throw userError;
+   993→        }
+   994→        
+   995→        const subIdFromDb = userData?.subscription_id; 
+   996→        return { success: true, data: subIdFromDb ?? null };
+   997→
+   998→    } catch (error) {
+   999→        logger.error(`[getUserSubscription] Exception for user ${userId}:`, error);
+  1000→        return { success: false, error: error instanceof Error ? error.message : "Failed to fetch subscription-related info" };
+  1001→    }
+  1002→};
+  1003→
+  1004→export const getUserResults = async (userId: string): Promise<{ success: boolean; data?: DbUserResult[]; error?: string }> => {
+  1005→    const client = await createAuthenticatedClient(userId);
+  1006→    if (!client) return { success: false, error: "Failed to create authenticated client." };
+  1007→
+  1008→    try {
+  1009→        const { data, error } = await client
+  1010→            .from("user_results")
+  1011→            .select("user_id, car_id, created_at")
+  1012→            .eq("user_id", userId)
+  1013→            .order("created_at", { ascending: false });
+  1014→
+  1015→        if (error) throw error;
+  1016→        logger.info(`Fetched ${data?.length || 0} results for user ${userId}.`);
+  1017→        return { success: true, data: data || [] };
+  1018→    } catch (error) {
+  1019→        logger.error(`Error fetching user results for ${userId}:`, error);
+  1020→        return { success: false, error: error instanceof Error ? error.message : "Failed to fetch user results" };
+  1021→    }
+  1022→};
+  1023→

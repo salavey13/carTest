@@ -1,0 +1,677 @@
+     1→"use client";
+     2→/**
+     3→ * Vibe Control Center — Admin Dashboard v2.1
+     4→ * 
+     5→ * 🎯 Fixed: Mobile overflow, removed footer, improved calibrator integration
+     6→ * 🛠️ Mobile-first responsive design with proper overflow handling
+     7→ */
+     8→
+     9→import { useEffect, useState, useCallback, Suspense, useMemo } from "react";
+    10→import { useSearchParams, useRouter } from 'next/navigation';
+    11→import { useAppContext } from "@/contexts/AppContext";
+    12→import { CarSubmissionForm } from "@/components/CarSubmissionForm";
+    13→import { QuickSetWebhookButton } from "@/components/QuickSetWebhookButton";
+    14→import Link from "next/link";
+    15→import { motion, AnimatePresence } from "framer-motion";
+    16→import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+    17→import { toast } from "sonner";
+    18→import { Loading } from "@/components/Loading";
+    19→import Image from "next/image";
+    20→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+    21→import { Button } from "@/components/ui/button";
+    22→import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+    23→import { Badge } from "@/components/ui/badge";
+    24→import { Separator } from "@/components/ui/separator";
+    25→import { Input } from "@/components/ui/input";
+    26→import { getEditableVehiclesForUser } from "@/app/rentals/actions";
+    27→import type { Database } from "@/types/database.types";
+    28→import { cn } from "@/lib/utils";
+    29→
+    30→type Vehicle = Database['public']['Tables']['cars']['Row'];
+    31→
+    32→const normalizeVin = (value: unknown) => (typeof value === "string" ? value.trim().toUpperCase() : "");
+    33→
+    34→const VIN_ALLOWED = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789";
+    35→
+    36→const buildSyntheticVin = (vehicle: Vehicle) => {
+    37→  const raw = `${vehicle.make ?? ""}${vehicle.model ?? ""}${vehicle.year ?? ""}${vehicle.id ?? ""}`.toUpperCase();
+    38→  const mapped = raw
+    39→    .replace(/I/g, "1")
+    40→    .replace(/O/g, "0")
+    41→    .replace(/Q/g, "0")
+    42→    .replace(/[^A-Z0-9]/g, "");
+    43→  const normalized = mapped
+    44→    .split("")
+    45→    .map((char) => (VIN_ALLOWED.includes(char) ? char : "X"))
+    46→    .join("");
+    47→  return (normalized + "CARTESTVIN00000000").slice(0, 17);
+    48→};
+    49→
+    50→// === QUICK STATS COMPONENT ===
+    51→function AdminQuickStats({ vehicles, isAdmin }: { vehicles: Vehicle[]; isAdmin: boolean }) {
+    52→  const stats = useMemo(() => {
+    53→    const bikes = vehicles.filter(v => v.type === 'bike').length;
+    54→    const cars = vehicles.filter(v => v.type === 'car').length;
+    55→    const withVin = vehicles.filter(v => v.specs?.vin).length;
+    56→    
+    57→    return [
+    58→      { label: "Байки", value: bikes, icon: "::FaMotorcycle::", color: "text-brand-pink", bg: "bg-brand-pink/10" },
+    59→      { label: "Авто", value: cars, icon: "::FaCar::", color: "text-brand-cyan", bg: "bg-brand-cyan/10" },
+    60→      { label: "С VIN", value: withVin, icon: "::FaFileSignature::", color: "text-brand-lime", bg: "bg-brand-lime/10" },
+    61→      { label: "Доступ", value: isAdmin ? "ADMIN" : "USER", icon: isAdmin ? "::FaShieldHalved::" : "::FaUser::", color: isAdmin ? "text-amber-400" : "text-zinc-400", bg: isAdmin ? "bg-amber-400/10" : "bg-zinc-400/10" },
+    62→    ];
+    63→  }, [vehicles, isAdmin]);
+    64→
+    65→  return (
+    66→    <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-4 sm:mb-6">
+    67→      {stats.map((stat, i) => (
+    68→        <motion.div
+    69→          key={stat.label}
+    70→          initial={{ opacity: 0, y: 10 }}
+    71→          animate={{ opacity: 1, y: 0 }}
+    72→          transition={{ delay: i * 0.05 }}
+    73→          className={cn("rounded-xl border border-white/10 p-3 sm:p-4 backdrop-blur-sm", stat.bg)}
+    74→        >
+    75→          <div className={cn("mb-1 sm:mb-2", stat.color)}>
+    76→            <VibeContentRenderer content={stat.icon} className="h-4 w-4 sm:h-5 sm:w-5" />
+    77→          </div>
+    78→          <div className="text-lg sm:text-2xl font-bold text-white font-orbitron">{stat.value}</div>
+    79→          <div className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider">{stat.label}</div>
+    80→        </motion.div>
+    81→      ))}
+    82→    </div>
+    83→  );
+    84→}
+    85→
+    86→// === VEHICLE CARD COMPONENT ===
+    87→function VehicleCard({ vehicle, onSelect, isSelected }: { vehicle: Vehicle; onSelect: (v: Vehicle) => void; isSelected: boolean }) {
+    88→  return (
+    89→    <motion.button
+    90→      layout
+    91→      initial={{ opacity: 0, scale: 0.95 }}
+    92→      animate={{ opacity: 1, scale: 1 }}
+    93→      whileHover={{ scale: 1.02, y: -2 }}
+    94→      whileTap={{ scale: 0.98 }}
+    95→      onClick={() => onSelect(vehicle)}
+    96→      className={cn(
+    97→        "w-full text-left rounded-xl border p-3 sm:p-4 transition-all duration-200",
+    98→        "bg-dark-card/60 hover:bg-dark-card/80 backdrop-blur-sm",
+    99→        isSelected 
+   100→          ? "border-brand-lime/50 ring-2 ring-brand-lime/30 shadow-lg shadow-brand-lime/10" 
+   101→          : "border-white/10 hover:border-white/20",
+   102→      )}
+   103→    >
+   104→      <div className="flex items-start justify-between gap-2">
+   105→        <div className="flex items-center gap-2 min-w-0 flex-1">
+   106→          <span className="text-lg shrink-0">{vehicle.type === 'bike' ? '🏍️' : '🚗'}</span>
+   107→          <div className="min-w-0">
+   108→            <div className="font-medium text-white truncate">{vehicle.make} {vehicle.model}</div>
+   109→            <div className="text-xs text-zinc-400 truncate">{vehicle.year || '—'} • {vehicle.color || '—'}</div>
+   110→          </div>
+   111→        </div>
+   112→        {isSelected && (
+   113→          <Badge className="shrink-0 bg-brand-lime/20 text-brand-lime border-brand-lime/30 text-[10px]">
+   114→            Выбран
+   115→          </Badge>
+   116→        )}
+   117→      </div>
+   118→      {vehicle.specs?.vin && (
+   119→        <div className="mt-2 text-[10px] font-mono text-zinc-500 bg-black/30 px-2 py-1 rounded inline-block">
+   120→          VIN: {vehicle.specs.vin.slice(-6).toUpperCase()}
+   121→        </div>
+   122→      )}
+   123→    </motion.button>
+   124→  );
+   125→}
+   126→
+   127→// === MAP TOOLS PANEL ===
+   128→function MapToolsPanel({ crewSlug }: { crewSlug: string }) {
+   129→  const tools = [
+   130→    {
+   131→      title: "Калибратор Карты",
+   132→      description: "Выровнять GPS bounds под изображение карты",
+   133→      href: "/admin/map-calibrator",
+   134→      icon: "::FaRulerCombined::",
+   135→      color: "from-brand-cyan to-brand-lime",
+   136→      badge: "NEW",
+   137→    },
+   138→    {
+   139→      title: "MapRiders",
+   140→      description: "Управление live-трекингом экипажа",
+   141→      href: `/franchize/${crewSlug}/map-riders`,
+   142→      icon: "::FaSatelliteDish::",
+   143→      color: "from-brand-purple to-brand-pink",
+   144→    },
+   145→    {
+   146→      title: "POI Editor",
+   147→      description: "Редактировать точки интереса и маршруты на карте",
+   148→      href: "/admin/map-routes",
+   149→      icon: "::FaLocationDot::",
+   150→      color: "from-amber-400 to-orange-500",
+   151→      badge: "NEW",
+   152→    },
+   153→  ];
+   154→
+   155→  return (
+   156→    <Card className="border-brand-purple/30 bg-slate-950/60 backdrop-blur-xl overflow-hidden">
+   157→      <CardHeader className="pb-3">
+   158→        <CardTitle className="flex items-center gap-2 text-lg text-white">
+   159→          <VibeContentRenderer content="::FaMap::" className="text-brand-cyan" />
+   160→          Map Tools
+   161→        </CardTitle>
+   162→        <CardDescription className="text-zinc-400 text-sm">
+   163→          Инструменты для работы с картами экипажа
+   164→        </CardDescription>
+   165→      </CardHeader>
+   166→      <CardContent className="space-y-2">
+   167→        {tools.map((tool, i) => (
+   168→          <Link key={tool.href} href={tool.href}>
+   169→            <motion.div
+   170→              initial={{ opacity: 0, x: -10 }}
+   171→              animate={{ opacity: 1, x: 0 }}
+   172→              transition={{ delay: i * 0.05 }}
+   173→              className={cn(
+   174→                "group flex items-center justify-between p-3 rounded-lg border border-white/10",
+   175→                "bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+   176→              )}
+   177→            >
+   178→              <div className="flex items-center gap-3 min-w-0 flex-1">
+   179→                <div className={cn("p-2 rounded-lg bg-gradient-to-br shrink-0", tool.color)}>
+   180→                  <VibeContentRenderer content={tool.icon} className="h-4 w-4 text-black" />
+   181→                </div>
+   182→                <div className="min-w-0">
+   183→                  <div className="font-medium text-white text-sm truncate">{tool.title}</div>
+   184→                  <div className="text-xs text-zinc-400 truncate">{tool.description}</div>
+   185→                </div>
+   186→              </div>
+   187→              <div className="flex items-center gap-2 shrink-0">
+   188→                {tool.badge && (
+   189→                  <Badge className="bg-brand-lime/20 text-brand-lime border-brand-lime/30 text-[10px]">
+   190→                    {tool.badge}
+   191→                  </Badge>
+   192→                )}
+   193→                <VibeContentRenderer content="::FaArrowRight::" className="h-3 w-3 text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+   194→              </div>
+   195→            </motion.div>
+   196→          </Link>
+   197→        ))}
+   198→      </CardContent>
+   199→    </Card>
+   200→  );
+   201→}
+   202→
+   203→// === KEYBOARD SHORTCUTS PANEL ===
+   204→function KeyboardShortcutsPanel() {
+   205→  const shortcuts = [
+   206→    { keys: ["N"], action: "Новый байк" },
+   207→    { keys: ["E"], action: "Редактировать" },
+   208→    { keys: ["F"], action: "Фильтр" },
+   209→    { keys: ["?", "Shift"], action: "Показать подсказки" },
+   210→  ];
+   211→
+   212→  return (
+   213→    <Card className="border-white/10 bg-slate-950/40 backdrop-blur-sm overflow-hidden">
+   214→      <CardHeader className="pb-2">
+   215→        <CardTitle className="text-sm text-zinc-300 flex items-center gap-2">
+   216→          <VibeContentRenderer content="::FaKeyboard::" className="text-brand-cyan" />
+   217→          Горячие клавиши
+   218→        </CardTitle>
+   219→      </CardHeader>
+   220→      <CardContent>
+   221→        <div className="grid grid-cols-2 gap-2">
+   222→          {shortcuts.map((s) => (
+   223→            <div key={s.action} className="flex items-center justify-between text-xs">
+   224→              <span className="text-zinc-400">{s.action}</span>
+   225→              <div className="flex gap-0.5">
+   226→                {s.keys.map((k, i) => (
+   227→                  <kbd key={i} className="px-1.5 py-0.5 rounded bg-white/10 border border-white/20 text-[10px] font-mono text-zinc-300">
+   228→                    {k}
+   229→                  </kbd>
+   230→                ))}
+   231→              </div>
+   232→            </div>
+   233→          ))}
+   234→        </div>
+   235→      </CardContent>
+   236→    </Card>
+   237→  );
+   238→}
+   239→
+   240→// === MAIN CONTENT ===
+   241→function AdminPageContent() {
+   242→  const { dbUser, userCrewInfo, isAdmin, isLoading: appContextLoading } = useAppContext();
+   243→  const searchParams = useSearchParams();
+   244→  const router = useRouter();
+   245→  const editId = searchParams.get('edit');
+   246→
+   247→  const [isTrulyAdmin, setIsTrulyAdmin] = useState<boolean>(false);
+   248→  const [userVehicles, setUserVehicles] = useState<Vehicle[]>([]);
+   249→  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+   250→  const [isFetchingVehicles, setIsFetchingVehicles] = useState(false);
+   251→  const [typeFilter, setTypeFilter] = useState<"all" | "bike" | "car">("all");
+   252→  const [searchQuery, setSearchQuery] = useState("");
+   253→  const [showShortcuts, setShowShortcuts] = useState(false);
+   254→  const [isBulkFillingVin, setIsBulkFillingVin] = useState(false);
+   255→
+   256→  const fetchUserVehicles = useCallback(async (userId: string) => {
+   257→    setIsFetchingVehicles(true);
+   258→    try {
+   259→      const { data, error, success } = await getEditableVehiclesForUser(userId);
+   260→      
+   261→      if (!success || error) {
+   262→        throw new Error(error || "Не удалось получить список техники.");
+   263→      }
+   264→      
+   265→      setUserVehicles((data || []).filter(v => v.type === 'bike' || v.type === 'car'));
+   266→      
+   267→      if(editId) {
+   268→        const vehicleToEdit = data?.find(v => v.id === editId);
+   269→        if (vehicleToEdit) {
+   270→            setSelectedVehicle(vehicleToEdit);
+   271→            toast.info(`Загружен для редактирования: ${vehicleToEdit.make} ${vehicleToEdit.model}`);
+   272→        } else {
+   273→            toast.error(`Транспорт с ID ${editId} не найден в вашем гараже или команде.`);
+   274→        }
+   275→      }
+   276→    } catch (error) {
+   277→      toast.error(error instanceof Error ? error.message : "Не удалось загрузить вашу технику.");
+   278→    } finally {
+   279→      setIsFetchingVehicles(false);
+   280→    }
+   281→  }, [editId]);
+   282→
+   283→  useEffect(() => {
+   284→    if (!appContextLoading && dbUser?.user_id) {
+   285→      if (typeof isAdmin === 'function') {
+   286→        setIsTrulyAdmin(isAdmin());
+   287→      }
+   288→      fetchUserVehicles(dbUser.user_id);
+   289→    }
+   290→  }, [appContextLoading, dbUser, isAdmin, fetchUserVehicles]);
+   291→
+   292→  // Keyboard shortcuts
+   293→  useEffect(() => {
+   294→    const handler = (e: KeyboardEvent) => {
+   295→      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+   296→      
+   297→      if (e.key === '?' && e.shiftKey) {
+   298→        e.preventDefault();
+   299→        setShowShortcuts(prev => !prev);
+   300→      }
+   301→      if (e.key === 'n' || e.key === 'N') {
+   302→        e.preventDefault();
+   303→        setSelectedVehicle(null);
+   304→        router.push('/admin');
+   305→      }
+   306→      if (e.key === 'f' || e.key === 'F') {
+   307→        e.preventDefault();
+   308→        const input = document.querySelector('input[placeholder="Поиск в гараже..."]') as HTMLInputElement;
+   309→        input?.focus();
+   310→      }
+   311→    };
+   312→    
+   313→    window.addEventListener('keydown', handler);
+   314→    return () => window.removeEventListener('keydown', handler);
+   315→  }, [router]);
+   316→
+   317→  const visibleVehicles = useMemo(() => {
+   318→    return userVehicles
+   319→      .filter(v => typeFilter === "all" ? true : v.type === typeFilter)
+   320→      .filter(v => {
+   321→        if (!searchQuery.trim()) return true;
+   322→        const q = searchQuery.toLowerCase();
+   323→        return (
+   324→          v.make?.toLowerCase().includes(q) ||
+   325→          v.model?.toLowerCase().includes(q) ||
+   326→          v.year?.toString().includes(q) ||
+   327→          v.specs?.vin?.toLowerCase().includes(q)
+   328→        );
+   329→      });
+   330→  }, [userVehicles, typeFilter, searchQuery]);
+   331→
+   332→
+   333→
+   334→  const vinAudit = useMemo(() => {
+   335→    const target = userVehicles.filter(v => v.type === "bike" || v.type === "car");
+   336→    const missing = target.filter(v => !normalizeVin(v.specs?.vin));
+   337→    return {
+   338→      total: target.length,
+   339→      withVin: target.length - missing.length,
+   340→      missing,
+   341→    };
+   342→  }, [userVehicles]);
+   343→
+   344→  const handleBulkFillVin = useCallback(async () => {
+   345→    if (!dbUser?.user_id || !vinAudit.missing.length) return;
+   346→    setIsBulkFillingVin(true);
+   347→    try {
+   348→      for (const vehicle of vinAudit.missing) {
+   349→        const syntheticVin = buildSyntheticVin(vehicle);
+   350→        const res = await fetch('/api/cars', {
+   351→          method: 'PUT',
+   352→          headers: { 'Content-Type': 'application/json' },
+   353→          body: JSON.stringify({
+   354→            ...vehicle,
+   355→            specs: {
+   356→              ...(vehicle.specs || {}),
+   357→              vin: syntheticVin,
+   358→            },
+   359→          }),
+   360→        });
+   361→        if (!res.ok) {
+   362→          throw new Error(`VIN bulk-fill failed for ${vehicle.make} ${vehicle.model}`);
+   363→        }
+   364→      }
+   365→      toast.success(`VIN заполнен для ${vinAudit.missing.length} карточек`);
+   366→      await fetchUserVehicles(dbUser.user_id);
+   367→    } catch (error) {
+   368→      toast.error(error instanceof Error ? error.message : 'Не удалось выполнить bulk-fill VIN');
+   369→    } finally {
+   370→      setIsBulkFillingVin(false);
+   371→    }
+   372→  }, [dbUser?.user_id, vinAudit.missing, fetchUserVehicles]);
+   373→  const handleVehicleSelect = (vehicle: Vehicle | null) => {
+   374→    setSelectedVehicle(vehicle);
+   375→    if (vehicle) {
+   376→      router.push(`/admin?edit=${vehicle.id}`, { scroll: false });
+   377→      toast.success(`Редактирование: ${vehicle.make} ${vehicle.model}`);
+   378→    }
+   379→  };
+   380→  
+   381→  const handleFormSuccess = () => {
+   382→    if (dbUser?.user_id) {
+   383→      fetchUserVehicles(dbUser.user_id);
+   384→    }
+   385→    if (!editId) {
+   386→      setSelectedVehicle(null);
+   387→    }
+   388→    toast.success("Изменения сохранены");
+   389→  };
+   390→
+   391→  if (appContextLoading) { 
+   392→    return <Loading text="ПРОВЕРКА ДОСТУПА..." />;
+   393→  }
+   394→  
+   395→  const crewSlug = userCrewInfo?.slug || "vip-bike";
+   396→
+   397→  return (
+   398→    <div className="min-h-screen pt-20 sm:pt-24 bg-black relative overflow-hidden">
+   399→      {/* Animated background */}
+   400→      <div className="fixed inset-0 z-[-1] opacity-20">
+   401→        <Image
+   402→          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg"
+   403→          alt="Admin Background"
+   404→          fill
+   405→          className="object-cover animate-pan-zoom"
+   406→          priority
+   407→        />
+   408→        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent"></div>
+   409→        {/* Grid overlay for cyberpunk feel */}
+   410→        <div className="absolute inset-0 bg-[linear-gradient(rgba(124,244,120,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(124,244,120,0.03)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+   411→      </div>
+   412→
+   413→      <main className="container mx-auto pt-4 sm:pt-6 px-3 sm:px-4 relative z-10 pb-16 max-w-7xl">
+   414→        {/* Header */}
+   415→        <motion.div
+   416→          initial={{ opacity: 0, y: -10 }}
+   417→          animate={{ opacity: 1, y: 0 }}
+   418→          className="mb-4 sm:mb-6"
+   419→        >
+   420→          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+   421→            <div className="min-w-0">
+   422→              <h1 className="flex items-center gap-2 sm:gap-3 text-xl sm:text-3xl font-bold text-white font-orbitron">
+   423→                <VibeContentRenderer content="::FaSatelliteDish::" className="h-6 w-6 sm:h-8 sm:w-8 text-brand-cyan animate-pulse shrink-0" />
+   424→                <span className="truncate">VIBE CONTROL CENTER</span>
+   425→              </h1>
+   426→              <p className="mt-1 text-xs sm:text-base text-zinc-400 font-mono truncate">
+   427→                {selectedVehicle 
+   428→                  ? `Редактирование: ${selectedVehicle.make} ${selectedVehicle.model}` 
+   429→                  : 'Управление флотом • Добавляй технику, настраивай карты, управляй экипажем'}
+   430→              </p>
+   431→            </div>
+   432→            <div className="flex items-center gap-2 shrink-0">
+   433→              <Badge variant="outline" className="border-brand-lime/30 text-brand-lime text-[10px] sm:text-xs hidden sm:flex">
+   434→                <VibeContentRenderer content="::FaBolt::" className="mr-1" />
+   435→                {isTrulyAdmin ? "ADMIN MODE" : "USER MODE"}
+   436→              </Badge>
+   437→              <Button 
+   438→                size="sm" 
+   439→                variant="ghost" 
+   440→                className="text-zinc-400 hover:text-white shrink-0"
+   441→                onClick={() => setShowShortcuts(prev => !prev)}
+   442→                title="Показать горячие клавиши (?)"
+   443→              >
+   444→                <VibeContentRenderer content="::FaKeyboard::" />
+   445→              </Button>
+   446→            </div>
+   447→          </div>
+   448→        </motion.div>
+   449→
+   450→        {/* Quick Stats */}
+   451→        <AdminQuickStats vehicles={userVehicles} isAdmin={isTrulyAdmin} />
+   452→
+   453→        {/* Main Grid */}
+   454→        <div className="grid gap-4 sm:gap-6 lg:grid-cols-[1.2fr,0.8fr]">
+   455→          {/* Left Column: Vehicle Management */}
+   456→          <div className="space-y-4 sm:space-y-6 min-w-0">
+   457→            {/* Vehicle Selector Card */}
+   458→            <Card className="border-brand-purple/30 bg-slate-950/60 backdrop-blur-xl overflow-hidden">
+   459→              <CardHeader className="pb-3">
+   460→                <div className="flex items-center justify-between">
+   461→                  <CardTitle className="text-base sm:text-lg text-white">Гараж</CardTitle>
+   462→                  <Badge variant="outline" className="text-[10px] sm:text-xs border-white/20 text-zinc-400 shrink-0">
+   463→                    {visibleVehicles.length} из {userVehicles.length}
+   464→                  </Badge>
+   465→                </div>
+   466→              </CardHeader>
+   467→              <CardContent className="space-y-3 sm:space-y-4">
+   468→                {/* Search + Actions */}
+   469→                <div className="flex flex-col sm:flex-row gap-2">
+   470→                  <div className="relative flex-1 min-w-0">
+   471→                    <VibeContentRenderer content="::FaSearchengin::" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+   472→                    <Input
+   473→                      placeholder="Поиск в гараже..."
+   474→                      value={searchQuery}
+   475→                      onChange={(e) => setSearchQuery(e.target.value)}
+   476→                      className="pl-9 input-cyber text-sm"
+   477→                    />
+   478→                  </div>
+   479→                  <Button 
+   480→                    variant="outline" 
+   481→                    onClick={() => { setSelectedVehicle(null); router.push('/admin'); }}
+   482→                    className="shrink-0 text-sm"
+   483→                  >
+   484→                    <VibeContentRenderer content="::FaPlus::" className="mr-1.5" />
+   485→                    Новый
+   486→                  </Button>
+   487→                </div>
+   488→
+   489→                {/* Type Filters */}
+   490→                <div className="flex gap-1.5 p-1 rounded-lg bg-white/5">
+   491→                  {[
+   492→                    { key: "all", label: "Все", icon: "::FaLayerGroup::" },
+   493→                    { key: "bike", label: "Байки", icon: "::FaMotorcycle::" },
+   494→                    { key: "car", label: "Авто", icon: "::FaCar::" },
+   495→                  ].map((f) => (
+   496→                    <Button
+   497→                      key={f.key}
+   498→                      size="sm"
+   499→                      variant={typeFilter === f.key ? "default" : "ghost"}
+   500→                      onClick={() => setTypeFilter(f.key as any)}
+   501→                      className={cn(
+   502→                        "flex-1 text-xs font-medium",
+   503→                        typeFilter === f.key 
+   504→                          ? "bg-brand-purple/80 text-white" 
+   505→                          : "text-zinc-400 hover:text-white hover:bg-white/10"
+   506→                      )}
+   507→                    >
+   508→                      <VibeContentRenderer content={f.icon} className="mr-1.5 h-3 w-3" />
+   509→                      <span className="hidden sm:inline">{f.label}</span>
+   510→                      <span className="sm:hidden">{f.label[0]}</span>
+   511→                    </Button>
+   512→                  ))}
+   513→                </div>
+   514→
+   515→                {/* Vehicle Grid */}
+   516→                <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1 simple-scrollbar">
+   517→                  <AnimatePresence mode="popLayout">
+   518→                    {isFetchingVehicles ? (
+   519→                      <div className="py-8 text-center text-zinc-500">
+   520→                        <Loading text="Загрузка гаража..." className="inline" />
+   521→                      </div>
+   522→                    ) : visibleVehicles.length > 0 ? (
+   523→                      visibleVehicles.map((vehicle) => (
+   524→                        <VehicleCard
+   525→                          key={vehicle.id}
+   526→                          vehicle={vehicle}
+   527→                          onSelect={handleVehicleSelect}
+   528→                          isSelected={selectedVehicle?.id === vehicle.id}
+   529→                        />
+   530→                      ))
+   531→                    ) : (
+   532→                      <motion.div
+   533→                        initial={{ opacity: 0 }}
+   534→                        animate={{ opacity: 1 }}
+   535→                        className="py-8 text-center text-zinc-500 text-sm"
+   536→                      >
+   537→                        {searchQuery 
+   538→                          ? "Ничего не найдено по запросу" 
+   539→                          : typeFilter !== "all"
+   540→                            ? `Нет ${typeFilter === "bike" ? "байков" : "авто"} в гараже`
+   541→                            : "Гараж пуст — добавь первую технику!"}
+   542→                      </motion.div>
+   543→                    )}
+   544→                  </AnimatePresence>
+   545→                </div>
+   546→
+   547→                {/* VIN Audit */}
+   548→                <div className="rounded border border-brand-lime/20 bg-brand-lime/5 px-3 py-2 space-y-2">
+   549→                  <p className="text-[10px] sm:text-[11px] text-zinc-300 font-mono">
+   550→                    VIN аудит: <span className="text-brand-lime">{vinAudit.withVin}</span> / {vinAudit.total} заполнено
+   551→                  </p>
+   552→                  {vinAudit.missing.length > 0 && (
+   553→                    <p className="text-[10px] text-amber-300 font-mono">Пустых VIN: {vinAudit.missing.length}</p>
+   554→                  )}
+   555→                  {isTrulyAdmin && vinAudit.missing.length > 0 && (
+   556→                    <Button size="sm" variant="outline" onClick={handleBulkFillVin} disabled={isBulkFillingVin} className="h-7 text-[11px]">
+   557→                      {isBulkFillingVin ? 'Заполняю VIN…' : 'Bulk-fill VIN'}
+   558→                    </Button>
+   559→                  )}
+   560→                </div>
+   561→                <p className="text-[10px] sm:text-[11px] text-zinc-500 font-mono bg-black/30 px-3 py-2 rounded">
+   562→                  💡 Для генерации договоров добавляй <code className="text-brand-lime">vin</code> в specs карточки
+   563→                </p>
+   564→              </CardContent>
+   565→            </Card>
+   566→
+   567→            {/* Car Submission Form */}
+   568→            <motion.div
+   569→              key={selectedVehicle?.id || "new"}
+   570→              initial={{ opacity: 0, y: 10 }}
+   571→              animate={{ opacity: 1, y: 0 }}
+   572→              transition={{ duration: 0.2 }}
+   573→              className="min-w-0"
+   574→            >
+   575→              <CarSubmissionForm 
+   576→                ownerId={dbUser?.user_id} 
+   577→                vehicleToEdit={selectedVehicle} 
+   578→                onSuccess={handleFormSuccess} 
+   579→              />
+   580→            </motion.div>
+   581→          </div>
+   582→
+   583→          {/* Right Column: Tools & Quick Links */}
+   584→          <div className="space-y-4 sm:space-y-6 min-w-0">
+   585→            {/* Map Tools */}
+   586→            <MapToolsPanel crewSlug={crewSlug} />
+   587→
+   588→            {/* Keyboard Shortcuts */}
+   589→            <AnimatePresence>
+   590→              {showShortcuts && (
+   591→                <motion.div
+   592→                  initial={{ opacity: 0, height: 0 }}
+   593→                  animate={{ opacity: 1, height: "auto" }}
+   594→                  exit={{ opacity: 0, height: 0 }}
+   595→                  transition={{ duration: 0.2 }}
+   596→                  className="overflow-hidden"
+   597→                >
+   598→                  <KeyboardShortcutsPanel />
+   599→                </motion.div>
+   600→              )}
+   601→            </AnimatePresence>
+   602→
+   603→            {/* Quick Navigation */}
+   604→            <Card className="border-white/10 bg-slate-950/40 backdrop-blur-sm overflow-hidden">
+   605→              <CardHeader className="pb-3">
+   606→                <CardTitle className="text-sm text-zinc-300">Быстрые переходы</CardTitle>
+   607→              </CardHeader>
+   608→              <CardContent className="space-y-2">
+   609→                {[
+   610→                  { label: "Мото-гараж", href: "/franchize/vip-bike", icon: "::FaMotorcycle::", color: "text-brand-pink" },
+   611→                  { label: "Franchise Docs", href: `/franchize/${crewSlug}/admin`, icon: "::FaFileContract::", color: "text-amber-400" },
+   612→                  ...(isTrulyAdmin ? [{ label: "Мой Паддок", href: "/paddock", icon: "::FaWarehouse::", color: "text-brand-cyan" }] : []),
+   613→                ].map((link) => (
+   614→                  <Link key={link.href} href={link.href}>
+   615→                    <motion.div
+   616→                      whileHover={{ x: 4 }}
+   617→                      className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/5 transition-colors group"
+   618→                    >
+   619→                      <VibeContentRenderer content={link.icon} className={cn("h-4 w-4 shrink-0", link.color)} />
+   620→                      <span className="text-sm text-zinc-300 group-hover:text-white transition-colors truncate">{link.label}</span>
+   621→                      <VibeContentRenderer content="::FaArrowRight::" className="h-3 w-3 text-zinc-600 ml-auto shrink-0 group-hover:text-zinc-400 transition-colors" />
+   622→                    </motion.div>
+   623→                  </Link>
+   624→                ))}
+   625→                {isTrulyAdmin && (
+   626→                  <div className="pt-2 border-t border-white/10 mt-2">
+   627→                    <QuickSetWebhookButton />
+   628→                  </div>
+   629→                )}
+   630→              </CardContent>
+   631→            </Card>
+   632→
+   633→            {/* Help / Support */}
+   634→            <Card className="border-brand-cyan/20 bg-gradient-to-br from-brand-cyan/5 to-transparent overflow-hidden">
+   635→              <CardContent className="p-3 sm:p-4">
+   636→                <div className="flex items-start gap-3">
+   637→                  <VibeContentRenderer content="::FaCircleQuestion::" className="h-5 w-5 text-brand-cyan mt-0.5 shrink-0" />
+   638→                  <div className="min-w-0">
+   639→                    <div className="text-sm font-medium text-white">Нужна помощь?</div>
+   640→                    <p className="text-xs text-zinc-400 mt-1">
+   641→                      Напиши в <Link href="https://t.me/oneBikePlsBot" className="text-brand-cyan hover:underline">@oneBikePlsBot</Link> или открой <Link href="/docs/admin" className="text-brand-cyan hover:underline">документацию</Link>.
+   642→                    </p>
+   643→                  </div>
+   644→                </div>
+   645→              </CardContent>
+   646→            </Card>
+   647→          </div>
+   648→        </div>
+   649→      </main>
+   650→
+   651→      {/* Mobile FAB for new vehicle */}
+   652→      <div className="fixed bottom-4 right-4 z-50 sm:hidden">
+   653→        <Button
+   654→          size="lg"
+   655→          className="h-14 w-14 rounded-full bg-brand-purple hover:bg-brand-purple/90 shadow-lg shadow-brand-purple/30"
+   656→          onClick={() => { setSelectedVehicle(null); router.push('/admin'); }}
+   657→        >
+   658→          <VibeContentRenderer content="::FaPlus::" className="h-6 w-6" />
+   659→        </Button>
+   660→      </div>
+   661→    </div>
+   662→  );
+   663→}
+   664→
+   665→// === PAGE WRAPPER ===
+   666→export default function AdminPage() {
+   667→  return (
+   668→    <Suspense fallback={
+   669→      <div className="min-h-screen flex items-center justify-center bg-black">
+   670→        <Loading text="Загрузка панели управления..." />
+   671→      </div>
+   672→    }>
+   673→      <AdminPageContent />
+   674→    </Suspense>
+   675→  );
+   676→}
+   677→
