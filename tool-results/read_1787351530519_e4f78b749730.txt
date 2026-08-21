@@ -1,0 +1,2002 @@
+     1→"use client";
+     2→
+     3→import {
+     4→  AlertTriangle,
+     5→  BarChart3,
+     6→  Bike,
+     7→  Calendar,
+     8→  CheckCircle2,
+     9→  CircleDollarSign,
+    10→  Clock,
+    11→  FileText,
+    12→  Info,
+    13→  Package,
+    14→  Phone,
+    15→  Shield,
+    16→  Star,
+    17→  Swords,
+    18→  X,
+    19→  Zap,
+    20→} from "lucide-react";
+    21→import Link from "next/link";
+    22→import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+    23→import type { CatalogItemVM, FranchizeTheme } from "../actions";
+    24→import { hasRentPrice, hasSalePrice, ruPluralDays } from "../lib/catalog-utils";
+    25→import { getDisplayPriceTier, type BikePricingSpecs } from "../lib/pricing-calculator";
+    26→import {
+    27→  CATALOG_VS_SPECS,
+    28→  VsSpecRow,
+    29→  getCatalogVsSpecValue,
+    30→} from "@/components/franchize/VsSpecRow";
+    31→import {
+    32→  getCatalogPropulsionLabel,
+    33→  getCatalogPropulsionSegment,
+    34→  isSameCatalogPropulsion,
+    35→} from "@/app/franchize/lib/catalog-propulsion";
+    36→import { ItemGallery } from "../components/ItemGallery";
+    37→import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
+    38→import { readableTextOnColor, withAlpha } from "../lib/theme";
+    39→import { FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
+    40→import { encodeStartappState, type StartappState } from "@/lib/startapp-state";
+    41→import { getTelegramWebAppAdaptiveHref } from "@/app/franchize/lib/telegram-links";
+    42→import { upsertFranchizeLead } from "@/app/franchize/lib/leads";
+    43→import { useCrewTokens, type CrewTokens } from "@/app/franchize/lib/use-crew-tokens";
+    44→import { addDaysISO, formatRuDateFromISO, todayISO, durationDaysFromDateTime } from "@/app/franchize/lib/date-utils";
+    45→import { getBrowserMarketingAttribution } from "@/lib/marketing-attribution";
+    46→import {
+    47→  reachVipBikeGoal,
+    48→  VIP_BIKE_METRIKA_GOALS,
+    49→} from "@/lib/yandex-metrika";
+    50→
+    51→// ── Russian Label Helper (VIP Bike Landing & Catalog Improvements) ──
+    52→// Helper to get Russian label from spec_labels in rawSpecs
+    53→// NOTE: item.specs may already contain Russian labels (populated server-side).
+    54→// Use this helper when directly accessing rawSpecs fields for display.
+    55→function getRussianLabel(key: string, item: CatalogItemVM): string {
+    56→  const specLabels = (item.rawSpecs as Record<string, unknown> | undefined)?.spec_labels as Record<string, string> | undefined;
+    57→  return specLabels?.[key] || key;
+    58→}
+    59→
+    60→// Equipment category labels in Russian
+    61→const EQUIPMENT_CATEGORY_LABELS: Record<string, string> = {
+    62→  helmet: "Шлемы",
+    63→  jacket: "Куртки",
+    64→  pants: "Штаны",
+    65→  gloves: "Перчатки",
+    66→  boots: "Боты",
+    67→  security: "Безопасность",
+    68→  electronics: "Электроника",
+    69→  suit: "Комбинезоны",
+    70→};
+    71→
+    72→// ─────────────────────────────────────────────────────
+    73→// Item Modal — generalized for rental & order flows
+    74→// ─────────────────────────────────────────────────────
+    75→// flowType controls which sections appear:
+    76→//   "rental" → full rental UI (packages, duration, perks, auction,
+    77→//              rental strip, deposit/tariff info, "Забронировать" CTA)
+    78→//   "order"  → order-only UI (no rental options, simple "Выбрать" CTA,
+    79→//              no rental strip, no deposit info)
+    80→//
+    81→// Default is "rental" for backward compatibility with vip-bike.
+    82→// ─────────────────────────────────────────────────────
+    83→
+    84→export type FlowType = "rental" | "order";
+    85→
+    86→interface ItemModalProps {
+    87→  item: CatalogItemVM | null;
+    88→  items: CatalogItemVM[];
+    89→  slug: string;
+    90→  theme: FranchizeTheme;
+    91→  pickupAddress?: string;
+    92→  workingHours?: string;
+    93→  /** Crew business flow type — "rental" shows rental options, "order" hides them */
+    94→  flowType?: FlowType;
+    95→  options: {
+    96→    package: string;
+    97→    duration: string;
+    98→    perk: string;
+    99→    auction: string;
+   100→    /** Rental start date (ISO string yyyy-MM-dd) */
+   101→    rentStartDate?: string;
+   102→    /** Rental end date (ISO string yyyy-MM-dd) */
+   103→    rentEndDate?: string;
+   104→    /** Rental start time (HH:mm) — defaults to "10:00" */
+   105→    rentStartTime?: string;
+   106→    /** Rental end time (HH:mm) — defaults to "10:00" */
+   107→    rentEndTime?: string;
+   108→    /** Pre-selected additional items (jacket, boots, backpack, charger, gloves, net, bag). */
+   109→    extrasSelection?: AdditionalItemsSelection;
+   110→  };
+   111→  auctionOptions: string[];
+   112→  onChangeOption: (
+   113→    key: "package" | "duration" | "perk" | "auction" | "rentStartDate" | "rentEndDate" | "rentStartTime" | "rentEndTime",
+   114→    value: string,
+   115→  ) => void;
+   116→  onClose: () => void;
+   117→  /**
+   118→   * Called when "Добавить в корзину" CTA is clicked.
+   119→   * Receives the computed extras string so the parent can pass it directly
+   120→   * to addItem() instead of relying on stale React state closure.
+   121→   */
+   122→  onAddToCart: (extrasStr?: string) => void | Promise<void>;
+   123→  /** Called when "Купить" (buy) CTA is clicked for sale-only flow */
+   124→  onBuyItem?: () => void | Promise<void>;
+   125→  /** Called when "Тест-драйв" CTA is clicked — adds to cart with testdrive flow */
+   126→  onTestdrive?: () => void | Promise<void>;
+   127→  /** Shows "С возвращением!" badge for returning users */
+   128→  isReturningUser?: boolean;
+   129→  /** Display mode from catalog filter — overrides flowType for content visibility */
+   130→  displayMode?: "rent" | "sale" | "service" | "equipment";
+   131→  /** Restricts rental counter goals to the canonical VIP BIKE rental flow. */
+   132→  vipBikeRentalTrackingEnabled?: boolean;
+   133→}
+   134→
+   135→const packageOptions = ["Базовый", "Комфорт", "Максимум"];
+   136→const durationOptions = ["1 день", "3 дня", "7 дней"];
+   137→const perkOptions = ["Стандарт", "Шлем + GoPro", "Полный комплект"];
+   138→const modalFocusableSelector = [
+   139→  "a[href]",
+   140→  "button:not([disabled])",
+   141→  "textarea:not([disabled])",
+   142→  "input:not([disabled])",
+   143→  "select:not([disabled])",
+   144→  '[tabindex]:not([tabindex="-1"])',
+   145→].join(",");
+   146→
+   147→// Legacy `--item-*` CSS-var map. Kept so the dozens of existing
+   148→// `style={{ color: 'var(--item-text)' }}` attributes in this file keep
+   149→// working after the migration to `useCrewTokens`. The actual values
+   150→// are populated by the `themeVars` memo inside `ItemModal` below.
+   151→const MODAL_CSS_VAR_KEYS = [
+   152→  "--item-accent",
+   153→  "--item-border",
+   154→  "--item-input-bg",
+   155→  "--item-muted-text",
+   156→  "--item-text",
+   157→  "--item-accent-contrast",
+   158→  "--item-bg-elevated",
+   159→] as const;
+   160→
+   161→function OptionChips({
+   162→  title,
+   163→  options,
+   164→  selected,
+   165→  onSelect,
+   166→}: {
+   167→  title: string;
+   168→  options: string[];
+   169→  selected: string;
+   170→  onSelect: (value: string) => void;
+   171→}) {
+   172→  return (
+   173→    <div>
+   174→      <p className="mb-2 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+   175→        {title}
+   176→      </p>
+   177→      <div className="flex flex-wrap gap-2" role="group" aria-label={title}>
+   178→        {options.map((option) => {
+   179→          const isActive = option === selected;
+   180→          return (
+   181→            <button
+   182→              key={option}
+   183→              type="button"
+   184→              aria-pressed={isActive}
+   185→              onClick={() => onSelect(option)}
+   186→              className={`rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] ${
+   187→                isActive
+   188→                  ? "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
+   189→                  : "border-[var(--item-border)] text-[var(--item-text)]"
+   190→              }`}
+   191→            >
+   192→              {option}
+   193→            </button>
+   194→          );
+   195→        })}
+   196→      </div>
+   197→    </div>
+   198→  );
+   199→}
+   200→
+   201→/** Date + time pickers for rental start/end — this is the SINGLE
+   202→ *  source of truth for the rental window. The order page reads the
+   203→ *  values from the cart line and shows them passively, it does not
+   204→ *  ask the user to re-pick. */
+   205→function RentalDatePickers({
+   206→  startDate,
+   207→  endDate,
+   208→  startTime,
+   209→  endTime,
+   210→  onStartChange,
+   211→  onEndChange,
+   212→  onStartTimeChange,
+   213→  onEndTimeChange,
+   214→  T,
+   215→}: {
+   216→  startDate: string;
+   217→  endDate: string;
+   218→  startTime: string;
+   219→  endTime: string;
+   220→  onStartChange: (v: string) => void;
+   221→  onEndChange: (v: string) => void;
+   222→  onStartTimeChange: (v: string) => void;
+   223→  onEndTimeChange: (v: string) => void;
+   224→  T: CrewTokens;
+   225→}) {
+   226→  const today = todayISO();
+   227→  const endMin = startDate || today;
+   228→
+   229→  const dayCount = (() => {
+   230→    if (!startDate || !endDate) return null;
+   231→    try {
+   232→      return durationDaysFromDateTime(startDate, startTime || "10:00", endDate, endTime || "10:00");
+   233→    } catch {
+   234→      return null;
+   235→    }
+   236→  })();
+   237→
+   238→  const baseInputStyle: React.CSSProperties = {
+   239→    backgroundColor: T.bgElevated,
+   240→    borderColor: T.border,
+   241→    color: T.text,
+   242→  };
+   243→
+   244→  return (
+   245→    <div
+   246→      className="rounded-2xl border p-3"
+   247→      style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}
+   248→    >
+   249→      <p
+   250→        className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em]"
+   251→        style={{ color: T.textMuted }}
+   252→      >
+   253→        <Calendar className="h-3.5 w-3.5" />
+   254→        Период аренды
+   255→      </p>
+   256→      <div className="grid grid-cols-2 gap-3">
+   257→        <div>
+   258→          <label
+   259→            className="mb-1 block text-[10px] uppercase tracking-[0.08em]"
+   260→            style={{ color: T.textMuted }}
+   261→          >
+   262→            Дата начала
+   263→          </label>
+   264→          <input
+   265→            type="date"
+   266→            value={startDate}
+   267→            min={today}
+   268→            onChange={(e) => onStartChange(e.target.value)}
+   269→            className="min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+   270→            style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
+   271→            aria-label="Дата начала аренды"
+   272→          />
+   273→        </div>
+   274→        <div>
+   275→          <label
+   276→            className="mb-1 block text-[10px] uppercase tracking-[0.08em]"
+   277→            style={{ color: T.textMuted }}
+   278→          >
+   279→            Время выдачи
+   280→          </label>
+   281→          <input
+   282→            type="time"
+   283→            value={startTime}
+   284→            onChange={(e) => onStartTimeChange(e.target.value)}
+   285→            className="min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+   286→            style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
+   287→            aria-label="Время выдачи"
+   288→          />
+   289→        </div>
+   290→        <div>
+   291→          <label
+   292→            className="mb-1 block text-[10px] uppercase tracking-[0.08em]"
+   293→            style={{ color: T.textMuted }}
+   294→          >
+   295→            Дата возврата
+   296→          </label>
+   297→          <input
+   298→            type="date"
+   299→            value={endDate}
+   300→            min={endMin}
+   301→            onChange={(e) => onEndChange(e.target.value)}
+   302→            className="min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+   303→            style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
+   304→            aria-label="Дата возврата"
+   305→          />
+   306→        </div>
+   307→        <div>
+   308→          <label
+   309→            className="mb-1 block text-[10px] uppercase tracking-[0.08em]"
+   310→            style={{ color: T.textMuted }}
+   311→          >
+   312→            Время возврата
+   313→          </label>
+   314→          <input
+   315→            type="time"
+   316→            value={endTime}
+   317→            onChange={(e) => onEndTimeChange(e.target.value)}
+   318→            className="min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+   319→            style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
+   320→            aria-label="Время возврата"
+   321→          />
+   322→        </div>
+   323→      </div>
+   324→      {dayCount && (
+   325→        <p className="mt-2 text-[11px]" style={{ color: T.textMuted }}>
+   326→          {dayCount === 1 ? "Аренда на 1 день" : `Аренда на ${dayCount} ${ruPluralDays(dayCount)}`}
+   327→          {" · "}
+   328→          <span className="font-semibold" style={{ color: T.text }}>
+   329→            {formatRuDateFromISO(startDate)} {startTime} → {formatRuDateFromISO(endDate)} {endTime}
+   330→          </span>
+   331→        </p>
+   332→      )}
+   333→    </div>
+   334→  );
+   335→}
+   336→
+   337→// ───────────────────────────────────────────────────────────────────────────────
+   338→// Duration Shortcuts — quick date/time selection with prices
+   339→// ───────────────────────────────────────────────────────────────────────────────
+   340→function DurationShortcuts({
+   341→  startDate,
+   342→  endDate,
+   343→  startTime,
+   344→  endTime,
+   345→  onStartDateChange,
+   346→  onEndDateChange,
+   347→  onStartTimeChange,
+   348→  onEndTimeChange,
+   349→  T,
+   350→  specs,
+   351→}: {
+   352→  startDate: string;
+   353→  endDate: string;
+   354→  startTime: string;
+   355→  endTime: string;
+   356→  onStartDateChange: (v: string) => void;
+   357→  onEndDateChange: (v: string) => void;
+   358→  onStartTimeChange: (v: string) => void;
+   359→  onEndTimeChange: (v: string) => void;
+   360→  T: CrewTokens;
+   361→  specs?: Record<string, unknown>;
+   362→}) {
+   363→  const fmt = (n: number) => n.toLocaleString("ru-RU");
+   364→  const today = todayISO();
+   365→
+   366→  const addHours = (timeStr: string, hours: number): string => {
+   367→    const [h, m] = timeStr.split(":").map(Number);
+   368→    const totalMinutes = (h * 60 + m) + hours * 60;
+   369→    const newH = Math.floor(totalMinutes / 60) % 24;
+   370→    const newM = totalMinutes % 60;
+   371→    return `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`;
+   372→  };
+   373→
+   374→  /** Check if an ISO date string falls on a weekend */
+   375→  const isWeekendDay = (dateStr: string): boolean => {
+   376→    if (!dateStr) return false;
+   377→    const d = new Date(dateStr + "T12:00:00");
+   378→    const day = d.getDay();
+   379→    return day === 0 || day === 6;
+   380→  };
+   381→
+   382→  const getDailyPrice = (): number => {
+   383→    // Weekend override: rent_weekend when it's a Saturday/Sunday
+   384→    if (isWeekendDay(startDate)) {
+   385→      return Number(specs?.rent_weekend) || Number(specs?.dailyPrice) || Number(specs?.rent_weekday) || 0;
+   386→    }
+   387→    return Number(specs?.dailyPrice) || Number(specs?.rent_weekday) || 0;
+   388→  };
+   389→
+   390→  const getPrice = (hours: number): number => {
+   391→    if (!specs) return 0;
+   392→    if (hours <= 1) return Number(specs?.price_per_hour) || 0;
+   393→    if (hours === 2) return Number(specs?.price_per_2h) || Math.round((Number(specs?.price_per_hour) || 0) + ((Number(specs?.price_per_3h) || 0) - (Number(specs?.price_per_hour) || 0)) / 2) || (Number(specs?.price_per_hour) || 0) * 2;
+   394→    if (hours <= 3) return Number(specs?.price_per_3h) || (Number(specs?.price_per_hour) || 0) * 3;
+   395→    if (hours <= 6) return Number(specs?.price_per_6h) || (Number(specs?.price_per_hour) || 0) * 6;
+   396→    if (hours <= 12) return Number(specs?.price_per_12h) || (Number(specs?.price_per_hour) || 0) * 12;
+   397→    const days = Math.ceil(hours / 24);
+   398→    const dailyPrice = getDailyPrice();
+   399→    if (days === 1) return dailyPrice;
+   400→    if (days <= 4) return (Number(specs?.rent_2_4d) || dailyPrice) * days;
+   401→    if (days <= 10) return (Number(specs?.rent_5_10d) || dailyPrice) * days;
+   402→    return (Number(specs?.rent_11_30d) || dailyPrice) * days;
+   403→  };
+   404→
+   405→  const hourOptions = [
+   406→    { label: "1 час", hours: 1 },
+   407→    { label: "2 часа", hours: 2 },
+   408→    { label: "3 часа", hours: 3 },
+   409→    { label: "6 часов", hours: 6 },
+   410→    { label: "12 часов", hours: 12 },
+   411→  ];
+   412→
+   413→  const dayOptions = [
+   414→    { label: "1 день", days: 1 },
+   415→    { label: "3 дня", days: 3 },
+   416→    { label: "7 дней", days: 7 },
+   417→    { label: "2 недели", days: 14 },
+   418→    { label: "1 месяц", days: 30 },
+   419→  ];
+   420→
+   421→  const handleHourClick = (hours: number) => {
+   422→    const effectiveStart = startDate || today;
+   423→    onStartDateChange(effectiveStart);
+   424→    onEndDateChange(effectiveStart);
+   425→    onStartTimeChange(startTime);
+   426→    onEndTimeChange(addHours(startTime, hours));
+   427→  };
+   428→
+   429→  const handleDayClick = (days: number) => {
+   430→    const effectiveStart = startDate || today;
+   431→    onStartDateChange(effectiveStart);
+   432→    onEndDateChange(addDaysISO(effectiveStart, days));
+   433→    onStartTimeChange(startTime);
+   434→    onEndTimeChange(startTime);
+   435→  };
+   436→
+   437→  const buttonStyle = (isActive: boolean): React.CSSProperties => ({
+   438→    borderColor: isActive ? T.accent : T.border,
+   439→    color: isActive ? T.accent : T.text,
+   440→    backgroundColor: isActive ? T.accentSoft : "transparent",
+   441→  });
+   442→
+   443→  // FIX: Mutual exclusion between hour and day balloons. Previously
+   444→  // `isDayActive(1)` returned `true` for a same-day rental because
+   445→  // `diffDaysISO` is inclusive (it counts both the start and end day,
+   446→  // so a same-day rental resolves to 1). That made both "3 часа" and
+   447→  // "1 день" light up at the same time when the user clicked either
+   448→  // one — the user reported this as "3 hours and 12 hours both get
+   449→  // selected" because the day balloon was visually next to the
+   450→  // hour balloons and they read it as a second hour option.
+   451→  //
+   452→  // The fix is twofold:
+   453→  //   1. `isHourActive` — unchanged, but now ONLY fires on same-day
+   454→  //      rentals. The minute math already guarantees mutual exclusion
+   455→  //      between 3/6/12 because their minute counts (180/360/720) are
+   456→  //      pairwise different.
+   457→  //   2. `isDayActive` — now refuses to fire on same-day rentals
+   458→  //      (those are the hour balloons' territory) and uses a NON-
+   459→  //      inclusive day count so a 1-day rental (endDate = startDate
+   460→  //      + 1) resolves to `d === 1`, not `d === 2`.
+   461→  const isHourActive = (h: number): boolean => {
+   462→    if (!endDate || !startDate || endDate !== startDate) return false;
+   463→    const [sh, sm] = startTime.split(":").map(Number);
+   464→    const [eh, em] = endTime.split(":").map(Number);
+   465→    const minutes = (eh * 60 + em) - (sh * 60 + sm);
+   466→    return Number.isFinite(minutes) && minutes === h * 60;
+   467→  };
+   468→
+   469→  const isDayActive = (d: number): boolean => {
+   470→    if (!startDate || !endDate) return false;
+   471→    // Same-day rentals belong to the hour balloons, not the day ones.
+   472→    if (endDate === startDate) return false;
+   473→    try {
+   474→      const { diffDaysISO } = require("@/app/franchize/lib/date-utils");
+   475→      // Non-inclusive day count: a 1-day rental is endDate = startDate
+   476→      // + 1, so `diffDaysISO - 1 === 1`. Without the -1 we'd hit
+   477→      // `diffDaysISO === 1` which a 0-day (same-day) rental also
+   478→      // satisfies — that's the bug that was lighting up "1 день"
+   479→      // whenever the user picked any hour option.
+   480→      return diffDaysISO(startDate, endDate) - 1 === d;
+   481→    } catch {
+   482→      return false;
+   483→    }
+   484→  };
+   485→
+   486→  const hasDates = !!startDate;
+   487→
+   488→  // Compute total price for the currently selected period
+   489→  const totalPrice = (() => {
+   490→    if (!hasDates || !endDate) return null;
+   491→    try {
+   492→      const { durationDaysFromDateTime } = require("@/app/franchize/lib/date-utils");
+   493→      const days = durationDaysFromDateTime(startDate, startTime || "10:00", endDate, endTime || "10:00");
+   494→      const totalHours = Math.round(days * 24);
+   495→      const p = getPrice(totalHours);
+   496→      if (p > 0) return p;
+   497→    } catch {}
+   498→    return null;
+   499→  })();
+   500→
+   501→  return (
+   502→    <div
+   503→      className="rounded-2xl border p-3"
+   504→      style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}
+   505→    >
+   506→      <div className="mb-2 flex items-center justify-between gap-2">
+   507→        <p
+   508→          className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em]"
+   509→          style={{ color: T.textMuted }}
+   510→        >
+   511→          <Clock className="h-3.5 w-3.5" />
+   512→          Быстрый выбор
+   513→        </p>
+   514→        {hasDates && totalPrice !== null && (
+   515→          <p className="text-sm font-bold" style={{ color: T.accent }}>
+   516→            ≈ {fmt(totalPrice)} ₽
+   517→          </p>
+   518→        )}
+   519→      </div>
+   520→
+   521→      {hasDates && (
+   522→        <p className="mb-2 text-[10px] tracking-wide" style={{ color: T.textMuted }}>
+   523→          <span className="font-semibold" style={{ color: T.text }}>
+   524→            {formatRuDateFromISO(startDate)} {startTime}
+   525→          </span>
+   526→          {" → "}
+   527→          <span className="font-semibold" style={{ color: T.text }}>
+   528→            {formatRuDateFromISO(endDate)} {endTime}
+   529→          </span>
+   530→        </p>
+   531→      )}
+   532→
+   533→      <div className="flex flex-wrap gap-1.5">
+   534→        {hourOptions.map((opt) => {
+   535→          const price = getPrice(opt.hours);
+   536→          const active = isHourActive(opt.hours);
+   537→          return (
+   538→            <button
+   539→              key={opt.label}
+   540→              type="button"
+   541→              onClick={() => handleHourClick(opt.hours)}
+   542→              className="flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition hover:opacity-90 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+   543→              style={buttonStyle(active)}
+   544→            >
+   545→              <span>{opt.label}</span>
+   546→              {price > 0 && (
+   547→                <span className="font-bold">{fmt(price)} ₽</span>
+   548→              )}
+   549→            </button>
+   550→          );
+   551→        })}
+   552→        <span className="mx-0.5 self-center text-[10px]" style={{ color: T.textMuted }}>|</span>
+   553→        {dayOptions.map((opt) => {
+   554→          const price = getPrice(opt.days * 24);
+   555→          const active = isDayActive(opt.days);
+   556→          return (
+   557→            <button
+   558→              key={opt.label}
+   559→              type="button"
+   560→              onClick={() => handleDayClick(opt.days)}
+   561→              className="flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition hover:opacity-90 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+   562→              style={buttonStyle(active)}
+   563→            >
+   564→              <span>{opt.label}</span>
+   565→              {price > 0 && (
+   566→                <span className="font-bold">{fmt(price)} ₽</span>
+   567→              )}
+   568→            </button>
+   569→          );
+   570→        })}
+   571→      </div>
+   572→    </div>
+   573→  );
+   574→}
+   575→
+   576→// ───────────────────────────────────────────────────────────────────────────────
+   577→// Pricing Table — compact multi-day prices (hourly/daily covered by DurationShortcuts)
+   578→// ───────────────────────────────────────────────────────────────────────────────
+   579→function PricingTable({
+   580→  specs,
+   581→  borderColor,
+   582→  accentColor,
+   583→}: {
+   584→  specs: Record<string, unknown>;
+   585→  borderColor: string;
+   586→  accentColor: string;
+   587→}) {
+   588→  const fmt = (n: number) => n.toLocaleString("ru-RU");
+   589→
+   590→  // Only multi-day prices — hourly/1d covered by DurationShortcuts balloons
+   591→  const multiDay = [
+   592→    { label: "2–4 дня", value: Number(specs.rent_2_4d) || 0, suffix: "₽/сутки" },
+   593→    { label: "5–10 дней", value: Number(specs.rent_5_10d) || 0, suffix: "₽/сутки" },
+   594→    { label: "11–30 дней", value: Number(specs.rent_11_30d) || 0, suffix: "₽/сутки" },
+   595→  ].filter((t) => t.value > 0);
+   596→
+   597→  if (multiDay.length === 0) return null;
+   598→
+   599→  return (
+   600→    <div
+   601→      className="rounded-2xl border bg-[var(--item-border)]/15 p-3"
+   602→      style={{ borderColor }}
+   603→    >
+   604→      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+   605→        Долгосрочная аренда
+   606→      </p>
+   607→      <div className="flex flex-wrap gap-1.5">
+   608→        {multiDay.map((tier, i) => (
+   609→          <div
+   610→            key={i}
+   611→            className="flex items-center gap-1.5 rounded-full border px-3 py-1"
+   612→            style={{ borderColor: `${borderColor}60` }}
+   613→          >
+   614→            <span className="text-[11px] text-[var(--item-muted-text)]">{tier.label}</span>
+   615→            <span className="text-xs font-bold" style={{ color: accentColor }}>
+   616→              {fmt(tier.value)} {tier.suffix}
+   617→            </span>
+   618→          </div>
+   619→        ))}
+   620→      </div>
+   621→    </div>
+   622→  );
+   623→}
+   624→
+   625→// ───────────────────────────────────────────────────────────────────────────────
+   626→// Equipment Pricing — simple daily rate with day 2+ 50% discount
+   627→// ───────────────────────────────────────────────────────────────────────────────
+   628→function EquipmentPricingCalculator({
+   629→  dailyPrice,
+   630→  startDate,
+   631→  endDate,
+   632→  borderColor,
+   633→  accentColor,
+   634→  T,
+   635→}: {
+   636→  dailyPrice: number;
+   637→  startDate: string;
+   638→  endDate: string;
+   639→  borderColor: string;
+   640→  accentColor: string;
+   641→  T: CrewTokens;
+   642→}) {
+   643→  const fmt = (n: number) => n.toLocaleString("ru-RU");
+   644→
+   645→  const dayCount = (() => {
+   646→    if (!startDate || !endDate) return 0;
+   647→    try {
+   648→      return durationDaysFromDateTime(startDate, "10:00", endDate, "10:00");
+   649→    } catch {
+   650→      return 0;
+   651→    }
+   652→  })();
+   653→
+   654→  // Equipment pricing: day 1 = full price, day 2+ = 50% discount
+   655→  const basePrice = dailyPrice * dayCount;
+   656→  const discount = dayCount > 1 ? (dailyPrice * (dayCount - 1)) * 0.5 : 0;
+   657→  const totalPrice = basePrice - discount;
+   658→
+   659→  return (
+   660→    <div
+   661→      className="rounded-2xl border p-3 space-y-2"
+   662→      style={{ borderColor, backgroundColor: T.bgElevated }}
+   663→    >
+   664→      <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em]" style={{ color: T.textMuted }}>
+   665→        <CircleDollarSign className="h-3.5 w-3.5" />
+   666→        Калькулятор стоимости
+   667→      </p>
+   668→
+   669→      {dayCount > 0 ? (
+   670→        <>
+   671→          <div className="space-y-1">
+   672→            {dayCount === 1 && (
+   673→              <div className="flex justify-between text-sm">
+   674→                <span style={{ color: T.textMuted }}>{dayCount} {ruPluralDays(dayCount)}</span>
+   675→                <span className="font-medium" style={{ color: accentColor }}>
+   676→                  {fmt(dailyPrice)} ₽
+   677→                </span>
+   678→              </div>
+   679→            )}
+   680→            {dayCount > 1 && (
+   681→              <>
+   682→                <div className="flex justify-between text-sm">
+   683→                  <span style={{ color: T.textMuted }}>День 1 (полный)</span>
+   684→                  <span className="font-medium" style={{ color: accentColor }}>
+   685→                    {fmt(dailyPrice)} ₽
+   686→                  </span>
+   687→                </div>
+   688→                <div className="flex justify-between text-sm">
+   689→                  <span style={{ color: T.textMuted }}>Дни 2–{dayCount} (50% скидка)</span>
+   690→                  <span className="font-medium" style={{ color: accentColor }}>
+   691→                    {fmt((dailyPrice * (dayCount - 1)) / 2)} ₽
+   692→                  </span>
+   693→                </div>
+   694→              </>
+   695→            )}
+   696→          </div>
+   697→
+   698→          <div className="flex items-center justify-between rounded-lg border px-3 py-2" style={{ borderColor: `${borderColor}30` }}>
+   699→            <span className="text-sm font-medium" style={{ color: T.textMuted }}>Итого:</span>
+   700→            <span className="text-lg font-bold" style={{ color: accentColor }}>
+   701→              {fmt(totalPrice)} ₽
+   702→            </span>
+   703→          </div>
+   704→
+   705→          <div className="rounded-lg bg-green-500/10 border border-green-500/30 px-2 py-1 text-center">
+   706→            <p className="text-xs font-medium text-green-400">
+   707→              {dayCount > 1 ? `Сэкономьте ${fmt(discount)} ₽ со второго дня` : "Выберите несколько дней для скидки 50%"}
+   708→            </p>
+   709→          </div>
+   710→        </>
+   711→      ) : (
+   712→        <p className="text-sm text-center" style={{ color: T.textMuted }}>
+   713→          Выберите даты для расчёта стоимости
+   714→        </p>
+   715→      )}
+   716→    </div>
+   717→  );
+   718→}
+   719→
+   720→// ───────────────────────────────────────────────────────────────────────────────
+   721→// Additional Items — helmets, gloves, net, coat, backpack, charger
+   722→// ───────────────────────────────────────────────────────────────────────────────
+   723→
+   724→/** All rentable extras with their prices (per rental, not per day).
+   725→ *  Helmet price is dynamic: 500₽ for hourly (<24h), 1000₽ for daily+ (≥24h).
+   726→ *  The `price` field here is the daily rate (used as fallback). */
+   727→export const ADDITIONAL_ITEMS = [
+   728→  { key: "helmet", label: "Шлем", price: 1000, hourlyPrice: 500, type: "count" as const, max: 2 },
+   729→  { key: "gloves", label: "Перчатки", price: 500, type: "toggle" as const },
+   730→  { key: "jacket", label: "Куртка", price: 500, type: "toggle" as const },
+   731→  { key: "pants", label: "Штаны", price: 500, type: "toggle" as const },
+   732→  { key: "boots", label: "Боты/Сапоги", price: 500, type: "toggle" as const },
+   733→  { key: "net", label: "Сетка", price: 500, type: "toggle" as const },
+   734→  { key: "backpack", label: "Рюкзак", price: 500, type: "toggle" as const },
+   735→  { key: "charger", label: "Зарядка", price: 0, type: "toggle" as const },
+   736→];
+   737→
+   738→export type AdditionalItemsSelection = Record<string, number | boolean>;
+   739→
+   740→/** Get the effective price for an additional item based on rental duration. */
+   741→function getAdditionalItemPrice(item: typeof ADDITIONAL_ITEMS[number], rentalHours?: number): number {
+   742→  if (item.key === "helmet" && rentalHours !== undefined) {
+   743→    return rentalHours < 24 ? (item.hourlyPrice ?? 500) : item.price;
+   744→  }
+   745→  return item.price;
+   746→}
+   747→
+   748→/** Calculate total extras cost from selection.
+   749→ *  @param rentalHours - if provided, helmet price is dynamic (500₽ for <24h, 1000₽ for ≥24h) */
+   750→export function calcExtrasTotal(sel: AdditionalItemsSelection, rentalHours?: number): number {
+   751→  return ADDITIONAL_ITEMS.reduce((sum, item) => {
+   752→    const val = sel[item.key];
+   753→    const unitPrice = getAdditionalItemPrice(item, rentalHours);
+   754→    if (item.type === "count") return sum + (typeof val === "number" ? val : 0) * unitPrice;
+   755→    return sum + (val === true ? unitPrice : 0);
+   756→  }, 0);
+   757→}
+   758→
+   759→/** Build a human-readable summary of selected extras. */
+   760→export function extrasSummary(sel: AdditionalItemsSelection): string {
+   761→  const parts: string[] = [];
+   762→  for (const item of ADDITIONAL_ITEMS) {
+   763→    const val = sel[item.key];
+   764→    if (item.type === "count" && typeof val === "number" && val > 0) {
+   765→      parts.push(`${item.label} ×${val}`);
+   766→    } else if (val === true) {
+   767→      parts.push(item.label);
+   768→    }
+   769→  }
+   770→  return parts.join(", ");
+   771→}
+   772→
+   773→function AdditionalItems({
+   774→  selection,
+   775→  onChange,
+   776→  rentalHours,
+   777→}: {
+   778→  selection: AdditionalItemsSelection;
+   779→  onChange: (sel: AdditionalItemsSelection) => void;
+   780→  rentalHours?: number;
+   781→}) {
+   782→  return (
+   783→    <div className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3">
+   784→      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+   785→        <Package className="h-3.5 w-3.5" /> Доп. оборудование
+   786→      </p>
+   787→      <div className="space-y-2">
+   788→        {ADDITIONAL_ITEMS.map((item) => {
+   789→          const effectivePrice = getAdditionalItemPrice(item, rentalHours);
+   790→          if (item.type === "count") {
+   791→            const count = (selection[item.key] as number) || 0;
+   792→            return (
+   793→              <div key={item.key} className="flex items-center justify-between">
+   794→                <span className="text-xs">
+   795→                  {item.label}
+   796→                  {effectivePrice > 0 && <span className="opacity-50"> +{effectivePrice}₽</span>}
+   797→                  {effectivePrice === 0 && <span className="opacity-50"> бесплатно</span>}
+   798→                </span>
+   799→                <div className="flex gap-1.5">
+   800→                  {[0, 1, 2].map((n) => (
+   801→                    <button
+   802→                      key={n}
+   803→                      type="button"
+   804→                      onClick={() => onChange({ ...selection, [item.key]: n })}
+   805→                      aria-pressed={count === n}
+   806→                      className={`h-7 w-7 rounded-full border text-xs font-bold transition hover:opacity-90 active:scale-[0.95] ${
+   807→                        count === n
+   808→                          ? "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
+   809→                          : "border-[var(--item-border)] text-[var(--item-text)]"
+   810→                      }`}
+   811→                    >
+   812→                      {n}
+   813→                    </button>
+   814→                  ))}
+   815→                </div>
+   816→              </div>
+   817→            );
+   818→          }
+   819→          // toggle
+   820→          const checked = selection[item.key] === true;
+   821→          return (
+   822→            <label
+   823→              key={item.key}
+   824→              className="flex cursor-pointer items-center justify-between rounded-lg border px-2.5 py-1.5 transition hover:opacity-80"
+   825→              style={{ borderColor: checked ? "var(--item-accent)" : "var(--item-border)" }}
+   826→            >
+   827→              <span className="text-xs">
+   828→                {item.label}
+   829→                {effectivePrice > 0 && <span className="opacity-50"> +{effectivePrice}₽</span>}
+   830→                {effectivePrice === 0 && <span className="opacity-50"> бесплатно</span>}
+   831→              </span>
+   832→              <input
+   833→                type="checkbox"
+   834→                checked={checked}
+   835→                onChange={(e) => onChange({ ...selection, [item.key]: e.target.checked })}
+   836→                className="h-4 w-4 accent-[var(--item-accent)]"
+   837→              />
+   838→            </label>
+   839→          );
+   840→        })}
+   841→      </div>
+   842→      {/* Total extras cost */}
+   843→      {calcExtrasTotal(selection, rentalHours) > 0 && (
+   844→        <p className="mt-2 text-right text-xs font-bold text-[var(--item-accent)]">
+   845→          +{calcExtrasTotal(selection, rentalHours).toLocaleString("ru-RU")} ₽
+   846→        </p>
+   847→      )}
+   848→    </div>
+   849→  );
+   850→}
+   851→
+   852→// ───────────────────────────────────────────────────────────────────────────────
+   853→// Helmet Balloons — DEPRECATED, replaced by AdditionalItems above
+   854→// Kept for backward compatibility with existing cart code
+   855→// ───────────────────────────────────────────────────────────────────────────────
+   856→function HelmetBalloons({
+   857→  selected,
+   858→  onSelect,
+   859→}: {
+   860→  selected: number;
+   861→  onSelect: (count: number) => void;
+   862→}) {
+   863→  const options = [
+   864→    { count: 1, label: "+1 шлем" },
+   865→    { count: 2, label: "+2 шлема" },
+   866→  ];
+   867→
+   868→  return (
+   869→    <div className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3">
+   870→      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+   871→        <Shield className="h-3.5 w-3.5" /> Шлемы
+   872→      </p>
+   873→      <div className="flex flex-wrap gap-2">
+   874→        {options.map((opt) => (
+   875→          <button
+   876→            key={opt.count}
+   877→            type="button"
+   878→            onClick={() => onSelect(opt.count === selected ? 0 : opt.count)}
+   879→            aria-pressed={selected === opt.count}
+   880→            className={`rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] ${
+   881→              selected === opt.count
+   882→                ? "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
+   883→                : "border-[var(--item-border)] text-[var(--item-text)]"
+   884→            }`}
+   885→          >
+   886→            {opt.label}
+   887→          </button>
+   888→        ))}
+   889→      </div>
+   890→      {selected === 0 && (
+   891→        <p className="mt-2 text-[10px] text-[var(--item-muted-text)]">
+   892→          (ни один не выбран = есть свой)
+   893→        </p>
+   894→      )}
+   895→    </div>
+   896→  );
+   897→}
+   898→
+   899→// ───────────────────────────────────────────────────────────────────────────────
+   900→// Price Card — displays calculated pricing with breakdown
+   901→// ───────────────────────────────────────────────────────────────────────────────
+   902→function PriceCard({
+   903→  specs,
+   904→  startDate,
+   905→  endDate,
+   906→  startTime,
+   907→  endTime,
+   908→  helmetCount,
+   909→  extrasSelection,
+   910→  isExpanded,
+   911→  onToggleExpand,
+   912→  borderColor,
+   913→}: {
+   914→  specs: Record<string, unknown>;
+   915→  startDate: string;
+   916→  endDate: string;
+   917→  startTime: string;
+   918→  endTime: string;
+   919→  helmetCount: number;
+   920→  extrasSelection?: AdditionalItemsSelection;
+   921→  isExpanded: boolean;
+   922→  onToggleExpand: () => void;
+   923→  borderColor: string;
+   924→}) {
+   925→  if (!startDate || !endDate) return null;
+   926→
+   927→  // Dynamic import of calculatePrice (client-side only)
+   928→  const { calculatePrice, getHelmetPrice } = require("@/lib/rental-pricing-calculator");
+   929→  const result = calculatePrice(
+   930→    specs as any,
+   931→    startDate,
+   932→    endDate,
+   933→    startTime || "10:00",
+   934→    endTime || "10:00",
+   935→    helmetCount
+   936→  );
+   937→
+   938→  // Calculate rental hours for dynamic helmet pricing
+   939→  const rentalHours = (() => {
+   940→    try {
+   941→      const start = new Date(`${startDate}T${startTime || "10:00"}`);
+   942→      const end = new Date(`${endDate}T${endTime || "10:00"}`);
+   943→      return Math.max(1, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+   944→    } catch {
+   945→      return 24; // default to daily pricing if dates are invalid
+   946→    }
+   947→  })();
+   948→  const helmetUnitPrice = getHelmetPrice(rentalHours);
+   949→
+   950→  // Add non-helmet extras to the total
+   951→  const extrasTotal = extrasSelection ? calcExtrasTotal(extrasSelection, rentalHours) : 0;
+   952→  // Subtract helmet cost from extrasTotal (already counted in result.helmetRub)
+   953→  const helmetFromExtras = extrasSelection ? (typeof extrasSelection.helmet === "number" ? (extrasSelection.helmet as number) * helmetUnitPrice : 0) : 0;
+   954→  const nonHelmetExtras = extrasTotal - helmetFromExtras;
+   955→  const grandTotal = result.totalRub + nonHelmetExtras;
+   956→
+   957→  const fmt = (n: number) => n.toLocaleString("ru-RU");
+   958→
+   959→  return (
+   960→    <div
+   961→      className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3"
+   962→      style={{ borderColor }}
+   963→    >
+   964→      <div className="flex items-center justify-between gap-3">
+   965→        <div className="flex items-center gap-2">
+   966→          <CircleDollarSign className="h-5 w-5 text-[var(--item-accent)]" />
+   967→          <span className="text-lg font-bold text-[var(--item-accent)]">
+   968→            {fmt(grandTotal)} ₽
+   969→          </span>
+   970→        </div>
+   971→        {result.savingsPercent > 0 && (
+   972→          <span className="text-xs text-[var(--item-muted-text)]">
+   973→            Экономия {result.savingsPercent}% vs посуточно
+   974→          </span>
+   975→        )}
+   976→      </div>
+   977→
+   978→      {!isExpanded && (
+   979→        <button
+   980→          type="button"
+   981→          onClick={onToggleExpand}
+   982→          className="mt-2 text-xs text-[var(--item-accent)] transition hover:opacity-90"
+   983→        >
+   984→          Детали стоимости
+   985→        </button>
+   986→      )}
+   987→
+   988→      {isExpanded && (
+   989→        <div className="mt-3 space-y-2 text-xs">
+   990→          <p className="flex items-center gap-1.5 font-medium text-[var(--item-accent)]">
+   991→            <BarChart3 className="h-4 w-4" /> Детали стоимости
+   992→          </p>
+   993→          <div className="space-y-1">
+   994→            <p>• Период: {result.breakdown.period}</p>
+   995→            <p>• Тариф: {result.breakdown.ratePerPeriod}</p>
+   996→            <p>• Аренда: {fmt(result.basePriceRub)} ₽</p>
+   997→            {result.helmetRub > 0 && <p>• Шлем ×{helmetCount}: {fmt(result.helmetRub)} ₽ ({fmt(helmetUnitPrice)} ₽/шт{rentalHours < 24 ? ", почасово" : ""})</p>}
+   998→            {nonHelmetExtras > 0 && extrasSelection && (
+   999→              <>
+  1000→                {ADDITIONAL_ITEMS.filter((i) => i.key !== "helmet").map((item) => {
+  1001→                  const val = extrasSelection[item.key];
+  1002→                  if (val !== true && val !== 1) return null;
+  1003→                  return (
+  1004→                    <p key={item.key}>
+  1005→                      • {item.label}: {item.price > 0 ? `${fmt(item.price)} ₽` : "бесплатно"}
+  1006→                    </p>
+  1007→                  );
+  1008→                })}
+  1009→              </>
+  1010→            )}
+  1011→            <p>• Залог: {fmt(result.depositRub)} ₽</p>
+  1012→          </div>
+  1013→          <div className="border-t border-[var(--item-border)] pt-2">
+  1014→            <p className="font-semibold">
+  1015→              Итого: {fmt(grandTotal)} ₽ (аренда
+  1016→              {result.helmetRub > 0 ? " + шлем" : ""}
+  1017→              {nonHelmetExtras > 0 ? " + доп." : ""})
+  1018→            </p>
+  1019→            {result.savingsRub > 0 && (
+  1020→              <p className="text-[var(--item-muted-text)]">
+  1021→                Экономия {fmt(result.savingsRub)} ₽ против{
+  1022→                  result.tier === "multi-day-2-4" ? " трёх" :
+  1023→                  result.tier === "multi-day-5-10" ? " семи" :
+  1024→                  result.tier === "multi-day-11-30" ? " нескольких" :
+  1025→                  " отдельных"
+  1026→                } дней
+  1027→              </p>
+  1028→            )}
+  1029→          </div>
+  1030→        </div>
+  1031→      )}
+  1032→    </div>
+  1033→  );
+  1034→}
+  1035→
+  1036→// ───────────────────────────────────────────────────────────────────────────────
+  1037→// Callback Request Form — lead capture for users not ready to commit
+  1038→// ───────────────────────────────────────────────────────────────────────────────
+  1039→function CallbackRequestForm({
+  1040→  bikeTitle,
+  1041→  onSubmit,
+  1042→  trackingEnabled,
+  1043→}: {
+  1044→  bikeTitle: string;
+  1045→  onSubmit: (
+  1046→    name: string,
+  1047→    phone: string,
+  1048→    website: string,
+  1049→  ) => Promise<{ notificationSent: boolean }>;
+  1050→  trackingEnabled: boolean;
+  1051→}) {
+  1052→  const [name, setName] = useState("");
+  1053→  const [phone, setPhone] = useState("");
+  1054→  const [website, setWebsite] = useState("");
+  1055→  const [consent, setConsent] = useState(false);
+  1056→  const [submitted, setSubmitted] = useState(false);
+  1057→  const [submitting, setSubmitting] = useState(false);
+  1058→  const [errorMessage, setErrorMessage] = useState("");
+  1059→  const formStartedRef = useRef(false);
+  1060→
+  1061→  useEffect(() => {
+  1062→    if (!trackingEnabled) return;
+  1063→    const attribution = getBrowserMarketingAttribution();
+  1064→    reachVipBikeGoal(
+  1065→      VIP_BIKE_METRIKA_GOALS.callbackFormView,
+  1066→      { bike_title: bikeTitle },
+  1067→      attribution,
+  1068→    );
+  1069→  }, [bikeTitle, trackingEnabled]);
+  1070→
+  1071→  const handleFormStart = () => {
+  1072→    if (!trackingEnabled || formStartedRef.current) return;
+  1073→    formStartedRef.current = true;
+  1074→    const attribution = getBrowserMarketingAttribution();
+  1075→    reachVipBikeGoal(
+  1076→      VIP_BIKE_METRIKA_GOALS.callbackFormStart,
+  1077→      { bike_title: bikeTitle },
+  1078→      attribution,
+  1079→    );
+  1080→  };
+  1081→
+  1082→  const handleSubmit = async (e: React.FormEvent) => {
+  1083→    e.preventDefault();
+  1084→    if (
+  1085→      submitting ||
+  1086→      !consent ||
+  1087→      name.trim().length < 2 ||
+  1088→      phone.trim().length < 10
+  1089→    ) return;
+  1090→
+  1091→    setSubmitting(true);
+  1092→    setErrorMessage("");
+  1093→    const attribution = getBrowserMarketingAttribution();
+  1094→    if (trackingEnabled) {
+  1095→      reachVipBikeGoal(
+  1096→        VIP_BIKE_METRIKA_GOALS.callbackSubmitAttempt,
+  1097→        { bike_title: bikeTitle },
+  1098→        attribution,
+  1099→      );
+  1100→    }
+  1101→
+  1102→    try {
+  1103→      const result = await onSubmit(name.trim(), phone.trim(), website);
+  1104→      if (trackingEnabled) {
+  1105→        reachVipBikeGoal(
+  1106→          VIP_BIKE_METRIKA_GOALS.leadDbSuccess,
+  1107→          { bike_title: bikeTitle },
+  1108→          attribution,
+  1109→        );
+  1110→        reachVipBikeGoal(
+  1111→          VIP_BIKE_METRIKA_GOALS.leadSubmitSuccess,
+  1112→          {
+  1113→            bike_title: bikeTitle,
+  1114→            notification_sent: result.notificationSent,
+  1115→          },
+  1116→          attribution,
+  1117→        );
+  1118→      }
+  1119→      setSubmitted(true);
+  1120→    } catch (error) {
+  1121→      setErrorMessage(
+  1122→        error instanceof Error
+  1123→          ? error.message
+  1124→          : "Не удалось отправить заявку. Попробуйте ещё раз.",
+  1125→      );
+  1126→      if (trackingEnabled) {
+  1127→        reachVipBikeGoal(
+  1128→          VIP_BIKE_METRIKA_GOALS.leadSubmitError,
+  1129→          { bike_title: bikeTitle },
+  1130→          attribution,
+  1131→        );
+  1132→      }
+  1133→    } finally {
+  1134→      setSubmitting(false);
+  1135→    }
+  1136→  };
+  1137→
+  1138→  // Theme-aware input style — explicit color/background/pointerEvents so
+  1139→  // the input is actually focusable and typeable inside the modal (Telegram
+  1140→  // WebApp and some mobile browsers previously failed to receive keystrokes
+  1141→  // because the color-mix background collapsed to transparent and/or
+  1142→  // touch-action="manipulation" on the form intercepted events).
+  1143→  const inputStyle: React.CSSProperties = {
+  1144→    backgroundColor: "var(--item-input-bg, var(--franchize-bg-base, #111217))",
+  1145→    color: "var(--item-text, var(--franchize-text-primary, #fff))",
+  1146→    borderColor: "var(--item-accent)",
+  1147→    borderWidth: "1.5px",
+  1148→    pointerEvents: "auto",
+  1149→    // Make sure iOS/Telegram don't auto-zoom or override font
+  1150→    fontSize: 16,
+  1151→  };
+  1152→
+  1153→  if (submitted) {
+  1154→    return (
+  1155→      <div className="rounded-2xl border px-3 py-3 text-center" style={{ borderColor: "var(--item-accent)", backgroundColor: "color-mix(in srgb, var(--item-accent) 10%, transparent)" }}>
+  1156→        <p className="flex items-center justify-center gap-1.5 text-sm font-semibold text-[var(--item-accent)]">
+  1157→          <CheckCircle2 className="h-4 w-4" /> Заявка сохранена
+  1158→        </p>
+  1159→        <p className="mt-1 text-xs text-[var(--item-muted-text)]">
+  1160→          Менеджер VIP BIKE свяжется с вами по указанному номеру.
+  1161→        </p>
+  1162→      </div>
+  1163→    );
+  1164→  }
+  1165→
+  1166→  return (
+  1167→    <form
+  1168→      onSubmit={handleSubmit}
+  1169→      onFocusCapture={handleFormStart}
+  1170→      onKeyDown={(e) => e.stopPropagation()}
+  1171→      style={{
+  1172→        borderColor: "var(--item-border)",
+  1173→        backgroundColor: "color-mix(in srgb, var(--item-border) 15%, transparent)",
+  1174→        pointerEvents: "auto",
+  1175→      }}
+  1176→      className="rounded-2xl border p-3"
+  1177→    >
+  1178→      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+  1179→        <Phone className="h-3.5 w-3.5" /> Запросить звонок
+  1180→      </p>
+  1181→      <p className="mb-2 text-[11px] text-[var(--item-muted-text)]">
+  1182→        Оставьте контакты — менеджер перезвонит, ответит на вопросы и поможет с оформлением.
+  1183→        Документы можно показать при встрече.
+  1184→      </p>
+  1185→      <div className="space-y-2">
+  1186→        <input
+  1187→          type="text"
+  1188→          inputMode="text"
+  1189→          autoComplete="name"
+  1190→          placeholder="Имя"
+  1191→          value={name}
+  1192→          onChange={(e) => setName(e.target.value)}
+  1193→          onKeyDown={(e) => e.stopPropagation()}
+  1194→          className="min-h-11 w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
+  1195→          style={inputStyle}
+  1196→          aria-label="Ваше имя"
+  1197→          required
+  1198→          minLength={2}
+  1199→        />
+  1200→        <input
+  1201→          type="tel"
+  1202→          inputMode="tel"
+  1203→          autoComplete="tel"
+  1204→          placeholder="Телефон (+7 999 123-45-67)"
+  1205→          value={phone}
+  1206→          onChange={(e) => setPhone(e.target.value)}
+  1207→          onKeyDown={(e) => e.stopPropagation()}
+  1208→          className="min-h-11 w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
+  1209→          style={inputStyle}
+  1210→          aria-label="Номер телефона"
+  1211→          required
+  1212→          minLength={10}
+  1213→        />
+  1214→        <label className="absolute -left-[10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">
+  1215→          Сайт
+  1216→          <input
+  1217→            type="text"
+  1218→            name="website"
+  1219→            value={website}
+  1220→            onChange={(event) => setWebsite(event.target.value)}
+  1221→            tabIndex={-1}
+  1222→            autoComplete="off"
+  1223→          />
+  1224→        </label>
+  1225→        <label className="flex min-h-11 cursor-pointer items-start gap-2 py-1 text-[11px] leading-5 text-[var(--item-muted-text)]">
+  1226→          <input
+  1227→            type="checkbox"
+  1228→            checked={consent}
+  1229→            onChange={(event) => setConsent(event.target.checked)}
+  1230→            className="mt-1 h-4 w-4 shrink-0 accent-[var(--item-accent)]"
+  1231→            required
+  1232→          />
+  1233→          <span>
+  1234→            Даю согласие ИП Воробьёву Р. В. на обработку имени и телефона для связи по этой заявке.
+  1235→          </span>
+  1236→        </label>
+  1237→        {errorMessage && (
+  1238→          <p className="flex items-start gap-1.5 text-xs text-red-400" role="alert">
+  1239→            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+  1240→            {errorMessage}
+  1241→          </p>
+  1242→        )}
+  1243→        <button
+  1244→          type="submit"
+  1245→          disabled={submitting || !consent}
+  1246→          aria-busy={submitting}
+  1247→          className="min-h-11 w-full rounded-lg px-3 py-2 text-sm font-bold transition hover:brightness-110 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
+  1248→          style={{ backgroundColor: "var(--item-accent)", color: "var(--item-accent-contrast)" }}
+  1249→        >
+  1250→          {submitting ? "Отправляем..." : "Перезвоните мне"}
+  1251→        </button>
+  1252→      </div>
+  1253→    </form>
+  1254→  );
+  1255→}
+  1256→
+  1257→// ───────────────────────────────────────────────────────────────────────────────
+  1258→// Rounding Warning — shows when hours are messy (4-5h → 6h, 7-11h → 12h)
+  1259→// ───────────────────────────────────────────────────────────────────────────────
+  1260→function RoundingWarning({
+  1261→  rounded,
+  1262→  displayHours,
+  1263→  startTime,
+  1264→  onFixClick,
+  1265→}: {
+  1266→  rounded: boolean;
+  1267→  displayHours?: number;
+  1268→  startTime: string;
+  1269→  onFixClick: () => void;
+  1270→}) {
+  1271→  if (!rounded || !displayHours) return null;
+  1272→
+  1273→  // Calculate rounded end time
+  1274→  const [h, m] = startTime.split(":").map(Number);
+  1275→  const totalMinutes = h * 60 + m + displayHours * 60;
+  1276→  const newH = Math.floor(totalMinutes / 60) % 24;
+  1277→  const newM = totalMinutes % 60;
+  1278→  const roundedEndTime = `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`;
+  1279→
+  1280→  return (
+  1281→    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+  1282→      <div className="flex items-center justify-between gap-3">
+  1283→        <span className="inline-flex items-center gap-1 text-amber-300">
+  1284→          <AlertTriangle className="h-3.5 w-3.5" aria-hidden /> Округляем до {displayHours} ч
+  1285→        </span>
+  1286→        <button
+  1287→          type="button"
+  1288→          onClick={onFixClick}
+  1289→          className="shrink-0 rounded-full border border-amber-500/40 px-2 py-1 text-amber-300 hover:bg-amber-500/20 transition"
+  1290→        >
+  1291→          До {roundedEndTime}
+  1292→        </button>
+  1293→      </div>
+  1294→    </div>
+  1295→  );
+  1296→}
+  1297→
+  1298→export function ItemModal({
+  1299→  item,
+  1300→  items,
+  1301→  slug,
+  1302→  theme,
+  1303→  pickupAddress = "",
+  1304→  workingHours = "",
+  1305→  flowType = "rental",
+  1306→  options,
+  1307→  auctionOptions,
+  1308→  onChangeOption,
+  1309→  onClose,
+  1310→  onAddToCart,
+  1311→  onBuyItem,
+  1312→  onTestdrive,
+  1313→  isReturningUser = false,
+  1314→  displayMode,
+  1315→  vipBikeRentalTrackingEnabled = false,
+  1316→}: ItemModalProps) {
+  1317→  // Service items (vibe sessions, education, etc.) always use "order" flow — hide rental UI
+  1318→  const isServiceItem = (item?.rawSpecs as Record<string, unknown>)?.service === true;
+  1319→  const effectiveFlowType = isServiceItem ? "order" : flowType;
+  1320→  const isRental = displayMode ? displayMode === "rent" : effectiveFlowType === "rental";
+  1321→  const isVipBikeRental = slug === "vip-bike" && isRental;
+  1322→  const isEquipment = displayMode === "equipment" || (item?.type === "equipment");
+  1323→  const modalRef = useRef<HTMLDivElement>(null);
+  1324→  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  1325→  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+  1326→  const [isAdding, setIsAdding] = useState(false);
+  1327→  const [isBuying, setIsBuying] = useState(false);
+  1328→  // Shows a friendly "продолжаем из Telegram" banner when the user came via
+  1329→  // a bot deep-link. Consumed from sessionStorage (set by CatalogClient).
+  1330→  const [startappBanner, setStartappBanner] = useState<string | null>(null);
+  1331→  const [vsBike, setVsBike] = useState<CatalogItemVM | null>(null);
+  1332→
+  1333→  // New state for dynamic pricing
+  1334→  const [helmetCount, setHelmetCount] = useState(0);
+  1335→  // Additional items: helmet count + gloves/net/bag/coat toggles
+  1336→  const [extrasSelection, setExtrasSelection] = useState<AdditionalItemsSelection>({ helmet: 0 });
+  1337→  const [priceCardExpanded, setPriceCardExpanded] = useState(false);
+  1338→  const [rentStartTime, setRentStartTime] = useState("10:00");
+  1339→  const [rentEndTime, setRentEndTime] = useState("10:00");
+  1340→  // Dynamic calculated price from franchize pricing calculator
+  1341→  const [calculatedPrice, setCalculatedPrice] = useState<{ label: string; price: string; period: string } | null>(null);
+  1342→
+  1343→  // ── Browser vs Telegram context detection ──
+  1344→  // Default to false (browser) — corrected to true on mount if Telegram SDK is present.
+  1345→  // This prevents a flash of Telegram-mode buttons on first render in a browser.
+  1346→  const [isInTelegram, setIsInTelegram] = useState(false);
+  1347→  // Callback request form
+  1348→  const [showCallbackForm, setShowCallbackForm] = useState(false);
+  1349→
+  1350→  useEffect(() => {
+  1351→    if (typeof window === "undefined") return;
+  1352→    const tg = (window as any).Telegram?.WebApp;
+  1353→    // If no Telegram WebApp SDK or no initData → user is in a regular browser
+  1354→    const inTg = !!(tg && tg.initData && tg.initData.length > 0);
+  1355→    setIsInTelegram(inTg);
+  1356→  }, [item?.id]);
+  1357→
+  1358→  // Sync pre-filled options from deep-link / parent into local modal state.
+  1359→  useEffect(() => {
+  1360→    if (!item) return;
+  1361→    if (options.rentStartTime) setRentStartTime(options.rentStartTime);
+  1362→    if (options.rentEndTime) setRentEndTime(options.rentEndTime);
+  1363→    if (options.extrasSelection && typeof options.extrasSelection === "object") {
+  1364→      setExtrasSelection((prev) => ({ ...prev, ...options.extrasSelection }));
+  1365→      if (typeof options.extrasSelection.helmet === "number") {
+  1366→        setHelmetCount(options.extrasSelection.helmet);
+  1367→      }
+  1368→    }
+  1369→  }, [item?.id, options.rentStartTime, options.rentEndTime, options.extrasSelection]);
+  1370→
+  1371→  // Determine which CTAs to show (safe optional chaining — item may be null during close transition)
+  1372→  // Only show CTAs for flows that are explicitly enabled via rent=1/sale=1 specs
+  1373→  const showRentCta = displayMode
+  1374→    ? displayMode === "rent" && (item ? hasRentPrice(item) : false)
+  1375→    : isRental && (item ? hasRentPrice(item) : false);
+  1376→  const showBuyCta = displayMode
+  1377→    ? displayMode === "sale" && (item ? hasSalePrice(item) : false)
+  1378→    : item ? hasSalePrice(item) : false;
+  1379→
+  1380→  const gallery = useMemo(() => {
+  1381→    if (!item) return [];
+  1382→    const urls = item.mediaUrls?.length
+  1383→      ? item.mediaUrls
+  1384→      : item.imageUrl
+  1385→        ? [item.imageUrl]
+  1386→        : [];
+  1387→    return Array.from(new Set(urls.filter(Boolean) as string[]));
+  1388→  }, [item]);
+  1389→
+  1390→  const descriptionText = useMemo(() => {
+  1391→    if (item?.description) return item.description;
+  1392→    // Generalized fallback — no bike-specific language
+  1393→    return isRental
+  1394→      ? "Позиция готова к аренде: технический чек выполнен, документы готовы, выдача без очереди."
+  1395→      : "Позиция доступна для заказа. Оставьте заявку, и менеджер свяжется с вами для уточнения деталей.";
+  1396→  }, [item?.description, isRental]);
+  1397→
+  1398→  const T = useCrewTokens(theme);
+  1399→  // Map the new tokens back onto the legacy `--item-*` CSS variables
+  1400→  // so the rest of the modal (gallery, badges, footer buttons, etc.)
+  1401→  // can keep using its existing CSS-var indirection. This avoids
+  1402→  // touching 200+ style attributes while we migrate the visual
+  1403→  // primitives to `T` one component at a time.
+  1404→  const themeVars: React.CSSProperties = useMemo(
+  1405→    () => ({
+  1406→      "--item-accent": T.accent,
+  1407→      "--item-border": T.borderSoft,
+  1408→      "--item-input-bg": T.bg,
+  1409→      "--item-muted-text": T.textMuted,
+  1410→      "--item-text": T.text,
+  1411→      "--item-accent-contrast": T.accentContrast,
+  1412→      "--item-bg-elevated": T.bgElevated,
+  1413→    }),
+  1414→    [T],
+  1415→  );
+  1416→  // Backward-compat shim so the dozens of existing `surface.card` /
+  1417→  // `surface.mutedText` / `surface.subtleCard` attributes keep working.
+  1418→  const surface = T.styles;
+  1419→
+  1420→  useEffect(() => {
+  1421→    setDescriptionExpanded(false);
+  1422→    setActiveMediaIndex(0);
+  1423→    setVsBike(null);
+  1424→    setStartappBanner(null);
+  1425→    // Detect deep-link from bot (set by CatalogClient) and show a banner.
+  1426→    if (typeof window !== "undefined") {
+  1427→      try {
+  1428→        const raw = sessionStorage.getItem("franchize-startapp-banner");
+  1429→        if (raw) {
+  1430→          const parsed = JSON.parse(raw);
+  1431→          if (parsed?.bikeId && parsed.bikeId === item?.id) {
+  1432→            setStartappBanner("Продолжаем подбор из Telegram — часть данных уже заполнена");
+  1433→          }
+  1434→          sessionStorage.removeItem("franchize-startapp-banner");
+  1435→        }
+  1436→      } catch {
+  1437→        sessionStorage.removeItem("franchize-startapp-banner");
+  1438→      }
+  1439→    }
+  1440→  }, [item?.id]);
+  1441→
+  1442→  // Recalculate price when dates change
+  1443→  useEffect(() => {
+  1444→    if (!item || !item.rawSpecs || isVipBikeRental) {
+  1445→      setCalculatedPrice(null);
+  1446→      return;
+  1447→    }
+  1448→
+  1449→    const specs = item.rawSpecs as BikePricingSpecs;
+  1450→    const result = getDisplayPriceTier(specs, options.rentStartDate, options.rentEndDate);
+  1451→    setCalculatedPrice(result);
+  1452→  }, [isVipBikeRental, item, options.rentStartDate, options.rentEndDate]);
+  1453→
+  1454→  useEffect(() => {
+  1455→    if (!item) return;
+  1456→
+  1457→    const originalOverflow = document.body.style.overflow;
+  1458→    const previouslyFocused = document.activeElement as HTMLElement | null;
+  1459→
+  1460→    document.body.style.overflow = "hidden";
+  1461→
+  1462→    const handleKeyDown = (e: KeyboardEvent) => {
+  1463→      if (e.key === "Escape") {
+  1464→        e.preventDefault();
+  1465→        e.stopPropagation();
+  1466→        onClose();
+  1467→        return;
+  1468→      }
+  1469→
+  1470→      if (e.key !== "Tab") return;
+  1471→
+  1472→      const focusable = Array.from(modalRef.current?.querySelectorAll<HTMLElement>(modalFocusableSelector) ?? [])
+  1473→        .filter((element) => element.offsetParent !== null || element === document.activeElement);
+  1474→      if (focusable.length === 0) {
+  1475→        e.preventDefault();
+  1476→        modalRef.current?.focus();
+  1477→        return;
+  1478→      }
+  1479→
+  1480→      const first = focusable[0];
+  1481→      const last = focusable[focusable.length - 1];
+  1482→      if (e.shiftKey && document.activeElement === first) {
+  1483→        e.preventDefault();
+  1484→        last.focus();
+  1485→      } else if (!e.shiftKey && document.activeElement === last) {
+  1486→        e.preventDefault();
+  1487→        first.focus();
+  1488→      }
+  1489→    };
+  1490→
+  1491→    document.addEventListener("keydown", handleKeyDown);
+  1492→    const focusDialog = window.requestAnimationFrame(() => modalRef.current?.focus());
+  1493→
+  1494→    return () => {
+  1495→      window.cancelAnimationFrame(focusDialog);
+  1496→      document.body.style.overflow = originalOverflow;
+  1497→      document.removeEventListener("keydown", handleKeyDown);
+  1498→      if (previouslyFocused && document.contains(previouslyFocused)) {
+  1499→        previouslyFocused.focus();
+  1500→      }
+  1501→    };
+  1502→  }, [item, onClose]);
+  1503→
+  1504→  const handleAddToCart = useCallback(
+  1505→    (e: React.MouseEvent<HTMLButtonElement>) => {
+  1506→      e.preventDefault();
+  1507→      e.stopPropagation();
+  1508→      if (isAdding) return;
+  1509→
+  1510→      setIsAdding(true);
+  1511→      try {
+  1512→        // Store extras selection in perk field for cart
+  1513→        // Format: "шлем×2,перчатки,сумка" or "стандарт" if nothing selected
+  1514→        const extrasStr = extrasSummary(extrasSelection);
+  1515→        const perkValue = extrasStr || "стандарт";
+  1516→        // Update parent React state for next render
+  1517→        onChangeOption("perk", perkValue);
+  1518→        // Pass extras string DIRECTLY to onAddToCart — bypasses stale closure issue
+  1519→        // where addItem reads selectedOptions.perk before React flushes state update.
+  1520→        // The parent (CatalogClient) must use this parameter to override perk in addItem().
+  1521→        const result = onAddToCart(perkValue);
+  1522→        if (result instanceof Promise) {
+  1523→          result.finally(() => setIsAdding(false));
+  1524→        } else {
+  1525→          setIsAdding(false);
+  1526→        }
+  1527→      } catch {
+  1528→        setIsAdding(false);
+  1529→      }
+  1530→    },
+  1531→    [isAdding, onAddToCart, helmetCount, onChangeOption, extrasSelection],
+  1532→  );
+  1533→
+  1534→  const handleBuyItem = useCallback(
+  1535→    (e: React.MouseEvent<HTMLButtonElement>) => {
+  1536→      e.preventDefault();
+  1537→      e.stopPropagation();
+  1538→      if (isBuying) return;
+  1539→
+  1540→      setIsBuying(true);
+  1541→      try {
+  1542→        const result = onBuyItem?.();
+  1543→        if (result instanceof Promise) {
+  1544→          result.finally(() => setIsBuying(false));
+  1545→        } else {
+  1546→          setIsBuying(false);
+  1547→        }
+  1548→      } catch {
+  1549→        setIsBuying(false);
+  1550→      }
+  1551→    },
+  1552→    [isBuying, onBuyItem],
+  1553→  );
+  1554→
+  1555→  const changeMedia = useCallback(
+  1556→    (direction: -1 | 1) => {
+  1557→      setActiveMediaIndex(
+  1558→        (prev) => (prev + direction + gallery.length) % gallery.length,
+  1559→      );
+  1560→    },
+  1561→    [gallery.length],
+  1562→  );
+  1563→
+  1564→  const propulsionSegment = useMemo(
+  1565→    () => (item ? getCatalogPropulsionSegment(item) : "unknown"),
+  1566→    [item],
+  1567→  );
+  1568→  const propulsionLabel = getCatalogPropulsionLabel(propulsionSegment);
+  1569→
+  1570→  const rentalStrip = useMemo(() => {
+  1571→    if (!item || !isRental) return null;
+  1572→    return buildCatalogRentalStrip(item, {
+  1573→      hqLocation: pickupAddress,
+  1574→      contacts: { address: pickupAddress, workingHours },
+  1575→    });
+  1576→  }, [item, isRental, pickupAddress, workingHours]);
+  1577→
+  1578→  // Dynamic pricing result (computed from dates, times, helmet count)
+  1579→  const pricingResult = useMemo(() => {
+  1580→    if (
+  1581→      !item ||
+  1582→      isVipBikeRental ||
+  1583→      !options.rentStartDate ||
+  1584→      !options.rentEndDate
+  1585→    ) return null;
+  1586→
+  1587→    try {
+  1588→      const { calculatePrice } = require("@/lib/rental-pricing-calculator");
+  1589→      return calculatePrice(
+  1590→        item.rawSpecs ?? {},
+  1591→        options.rentStartDate,
+  1592→        options.rentEndDate,
+  1593→        rentStartTime,
+  1594→        rentEndTime,
+  1595→        helmetCount
+  1596→      );
+  1597→    } catch {
+  1598→      return null;
+  1599→    }
+  1600→  }, [helmetCount, isVipBikeRental, item, options.rentStartDate, options.rentEndDate, rentStartTime, rentEndTime]);
+  1601→
+  1602→  // Rounding fix handler — sets end time to rounded value
+  1603→  const handleFixRounding = useCallback(() => {
+  1604→    if (!pricingResult?.displayHours || !pricingResult.rounded) return;
+  1605→
+  1606→    const [h, m] = rentStartTime.split(":").map(Number);
+  1607→    const totalMinutes = h * 60 + m + pricingResult.displayHours * 60;
+  1608→    const newH = Math.floor(totalMinutes / 60) % 24;
+  1609→    const newM = totalMinutes % 60;
+  1610→    const roundedEndTime = `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`;
+  1611→
+  1612→    setRentEndTime(roundedEndTime);
+  1613→    onChangeOption("rentEndTime", roundedEndTime);
+  1614→    onChangeOption("rentEndDate", options.rentStartDate || ""); // Same day for hourly
+  1615→  }, [pricingResult, rentStartTime, options.rentStartDate, onChangeOption]);
+  1616→
+  1617→  const comparableBikes = useMemo(() => {
+  1618→    if (!item) return [];
+  1619→    return items
+  1620→      .filter(
+  1621→        (candidate) =>
+  1622→          candidate.id !== item.id &&
+  1623→          candidate.availabilityStatus === "available" &&
+  1624→          isSameCatalogPropulsion(item, candidate),
+  1625→      )
+  1626→      .slice(0, 6);
+  1627→  }, [item, items]);
+  1628→
+  1629→  // ── Bot username for deep-links (from crew config) ──
+  1630→  const botUsername = (theme as any)?.telegramBotUsername || "oneBikePlsBot";
+  1631→
+  1632→  // Track a browser user who clicked "continue in Telegram" as a lead.
+  1633→  const trackContinueInTgLead = useCallback(
+  1634→    (flowType: "rental" | "sale") => {
+  1635→      const attribution = getBrowserMarketingAttribution();
+  1636→      if (vipBikeRentalTrackingEnabled) {
+  1637→        reachVipBikeGoal(
+  1638→          VIP_BIKE_METRIKA_GOALS.telegramContinue,
+  1639→          { flow_type: flowType, bike_id: item?.id, bike_title: item?.title },
+  1640→          attribution,
+  1641→        );
+  1642→      }
+  1643→      void upsertFranchizeLead({
+  1644→        slug,
+  1645→        userId: item?.id ? `${flowType}-${item.id}-${Date.now()}` : `browser-${Date.now()}`,
+  1646→        intentType: flowType === "rental" ? "rent" : "sale",
+  1647→        stage: "configured",
+  1648→        bikeId: item?.id,
+  1649→        bikeTitle: item?.title,
+  1650→        sourceRoute: `/franchize/${slug}?continue_in_tg=${flowType}`,
+  1651→        contactChannel: "web_app",
+  1652→        urgencyScore: flowType === "rental" ? 75 : 85,
+  1653→        metadata: {
+  1654→          flowType,
+  1655→          startDate: options.rentStartDate,
+  1656→          endDate: options.rentEndDate,
+  1657→          startTime: rentStartTime,
+  1658→          endTime: rentEndTime,
+  1659→          helmetCount,
+  1660→          extrasSelection,
+  1661→          package: options.package,
+  1662→          perk: options.perk,
+  1663→          attribution,
+  1664→        },
+  1665→        ensureUser: true,
+  1666→      });
+  1667→    },
+  1668→    [slug, item?.id, item?.title, options.rentStartDate, options.rentEndDate, rentStartTime, rentEndTime, helmetCount, extrasSelection, options.package, options.perk, vipBikeRentalTrackingEnabled]
+  1669→  );
+  1670→
+  1671→  // ── buildStartappLink — MUST be before early return (it's a hook) ──
+  1672→  const buildStartappLink = useCallback(
+  1673→    (flowType: "rental" | "sale"): string | null => {
+  1674→      if (!item) return null;
+  1675→      try {
+  1676→        const state: StartappState = {
+  1677→          type: flowType === "rental" ? "rental" : "sale",
+  1678→          bikeId: item.id,
+  1679→          startDate: options.rentStartDate || undefined,
+  1680→          endDate: options.rentEndDate || undefined,
+  1681→          startTime: rentStartTime || undefined,
+  1682→          endTime: rentEndTime || undefined,
+  1683→          helmetCount: helmetCount > 0 ? helmetCount : undefined,
+  1684→          extrasGloves: extrasSelection.gloves === true || undefined,
+  1685→          extrasNet: extrasSelection.net === true || undefined,
+  1686→          extrasBag: extrasSelection.bag === true || undefined,
+  1687→          extrasJacket: extrasSelection.jacket === true || undefined,
+  1688→          extrasPants: extrasSelection.pants === true || undefined,
+  1689→          extrasBoots: extrasSelection.boots === true || undefined,
+  1690→          extrasBackpack: extrasSelection.backpack === true || undefined,
+  1691→          extrasCharger: extrasSelection.charger === true || undefined,
+  1692→          package: options.package || undefined,
+  1693→          perk: options.perk || undefined,
+  1694→        };
+  1695→        const startappParam = encodeStartappState(state);
+  1696→        return getTelegramWebAppAdaptiveHref(startappParam, botUsername);
+  1697→      } catch {
+  1698→        return getTelegramWebAppAdaptiveHref("", botUsername);
+  1699→      }
+  1700→    },
+  1701→    [item, options.rentStartDate, options.rentEndDate, options.package, options.perk, rentStartTime, rentEndTime, helmetCount, extrasSelection, botUsername],
+  1702→  );
+  1703→
+  1704→  // ── handleCallbackSubmit — MUST be before early return (it's a hook) ──
+  1705→  const handleCallbackSubmit = useCallback(
+  1706→    async (name: string, phone: string, website: string) => {
+  1707→      const attribution = getBrowserMarketingAttribution();
+  1708→      const callbackEndpoint = vipBikeRentalTrackingEnabled
+  1709→        ? "/api/franchize/vip-bike/callback-lead"
+  1710→        : "/api/franchize/callback-lead";
+  1711→      const response = await fetch(callbackEndpoint, {
+  1712→        method: "POST",
+  1713→        headers: { "Content-Type": "application/json" },
+  1714→        body: JSON.stringify({
+  1715→          slug,
+  1716→          bikeId: item?.id,
+  1717→          name,
+  1718→          phone,
+  1719→          consent: true,
+  1720→          website,
+  1721→          attribution,
+  1722→        }),
+  1723→      });
+  1724→      const result = (await response.json().catch(() => null)) as {
+  1725→        success?: boolean;
+  1726→        error?: string;
+  1727→        notificationSent?: boolean;
+  1728→      } | null;
+  1729→
+  1730→      if (!response.ok || !result?.success) {
+  1731→        throw new Error(
+  1732→          result?.error || "Не удалось отправить заявку. Попробуйте ещё раз.",
+  1733→        );
+  1734→      }
+  1735→
+  1736→      return { notificationSent: result.notificationSent === true };
+  1737→    },
+  1738→    [item?.id, slug, vipBikeRentalTrackingEnabled],
+  1739→  );
+  1740→
+  1741→  if (!item) return null;
+  1742→
+  1743→  // Generalized fallback specs — rental vs order
+  1744→  // Use dynamic pricing when dates are selected, otherwise fallback to rentPriceLabel
+  1745→  // Only show prices that are explicitly enabled via rent=1/sale=1 specs
+  1746→  const rentalPriceDisplay = calculatedPrice
+  1747→    ? `${calculatedPrice.price} ${calculatedPrice.period}`
+  1748→    : item.rentPriceLabel;
+  1749→
+  1750→  const showRentInSpecs = displayMode ? displayMode === "rent" && hasRentPrice(item) : hasRentPrice(item);
+  1751→  const showSaleInSpecs = displayMode ? displayMode === "sale" && hasSalePrice(item) : hasSalePrice(item);
+  1752→
+  1753→  // Compact multi-day price reference (not shown in DurationShortcuts hourly balloons).
+  1754→  // Only 2-4d, 5-10d, 11-30d — hourly/1d prices are covered by DurationShortcuts + PriceCard.
+  1755→  const specs = item.rawSpecs as BikePricingSpecs | undefined;
+  1756→  const multiDayPrices = [
+  1757→    specs?.rent_2_4d ? { label: "2-4 дня", value: `${Number(specs.rent_2_4d).toLocaleString("ru-RU")} ₽/день` } : null,
+  1758→    specs?.rent_5_10d ? { label: "5-10 дней", value: `${Number(specs.rent_5_10d).toLocaleString("ru-RU")} ₽/день` } : null,
+  1759→    specs?.rent_11_30d ? { label: "11-30 дней", value: `${Number(specs.rent_11_30d).toLocaleString("ru-RU")} ₽/день` } : null,
+  1760→  ].filter(Boolean) as Array<{ label: string; value: string }>;
+  1761→
+  1762→  // Equipment-specific specs with Russian labels
+  1763→  const equipmentSpecs = isEquipment ? (() => {
+  1764→    const rs = item.rawSpecs as Record<string, unknown> | undefined;
+  1765→    const labels = rs?.spec_labels as Record<string, string> | undefined;
+  1766→    const equipmentSpecList: Array<{ label: string; value: string }> = [];
+  1767→
+  1768→    // Add category with Russian label
+  1769→    const category = (rs?.category as string) || "";
+  1770→    equipmentSpecList.push({
+  1771→      label: "Категория",
+  1772→      value: EQUIPMENT_CATEGORY_LABELS[category] || category,
+  1773→    });
+  1774→
+  1775→    // Add price (rental)
+  1776→    equipmentSpecList.push({
+  1777→      label: "Аренда",
+  1778→      value: item.rentPriceLabel || `${item.pricePerDay.toLocaleString("ru-RU")} ₽/день`,
+  1779→    });
+  1780→
+  1781→    // Add sale price if available
+  1782→    if (showSaleInSpecs && item.salePrice) {
+  1783→      equipmentSpecList.push({
+  1784→        label: "Покупка",
+  1785→        value: `${item.salePrice.toLocaleString("ru-RU")} ₽`,
+  1786→      });
+  1787→    }
+  1788→
+  1789→    // Add safety certification
+  1790→    const safety = rs?.safety as string[] | string | undefined;
+  1791→    if (safety) {
+  1792→      const safetyStr = Array.isArray(safety) ? safety.join(", ") : String(safety);
+  1793→      equipmentSpecList.push({
+  1794→        label: labels?.safety || "Сертификация",
+  1795→        value: safetyStr,
+  1796→      });
+  1797→    }
+  1798→
+  1799→    // Add materials
+  1800→    const materials = rs?.materials as string | undefined;
+  1801→    if (materials) {
+  1802→      equipmentSpecList.push({
+  1803→        label: labels?.materials || "Материалы",
+  1804→        value: materials,
+  1805→      });
+  1806→    }
+  1807→
+  1808→    // Add sizes
+  1809→    const sizes = rs?.sizes as string[] | string | undefined;
+  1810→    if (sizes) {
+  1811→      const sizesStr = Array.isArray(sizes) ? sizes.join(", ") : String(sizes);
+  1812→      equipmentSpecList.push({
+  1813→        label: labels?.sizes || "Размеры",
+  1814→        value: sizesStr,
+  1815→      });
+  1816→    }
+  1817→
+  1818→    // Add features
+  1819→    const features = rs?.features as string[] | string | undefined;
+  1820→    if (features) {
+  1821→      const featuresStr = Array.isArray(features) ? features.join(", ") : String(features);
+  1822→      equipmentSpecList.push({
+  1823→        label: labels?.features || "Особенности",
+  1824→        value: featuresStr,
+  1825→      });
+  1826→    }
+  1827→
+  1828→    return equipmentSpecList;
+  1829→  })() : null;
+  1830→
+  1831→  const fallbackSpecs = isRental
+  1832→    ? [
+  1833→        { label: "Категория", value: item.category },
+  1834→        // Multi-day prices compact reference (hourly/1d shown in DurationShortcuts)
+  1835→        ...multiDayPrices,
+  1836→        ...(showSaleInSpecs
+  1837→          ? [
+  1838→              {
+  1839→                label: "Цена покупки",
+  1840→                value: `${item.salePrice!.toLocaleString("ru-RU")} ₽`,
+  1841→              },
+  1842→            ]
+  1843→          : []),
+  1844→        { label: "Статус", value: "Готов к выдаче" },
+  1845→      ]
+  1846→    : [
+  1847→        { label: "Категория", value: item.category },
+  1848→        ...(showSaleInSpecs
+  1849→          ? [
+  1850→              {
+  1851→                label: "Цена",
+  1852→                value: `${item.salePrice!.toLocaleString("ru-RU")} ₽`,
+  1853→              },
+  1854→            ]
+  1855→          : []),
+  1856→        { label: "Статус", value: "Доступно для заказа" },
+  1857→      ];
+  1858→
+  1859→  const normalizedSpecs = (
+  1860→    // For equipment items, use the equipment-specific specs with Russian labels
+  1861→    isEquipment ? equipmentSpecs :
+  1862→    // Otherwise, use item specs or fallback specs
+  1863→    (item.specs.length > 0 ? item.specs : fallbackSpecs)
+  1864→  )
+  1865→    // Filter out internal fields like "id" and "rent" that shouldn't be shown to customers
+  1866→    .filter((s) => {
+  1867→      const excludeKeys = new Set(["id", "rent"]);
+  1868→      const key = s.label?.toLowerCase().trim();
+  1869→      return !excludeKeys.has(key);
+  1870→    });
+  1871→
+  1872→  // ── CTA labels (browser vs Telegram) ──
+  1873→  const rentCtaLabel = isInTelegram
+  1874→    ? (isAdding ? "Бронируем..." : "Забронировать")
+  1875→    : "Забронировать в Telegram";
+  1876→  const buyCtaLabel = isInTelegram
+  1877→    ? (isBuying ? "Покупаем..." : "Купить")
+  1878→    : "Купить в Telegram";
+  1879→  const singleCtaLabel = isInTelegram
+  1880→    ? (isAdding ? "Добавляем..." : showRentCta ? "Забронировать" : "Выбрать")
+  1881→    : "Продолжить в Telegram";
+  1882→
+  1883→  // Determine footer grid layout
+  1884→  const footerCols = showRentCta && showBuyCta ? 3 : 2;
+  1885→
+  1886→  return (
+  1887→    <div
+  1888→      ref={modalRef}
+  1889→      className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-[var(--item-border)]/60 p-2 pb-4 outline-none sm:items-center sm:p-3"
+  1890→      role="dialog"
+  1891→      aria-modal="true"
+  1892→      aria-labelledby={`item-modal-title-${item.id}`}
+  1893→      aria-describedby={`item-modal-description-${item.id}`}
+  1894→      tabIndex={-1}
+  1895→      style={themeVars}
+  1896→    >
+  1897→      <div
+  1898→        className="flex w-full max-w-4xl flex-col overflow-hidden rounded-[1.75rem] border shadow-[0_30px_80px_rgba(0,0,0,0.35)] sm:my-auto sm:rounded-3xl max-h-[calc(100dvh-1.5rem)]"
+  1899→        style={surface.card}
+  1900→      >
+  1901→        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
+  1902→          {/* Gallery Component — rentalbikes-style portrait hero */}
+  1903→          <ItemGallery
+  1904→            images={gallery}
+  1905→            activeIndex={activeMediaIndex}
+  1906→            onNavigate={changeMedia}
+  1907→            onSelect={setActiveMediaIndex}
+  1908→            altText={item.title}
+  1909→            borderColor="var(--item-border)"
+  1910→            accentColor="var(--item-accent)"
+  1911→            bgColor="color-mix(in srgb, var(--item-border) 15%, transparent)"
+  1912→            mainAspectRatio="16/11"
+  1913→            prefer4x3
+  1914→            disableKeyboardNav={false}
+  1915→            closeButton={
+  1916→              <button
+  1917→                type="button"
+  1918→                onClick={onClose}
+  1919→                className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/75 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+  1920→                aria-label="Закрыть"
+  1921→              >
+  1922→                <X className="h-4 w-4" />
+  1923→              </button>
+  1924→            }
+  1925→          />
+  1926→
+  1927→          {/* Content — rentalbikes-inspired layout */}
+  1928→          <div className="space-y-4 p-4 sm:p-5">
+  1929→            {/* Deep-link banner — shown when arriving from a Telegram bot */}
+  1930→            {startappBanner && (
+  1931→              <div
+  1932→                className="flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs"
+  1933→                  style={{
+  1934→                    borderColor: "color-mix(in srgb, var(--item-accent) 25%, transparent)",
+  1935→                    backgroundColor: "color-mix(in srgb, var(--item-accent) 8%, transparent)",
+  1936→                    color: "var(--item-accent)",
+  1937→                  }}
+  1938→                role="status"
+  1939→              >
+  1940→                <Zap className="h-4 w-4 shrink-0" aria-hidden />
+  1941→                <span>{startappBanner}</span>
+  1942→              </div>
+  1943→            )}
+  1944→            {/* Title + characteristics row (rentalbikes-style) */}
+  1945→            <div>
+  1946→              <h3
+  1947→                id={`item-modal-title-${item.id}`}
+  1948→                className="text-lg font-bold sm:text-xl"
+  1949→              >
+  1950→                {item.title}
+  1951→              </h3>
+  1952→              <p className="text-sm" style={surface.mutedText}>
+  1953→                {item.subtitle}
+  1954→              </p>
+  1955→
+  1956→              {/* Spec chips row — rentalbikes-style inline icons (speed, engine, weight) */}
+  1957→              {normalizedSpecs.length > 0 && (
+  1958→                <div className="mt-2 flex flex-wrap gap-2">
+  1959→                  {normalizedSpecs.slice(0, 4).map((spec) => (
+  1960→                    <span
+  1961→                      key={`${spec.label}-${spec.value}`}
+  1962→                      className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--item-border)]/40 px-2.5 py-1.5 text-xs font-semibold text-[var(--item-accent)]"
+  1963→                    >
+  1964→                      <span className="text-[10px] opacity-70">{spec.label}</span>
+  1965→                      <span className="text-[var(--item-text)]">{spec.value}</span>
+  1966→                    </span>
+  1967→                  ))}
+  1968→                </div>
+  1969→              )}
+  1970→
+  1971→              {/* Availability badge + sale badge */}
+  1972→              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+  1973→                <span
+  1974→                  className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold"
+  1975→                  style={
+  1976→                    (rentalStrip?.isAvailable ?? item.availabilityStatus === "available")
+  1977→                      ? T.styles.successBadge
+  1978→                      : { backgroundColor: T.accentSoft, color: T.accent, borderColor: T.accent }
+  1979→                  }
+  1980→                >
+  1981→                  <span
+  1982→                    className="inline-block h-1.5 w-1.5 rounded-full"
+  1983→                    style={{
+  1984→                      backgroundColor:
+  1985→                        (rentalStrip?.isAvailable ?? item.availabilityStatus === "available")
+  1986→                          ? (T.isLight ? "#059669" : "#34d399")
+  1987→                          : T.accent,
+  1988→                    }}
+  1989→                  />
+  1990→                  {isRental
+  1991→                    ? `Сегодня: ${rentalStrip?.todayLabel ?? "Уточним в Telegram"}`
+  1992→                    : item.availabilityStatus === "available"
+  1993→                      ? "Доступно для заказа"
+  1994→                      : "Уточните наличие"}
+  1995→                </span>
+  1996→                {showBuyCta && (
+  1997→                  <span
+  1998→                    className="inline-flex rounded-full border px-2.5 py-1 font-semibold"
+  1999→                    style={{ backgroundColor: T.accentSoft, color: T.accent, borderColor: T.accent }}
+  2000→                  >
+
+[showing lines 1-2000 of 2509; use offset=2001 with limit to continue reading]
