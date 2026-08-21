@@ -112,11 +112,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 5. Size cap (10 MB) ──
-    const MAX_BYTES = 10 * 1024 * 1024;
+    // ── 5. Size cap (5 MB) ──
+    // The client-side reduceImageResolution() (lib/client-image-compress.ts)
+    // downscales to max 1400px / JPEG quality 0.70 BEFORE upload, producing
+    // ~200-400 KB files typically. 5 MB is a generous cap that allows for
+    // edge cases (very detailed images, PNGs that didn't compress well) while
+    // still blocking accidental large uploads. Previous 10 MB was too lax.
+    // If you need to raise this, also check Vercel's 4.5 MB body size limit
+    // on the default Hobby plan.
+    const MAX_BYTES = 5 * 1024 * 1024;
     if (file.size > MAX_BYTES) {
       return NextResponse.json(
-        { success: false, error: `file too large (${(file.size / 1024 / 1024).toFixed(1)} MB); max 10 MB` },
+        { success: false, error: `Файл слишком большой (${(file.size / 1024 / 1024).toFixed(1)} МБ); макс. 5 МБ. Сожмите изображение перед загрузкой.` },
         { status: 413 },
       );
     }

@@ -791,6 +791,14 @@ interface DocFlowContext {
   saleDeliveryMethod?: 'pickup' | 'transport_company';
   saleTransportCompany?: string;
   saleTransportPaymentType?: 'buyer_pays' | 'seller_pays';
+
+  // ── Crew selection (preserved across setState) ─────────────────────────────
+  // When the operator picks a crew via the crew-selection keyboard (crewsel_*),
+  // command-handler.ts upserts user_states with context.selectedCrew. Without
+  // this field on DocFlowContext, our setState would silently drop it, and
+  // subsequent getDocCrewSlug() calls would fall back to "vip-bike" default —
+  // breaking multi-crew operators who select a non-default crew.
+  selectedCrew?: string;
 }
 
 // ── Step arrays for flow-specific numbering ──────────────────────────────────
@@ -2796,10 +2804,14 @@ async function gotoConfirmFromSts(chatId: number, userId: string, context: DocFl
 }
 
 async function setState(userId: string, state: string, context: DocFlowContext) {
+  // Add `_doc: true` marker so /ekip's text/callback handlers can bail out
+  // when the user is actually in a /doc flow (mirrors /ekip's `_ekip` marker).
+  // Without this, /ekip's handleEkipText would intercept /doc's text input
+  // for shared state names like "name", "passport", "birth", etc.
   await supabaseAdmin.from("user_states").upsert({
     user_id: userId,
     state,
-    context,
+    context: { ...context, _doc: true },
     expires_at: new Date(Date.now() + DOC_STATE_EXPIRY_MINUTES * 60 * 1000).toISOString(),
   });
 }
@@ -2852,6 +2864,14 @@ export async function handleDocText(userId: string, chatId: number, text: string
   if (!docState) return false;
 
   const { state, context } = docState;
+
+  // Symmetric marker check: if the state was set by /ekip (not /doc), bail out
+  // so /ekip's handleEkipText can run next in the dispatcher chain. Without this
+  // check, /doc's text handler matches 11 shared state names (name, passport,
+  // birth, address, schedule_start, schedule_end, payment_cash, etc.) and
+  // silently drives /ekip's flow through /doc's state machine — corrupting the
+  // hybrid state. Mirrors /ekip's `_ekip` marker check at ekip-manual.ts:865.
+  if ((context as any)?._ekip === true) return false;
 
   if (state === "bike") {
     const bike = await resolveBikeById(text.trim());
@@ -3590,6 +3610,13 @@ export async function handleDocCallback(
   if (!docState) return false;
 
   const { state, context } = docState;
+
+  // Symmetric marker check: if the state was set by /ekip (not /doc), bail out
+  // so /ekip's handleEkipCallback can handle it. Without this check, /doc's
+  // callback handler would consume shared callback_data strings (cancel,
+  // restart, ok, eq_done, p_custom, ph_skip, all s_*/e_*/pay_*/paydest_*/
+  // paysplit_*/dep_*) even when the user is in a /ekip flow.
+  if ((context as any)?._ekip === true) return false;
 
   // Answer callback query to stop loading animation on button
   if (callbackQueryId) {
@@ -4364,6 +4391,13 @@ export async function docCommand(
   const parts = text.trim().split(/\s+/);
   const bikeArg = parts.slice(1).join(" ").trim();
 
+  // Preserve selectedCrew across setState — the crew selection keyboard (crewsel_*)
+  // stores selectedCrew in user_states.context, but our setState overwrites the
+  // whole context object. Read the existing selectedCrew and merge it into the
+  // new context so getDocCrewSlug() can still find it later in the flow.
+  const existingState = await getState(userIdStr);
+  const preservedSelectedCrew = (existingState?.context as any)?.selectedCrew as string | undefined;
+
   if (bikeArg) {
     const bike = await resolveBikeById(bikeArg);
     if (!bike) {
@@ -4375,6 +4409,7 @@ export async function docCommand(
       bikeMake: bike.make,
       bikeModel: bike.model,
       dealType: "rent",
+      ...(preservedSelectedCrew ? { selectedCrew: preservedSelectedCrew } : {}),
     };
     await setState(userIdStr, "deal", context);
     await sendComplexMessage(chatId, `🏍 ${bike.make} ${bike.model}`, [], { removeKeyboard: true });

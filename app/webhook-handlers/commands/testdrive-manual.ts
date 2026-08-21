@@ -80,6 +80,9 @@ interface TestDriveContext {
   licenseIssueDate?: string;    // null if user chose "нет прав"
   licenseExpiryDate?: string;   // auto-calc +10 years from issue
   licenseCategory?: string;
+  // Crew selection — preserved across setState (multi-crew operator support).
+  // See doc-manual.ts:795 for the same field with full rationale.
+  selectedCrew?: string;
 }
 
 // ── Keyboard builders ────────────────────────────────────────────────────────
@@ -1232,7 +1235,15 @@ export async function testDriveCommand(
   });
   buttons.push([{ text: "❌ Отменить", callback_data: "td_cancel" }]);
 
-  await setState(userIdStr, "td_bike", { bikeId: "" });
+  // Preserve selectedCrew across setState — multi-crew operator support.
+  // See doc-manual.ts:4386 for the same pattern with full rationale.
+  const existingState = await getState(userIdStr);
+  const preservedSelectedCrew = (existingState?.context as any)?.selectedCrew as string | undefined;
+
+  await setState(userIdStr, "td_bike", {
+    bikeId: "",
+    ...(preservedSelectedCrew ? { selectedCrew: preservedSelectedCrew } : {}),
+  });
   await sendComplexMessage(
     chatId,
     "🛵 *Тест-драйв — выберите байк*",

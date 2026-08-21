@@ -486,6 +486,9 @@ interface EkipFlowContext {
   priceOverridden?: boolean;
   clientPhone?: string;
   clientPhoneResolved?: boolean;
+  // Crew selection — preserved across setState (multi-crew operator support).
+  // See doc-manual.ts:795 for the same field with full rationale.
+  selectedCrew?: string;
 }
 
 // ── Smart parsers (reused from doc-manual) ─────────────────────────────────────
@@ -1094,30 +1097,36 @@ export async function handleEkipCallback(
     }
   }
 
-  // 2026-08-19 review: handle cancel + restart BEFORE the state check.
-  // Previously, if the ekip state had been cleared (e.g. by an error in
-  // an earlier step, or by the eq_done handler moving state forward to
-  // a stage that didn't expect further equipment clicks), clicking
-  // "❌ Отменить" would hit the `if (!ekipState) return false` guard,
-  // fall through to handleDocCallback (also no doc state) → fall through
-  // to "Неизвестная кнопка. Используй /help или /doc." This was confusing
-  // for users who just wanted to abort.
+  // 2026-08-21 FIX: cancel/restart early-return previously fired BEFORE the
+  // `_ekip` marker check, so clicking /doc's "❌ Отменить" or "↩️ Начать
+  // заново" button mid-/doc-flow wiped /doc's state and either showed the
+  // /ekip-branded "use /ekip" message or actually started /ekip. We now
+  // check the marker FIRST and bail out if the user is not in /ekip flow,
+  // letting /doc's handler run next in the dispatcher chain.
   //
-  // Now: cancel + restart always succeed, even with no state.
-  if (callbackData === "cancel") {
-    await sendComplexMessage(chatId, "❌ Отменено. /ekip для начала.", [], { removeKeyboard: true });
-    await clearState(userId);
-    return true;
-  }
-
-  if (callbackData === "restart") {
-    await clearState(userId);
-    await ekipCommand(chatId, parseInt(userId), undefined, "/ekip");
-    return true;
-  }
-
+  // Edge case: if ekip state was cleared by an earlier error and the user
+  // clicks "❌ Отменить" (no state at all), we still want to clear any
+  // leftover state. We handle that by always clearing when there's NO state
+  // AND the user clicks cancel. But if there IS a state and it's a /doc
+  // state, we bail out so /doc's handler runs.
   const ekipState = await getState(userId);
-  if (!ekipState) return false;
+  if (!ekipState) {
+    // No state — handle bare cancel/restart as best-effort fallback so the
+    // user isn't stuck with an inline keyboard they can't dismiss.
+    if (callbackData === "cancel") {
+      await sendComplexMessage(chatId, "❌ Отменено.", [], { removeKeyboard: true });
+      await clearState(userId);
+      return true;
+    }
+    if (callbackData === "restart") {
+      await clearState(userId);
+      // Don't auto-start /ekip when there was no /ekip state — could have
+      // been a stale /doc button. Let the user type the command they want.
+      await sendComplexMessage(chatId, "↩️ Используйте /doc, /ekip или /testdrive.", [], { removeKeyboard: true });
+      return true;
+    }
+    return false;
+  }
 
   // 2026-08-19 HOTFIX: only handle callbacks when the user is actually in
   // the /ekip flow. The /doc flow ALSO uses `eq_done` callback_data (and
@@ -1131,6 +1140,19 @@ export async function handleEkipCallback(
   // this marker, so checking it reliably distinguishes the two flows.
   const isEkipState = (ekipState.context as any)?._ekip === true;
   if (!isEkipState) return false;
+
+  // Now safe to handle cancel/restart — we know we're in a /ekip flow.
+  if (callbackData === "cancel") {
+    await sendComplexMessage(chatId, "❌ Отменено. /ekip для начала.", [], { removeKeyboard: true });
+    await clearState(userId);
+    return true;
+  }
+
+  if (callbackData === "restart") {
+    await clearState(userId);
+    await ekipCommand(chatId, parseInt(userId), undefined, "/ekip");
+    return true;
+  }
 
   const { state, context } = ekipState;
 
@@ -1918,10 +1940,16 @@ export async function ekipCommand(
   const parts = text.trim().split(/\s+/);
   const equipmentArg = parts.slice(1).join(" ").trim();
 
+  // Preserve selectedCrew across setState — multi-crew operator support.
+  // See doc-manual.ts:4386 for the same pattern with full rationale.
+  const existingState = await getState(userIdStr);
+  const preservedSelectedCrew = (existingState?.context as any)?.selectedCrew as string | undefined;
+
   // Start with deal type selection (same as doc-manual quality bar)
   const context: EkipFlowContext = {
     dealType: "rent",
     equipmentId: "",
+    ...(preservedSelectedCrew ? { selectedCrew: preservedSelectedCrew } : {}),
   };
 
   if (equipmentArg) {
