@@ -69,6 +69,21 @@ export const VIP_BIKE_RENTAL_CATALOG: Readonly<Record<string, CanonicalRental>> 
     pricePerDay: 12_000,
     segment: "petrol",
   },
+  // Added 2026-08-21: was missing from allowlist → bike appeared in DB but was
+  // filtered out by buildVipBikeRentalCatalog (lib/vip-bike-rental-catalog.ts:184).
+  // The catalog-adder skill inserts the row in public.cars but doesn't update
+  // this allowlist — operator must add the entry manually.
+  "ducati-1199-panigale-2012": {
+    title: "Ducati 1199 Panigale",
+    pricePerDay: 18_000,
+    segment: "petrol",
+  },
+  // Added 2026-08-21: same as above.
+  "honda-cbr600rr-2003": {
+    title: "Honda CBR600RR",
+    pricePerDay: 10_000,
+    segment: "petrol",
+  },
   "jilang-max-pro": {
     title: "Jilang Max Pro",
     pricePerDay: 8_000,

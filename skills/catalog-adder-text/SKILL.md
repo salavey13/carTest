@@ -86,6 +86,35 @@ bash ~/.claude/skills/catalog-adder-text/catalog-add.sh get-reference falcon-lit
 ```
 Открыть в браузере: `https://vip-bike.ru/rent/falcon-lite-2026` (или на фронте каталога `/franchize/vip-bike`).
 
+### 5b. ⚠️ VIP-BIKE RENTAL ALLOWLIST — обязательный шаг для rent-режима
+
+Если байк добавляется в экипаж `vip-bike` и должен отображаться в **rent-режиме** каталога
+(`/franchize/vip-bike` или `rental.vip-bike.ru`), его `id` нужно добавить в **allowlist**
+в файле `lib/vip-bike-rental-catalog.ts` (маппинг `VIP_BIKE_RENTAL_CATALOG`).
+
+**Без этого шага байк будет в БД, но НЕ появится в каталоге** — фильтр `buildVipBikeRentalCatalog`
+проходит по allowlist'у и дропает всё, чего там нет.
+
+```ts
+// lib/vip-bike-rental-catalog.ts — добавить запись по алфавиту в свою секцию (electric/petrol):
+"<bike-id>": {
+  title: "<Human-readable title>",
+  pricePerDay: <суточная цена в ₽>,  // должна совпадать с cars.daily_price
+  segment: "electric" | "petrol",   // electric = электро, petrol = ДВС
+  weekendPrice: <опц.>,             // только если отличается
+},
+```
+
+**Когда НЕ нужно добавлять в allowlist:**
+- Sale-only байки (rent=0) — они показываются в sale-режиме, allowlist не нужен
+- Байки других экипажей (не vip-bike) — allowlist применяется только к vip-bike
+- Сервисы / equipment — они не проходят через `buildVipBikeRentalCatalog`
+
+**Что проверить:**
+- ✅ `pricePerDay` в allowlist совпадает с `cars.daily_price` (иначе клиент увидит цену из allowlist'а)
+- ✅ `segment` правильный (electric/petrol) — иначе фильтр по propulsion сломается
+- ✅ Commit + push (файл либный, не в БД)
+
 ## Supabase Access
 
 ```bash
