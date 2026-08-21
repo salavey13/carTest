@@ -2295,11 +2295,40 @@ ${qrDeepLink}`);
       metadata: {
         dealType: isRent ? "rent" : "sale",
         operatorId: String(userId),
+        // Phase 3c: explicitly link this intent to the rental row. This lets the
+        // leads page render a clickable "Open rental" SPA link even when the
+        // phone/name normalization between /testdrive and /doc diverges.
+        ...(rentalId ? { rentalId } : {}),
         hasPassport: !!(context.mpSeries && context.mpNumber),
         hasLicense: !!(context.mlSeries && context.mlNumber),
       },
       ensureUser: true,
     });
+
+    // ── Link existing test_drive intents to this rental (if any) ──
+    // When /doc-manual converts a testdrive into a real rental, the original
+    // test_drive intent (created by /testdrive) is left without any reference
+    // to the new rental. We backfill metadata.rentalId on those intents so:
+    //   - the leads page can attach the rental to the testdrive lead directly
+    //     (robust against phone-format mismatches)
+    //   - the evening digest can count testdrive→rental conversions
+    if (isRent && rentalId) {
+      try {
+        const { linkTestdriveIntentsToRental } = await import("@/app/franchize/lib/leads");
+        const linked = await linkTestdriveIntentsToRental({
+          slug: resolvedSlug,
+          bikeId: bike.id,
+          phone: leadPhone || null,
+          telegramUserId: String(userId),
+          rentalId,
+        });
+        if (linked > 0) {
+          logger.info(`[/doc] Linked ${linked} test_drive intent(s) to rental ${rentalId}`);
+        }
+      } catch (linkErr) {
+        logger.warn("[/doc] linkTestdriveIntentsToRental failed (non-fatal):", linkErr);
+      }
+    }
 
     // ── Create crew_todos for equipment return and default checks ──────────
     if (isRent) {

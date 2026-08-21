@@ -170,3 +170,121 @@ export async function touchFranchizeLead(
     logger.warn("[touchFranchizeLead] failed:", err);
   }
 }
+
+/**
+ * Link existing test_drive franchize_intents to a newly-created rental.
+ *
+ * When /doc-manual converts a testdrive into a real rental, the rental row is
+ * created and a new `rent` intent is upserted. But the ORIGINAL test_drive intent
+ * (created by /testdrive) is left dangling — it has no rental_id reference.
+ *
+ * This helper finds test_drive intents for the same crew + bike + customer and
+ * writes `metadata.rentalId` + `metadata.convertedToRentalAt` so:
+ *   1. The leads page can attach the rental to the testdrive lead directly via
+ *      metadata lookup (robust to phone-format mismatches between operators).
+ *   2. The evening digest can count testdrive→rental conversions.
+ *
+ * Matching strategy (any of):
+ *   - phone match (preferred — works across operators)
+ *   - telegram_user_id match (same operator created both)
+ *
+ * @returns number of intents updated.
+ */
+export async function linkTestdriveIntentsToRental(params: {
+  slug: string;
+  bikeId?: string | null;
+  phone?: string | null;
+  telegramUserId?: string | null;
+  rentalId: string;
+}): Promise<number> {
+  const slug = (params.slug || "").trim().toLowerCase();
+  if (!slug || !params.rentalId) return 0;
+
+  const phone = normalizePhone(params.phone);
+  const tgId = params.telegramUserId?.trim() || null;
+  const bikeId = params.bikeId?.trim() || null;
+
+  // Build a disjunctive filter. We match on (slug + intent_type='test_drive') AND
+  // (phone = X OR telegram_user_id = Y) AND optionally bike_id = Z. Supabase REST
+  // doesn't expose OR-of-different-columns cleanly, so we run up to two queries
+  // and dedupe by id.
+  const baseQuery = () =>
+    supabaseAdmin
+      .from("franchize_intents")
+      .select("id, metadata, phone, telegram_user_id, bike_id")
+      .eq("slug", slug)
+      .eq("intent_type", "test_drive")
+      .neq("stage", "dismissed");
+
+  type Row = { id: string; metadata: Record<string, unknown> | null; phone: string | null; telegram_user_id: string | null; bike_id: string | null };
+  const queries: Promise<Row[] | null>[] = [];
+  if (phone) queries.push(Promise.resolve(baseQuery().eq("phone", phone).then((r) => (r.data as Row[] | null) ?? null)));
+  if (tgId) queries.push(Promise.resolve(baseQuery().eq("telegram_user_id", tgId).then((r) => (r.data as Row[] | null) ?? null)));
+
+  if (queries.length === 0) return 0;
+
+  try {
+    const results = await Promise.all(queries);
+    const seen = new Set<string>();
+    const toUpdate: Array<{ id: string; metadata: Record<string, unknown> }> = [];
+
+    for (const rows of results) {
+      if (!rows) continue;
+      for (const row of rows) {
+        if (seen.has(row.id)) continue;
+        seen.add(row.id);
+        // Optional bike_id filter — only link when the testdrive was for the same
+        // bike (or bike_id is null on the intent, meaning generic).
+        if (bikeId && row.bike_id && row.bike_id !== bikeId) continue;
+        const existingMeta = (row.metadata as Record<string, unknown> | null) || {};
+        // Skip if already linked to a DIFFERENT rental (don't overwrite).
+        if (existingMeta.rentalId && existingMeta.rentalId !== params.rentalId) continue;
+        if (existingMeta.rentalId === params.rentalId) continue; // already linked
+        toUpdate.push({
+          id: row.id,
+          metadata: {
+            ...existingMeta,
+            rentalId: params.rentalId,
+            convertedToRentalAt: new Date().toISOString(),
+          },
+        });
+      }
+    }
+
+    if (toUpdate.length === 0) return 0;
+
+    // Update each intent row individually (preserves existing metadata merge).
+    const updates = toUpdate.map((u) =>
+      supabaseAdmin
+        .from("franchize_intents")
+        .update({
+          metadata: u.metadata,
+          // Mark as closed — the testdrive is no longer an open lead; it has
+          // been converted into a real rental. "closed" is a valid stage value
+          // (see franchizeIntentStages) and is in operatorCloserStages so it
+          // won't be silently downgraded by future upserts.
+          stage: "closed",
+          last_seen_at: new Date().toISOString(),
+        })
+        .eq("id", u.id),
+    );
+    const results2 = await Promise.all(updates);
+    const failed = results2.filter((r) => r.error);
+    if (failed.length > 0) {
+      logger.warn(
+        `[linkTestdriveIntentsToRental] ${failed.length}/${toUpdate.length} updates failed:`,
+        failed[0]?.error,
+      );
+    }
+    const succeeded = toUpdate.length - failed.length;
+    if (succeeded > 0) {
+      logger.info(
+        `[linkTestdriveIntentsToRental] linked ${succeeded} test_drive intent(s) to rental ${params.rentalId}`,
+      );
+    }
+    return succeeded;
+  } catch (err) {
+    logger.warn("[linkTestdriveIntentsToRental] failed:", err);
+    return 0;
+  }
+}

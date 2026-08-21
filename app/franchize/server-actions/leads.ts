@@ -427,11 +427,13 @@ export async function getFranchizeLeads(
       // 6. Testdrive contract artifacts (crew-filtered by crew_slug).
       // Schema columns: id (uuid PK), telegram_chat_id, customer_phone, customer_full_name,
       //   requested_bike_id, resolved_bike_id, testdrive_date, total_sum (numeric),
-      //   created_at, created_by_operator_chat_id, license_categories.
-      // Used to show testdrive leads on the /leads page + pre-fill data for future rentals.
+      //   created_at, created_by_operator_chat_id, license_categories, original_sha256.
+      // original_sha256 is needed to back-link to the franchize_intent (whose
+      // metadata.docSha256 matches) so we can read metadata.rentalId and attach
+      // the converted rental to the testdrive lead.
       privateSchema()
         .from("testdrive_contract_artifacts")
-        .select("id, telegram_chat_id, customer_phone, customer_full_name, requested_bike_id, resolved_bike_id, testdrive_date, total_sum, created_at, created_by_operator_chat_id, license_categories, customer_passport, customer_driver_license")
+        .select("id, telegram_chat_id, customer_phone, customer_full_name, requested_bike_id, resolved_bike_id, testdrive_date, total_sum, created_at, created_by_operator_chat_id, license_categories, customer_passport, customer_driver_license, original_sha256")
         .eq("crew_slug", safeSlug)
         .order("created_at", { ascending: false })
         .limit(200),
@@ -855,6 +857,76 @@ export async function getFranchizeLeads(
           rentals: [],
           sales: [],
         });
+      }
+    }
+
+    // 6.5. Backfill: attach converted rental to testdrive leads via metadata.rentalId
+    //
+    // When /doc-manual converts a testdrive into a real rental, linkTestdriveIntentsToRental()
+    // (called from /doc-manual.ts) writes `metadata.rentalId` onto the matching test_drive
+    // franchize_intent. This step reads that back-link and attaches the rental to the
+    // testdrive artifact lead — robust against phone-format mismatches between the
+    // /testdrive and /doc operators.
+    //
+    // Without this backfill, the testdrive lead on /leads would show "no rentals"
+    // even though a rental exists, just because the phones were stored in different
+    // formats (e.g. "+7999..." vs "8999...").
+    if (testdriveArtifacts && rentals && intentLeads) {
+      // Map docSha256 → rentalId, extracted from test_drive franchize_intents.
+      const rentalIdByDocSha256 = new Map<string, string>();
+      for (const i of intentLeads) {
+        if (i.intent_type !== "test_drive") continue;
+        const meta = (i.metadata as Record<string, unknown> | null) || {};
+        const sha = typeof meta.docSha256 === "string" ? meta.docSha256 : null;
+        const rid = typeof meta.rentalId === "string" ? meta.rentalId : null;
+        if (sha && rid) rentalIdByDocSha256.set(sha, rid);
+      }
+
+      // Map rental_id → rental row (for direct lookup).
+      const rentalById = new Map<string, typeof rentals[number]>();
+      for (const r of rentals) {
+        if (r.rental_id) rentalById.set(r.rental_id, r);
+      }
+
+      if (rentalIdByDocSha256.size > 0) {
+        for (const t of testdriveArtifacts) {
+          const sha = t.original_sha256 || null;
+          if (!sha) continue;
+          const rid = rentalIdByDocSha256.get(sha);
+          if (!rid) continue;
+          const rentalRow = rentalById.get(rid);
+          if (!rentalRow) continue;
+          // Find the lead this testdrive artifact was merged into (keyed by phone
+          // when pre-claim, or by telegram_chat_id otherwise — same logic as step 6).
+          const normalizedCustomerPhone = normalizePhone(t.customer_phone);
+          const isOperator = t.created_by_operator_chat_id && t.telegram_chat_id === t.created_by_operator_chat_id;
+          const preferPhone = !!normalizedCustomerPhone && isOperator;
+          const leadKey = preferPhone
+            ? normalizedCustomerPhone!
+            : (t.telegram_chat_id || normalizedCustomerPhone || "");
+          const lead = leadMap.get(leadKey);
+          if (!lead) continue;
+          // Dedupe by rentalId — don't push if already attached (e.g. via phone match).
+          if (lead.rentals.some((r: LeadRentalRow) => r.rentalId === rid)) continue;
+          const vehicle = rentalRow.vehicle as { make?: string; model?: string } | null;
+          const bikeTitle = `${vehicle?.make || ""} ${vehicle?.model || ""}`.trim() || null;
+          lead.rentals.push({
+            rentalId: rentalRow.rental_id,
+            status: rentalRow.status || "pending_confirmation",
+            paymentStatus: rentalRow.payment_status || "interest_paid",
+            startDate: rentalRow.requested_start_date,
+            endDate: rentalRow.requested_end_date,
+            bikeTitle,
+            totalCost: Number(rentalRow.total_cost) || 0,
+            metadata: rentalRow.metadata ? (rentalRow.metadata as Record<string, unknown>) : null,
+            passportMainpagePhoto: (rentalRow as any).passport_mainpage_photo || null,
+            passportRegistrationPhoto: (rentalRow as any).passport_registration_photo || null,
+            driversLicenceFrontalPhoto: (rentalRow as any).drivers_licence_frontal_photo || null,
+          });
+          // Mark the lead so we can see in the UI/inspector that the link came from
+          // the explicit metadata backfill (vs phone matching).
+          if (!lead.intentType) lead.intentType = "test_drive";
+        }
       }
     }
 

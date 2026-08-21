@@ -36,7 +36,11 @@ import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared, lo
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026;
 const STATE_EXPIRY_MINUTES = 30;
-const TESTDRIVE_PRICE = 5000;
+// Testdrive is FREE — 10-minute supervised ride, no rental period, no deposit.
+// Previously 5000 ₽, but the operator flow + template + reporting all assumed a
+// paid contract that never made sense for a free supervised test-ride. Now zero
+// across the board: template vars, Telegram confirmation, total_sum in DB.
+const TESTDRIVE_PRICE = 0;
 
 // ── Crew slug resolution ─────────────────────────────────────────────────────
 
@@ -680,7 +684,7 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       `👤 ${context.customerFullName}\n` +
       `📱 ${context.customerPhone || "—"}\n` +
       `📄 ${docStr}\n` +
-      `💰 ${price.toLocaleString("ru-RU")} ₽\n` +
+      `🆓 Бесплатно (10 минут)\n` +
       (qrPngBuffer ? `📲 QR-код отправлен отдельно — покажите клиенту` : ``),
       [[{ text: "🚀 Открыть", url: process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app" }]],
       { removeKeyboard: true, parseMode: "Markdown" },
