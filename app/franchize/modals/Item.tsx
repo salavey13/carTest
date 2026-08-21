@@ -1439,9 +1439,13 @@ export function ItemModal({
     }
   }, [item?.id]);
 
-  // Recalculate price when dates change
+  // Recalculate price when dates change.
+  // Note: previously this was gated by `isVipBikeRental` (commit 0aa03a172)
+  // which caused VIP Bike rentals to never compute prices inline — only the
+  // "manager will confirm" placeholder showed. Removed 2026-08-21: VIP Bike
+  // rentals now get the full inline pricing UI back.
   useEffect(() => {
-    if (!item || !item.rawSpecs || isVipBikeRental) {
+    if (!item || !item.rawSpecs) {
       setCalculatedPrice(null);
       return;
     }
@@ -1449,7 +1453,7 @@ export function ItemModal({
     const specs = item.rawSpecs as BikePricingSpecs;
     const result = getDisplayPriceTier(specs, options.rentStartDate, options.rentEndDate);
     setCalculatedPrice(result);
-  }, [isVipBikeRental, item, options.rentStartDate, options.rentEndDate]);
+  }, [item, options.rentStartDate, options.rentEndDate]);
 
   useEffect(() => {
     if (!item) return;
@@ -1575,11 +1579,12 @@ export function ItemModal({
     });
   }, [item, isRental, pickupAddress, workingHours]);
 
-  // Dynamic pricing result (computed from dates, times, helmet count)
+  // Dynamic pricing result (computed from dates, times, helmet count).
+  // Note: previously gated by `isVipBikeRental` (commit 0aa03a172) — same
+  // regression as the calculatedPrice useEffect above. Removed 2026-08-21.
   const pricingResult = useMemo(() => {
     if (
       !item ||
-      isVipBikeRental ||
       !options.rentStartDate ||
       !options.rentEndDate
     ) return null;
@@ -1597,7 +1602,7 @@ export function ItemModal({
     } catch {
       return null;
     }
-  }, [helmetCount, isVipBikeRental, item, options.rentStartDate, options.rentEndDate, rentStartTime, rentEndTime]);
+  }, [helmetCount, item, options.rentStartDate, options.rentEndDate, rentStartTime, rentEndTime]);
 
   // Rounding fix handler — sets end time to rounded value
   const handleFixRounding = useCallback(() => {
@@ -2218,13 +2223,6 @@ export function ItemModal({
                     accentColor="var(--item-accent)"
                     T={T}
                   />
-                ) : isVipBikeRental ? (
-                  <p
-                    className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3 text-sm leading-6 text-[var(--item-muted-text)]"
-                    role="note"
-                  >
-                    Стоимость по выбранным датам и дополнительные условия подтвердит менеджер.
-                  </p>
                 ) : (
                   <>
                     <PricingTable
