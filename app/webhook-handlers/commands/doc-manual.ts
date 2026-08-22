@@ -1227,6 +1227,48 @@ function buildRentSummary(context: DocFlowContext): string {
     `📅 ${context.rentStartDate} ${context.rentStartTime} → ${context.rentEndDate} ${context.rentEndTime}`,
   );
 
+  // ── Rental price line ──
+  // Show the total rental cost (either overridden by operator or calculated).
+  // The override amount = cashAmount + bankAmount (see line ~1608).
+  if (context.cashAmount || context.bankAmount) {
+    const total = (context.cashAmount || 0) + (context.bankAmount || 0);
+    const overrideLabel = context.priceOverridden ? " (своя цена)" : "";
+    lines.push("", `💰 Аренда: ${total.toLocaleString("ru-RU")} ₽${overrideLabel}`);
+  }
+
+  // ── Equipment list ──
+  // Show selected equipment with prices so the operator can verify.
+  const eqLines: string[] = [];
+  if (context.helmets && context.helmets > 0) {
+    eqLines.push(`🪖 Шлемы: ${context.helmets} × 500₽ = ${(context.helmets * 500).toLocaleString("ru-RU")} ₽`);
+  }
+  if (context.gloves && context.gloves > 0) {
+    eqLines.push(`🧤 Перчатки: ${context.gloves} × 500₽ = ${(context.gloves * 500).toLocaleString("ru-RU")} ₽`);
+  }
+  if (context.jacket) eqLines.push("🧥 Куртка: 500₽");
+  if (context.pants) eqLines.push("👖 Штаны: 500₽");
+  if (context.boots) eqLines.push("👢 Боты: 500₽");
+  if (context.net) eqLines.push("🌐 Сетка: 500₽");
+  if (context.backpack) eqLines.push("🎒 Рюкзак: 500₽");
+  if (context.bag) eqLines.push("👜 Сумка: 500₽");
+  if (context.charger) eqLines.push("🔌 Зарядка: бесплатно");
+  if (eqLines.length > 0) {
+    lines.push("", "📦 Оборудование:");
+    lines.push(...eqLines.map(l => `  ${l}`));
+  }
+
+  // ── Payment split info ──
+  // Show how the rental is paid (cash + bank) — only if non-zero amounts.
+  if ((context.cashAmount || 0) > 0 && (context.bankAmount || 0) > 0) {
+    const dest = context.paymentCardDestination === "sber" ? "Сбер" : "Тинькофф";
+    lines.push("", `💳 Оплата: ${context.cashAmount.toLocaleString("ru-RU")}₽ наличными + ${context.bankAmount.toLocaleString("ru-RU")}₽ на ${dest}`);
+  } else if ((context.bankAmount || 0) > 0) {
+    const dest = context.paymentCardDestination === "sber" ? "Сбер" : "Тинькофф";
+    lines.push("", `💳 Оплата: ${context.bankAmount.toLocaleString("ru-RU")}₽ на ${dest}`);
+  } else if ((context.cashAmount || 0) > 0) {
+    lines.push("", `💳 Оплата: ${context.cashAmount.toLocaleString("ru-RU")}₽ наличными`);
+  }
+
   // ── Collateral line: cash deposit OR СТС pledge ──
   if (context.stsPledgeUsed) {
     const owner = context.stsOwnerFullName || context.mpFullName || "";
