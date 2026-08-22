@@ -1,0 +1,693 @@
+     1→// /app/franchize/[slug]/rental/[id]/page.tsx
+     2→import type { Metadata } from "next";
+     3→import { ExternalLink, Info } from "lucide-react";
+     4→import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
+     5→import { CrewHeader } from "../../../components/CrewHeader";
+     6→// goodmorning-polish: removed CrewFooter import (footer ditched on rental page)
+     7→import { FranchizeErrorBoundary } from "../../../components/ErrorBoundary";
+     8→import { DisplayModeProvider } from "../../../components/DisplayModeContext";
+     9→import { FranchizeRentalLifecycleActions } from "../../../components/FranchizeRentalLifecycleActions";
+    10→// goodmorning-polish: removed FranchizePageShell import — replaced with plain <div>
+    11→// to avoid backdrop-blur breaking position:fixed on QuickActionBar + excessive padding.
+    12→import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRentalDocumentsPanel";
+    13→// goodmorning-polish: removed RentalChecklistPanel import (broken local-state toggle,
+    14→// was duplicating RentalReturnChecklist which persists via API)
+    15→import { RentalMessageInput } from "../../../components/RentalMessageInput";
+    16→import { RentalReturnChecklist } from "../../../components/RentalReturnChecklist";
+    17→// I3: photo gallery component for ДО/ПОСЛЕ bike photos
+    18→import { RentalPhotoGallery } from "../../../components/RentalPhotoGallery";
+    19→// goodmorning-polish: removed RentalTelegramGuard import (no longer used after streamline)
+    20→import { crewPaletteForSurface, readablePaletteTextOnColor } from "../../../lib/theme";
+    21→import { buildFranchizeSectionMetadata } from "../../metadata";
+    22→import { formatRuDate } from "../../../lib/date-utils";
+    23→// goodmorning-fixes: removed RentalEscapeHatch import (component no longer used —
+    24→// its buttons were redundant + caused startapp-param stickiness in TG WebApp)
+    25→import { RentalLink } from "../../../components/RentalLink";
+    26→// Polish v2 components (Ideas A–G from RENTAL_PAGE_PRD.md)
+    27→import { RentalIdealBadge } from "../../../components/RentalIdealBadge";
+    28→import { RentalQuickActionBar } from "../../../components/RentalQuickActionBar";
+    29→import { RentalTimeline } from "../../../components/RentalTimeline";
+    30→import { RentalDepositTracker } from "../../../components/RentalDepositTracker";
+    31→import { RentalOdometerDelta } from "../../../components/RentalOdometerDelta";
+    32→import { FranchizeRentalRoleGuard } from "../../../components/FranchizeRentalRoleGuard";
+    33→// Polish v3 components (Phase 3: extend modal, Phase 5: renter + guest views)
+    34→import { RentalExtendModal } from "../../../components/RentalExtendModal";
+    35→import { RentalSetPhoneModal } from "../../../components/RentalSetPhoneModal";
+    36→import { RenterActionsPanel } from "../../../components/RenterActionsPanel";
+    37→import { GuestRentalCta } from "../../../components/GuestRentalCta";
+    38→import { RentalBikePhoto } from "../../../components/RentalBikePhoto";
+    39→import { RentalQrCode } from "../../../components/RentalQrCode";
+    40→
+    41→interface FranchizeRentalPageProps {
+    42→  params: Promise<{ slug: string; id: string }>;
+    43→}
+    44→
+    45→const statusLabel: Record<string, string> = {
+    46→  pending_confirmation: "Ожидает",
+    47→  confirmed: "Подтверждена",
+    48→  active: "Активна",
+    49→  completed: "Завершена",
+    50→  cancelled: "Отменена",
+    51→};
+    52→
+    53→const statusPalette: Record<string, { badgeBg: string; badgeText: string }> = {
+    54→  pending_confirmation: { badgeBg: "#f59e0b20", badgeText: "#f59e0b" },
+    55→  confirmed: { badgeBg: "#3b82f620", badgeText: "#3b82f6" },
+    56→  active: { badgeBg: "#22c55e20", badgeText: "#22c55e" },
+    57→  completed: { badgeBg: "#6b728020", badgeText: "#6b7280" },
+    58→  cancelled: { badgeBg: "#ef444420", badgeText: "#ef4444" },
+    59→};
+    60→
+    61→export async function generateMetadata({ params }: FranchizeRentalPageProps): Promise<Metadata> {
+    62→  const { slug, id } = await params;
+    63→  return buildFranchizeSectionMetadata(slug, {
+    64→    sectionTitle: "Карточка аренды",
+    65→    sectionDescription: "Карточка аренды экипажа: статус, документы и дальнейшие действия.",
+    66→    pathSuffix: `/rental/${id}`,
+    67→  });
+    68→}
+    69→
+    70→export default async function FranchizeRentalPage({ params }: FranchizeRentalPageProps) {
+    71→  const { slug, id } = await params;
+    72→  const [{ crew, items }, rental] = await Promise.all([
+    73→    getFranchizeBySlug(slug),
+    74→    getFranchizeRentalCard(slug, id),
+    75→  ]);
+    76→  const resolvedSlug = crew.slug || slug;
+    77→  const surface = crewPaletteForSurface(crew.theme);
+    78→  const p = crew.theme.palette;
+    79→  const isAuto = Boolean(crew.theme.isAuto);
+    80→
+    81→  // Theme-safe values — CSS vars for auto, palette values for manual themes
+    82→  const accent = isAuto ? "var(--franchize-accent-main)" : (p?.accentMain || "#B8860B");
+    83→  const accentTextOn = isAuto
+    84→    ? "var(--franchize-accent-contrast, #16130A)"
+    85→    : readablePaletteTextOnColor(p?.accentMain || "#B8860B", p);
+    86→  const textPrimary = isAuto ? "var(--franchize-text-primary)" : (p?.textPrimary || "#FFFFFF");
+    87→  const textSecondary = isAuto ? "var(--franchize-text-secondary)" : (p?.textSecondary || "#AAAAAA");
+    88→  const borderSoft = isAuto ? "var(--franchize-border-soft)" : (p?.borderSoft || "#333333");
+    89→
+    90→  // goodmorning-polish: CSS vars for the plain div that replaced FranchizePageShell.
+    91→  // Sets shadcn/ui vars so any Button/Dialog components inside still get themed correctly.
+    92→  const shellVarsFallback: React.CSSProperties = {
+    93→    "--background": isAuto ? "hsl(var(--background))" : (p?.bgCard || "#1a1a1a"),
+    94→    "--foreground": isAuto ? "hsl(var(--foreground))" : (p?.textPrimary || "#FFFFFF"),
+    95→    "--card": isAuto ? "hsl(var(--card))" : (p?.bgCard || "#1a1a1a"),
+    96→    "--card-foreground": isAuto ? "hsl(var(--card-foreground))" : (p?.textPrimary || "#FFFFFF"),
+    97→    "--primary": isAuto ? "var(--franchize-accent-main)" : (p?.accentMain || "#B8860B"),
+    98→    "--primary-foreground": accentTextOn,
+    99→    "--border": isAuto ? "var(--franchize-border-soft)" : (p?.borderSoft || "#333333"),
+   100→    "--ring": isAuto ? "var(--franchize-accent-main)" : (p?.accentMain || "#B8860B"),
+   101→    "--franchize-shell-accent": accent,
+   102→    "--franchize-shell-text": textPrimary,
+   103→    "--franchize-shell-muted": textSecondary,
+   104→    "--franchize-shell-border": borderSoft,
+   105→    "--franchize-shell-card": isAuto ? "var(--franchize-bg-card)" : (p?.bgCard || "#1a1a1a"),
+   106→  } as React.CSSProperties;
+   107→
+   108→  // goodmorning-polish: translate payment status to Russian
+   109→  const paymentStatusLabels: Record<string, string> = {
+   110→    fully_paid: "Полностью оплачена",
+   111→    interest_paid: "Предоплата получена",
+   112→    pending: "Ожидает оплаты",
+   113→    partial: "Частичная оплата",
+   114→    refunded: "Возврат средств",
+   115→  };
+   116→  const paymentStatusLabel = rental.paymentStatus
+   117→    ? (paymentStatusLabels[rental.paymentStatus] || rental.paymentStatus)
+   118→    : null;
+   119→
+   120→  // goodmorning-polish: removed dealStarted + profileHref (unused after streamline)
+   121→  const catalogHref = `/franchize/${resolvedSlug}`;
+   122→  const status = rental.status || "pending_confirmation";
+   123→  const statusStyle = statusPalette[status] || statusPalette.pending_confirmation;
+   124→
+   125→  // goodmorning-fixes: active rentals are ALWAYS verified (operator saw physical docs at pickup).
+   126→  // Was: showed "Не верифицирован" even when status=active → confusing for operators.
+   127→  const effectiveVerificationStatus =
+   128→    status === "active" || status === "completed"
+   129→      ? "verified" as const
+   130→      : rental.contractVerificationStatus;
+   131→  const verificationText =
+   132→    effectiveVerificationStatus === "verified"
+   133→      ? "Верифицирован"
+   134→      : effectiveVerificationStatus === "expired"
+   135→        ? "Истёк"
+   136→        : "Не верифицирован";
+   137→  const verificationStatusStyle =
+   138→    effectiveVerificationStatus === "verified"
+   139→      ? statusPalette.active
+   140→      : effectiveVerificationStatus === "expired"
+   141→        ? statusPalette.pending_confirmation
+   142→        : { badgeBg: `${textSecondary}20`, badgeText: textSecondary };
+   143→
+   144→  const bikeSearchHref = rental.vehicleTitle
+   145→    ? `/franchize/${resolvedSlug}?vehicle=${encodeURIComponent(rental.vehicleTitle)}`
+   146→    : catalogHref;
+   147→
+   148→  // Status-aware explanatory text — actionable phrasing (operator knows what to do next)
+   149→  const statusHint: Record<string, string> = {
+   150→    pending_confirmation: "Аренда готова к активации — подтвердите выдачу.",
+   151→    confirmed: "Аренда подтверждена. Готовьте ТС к выдаче.",
+   152→    active: "ТС у арендатора. Готовьте возврат к указанной дате.",
+   153→    completed: "Аренда завершена ✓ — запросите отзыв у клиента.",
+   154→    cancelled: "Аренда отменена.",
+   155→  };
+   156→  const hintText = rental.found ? (statusHint[status] || "") : "Сделка не найдена. Проверьте ссылку или вернитесь в каталог.";
+   157→
+   158→  // ── Polish v2: extract closure data for IdealBadge + OdometerDelta + DepositTracker ──
+   159→  const rentalMeta = (rental.metadata as Record<string, any> | null) ?? null;
+   160→  const closureData = rentalMeta?.closure_data ?? rentalMeta?.closure ?? null;
+   161→  const odometerBefore = rentalMeta?.pickup_freeze?.odometer_km ?? rentalMeta?.odometer_before ?? null;
+   162→  const odometerAfter = closureData?.odometer_after ?? rentalMeta?.odometer_after ?? null;
+   163→  const depositReturned =
+   164→    typeof closureData?.deposit_returned === "boolean"
+   165→      ? closureData.deposit_returned
+   166→      : typeof rentalMeta?.deposit_returned === "boolean"
+   167→        ? rentalMeta.deposit_returned
+   168→        : null;
+   169→  const depositRub = rentalMeta?.deposit_rub ?? rentalMeta?.depositRub ?? null;
+   170→  const damageLevel = closureData?.damage_level ?? rentalMeta?.damage_level ?? null;
+   171→  const todosDone = Number(rentalMeta?.todos_done ?? 0);
+   172→  const todosTotal = Number(rentalMeta?.todos_total ?? 0);
+   173→  const isVerified = rental.contractVerificationStatus === "verified" || status === "active";
+   174→
+   175→  // ── Polish v2: rental stage timestamps for Timeline ──
+   176→  // goodmorning-fixes: prefer rental.createdAt (from rentals.created_at column) over metadata.
+   177→  // Production metadata doesn't always have created_at — the DB column is the source of truth.
+   178→  // Also try metadata.history[] for status-change timestamps (operator-driven events).
+   179→  const historyArr = Array.isArray(rentalMeta?.history) ? (rentalMeta!.history as Array<{ status?: string; at?: string }>) : [];
+   180→  const findHistoryAt = (status: string) => historyArr.find((h) => h.status === status)?.at || null;
+   181→  const createdAt = rental.createdAt ?? rentalMeta?.created_at ?? rentalMeta?.createdAt ?? null;
+   182→  const verifiedAt = rentalMeta?.verified_at ?? rentalMeta?.verifiedAt ?? findHistoryAt("confirmed") ?? null;
+   183→  const pickedUpAt = rentalMeta?.picked_up_at ?? rentalMeta?.pickedUpAt ?? findHistoryAt("active") ?? null;
+   184→  const activeAt = rentalMeta?.active_at ?? rentalMeta?.activeAt ?? pickedUpAt;
+   185→  const returnedAt = closureData?.returned_at ?? rentalMeta?.returned_at ?? findHistoryAt("completed") ?? null;
+   186→  const completedAt = rentalMeta?.completed_at ?? rentalMeta?.completedAt ?? findHistoryAt("completed") ?? null;
+   187→
+   188→  // ── Stale rental detection ──
+   189→  // If the rental is "active" but the agreed/requested end date has passed,
+   190→  // show a warning banner prompting the operator to mark it as completed.
+   191→  const endDateStr = rental.agreedEndDate || rental.requestedEndDate;
+   192→  const endDate = endDateStr ? Date.parse(endDateStr) : Number.NaN;
+   193→  const isStale = status === "active" && !Number.isNaN(endDate) && endDate < Date.now();
+   194→
+   195→  return (
+   196→    <main className="min-h-screen" style={surface.page}>
+   197→      <DisplayModeProvider>
+   198→      <FranchizeErrorBoundary
+   199→        resetKey={resolvedSlug}
+   200→        fallbackTitle="Шапка недоступна"
+   201→        fallbackHref={catalogHref}
+   202→        fallbackLinkLabel="В каталог"
+   203→      >
+   204→      <CrewHeader
+   205→        crew={crew}
+   206→        activePath={`/franchize/${resolvedSlug}/rental/${id}`}
+   207→        groupLinks={items.map((item) => item.category)}
+   208→      />
+   209→      </FranchizeErrorBoundary>
+   210→      </DisplayModeProvider>
+   211→
+   212→      {/* goodmorning-polish: replaced <FranchizePageShell> with plain <div>.
+   213→          PageShell had backdrop-blur which creates a containing block that breaks
+   214→          position:fixed for the QuickActionBar (bar stuck to page bottom, not viewport).
+   215→          Also had excessive padding (py-8 + p-6 + rounded-[2rem]). Now: minimal padding,
+   216→          no backdrop-blur, no border shell. Content flows edge-to-edge with small margin. */}
+   217→      <div className="mx-auto w-full max-w-2xl px-3 py-3 space-y-4" style={shellVarsFallback}>
+   218→        {/* Inline CSS for bottom spacer + portrait bike photo aspect ratio */}
+   219→        <style>{`
+   220→          @media (max-width: 768px) {
+   221→            .rental-quick-bar-spacer { height: 140px; }
+   222→            .rental-bike-photo { aspect-ratio: 1 / 1; }
+   223→          }
+   224→          @media (min-width: 769px) {
+   225→            .rental-quick-bar-spacer { height: 24px; }
+   226→            .rental-bike-photo { aspect-ratio: 9 / 16; max-height: 70vh; }
+   227→          }
+   228→          /* goodmorning-polish: slide-LEFT animation for QuickActionBar expand.
+   229→             FAB (48px circle, bottom-right) → full bar slides in from the RIGHT
+   230→             (translateX positive → 0) + scales up from 0.69 (drastic, cool effect). */
+   231→          @keyframes slideup {
+   232→            from {
+   233→              opacity: 0;
+   234→              transform: translateX(40px) scale(0.69);
+   235→            }
+   236→            to {
+   237→              opacity: 1;
+   238→              transform: translateX(0) scale(1);
+   239→            }
+   240→          }
+   241→        `}</style>
+   242→
+   243→        {/* Top-level error boundary */}
+   244→        <FranchizeErrorBoundary
+   245→          fallbackTitle="Блок аренды временно недоступен"
+   246→          fallbackMessage="Что-то пошло не так при загрузке карточки. Попробуйте перезагрузить страницу или вернуться в профиль."
+   247→          fallbackHref={catalogHref}
+   248→          fallbackLinkLabel="В каталог"
+   249→        >
+   250→        {/* Stale rental warning */}
+   251→        {isStale && (
+   252→          <div
+   253→            className="rounded-2xl border-2 p-3 text-sm"
+   254→            style={{ borderColor: "#ef4444", backgroundColor: "#ef444410", color: textPrimary }}
+   255→          >
+   256→            <div className="flex items-start gap-2">
+   257→              <span className="text-base shrink-0 mt-0.5">⚠️</span>
+   258→              <div>
+   259→                <p className="font-semibold" style={{ color: "#ef4444" }}>Аренда просрочена</p>
+   260→                <p className="mt-0.5 text-xs opacity-80">
+   261→                  Дата возврата ({formatRuDate(new Date(endDate))}) уже прошла. Закройте аренду — переведите в «Завершена».
+   262→                </p>
+   263→              </div>
+   264→            </div>
+   265→          </div>
+   266→        )}
+   267→
+   268→        {/* Bike photo hero — portrait 9:16 on desktop, square on mobile */}
+   269→        {rental.found && rental.vehicleImageUrl && (
+   270→          <RentalBikePhoto
+   271→            src={rental.vehicleImageUrl}
+   272→            alt={rental.vehicleTitle || "Байк"}
+   273→            statusLabel={statusLabel[status] || status}
+   274→            statusBadgeBg={statusStyle.badgeBg}
+   275→            statusBadgeText={statusStyle.badgeText}
+   276→            rentalShortId={rental.rentalId?.slice(0, 8)}
+   277→            borderColor={borderSoft}
+   278→          />
+   279→        )}
+   280→
+   281→        {/* Compact header — status + IdealBadge only.
+   282→            Bike title + ID are already shown on the photo overlay above,
+   283→            so we don't repeat them here. */}
+   284→        <div className="flex flex-wrap items-center justify-between gap-2">
+   285→          <div className="space-y-1 min-w-0 flex-1">
+   286→            <div className="flex flex-wrap items-center gap-2">
+   287→              {rental.found && (
+   288→                <RentalIdealBadge
+   289→                  verified={isVerified}
+   290→                  todosDone={todosDone}
+   291→                  todosTotal={todosTotal}
+   292→                  odometerAfter={odometerAfter}
+   293→                  depositReturned={depositReturned}
+   294→                  damageLevel={damageLevel}
+   295→                  accentColor={accent}
+   296→                />
+   297→              )}
+   298→            </div>
+   299→            {hintText && (
+   300→              <p className="text-xs" style={{ color: textSecondary }}>{hintText}</p>
+   301→            )}
+   302→          </div>
+   303→          <span
+   304→            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+   305→            style={{ backgroundColor: statusStyle.badgeBg, color: statusStyle.badgeText }}
+   306→          >
+   307→            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: statusStyle.badgeText }} />
+   308→            {statusLabel[status] || status}
+   309→          </span>
+   310→        </div>
+   311→
+   312→        {/* Timeline (Idea C) — single source of truth for stage progress.
+   313→            Removed the static numbered "Текущие задачи" list that duplicated this info. */}
+   314→        {rental.found && (
+   315→          <RentalTimeline
+   316→            status={status}
+   317→            createdAt={createdAt}
+   318→            verifiedAt={verifiedAt}
+   319→            pickedUpAt={pickedUpAt}
+   320→            activeAt={activeAt}
+   321→            returnedAt={returnedAt}
+   322→            completedAt={completedAt}
+   323→            accentColor={accent}
+   324→            textPrimary={textPrimary}
+   325→            textSecondary={textSecondary}
+   326→            borderSoft={borderSoft}
+   327→          />
+   328→        )}
+   329→
+   330→        {/* Compact detail grid — bike photo is already shown above, so NO duplicate vehicle title here */}
+   331→        <section className="rounded-2xl border p-3 space-y-2" style={surface.subtleCard}>
+   332→          {/* Contract verification row */}
+   333→          <div className="flex flex-wrap items-center gap-2">
+   334→            <span className="text-xs" style={{ color: textSecondary }}>Контракт:</span>
+   335→            <span
+   336→              className="rounded-full border px-2.5 py-0.5 text-xs font-semibold"
+   337→              style={{ borderColor: verificationStatusStyle.badgeText, color: verificationStatusStyle.badgeText }}
+   338→            >
+   339→              {verificationText}
+   340→            </span>
+   341→            <RentalLink
+   342→              href={`/franchize/${resolvedSlug}/verify-doc?rental=${rental.rentalId}&scope=${encodeURIComponent(rental.contractVerifierScope || `rental:${rental.rentalId}`)}&key=${encodeURIComponent(rental.contractDocumentKey || `rental-${slug}-${rental.rentalId}`)}`}
+   343→              className="rounded-full border px-2.5 py-0.5 text-xs font-semibold transition hover:opacity-85"
+   344→              style={{ borderColor: accent, color: accent }}
+   345→            >
+   346→              Проверить
+   347→            </RentalLink>
+   348→          </div>
+   349→
+   350→          {/* Detail grid — 2 columns on desktop, 1 on mobile */}
+   351→          <div className="grid gap-2 text-sm sm:grid-cols-2 max-sm:grid-cols-1">
+   352→            {paymentStatusLabel && (
+   353→              <p><span style={{ color: textSecondary }}>Оплата:</span> {paymentStatusLabel}</p>
+   354→            )}
+   355→            {rental.totalCost > 0 && (
+   356→              <p><span style={{ color: textSecondary }}>Итого:</span> {rental.totalCost.toLocaleString("ru-RU")} ₽</p>
+   357→            )}
+   358→            {(rental.agreedStartDate || rental.agreedEndDate) && (
+   359→              <p>
+   360→                <span style={{ color: textSecondary }}>Период:</span>{" "}
+   361→                <span className="font-semibold">
+   362→                  {rental.agreedStartDate ? formatRuDate(new Date(rental.agreedStartDate)) : "?"}
+   363→                  {" → "}
+   364→                  {rental.agreedEndDate ? formatRuDate(new Date(rental.agreedEndDate)) : "?"}
+   365→                </span>
+   366→              </p>
+   367→            )}
+   368→            {rental.renterFullName && (
+   369→              <p>
+   370→                <span style={{ color: textSecondary }}>Арендатор:</span>{" "}
+   371→                <span className="font-semibold">{rental.renterFullName}</span>
+   372→              </p>
+   373→            )}
+   374→            {/* Phone display + operator edit button (Set Phone modal)
+   375→                SP-013 FIX: using <div> not <p> — the modal renders a <div> overlay which
+   376→                is flow content and cannot be nested inside <p> (invalid HTML, DOM corruption). */}
+   377→            <div className="flex items-center gap-2 flex-wrap">
+   378→              <span style={{ color: textSecondary }}>Телефон:</span>{" "}
+   379→              <span className="font-mono">{rental.renterPhone || "—"}</span>
+   380→              {/* Operator/admin/owner can set or edit phone */}
+   381→              <FranchizeRentalRoleGuard
+   382→                allowedRoles={["operator", "admin", "owner"]}
+   383→                ownerId={rental.ownerId}
+   384→                renterId={rental.renterId}
+   385→                renterTelegramChatId={rental.renterTelegramChatId}
+   386→                crewId={crew.id}
+   387→                crewSlug={resolvedSlug}
+   388→              >
+   389→                <RentalSetPhoneModal
+   390→                  rentalId={rental.rentalId}
+   391→                  currentPhone={rental.renterPhone}
+   392→                  bikeTitle={rental.vehicleTitle}
+   393→                  renterName={rental.renterFullName}
+   394→                  accentColor={accent}
+   395→                  accentTextOn={accentTextOn}
+   396→                  borderColor={borderSoft}
+   397→                  textPrimary={textPrimary}
+   398→                  textSecondary={textSecondary}
+   399→                  triggerClassName="text-xs underline-offset-2 hover:underline"
+   400→                  triggerStyle={{ color: accent }}
+   401→                />
+   402→              </FranchizeRentalRoleGuard>
+   403→              {rental.renterPhone && (
+   404→                <RentalLink
+   405→                  href={`/franchize/${resolvedSlug}/leads?phone=${encodeURIComponent(rental.renterPhone)}`}
+   406→                  className="text-xs underline-offset-2 hover:underline"
+   407→                  style={{ color: accent }}
+   408→                >
+   409→                  → в лидах
+   410→                </RentalLink>
+   411→              )}
+   412→            </div>
+   413→          </div>
+   414→
+   415→          {/* QR fix: show QR code for operator (to re-show to renter).
+   416→              Link is single-use — copy only, no open button. */}
+   417→          {rental.found && rental.docSha256 && rental.vehicleId && (
+   418→            <FranchizeRentalRoleGuard
+   419→              allowedRoles={["operator", "admin", "owner"]}
+   420→              ownerId={rental.ownerId}
+   421→              renterId={rental.renterId}
+   422→              renterTelegramChatId={rental.renterTelegramChatId}
+   423→              crewId={crew.id}
+   424→              crewSlug={resolvedSlug}
+   425→            >
+   426→              <RentalQrCode
+   427→                vehicleId={rental.vehicleId}
+   428→                docSha256={rental.docSha256}
+   429→                botUsername={process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}
+   430→                accentColor={accent}
+   431→                borderColor={borderSoft}
+   432→                textPrimary={textPrimary}
+   433→                textSecondary={textSecondary}
+   434→              />
+   435→            </FranchizeRentalRoleGuard>
+   436→          )}
+   437→
+   438→          {/* Deposit tracker (Idea F) + Odometer delta (Idea G) */}
+   439→          {rental.found && (
+   440→            <div className="grid gap-2 sm:grid-cols-2 max-sm:grid-cols-1">
+   441→              <RentalDepositTracker
+   442→                depositRub={depositRub}
+   443→                depositReturned={depositReturned}
+   444→                status={status}
+   445→                accentColor={accent}
+   446→                textPrimary={textPrimary}
+   447→                textSecondary={textSecondary}
+   448→                borderSoft={borderSoft}
+   449→              />
+   450→              <RentalOdometerDelta
+   451→                odometerBefore={odometerBefore}
+   452→                odometerAfter={odometerAfter}
+   453→                includedKm={rentalMeta?.included_km ?? null}
+   454→                overageRatePerKm={rentalMeta?.overage_rate_per_km ?? null}
+   455→                textPrimary={textPrimary}
+   456→                textSecondary={textSecondary}
+   457→                borderSoft={borderSoft}
+   458→                accentColor={accent}
+   459→              />
+   460→            </div>
+   461→          )}
+   462→        </section>
+   463→
+   464→        {/* Return checklist — OPERATOR ONLY. Single source of truth (was duplicated
+   465→            between RentalReturnChecklist in sidebar + RentalChecklistPanel in main).
+   466→            Removed RentalChecklistPanel entirely — its toggle was broken (local state
+   467→            only, reset on every re-render). RentalReturnChecklist persists via API. */}
+   468→        {rental.found && status === "active" && (
+   469→          <FranchizeRentalRoleGuard
+   470→            allowedRoles={["operator", "admin", "owner"]}
+   471→            ownerId={rental.ownerId}
+   472→            renterId={rental.renterId}
+   473→            renterTelegramChatId={rental.renterTelegramChatId}
+   474→            crewId={crew.id}
+   475→            crewSlug={resolvedSlug}
+   476→            fallback={
+   477→              <div className="text-xs opacity-60 py-2" style={{ color: textSecondary }}>
+   478→                📋 Чек-лист виден только операторам экипажа.
+   479→              </div>
+   480→            }
+   481→          >
+   482→            <RentalReturnChecklist
+   483→              rentalId={rental.rentalId}
+   484→              crewId={crew.id}
+   485→              crewSlug={resolvedSlug}
+   486→              accentColor={accent}
+   487→              borderColor={borderSoft}
+   488→              textPrimary={textPrimary}
+   489→              textSecondary={textSecondary}
+   490→              isAuto={isAuto}
+   491→            />
+   492→          </FranchizeRentalRoleGuard>
+   493→        )}
+   494→
+   495→          <FranchizeRentalRoleGuard
+   496→            allowedRoles={["operator", "admin", "owner", "renter"]}
+   497→            ownerId={rental.ownerId}
+   498→            renterId={rental.renterId}
+   499→            renterTelegramChatId={rental.renterTelegramChatId}
+   500→            crewId={crew.id}
+   501→            crewSlug={resolvedSlug}
+   502→          >
+   503→            {/* I3: Rental Photo Gallery — ДО (start) + ПОСЛЕ (end) photos.
+   504→                v1: non-blocking. Shown for operators + renter (renter can
+   505→                upload their own photos for damage documentation). */}
+   506→            <div id="rental-photo-gallery">
+   507→              <RentalPhotoGallery
+   508→                rentalId={rental.rentalId}
+   509→                initialStartCount={rental.startPhotoCount ?? 0}
+   510→                initialEndCount={rental.endPhotoCount ?? 0}
+   511→                canUpload={true}
+   512→                compact={false}
+   513→              />
+   514→            </div>
+   515→          </FranchizeRentalRoleGuard>
+   516→
+   517→        {/* Message input — only show when renter has a real TG chat_id
+   518→            (QR claimed). If QR not scanned, message will fail silently.
+   519→            Also hide for completed/cancelled — no point messaging a closed rental. */}
+   520→        {rental.found && status !== "completed" && status !== "cancelled" && rental.renterTelegramChatId && /^\d+$/.test(rental.renterTelegramChatId) && (
+   521→          <div id="rental-message-input">
+   522→            <RentalMessageInput
+   523→              rentalId={rental.rentalId}
+   524→              accentColor={accent}
+   525→              borderColor={borderSoft}
+   526→              textPrimary={textPrimary}
+   527→              textSecondary={textSecondary}
+   528→            />
+   529→          </div>
+   530→        )}
+   531→
+   532→        {/* Documents panel — OPERATOR ONLY.
+   533→            Only show for non-completed/cancelled rentals.
+   534→            For completed rentals, damage reports are no longer actionable —
+   535→            closure data is already saved in metadata.closure_data. */}
+   536→        {rental.found && status !== "completed" && status !== "cancelled" && (
+   537→        <FranchizeRentalRoleGuard
+   538→          allowedRoles={["operator", "admin", "owner"]}
+   539→          ownerId={rental.ownerId}
+   540→          renterId={rental.renterId}
+   541→          renterTelegramChatId={rental.renterTelegramChatId}
+   542→          crewId={crew.id}
+   543→          crewSlug={resolvedSlug}
+   544→        >
+   545→          <FranchizeErrorBoundary fallbackTitle="Документы временно недоступны" fallbackMessage="Попробуйте перезагрузить.">
+   546→            <FranchizeRentalDocumentsPanel
+   547→              rentalId={rental.rentalId}
+   548→              ownerId={rental.ownerId}
+   549→              crewId={crew.id}
+   550→              crewSlug={resolvedSlug}
+   551→              status={status}
+   552→              metadata={rental.metadata}
+   553→              palette={p}
+   554→              isAuto={isAuto}
+   555→            />
+   556→          </FranchizeErrorBoundary>
+   557→        </FranchizeRentalRoleGuard>
+   558→        )}
+   559→
+   560→        {/* Single "Продлить" button — operator-only. Opens ExtendModal with date picker.
+   561→            Was 2 duplicate buttons (sidebar + action row); now just one. */}
+   562→        {rental.found && status === "active" && (
+   563→          <FranchizeRentalRoleGuard
+   564→            allowedRoles={["operator", "admin", "owner"]}
+   565→            ownerId={rental.ownerId}
+   566→            renterId={rental.renterId}
+   567→            renterTelegramChatId={rental.renterTelegramChatId}
+   568→            crewId={crew.id}
+   569→            crewSlug={resolvedSlug}
+   570→          >
+   571→            <RentalExtendModal
+   572→              rentalId={rental.rentalId}
+   573→              originalStartDate={rental.agreedStartDate}
+   574→              originalEndDate={rental.agreedEndDate || rental.requestedEndDate}
+   575→              bikeTitle={rental.vehicleTitle}
+   576→              renterName={rental.renterFullName}
+   577→              accentColor={accent}
+   578→              accentTextOn={accentTextOn}
+   579→              borderColor={borderSoft}
+   580→              textPrimary={textPrimary}
+   581→              textSecondary={textSecondary}
+   582→              triggerClassName="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition hover:opacity-90"
+   583→              triggerStyle={{ backgroundColor: accent, color: accentTextOn }}
+   584→            />
+   585→          </FranchizeRentalRoleGuard>
+   586→        )}
+   587→
+   588→        {/* Lifecycle actions — OPERATOR ONLY.
+   589→            Wrapped in div#lifecycle-actions for QuickActionBar scroll target. */}
+   590→        <FranchizeRentalRoleGuard
+   591→          allowedRoles={["operator", "admin", "owner"]}
+   592→          ownerId={rental.ownerId}
+   593→          renterId={rental.renterId}
+   594→          renterTelegramChatId={rental.renterTelegramChatId}
+   595→          crewId={crew.id}
+   596→          crewSlug={resolvedSlug}
+   597→        >
+   598→          <div id="lifecycle-actions">
+   599→            <FranchizeErrorBoundary fallbackTitle="Действия временно недоступны" fallbackMessage="Попробуйте перезагрузить.">
+   600→              <FranchizeRentalLifecycleActions
+   601→                rentalId={rental.rentalId}
+   602→                ownerId={rental.ownerId}
+   603→                renterId={rental.renterId}
+   604→                crewId={crew.id}
+   605→                crewSlug={resolvedSlug}
+   606→                status={status}
+   607→                paymentStatus={rental.paymentStatus}
+   608→                hasPickupFreeze={Boolean((rental.metadata as { pickup_freeze?: { frozen_at?: unknown } } | null)?.pickup_freeze?.frozen_at)}
+   609→                // Fix: pass payment split so closure modal can show "Получено при выдаче"
+   610→                paymentSplit={(rental.metadata as { payment_split?: { cash: number; bank: number; card_destination?: string | null } } | null)?.payment_split ?? null}
+   611→                palette={p}
+   612→                isAuto={isAuto}
+   613→              />
+   614→            </FranchizeErrorBoundary>
+   615→          </div>
+   616→        </FranchizeRentalRoleGuard>
+   617→
+   618→        {/* Phase 5: Renter-specific actions panel */}
+   619→        {rental.found && (
+   620→          <RenterActionsPanel
+   621→            rentalId={rental.rentalId}
+   622→            ownerId={rental.ownerId}
+   623→            renterId={rental.renterId}
+   624→            renterTelegramChatId={rental.renterTelegramChatId}
+   625→            crewId={crew.id}
+   626→            crewSlug={resolvedSlug}
+   627→            contractVerified={isVerified}
+   628→            contractDownloadUrl={rental.contractDownloadUrl || null}
+   629→            photoUploadHref={`/franchize/${resolvedSlug}/verify-doc?rental=${rental.rentalId}`}
+   630→            messageCrewHref={`#rental-message-input`}
+   631→            telegramDeepLink={rental.telegramDeepLink}
+   632→            accentColor={accent}
+   633→            accentTextOn={accentTextOn}
+   634→            borderColor={borderSoft}
+   635→            textPrimary={textPrimary}
+   636→            textSecondary={textSecondary}
+   637→          />
+   638→        )}
+   639→
+   640→        {/* Phase 5: Guest minimal view */}
+   641→        {rental.found && (
+   642→          <GuestRentalCta
+   643→            ownerId={rental.ownerId}
+   644→            renterId={rental.renterId}
+   645→            renterTelegramChatId={rental.renterTelegramChatId}
+   646→            crewId={crew.id}
+   647→            crewSlug={resolvedSlug}
+   648→            bikeTitle={rental.vehicleTitle}
+   649→            statusLabel={statusLabel[status]}
+   650→            telegramDeepLink={rental.telegramDeepLink}
+   651→            accentColor={accent}
+   652→            accentTextOn={accentTextOn}
+   653→            borderColor={borderSoft}
+   654→            textPrimary={textPrimary}
+   655→            textSecondary={textSecondary}
+   656→          />
+   657→        )}
+   658→
+   659→        {/* Bottom spacer so QuickActionBar doesn't overlap last button.
+   660→            140px on mobile to clear phone native nav + the bar. */}
+   661→        {rental.found && status !== "completed" && status !== "cancelled" && (
+   662→          <div className="rental-quick-bar-spacer" aria-hidden="true" />
+   663→        )}
+   664→        </FranchizeErrorBoundary>
+   665→      </div>
+   666→
+   667→      {/* Quick-action floating bar (Idea B) — OUTSIDE the content div.
+   668→          goodmorning-polish: moved outside FranchizePageShell's replacement div
+   669→          because backdrop-blur/transform on ancestors breaks position:fixed.
+   670→          Now a direct child of <main> → position:fixed sticks to viewport. */}
+   671→      {rental.found && (
+   672→        <RentalQuickActionBar
+   673→          rentalId={rental.rentalId}
+   674→          showProlong={status === "active"}
+   675→          showClose={status === "active"}
+   676→          showMessagerent={status !== "completed" && status !== "cancelled"}
+   677→          prolongHref={bikeSearchHref}
+   678→          ownerId={rental.ownerId}
+   679→          renterId={rental.renterId}
+   680→          renterTelegramChatId={rental.renterTelegramChatId}
+   681→          crewId={crew.id}
+   682→          crewSlug={resolvedSlug}
+   683→          accentColor={accent}
+   684→          accentTextOn={accentTextOn}
+   685→          borderColor={borderSoft}
+   686→          textPrimary={textPrimary}
+   687→        />
+   688→      )}
+   689→
+   690→    </main>
+   691→  );
+   692→}
+   693→
