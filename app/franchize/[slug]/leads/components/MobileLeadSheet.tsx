@@ -158,12 +158,11 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: MobileLea
             dragElastic={{ top: 0, bottom: 0.4 }}
             onDragEnd={handleDragEnd}
           >
-            {/* Sticky header — drag handle + title + close button */}
-            {/* pr-16 reserves space on the right for Telegram's native floating
-                back/close button (top-right of WebApp viewport). Without this
-                padding, our X button overlaps the native button and is untappable. */}
+            {/* Sticky header — drag handle + title (NO close button here —
+                it overlaps Telegram's native floating back/close button
+                which sits at the top-right of the WebApp viewport). */}
             <div
-              className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 pr-16 pb-2 pt-3"
+              className="sticky top-0 z-10 flex shrink-0 items-center gap-3 pb-2 pt-3"
               style={{
                 backgroundColor: T.bgCard,
                 borderBottom: `1px solid ${T.borderSoft}`,
@@ -198,13 +197,23 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: MobileLea
                   </p>
                 )}
               </div>
+            </div>
+
+            {/* Close button — placed BELOW the header, centered, to avoid
+                overlapping Telegram's native floating button (top-right).
+                The native button is ~44px tall; placing our X at ~60px from
+                the top of the sheet clears it with margin to spare. */}
+            <div className="flex shrink-0 justify-center pb-1 pt-1" style={{ backgroundColor: T.bgCard }}>
               <button
                 onClick={onClose}
-                className="shrink-0 rounded-xl p-2 transition hover:bg-black/10 active:scale-95"
-                style={{ color: T.textMuted }}
+                className="flex h-9 w-9 items-center justify-center rounded-full border transition hover:bg-black/10 active:scale-95"
+                style={{
+                  color: T.textMuted,
+                  borderColor: T.borderSoft,
+                }}
                 aria-label="Закрыть"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
