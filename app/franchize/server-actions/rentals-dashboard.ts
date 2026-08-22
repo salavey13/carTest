@@ -265,12 +265,15 @@ export async function getRentalsDashboard(input: {
         .order("created_at", { ascending: false }),
       // Query 2: rentals whose PERIOD overlaps the selected day
       // (start <= endOfDay AND end >= startOfDay)
+      // FIX: Exclude completed rentals - they were already counted on creation day
+      // for multi-day rentals to avoid double counting.
       supabaseAdmin
         .from("rentals")
         .select(baseSelect)
         .eq("vehicle.crew_id", crew.id)
         .lte("requested_start_date", endOfDay)
         .gte("requested_end_date", startOfDay)
+        .not("status", "completed")  // Exclude finished rentals (already counted)
         .order("created_at", { ascending: false }),
     ]);
 
