@@ -82,15 +82,20 @@ export function formatRuDate(date: Date | null | undefined): string {
 }
 
 /**
- * Format a Date as DD.MM.YYYY HH:mm.
+ * Format a Date as DD.MM.YYYY HH:mm in MSK timezone (UTC+3).
+ * Russia hasn't observed DST since 2014, so MSK is always UTC+3.
+ * Uses UTC methods on a +3h-shifted Date to be server/client timezone-independent.
  */
 export function formatRuDateTime(date: Date | null | undefined): string {
   if (!date || Number.isNaN(date.getTime())) return "—";
-  const dd = String(date.getDate()).padStart(2, "0");
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const yyyy = date.getFullYear();
-  const hh = String(date.getHours()).padStart(2, "0");
-  const min = String(date.getMinutes()).padStart(2, "0");
+  // Shift to MSK (UTC+3) and extract UTC components — works on both
+  // server (UTC) and client (any local timezone) without surprises.
+  const msk = new Date(date.getTime() + 3 * 60 * 60 * 1000);
+  const dd = String(msk.getUTCDate()).padStart(2, "0");
+  const mm = String(msk.getUTCMonth() + 1).padStart(2, "0");
+  const yyyy = msk.getUTCFullYear();
+  const hh = String(msk.getUTCHours()).padStart(2, "0");
+  const min = String(msk.getUTCMinutes()).padStart(2, "0");
   return `${dd}.${mm}.${yyyy} ${hh}:${min}`;
 }
 
