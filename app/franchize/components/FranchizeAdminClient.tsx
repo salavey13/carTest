@@ -908,6 +908,10 @@ export function FranchizeAdminClient({
               />
             </div>
           </>
+        ) : userCrewMemberships.length === 0 ? (
+          <div className="py-3 text-sm text-muted-foreground text-center">
+            Загрузка состава экипажа...
+          </div>
         ) : (
           <div className="py-3 text-sm text-muted-foreground text-center">
             Только администратор экипажа может редактировать технику.

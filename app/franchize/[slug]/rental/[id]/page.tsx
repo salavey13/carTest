@@ -19,7 +19,7 @@ import { RentalPhotoGallery } from "../../../components/RentalPhotoGallery";
 // goodmorning-polish: removed RentalTelegramGuard import (no longer used after streamline)
 import { crewPaletteForSurface, readablePaletteTextOnColor } from "../../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../../metadata";
-import { formatRuDate } from "../../../lib/date-utils";
+import { formatRuDate, formatRuDateTime } from "../../../lib/date-utils";
 // goodmorning-fixes: removed RentalEscapeHatch import (component no longer used —
 // its buttons were redundant + caused startapp-param stickiness in TG WebApp)
 import { RentalLink } from "../../../components/RentalLink";
@@ -359,9 +359,9 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               <p>
                 <span style={{ color: textSecondary }}>Период:</span>{" "}
                 <span className="font-semibold">
-                  {rental.agreedStartDate ? formatRuDate(new Date(rental.agreedStartDate)) : "?"}
+                  {rental.agreedStartDate ? formatRuDateTime(new Date(rental.agreedStartDate)) : "?"}
                   {" → "}
-                  {rental.agreedEndDate ? formatRuDate(new Date(rental.agreedEndDate)) : "?"}
+                  {rental.agreedEndDate ? formatRuDateTime(new Date(rental.agreedEndDate)) : "?"}
                 </span>
               </p>
             )}

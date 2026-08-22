@@ -724,7 +724,20 @@ export async function initiateTelegramRentalPhotoUpload(
         }
 
         if (photoType === 'start' && !['pending_confirmation', 'confirmed'].includes(rental.status)) {
-            return { success: false, error: 'Фото ДО доступно только до подтверждения получения.' };
+            // Allow 'active' status too if within ±2 hours of agreed_start_date.
+            // Operator might have flipped to active at handoff but still wants to
+            // capture pre-rental photos (passport, odometer, damage).
+            // Window is ±2h to account for timezone mismatches (UTC vs MSK).
+            if (rental.status === 'active' && rental.agreed_start_date) {
+                const startTime = new Date(rental.agreed_start_date).getTime();
+                const now = Date.now();
+                const TWO_HOURS = 2 * 60 * 60 * 1000;
+                if (Math.abs(now - startTime) >= TWO_HOURS) {
+                    return { success: false, error: 'Фото ДО доступно только до выдачи или в течение 2 часов после начала аренды.' };
+                }
+            } else {
+                return { success: false, error: 'Фото ДО доступно только до подтверждения получения.' };
+            }
         }
 
         if (photoType === 'end' && rental.status !== 'active') {

@@ -181,26 +181,26 @@ async function validateUpload(
     return { ok: false, error: "Аренда не найдена." };
   }
 
-  // Status check: start photos before pickup OR within 1 hour of start;
+  // Status check: start photos before pickup OR within ±2 hours of start;
   // end photos only when active.
-  // I4 enhancement: allow ДО photos for active rentals within 1 hour of
-  // agreed_start_date — operator might have flipped to active at handoff
-  // but still wants to capture pre-rental photos.
+  // Allow ДО photos for active rentals within ±2 hours of agreed_start_date.
+  // Window is ±2h (not ±1h) to account for timezone mismatches (UTC vs MSK)
+  // and operator delays during handoff.
   if (photoType === "start") {
     const allowedStatuses = ["pending_confirmation", "confirmed"];
-    // Also allow 'active' if within ±1 hour of agreed_start_date
+    // Also allow 'active' if within ±2 hours of agreed_start_date
     if (rental.status === "active" && rental.agreed_start_date) {
       const startTime = new Date(rental.agreed_start_date).getTime();
       const now = Date.now();
-      const ONE_HOUR = 60 * 60 * 1000;
-      if (Math.abs(now - startTime) < ONE_HOUR) {
+      const TWO_HOURS = 2 * 60 * 60 * 1000;
+      if (Math.abs(now - startTime) < TWO_HOURS) {
         allowedStatuses.push("active");
       }
     }
     if (!allowedStatuses.includes(rental.status)) {
       return {
         ok: false,
-        error: "Фото ДО можно добавить только до выдачи или в течение часа после начала аренды.",
+        error: "Фото ДО можно добавить только до выдачи или в течение 2 часов после начала аренды.",
       };
     }
   } else {
