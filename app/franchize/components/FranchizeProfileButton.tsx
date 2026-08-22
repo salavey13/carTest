@@ -44,6 +44,7 @@ const DEFAULT_NOTIFICATION_PREFERENCES: FranchizeNotificationPreferences = {
   orderUpdates: true,
   mapRidersAlerts: true,
   marketingDigest: false,
+  reviewRequests: true,
 };
 
 // FIX: De-biked notification option helper text.
@@ -52,6 +53,7 @@ const NOTIFICATION_OPTIONS: Array<{ key: keyof FranchizeNotificationPreferences;
   { key: "orderUpdates", label: "Статусы заказов", helper: "бронь, покупка, документы" },
   { key: "mapRidersAlerts", label: "MapRiders", helper: "заезды и встречи экипажа" },
   { key: "marketingDigest", label: "Редкие акции", helper: "промо и новости экипажа" },
+  { key: "reviewRequests", label: "Отзывы после аренды", helper: "просьба оставить отзыв после завершения" },
 ];
 
 // FIX: De-biked slug fallback. Was "vip-bike" — now empty string.
