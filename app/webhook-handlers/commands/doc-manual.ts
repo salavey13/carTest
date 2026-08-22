@@ -2166,7 +2166,9 @@ ${qrDeepLink}`);
         rent_end_date: context.rentEndDate || null,
         daily_price: Number(vars.daily_price_rub) || bike.specs?.dailyPrice || bike.specs?.rent_weekday || null,
         deposit_rub: depositForRecord,
-        total_sum: Number(vars.subtotal_rub) || Number(vars.pricing_tier_price_rub) || Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000"),
+        total_sum: context.priceOverridden
+          ? (context.cashAmount || 0) + (context.bankAmount || 0)
+          : (Number(vars.subtotal_rub) || Number(vars.pricing_tier_price_rub) || Number(bike.specs?.dailyPrice || bike.specs?.rent_weekday || "10000")),
         template_version: 1,
         rental_id: rentalId || null,  // FK to rentals table if rental was created
         // СТС pledge columns (added 2026-06-17):

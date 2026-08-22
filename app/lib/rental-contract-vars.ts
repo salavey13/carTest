@@ -795,8 +795,16 @@ export function buildRentalContractVariables(
       : '',
     // Tier-aware pricing (for quick-info and section 4.1)
     pricing_tier_label: tierLabel || 'сутки',
-    pricing_tier_price_rub: String(Math.round(tierPrice || subtotalRounded)),
-    pricing_tier_unit: tierUnit || 'за сутки',
+    // 2026-08-22 fix: when operator overrode the price, the DOCX template
+    // should show the overridden price (not the original tier price).
+    // Previously `tierPrice || subtotalRounded` always returned the original
+    // tier price (e.g. 9000₽ for weekend) even when the operator set 4000₽.
+    pricing_tier_price_rub: String(
+      options.priceOverridden
+        ? Math.round(rentAndEquipment)
+        : Math.round(tierPrice || subtotalRounded)
+    ),
+    pricing_tier_unit: options.priceOverridden ? 'итого' : (tierUnit || 'за сутки'),
     // Equipment
     equipment_helmets: String(options.equipment?.helmets || 0),
     equipment_gloves: String(options.equipment?.gloves || 0),
