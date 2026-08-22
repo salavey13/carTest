@@ -1,25 +1,23 @@
 ---
 name: franchize-catalog-text
 description: >
-  Text-based catalog for VIP Bike franchise. Query bikes, equipment, pricing, availability via Supabase
+  Text-based catalog for VIP Bike franchise. Query bikes, pricing, availability via Supabase
   REST API (curl). Outputs formatted text — no UI, no JSON blobs.
   Trigger phrases (RU): "каталог байков", "список байков", "сколько стоит аренда",
   "доступность байка", "покажи байки", "какие байки есть", "цена байка", "залог за байк",
-  "характеристики байка", "свободен ли байк", "бронь байка", "экипировка", "снаряжение",
-  "шлемы", "куртки", "перчатки".
+  "характеристики байка", "свободен ли байк", "бронь байка".
   Trigger phrases (EN): "bike catalog", "bike list", "bike pricing", "bike availability",
-  "show bikes", "bike specs", "bike deposit", "is bike free", "bike tier prices",
-  "equipment", "gear", "helmets", "jackets", "gloves".
+  "show bikes", "bike specs", "bike deposit", "is bike free", "bike tier prices".
 ---
 
 # Franchize Catalog (text) — VIP Bike
 
-Триггер-фразы (RU): **`каталог байков`**, **`список байков`**, **`сколько стоит аренда`**, **`доступность байка`**, **`покажи байки`**, **`какие байки есть`**, **`цена байка`**, **`залог за байк`**, **`характеристики байка`**, **`свободен ли байк`**, **`бронь байка`**, **`экипировка`**, **`снаряжение`**, **`шлемы`**, **`куртки`**, **`перчатки`**.
-Триггер-фразы (EN): `bike catalog`, `bike list`, `bike pricing`, `bike availability`, `show bikes`, `bike specs`, `bike deposit`, `is bike free`, `bike tier prices`, `equipment`, `gear`, `helmets`, `jackets`, `gloves`.
+Триггер-фразы (RU): **`каталог байков`**, **`список байков`**, **`сколько стоит аренда`**, **`доступность байка`**, **`покажи байки`**, **`какие байки есть`**, **`цена байка`**, **`залог за байк`**, **`характеристики байка`**, **`свободен ли байк`**, **`бронь байка`**.
+Триггер-фразы (EN): `bike catalog`, `bike list`, `bike pricing`, `bike availability`, `show bikes`, `bike specs`, `bike deposit`, `is bike free`, `bike tier prices`.
 
 ## Overview
 
-Text-based эквивалент каталога ТС и экипировки для экипажа `vip-bike`. Читает таблицу `public.cars` через Supabase REST API (PostgREST), фильтрует по `crew_id = 2d5fde70-1dd3-4f0d-8d72-66ccf6908746` и `type IN (bike, equipment)`, выводит форматированную текстовую таблицу. Также читает `public.rentals` для проверки доступности конкретного байка на дату.
+Text-based эквивалент каталога ТС для экипажа `vip-bike`. Читает таблицу `public.cars` через Supabase REST API (PostgREST), фильтрует по `crew_id = 2d5fde70-1dd3-4f0d-8d72-66ccf6908746` и `type = bike`, выводит форматированную текстовую таблицу. Также читает `public.rentals` для проверки доступности конкретного байка на дату.
 
 Skill использует только `curl` к Supabase REST API и стандартные shell-утилиты. Не запускает Node.js сервер, не требует сборки Next.js.
 
@@ -32,8 +30,6 @@ Use this skill when:
 - Нужно показать полные спецификации одного байка (specs jsonb, image_url, availability_rules).
 - Нужно проверить, свободен ли байк на конкретную дату (на основе активных/подтверждённых аренд).
 - Нужно ответить клиенту в Telegram «какие байки есть» без открытия браузера.
-- **NEW**: Нужно посмотреть список доступной экипировки (шлемы, куртки, перчатки и т.д.) и их арендные цены.
-- **NEW**: Нужно рассчитать стоимость аренды экипировки на несколько дней с учётом скидки 50% со второго дня.
 
 ## Supabase Access
 
@@ -53,7 +49,7 @@ HDR_PUBLIC=(-H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" -H "Authorization: Bearer 
 
 ## Commands
 
-### 1. `list-bikes [--type bike|scooter|equipment|all]` — список ТС и экипировки экипажа
+### 1. `list-bikes [--type bike|scooter|all]` — список ТС экипажа
 
 ```bash
 # Все байки (type=bike)
@@ -247,86 +243,7 @@ select=quantity\
 
 ---
 
-### 5. `list-equipment [--category helmet|jacket|pants|gloves|boots|security|electronics|all]` — список экипировки
-
-```bash
-# Вся экипировка
-curl -sS "${SUPABASE_URL}/rest/v1/cars?\
-select=id,make,model,daily_price,image_url,specs,type\
-&crew_id=eq.${CREW_ID}&type=eq.equipment&is_test_result=eq.false\
-&order=make.asc,model.asc" \
-  "${HDR_PUBLIC[@]}"
-
-# Только шлемы
-curl -sS "${SUPABASE_URL}/rest/v1/cars?\
-select=id,make,model,daily_price,specs\
-&crew_id=eq.${CREW_ID}&type=eq.equipment&is_test_result=eq.false\
-&specs->>category=eq.helmet\
-&order=make.asc" \
-  "${HDR_PUBLIC[@]}"
-```
-
-**Пример вывода:**
-
-```
-=== Экипировка vip-bike — 6 позиций ===
-ID                     Марка             Модель                   Цена/день     Размеры       Характеристики
-──────────────────────  ────────────────  ────────────────────────  ──────────  ─────────────  ─────────────────────────────
-shoei-x15              Shoei             X15                      1 000 ₽      S/M/L/XL       badge=DOT, materials=фибerglass
-alpinestars-titanium   Alpinestars       Titanium                 800 ₽        M/L            materials=кожа, features=защита пальцев
-fox-rampage            Fox               Rampage Pro              500 ₽         S/M/L          features=вентиляция
-dainese-trousers       Dainese           TRQ-Tour                 600 ₽         48-54          materials=кевлар, features=защита колен
-...
-
-— Цены с учётом скидки 50% со второго дня —
-  Shoei X15:      День 1 — 1 000 ₽,  Дни 2+ — 500 ₽/день
-  Alpinestars:     День 1 — 800 ₽,   Дни 2+ — 400 ₽/день
-  Fox Rampage:    День 1 — 500 ₽,   Дни 2+ — 250 ₽/день
-```
-
-🌐 Web: `https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/equipment`
-
----
-
-### 6. `equipment-pricing <itemId> <days>` — расчёт стоимости аренды экипировки
-
-```bash
-ITEM_ID="shoei-x15"
-DAYS=3
-
-# Получаем базовую цену
-DAILY_PRICE=$(curl -sS "${SUPABASE_URL}/rest/v1/cars?\
-select=daily_price\
-&id=eq.${ITEM_ID}&crew_id=eq.${CREW_ID}" \
-  "${HDR_PUBLIC[@]}" | jq -r '.[0].daily_price')
-
-# Расчёт: день 1 = полная цена, дни 2+ = 50% скидка
-BASE_PRICE=$((DAILY_PRICE * DAYS))
-DISCOUNT=$((DAYS > 1 ? (DAILY_PRICE * (DAYS - 1)) / 2 : 0))
-TOTAL_PRICE=$((BASE_PRICE - DISCOUNT))
-
-echo "=== Стоимость аренды на ${DAYS} дней ==="
-echo "Базовая цена: ${BASE_PRICE} ₽"
-echo "Скидка (дни 2+): ${DISCOUNT} ₽"
-echo "Итого: ${TOTAL_PRICE} ₽"
-```
-
-**Пример вывода:**
-
-```
-=== Стоимость аренды Shoei X15 на 3 дня ===
-Базовая цена: 3 000 ₽ (1 000 × 3)
-Скидка (дни 2+): 1 000 ₽ (50% на 2 дня)
-Итого: 2 000 ₽
-
-Детализация:
-  День 1: 1 000 ₽ (полный)
-  Дни 2-3: 500 ₽/день (50% скидка)
-```
-
----
-
-### 7. `find-bike <query>` — поиск байка по марке/модели
+### 5. `find-bike <query>` — поиск байка по марке/модели
 
 ```bash
 QUERY="BMW"
@@ -357,7 +274,7 @@ bmw-r1250rs            BMW               R1250RS                  12 000 ₽    
 
 ### Public schema
 
-- `cars` — `id` (text PK), `make`, `model`, `description`, `embedding` (vector), `daily_price`, `image_url`, `rent_link`, `is_test_result`, `specs` (jsonb — для байков: `dailyPrice`, `rent_weekday`, `rent_weekend`, `rent_2_4d`, `rent_5_10d`, `rent_11_30d`, `deposit_rub`, `color`, `year`, `vin`, `power_kw`, `battery_kwh`, `range_km`, `weight_kg`; для экипировки: `category` (helmet/jacket/pants/gloves/boots/security/electronics), `sizes` (array), `badge`, `materials`, `features`), `owner_id`, `type` (`bike` / `scooter` / `car` / `service` / `equipment`), `crew_id`, `availability_rules` (jsonb — `available`, `season`, `min_rental_days`, `max_rental_days`, `notice_hours`), `quantity`.
+- `cars` — `id` (text PK), `make`, `model`, `description`, `embedding` (vector), `daily_price`, `image_url`, `rent_link`, `is_test_result`, `specs` (jsonb — `dailyPrice`, `rent_weekday`, `rent_weekend`, `rent_2_4d`, `rent_5_10d`, `rent_11_30d`, `deposit_rub`, `color`, `year`, `vin`, `power_kw`, `battery_kwh`, `range_km`, `weight_kg`), `owner_id`, `type` (`bike` / `scooter` / `car` / `service`), `crew_id`, `availability_rules` (jsonb — `available`, `season`, `min_rental_days`, `max_rental_days`, `notice_hours`), `quantity`.
 - `rentals` — `rental_id`, `user_id`, `vehicle_id`, `status`, `requested_start_date`, `requested_end_date`, `agreed_start_date`, `agreed_end_date`, `crew_id`. Используется только для проверки доступности.
 - `crews` — `id`, `slug`, `name`. Используется для резолва `crew_id` по `slug`.
 
@@ -367,14 +284,13 @@ Catalog skill не использует private schema.
 
 ## Web Links
 
-| Command               | Web page                                                                                    |
-|-----------------------|----------------------------------------------------------------------------------------------|
-| `list-bikes`          | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro      |
-| `list-equipment`      | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/equipment             |
-| `bike-detail`         | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro      |
-| `equipment-pricing`   | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/equipment             |
-| `check-availability`  | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro      |
-| `find-bike`           | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro      |
+| Command            | Web page                                                                              |
+|--------------------|---------------------------------------------------------------------------------------|
+| `list-bikes`       | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro  |
+| `bike-detail`      | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro  |
+| `bike-pricing`     | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro  |
+| `check-availability`| https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro |
+| `find-bike`        | https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/electro-enduro  |
 
 ## Anti-hallucination: флаги, которых НЕ существует
 
@@ -388,7 +304,6 @@ Catalog skill не использует private schema.
 - ~~`--format csv|md`~~ — не существует. Только текстовая таблица.
 - ~~`bike-detail --withRentals`~~ — не существует. Для аренд байка используйте `rental-card-text` skill.
 - ~~`check-availability --range <start> <end>`~~ — не существует. Только одна дата. Для диапазона вызовите команду несколько раз.
-- ~~`equipment-pricing --percent <number>`~~ — не существует. Скидка экипировки всегда 50% со второго дня (hardcoded бизнес-логика).
 
 ## Error Handling
 

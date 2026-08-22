@@ -86,31 +86,6 @@ bash ~/.claude/skills/catalog-adder-text/catalog-add.sh get-reference falcon-lit
 ```
 Открыть в браузере: `https://vip-bike.ru/rent/falcon-lite-2026` (или на фронте каталога `/franchize/vip-bike`).
 
-### 5b. ⚠️ JSON типы — строго boolean/number, не строки
-
-В `specs` jsonb используй **настоящие** JSON типы, НЕ строки:
-
-| Поле | ❌ НЕ правильно (string) | ✅ Правильно (boolean/number) |
-|---|---|---|
-| `rent` | `"1"` / `"true"` / `"false"` | `1` (number) для включения, `0` для выключения |
-| `sale` | `"true"` / `"false"` | `true` / `false` (boolean) |
-| `hidden` | `"false"` / `"true"` | `false` / `true` (boolean) |
-| `rent_weekend`, `price_per_hour`, etc. | `"15000"` | `15000` (number) |
-
-Код в `app/franchize/lib/catalog-utils.ts:isSpecExplicitlyEnabled` ДЕЛАЕТ fallback на строки (через `String(value).toLowerCase() === "1"`), но это defensive coding, не повод писать кривые данные. Строковые значения ломают:
-- строгие `=== true` / `=== 1` проверки (встречаются в нескольких местах)
-- JSON Schema валидацию (если добавим)
-- API контракты для будущих потребителей
-
-Если увидишь в `specs` строковые булевы/числа — нормализуй через:
-```bash
-node scripts/normalize-bike-specs.js  # (см. пример в репозитории)
-```
-
-### 5c. `rent_link` — устаревшая колонка (legacy)
-
-Колонка `cars.rent_link` была частью старой не-franchize версии сайта аренды. **Сейчас не используется** — `/rent/{bikeId}` роут резолвится динамически через `[slug]` + `bikeId`. Можно оставлять `null` или не трогать. Не добавляй в новые INSERT'ы.
-
 ## Supabase Access
 
 ```bash

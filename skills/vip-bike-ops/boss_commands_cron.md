@@ -8,57 +8,7 @@
 > (salavey13, admin). When the bot-to-chat-reply flow is built, this will
 > change — but for now, this is the testing pipeline.
 
-> ⚠️ **CRON SCHEDULE CHANGE NOTICE (2026-08-10)** ⚠️
->
-> If your VPS crontab currently has `evening-summary.sh` scheduled at `0 17 * * *`
-> (= 20:00 MSK / 8pm), you MUST update it to `0 18 * * *` (= 21:00 MSK / 9pm)
-> to match the schedule documented below.
->
-> **To update:**
-> ```bash
-> # SSH to VPS, then:
-> crontab -e
-> # Find the line:
-> #   0 17 * * * /home/z/my-project/analytics/boss-commands/evening-summary.sh ...
-> # Change "0 17" to "0 18" and save.
->
-> # Verify:
-> crontab -l | grep evening-summary
-> # Should show: 0 18 * * * /home/z/my-project/analytics/boss-commands/evening-summary.sh ...
-> ```
->
-> The script header was already correct (`0 18 * * *` = 21:00 MSK), but the
-> actual VPS cron was set to 20:00 — this update brings them in sync.
->
-> **Why 21:00 instead of 20:00?** At 21:00 most rentals due for return that day
-> have actually been returned, so the "Активные аренды" section in the digest
-> shows meaningful "до 21:00 МСК" entries rather than still-pending returns.
-> 20:00 was too early — operators were getting the digest while rentals were
-> still actively being closed.
-
-> 🐛 **BUG FIX (2026-08-10): UTC vs MSK display bug** 🐛
->
-> Previously, all cron notification scripts (`returns-reminder.sh`,
-> `evening-summary.sh`, `morning-standup.sh`, `overdue-alert.sh`) displayed
-> times in **UTC** without converting to Moscow time. Operators reading
-> "до 18:00 UTC" interpreted "18:00" as MSK (which happened to match the
-> rental's START time), making them think the scripts were showing start
-> times instead of end times.
->
-> **Fix**: All scripts now use the `moscow_hhmm()` and `moscow_fmt()` helpers
-> from `_lib.sh` to convert ISO timestamps to Moscow time before display.
-> Times now appear as "до 21:00 МСК" instead of "до 18:00 UTC" — explicit
-> timezone label removes all ambiguity.
->
-> Affected scripts (all fixed in this update):
-> - `returns-reminder.sh` — "до HH:MM МСК" (was "до HH:MM UTC")
-> - `evening-summary.sh` — "до HH:MM МСК" (was "до HH:MM UTC")
-> - `morning-standup.sh` — "до HH:MM МСК" + "с DD.MM.YYYY HH:MM МСК" (was UTC slices)
-> - `overdue-alert.sh` — "возврат был DD.MM.YYYY HH:MM" (was UTC date+time slices)
-
-
-
-
+---
 
 ## 1. Architecture
 
@@ -94,7 +44,7 @@
 bot does NOT listen for replies yet (that's the future "interactive bot"
 phase). For now this is a one-way notification pipeline.
 
-
+---
 
 ## 2. Files
 
@@ -112,7 +62,7 @@ boss-commands/
 All scripts support `--dry-run` to print to stdout instead of sending Telegram
 (useful for debugging without spamming the admin).
 
-
+---
 
 ## 3. Cron schedule table
 
@@ -161,7 +111,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 Logs go to `/var/log/vip-bike-ops.log` — rotate with logrotate or truncate manually.
 
-
+---
 
 ## 4. Per-command detail
 
@@ -207,7 +157,7 @@ Logs go to `/var/log/vip-bike-ops.log` — rotate with logrotate or truncate man
 **PII masking**: user_id shown as `XXXXXXXX…` (first 8 chars). Phone never shown.
 **Fail-safe**: if any query fails, that section shows "Нет данных" instead of crashing.
 
-
+---
 
 ### 4.2 evening-summary.sh — 📊 Итоги дня
 
@@ -249,7 +199,7 @@ Logs go to `/var/log/vip-bike-ops.log` — rotate with logrotate or truncate man
 
 **Defensive parsing**: `sale_price` can be a string with spaces ("420 000") — the jq filter strips spaces and uses `tonumber? // 0` fallback.
 
-
+---
 
 ### 4.3 returns-reminder.sh — ⏰ Returns reminder
 
@@ -275,7 +225,7 @@ Logs go to `/var/log/vip-bike-ops.log` — rotate with logrotate or truncate man
 
 **Why silent**: this runs 13 times a day (every hour 09-21). If it always sent, the admin would get 13 messages/day even on days with zero returns. Silent mode = signal, not noise.
 
-
+---
 
 ### 4.4 overdue-alert.sh — 🔴 Overdue alert
 
@@ -305,7 +255,7 @@ Logs go to `/var/log/vip-bike-ops.log` — rotate with logrotate or truncate man
 **Queries** (1):
 1. `rentals?status=eq.active&agreed_end_date=lt.<now_utc>` → all overdue active rentals
 
-
+---
 
 ### 4.5 qr-claim-watchdog.sh — 🔴 QR claim watchdog
 
@@ -335,7 +285,7 @@ Logs go to `/var/log/vip-bike-ops.log` — rotate with logrotate or truncate man
 
 **17h threshold**: matches the leads page's `unclaimed_qr_age` SLA signal threshold (yellow > 17h, red > 48h).
 
-
+---
 
 ### 4.6 weekly-revenue.sh — 📅 Weekly revenue
 
@@ -369,7 +319,7 @@ Logs go to `/var/log/vip-bike-ops.log` — rotate with logrotate or truncate man
 
 Plus a `group_by(.vehicle_id)` jq aggregation for top-3 bikes by rental revenue.
 
-
+---
 
 ## 5. _lib.sh — shared library API
 
@@ -410,7 +360,7 @@ Every boss script sources `_lib.sh` at the top. The library provides:
 
 5. **Secrets parsing**: `_lib.sh` reads `SECRETS_FILE` (default `/home/z/my-project/upload/secrets.txt`) and parses `key=value` lines. The bot token is on line 3 as a bare string (no key=) — `_lib.sh` extracts it explicitly via `sed -n '3p'`.
 
-
+---
 
 ## 6. Testing workflow
 
@@ -460,7 +410,7 @@ done
 bash -x ./morning-standup.sh --dry-run 2>&1 | less
 ```
 
-
+---
 
 ## 7. Future: bot-to-chat-reply flow
 
@@ -492,7 +442,7 @@ FUTURE (two-way chat):
 - All 6 boss-command scripts will work as both cron-triggered AND bot-triggered.
 - The cron schedule stays — even when the bot is live, cron still pushes morning-standup at 09:00.
 
-
+---
 
 ## 8. Adding a new boss command
 
@@ -562,7 +512,7 @@ else
 fi
 ```
 
-
+---
 
 ## 9. Anti-hallucination reminders for cron authors
 
@@ -579,7 +529,7 @@ When writing a new boss command:
 9. **Don't fail loudly** — if a query errors, log it and continue. The admin should still get the other sections of the digest.
 10. **Don't spam** — silent scripts should stay silent when there's nothing to report. A daily "0 overdue rentals" message is noise.
 
-
+---
 
 ## 10. Operations runbook
 

@@ -132,7 +132,7 @@ node skills/qr-deeplink-on-demand/scripts/generate-qr.mjs \
 4. **Email signature embed** — Embed the PNG vCard in your email signature
    so every email you send advertises crew creation.
 
-5. **Boss-command integration** — When the boss agent identifies a priority lead
+5. **Boss-command integration** — When the boss agent identifies a hot lead
    who wants to start their own franchise, automatically generate the PDF
    card and send it to the lead's Telegram chat:
 
