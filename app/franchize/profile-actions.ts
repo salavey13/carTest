@@ -52,6 +52,7 @@ export type FranchizeNotificationPreferences = {
   orderUpdates: boolean;
   mapRidersAlerts: boolean;
   marketingDigest: boolean;
+  reviewRequests: boolean;
 };
 
 const FRANCHIZE_ACHIEVEMENT_CAPABILITIES = {
@@ -85,6 +86,7 @@ const DEFAULT_NOTIFICATION_PREFERENCES: FranchizeNotificationPreferences = {
   orderUpdates: true,
   mapRidersAlerts: true,
   marketingDigest: false,
+  reviewRequests: true,
 };
 
 function normalizeSlug(slug: string): string {
@@ -102,6 +104,7 @@ function normalizeNotificationPreferences(value: unknown): FranchizeNotification
     mapRidersAlerts:
       typeof raw.mapRidersAlerts === "boolean" ? raw.mapRidersAlerts : DEFAULT_NOTIFICATION_PREFERENCES.mapRidersAlerts,
     marketingDigest: typeof raw.marketingDigest === "boolean" ? raw.marketingDigest : DEFAULT_NOTIFICATION_PREFERENCES.marketingDigest,
+    reviewRequests: typeof raw.reviewRequests === "boolean" ? raw.reviewRequests : DEFAULT_NOTIFICATION_PREFERENCES.reviewRequests,
   };
 }
 

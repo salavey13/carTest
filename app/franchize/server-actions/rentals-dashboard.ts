@@ -1983,9 +1983,10 @@ export async function updateRentalStatus(input: {
     // ── Fetch current rental for metadata merge + renter chat_id ──
     // S5 fix: include vehicle.id in SELECT — needed for the bike-specs odometer save below.
     // Was: vehicle:cars(make, model) only → vehicle.id was always undefined → save never fired.
+    // 2026-08-22: also include crew_id — needed for sendReviewNudge() to resolve crew.reviewsLink.
     const { data: rental } = await supabaseAdmin
       .from("rentals")
-      .select("rental_id, status as old_status, metadata, user_id, vehicle:cars(id, make, model)")
+      .select("rental_id, status as old_status, metadata, user_id, crew_id, vehicle:cars(id, make, model)")
       .eq("rental_id", rentalId)
       .maybeSingle();
 
@@ -2060,6 +2061,28 @@ export async function updateRentalStatus(input: {
         });
       } catch (tgErr) {
         console.warn("[update-rental-status] TG notify failed (non-fatal):", tgErr);
+      }
+
+      // ── Send review nudge as a separate message when status is 'completed' ──
+      // PRD v0.4 Feature 1 — see docs/PRD_LIFECYCLE_MESSAGING.md
+      // The receipt message above says "Аренда завершена" but doesn't include
+      // a review link. The nudge is a separate message with a Yandex Maps button.
+      if (status === "completed") {
+        try {
+          const { sendReviewNudge } = await import("@/app/franchize/lib/lifecycle-messaging");
+          await sendReviewNudge({
+            rental: {
+              rental_id: rentalId,
+              user_id: rental?.user_id ?? null,
+              crew_id: rental?.crew_id ?? null,
+              vehicle: rental?.vehicle as { make?: string; model?: string } | null,
+              metadata: rental?.metadata as Record<string, unknown> | null,
+            },
+            renterChatId,
+          });
+        } catch (nudgeErr) {
+          console.warn("[update-rental-status] Review nudge failed (non-fatal):", nudgeErr);
+        }
       }
     }
 

@@ -1601,7 +1601,7 @@ export async function confirmVehicleReturn(
                 if (closureData?.damageNotes) {
                     receiptParts.push(`📝 Заметки: ${closureData.damageNotes}`);
                 }
-                receiptParts.push(``, `Спасибо за аренду! Будем рады отзыву.`);
+                receiptParts.push(``, `Спасибо за аренду!`);
 
                 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
                 await fetch(`${siteUrl}/api/forward-telegram`, {
@@ -1617,6 +1617,27 @@ export async function confirmVehicleReturn(
                     }),
                     signal: AbortSignal.timeout(10000),
                 });
+
+                // ── Send review nudge as a separate message (PRD v0.4 Feature 1) ──
+                // The receipt says "Спасибо за аренду!" but no longer includes the
+                // buried "Будем рады отзыву" nudge — that's now a separate message
+                // with a Yandex Maps review button. See docs/PRD_LIFECYCLE_MESSAGING.md
+                try {
+                    const { sendReviewNudge } = await import("@/app/franchize/lib/lifecycle-messaging");
+                    await sendReviewNudge({
+                        rental: {
+                            rental_id: rental.rental_id,
+                            user_id: rental.user_id,
+                            crew_id: rental.crew_id,
+                            vehicle_id: rental.vehicle_id,
+                            vehicle: rental.vehicle as { make?: string | null; model?: string | null } | null,
+                            metadata: rental.metadata as Record<string, unknown> | null,
+                        },
+                        renterChatId: receiptChatId,
+                    });
+                } catch (nudgeErr) {
+                    logger.warn(`[confirmVehicleReturn] Review nudge failed (non-fatal):`, nudgeErr);
+                }
             } catch (tgErr) {
                 logger.warn(`[confirmVehicleReturn] Receipt notify failed (non-fatal):`, tgErr);
             }
