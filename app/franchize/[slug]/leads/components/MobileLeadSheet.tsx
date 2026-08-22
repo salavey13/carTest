@@ -159,8 +159,11 @@ export function MobileLeadSheet({ open, onClose, children, title, T }: MobileLea
             onDragEnd={handleDragEnd}
           >
             {/* Sticky header — drag handle + title + close button */}
+            {/* pr-16 reserves space on the right for Telegram's native floating
+                back/close button (top-right of WebApp viewport). Without this
+                padding, our X button overlaps the native button and is untappable. */}
             <div
-              className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-3"
+              className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 pr-16 pb-2 pt-3"
               style={{
                 backgroundColor: T.bgCard,
                 borderBottom: `1px solid ${T.borderSoft}`,
