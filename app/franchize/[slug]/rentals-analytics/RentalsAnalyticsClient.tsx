@@ -1302,11 +1302,7 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                               </span>
                             </td>
                             <td className="px-3 md:px-5 py-3 md:py-4">
-                              <div className="text-xs md:text-sm font-semibold leading-tight" style={{ color: textPrimary }}>{rental.renter_full_name
-  || (rental.isOperatorPlaceholder ? "Клиент (имя в договоре)" : null)
-  || rental.user?.full_name
-  || rental.user?.username
-  || "—"}</div>
+                              <div className="text-xs md:text-sm font-semibold leading-tight" style={{ color: textPrimary }}>{rental.documentSecret?.renter_full_name || rental.user?.full_name || rental.user?.username || "—"}</div>
                               <div className="text-[10px] md:text-xs mt-0.5" style={{ color: textSecondary }}>
                                 {rental.vehicle?.make} {rental.vehicle?.model}
                               </div>
