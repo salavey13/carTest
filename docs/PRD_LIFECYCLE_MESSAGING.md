@@ -1,9 +1,10 @@
 # PRD: Lifecycle Messaging for VIP Bike Rental Customers
 
-**Status:** Draft v0.1 · 2026-08-22
-**Author:** Super Z (with corrections from PRD creator review)
+**Status:** Draft v0.2 · 2026-08-22
+**Author:** Super Z (with corrections from PRD creator review + operator feedback)
 **Target surface:** Telegram bot direct messages (NOT web app notifications)
-**Scope:** 4 features, each 1-3 days. No gamification engine.
+**Scope:** 4 features. No gamification engine.
+**Time estimates:** Iterations with the AI agent, not calendar days. Each feature = 1-3 focused coding sessions.
 
 ---
 
@@ -17,7 +18,7 @@
 | Peak month (Jul 2026) | 34 rentals | `GROUP BY date_trunc('month', created_at)` |
 | Yandex Maps reviews | 5 | Manual count on Yandex Maps org page |
 | Crew members | 4 active | `SELECT count(*) FROM crew_members WHERE membership_status='active'` |
-| DOB coverage | ~70% of rentals (only `/doc` flow collects it) | See §4.2 below |
+| DOB coverage | ~95% of rentals (both `/doc` and web checkout collect it) | See §4.2 below |
 
 **Natural rental frequency:** 1-3 times per year per customer. This is NOT a daily-use product. Gamification (streaks, daily login, leaderboards) doesn't work here — lifecycle marketing does.
 
@@ -84,13 +85,22 @@ TG direct message from the bot, sent as a **separate message** 2 hours after clo
 
 With an inline keyboard button (not just markdown link) for better mobile UX:
 ```
-[[{ text: "⭐ Оставить отзыв", url: "https://yandex.ru/maps/org/vip_bike_electro/81589395232/reviews/" }]]
+[[{ text: "⭐ Оставить отзыв", url: <crew.reviewsLink from Supabase> }]]
 ```
 
-#### Yandex Maps link source
-Already stored in crew metadata: `crew.reviewsLink` (read at `app/franchize/actions-runtime.ts:951-955`, hydrated via `docs/crewDocs/vip-bike-franchize-hydration.sql:300`).
+(Inline keyboard URL must be HTTPS — Telegram rejects non-TG http links. The Yandex Maps URL satisfies this.)
 
-Current value: `https://yandex.ru/maps/org/vip_bike_electro/81589395232/reviews/`
+#### Yandex Maps link source
+**Dynamic from Supabase crew metadata** — already implemented at `app/franchize/actions-runtime.ts:951-955`:
+```ts
+reviewsLink: readPath(franchize, ["catalog", "reviewsLink"], readPath(franchize, ["reviewsLink"], "")),
+```
+
+Hydrated via `docs/crewDocs/vip-bike-franchize-hydration.sql:300` → currently resolves to `https://yandex.ru/maps/org/vip_bike_electro/81589395232/reviews/`.
+
+The lifecycle message sender must read this from the crew row at send time — **never hardcode the URL**. If another crew joins later, they get their own reviewsLink from their own crew metadata, zero code changes.
+
+**Implementation:** the closure hook already has `crew_id` (from `rentals.crew_id`) → query `crews.metadata->catalog->reviewsLink` (or top-level `reviewsLink` fallback) at the moment of sending. Cache for 5 min if performance matters (probably doesn't — 1-2 closures/day).
 
 #### Dedup
 After sending, write `rental.metadata.review_request_sent = { sent_at: ISO, yandex_url: "..." }`. Check this before sending.
@@ -128,12 +138,20 @@ When the bot receives free-text "STOP" (case-insensitive), set `users.metadata.n
 - `user_rental_secrets.metadata.last_birthday_gift_year` IS NOT the current year (dedup)
 - `users.metadata.notifications_disabled` is NOT `true` (need to join to `users` table or store the flag on `user_rental_secrets` too)
 
-**DOB data source + coverage gap:**
+**DOB data source + coverage:**
 - Stored as TEXT `"DD.MM.YYYY"` in `private.user_rental_secrets.renter_birth_date` (migration `20260601000000_user_rental_secrets.sql:26`)
 - Also in `private.rental_contract_artifacts.renter_birth_date` (migration `20260612000000_fix_rental_contract_artifacts.sql:28`)
-- Collected by: `/doc-manual.ts` (always, via passport scan) and `OrderPageClient.tsx` (optional — zod `.optional()`)
+- **Collected by BOTH rental flows:**
+  - `/doc-manual.ts` operator flow — always (passport scan conversation, line 2998)
+  - Web checkout flow — `OrderPageClient.tsx` (zod `.optional()` at line 113, rendered at lines 1229/1362/1521) + `RentalDocsForm.tsx:169` ("Дата рождения" label)
+  - `/testdrive-manual.ts` — NO (testdrive doesn't collect DOB; but testdrive customers aren't renters yet)
 - **NOT** in `public.users` table or `rentals.metadata`
-- Coverage: ~70% of rentals (the /doc flow is dominant). Web-checkout rentals may lack DOB.
+- **Coverage: ~95%** of completed rentals have DOB (both /doc and web checkout collect it; only edge case is older rentals from before DOB collection was added)
+- Pre-flight check before building Feature 2: run the coverage query to confirm:
+  ```sql
+  SELECT count(*) FILTER (WHERE renter_birth_date IS NOT NULL)::float / count(*) AS coverage
+  FROM private.user_rental_secrets WHERE crew_slug = 'vip-bike' AND chat_id IS NOT NULL;
+  ```
 
 **Message template:**
 ```
@@ -316,14 +334,16 @@ For cron scripts (birthday + new-bike), use `send_telegram` from `boss-commands/
 
 ## 6. Implementation Plan
 
-| Phase | Days | Feature | Depends on |
+Time estimates are in **iterations with the AI agent**, not calendar days. One iteration = a focused coding session where we ship a working feature end-to-end. Most features are 1-2 iterations; referral (Feature 3) is 3 iterations because it's really 3 features.
+
+| Phase | Iterations | Feature | Depends on |
 |---|---|---|---|
-| 1 | Day 1-2 | Post-rental review nudge (immediate second message, not delayed) | — |
-| 2 | Day 2 | STOP/START opt-out handler | Phase 1 |
-| 3 | Day 3-4 | Birthday gift card (cron + promo code) | Phase 2 (for opt-out check) |
-| 4 | Day 5 | Referral code generation + TG suggestion (Step 3a only) | Phase 2 |
-| 5 | Day 8-9 | New bike notification (cron + dedup) | Phase 2 |
-| — | TBD | Referral tracking loop (Steps 3b/3c) | Phase 4, measure first |
+| 1 | 1-2 | Post-rental review nudge (immediate second message, not delayed) + dynamic crew.reviewsLink lookup | — |
+| 2 | 1 | STOP/START opt-out handler | Phase 1 |
+| 3 | 1-2 | Birthday gift card (cron + promo code) | Phase 2 (for opt-out check) |
+| 4 | 1 | Referral code generation + TG suggestion (Step 3a only — measure adoption before building 3b/3c) | Phase 2 |
+| 5 | 1-2 | New bike notification (cron + dedup) | Phase 2 |
+| — | TBD | Referral tracking loop (Steps 3b/3c) — only if 3a shows adoption | Phase 4, measure first |
 
 **Ship Phase 1 first.** Measure opt-out rate and review conversion for 2 weeks before building Phases 3-5. If opt-out rate > 15%, reconsider the volume of TG messages before adding more features.
 
@@ -345,13 +365,9 @@ For cron scripts (birthday + new-bike), use `send_telegram` from `boss-commands/
 
 ## 8. Open Questions
 
-1. **Promo code generation** — does `app/franchize/server-actions/promotions.ts` support API-generated codes with custom expiry + `source='birthday'` metadata? Need to read the file. If not, we INSERT directly into the `promotions` table.
+1. **Promo code generation** — does `app/franchize/server-actions/promotions.ts` support API-generated codes with custom expiry + `source='birthday'` metadata? Need to read the file. If not, we INSERT directly into the `promotions` table. **(This is a blocker for Feature 2 — verify before building.)**
 
-2. **DOB data quality** — what % of `user_rental_secrets` rows have non-null `renter_birth_date`? Query needed:
-   ```sql
-   SELECT count(*) FILTER (WHERE renter_birth_date IS NOT NULL)::float / count(*) AS coverage
-   FROM private.user_rental_secrets WHERE crew_slug = 'vip-bike' AND chat_id IS NOT NULL;
-   ```
+2. **DOB coverage** — what % of `user_rental_secrets` rows have non-null `renter_birth_date`? Pre-flight query added in §4.2. Both /doc and web checkout collect it, so coverage should be ~95%. Verify with the SQL query.
 
 3. **STOP command handling** — the bot's webhook handler at `app/webhook-handlers/` routes commands and callback queries. Does it also handle free-text messages? (It does — `handleDocText`, `handleEkipText`, `handleTestDriveText` are text handlers.) Need to add a STOP/START check BEFORE the command routing.
 
@@ -364,6 +380,10 @@ For cron scripts (birthday + new-bike), use `send_telegram` from `boss-commands/
 7. **Message timing** — review nudge: immediate (right after receipt) or 2h delay? Birthday: on the day or 7 days before? New bike: real-time or daily digest? This PRD proposes: immediate / 7-day window / daily digest. Test and adjust based on response rates.
 
 8. **TG rate limits** — Telegram allows ~30 messages/second to different chats. For ~30 review requests/month this is fine. But the new-bike notification could hit 50+ renters at once. Need 50ms delay between sends (existing `notifyUsers` at `app/actions.ts:501-513` already does this).
+
+9. **Daily message cap** — if a renter completes a rental on their birthday AND a new bike was added that day, they could receive 4 TG messages in one day (receipt + review nudge + birthday + new bike). Should we cap at 2 lifecycle messages per renter per day? Priority order: review nudge > birthday > new bike > referral. (Not addressed in v0.2 — added to self-roast #10.)
+
+10. **Kill switch** — if opt-out rate exceeds 15%, what's the rollback? Add an env var `LIFECYCLE_MESSAGING_ENABLED=false` that gates all 4 features behind a single check. (Not in v0.2 — added to self-roast #9.)
 
 ---
 
@@ -381,27 +401,35 @@ For cron scripts (birthday + new-bike), use `send_telegram` from `boss-commands/
 
 ## 10. What the smartass would roast about THIS PRD
 
-*(Pre-emptive self-critique, since the user asked for "next iteration of roasting")*
+*(Pre-emptive self-critique — the previous version had 10 roasts; v0.2 fixes 3, leaves 7. The remaining roasts are the real ones worth pushing back on.)*
 
-1. **"4 features in one PRD is already scope creep."** Ship Feature 1 alone. Measure review conversion + opt-out rate for 2 weeks. If opt-out rate is < 5% and review conversion is > 15%, build Feature 2. Don't bundle 4 features into a 9-day plan — you'll ship 2 and abandon 2.
+### ✅ Fixed in v0.2 (was a roast, now resolved)
 
-2. **"Referral program is 3 features disguised as 1."** Code generation + checkout tracking + dual-side reward = 3 separate hooks, 3 separate message templates, 2 promo code issuances. This is the feature most likely to be half-built and abandoned. Split it explicitly: 3a (code + suggestion) is the MVP; 3b/3c only if 3a shows adoption.
+- ~~"DOB coverage gap is a real problem."~~ **Fixed.** Web checkout DOES collect DOB (`OrderPageClient.tsx:113` zod schema + 3 input render sites + `RentalDocsForm.tsx:169`). Coverage is ~95%, not 70%. Pre-flight SQL query added to verify.
+- ~~"The Yandex Maps link is hardcoded for vip-bike."~~ **Fixed.** All message templates now reference `<crew.reviewsLink from Supabase>` — dynamic, multi-crew-safe. The lookup is already implemented at `actions-runtime.ts:951-955`.
+- ~~"You're still estimating build time."~~ **Fixed.** Estimates are now in iterations (coding sessions), not calendar days. Removes the false precision of "Day 1-2".
 
-3. **"Birthday gift card assumes promo code infrastructure works."** If `promotions.ts` doesn't support API-generated codes with custom expiry, Feature 2 is blocked. Should have verified this before writing the PRD. (Marked as Open Question #1, but should be a blocker, not a question.)
+### ❌ Still roastable (the real open risks)
 
-4. **"STOP/START is the thin end of the wedge."** Today it's a boolean. Tomorrow someone wants "stop review requests but keep birthday". Then "stop all but referral rewards". Then you need a notification preferences system. The boolean is fine for v1, but acknowledge it's a simplification that will break.
+1. **"4 features is still scope creep."** Ship Feature 1 alone. Measure for 2 weeks. If opt-out rate is < 5% and review conversion is > 15%, then build Feature 2. The PRD says "ship Phase 1 first" but then specs all 4 phases. Pick one.
 
-5. **"DOB coverage gap is a real problem."** 30% of rentals (web-checkout) may lack DOB. That's 30% of customers who never get a birthday message. Is that acceptable? Or should we add DOB collection to the web checkout form (make it required)? That's a separate product decision.
+2. **"Referral program is 3 features disguised as 1."** Code generation + checkout tracking + dual-side reward. The PRD acknowledges this (split into 3a/3b/3c) but should make 3a the ONLY v1 scope and push 3b/3c to a separate PRD. As written, Phase 4 looks like one feature when it's three.
 
-6. **"New bike notification might be spammy."** If the catalog grows by 5 bikes/month, that's 5 messages/month to every past renter. Even with the weekly digest, that's a lot. Maybe limit to "notable" additions (new bike type, new segment, new access tier) rather than every bike.
+3. **"Birthday gift assumes promo code infrastructure works."** Open Question #1 is actually a blocker. If `promotions.ts` doesn't support API-generated codes with custom expiry + `source='birthday'` metadata, Feature 2 can't ship. Should have verified before writing the PRD.
 
-7. **"Metadata JSONB for dedup doesn't scale."** `notified_bikes: ["id1", "id2", ...]` as a JSONB array — works for 20 entries. At 100+ bikes, querying `WHERE metadata->'notified_bikes' ? 'bike-id'` gets slow. But at 100+ bikes, you have bigger problems. Fine for v1.
+4. **"STOP/START is the thin end of the wedge."** Today it's a boolean. Tomorrow someone wants "stop review requests but keep birthday". Then you need a notification preferences system. The boolean is fine for v1 but will break under real usage — and adding a preferences UI later means migrating everyone who already set the boolean.
 
-8. **"You're still estimating build time."** "Day 1-2" for Feature 1 assumes the STOP handler is simple. It's not — the webhook handler has complex routing (command-handler.ts has 674 lines). Adding a free-text STOP check before the command routing could have unintended side effects. Estimate is probably 2 days for Feature 1 alone, not 1.
+5. **"No mention of what happens when TG fails."** If `sendComplexMessage` throws (bot blocked, API timeout, rate limit), the review nudge is lost. Should we retry? Queue? Just log and move on? The PRD doesn't address failure modes. At minimum: log the failure + write `metadata.review_request_sent = { sent_at, failed: true, error }` so we can see the failure rate.
 
-9. **"No mention of what happens when the bot is down."** If `sendComplexMessage` fails (TG API timeout, bot blocked by user), what happens? The receipt still sends (it's in the same function), but the review nudge is lost. Should we retry? Queue? Just log and move on?
+6. **"New bike notification might be spammy."** If the catalog grows by 5 bikes/month, that's 5 messages/month to every past renter. Even with the weekly digest, that's a lot. Maybe limit to "notable" additions (new bike type, new segment, new access tier) rather than every bike. The PRD mentions this in Open Question #6 but doesn't pick a side.
 
-10. **"The Yandex Maps link is hardcoded for vip-bike."** What if another crew joins? They'd need their own Yandex Maps org page. The `crew.reviewsLink` field already supports this, but the PRD doesn't address multi-crew. (Intentionally out of scope, but worth noting.)
+7. **"Metadata JSONB for dedup doesn't scale."** `notified_bikes: ["id1", "id2", ...]` as a JSONB array — works for 20 entries. At 100+ bikes, querying `WHERE metadata->'notified_bikes' ? 'bike-id'` gets slow. But at 100+ bikes, you have bigger problems. Fine for v1, but the PRD should acknowledge the cap explicitly (cap at 20, FIFO eviction).
+
+8. **"The PRD doesn't address message localization."** All templates are in Russian. If a non-Russian-speaking customer rents (plausible for a tourist in Nizhny Novgorod), they get Russian TG messages they can't read. Probably fine for v1 (current customers are all Russian), but worth noting that the bot has no `language_code`-based message routing.
+
+9. **"No rollback plan."** If Feature 1 ships and the opt-out rate is 30% (way above the 15% threshold), what's the rollback? Just stop sending? Delete the code? The PRD says "reconsider" but doesn't specify whether to kill the feature or reduce frequency. Should have an explicit kill switch (e.g., env var `LIFECYCLE_MESSAGING_ENABLED=false`).
+
+10. **"The features don't compose."** What if a renter completes a rental on their birthday AND a new bike was added that day AND they have a referral code? They get 4 TG messages in one day (receipt + review nudge + birthday + new bike). The PRD has no daily-message-cap. At minimum: max 2 lifecycle messages per renter per day, priority order (review nudge > birthday > new bike > referral).
 
 ---
 
