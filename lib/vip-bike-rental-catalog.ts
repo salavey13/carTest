@@ -3,14 +3,17 @@ import type { CatalogItemVM } from "@/app/franchize/actions";
 export type VipBikeRentalSegment = "electric" | "petrol";
 
 // Spec keys that should NOT appear on the public rental landing page.
-// These are internal pricing tiers (hourly, deposit, weekend tariffs, etc.)
-// that the catalog-adder skill writes for operator use but shouldn't be
-// surfaced to the public. The daily price is shown separately as
-// `pricePerDay` + `rentPriceLabel`.
+// These are internal-only fields (deposit amounts, delivery fees, helmet prices)
+// that shouldn't be surfaced to the customer. But we do NOT strip the pricing
+// tier fields (price_per_hour, price_per_2h, price_per_3h, price_per_6h,
+// price_per_12h, rent_2_4d, rent_5_10d, rent_11_30d, rent_weekend) because
+// the modal calculator needs them to show correct prices in the duration
+// balloons and the PriceCard breakdown.
 //
-// Note: `rent_weekend` IS in this strip list — the public landing page
-// shows the daily price as the main CTA. Weekend pricing is handled in the
-// cart / checkout flow, not on the catalog card.
+// Previously (v0.3-v0.4) we stripped ALL pricing tiers — this caused:
+//   Bug 1: hourly balloons showed 0₽ (all price_per_Xh fields were missing)
+//   Bug 2: 3-day weekend balloon showed 3 × rent_weekend instead of rent_2_4d × 3
+// Fixed 2026-08-22: only strip deposit/delivery/helmet fields.
 const UNCONFIRMED_PRICE_KEYS = [
   "deposit",
   "deposit_label",
@@ -18,21 +21,15 @@ const UNCONFIRMED_PRICE_KEYS = [
   "security_deposit",
   "security_deposit_rub",
   "pledge",
-  "price_per_hour",
-  "price_per_2h",
-  "price_per_3h",
-  "price_per_6h",
-  "price_per_12h",
-  "rent_2_4d",
-  "rent_5_10d",
-  "rent_11_30d",
-  "rent_weekend",
   "delivery_price",
   "helmet_price",
 ] as const;
 
+// Strip only deposit/delivery spec labels from the public spec list.
+// Previously stripped hourly/daily/tariff/weekend labels too — but the modal
+// calculator needs those to display correct prices in DurationShortcuts.
 const PRIVATE_SPEC_LABEL_RE =
-  /залог|депозит|час|сут|день|аренд|тариф|выходн|будн|скидк|достав|экип|шлем|перчат/i;
+  /залог|депозит|достав/i;
 
 function formatRub(value: number) {
   return value.toLocaleString("ru-RU");

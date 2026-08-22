@@ -59,13 +59,13 @@ describe("VIP BIKE rental catalog (no allowlist — DB-driven)", () => {
       vipBikeRentalCanonical: true,
       vipBikeRentalSegment: "electric",
     });
-    // Unconfirmed price keys (deposit, hourly, multi-day tiers) should be
-    // stripped from rawSpecs — they're internal pricing, not for the public
-    // landing page. rent_weekend IS preserved if set in DB (it's the only
-    // tier shown publicly via the "Выходной день" spec row).
+    // Deposit/delivery fields should be stripped from rawSpecs — they're
+    // internal-only. But pricing tiers (price_per_hour, rent_2_4d, etc.)
+    // are NOW KEPT so the modal calculator can show correct prices.
+    // (Previously stripped — caused Bug 1 + Bug 2 per v0.5 fix.)
     expect(bike.rawSpecs).not.toHaveProperty("deposit_rub");
-    expect(bike.rawSpecs).not.toHaveProperty("price_per_hour");
-    expect(bike.rawSpecs).not.toHaveProperty("rent_2_4d");
+    expect(bike.rawSpecs).toHaveProperty("price_per_hour");
+    expect(bike.rawSpecs).toHaveProperty("rent_2_4d");
     expect(bike.rawSpecs).toHaveProperty("rent_weekend");
     // Private spec labels (deposit, hourly, etc.) should be stripped from specs list
     expect(bike.specs.some((spec) => /залог/i.test(spec.label))).toBe(false);
