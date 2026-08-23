@@ -3,7 +3,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Menu, Send } from "lucide-react";
+import { ArrowLeft, Menu, Send, Wrench } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
@@ -365,15 +365,22 @@ export function CrewHeader({
               { key: "sale" as const, label: "Продажа", count: items?.filter(hasSalePrice).length ?? 0 },
               { key: "service" as const, label: "Сервис", count: items?.filter(hasServicePrice).length ?? 0 },
               { key: "equipment" as const, label: "Экипировка", count: items?.filter(hasEquipmentPrice).length ?? 0, isEquipment: true },
+              { key: "parts" as const, label: "Запчасти", count: 0, icon: Wrench, isExternal: true },
             ]).map((pill) => {
-              // Equipment uses pathname-based active state (separate route);
+              // Equipment and Parts use pathname-based active state (separate routes);
               // rent/sale/service use displayMode-based active state
               const isActive = pill.isEquipment
                 ? pathname === `${mainCatalogPath}/${EQUIPMENT_PATH}`
-                : displayMode === pill.key && !pathname.includes(`/${EQUIPMENT_PATH}`);
+                : pill.isExternal
+                  ? pathname === `${mainCatalogPath}/parts`
+                  : displayMode === pill.key && !pathname.includes(`/${EQUIPMENT_PATH}`) && !pathname.includes(`/parts`);
               const handlePillClick = () => {
                 if (pill.isEquipment) {
                   router.push(`${mainCatalogPath}/${EQUIPMENT_PATH}`);
+                  return;
+                }
+                if (pill.isExternal) {
+                  router.push(`${mainCatalogPath}/parts`);
                   return;
                 }
                 if (isOnCatalogPage) {
@@ -393,7 +400,7 @@ export function CrewHeader({
                   aria-controls="catalog-sections"
                   onClick={handlePillClick}
                   disabled={isTransitioning}
-                  className="shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 select-none disabled:opacity-50 active:scale-95"
+                  className="shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 select-none disabled:opacity-50 active:scale-95 flex items-center gap-1.5"
                   style={{
                     backgroundColor: isActive
                       ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain)
@@ -404,6 +411,7 @@ export function CrewHeader({
                     transform: isActive ? "scale(1.05)" : "scale(1)",
                   }}
                 >
+                  {pill.icon && <pill.icon className="h-3.5 w-3.5" aria-hidden />}
                   {pill.label}
                   {pill.count > 0 && (
                     <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-black/10 px-1.5 py-0.5 text-[10px] font-semibold">
