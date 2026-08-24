@@ -131,14 +131,27 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                             shiftEarnedAmount = Math.round(salaryAmount);
                             shiftEarnedHours = Math.round((durationMinutes / 60) * 10) / 10;
                             shiftEarnedRate = rate;
+
+                            // BUG FIX (2026-08-24): duration_minutes is a GENERATED
+                            // column — PostgREST silently rejects any UPDATE that
+                            // tries to write to it. The previous code included
+                            // duration_minutes + salary_amount in the UPDATE payload,
+                            // which caused the ENTIRE UPDATE to fail (including
+                            // clock_out_time). Result: shift stayed open even though
+                            // the bot said "Смена завершена".
+                            //
+                            // Fix: only write clock_out_time + salary_amount (which
+                            // IS a regular column). duration_minutes is auto-computed
+                            // by the database (generated column = EXTRACT(EPOCH FROM
+                            // (clock_out_time - clock_in_time)) / 60).
                             return supabaseAdmin.from('crew_member_shifts').update({
                                 clock_out_time: new Date().toISOString(),
-                                duration_minutes: durationMinutes,
                                 salary_amount: Math.round(salaryAmount * 100) / 100,
                             }).eq('id', latestShift.id);
                         }
                     }
-                    return supabaseAdmin.from('crew_member_shifts').update({ clock_out_time: new Date().toISOString() }).eq('id', latestShift.id);
+                    // No active shift found — return a no-op (don't crash)
+                    return { data: null, error: null };
                 };
             // Closing is allowed when there is an active shift row OR live_status is
             // not offline. Two drift scenarios both converge on offline:
