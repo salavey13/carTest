@@ -1,0 +1,873 @@
+     1→// app/franchize/server-actions/salary-calculations.ts
+     2→"use server";
+     3→
+     4→import { supabaseAdmin } from "@/lib/supabase-server";
+     5→import { logger } from "@/lib/logger";
+     6→import {
+     7→  verifyCrewAccess,
+     8→  handleError,
+     9→  successResponse,
+    10→  errorResponse,
+    11→  type ActionResponse,
+    12→} from "./shared/auth-helpers";
+    13→
+    14→/**
+    15→ * I5 — Salary calculations server actions.
+    16→ * Plan: docs/superpowers/plans/2026-08-12-i5-commissions-salary.md (Task 3)
+    17→ */
+    18→
+    19→// Cache для расчётов зарплаты (24 часа TTL для оптимизации повторных запросов)
+    20→const salaryCalcCache = new Map<string, { data: any; expiry: number }>();
+    21→
+    22→/**
+    23→ * Проверяет, пересекаются ли периоды дат.
+    24→ *
+    25→ * @param existingStart - Начало существующего периода
+    26→ * @param existingEnd - Конец существующего периода
+    27→ * @param newStart - Начало нового периода
+    28→ * @param newEnd - Конец нового периода
+    29→ * @returns true если периоды пересекаются
+    30→ */
+    31→function periodsOverlap(
+    32→  existingStart: string,
+    33→  existingEnd: string,
+    34→  newStart: string,
+    35→  newEnd: string
+    36→): boolean {
+    37→  const eStart = new Date(existingStart);
+    38→  const eEnd = new Date(existingEnd);
+    39→  const nStart = new Date(newStart);
+    40→  const nEnd = new Date(newEnd);
+    41→
+    42→  // Периоды пересекаются если: (StartA <= EndB) и (EndA >= StartB)
+    43→  return eStart < nEnd && eEnd > nStart;
+    44→}
+    45→
+    46→/**
+    47→ * Получает существующий план зарплаты или создаёт новый для указанного периода.
+    48→ *
+    49→ * @param params - Параметры для получения/создания плана
+    50→ * @param params.slug - Slug команды для доступа
+    51→ * @param params.actorUserId - ID пользователя, выполняющего действие
+    52→ * @param params.memberId - ID сотрудника, для которого создаётся план
+    53→ * @param params.periodStart - Начало периода в формате ISO
+    54→ * @param params.periodEnd - Конец периода в формате ISO
+    55→ * @returns Объект с success и id плана, или error
+    56→ *
+    57→ * @throws Возвращает ошибку, если пользователь не владелец или период некорректен
+    58→ */
+    59→export async function getOrCreateSalaryPlan(params: {
+    60→  slug: string;
+    61→  actorUserId: string;
+    62→  memberId: string;
+    63→  periodStart: string;
+    64→  periodEnd: string;
+    65→}): Promise<ActionResponse<{ id: string }>> {
+    66→  const { slug, actorUserId, memberId, periodStart, periodEnd } = params;
+    67→
+    68→  // Валидация периодов
+    69→  const startDate = new Date(periodStart);
+    70→  const endDate = new Date(periodEnd);
+    71→  if (startDate >= endDate) {
+    72→    return { success: false, error: "Дата начала должна быть раньше даты окончания." };
+    73→  }
+    74→
+    75→  try {
+    76→    const access = await verifyCrewAccess(slug);
+    77→    // Only owners can manage salary plans
+    78→    if (!access.allowed || !access.isOwner) {
+    79→      return { success: false, error: "Только владелец может управлять планами зарплаты." };
+    80→    }
+    81→
+    82→    // Try to get existing plan
+    83→    const { data: existing } = await supabaseAdmin
+    84→      .from("salary_plans")
+    85→      .select("id")
+    86→      .eq("crew_id", access.crewId)
+    87→      .eq("member_id", memberId)
+    88→      .eq("period_start", periodStart)
+    89→      .eq("period_end", periodEnd)
+    90→      .maybeSingle();
+    91→
+    92→    if (existing) {
+    93→      return { success: true, data: { id: existing.id } };
+    94→    }
+    95→
+    96→    // Проверка на пересечение периодов с улучшенным сообщением (Priority 2 Fix 5)
+    97→    // Defensive (2026-08-19 review): the check_period_overlap RPC may be
+    98→    // missing on environments where migration 20260814000001_fix_salary_commission_flow.sql
+    99→    // wasn't applied (same class of issue as has_commission_rates). Fall back
+   100→    // to a direct query against salary_plans when the RPC errors out.
+   101→    let overlappingPlans: any[] | null = null;
+   102→    try {
+   103→      const { data, error: rpcErr } = await supabaseAdmin
+   104→        .rpc("check_period_overlap", {
+   105→          p_crew_id: access.crewId,
+   106→          p_member_id: memberId,
+   107→          p_period_start: periodStart,
+   108→          p_period_end: periodEnd,
+   109→        });
+   110→      if (rpcErr) {
+   111→        logger.warn("[getOrCreateSalaryPlan] check_period_overlap RPC failed, falling back to direct query:", rpcErr);
+   112→      } else {
+   113→        overlappingPlans = data;
+   114→      }
+   115→    } catch (rpcException) {
+   116→      logger.warn("[getOrCreateSalaryPlan] check_period_overlap RPC threw, falling back to direct query:", rpcException);
+   117→    }
+   118→
+   119→    if (overlappingPlans === null) {
+   120→      // Fallback: a period overlaps if there's an existing plan for this
+   121→      // member where period_start < newEnd AND period_end > newStart.
+   122→      const startDate = new Date(periodStart);
+   123→      const endDate = new Date(periodEnd);
+   124→      const { data: fallback, error: fallbackErr } = await supabaseAdmin
+   125→        .from("salary_plans")
+   126→        .select("id, period_start, period_end")
+   127→        .eq("crew_id", access.crewId)
+   128→        .eq("member_id", memberId)
+   129→        .lt("period_start", endDate.toISOString())
+   130→        .gt("period_end", startDate.toISOString());
+   131→      if (fallbackErr) {
+   132→        logger.warn("[getOrCreateSalaryPlan] Fallback overlap query failed:", fallbackErr);
+   133→      }
+   134→      overlappingPlans = (fallback || []).map((p: any) => ({
+   135→        ...p,
+   136→        conflict_description: `Период пересекается с планом ${p.period_start} → ${p.period_end}`,
+   137→      }));
+   138→    }
+   139→
+   140→    if (overlappingPlans && overlappingPlans.length > 0) {
+   141→      const overlap = overlappingPlans[0];
+   142→      logger.warn("[getOrCreateSalaryPlan] Period overlap detected", {
+   143→        crewId: access.crewId,
+   144→        memberId,
+   145→        newPeriod: { start: periodStart, end: periodEnd },
+   146→      });
+   147→      return {
+   148→        success: false,
+   149→        error: overlap.conflict_description || "Период пересекается с существующим планом зарплаты."
+   150→      };
+   151→    }
+   152→
+   153→    // Create new plan
+   154→    const { data: plan, error } = await supabaseAdmin
+   155→      .from("salary_plans")
+   156→      .insert({
+   157→        crew_id: access.crewId,
+   158→        member_id: memberId,
+   159→        period_start: periodStart,
+   160→        period_end: periodEnd,
+   161→        payout_schedule: ["10", "25"],
+   162→        balance_due: 0,
+   163→      })
+   164→      .select("id")
+   165→      .single();
+   166→
+   167→    if (error || !plan) {
+   168→      logger.error("[getOrCreateSalaryPlan] Insert failed:", error);
+   169→      return { success: false, error: "Не удалось создать план." };
+   170→    }
+   171→
+   172→    return successResponse({ id: plan.id });
+   173→  } catch (err) {
+   174→    logger.error("[getOrCreateSalaryPlan] Exception:", err);
+   175→    return errorResponse(handleError(err, "getOrCreateSalaryPlan"));
+   176→  }
+   177→}
+   178→
+   179→/**
+   180→ * Рассчитывает доход сотрудника за указанный период.
+   181→ *
+   182→ * Integration with shifts and commissions:
+   183→ * - Shifts: Uses salary_amount from crew_member_shifts (auto-calculated as duration_minutes/60 * hourly_rate)
+   184→ * - Commissions: Looks up commission rates from commission_rates table based on operation_type
+   185→ *   Applies percentages to cash_transactions income types (rental, sale, equipment)
+   186→ *
+   187→ * @param params - Параметры для расчёта зарплаты
+   188→ * @param params.slug - Slug команды
+   189→ * @param params.actorUserId - ID пользователя, запрашивающего расчёт
+   190→ * @param params.memberId - ID сотрудника
+   191→ * @param params.periodStart - Начало периода
+   192→ * @param params.periodEnd - Конец периода
+   193→ * @returns Объект с breakdown доходов (смены, комиссии, бонусы) и итоговыми суммами
+   194→ *
+   195→ * Вычисляет доход от:
+   196→ * - Смены (salary_amount из crew_member_shifts)
+   197→ * - Комиссии (expense_commission транзакции + auto-calc from operation types)
+   198→ * - Бонусы (зарезервировано для будущего использования)
+   199→ */
+   200→export async function calculateSalaryForPeriod(params: {
+   201→  slug: string;
+   202→  actorUserId: string;
+   203→  memberId: string;
+   204→  periodStart: string;
+   205→  periodEnd: string;
+   206→}): Promise<ActionResponse<{
+   207→  shiftIncome: number;
+   208→  commissionIncome: number;
+   209→  bonusIncome: number;
+   210→  totalIncome: number;
+   211→  breakdown: Array<{ type: string; amount: number; description: string }>;
+   212→}>> {
+   213→  const { slug, actorUserId, memberId, periodStart, periodEnd } = params;
+   214→
+   215→  try {
+   216→    const access = await verifyCrewAccess(slug);
+   217→    if (!access.allowed) {
+   218→      return { success: false, error: access.error };
+   219→    }
+   220→
+   221→    // CR fix (2026-08-19 review): owner-or-self check. Previously any active
+   222→    // crew member could call calculateSalaryForPeriod with any memberId and
+   223→    // read another member's full salary breakdown (IDOR). Owners (incl.
+   224→    // co_owner / admin roles per shared verifyCrewAccess) can query anyone;
+   225→    // regular members can only query their own.
+   226→    if (!access.isOwner && memberId !== access.actorUserId) {
+   227→      return {
+   228→        success: false,
+   229→        error: "Недостаточно прав для просмотра чужого расчёта зарплаты.",
+   230→      };
+   231→    }
+   232→
+   233→    // Check if crew has commission rates configured (Priority 1 Fix 3)
+   234→    // Defensive: the has_commission_rates RPC may not be present on all
+   235→    // environments (migration 20260814000001 not yet applied). Fall back to
+   236→    // a direct count query on commission_rates instead of crashing.
+   237→    let useRateCalculation = false;
+   238→    try {
+   239→      const { data: hasRates, error: rpcError } = await supabaseAdmin
+   240→        .rpc("has_commission_rates", { p_crew_id: access.crewId });
+   241→      if (rpcError) {
+   242→        logger.warn("[calculateSalaryForPeriod] has_commission_rates RPC failed, falling back to direct count:", rpcError);
+   243→      } else {
+   244→        useRateCalculation = hasRates === true;
+   245→      }
+   246→      if (!useRateCalculation) {
+   247→        // Fallback: check commission_rates table directly
+   248→        const { count, error: countErr } = await supabaseAdmin
+   249→          .from("commission_rates")
+   250→          .select("id", { count: "exact", head: true })
+   251→          .eq("crew_id", access.crewId)
+   252→          .eq("is_active", true);
+   253→        if (!countErr && (count || 0) > 0) {
+   254→          useRateCalculation = true;
+   255→        }
+   256→      }
+   257→    } catch (err) {
+   258→      logger.warn("[calculateSalaryForPeriod] Failed to detect commission rates, defaulting to recorded method:", err);
+   259→    }
+   260→
+   261→    // Get shift income
+   262→    // Проверяем кеш для расчётов зарплаты (оптимизация повторных запросов)
+   263→    // Priority 1 Fix 3: Include calculation method in cache key.
+   264→    // NOTE: cacheKey must be constructed AFTER `useRateCalculation` is
+   265→    // determined, otherwise referencing the const here triggers a
+   266→    // Temporal Dead Zone ReferenceError.
+   267→    const cacheKey = `${access.crewId}-${memberId}-${periodStart}-${periodEnd}-${useRateCalculation}`;
+   268→    const cached = salaryCalcCache.get(cacheKey);
+   269→    if (cached && cached.expiry > Date.now()) {
+   270→      logger.debug("[calculateSalaryForPeriod] Cache hit", { cacheKey, useRateCalculation });
+   271→      return successResponse(cached.data);
+   272→    }
+   273→
+   274→    // Query shifts using correct columns (clock_in_time / clock_out_time /
+   275→    // hourly_rate). `shift_start` and `bike_id` do NOT exist on
+   276→    // crew_member_shifts and previously caused the query to fail.
+   277→    const { data: shifts, error: shiftError } = await supabaseAdmin
+   278→      .from("crew_member_shifts")
+   279→      .select("clock_in_time, clock_out_time, hourly_rate, salary_amount")
+   280→      .eq("crew_id", access.crewId)
+   281→      .eq("member_id", memberId)
+   282→      .gte("clock_in_time", periodStart)
+   283→      .lt("clock_in_time", periodEnd);
+   284→
+   285→    if (shiftError) {
+   286→      logger.warn("[calculateSalaryForPeriod] Shifts query failed:", shiftError);
+   287→    }
+   288→
+   289→    const shiftIncome = (shifts || []).reduce((sum: number, s: any) => {
+   290→      // Prefer stored salary_amount (already rounded for completed shifts).
+   291→      // For active shifts where salary_amount is null, compute on the fly
+   292→      // from duration * hourly_rate so we don't report zero income.
+   293→      const stored = Number(s.salary_amount || 0);
+   294→      if (stored > 0) return sum + stored;
+   295→
+   296→      const start = s.clock_in_time ? new Date(s.clock_in_time) : null;
+   297→      if (!start) return sum;
+   298→      const end = s.clock_out_time ? new Date(s.clock_out_time) : new Date();
+   299→      const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+   300→      const rate = Number(s.hourly_rate || 0);
+   301→      return sum + (hours * rate);
+   302→    }, 0);
+   303→
+   304→    // Get commission rates for this crew if using rate calculation
+   305→    let commissionRates: any[] | null = null;
+   306→    if (useRateCalculation) {
+   307→      const { data: rates, error: ratesError } = await supabaseAdmin
+   308→        .from("commission_rates")
+   309→        .select("*")
+   310→        .eq("crew_id", access.crewId)
+   311→        .eq("is_active", true);
+   312→
+   313→      if (!ratesError) {
+   314→        commissionRates = rates;
+   315→      } else {
+   316→        logger.warn("[calculateSalaryForPeriod] Commission rates query failed:", ratesError);
+   317→      }
+   318→    }
+   319→
+   320→    // Priority 1 Fix 3: Use calculated OR recorded commissions, not both
+   321→    let commissionIncome = 0;
+   322→    const breakdown: Array<{ type: string; amount: number; description: string }> = [];
+   323→    breakdown.push({ type: "shifts", amount: shiftIncome, description: "Смены" });
+   324→
+   325→    if (useRateCalculation && commissionRates && commissionRates.length > 0) {
+   326→      // Method 1: Calculate from commission rates (preferred when configured)
+   327→      // Build rate map: operation_type -> { commissionType, commissionValue }
+   328→      const rateMap = new Map();
+   329→      commissionRates.forEach((rate: any) => {
+   330→        // Use highest priority rate for each operation type
+   331→        const existing = rateMap.get(rate.operation_type);
+   332→        if (!existing || (rate.priority > existing.priority)) {
+   333→          rateMap.set(rate.operation_type, {
+   334→            commissionType: rate.commission_type,
+   335→            commissionValue: Number(rate.commission_value),
+   336→          });
+   337→        }
+   338→      });
+   339→
+   340→      // Get all income transactions for this member to calculate commissions
+   341→      const { data: incomeTransactions, error: incomeError } = await supabaseAdmin
+   342→        .from("cash_transactions")
+   343→        .select("id, amount, transaction_type, flow_direction, description, transaction_date")
+   344→        .eq("crew_id", access.crewId)
+   345→        .eq("created_by", memberId)
+   346→        .in("transaction_type", ["income_rental", "income_sale", "income_equipment"])
+   347→        .gte("transaction_date", periodStart)
+   348→        .lt("transaction_date", periodEnd);
+   349→
+   350→      if (!incomeError && incomeTransactions) {
+   351→        for (const tx of incomeTransactions) {
+   352→          const incomeAmount = Number(tx.amount);
+   353→          if (incomeAmount <= 0) continue;
+   354→
+   355→          // Map transaction type to operation type
+   356→          let operationType: string | null = null;
+   357→          if (tx.transaction_type === "income_rental") {
+   358→            // Could be hourly or daily - for now assume daily
+   359→            operationType = "rental_daily";
+   360→          } else if (tx.transaction_type === "income_sale") {
+   361→            operationType = "sale";
+   362→          } else if (tx.transaction_type === "income_equipment") {
+   363→            operationType = "equipment_rental";
+   364→          }
+   365→
+   366→          if (!operationType) continue;
+   367→
+   368→          const rate = rateMap.get(operationType);
+   369→          if (!rate) continue;
+   370→
+   371→          let commissionAmount = 0;
+   372→          if (rate.commissionType === "percentage") {
+   373→            commissionAmount = (incomeAmount * rate.commissionValue) / 100;
+   374→          } else {
+   375→            commissionAmount = rate.commissionValue;
+   376→          }
+   377→
+   378→          commissionIncome += commissionAmount;
+   379→          breakdown.push({
+   380→            type: `commission_${operationType}`,
+   381→            amount: commissionAmount,
+   382→            description: `Комиссия: ${tx.description || tx.transaction_type}`,
+   383→          });
+   384→        }
+   385→      }
+   386→    } else {
+   387→      // Method 2: Use recorded expense_commission transactions (fallback when no rates configured)
+   388→      const { data: commissions, error: commError } = await supabaseAdmin
+   389→        .from("cash_transactions")
+   390→        .select("amount, description, transaction_date")
+   391→        .eq("crew_id", access.crewId)
+   392→        .eq("to_user_id", memberId)
+   393→        .eq("transaction_type", "expense_commission")
+   394→        .gte("transaction_date", periodStart)
+   395→        .lt("transaction_date", periodEnd);
+   396→
+   397→      if (!commError && commissions) {
+   398→        commissionIncome = commissions.reduce((sum: number, c: any) => {
+   399→          const amount = Number(c.amount || 0);
+   400→          return sum + (amount > 0 ? amount : 0);
+   401→        }, 0);
+   402→
+   403→        if (commissionIncome > 0) {
+   404→          breakdown.push({
+   405→            type: "commissions",
+   406→            amount: commissionIncome,
+   407→            description: "Комиссии (выплачено)"
+   408→          });
+   409→        }
+   410→      }
+   411→    }
+   412→
+   413→    const totalIncome = shiftIncome + commissionIncome;
+   414→
+   415→    const result = {
+   416→      shiftIncome,
+   417→      commissionIncome,
+   418→      bonusIncome: 0,
+   419→      totalIncome,
+   420→      breakdown,
+   421→    };
+   422→
+   423→    // Кэшируем результат на 24 часа — но НЕ если there's an active (in-progress)
+   424→    // shift in the result. Active shifts compute their salary using `new Date()`
+   425→    // as the end time, so the cached value would freeze the live number for
+   426→    // 24h. Better to recompute on each request when a shift is still running.
+   427→    const hasActiveShift = (shifts || []).some((s: any) => !s.clock_out_time);
+   428→    if (!hasActiveShift) {
+   429→      salaryCalcCache.set(cacheKey, {
+   430→        data: result,
+   431→        expiry: Date.now() + 24 * 60 * 60 * 1000, // 24 часа
+   432→      });
+   433→    } else {
+   434→      logger.debug("[calculateSalaryForPeriod] Skipping cache (active shift present)", { cacheKey });
+   435→    }
+   436→
+   437→    return successResponse(result);
+   438→  } catch (err) {
+   439→    logger.error("[calculateSalaryForPeriod] Exception:", err);
+   440→    return errorResponse(handleError(err, "calculateSalaryForPeriod"));
+   441→  }
+   442→}
+   443→
+   444→/**
+   445→ * Регистрирует выплату зарплаты, создавая транзакцию и обновляя статус расчёта.
+   446→ *
+   447→ * @param params - Параметры для записи выплаты
+   448→ * @param params.slug - Slug команды
+   449→ * @param params.actorUserId - ID пользователя, выполняющего выплату
+   450→ * @param params.salaryCalcId - ID расчёта зарплаты
+   451→ * @returns Объект с success или error
+   452→ *
+   453→ * Процесс:
+   454→ * 1. Проверяет права доступа (владелец)
+   455→ * 2. Проверяет idempotency — если уже выплачено, возвращает success без изменений
+   456→ * 3. Создаёт транзакцию expense_salary
+   457→ * 4. Обновляет статус расчёта на "paid"
+   458→ */
+   459→export async function recordPayout(params: {
+   460→  slug: string;
+   461→  actorUserId: string;
+   462→  salaryCalcId: string;
+   463→}): Promise<ActionResponse> {
+   464→  const { slug, actorUserId, salaryCalcId } = params;
+   465→
+   466→  try {
+   467→    const access = await verifyCrewAccess(slug);
+   468→    if (!access.allowed || !access.isOwner) {
+   469→      return { success: false, error: access.error || "Только владелец может выплачивать зарплату." };
+   470→    }
+   471→
+   472→    // Get salary calculation with plan details in single query (optimization)
+   473→    const { data: calc, error: calcError } = await supabaseAdmin
+   474→      .from("salary_calculations")
+   475→      .select(`
+   476→        *,
+   477→        salary_plans!inner (
+   478→          member_id,
+   479→          crew_id
+   480→        )
+   481→      `)
+   482→      .eq("id", salaryCalcId)
+   483→      .maybeSingle();
+   484→
+   485→    if (calcError || !calc) {
+   486→      return { success: false, error: "Расчёт не найден." };
+   487→    }
+   488→
+   489→    const plan = calc.salary_plans;
+   490→    if (!plan) {
+   491→      return { success: false, error: "План не найден." };
+   492→    }
+   493→
+   494→    // Idempotency: check if already paid
+   495→    if (calc.payout_status === "paid") {
+   496→      return { success: true }; // Already paid, no-op
+   497→    }
+   498→
+   499→    // Create expense_salary transaction
+   500→    const { data: tx, error: txError } = await supabaseAdmin
+   501→      .from("cash_transactions")
+   502→      .insert({
+   503→        crew_id: plan.crew_id,
+   504→        salary_calc_id: calc.id,
+   505→        transaction_type: "expense_salary",
+   506→        flow_direction: "out",
+   507→        amount: calc.total_income,
+   508→        payment_method: "cash",
+   509→        category: "Зарплата",
+   510→        description: `Выплата зарплаты за период ${calc.period_start}`,
+   511→        transaction_date: new Date().toISOString(),
+   512→        to_user_id: plan.member_id,
+   513→        // CR fix (2026-19 review): use cookie-derived access.actorUserId for
+   514→        // created_by, NOT the client-supplied actorUserId param. Otherwise
+   515→        // an owner can attribute a payout to a different user in the audit
+   516→        // trail (c.f. CR fix H1 in createManualCashTransaction).
+   517→        created_by: access.actorUserId,
+   518→      })
+   519→      .select("id")
+   520→      .single();
+   521→
+   522→    if (txError || !tx) {
+   523→      logger.error("[recordPayout] Failed to create transaction:", txError);
+   524→      return { success: false, error: "Не удалось создать транзакцию." };
+   525→    }
+   526→
+   527→    // Update salary calculation
+   528→    const { error: updateError } = await supabaseAdmin
+   529→      .from("salary_calculations")
+   530→      .update({
+   531→        payout_status: "paid",
+   532→        paid_at: new Date().toISOString(),
+   533→        cash_transaction_id: tx.id,
+   534→        updated_at: new Date().toISOString(),
+   535→      })
+   536→      .eq("id", salaryCalcId);
+   537→
+   538→    if (updateError) {
+   539→      logger.error("[recordPayout] Failed to update calculation:", updateError);
+   540→      return { success: false, error: "Не удалось обновить статус." };
+   541→    }
+   542→
+   543→    logger.info("[recordPayout] Recorded payout", {
+   544→      salaryCalcId,
+   545→      transactionId: tx.id,
+   546→      amount: calc.total_income,
+   547→    });
+   548→
+   549→    return successResponse();
+   550→  } catch (err) {
+   551→    logger.error("[recordPayout] Exception:", err);
+   552→    return errorResponse(handleError(err, "recordPayout"));
+   553→  }
+   554→}
+   555→
+   556→/**
+   557→ * Records a salary payout for a member+period WITHOUT requiring a pre-existing
+   558→ * salary_calculations snapshot row. Computes the accrued amount dynamically
+   559→ * (same logic as getOwnerSalaryOverview / getMyEarnings), subtracts already-paid
+   560→ * amounts in the same period, and inserts an expense_salary transaction for the
+   561→ * remaining balance.
+   562→ *
+   563→ * Added 2026-08-19 review: previously the salary page's "Выплатить" button
+   564→ * called `recordPayout({ salaryCalcId })` — but salary_calculations is empty
+   565→ * for this crew, so the button always failed with "Расчёт не найден."
+   566→ *
+   567→ * Auth: owner / co_owner / admin only.
+   568→ */
+   569→export async function recordPayoutForPeriod(params: {
+   570→  slug: string;
+   571→  actorUserId?: string; // Deprecated: cookie-derived access.actorUserId is used
+   572→  memberId: string;
+   573→  periodStart: string;
+   574→  periodEnd: string;
+   575→}): Promise<ActionResponse<{ transactionId: string; paidAmount: number }>> {
+   576→  const { slug, memberId, periodStart, periodEnd } = params;
+   577→
+   578→  // Validate period
+   579→  const startDate = new Date(periodStart);
+   580→  const endDate = new Date(periodEnd);
+   581→  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+   582→    return { success: false, error: "Некорректный формат дат периода." };
+   583→  }
+   584→  if (startDate >= endDate) {
+   585→    return { success: false, error: "Дата начала должна быть раньше даты окончания." };
+   586→  }
+   587→
+   588→  try {
+   589→    const access = await verifyCrewAccess(slug);
+   590→    if (!access.allowed || !access.isOwner) {
+   591→      return {
+   592→        success: false,
+   593→        error: access.error || "Только владелец может выплачивать зарплату.",
+   594→      };
+   595→    }
+   596→
+   597→    const periodStartIso = startDate.toISOString();
+   598→    const periodEndIso = endDate.toISOString();
+   599→
+   600→    // Compute accrued for this member in this period (shifts + commissions)
+   601→    const { data: shifts } = await supabaseAdmin
+   602→      .from("crew_member_shifts")
+   603→      .select("clock_in_time, clock_out_time, hourly_rate, salary_amount")
+   604→      .eq("crew_id", access.crewId)
+   605→      .eq("member_id", memberId)
+   606→      .gte("clock_in_time", periodStartIso)
+   607→      .lt("clock_in_time", periodEndIso);
+   608→
+   609→    const shiftAccrued = (shifts || []).reduce((sum: number, s: any) => {
+   610→      const stored = Number(s.salary_amount || 0);
+   611→      if (stored > 0) return sum + stored;
+   612→      const start = s.clock_in_time ? new Date(s.clock_in_time) : null;
+   613→      if (!start) return sum;
+   614→      const end = s.clock_out_time ? new Date(s.clock_out_time) : new Date();
+   615→      const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+   616→      const rate = Number(s.hourly_rate || 0);
+   617→      return sum + hours * rate;
+   618→    }, 0);
+   619→
+   620→    const { data: commissions } = await supabaseAdmin
+   621→      .from("cash_transactions")
+   622→      .select("amount")
+   623→      .eq("crew_id", access.crewId)
+   624→      .eq("to_user_id", memberId)
+   625→      .eq("transaction_type", "expense_commission")
+   626→      .gte("transaction_date", periodStartIso)
+   627→      .lt("transaction_date", periodEndIso);
+   628→    const commissionAccrued = (commissions || []).reduce(
+   629→      (sum: number, c: any) => sum + (Number(c.amount) > 0 ? Number(c.amount) : 0),
+   630→      0,
+   631→    );
+   632→
+   633→    const accrued = Math.round(shiftAccrued + commissionAccrued);
+   634→
+   635→    // Already paid out for this period — crew-scoped.
+   636→    const { data: payouts } = await supabaseAdmin
+   637→      .from("cash_transactions")
+   638→      .select("amount")
+   639→      .eq("crew_id", access.crewId)
+   640→      .eq("to_user_id", memberId)
+   641→      .eq("transaction_type", "expense_salary")
+   642→      .gte("transaction_date", periodStartIso)
+   643→      .lt("transaction_date", periodEndIso);
+   644→    const alreadyPaid = (payouts || []).reduce(
+   645→      (sum: number, p: any) => sum + (Number(p.amount) > 0 ? Number(p.amount) : 0),
+   646→      0,
+   647→    );
+   648→
+   649→    const balanceDue = Math.max(0, accrued - alreadyPaid);
+   650→    if (balanceDue <= 0) {
+   651→      return {
+   652→        success: false,
+   653→        error: "Баланс к выплате равен нулю — payout уже зарегистрирован.",
+   654→      };
+   655→    }
+   656→
+   657→    // Insert expense_salary transaction (no salary_calc_id — there's no
+   658→    // snapshot row, and the FK is nullable per migration 20260812000009).
+   659→    const { data: tx, error: txError } = await supabaseAdmin
+   660→      .from("cash_transactions")
+   661→      .insert({
+   662→        crew_id: access.crewId,
+   663→        transaction_type: "expense_salary",
+   664→        flow_direction: "out",
+   665→        amount: balanceDue,
+   666→        payment_method: "cash",
+   667→        category: "Зарплата",
+   668→        description: `Выплата зарплаты за период ${periodStartIso}`,
+   669→        transaction_date: new Date().toISOString(),
+   670→        to_user_id: memberId,
+   671→        created_by: access.actorUserId, // cookie-derived, not client-supplied
+   672→      })
+   673→      .select("id")
+   674→      .single();
+   675→
+   676→    if (txError || !tx) {
+   677→      logger.error("[recordPayoutForPeriod] Failed to create transaction:", txError);
+   678→      return { success: false, error: "Не удалось создать транзакцию." };
+   679→    }
+   680→
+   681→    logger.info("[recordPayoutForPeriod] Recorded payout", {
+   682→      memberId,
+   683→      amount: balanceDue,
+   684→      transactionId: tx.id,
+   685→    });
+   686→
+   687→    return successResponse({ transactionId: tx.id, paidAmount: balanceDue });
+   688→  } catch (err) {
+   689→    logger.error("[recordPayoutForPeriod] Exception:", err);
+   690→    return errorResponse(handleError(err, "recordPayoutForPeriod"));
+   691→  }
+   692→}
+   693→
+   694→/**
+   695→ * Получает сводку заработка текущего пользователя.
+   696→ *
+   697→ * @param params - Параметры запроса
+   698→ * @param params.slug - Slug команды
+   699→ * @param params.actorUserId - ID пользователя
+   700→ * @returns Текущий план зарплаты и последние комиссии
+   701→ *
+   702→ * Данные включают:
+   703→ * - currentPlan: начисленные суммы, баланс, следующая дата выплаты
+   704→ * - recentCommissions: до 10 последних комиссионных транзакций
+   705→ */
+   706→export async function getMyEarnings(params: {
+   707→  slug: string;
+   708→  actorUserId: string;
+   709→}): Promise<{
+   710→  success: boolean;
+   711→  data?: {
+   712→    currentPlan: { accrued: number; balanceDue: number; nextPayoutDate: string | null };
+   713→    recentCommissions: Array<{ amount: number; date: string; description: string }>;
+   714→  };
+   715→  error?: string;
+   716→}> {
+   717→  const { slug, actorUserId } = params;
+   718→
+   719→  try {
+   720→    const access = await verifyCrewAccess(slug);
+   721→    if (!access.allowed) {
+   722→      return { success: false, error: access.error };
+   723→    }
+   724→
+   725→    // CR fix H2: use access.actorUserId (from cookie) instead of client-supplied actorUserId.
+   726→    // Previously: any crew member could pass another member's user_id to read
+   727→    // their salary plan + commission payments (data exposure).
+   728→    const secureUserId = access.actorUserId;
+   729→
+   730→    // Get current month plan
+   731→    const now = new Date();
+   732→    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+   733→    const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+   734→
+   735→    const { data: plan } = await supabaseAdmin
+   736→      .from("salary_plans")
+   737→      .select("*")
+   738→      .eq("crew_id", access.crewId)
+   739→      .eq("member_id", secureUserId)
+   740→      .eq("period_start", periodStart)
+   741→      .maybeSingle();
+   742→
+   743→    // ── Compute current-month accrued DYNAMICALLY ──────────────────────────
+   744→    // The `salary_plans.total_accrued` column is only kept in sync by a trigger
+   745→    // that fires when `salary_calculations` records are inserted (which is a
+   746→    // manual owner action and rarely happens). As a result the profile page
+   747→    // was showing "Начислено (месяц) 0 ₽" and "К выплате 0 ₽" even when real
+   748→    // shifts existed in `crew_member_shifts` for the current month.
+   749→    //
+   750→    // We now compute the month-to-date accrued from `crew_member_shifts`
+   751→    // (using salary_amount when present, falling back to duration × hourly_rate
+   752→    // for active shifts without a stored amount) + recorded commissions
+   753→    // (expense_commission) in the same period. This mirrors the logic used by
+   754→    // `getMemberEarnings` in `team-earnings.ts`, so the monthly total and the
+   755→    // period-total shown in the date picker stay consistent.
+   756→    const { data: monthShifts, error: monthShiftErr } = await supabaseAdmin
+   757→      .from("crew_member_shifts")
+   758→      .select("clock_in_time, clock_out_time, hourly_rate, salary_amount")
+   759→      .eq("crew_id", access.crewId)
+   760→      .eq("member_id", secureUserId)
+   761→      .gte("clock_in_time", periodStart)
+   762→      .lt("clock_in_time", periodEnd);
+   763→    if (monthShiftErr) {
+   764→      logger.warn("[getMyEarnings] Shifts query failed:", monthShiftErr);
+   765→    }
+   766→    const dynamicShiftAccrued = (monthShifts || []).reduce((sum: number, s: any) => {
+   767→      const stored = Number(s.salary_amount || 0);
+   768→      if (stored > 0) return sum + stored;
+   769→      const start = s.clock_in_time ? new Date(s.clock_in_time) : null;
+   770→      if (!start) return sum;
+   771→      const end = s.clock_out_time ? new Date(s.clock_out_time) : new Date();
+   772→      const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+   773→      const rate = Number(s.hourly_rate || 0);
+   774→      return sum + hours * rate;
+   775→    }, 0);
+   776→
+   777→    // Month-to-date commissions recorded against this member.
+   778→    const { data: monthCommissions, error: monthCommErr } = await supabaseAdmin
+   779→      .from("cash_transactions")
+   780→      .select("amount")
+   781→      .eq("crew_id", access.crewId)
+   782→      .eq("to_user_id", secureUserId)
+   783→      .eq("transaction_type", "expense_commission")
+   784→      .gte("transaction_date", periodStart)
+   785→      .lt("transaction_date", periodEnd);
+   786→    if (monthCommErr) {
+   787→      logger.warn("[getMyEarnings] Commissions query failed:", monthCommErr);
+   788→    }
+   789→    const dynamicCommissionAccrued = (monthCommissions || []).reduce(
+   790→      (sum: number, c: any) => sum + (Number(c.amount) > 0 ? Number(c.amount) : 0),
+   791→      0,
+   792→    );
+   793→
+   794→    // Already-paid-out salary for this plan (so balanceDue excludes it).
+   795→    // Sums all `expense_salary` transactions for the member in the plan's
+   796→    // period (if a plan exists) — falls back to 0 if no plan.
+   797→    let alreadyPaidThisPeriod = 0;
+   798→    if (plan) {
+   799→      const { data: payouts, error: payoutsErr } = await supabaseAdmin
+   800→        .from("cash_transactions")
+   801→        .select("amount")
+   802→        .eq("crew_id", access.crewId)
+   803→        .eq("to_user_id", secureUserId)
+   804→        .eq("transaction_type", "expense_salary")
+   805→        .gte("transaction_date", periodStart)
+   806→        .lt("transaction_date", periodEnd);
+   807→      if (payoutsErr) {
+   808→        logger.warn("[getMyEarnings] Payouts query failed:", payoutsErr);
+   809→      }
+   810→      alreadyPaidThisPeriod = (payouts || []).reduce(
+   811→        (sum: number, p: any) => sum + (Number(p.amount) > 0 ? Number(p.amount) : 0),
+   812→        0,
+   813→      );
+   814→    }
+   815→
+   816→    const dynamicAccrued = Math.round(dynamicShiftAccrued + dynamicCommissionAccrued);
+   817→    // balance_due reflects what the owner still owes for this period: the
+   818→    // higher of (dynamicAccrued − already paid, plan.balance_due). We prefer
+   819→    // the dynamic calc when it is non-zero (live data); otherwise fall back to
+   820→    // whatever the plan recorded.
+   821→    const dynamicBalanceDue = Math.max(0, dynamicAccrued - alreadyPaidThisPeriod);
+   822→    const planBalanceDue = plan ? Number(plan.balance_due || 0) : 0;
+   823→    const balanceDue = dynamicAccrued > 0 ? dynamicBalanceDue : planBalanceDue;
+   824→
+   825→    const currentPlan = {
+   826→      accrued: dynamicAccrued > 0
+   827→        ? dynamicAccrued
+   828→        : (plan ? Number(plan.total_accrued || 0) : 0),
+   829→      balanceDue,
+   830→      nextPayoutDate: getNextPayoutDate(plan?.payout_schedule || ["10", "25"]),
+   831→    };
+   832→
+   833→    // Get recent commissions
+   834→    const { data: commissions } = await supabaseAdmin
+   835→      .from("cash_transactions")
+   836→      .select("amount, description, transaction_date")
+   837→      .eq("crew_id", access.crewId)
+   838→      .eq("to_user_id", secureUserId)  // CR fix H2: cookie-derived, not client-supplied
+   839→      .eq("transaction_type", "expense_commission")
+   840→      .order("transaction_date", { ascending: false })
+   841→      .limit(10);
+   842→
+   843→    const recentCommissions = (commissions || []).map((c: any) => ({
+   844→      amount: Number(c.amount),
+   845→      date: c.transaction_date,
+   846→      description: c.description,
+   847→    }));
+   848→
+   849→    return successResponse({ currentPlan, recentCommissions });
+   850→  } catch (err) {
+   851→    logger.error("[getMyEarnings] Exception:", err);
+   852→    return errorResponse(handleError(err, "getMyEarnings"));
+   853→  }
+   854→}
+   855→
+   856→function getNextPayoutDate(schedule: string[]): string | null {
+   857→  const now = new Date();
+   858→  const today = now.getDate();
+   859→  const currentMonth = now.getMonth();
+   860→  const currentYear = now.getFullYear();
+   861→
+   862→  for (const dayStr of [...schedule].sort()) {
+   863→    const day = parseInt(dayStr, 10);
+   864→    if (day > today) {
+   865→      return new Date(currentYear, currentMonth, day).toISOString();
+   866→    }
+   867→  }
+   868→
+   869→  // Next month
+   870→  const firstDay = parseInt(schedule[0], 10);
+   871→  return new Date(currentYear, currentMonth + 1, firstDay).toISOString();
+   872→}
+   873→

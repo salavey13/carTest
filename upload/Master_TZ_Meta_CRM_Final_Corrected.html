@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Финальное ТЗ и Уточненный Отчет: Мета-CRM Мотопроката</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --card-border: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-orange: #f97316;
+            --accent-amber: #f59e0b;
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-pink: #ec4899;
+            --accent-teal: #14b8a6;
+            --accent-red: #ef4444;
+            --accent-indigo: #6366f1;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            border-bottom: 2px solid var(--card-border);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .title-area h1 {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .title-area p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .deadline-badge {
+            background: rgba(249, 115, 22, 0.15);
+            border: 1px solid var(--accent-orange);
+            color: var(--accent-orange);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 12px;
+        }
+
+        .card-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .icon-orange { background: rgba(249, 115, 22, 0.2); color: var(--accent-orange); }
+        .icon-blue { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }
+        .icon-green { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
+        .icon-purple { background: rgba(139, 92, 246, 0.2); color: var(--accent-purple); }
+        .icon-pink { background: rgba(236, 72, 153, 0.2); color: var(--accent-pink); }
+        .icon-teal { background: rgba(20, 184, 166, 0.2); color: var(--accent-teal); }
+        .icon-red { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+        .icon-indigo { background: rgba(99, 102, 241, 0.2); color: var(--accent-indigo); }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        ul.task-list {
+            list-style: none;
+        }
+
+        ul.task-list li {
+            position: relative;
+            padding-left: 24px;
+            margin-bottom: 12px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        ul.task-list li strong {
+            color: var(--text-primary);
+        }
+
+        ul.task-list li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--accent-green);
+            font-weight: bold;
+        }
+
+        .report-box {
+            background: #020617;
+            border: 1px solid var(--accent-teal);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #38bdf8;
+            white-space: pre-wrap;
+            margin-top: 10px;
+        }
+
+        .rules-banner {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(249, 115, 22, 0.15));
+            border: 1px solid #ef4444;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        footer {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 13px;
+            padding-top: 20px;
+            border-top: 1px solid var(--card-border);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="title-area">
+            <h1>Финальное ТЗ & Уточненный Ежедневный Отчет</h1>
+            <p>Учет аренд, детализация экипировки (шлемы, перчатки 500₽), сервис, предоплаты и хозрасходы</p>
+        </div>
+        <div class="deadline-badge">
+            <span>⏱️ Дедлайн: 1 сентября (10 дней)</span>
+        </div>
+    </header>
+
+    <div class="rules-banner">
+        <h3>⚠️ Правило занесения наименований экипировки</h3>
+        <p style="font-size: 14px; color: #e2e8f0;">
+            Бот должен выводить <strong>конкретные наименования</strong> предметов экипировки (например: <i>«Перчатки — 500 ₽»</i>, <i>«Шлем — 1 000 ₽»</i>), а не безымянные позиционные выгрузки, чтобы исключить путаницу.
+        </p>
+    </div>
+
+    <!-- Блок: Эталонный финансовый отчет за день -->
+    <div class="card" style="margin-bottom: 30px; border: 1px solid var(--accent-teal);">
+        <div class="card-header">
+            <div class="card-icon icon-teal">📋</div>
+            <div class="card-title" style="color: var(--accent-teal);">Финальный Скорректированный Отчет за Сегодня</div>
+        </div>
+        <div class="report-box">
+📊 ЕЖЕДНЕВНЫЙ СУТОЧНЫЙ ОТЧЕТ — МОТОПРОКАТ
+
+🔑 АРЕНДЫ ТЕХНИКИ (Всего: 5):
+  1. Jilang (Джиланг) — [Сумма ₽]
+  2. Leopard Osaka — [Сумма ₽]
+  3. Breakout (Брайкаут) — [Сумма ₽]
+  4. CBR (Сибирь) — [Сумма ₽]
+  5. Бесплатная аренда (1 час) — 0 ₽ [Приз за конкурс]
+  (⚠️ Возврат Ducati за вчера обработан, в счет новых аренд за сегодня не вошел)
+
+🛡️ ЭКИПИРОВКА И ДОП. ОПЦИИ:
+  • 2 шлема к договор Jilang — 2 000 ₽
+  • Перчатки (1 аренда) — 500 ₽
+  ── Итого по экипировке: 2 500 ₽
+
+💳 ПРЕДОПЛАТЫ / БРОНИРОВАНИЕ (ПРОДАЖИ):
+  • BMW — 5 000 ₽ (Предоплата за бронь принята)
+
+🛠️ СЕРВИС И ОБСЛУЖИВАНИЕ ТЕХНИКИ:
+  • Yamaha R6 (подтяжка цепи) — 1 300 ₽
+    ├── 50% Влад (ЗП): 650 ₽
+    └── 50% Доход компании: 650 ₽
+  • Ducati (обслуживание / ремонт)
+    ├── Ответственный мастер: Слава
+    └── Помощь в сервисе: Влад
+
+🛒 ХОЗРАСХОДЫ И ОБЩЕСТВЕННЫЕ НУЖДЫ:
+  • Утвержденный лимит: 10 000 ₽ / месяц
+  • Покупки за сегодня (чай, кофе, бпшки, табак, уголь) — [Сумма ₽] (Закуп: Рустам)
+
+💸 ЗАРПЛАТЫ И ВЫПЛАТЫ (ФОТ):
+  • Зарплата за день — 3 800 ₽ [Указать получателя]
+
+🔒 ЗАЛОГИ (Учет Рустама):
+  • Прием / возврат залогов проверен (не входят в операционный доход)</div>
+    </div>
+
+    <div class="grid">
+        <!-- Блок 1: Детализация экипировки -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon icon-orange">🧤</div>
+                <div class="card-title">1. Детализация Позиций Экипировки</div>
+            </div>
+            <ul class="task-list">
+                <li><strong>Фиксация перчаток (500 ₽):</strong> В отчете за сегодня зафиксирована аренда перчаток за 500 ₽.</li>
+                <li><strong>Требование к боту:</strong> Запретить вывод абстрактных строк «выдача экипа». Бот должен четко разбивать по типам: <code>Перчатки — 500 ₽</code>, <code>Шлем — X ₽</code>, <code>Куртка — Y ₽</code>.</li>
+            </ul>
+        </div>
+
+        <!-- Блок 2: Хозяйственный лимит -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon icon-indigo">☕</div>
+                <div class="card-title">2. Утвержденный Лимит Хозрасходов</div>
+            </div>
+            <ul class="task-list">
+                <li><strong>Лимит фонда:</strong> Установлена фиксированная сумма <strong>10 000 ₽ / месяц</strong> на общественные нужды (чай, кофе, еда, табак, уголь).</li>
+                <li><strong>Трекинг остатка:</strong> Отображать остаток фонда после покупок Рустама.</li>
+            </ul>
+        </div>
+
+        <!-- Блок 3: Сервис и Доп. опции -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon icon-red">🔧</div>
+                <div class="card-title">3. Сервисы & Комплектность</div>
+            </div>
+            <ul class="task-list">
+                <li><strong>Привязка доп. опций:</strong> Включение шлемов (2 000 ₽) и экипа напрямую в карточку аренды.</li>
+                <li><strong>Ремонтный модуль:</strong> Фиксация ремонта Ducati (Слава + Влад).</li>
+            </ul>
+        </div>
+    </div>
+
+    <footer>
+        Сформировано для команды Мета-CRM | Срок доработок: до 1 сентября 2026 г.
+    </footer>
+
+</body>
+</html>
