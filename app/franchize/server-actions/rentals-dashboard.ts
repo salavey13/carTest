@@ -273,7 +273,7 @@ export async function getRentalsDashboard(input: {
         .eq("vehicle.crew_id", crew.id)
         .lte("requested_start_date", endOfDay)
         .gte("requested_end_date", startOfDay)
-        .not("status", "completed")  // Exclude finished rentals (already counted)
+        .neq("status", "completed")  // Exclude finished rentals (already counted on creation day)
         .order("created_at", { ascending: false }),
     ]);
 
