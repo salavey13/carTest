@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Финальное Техническое Задание: Мета-CRM Мотопроката</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --card-border: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-orange: #f97316;
+            --accent-amber: #f59e0b;
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-pink: #ec4899;
+            --accent-teal: #14b8a6;
+            --accent-red: #ef4444;
+            --accent-indigo: #6366f1;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            border-bottom: 2px solid var(--card-border);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .title-area h1 {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .title-area p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .deadline-badge {
+            background: rgba(249, 115, 22, 0.15);
+            border: 1px solid var(--accent-orange);
+            color: var(--accent-orange);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 12px;
+        }
+
+        .card-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .icon-orange { background: rgba(249, 115, 22, 0.2); color: var(--accent-orange); }
+        .icon-blue { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }
+        .icon-green { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
+        .icon-purple { background: rgba(139, 92, 246, 0.2); color: var(--accent-purple); }
+        .icon-pink { background: rgba(236, 72, 153, 0.2); color: var(--accent-pink); }
+        .icon-teal { background: rgba(20, 184, 166, 0.2); color: var(--accent-teal); }
+        .icon-red { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+        .icon-indigo { background: rgba(99, 102, 241, 0.2); color: var(--accent-indigo); }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        ul.task-list {
+            list-style: none;
+        }
+
+        ul.task-list li {
+            position: relative;
+            padding-left: 24px;
+            margin-bottom: 12px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        ul.task-list li strong {
+            color: var(--text-primary);
+        }
+
+        ul.task-list li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--accent-green);
+            font-weight: bold;
+        }
+
+        .report-box {
+            background: #020617;
+            border: 1px solid var(--accent-teal);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #38bdf8;
+            white-space: pre-wrap;
+            margin-top: 10px;
+        }
+
+        .rules-banner {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(249, 115, 22, 0.15));
+            border: 1px solid #ef4444;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        .metric-table th, .metric-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .metric-table th {
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .badge-kpi { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+        .badge-ops { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }
+        .badge-mkt { background: rgba(139, 92, 246, 0.2); color: var(--accent-purple); }
+
+        footer {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 13px;
+            padding-top: 20px;
+            border-top: 1px solid var(--card-border);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="title-area">
+            <h1>Единый Мастер-Документ ТЗ: Мета-CRM Мотопроката</h1>
+            <p>Финансовая детализация, учет смен, личные кабинеты, экипировка, сервис, хозрасходы и геймификация</p>
+        </div>
+        <div class="deadline-badge">
+            <span>⏱️ Дедлайн доработок: 1 сентября (10 дней)</span>
+        </div>
+    </header>
+
+    <div class="rules-banner">
+        <h3>⚠️ Жесткие регламенты управления и учета</h3>
+        <p style="font-size: 14px; color: #e2e8f0;">
+            1. <strong>Сервисный регламент:</strong> Любые оказанные услуги заносятся в бота день в день. Невнесенные и непроверенные работы <strong>НЕ ОПЛАЧИВАЮТСЯ</strong>.<br>
+            2. <strong>Финансовый регламент хозрасходов:</strong> Мелкие покупки (чай, кофе, еда, табак, уголь) фиксируются в отдельном фонде с лимитом <strong>10 000 ₽ / месяц</strong> и не списываются в ЗП сотрудникам.<br>
+            3. <strong>Договорной регламент:</strong> Аренда экипировки автоматически извлекается из состава договоров аренды техники.
+        </p>
+    </div>
+
+    <!-- Блок: Эталонный вечерний дайджест -->
+    <div class="card" style="margin-bottom: 30px; border: 1px solid var(--accent-teal);">
+        <div class="card-header">
+            <div class="card-icon icon-teal">📋</div>
+            <div class="card-title" style="color: var(--accent-teal);">Образец Вечернего Суточного Дайджеста (Формируется ПОСЛЕ закрытия смен)</div>
+        </div>
+        <div class="report-box">
+📊 ЕЖЕДНЕВНЫЙ ВЕЧЕРНИЙ ДАЙДЖЕСТ — МОТОПРОКАТ
+
+🔑 АРЕНДЫ ТЕХНИКИ (Всего: 5):
+  1. Jilang (Джиланг) — [Сумма ₽]
+  2. Leopard Osaka — [Сумма ₽]
+  3. Breakout (Брайкаут) — [Сумма ₽]
+  4. CBR (Сибирь) — [Сумма ₽]
+  5. Бесплатная аренда (1 час) — 0 ₽ [Приз за конкурс]
+  (⚠️ Возврат Ducati за вчера закрыт, в счет новых аренд не засчитан)
+
+🛡️ АРЕНДА И ВЫДАЧА ЭКИПИРОВКИ (Извлечено из договоров):
+  • 2 шлема (к договору Jilang) — 2 000 ₽
+  • Перчатки — 500 ₽ (Аренда)
+  • Шлем коцаный (друг Феди) — 500 ₽ [Скидка/Подарок]
+  ── Итого экипировка (аренда): 3 000 ₽
+
+💳 ПРЕДОПЛАТЫ / БРОНИРОВАНИЕ (ПРОДАЖИ):
+  • BMW — 5 000 ₽ (Предоплата принята)
+
+🛠️ СЕРВИС И ОБСЛУЖИВАНИЕ ТЕХНИКИ:
+  • Yamaha R6 (подтяжка цепи) — 1 300 ₽
+    ├── 50% Влад (ЗП): 650 ₽
+    └── 50% Компания: 650 ₽
+  • Ducati (ремонт / восстановление)
+    ├── Ответственный: Слава (забрал в работу)
+    └── Помощь в сервисе: Влад
+  ── Итого сервис за день: 1 300 ₽ (плюс открытые наряды)
+
+🛒 ХОЗРАСХОДЫ И ОБЩЕСТВЕННЫЕ НУЖДЫ (ФОНД 10 000 ₽/МЕС):
+  • Закупки за день (чай, кофе, бпшки, табак, уголь) — [Сумма ₽] (Закуп: Рустам)
+  • Остаток месячного лимита: [10 000 ₽ - Потрачено]
+
+💸 ЗАРПЛАТЫ И ВЫПЛАТЫ (ФОТ):
+  • Зарплата за день — 3 800 ₽ [Сотрудник: Имя]
+
+🔒 ЗАЛОГИ (Учет Рустама):
+  • Прием / возврат залогов проверен (не входят в операционную выручку)
+
+⏱️ СТАТУС СМЕН СОТРУДНИКОВ:
+  • Рустам: Check-in 09:00 | Check-out 18:00 (9 ч)
+  • Паша: Check-in 10:00 | Check-out 21:00 (11 ч)
+  • Влад: Check-in 11:00 | Check-out 19:00 (8 ч)</div>
+    </div>
+
+    <div class="grid">
+        <!-- Блок 1: Отчеты & Дайджест -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon icon-orange">📊</div>
+                <div class="card-title">1. Отчеты & Время Дайджеста</div>
+            </div>
+            <ul class="task-list">
+                <li><strong>Перенос дайджеста:</strong> Сдвинуть автоматическое формирование вечернего отчета на более позднее время, чтобы в него попадало точное время закрытия смен сотрудников.</li>
+                <li><strong>Детализация по мотоциклам:</strong> Выводить <code>[Модель] — [Сумма ₽]</code> вместо общей абстрактной суммы.</li>
+                <li><strong>Исключение возвратов:</strong> Закрытие вчерашней аренды (Ducati) не увеличивает счетчик аренд за сегодня (должно быть 5, а не 6).</li>
+                <li><strong>Фильтр залогов:</strong> Залоги Рустама вынесены за пределы отчета выручки.</li>
+            </ul>
+        </div>
+
+        <!-- Блок 2: Сервисный модуль -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon icon-red">🔧</div>
+                <div class="card-title">2. Детализация Сервиса</div>
+            </div>
+            <ul class="task-list">
+                <li><strong>Сплит 50/50:</strong> Клиентский сервис (Yamaha R6 — 1300 ₽) делится ровно 50% мастеру / 50% компании.</li>
+                <li><strong>Мульти-исполнители:</strong> Ремонт Ducati фиксирует основного мастера (Слава) и помощника (Влад).</li>
+                <li><strong>Суммарный & Детальный вывод:</strong> В дайджесте выводится и подробная разбивка работ, и итоговая сумма сервиса за день.</li>
+            </ul>
+        </div>
+
+        <!-- Блок 3: Экипировка & Договоры -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon icon-purple">🛡️</div>
+                <div class="card-title">3. Извлечение Экипа & Аналитика</div>
+            </div>
+            <ul class="task-list">
+                <li><strong>Извлечение из договоров:</strong> Если экип занесен в общий договор аренды мота (2 шлема на 2000 ₽ к Jilang), бот автоматически «распаковывает» его и выносит в блок экипировки.</li>
+                <li><strong>Гибкие тарифы и подарки:</strong> Возможность оформлять экип как подарок или скидку (напр. коцаный шлем за 500 ₽ другу Феди).</li>
+                <li><strong>Разделение Продажи / Аренда:</strong> Четкий разграничитель продаваемого и арендуемого экипа.</li>
+                <li><strong>Окупаемость (ROI):</strong> Авто-подсчет окупаемости экипировки (Закупка vs Доход от аренд).</li>
+            </ul>
+        </div>
+
+        <!-- Блок 4: Учет Смен & ЛК -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon icon-green">⏱️</div>
+                <div class="card-title">4. Учет Смен & Личный Кабинет</div>
+            </div>
+            <ul class="task-list">
+                <li><strong>Отдельный учет смен:</strong> Точный фиксатор приезда (Check-in) и ухода (Check-out) для каждого: Рустам, Паша, Влад.</li>
+                <li><strong>Метрики времени:</strong> Сбор часов наработки по объектам (VIP-BEL, Байк 2 Дом).</li>
+                <li><strong>Интерактивный ЛК (App/WebApp):</strong> Прозрачный баланс зарплаты в реальном времени, статистика бонусов и ввод данных в 1 клик.</li>
+            </ul>
+        </div>
+
+        <!-- Блок 5: Предоплаты -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon icon-teal">💳</div>
+                <div class="card-title">5. Трекинг Предоплат</div>
+            </div>
+            <ul class="task-list">
+                <li><strong>Бронирование:</strong> Учет авансов при бронировании техники перед покупкой/арендой (например, 5 000 ₽ за BMW).</li>
+                <li><strong>Вывод в дайджест:</strong> Поступившие предоплаты выносятся отдельной строкой в суточной сводке.</li>
+            </ul>
+        </div>
+
+        <!-- Блок 6: Хозяйственный фонд -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon icon-indigo">☕</div>
+                <div class="card-title">6. Фонд «Хозрасходы» (10 000 ₽)</div>
+            </div>
+            <ul class="task-list">
+                <li><strong>Лимит 10 000 ₽/мес:</strong> Покупки на бытовые нужды (хавка, чай, кофе, угли, табак, бпшки).</li>
+                <li><strong>Запрет на запись в ЗП:</strong> Рустам вносит покупки через ассистента, сумма списывается из хозфонда без затрагивания ЗП.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Таблица Геймификации -->
+    <div class="card" style="margin-bottom: 30px;">
+        <div class="card-header">
+            <div class="card-icon icon-pink">🏆</div>
+            <div class="card-title">7. Система Мотивации и «Ачивки»</div>
+        </div>
+        <table class="metric-table">
+            <thead>
+                <tr>
+                    <th>Номинация / «Ачивка»</th>
+                    <th>Условие получения</th>
+                    <th>Тип KPI</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>🥇 <strong>«Король Продаж»</strong></td>
+                    <td>Кто больше всех продал мотоциклов</td>
+                    <td><span class="badge badge-kpi">ТОП KPI</span></td>
+                </tr>
+                <tr>
+                    <td>🔑 <strong>«Мастер Аренды»</strong></td>
+                    <td>Кто сделала больше всех выдач и договоров аренды</td>
+                    <td><span class="badge badge-ops">Операции</span></td>
+                </tr>
+                <tr>
+                    <td>⏱️ <strong>«Хозяин Смен»</strong></td>
+                    <td>Кто отработал больше всех часов на смене</td>
+                    <td><span class="badge badge-ops">Операции</span></td>
+                </tr>
+                <tr>
+                    <td>🧲 <strong>«Магнит Клиентов»</strong></td>
+                    <td>Кто привлек больше всего новых клиентов</td>
+                    <td><span class="badge badge-mkt">Маркетинг</span></td>
+                </tr>
+                <tr>
+                    <td>📸 <strong>«Контент-Мейкер»</strong></td>
+                    <td>Кто выложил больше всего сторис и видео</td>
+                    <td><span class="badge badge-mkt">Маркетинг</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <footer>
+        Сформировано для Паши и руководства компании | Срок сдачи проекта: 1 сентября 2026 г.
+    </footer>
+
+</body>
+</html>
