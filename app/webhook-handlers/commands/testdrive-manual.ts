@@ -29,6 +29,7 @@ import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franc
 import { privateSchema } from "@/lib/private-secrets";
 import { isCrewMember } from "@/app/lib/user-rental-secrets";
 import { createLeadFollowupTodos } from "@/app/franchize/server-actions/crew-todos";
+import nodemailer from "nodemailer";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrew } from "../lib/crew-access";
@@ -887,7 +888,6 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       const emailTo = process.env.EMAIL_DEFAULT_TO || crewSecrets.email || "vip_bike@mail.ru";
 
       if (smtpHost && smtpUser && smtpPass) {
-        const nodemailer = require("nodemailer");
         const transporter = nodemailer.createTransport({
           host: smtpHost,
           port: smtpPort,

@@ -1,0 +1,706 @@
+     1→// /app/webhook-handlers/commands/command-handler.ts
+     2→import { logger } from "@/lib/logger";
+     3→import { startCommand } from "./start";
+     4→import { rageCommand } from "./rage";
+     5→import { leadsCommand } from "./leads";
+     6→import { sauceCommand } from "./sauce";
+     7→import { fileCommand } from "./file";
+     8→import { offerCommand } from "./offer";
+     9→import { howtoCommand } from "./howto";
+    10→import { ctxCommand, handleCtxSelection } from "./ctx";
+    11→import { profileCommand } from "./profile";
+    12→import { helpCommand } from "./help";
+    13→import { rageSettingsCommand } from "./rageSettings";
+    14→import { sendComplexMessage } from "../actions/sendComplexMessage";
+    15→import { supabaseAnon, supabaseAdmin } from "@/hooks/supabase";
+    16→import { simCommand } from "./sim";
+    17→import { simGoCommand } from "./sim_go";
+    18→import { seedMarketCommand } from "./seed_market";
+    19→import { simGodCommand } from "./sim_god";
+    20→import { leaderboardCommand } from "./leaderboard";
+    21→import { sosCommand, handleSosPaymentChoice } from "./sos";
+    22→import { actionsCommand, handleActionChoice } from "./actions";
+    23→import { shiftCommand } from "./shift";
+    24→import { wbCommand } from "./wb";
+    25→import { codexCommand } from "./codex";
+    26→import { docCommand, handleDocText, handleDocCallback } from "./doc-manual";
+    27→import { ekipCommand, handleEkipText, handleEkipCallback } from "./ekip-manual";
+    28→import { handleSubrentManualCommand } from "./subrent-manual";
+    29→import { analyticsPassCommand } from "./analytics_pass";
+    30→import { testDriveCommand, handleTestDriveText, handleTestDriveCallback } from "./testdrive-manual";
+    31→import { sampleCommand } from "./sample";
+    32→import { getUserCrews, getAllCrews, buildCrewSelectionKeyboard } from "../lib/crew-access";
+    33→
+    34→import { escapeTelegramMarkdown } from "@/lib/utils"; // Helper для Markdown escape
+    35→
+    36→// Expiry for transient user_states rows (pending_* + crew_selected_*).
+    37→// These are intermediate states used by the crew-selection keyboard flow —
+    38→// the user types /doc, sees the crew-selection keyboard, picks a crew, then
+    39→// the actual /doc command runs and replaces this row with its own state.
+    40→//
+    41→// 5 minutes is generous: the operator just needs to tap a crew button.
+    42→// Previously these rows had NO expires_at → they accumulated in user_states
+    43→// forever (one per abandoned /doc, /testdrive, /ekip, /subrent attempt).
+    44→// Now they auto-expire and the next /doc starts clean.
+    45→//
+    46→// NOTE: this matches the DOC/TESTDRIVE/EKIP command-level expiry of 30 min,
+    47→// but is shorter because pending_* states are SO transient. If the user
+    48→// takes >5 min to pick a crew, they should re-type the command.
+    49→const PENDING_STATE_EXPIRY_MS = 5 * 60 * 1000;
+    50→
+    51→function pendingExpiryIso(): string {
+    52→  return new Date(Date.now() + PENDING_STATE_EXPIRY_MS).toISOString();
+    53→}
+    54→
+    55→export async function handleCommand(update: any) {
+    56→    if (update.message?.text || update.message?.caption || update.callback_query) {
+    57→        const text: string = update.message?.text || update.message?.caption || update.callback_query?.data;
+    58→        const chatId: number = update.message?.chat.id || update.callback_query?.message.chat.id;
+    59→        const userId: number = update.message?.from.id || update.callback_query?.from.id;
+    60→        const userIdStr = String(userId);
+    61→        const username: string | undefined = update.message?.from.username || update.callback_query?.from.username;
+    62→        const parts = text.split(' ');
+    63→        const command = parts[0].toLowerCase();
+    64→        const args = parts.slice(1);
+    65→
+    66→        logger.info(`[Command Handler] Received: '${text}' from User: ${userIdStr}`);
+    67→
+    68→        // ── State-aware callback routing ──────────────────────────────────────
+    69→        // Check user's active flow state FIRST to resolve routing conflicts
+    70→        // between /subrent and /doc (shared prefixes: cancel, ok, s_*, p_*).
+    71→        // Uses supabaseAdmin (bypasses RLS — user_states may not be readable by anon).
+    72→        let userFlowState: string | null = null;
+    73→        if (update.callback_query) {
+    74→            const { data: flowCheck } = await supabaseAdmin
+    75→                .from("user_states")
+    76→                .select("state")
+    77→                .eq("user_id", userIdStr)
+    78→                .maybeSingle();
+    79→            userFlowState = flowCheck?.state || null;
+    80→            logger.info(`[Command Handler] User ${userIdStr} flow state: ${userFlowState || 'none'}`);
+    81→        }
+    82→
+    83→        // Handle callback queries for /subrent flow
+    84→        // Includes subrent-specific prefixes AND shared prefixes (cancel, ok, s_, p_)
+    85→        // when user is confirmed to be in subrent state.
+    86→        if (update.callback_query && (
+    87→            text.startsWith("bike_") ||
+    88→            text.startsWith("pct_") ||
+    89→            text.startsWith("price_") ||
+    90→            text.startsWith("hourly_") ||
+    91→            text.startsWith("seasonal_") ||
+    92→            text.startsWith("dur_") ||
+    93→            text.startsWith("edit_") ||
+    94→            text === "yes" || text === "no" ||
+    95→            // State-aware: route shared prefixes to subrent when in subrent flow
+    96→            (userFlowState?.startsWith("subrent_") && (
+    97→                text === "cancel" || text === "ok" ||
+    98→                text.startsWith("s_") || text.startsWith("p_")
+    99→            ))
+   100→        )) {
+   101→            await handleSubrentManualCommand({ userId: userIdStr, userName: username, text: undefined, callbackData: text, messageId: update.callback_query?.message?.message_id, callbackQueryId: update.callback_query?.id, crewId: undefined });
+   102→            return;
+   103→        }
+   104→
+   105→        // Handle callback queries for /ekip flow (equipment rental)
+   106→        // Must come BEFORE /doc routing because they share prefixes (s_, e_, p_, dep_, pay_)
+   107→        // Uses same pattern as /doc: checks state internally, not by prefix
+   108→        if (update.callback_query) {
+   109→            const handled = await handleEkipCallback(userIdStr, chatId, text, update.callback_query.id);
+   110→            if (handled) return;
+   111→        }
+   112→
+   113→        // Handle callback queries for /doc flow
+   114→        // Skip if user is in subrent state (shared prefixes already routed above)
+   115→        if (update.callback_query && !userFlowState?.startsWith("subrent_") && (
+   116→            text.startsWith("doc_") ||
+   117→            text.startsWith("cat_") ||
+   118→            text.startsWith("d_") ||
+   119→            text.startsWith("c_") ||
+   120→            text.startsWith("hl_") ||   // "has license?" Yes/No callbacks
+   121→            text.startsWith("e_") ||     // end date callbacks
+   122→            text.startsWith("p_") ||
+   123→            text.startsWith("s_") ||
+   124→            text.startsWith("eq_") ||    // equipment callbacks (eq_helmets, eq_done, etc)
+   125→            text.startsWith("pay_") ||   // payment split callbacks (pay_cash, pay_all_cash, pay_all_bank)
+   126→            text.startsWith("paydest_") || // payment destination callbacks (paydest_tbank, paydest_sber, paydest_split) — NEW
+   127→            text.startsWith("paysplit_") || // payment split card callbacks (paysplit_tbank, paysplit_sber) — NEW
+   128→            text.startsWith("dep_") ||   // deposit choice callbacks (dep_confirm, dep_custom, dep_sts)
+   129→            text.startsWith("depdest_") || // deposit destination callbacks (depdest_cash, depdest_tbank, depdest_sber, depdest_split) — FIX: was missing!
+   130→            text.startsWith("depsplit_") || // deposit split card callbacks (depsplit_tbank, depsplit_sber) — FIX: was missing!
+   131→            text.startsWith("delivery_") || // sale delivery method callbacks (delivery_pickup, delivery_tc_buyer, delivery_tc_seller) — FIX: was missing!
+   132→            text.startsWith("sr_") ||    // СТС owner-relation callbacks
+   133→            text.startsWith("salecol_") || // sale flow color callbacks
+   134→            text.startsWith("salevin_") || // sale flow VIN callbacks
+   135→            text === "cdone" ||
+   136→            text === "cancel" ||
+   137→            text === "ok" ||
+   138→            text === "restart" ||
+   139→            text === "correct_step" ||  // FIX: was missing — caused "неизвестная команда" on "Исправить шаг" button
+   140→            text === "sts_skip" ||
+   141→            text === "ph_skip"           // phone skip callback
+   142→        )) {
+   143→            const handled = await handleDocCallback(userIdStr, chatId, text, update.callback_query.id);
+   144→            if (handled) return;
+   145→        }
+   146→
+   147→        // Handle callback queries for /testdrive flow
+   148→        if (update.callback_query && text.startsWith("td_")) {
+   149→            const handled = await handleTestDriveCallback(userIdStr, chatId, text, update.callback_query.id);
+   150→            if (handled) return;
+   151→        }
+   152→
+   153→        // ── Crew selection callback (for /doc, /testdrive, /subrent) ──
+   154→        if (update.callback_query && text.startsWith("crewsel_")) {
+   155→            const crewSlug = text.replace("crewsel_", "");
+   156→            const userIdStrLocal = String(update.callback_query.from.id);
+   157→            const chatIdLocal = update.callback_query.message.chat.id;
+   158→
+   159→            if (crewSlug === "cancel") {
+   160→                await sendComplexMessage(chatIdLocal, "❌ Отменено.", [], { removeKeyboard: true });
+   161→                return;
+   162→            }
+   163→
+   164→            // Clear any pending state first
+   165→            await supabaseAdmin
+   166→                .from("user_states")
+   167→                .delete()
+   168→                .eq("user_id", userIdStrLocal)
+   169→                .like("state", "pending_%");
+   170→
+   171→            // Store the selected crew in user_states (using a stable key pattern)
+   172→            await supabaseAdmin
+   173→                .from("user_states")
+   174→                .upsert({
+   175→                    user_id: userIdStrLocal,
+   176→                    state: `crew_selected_${crewSlug}`,
+   177→                    context: { selectedCrew: crewSlug, selectedAt: Date.now() },
+   178→                    expires_at: pendingExpiryIso(),
+   179→                    updated_at: new Date().toISOString(),
+   180→                }, { onConflict: "user_id" });
+   181→
+   182→            // Check if there's a pending command to resume
+   183→            const currentState = userFlowState || "";
+   184→            if (currentState.startsWith("pending_doc_")) {
+   185→                const { docCommand: docCmd } = await import("./doc-manual");
+   186→                const bestPhotoVariant = update.callback_query.message?.photo?.length
+   187→                    ? [update.callback_query.message.photo[update.callback_query.message.photo.length - 1]]
+   188→                    : [];
+   189→                const documentFiles = update.callback_query.message?.document ? [update.callback_query.message.document] : [];
+   190→                await docCmd(chatIdLocal, Number(userIdStrLocal), undefined, "/doc", bestPhotoVariant, documentFiles);
+   191→            } else if (currentState.startsWith("pending_td_")) {
+   192→                const { testDriveCommand: tdCmd } = await import("./testdrive-manual");
+   193→                await tdCmd(chatIdLocal, Number(userIdStrLocal), undefined, "/testdrive");
+   194→            } else if (currentState.startsWith("pending_subrent_")) {
+   195→                const { handleSubrentManualCommand: srCmd } = await import("./subrent-manual");
+   196→                await srCmd({ userId: userIdStrLocal, userName: undefined, text: "/subrent", callbackData: undefined, crewId: crewSlug });
+   197→            } else if (currentState.startsWith("pending_ekip_")) {
+   198→                const { ekipCommand: ekipCmd } = await import("./ekip-manual");
+   199→                await ekipCmd(chatIdLocal, Number(userIdStrLocal), undefined, "/ekip");
+   200→            } else {
+   201→                await sendComplexMessage(chatIdLocal, "✅ Выбран экипаж. Используйте команду снова.", [], { removeKeyboard: true });
+   202→            }
+   203→            return;
+   204→        }
+   205→
+   206→        // Новые handlers для rules
+   207→        if (command.startsWith('/approve_')) {
+   208→            const id = command.split('_')[1];
+   209→            await handleApprove(id, chatId, userIdStr);
+   210→            return;
+   211→        }
+   212→        if (command.startsWith('/decline_')) {
+   213→            const id = command.split('_')[1];
+   214→            await handleDecline(id, chatId, userIdStr);
+   215→            return;
+   216→        }
+   217→        if (command.startsWith('/accept_')) {
+   218→            const id = command.split('_')[1];
+   219→            await handleAccept(id, chatId, userIdStr);
+   220→            return;
+   221→        }
+   222→        if (command.startsWith('/decline_rigger_')) { // Для rigger decline
+   223→            const id = command.split('_')[2];
+   224→            await handleRiggerDecline(id, chatId, userIdStr);
+   225→            return;
+   226→        }
+   227→
+   228→        // Fix для sauna: аналогичные handlers
+   229→        if (command.startsWith('/approve_sauna_')) {
+   230→            const id = command.split('_')[2];
+   231→            await handleApprove(id, chatId, userIdStr, 'sauna');
+   232→            return;
+   233→        }
+   234→        if (command.startsWith('/decline_sauna_')) {
+   235→            const id = command.split('_')[2];
+   236→            await handleDecline(id, chatId, userIdStr, 'sauna');
+   237→            return;
+   238→        }
+   239→
+   240→        const commandMap: { [key: string]: Function } = {
+   241→            "/start": () => startCommand(chatId, userId, update.message?.from || update.callback_query?.from, text),
+   242→            "/help": () => helpCommand(chatId, userId),
+   243→            "/shift": () => shiftCommand(chatId, userIdStr, username),
+   244→            "/actions": () => actionsCommand(chatId, userIdStr),
+   245→            "/sos": () => sosCommand(chatId, userIdStr),
+   246→            "/rage": () => rageCommand(chatId, userId),
+   247→            "/settings": () => rageSettingsCommand(chatId, userId, text),
+   248→            "/sim": () => simCommand(chatId, userIdStr, args),
+   249→            "/sim_god": () => simGodCommand(chatId, userIdStr, args),
+   250→            "/god": () => simGodCommand(chatId, userIdStr, args),
+   251→            "/sim_go": () => simGoCommand(chatId, userIdStr, args),
+   252→            "/seed_market": () => seedMarketCommand(chatId, userIdStr),
+   253→            "/leaderboard": () => leaderboardCommand(chatId, userIdStr),
+   254→            "/board": () => leaderboardCommand(chatId, userIdStr),
+   255→            "/wb": () => wbCommand(chatId, userIdStr),
+   256→            "/leads": () => leadsCommand(chatId, userId),
+   257→            "/sauce": () => sauceCommand(chatId, userId),
+   258→            "/file": () => fileCommand(chatId, userId, args),
+   259→            "/offer": () => offerCommand(chatId, userId),
+   260→            "/howto": () => howtoCommand(chatId, userId),
+   261→            "/ctx": () => ctxCommand(chatId, userId),
+   262→            "/profile": () => profileCommand(chatId, userId, username),
+   263→            "/analytics_pass": () => analyticsPassCommand(chatId, userId, username),
+   264→            "/sample": () => sampleCommand(chatId, userId, username),
+   265→            "/testdrive": async () => {
+   266→                const crews = await getUserCrews(userIdStr);
+   267→                if (crews.length === 0) {
+   268→                    // General public — show ALL crews for selection
+   269→                    const allCrews = await getAllCrews();
+   270→                    if (allCrews.length === 0) {
+   271→                        await sendComplexMessage(chatId, "🚫 Нет доступных экипажей.", [], { removeKeyboard: true });
+   272→                        return;
+   273→                    }
+   274→                    await supabaseAdmin.from("user_states").upsert({
+   275→                        user_id: userIdStr,
+   276→                        state: `pending_td_${Date.now()}`,
+   277→                        context: { pendingCommand: "/testdrive" },
+   278→                        expires_at: pendingExpiryIso(),
+   279→                    }, { onConflict: "user_id" });
+   280→                    await sendComplexMessage(
+   281→                        chatId,
+   282→                        "👥 Выберите экипаж для команды /testdrive:",
+   283→                        buildCrewSelectionKeyboard(allCrews, false),
+   284→                        { keyboardType: "inline" },
+   285→                    );
+   286→                    return;
+   287→                }
+   288→                if (crews.length === 1) {
+   289→                    // Auto-select single crew
+   290→                    await supabaseAdmin.from("user_states").upsert({
+   291→                        user_id: userIdStr,
+   292→                        state: `crew_selected_${crews[0].slug}`,
+   293→                        context: { selectedCrew: crews[0].slug, selectedAt: Date.now() },
+   294→                        expires_at: pendingExpiryIso(),
+   295→                    }, { onConflict: "user_id" });
+   296→                    return testDriveCommand(chatId, userId, username, text);
+   297→                }
+   298→                // Multiple crews — show selection
+   299→                await supabaseAdmin.from("user_states").upsert({
+   300→                    user_id: userIdStr,
+   301→                    state: `pending_td_${Date.now()}`,
+   302→                    context: { pendingCommand: "/testdrive" },
+   303→                    expires_at: pendingExpiryIso(),
+   304→                }, { onConflict: "user_id" });
+   305→                await sendComplexMessage(
+   306→                    chatId,
+   307→                    "👥 Выберите экипаж для команды /testdrive:",
+   308→                    buildCrewSelectionKeyboard(crews),
+   309→                    { keyboardType: "inline" },
+   310→                );
+   311→            },
+   312→            "/doc": async () => {
+   313→                const crews = await getUserCrews(userIdStr);
+   314→                if (crews.length === 0) {
+   315→                    // General public — show ALL crews for selection
+   316→                    const allCrews = await getAllCrews();
+   317→                    if (allCrews.length === 0) {
+   318→                        await sendComplexMessage(chatId, "🚫 Нет доступных экипажей.", [], { removeKeyboard: true });
+   319→                        return;
+   320→                    }
+   321→                    await supabaseAdmin.from("user_states").upsert({
+   322→                        user_id: userIdStr,
+   323→                        state: `pending_doc_${Date.now()}`,
+   324→                        context: { pendingCommand: "/doc" },
+   325→                        expires_at: pendingExpiryIso(),
+   326→                    }, { onConflict: "user_id" });
+   327→                    await sendComplexMessage(
+   328→                        chatId,
+   329→                        "👥 Выберите экипаж для команды /doc:",
+   330→                        buildCrewSelectionKeyboard(allCrews, false),
+   331→                        { keyboardType: "inline" },
+   332→                    );
+   333→                    return;
+   334→                }
+   335→                if (crews.length === 1) {
+   336→                    await supabaseAdmin.from("user_states").upsert({
+   337→                        user_id: userIdStr,
+   338→                        state: `crew_selected_${crews[0].slug}`,
+   339→                        context: { selectedCrew: crews[0].slug, selectedAt: Date.now() },
+   340→                        expires_at: pendingExpiryIso(),
+   341→                    }, { onConflict: "user_id" });
+   342→                    const bestPhotoVariant = update.message?.photo?.length
+   343→                        ? [update.message.photo[update.message.photo.length - 1]]
+   344→                        : [];
+   345→                    const documentFiles = update.message?.document ? [update.message.document] : [];
+   346→                    return docCommand(chatId, userId, username, text, bestPhotoVariant, documentFiles);
+   347→                }
+   348→                await supabaseAdmin.from("user_states").upsert({
+   349→                    user_id: userIdStr,
+   350→                    state: `pending_doc_${Date.now()}`,
+   351→                    context: { pendingCommand: "/doc" },
+   352→                    expires_at: pendingExpiryIso(),
+   353→                }, { onConflict: "user_id" });
+   354→                await sendComplexMessage(
+   355→                    chatId,
+   356→                    "👥 Выберите экипаж для команды /doc:",
+   357→                    buildCrewSelectionKeyboard(crews),
+   358→                    { keyboardType: "inline" },
+   359→                );
+   360→            },
+   361→            "/codex": () => {
+   362→                const bestPhotoVariant = update.message?.photo?.length
+   363→                    ? [update.message.photo[update.message.photo.length - 1]]
+   364→                    : [];
+   365→                const documentFiles = update.message?.document ? [update.message.document] : [];
+   366→                return codexCommand(chatId, userIdStr, username, text, bestPhotoVariant, documentFiles);
+   367→            },
+   368→            "/ekip": async () => {
+   369→                const crews = await getUserCrews(userIdStr);
+   370→                if (crews.length === 0) {
+   371→                    // General public — show ALL crews for selection
+   372→                    const allCrews = await getAllCrews();
+   373→                    if (allCrews.length === 0) {
+   374→                        await sendComplexMessage(chatId, "🚫 Нет доступных экипажей.", [], { removeKeyboard: true });
+   375→                        return;
+   376→                    }
+   377→                    await supabaseAdmin.from("user_states").upsert({
+   378→                        user_id: userIdStr,
+   379→                        state: `pending_ekip_${Date.now()}`,
+   380→                        context: { pendingCommand: "/ekip" },
+   381→                        expires_at: pendingExpiryIso(),
+   382→                    }, { onConflict: "user_id" });
+   383→                    await sendComplexMessage(
+   384→                        chatId,
+   385→                        "👥 Выберите экипаж для команды /ekip:",
+   386→                        buildCrewSelectionKeyboard(allCrews, false),
+   387→                        { keyboardType: "inline" },
+   388→                    );
+   389→                    return;
+   390→                }
+   391→                if (crews.length === 1) {
+   392→                    await supabaseAdmin.from("user_states").upsert({
+   393→                        user_id: userIdStr,
+   394→                        state: `crew_selected_${crews[0].slug}`,
+   395→                        context: { selectedCrew: crews[0].slug, selectedAt: Date.now() },
+   396→                        expires_at: pendingExpiryIso(),
+   397→                    }, { onConflict: "user_id" });
+   398→                    return ekipCommand(chatId, userId, username, text);
+   399→                }
+   400→                await supabaseAdmin.from("user_states").upsert({
+   401→                    user_id: userIdStr,
+   402→                    state: `pending_ekip_${Date.now()}`,
+   403→                    context: { pendingCommand: "/ekip" },
+   404→                    expires_at: pendingExpiryIso(),
+   405→                }, { onConflict: "user_id" });
+   406→                await sendComplexMessage(
+   407→                    chatId,
+   408→                    "👥 Выберите экипаж для команды /ekip:",
+   409→                    buildCrewSelectionKeyboard(crews),
+   410→                    { keyboardType: "inline" },
+   411→                );
+   412→            },
+   413→            "/subrent": async () => {
+   414→                const crews = await getUserCrews(userIdStr);
+   415→                if (crews.length === 0) {
+   416→                    // General public — show ALL crews for selection
+   417→                    const allCrews = await getAllCrews();
+   418→                    if (allCrews.length === 0) {
+   419→                        await sendComplexMessage(chatId, "🚫 Нет доступных экипажей.", [], { removeKeyboard: true });
+   420→                        return;
+   421→                    }
+   422→                    await supabaseAdmin.from("user_states").upsert({
+   423→                        user_id: userIdStr,
+   424→                        state: `pending_subrent_${Date.now()}`,
+   425→                        context: { pendingCommand: "/subrent" },
+   426→                        expires_at: pendingExpiryIso(),
+   427→                    }, { onConflict: "user_id" });
+   428→                    await sendComplexMessage(
+   429→                        chatId,
+   430→                        "👥 Выберите экипаж для команды /subrent:",
+   431→                        buildCrewSelectionKeyboard(allCrews, false),
+   432→                        { keyboardType: "inline" },
+   433→                    );
+   434→                    return;
+   435→                }
+   436→                if (crews.length === 1) {
+   437→                    await supabaseAdmin.from("user_states").upsert({
+   438→                        user_id: userIdStr,
+   439→                        state: `crew_selected_${crews[0].slug}`,
+   440→                        context: { selectedCrew: crews[0].slug, selectedAt: Date.now() },
+   441→                        expires_at: pendingExpiryIso(),
+   442→                    }, { onConflict: "user_id" });
+   443→                    return handleSubrentManualCommand({ userId: userIdStr, userName: username, text, callbackData: undefined, crewId: crews[0].slug });
+   444→                }
+   445→                await supabaseAdmin.from("user_states").upsert({
+   446→                    user_id: userIdStr,
+   447→                    state: `pending_subrent_${Date.now()}`,
+   448→                    context: { pendingCommand: "/subrent" },
+   449→                    expires_at: pendingExpiryIso(),
+   450→                }, { onConflict: "user_id" });
+   451→                await sendComplexMessage(
+   452→                    chatId,
+   453→                    "👥 Выберите экипаж для команды /subrent:",
+   454→                    buildCrewSelectionKeyboard(crews),
+   455→                    { keyboardType: "inline" },
+   456→                );
+   457→            },
+   458→        };
+   459→
+   460→        const commandFunction = commandMap[command]
+   461→            || (command.startsWith("/codex@") ? commandMap["/codex"] : undefined)
+   462→            || (command.startsWith("/doc@") ? commandMap["/doc"] : undefined)
+   463→            || (command.startsWith("/ekip@") ? commandMap["/ekip"] : undefined)
+   464→            || (command.startsWith("/subrent@") ? commandMap["/subrent"] : undefined)
+   465→            || (command.startsWith("/testdrive@") ? commandMap["/testdrive"] : undefined);
+   466→
+   467→        if (commandFunction) {
+   468→            logger.info(`[Command Handler] Executing command: ${command}`);
+   469→            try {
+   470→                await commandFunction();
+   471→            } catch (cmdError) {
+   472→                logger.error(`[Command Handler] Error executing command ${command}:`, cmdError);
+   473→            }
+   474→        } else {
+   475→            // H1 guard: if this is an unrouted callback_query (button click that
+   476→            // wasn't in any whitelist), DON'T feed its data into text handlers —
+   477→            // they would silently store the callback_data string as user input
+   478→            // and corrupt the flow state. Show "unknown command" instead.
+   479→            //
+   480→            // 2026-08-19 review: but if the unrouted callback is "cancel",
+   481→            // graceful-exit instead of "unknown button". The user clicked
+   482→            // "❌ Отменить" — they want out, not a lecture. This catches the
+   483→            // case where the flow's state has been cleared (e.g. via expiry
+   484→            // or an earlier error) but the user still sees a stale keyboard
+   485→            // with the cancel button on it.
+   486→            if (update.callback_query) {
+   487→                if (text === "cancel" || text === "restart") {
+   488→                    // Best-effort state cleanup, then acknowledge.
+   489→                    try {
+   490→                        await supabaseAdmin.from("user_states").delete().eq("user_id", userIdStr);
+   491→                    } catch (e) {
+   492→                        logger.warn(`[Command Handler] Failed to clear state on cancel:`, e);
+   493→                    }
+   494→                    if (text === "restart") {
+   495→                        await sendComplexMessage(chatId, "🔄 Начните заново командой /ekip, /doc или /subrent.", [], { removeKeyboard: true });
+   496→                    } else {
+   497→                        await sendComplexMessage(chatId, "❌ Отменено.", [], { removeKeyboard: true });
+   498→                    }
+   499→                    return;
+   500→                }
+   501→                logger.warn(`[Command Handler] Unrouted callback_query: ${text} (user ${userIdStr})`);
+   502→                await sendComplexMessage(chatId, "Неизвестная кнопка. Используй /help или /doc.", []);
+   503→                return;
+   504→            }
+   505→
+   506→            // Check if user is in /doc flow (awaiting bike selection or schedule)
+   507→            const docHandled = await handleDocText(userIdStr, chatId, text);
+   508→            if (docHandled) return;
+   509→
+   510→            // Check if user is in /ekip flow (equipment rental)
+   511→            const ekipHandled = await handleEkipText(userIdStr, chatId, text);
+   512→            if (ekipHandled) return;
+   513→
+   514→            // Check if user is in /testdrive flow
+   515→            // NOTE: no supabaseAnon pre-check — handleTestDriveText reads state internally
+   516→            // via supabaseAdmin (which bypasses RLS). Safe to call unconditionally.
+   517→            const tdHandled = await handleTestDriveText(userIdStr, chatId, text);
+   518→            if (tdHandled) return;
+   519→
+   520→            // Check if user is in /subrent flow
+   521→            // FIX: Use supabaseAdmin instead of supabaseAnon — user_states may have
+   522→            // RLS that blocks anon reads. State is saved with supabaseAdmin (service role),
+   523→            // so we must also read with supabaseAdmin to find it reliably.
+   524→            // FIX: Check error from maybeSingle() — it returns data:null on error
+   525→            // (e.g. PGRST116 = multiple rows due to missing expires_at in old saves).
+   526→            // In that case try cleanup + fall-through to handler.
+   527→            const { data: subrentState, error: subrentErr } = await supabaseAdmin.from("user_states")
+   528→                .select("state")
+   529→                .eq("user_id", userIdStr)
+   530→                .like("state", "subrent_%")
+   531→                .maybeSingle();
+   532→            if (subrentErr) {
+   533→                logger.warn(`[command-handler] subrent state maybeSingle error (${subrentErr.code}): ${subrentErr.message}`);
+   534→                // PGRST116 = multiple rows — likely stale duplicates from missing
+   535→                // expires_at in old saveState. Delete all, then route to subrent
+   536→                // handler anyway (will start fresh — better than survey handler).
+   537→                if (subrentErr.code === "PGRST116") {
+   538→                    await supabaseAdmin.from("user_states")
+   539→                        .delete()
+   540→                        .eq("user_id", userIdStr)
+   541→                        .like("state", "subrent_%");
+   542→                    // Route to subrent handler — context will be null → fresh start
+   543→                    await handleSubrentManualCommand({ userId: userIdStr, userName: username, text, callbackData: undefined, crewId: undefined });
+   544→                    return;
+   545→                }
+   546→                // For other errors, fall through (subrentState is already null)
+   547→            }
+   548→            if (subrentState) {
+   549→                await handleSubrentManualCommand({ userId: userIdStr, userName: username, text, callbackData: undefined, crewId: undefined });
+   550→                return;
+   551→            }
+   552→
+   553→            const shiftActionMap: { [key: string]: string } = {
+   554→                "✅ Начать Смену": "clock_in", "❌ Завершить Смену": "clock_out",
+   555→                "🏍️ На Байке": "toggle_ride", "🏢 В Боксе": "toggle_ride",
+   556→            };
+   557→            if (shiftActionMap[text]) {
+   558→                await shiftCommand(chatId, userIdStr, username, shiftActionMap[text]);
+   559→                return;
+   560→            }
+   561→
+   562→            if (text.startsWith('⛽️') || text.startsWith('🛠️') || text.startsWith('🙏')) {
+   563→                await handleSosPaymentChoice(chatId, userIdStr, text); return;
+   564→            }
+   565→            if (text.startsWith('📸') || text.startsWith('✅') || text.startsWith('🆘') || text.startsWith('棄') || text === '❌ Закрыть') {
+   566→                await handleActionChoice(chatId, userIdStr, text); return;
+   567→            }
+   568→            if (text.startsWith('Set Spread') || text.startsWith('Toggle') || text === 'Done') {
+   569→                await rageSettingsCommand(chatId, userId, text); return;
+   570→            }
+   571→            const ctxKeys = Object.keys(require("./content/subcontexts").subcontexts);
+   572→            if (ctxKeys.includes(text)) {
+   573→                await handleCtxSelection(chatId, userId, text); return;
+   574→            }
+   575→
+   576→            const { data: activeSurvey } = await supabaseAnon.from("user_survey_state").select('user_id').eq('user_id', String(userId)).maybeSingle();
+   577→            if (activeSurvey && update.message?.from) {
+   578→                await startCommand(chatId, userId, update.message.from, text);
+   579→            } else {
+   580→                logger.warn(`[Command Handler] Unknown command for user ${userId}. Text: '${text}'`);
+   581→                await sendComplexMessage(chatId, "Неизвестная команда. Используй /help.", []);
+   582→            }
+   583→        }
+   584→        return;
+   585→    }
+   586→    logger.warn("[Command Handler] Received unhandled update type.", { update_id: update.update_id });
+   587→}
+   588→
+   589→async function handleApprove(id: string, chatId: number, userId: string, type: string = 'rule') {
+   590→  // Простая проверка на admin (расширить по appContext)
+   591→  const { data: isAdmin } = await supabaseAnon.from('users').select('role').eq('user_id', userId).single();
+   592→  if (isAdmin?.role !== 'admin') {
+   593→    await sendComplexMessage(chatId, 'Access denied.', []);
+   594→    return;
+   595→  }
+   596→
+   597→  const response = await fetch(`/api/rentals/${id}`, {
+   598→    method: 'PATCH',
+   599→    headers: { 'Content-Type': 'application/json' },
+   600→    body: JSON.stringify({ status: 'confirmed', action: 'approve' }),
+   601→  });
+   602→
+   603→  if (response.ok) {
+   604→    const { data: rental } = await supabaseAnon.from('rentals').select('*').eq('rental_id', id).single();
+   605→    const summaryMd = escapeTelegramMarkdown(`Booking approved! \n**Type:** ${rental.metadata.session_type || type} \n**Time:** ${rental.requested_start_date} - ${rental.requested_end_date}`);
+   606→    await sendComplexMessage(rental.user_id, summaryMd, [], { imageQuery: `${type}-confirmed`, parseMode: 'MarkdownV2' });
+   607→    if (rental.metadata.rigger_id) await sendComplexMessage(rental.metadata.rigger_id, summaryMd, [], { parseMode: 'MarkdownV2' });
+   608→    await sendComplexMessage(chatId, 'Approved.', []);
+   609→  } else {
+   610→    await sendComplexMessage(chatId, 'Error approving.', []);
+   611→  }
+   612→}
+   613→
+   614→async function handleDecline(id: string, chatId: number, userId: string, type: string = 'rule') {
+   615→  // Admin check аналогично
+   616→  const { data: isAdmin } = await supabaseAnon.from('users').select('role').eq('user_id', userId).single();
+   617→  if (isAdmin?.role !== 'admin') {
+   618→    await sendComplexMessage(chatId, 'Access denied.', []);
+   619→    return;
+   620→  }
+   621→
+   622→  const response = await fetch(`/api/rentals/${id}`, {
+   623→    method: 'PATCH',
+   624→    headers: { 'Content-Type': 'application/json' },
+   625→    body: JSON.stringify({ status: 'cancelled', action: 'decline' }),
+   626→  });
+   627→
+   628→  if (response.ok) {
+   629→    const { data: rental } = await supabaseAnon.from('rentals').select('*').eq('rental_id', id).single();
+   630→    const summaryMd = escapeTelegramMarkdown(`Booking declined. \n**Type:** ${rental.metadata.session_type || type} \nRefund initiated.`);
+   631→    await sendComplexMessage(rental.user_id, summaryMd, [], { parseMode: 'MarkdownV2' });
+   632→    if (rental.metadata.rigger_id) await sendComplexMessage(rental.metadata.rigger_id, summaryMd, [], { parseMode: 'MarkdownV2' });
+   633→    await sendComplexMessage(chatId, 'Declined and refunded.', []);
+   634→  } else {
+   635→    await sendComplexMessage(chatId, 'Error declining.', []);
+   636→  }
+   637→}
+   638→
+   639→async function handleAccept(id: string, chatId: number, userId: string) {
+   640→  // Rigger check: убедиться, что userId == rigger_id
+   641→  // Select the full metadata object (not metadata->>rigger_id which
+   642→  // returns only { rigger_id: string } and makes rental.metadata undefined).
+   643→  const { data: rental } = await supabaseAnon.from('rentals').select('metadata, user_id').eq('rental_id', id).maybeSingle();
+   644→  if (!rental) {
+   645→    await sendComplexMessage(chatId, 'Аренда не найдена.', []);
+   646→    return;
+   647→  }
+   648→  const metadata = (rental.metadata || {}) as Record<string, any>;
+   649→  if (metadata.rigger_id !== userId) {
+   650→    await sendComplexMessage(chatId, 'Access denied.', []);
+   651→    return;
+   652→  }
+   653→
+   654→  const { error } = await supabaseAnon.from('rentals').update({
+   655→    metadata: { ...metadata, rigger_confirmed: true }
+   656→  }).eq('rental_id', id);
+   657→
+   658→  if (!error) {
+   659→    const summaryMd = escapeTelegramMarkdown(`You accepted the booking!`);
+   660→    await sendComplexMessage(chatId, summaryMd, [], { parseMode: 'MarkdownV2' });
+   661→    // Notify admin/user
+   662→    const adminChatId = process.env.ADMIN_CHAT_ID;
+   663→    if (adminChatId) {
+   664→      await sendComplexMessage(adminChatId, `Rigger accepted ${id}.`, []);
+   665→    }
+   666→  } else {
+   667→    await sendComplexMessage(chatId, 'Error accepting.', []);
+   668→  }
+   669→}
+   670→
+   671→async function handleRiggerDecline(id: string, chatId: number, userId: string) {
+   672→  // Аналогично accept, но decline: notify admin to reassign
+   673→  const { data: rental } = await supabaseAnon.from('rentals').select('metadata, user_id').eq('rental_id', id).maybeSingle();
+   674→  if (!rental) {
+   675→    await sendComplexMessage(chatId, 'Аренда не найдена.', []);
+   676→    return;
+   677→  }
+   678→  const metadata = (rental.metadata || {}) as Record<string, any>;
+   679→  if (metadata.rigger_id !== userId) {
+   680→    await sendComplexMessage(chatId, 'Access denied.', []);
+   681→    return;
+   682→  }
+   683→
+   684→  const { error } = await supabaseAnon.from('rentals').update({
+   685→    status: 'pending_reassign', // Или cancelled, по логике
+   686→    metadata: { ...metadata, rigger_confirmed: false }
+   687→  }).eq('rental_id', id);
+   688→
+   689→  if (!error) {
+   690→    await sendComplexMessage(chatId, 'Declined.', []);
+   691→    // Notify admin
+   692→    const adminChatId = process.env.ADMIN_CHAT_ID;
+   693→    if (adminChatId) {
+   694→      await sendComplexMessage(adminChatId, `Rigger declined ${id}. Reassign?`, [[{ text: '/reassign_' + id }]]);
+   695→    }
+   696→    // Notify user
+   697→    const summaryMd = escapeTelegramMarkdown(`Rigger declined. Admin will reassign.`);
+   698→    const renterChatId = rental.user_id;
+   699→    if (renterChatId) {
+   700→      await sendComplexMessage(renterChatId, summaryMd, [], { parseMode: 'MarkdownV2' });
+   701→    }
+   702→  } else {
+   703→    await sendComplexMessage(chatId, 'Error declining.', []);
+   704→  }
+   705→}
+   706→
