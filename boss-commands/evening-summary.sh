@@ -2,8 +2,12 @@
 # /home/z/my-project/boss-commands/evening-summary.sh
 #
 # Boss command: evening-summary
-# Sends an end-of-day KPI digest with per-bike breakdown, equipment extraction,
-# service detail, salary, хозрасходы, deposits, and shift status.
+# Sends an end-of-day KPI digest with equipment extraction, service detail,
+# salary, хозрасходы, deposits, and shift status.
+#
+# Per-bike rental breakdown is NOT included — the dashboard link at the bottom
+# opens the analytics page for today's date where all rentals are visible.
+# This keeps the digest concise.
 #
 # Cron schedule: every day at 22:00 Moscow = 19:00 UTC = "0 19 * * *"
 #
@@ -20,60 +24,37 @@ NOW_DISPLAY=$(TZ=Europe/Moscow date +"%H:%M")
 
 log "Running evening-summary for $TODAY"
 
-# Use +03:00 for MSK (no DST in Russia since 2014)
+# MSK timezone boundaries (Russia = UTC+3, no DST since 2014)
 START_UTC="${TODAY}T00:00:00+03:00"
 END_UTC="${TODAY}T23:59:59+03:00"
 START_ENC="${START_UTC//+/%2B}"
 END_ENC="${END_UTC//+/%2B}"
 
-# ─── Fetch bike names (id → "make model") ────────────────────────────────────
-BIKES_DATA=$(supabase_query "cars" "select=id,make,model&crew_id=eq.${CREW_ID}&type=eq.bike")
-BIKES_MAP=$(echo "$BIKES_DATA" | jq -r '[.[] | "\(.id)=\(.make // "") \(.model // "")"] | join("\n")')
-
-# Helper: resolve bike name by id
-bike_name() {
-  vid="$1"
-  name
-  bname=$(echo "$BIKES_MAP" | grep "^${vid}=" | head -1 | cut -d= -f2-)
-  if [[ -z "$bname" ]]; then echo "$vid"; else echo "$bname"; fi
-}
-
-# ─── Rentals ──────────────────────────────────────────────────────────────────
+# ─── Rentals (totals only — per-bike detail is in the dashboard link) ────────
 RENTALS_DATA=$(supabase_query "rentals" \
-  "select=rental_id,status,total_cost,vehicle_id,metadata&crew_id=eq.${CREW_ID}&or=(and(created_at.gte.${START_ENC},created_at.lte.${END_ENC}),and(agreed_start_date.lte.${END_ENC},agreed_end_date.gte.${START_ENC}))&vehicle_id=not.like.vip-bike-svc-*")
+  "select=rental_id,status,total_cost,metadata&crew_id=eq.${CREW_ID}&or=(and(created_at.gte.${START_ENC},created_at.lte.${END_ENC}),and(agreed_start_date.lte.${END_ENC},agreed_end_date.gte.${START_ENC}))&vehicle_id=not.like.vip-bike-svc-*")
 
-# Per-bike rental breakdown
-RENTAL_LINES=""
-RENTAL_COUNT=0
-RENTAL_REVENUE=0
-
-while IFS=$'\t' read -r rid status cost vid; do
-  [[ -z "$rid" ]] && continue
-  # Only count active + completed for revenue
-  if [[ "$status" == "active" || "$status" == "completed" ]]; then
-    RENTAL_COUNT=$((RENTAL_COUNT + 1))
-    RENTAL_REVENUE=$((RENTAL_REVENUE + cost))
-
-    bbname= "$vid")
-
-    # Check for special status
-    special=""
-    if [[ "$cost" -eq 0 ]]; then
-      special=" [бесплатно]"
-    fi
-
-    RENTAL_LINES="${RENTAL_LINES}• ${name} — ${cost} ₽${special}
-"
-  fi
-done < <(echo "$RENTALS_DATA" | jq -r '.[] | [.rental_id, .status, (.total_cost // 0), (.vehicle_id // "?")] | @tsv')
-
-if [[ -z "$RENTAL_LINES" ]]; then
-  RENTAL_LINES="  (нет аренд)"
-fi
+RENTAL_COUNT=$(echo "$RENTALS_DATA" | jq '[.[] | select(.status == "active" or .status == "completed")] | length' 2>/dev/null || echo 0)
+RENTAL_REVENUE=$(echo "$RENTALS_DATA" | jq '[.[] | select(.status == "active" or .status == "completed") | (.total_cost // 0)] | add // 0' 2>/dev/null || echo 0)
+RENTAL_ACTIVE=$(echo "$RENTALS_DATA" | jq '[.[] | select(.status == "active")] | length' 2>/dev/null || echo 0)
 
 # ─── Equipment extraction from rental metadata ───────────────────────────────
+# Equipment is stored in rentals.metadata.equipment as:
+#   { helmets: N, gloves: N, jacket: bool, pants: bool, boots: bool,
+#     net: bool, backpack: bool, bag: bool, charger: bool }
+# Prices: helmet = 1000₽/day (or 500₽ for <24h, but we use 1000 for simplicity
+# in the digest — the exact per-rental calculation is in the dashboard).
+# All other items = 500₽ flat.
+#
+# NOTE: the /doc flow stores equipment as COUNTS (helmets: 2, gloves: 1) and
+# BOOLEANS (jacket: true). The digest sums all rentals' equipment into totals.
+#
+# KNOWN LIMITATION: specific jacket/pants items (e.g. "Ducati Racing Jacket"
+# vs "KTM Textile Jacket") are NOT tracked per-rental — only the count/boolean.
+# The cars table has 30 equipment items (type='equipment') with individual
+# IDs, but rentals.metadata.equipment doesn't reference specific item IDs.
+# Per-item tracking would require a new equipment_rental table (deferred).
 EQUIPMENT_SECTION=$(echo "$RENTALS_DATA" | jq -r '
-  def num: if type == "number" then . elif type == "string" then (tonumber? // 0) else 0 end;
   [ .[] | select(.status == "active" or .status == "completed") | .metadata.equipment // empty ] as $all_eq |
   ($all_eq | map(.helmets // 0) | add // 0) as $h |
   ($all_eq | map(.gloves // 0) | add // 0) as $g |
@@ -99,7 +80,7 @@ EQUIPMENT_SECTION=$(echo "$RENTALS_DATA" | jq -r '
 
 # ─── Sales ───────────────────────────────────────────────────────────────────
 SALES_DATA=$(supabase_query "sale_contract_artifacts" \
-  "select=id,total_sum,sale_price&crew_slug=eq.${CREW_SLUG}&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}" \
+  "select=id,total_sum,sale_price&crew_id=eq.${CREW_ID}&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}" \
   "private")
 
 SALE_COUNT=$(echo "$SALES_DATA" | jq 'length' 2>/dev/null || echo 0)
@@ -108,7 +89,20 @@ SALE_REVENUE=$(echo "$SALES_DATA" | jq -r '
   ([.[] | (.total_sum // (.sale_price | to_num) // 0)] | add // 0)
 ' 2>/dev/null || echo 0)
 
-# ─── Service ─────────────────────────────────────────────────────────────────
+# ─── Service (with detail + 50/50 split display) ─────────────────────────────
+# Service work is stored as rentals with vehicle_id pointing to cars.type='service'.
+# Each service rental has metadata:
+#   { bike: "ducati-black", service_name: "Замена подножки", source: "service_work",
+#     created_by: "service-work-text", performed_at: ISO, client: "..." }
+# The service_name comes from the cars table (cars.model = service description).
+# There is NO mechanic_id field — the operator who ran the skill is in
+# rentals.created_by_operator_chat_id (but for service-work-text skill entries,
+# this field is typically null because the skill INSERTs directly via REST).
+#
+# 50/50 split: currently NOT auto-calculated. The digest shows the split
+# as a display-only calculation (total_cost / 2). Auto-creating an
+# expense_salary cash_transaction row would require knowing WHO the mechanic is —
+# currently service work entries don't have a mechanic_id field.
 SVC_IDS=$(supabase_query "cars" "select=id&crew_id=eq.${CREW_ID}&type=eq.service" | jq -r '[.[].id] | join(",")' 2>/dev/null || echo "")
 
 SERVICE_DETAIL=""
@@ -120,12 +114,18 @@ if [[ -n "$SVC_IDS" ]]; then
 
   SERVICE_REVENUE=$(echo "$SERVICES_DATA" | jq '[.[] | select(.status == "active" or .status == "completed") | (.total_cost // 0)] | add // 0' 2>/dev/null || echo 0)
 
+  # Build per-service detail with 50/50 split display
+  # Uses metadata.bike (which bike was serviced) + metadata.service_name (what was done)
   SERVICE_DETAIL=$(echo "$SERVICES_DATA" | jq -r '
     [ .[] | select(.status == "active" or .status == "completed") ] |
     if length == 0 then ""
     else
       map(
-        "• \(.vehicle_id) — \(.total_cost // 0) ₽\n  ├── 50% мастеру: \((.total_cost // 0) / 2 | floor) ₽\n  └── 50% компания: \((.total_cost // 0) / 2 | floor) ₽"
+        .total_cost as $cost |
+        (.metadata.bike // "—") as $bike |
+        (.metadata.service_name // .vehicle_id // "сервис") as $svc |
+        ($cost / 2 | floor) as $half |
+        "• \($bike): \($svc) — \($cost) ₽\n  ├── 50% мастеру: \($half) ₽\n  └── 50% компания: \($half) ₽"
       ) | join("\n")
     end
   ' 2>/dev/null || echo "")
@@ -133,7 +133,7 @@ fi
 
 # ─── Testdrives ──────────────────────────────────────────────────────────────
 TESTDRIVE_COUNT=$(supabase_query "testdrive_contract_artifacts" \
-  "select=id&crew_slug=eq.${CREW_SLUG}&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}" \
+  "select=id&crew_id=eq.${CREW_ID}&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}" \
   "private" | jq 'length' 2>/dev/null || echo 0)
 
 # ─── Deposits (excluded from revenue) ────────────────────────────────────────
@@ -152,21 +152,20 @@ DEPOSIT_KPIS=$(echo "$DEPOSIT_DATA" | jq -r '
 
 # ─── Salary (ФОТ) ────────────────────────────────────────────────────────────
 SALARY_DATA=$(supabase_query "cash_transactions" \
-  "select=amount,description&crew_slug=eq.${CREW_SLUG}&transaction_type=eq.expense_salary&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}")
+  "select=amount,description&crew_id=eq.${CREW_ID}&transaction_type=eq.expense_salary&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}")
 
 SALARY_SECTION=$(echo "$SALARY_DATA" | jq -r '
   if length == 0 then "  (нет выплат)"
   else [ .[] | "• \(.description // "выплата") — \(.amount) ₽" ] | join("\n") end
 ' 2>/dev/null || echo "  (ошибка)")
 
-# ─── Household expenses (хозрасходы) ─────────────────────────────────────────
+# ─── Household expenses (хозрасходы, лимит 10 000 ₽/мес) ────────────────────
 HOUSEHOLD_DATA=$(supabase_query "cash_transactions" \
-  "select=amount,description&crew_slug=eq.${CREW_SLUG}&transaction_type=eq.expense_other&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}")
+  "select=amount,description&crew_id=eq.${CREW_ID}&transaction_type=eq.expense_other&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}")
 
-# Monthly total for limit tracking
 MONTH_START=$(TZ=Europe/Moscow date +"%Y-%m-01T00:00:00+03:00" | sed 's/+/%2B/g')
 HOUSEHOLD_MONTH=$(supabase_query "cash_transactions" \
-  "select=amount&crew_slug=eq.${CREW_SLUG}&transaction_type=eq.expense_other&created_at=gte.${MONTH_START}" | jq '[.[].amount] | add // 0' 2>/dev/null || echo 0)
+  "select=amount&crew_id=eq.${CREW_ID}&transaction_type=eq.expense_other&created_at=gte.${MONTH_START}" | jq '[.[].amount] | add // 0' 2>/dev/null || echo 0)
 
 HOUSEHOLD_REMAINING=$((10000 - HOUSEHOLD_MONTH))
 
@@ -182,51 +181,38 @@ HOUSEHOLD_SECTION=$(echo "$HOUSEHOLD_DATA" | jq -r --argjson m "$HOUSEHOLD_MONTH
 SHIFTS_DATA=$(supabase_query "crew_member_shifts" \
   "select=member_id,clock_in_time,clock_out_time,duration_minutes&crew_id=eq.${CREW_ID}&clock_in_time=gte.${START_ENC}&clock_in_time=lte.${END_ENC}")
 
-# Fetch user names for shift members
 SHIFT_USER_IDS=$(echo "$SHIFTS_DATA" | jq -r '[.[].member_id] | unique | join(",")' 2>/dev/null)
 if [[ -n "$SHIFT_USER_IDS" && "$SHIFT_USER_IDS" != "null" ]]; then
-  USERS_DATA=$(supabase_query "users" "select=user_id,full_name&user_id=in.(${SHIFT_USER_IDS}")
-  USERS_MAP=$(echo "$USERS_DATA" | jq -r '[.[] | "\(.user_id)=\(.full_name // .user_id)"] | join("\n")')
-else
-  USERS_MAP=""
+  SHIFT_OR_FILTER=$(echo "$SHIFT_USER_IDS" | sed 's/,/,user_id.eq./g; s/^/user_id.eq./')
+  USERS_DATA=$(supabase_query "users" "select=user_id,full_name&or=(${SHIFT_OR_FILTER})")
 fi
 
-shift_user_name() {
-  uid="$1"
-  name
-  bname=$(echo "$USERS_MAP" | grep "^${uid}=" | head -1 | cut -d= -f2-)
-  if [[ -z "$bname" ]]; then echo "$uid"; else echo "$bname"; fi
-}
-
-SHIFT_SECTION=""
-while IFS=$'\t' read -r uid cin cout dur; do
-  [[ -z "$uid" ]] && continue
-  bbname= "$uid")
-
-  # Convert times to MSK (UTC + 3h)
-  cin_msk cout_msk
-  cin_msk=$(moscow_hhmm "$cin")
-  if [[ -z "$cout" || "$cout" == "null" ]]; then
-    cout_msk="open"
+# Combine shifts + users into a single JSON for jq processing
+SHIFT_SECTION=$(jq -rn --argjson shifts "$SHIFTS_DATA" --argjson users "$USERS_DATA" '
+  ($users | map({(.user_id): (.full_name // .user_id)}) | add // {}) as $names |
+  def fmt_time(ts):
+    if ts == null then "open"
+    else
+      ts[11:16] as $hhmm |
+      ($hhmm[0:2] | tonumber) as $h |
+      $hhmm[2:] as $m |
+      (($h + 3) % 24) as $msk |
+      (if $msk < 10 then "0" else "" end) + ($msk | tostring) + $m
+    end;
+  def fmt_h(mins):
+    if mins == null then "open"
+    else ((mins / 10 | floor) / 10 | tostring) + " ч"
+    end;
+  if ($shifts | length) == 0 then "  (нет смен)"
   else
-    cout_msk=$(moscow_hhmm "$cout")
-  fi
+    [ $shifts[] |
+      ($names[.member_id] // .member_id) as $n |
+      "• \($n): \(fmt_time(.clock_in_time)) → \(fmt_time(.clock_out_time)) (\(fmt_h(.duration_minutes)))"
+    ] | join("\n")
+  end
+' 2>/dev/null || echo "  (ошибка загрузки смен)")
 
-  if [[ -z "$dur" || "$dur" == "null" ]]; then
-    shift_hours="open"
-  else
-    shift_hours=$(echo "scale=1; $dur / 60" | bc 2>/dev/null || echo "?")" ч"
-  fi
-
-  SHIFT_SECTION="${SHIFT_SECTION}• ${name}: ${cin_msk} → ${cout_msk} (${shift_hours})
-"
-done < <(echo "$SHIFTS_DATA" | jq -r '.[] | [.member_id, .clock_in_time, (.clock_out_time // "null"), (.duration_minutes // "null")] | @tsv' 2>/dev/null)
-
-if [[ -z "$SHIFT_SECTION" ]]; then
-  SHIFT_SECTION="  (нет смен)"
-fi
-
-# ─── Active rentals with deep links ──────────────────────────────────────────
+# ─── Active rentals with deep links (keep — this is actionable) ──────────────
 ACTIVE_LIST=$(echo "$RENTALS_DATA" | jq -r '
   [.[] | select(.status == "active")] | .[0:5] |
   map("RENTAL_ROW|\(.rental_id[0:8])|\(.agreed_end_date)|\(.total_cost // 0)") | join("\n")
@@ -260,11 +246,12 @@ DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
 # ─── Compose message ─────────────────────────────────────────────────────────
 MESSAGE="📊 <b>ЕЖЕДНЕВНЫЙ ВЕЧЕРНИЙ ДАЙДЖЕСТ</b> — ${TODAY}, ${NOW_DISPLAY} МСК
 
-<b>🔑 АРЕНДЫ ТЕХНИКИ (${RENTAL_COUNT}):</b>
-${RENTAL_LINES}"
+<b>🔑 Аренды:</b> ${RENTAL_COUNT} (активных: ${RENTAL_ACTIVE})
+Выручка: ${RENTAL_REVENUE} ₽"
 
 if [[ -n "$EQUIPMENT_SECTION" ]]; then
   MESSAGE="${MESSAGE}
+
 <b>${EQUIPMENT_SECTION}</b>"
 fi
 
