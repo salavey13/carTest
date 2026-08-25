@@ -254,8 +254,10 @@ export async function getRentalsDashboard(input: {
       user:users!rentals_user_id_fkey(user_id, full_name, username, metadata)
     `;
 
-    // Query 1: rentals created today
-    const [createdTodayResult, periodOverlappingResult] = await Promise.all([
+    // Query 1: rentals whose START date falls on the selected day.
+    // The daily total should count rentals that STARTED today, not ones that
+    // END today (a multi-day rental from yesterday shouldn't be double-counted).
+    const [createdTodayResult, startedTodayResult] = await Promise.all([
       supabaseAdmin
         .from("rentals")
         .select(baseSelect)
@@ -263,17 +265,14 @@ export async function getRentalsDashboard(input: {
         .gte("created_at", startOfDay)
         .lte("created_at", endOfDay)
         .order("created_at", { ascending: false }),
-      // Query 2: rentals whose PERIOD overlaps the selected day
-      // (start <= endOfDay AND end >= startOfDay)
-      // FIX: Exclude completed rentals - they were already counted on creation day
-      // for multi-day rentals to avoid double counting.
+      // Query 2: rentals whose START DATE is on the selected day
+      // (requested_start_date >= startOfDay AND requested_start_date <= endOfDay)
       supabaseAdmin
         .from("rentals")
         .select(baseSelect)
         .eq("vehicle.crew_id", crew.id)
+        .gte("requested_start_date", startOfDay)
         .lte("requested_start_date", endOfDay)
-        .gte("requested_end_date", startOfDay)
-        .neq("status", "completed")  // Exclude finished rentals (already counted on creation day)
         .order("created_at", { ascending: false }),
     ]);
 
@@ -283,11 +282,11 @@ export async function getRentalsDashboard(input: {
     for (const r of (createdTodayResult.data || []) as any[]) {
       rentalMap.set(r.rental_id, r);
     }
-    for (const r of (periodOverlappingResult.data || []) as any[]) {
+    for (const r of (startedTodayResult.data || []) as any[]) {
       rentalMap.set(r.rental_id, r);
     }
     const rentals = Array.from(rentalMap.values());
-    const rentalsError = createdTodayResult.error || periodOverlappingResult.error;
+    const rentalsError = createdTodayResult.error || startedTodayResult.error;
 
     if (rentalsError) {
       console.error("[rentals-dashboard] Query error:", rentalsError);

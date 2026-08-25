@@ -182,6 +182,38 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
   // Pull-to-refresh state
   const [pullState, setPullState] = useState<"idle" | "pulling" | "refreshing">("idle");
   const [pullDistance, setPullDistance] = useState(0);
+
+  // CSV export modal state
+  const [csvExportOpen, setCsvExportOpen] = useState(false);
+  const [csvFromDate, setCsvFromDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  });
+  const [csvToDate, setCsvToDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+
+  const exportCsv = async () => {
+    try {
+      const actorUserId = getActorUserId();
+      if (!actorUserId) return;
+      const resp = await fetch(`/api/franchize/rentals-csv-export?slug=${initialSlug.trim()}&from=${csvFromDate}&to=${csvToDate}`, {
+        headers: actorUserId ? { "x-telegram-user-id": actorUserId } : {},
+      });
+      if (!resp.ok) { toast.error("Ошибка экспорта CSV"); return; }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${initialSlug}-rentals-${csvFromDate}-to-${csvToDate}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setCsvExportOpen(false);
+      toast.success("CSV скачан");
+    } catch { toast.error("Ошибка экспорта CSV"); }
+  };
+
   const pullThreshold = 80;
   const maxPullDistance = 120;
   const mainContentRef = useRef<HTMLDivElement>(null);
@@ -1057,8 +1089,21 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = withAlpha("#10b981", 0.15); e.currentTarget.style.borderColor = withAlpha("#10b981", 0.3); }}
               >
                 <Download className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                <span className="hidden md:inline">Экспорт</span>
-                <span className="md:hidden">XLS</span>
+                <span className="hidden md:inline">XLS</span>
+              </button>
+
+              {/* CSV Export with date range */}
+              <button
+                onClick={() => setCsvExportOpen(true)}
+                className="hidden sm:flex px-3 md:px-4 py-1.5 md:py-2.5 rounded-lg md:rounded-xl border font-semibold transition-all items-center gap-1.5 md:gap-2 text-xs md:text-sm"
+                style={{
+                  backgroundColor: withAlpha("#3b82f6", 0.15),
+                  borderColor: withAlpha("#3b82f6", 0.3),
+                  color: "#60a5fa",
+                }}
+              >
+                <FileText className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <span className="hidden md:inline">CSV</span>
               </button>
             </div>
           </div>
@@ -1302,9 +1347,35 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
                               </span>
                             </td>
                             <td className="px-3 md:px-5 py-3 md:py-4">
-                              <div className="text-xs md:text-sm font-semibold leading-tight" style={{ color: textPrimary }}>{rental.documentSecret?.renter_full_name || rental.user?.full_name || rental.user?.username || "—"}</div>
+                              <div className="text-xs md:text-sm font-semibold leading-tight" style={{ color: textPrimary }}>{rental.documentSecret?.renter_full_name || (rental as any)?.metadata?.renter_name || rental.user?.full_name || rental.user?.username || "—"}</div>
                               <div className="text-[10px] md:text-xs mt-0.5" style={{ color: textSecondary }}>
                                 {rental.vehicle?.make} {rental.vehicle?.model}
+                              </div>
+                              {/* Deposit + Equipment + Odometer (from metadata) */}
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {(rental as any)?.metadata?.deposit_amount && Number((rental as any).metadata.deposit_amount) > 0 && (
+                                  <span className="text-[9px] md:text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: withAlpha("#f59e0b", 0.15), color: "#f59e0b" }}>
+                                    Залог: {Number((rental as any).metadata.deposit_amount).toLocaleString("ru-RU")}₽
+                                  </span>
+                                )}
+                                {(rental as any)?.metadata?.equipment && (() => {
+                                  const eq = (rental as any).metadata.equipment;
+                                  const parts: string[] = [];
+                                  if (eq.helmets > 0) parts.push(`🪖×${eq.helmets}`);
+                                  if (eq.gloves > 0) parts.push(`🧤×${eq.gloves}`);
+                                  if (eq.jacket) parts.push("🧥");
+                                  if (eq.pants) parts.push("👖");
+                                  if (eq.boots) parts.push("👢");
+                                  if (eq.net) parts.push("🌐");
+                                  if (eq.backpack) parts.push("🎒");
+                                  if (eq.charger) parts.push("🔌");
+                                  return parts.length > 0 ? <span className="text-[9px] md:text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: withAlpha("#3b82f6", 0.15), color: "#3b82f6" }}>{parts.join(" ")}</span> : null;
+                                })()}
+                                {(rental as any)?.metadata?.odometer_before != null && (
+                                  <span className="text-[9px] md:text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: withAlpha("#10b981", 0.15), color: "#10b981" }}>
+                                    од: {(rental as any).metadata.odometer_before}км{(rental as any)?.metadata?.odometer_after != null ? `→${(rental as any).metadata.odometer_after}км` : ""}
+                                  </span>
+                                )}
                               </div>
                             </td>
                             <td className="px-3 md:px-5 py-3 md:py-4 text-right">
@@ -1501,6 +1572,61 @@ export function RentalsAnalyticsClient({ initialSlug, initialDate, crew }: Renta
         textPrimary={textPrimary}
         textSecondary={textSecondary}
       />
+
+      {/* CSV Export Modal */}
+      {csvExportOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.7)" }}
+          onClick={() => setCsvExportOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border p-5"
+            style={{ background: bgCard, borderColor: borderSoft }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold mb-4" style={{ color: textPrimary }}>📥 Экспорт CSV</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: textSecondary }}>С даты</label>
+                <input
+                  type="date"
+                  value={csvFromDate}
+                  onChange={(e) => setCsvFromDate(e.target.value)}
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
+                  style={{ background: bgCard, borderColor: borderSoft, color: textPrimary }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: textSecondary }}>По дату</label>
+                <input
+                  type="date"
+                  value={csvToDate}
+                  onChange={(e) => setCsvToDate(e.target.value)}
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
+                  style={{ background: bgCard, borderColor: borderSoft, color: textPrimary }}
+                />
+              </div>
+            </div>
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={() => setCsvExportOpen(false)}
+                className="flex-1 rounded-xl border py-2.5 text-sm font-medium"
+                style={{ borderColor: borderSoft, color: textSecondary }}
+              >
+                Отмена
+              </button>
+              <button
+                onClick={exportCsv}
+                className="flex-1 rounded-xl py-2.5 text-sm font-bold"
+                style={{ background: "#3b82f6", color: "#fff" }}
+              >
+                Скачать CSV
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
