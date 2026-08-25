@@ -36,7 +36,7 @@ import { SaleDetailDrawer } from "./SaleDetailDrawer";
 import { ServiceDetailDrawer } from "./ServiceDetailDrawer";
 import { ExportCsvModal } from "./ExportCsvModal";
 import { motion, AnimatePresence } from "framer-motion";
-import { CalendarDays, Download } from "lucide-react";
+import { CalendarDays, Table2 } from "lucide-react";
 
 interface AnalyticsClientProps {
   initialSlug: string;
@@ -56,6 +56,8 @@ interface AnalyticsClientProps {
   initialSaleId?: string;
   /** FIX (F9): CSV export handler — receives the picked date range. */
   onExportCsv?: (from: string, to: string) => Promise<void>;
+  /** FIX (F9 iter3): fetcher that returns CSV text for the in-modal table view. */
+  onFetchCsvText?: (from: string, to: string) => Promise<string>;
 }
 
 export function AnalyticsClient({
@@ -74,6 +76,7 @@ export function AnalyticsClient({
   initialRentalId,
   initialSaleId,
   onExportCsv,
+  onFetchCsvText,
 }: AnalyticsClientProps) {
   const router = useRouter();
   // Date state: controlled (when parent passes `date` + `onDateChange`) or
@@ -253,34 +256,38 @@ export function AnalyticsClient({
       {/* Date navigator */}
       <AnalyticsDateNav date={date} onChange={setDate} T={T} isToday={isToday} />
 
-      {/* FIX (F9): CSV export button — always visible on mobile and desktop.
-          No `hidden sm:...` classes: the operator tests on a phone. */}
+      {/* FIX (F9 iter3): table-view trigger — table icon only (no text).
+          Opens the in-modal table view + download icon button for actual CSV. */}
       {onExportCsv && (
         <div className="flex justify-end">
           <button
             type="button"
             onClick={() => setCsvModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 md:text-sm"
+            className="inline-flex items-center justify-center rounded-xl border px-2.5 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2"
             style={{
               borderColor: "#3b82f64d",
               backgroundColor: "#3b82f615",
               color: "#60a5fa",
               minHeight: "44px",
+              minWidth: "44px",
             }}
-            aria-label="Экспорт аренд в CSV за период"
+            aria-label="Открыть таблицу и экспорт CSV"
+            title="Таблица и экспорт CSV"
           >
-            <Download className="h-4 w-4" aria-hidden />
-            Экспорт CSV
+            <Table2 className="h-4 w-4" aria-hidden />
           </button>
         </div>
       )}
 
-      {/* CSV export modal (date range picker) */}
+      {/* CSV table-view modal — date pickers + huge horizontally-scrollable
+          table + download-icon button to actually save the CSV file. */}
       {onExportCsv && (
         <ExportCsvModal
           isOpen={csvModalOpen}
           onClose={() => setCsvModalOpen(false)}
           onExport={onExportCsv}
+          fetchCsvText={onFetchCsvText}
+          variant="rentals"
           T={T}
         />
       )}

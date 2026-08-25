@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Tag, Mail, User, Bike, Shield, Calendar, RefreshCw, Download } from "lucide-react";
+import { Tag, Mail, User, Bike, Shield, Calendar, RefreshCw, Table2 } from "lucide-react";
 
 import { useAppContext } from "@/contexts/AppContext";
 import {
@@ -91,6 +91,28 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
     accentContrast: "#ffffff",
   };
 
+  // FIX (F16 iter3): CSV table-view needs the CSV TEXT to render the rows.
+  // Same fetch as `exportSalesCsv` but yields `resp.text()` instead of blob.
+  const buildSalesCsvApiUrl = useCallback(
+    (from: string, to: string) =>
+      `/api/franchize/sales-csv-export?slug=${encodeURIComponent(initialSlug.trim())}` +
+      `&from=${from}&to=${to}`,
+    [initialSlug],
+  );
+
+  const fetchSalesCsvText = useCallback(
+    async (from: string, to: string): Promise<string> => {
+      const actorUserId = getActorUserId();
+      if (!actorUserId) throw new Error("no actor user id");
+      const resp = await fetch(buildSalesCsvApiUrl(from, to), {
+        headers: { "x-telegram-user-id": actorUserId },
+      });
+      if (!resp.ok) throw new Error(`http ${resp.status}`);
+      return await resp.text();
+    },
+    [buildSalesCsvApiUrl, getActorUserId],
+  );
+
   // FIX (F16): sales CSV export — mirrors the rentals handler but hits the
   // /api/franchize/sales-csv-export endpoint. Includes the same Telegram
   // WebApp fallback path as the rentals version (F15).
@@ -101,9 +123,7 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
         toast.error("Не удалось определить пользователя для экспорта");
         return;
       }
-      const csvApiUrl =
-        `/api/franchize/sales-csv-export?slug=${encodeURIComponent(initialSlug.trim())}` +
-        `&from=${from}&to=${to}`;
+      const csvApiUrl = buildSalesCsvApiUrl(from, to);
       const filename = `${initialSlug.trim()}-sales-${from}-to-${to}.csv`;
       const tgWebApp =
         typeof window !== "undefined" &&
@@ -157,7 +177,7 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
         toast.error("Ошибка экспорта CSV");
       }
     },
-    [getActorUserId, initialSlug],
+    [getActorUserId, buildSalesCsvApiUrl, initialSlug],
   );
 
   if (authLoading) return <AnalyticsLoading accentMain={accentMain} bgBase={bgBase} />;
@@ -174,21 +194,23 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
       <div className="flex items-center justify-between gap-2 flex-wrap p-3 rounded-xl border" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft }}>
         <AnalyticsDateNav selectedDate={selectedDate} onDateChange={setSelectedDate} accentMain={accentMain} bgCard={bgCard} borderSoft={borderSoft} textPrimary={textPrimary} textSecondary={textSecondary} />
         <div className="flex items-center gap-2">
-          {/* FIX (F16): CSV export button for sales — same look as rentals. */}
+          {/* FIX (F16 iter3): table-view trigger — table icon only (no text).
+              Opens the in-modal table view + download icon button for CSV. */}
           <button
             type="button"
             onClick={() => setCsvModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-bold transition focus:outline-none focus-visible:ring-2"
+            className="inline-flex items-center justify-center rounded-lg border px-2 py-1.5 text-xs font-bold transition focus:outline-none focus-visible:ring-2"
             style={{
               borderColor: withAlpha("#3b82f6", 0.3),
               backgroundColor: withAlpha("#3b82f6", 0.08),
               color: "#60a5fa",
               minHeight: "36px",
+              minWidth: "36px",
             }}
-            aria-label="Экспорт продаж в CSV за период"
+            aria-label="Открыть таблицу и экспорт CSV"
+            title="Таблица и экспорт CSV"
           >
-            <Download className="w-3.5 h-3.5" aria-hidden />
-            Экспорт CSV
+            <Table2 className="w-3.5 h-3.5" aria-hidden />
           </button>
           <button onClick={() => void loadSales(selectedDate, true)} disabled={refreshing} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold disabled:opacity-50" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft, color: textSecondary }}>
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} /> Обновить
@@ -196,11 +218,14 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
         </div>
       </div>
 
-      {/* CSV export modal (date range picker — reuses rentals component) */}
+      {/* CSV table-view modal (date range picker + huge horizontally-
+          scrollable table + download icon button to actually save the CSV). */}
       <ExportCsvModal
         isOpen={csvModalOpen}
         onClose={() => setCsvModalOpen(false)}
         onExport={exportSalesCsv}
+        fetchCsvText={fetchSalesCsvText}
+        variant="sales"
         T={T}
       />
 

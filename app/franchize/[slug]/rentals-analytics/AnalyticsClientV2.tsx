@@ -349,6 +349,30 @@ export function AnalyticsClientV2({
   // the system browser where Content-Disposition triggers a native download),
   // and as a final fallback we copy the API URL to the clipboard with a toast
   // prompting the operator to open it in their browser.
+  //
+  // FIX (F9 iter3): the modal now also wants the CSV TEXT itself (so it can
+  // render the table preview). `fetchCsvText` is the same fetch but yields
+  // `resp.text()` instead of blob+anchor.
+  const buildCsvApiUrl = useCallback(
+    (from: string, to: string) =>
+      `/api/franchize/rentals-csv-export?slug=${encodeURIComponent(initialSlug.trim())}` +
+      `&from=${from}&to=${to}`,
+    [initialSlug],
+  );
+
+  const fetchCsvText = useCallback(
+    async (from: string, to: string): Promise<string> => {
+      const actorUserId = getActorUserId();
+      if (!actorUserId) throw new Error("no actor user id");
+      const resp = await fetch(buildCsvApiUrl(from, to), {
+        headers: { "x-telegram-user-id": actorUserId },
+      });
+      if (!resp.ok) throw new Error(`http ${resp.status}`);
+      return await resp.text();
+    },
+    [buildCsvApiUrl, getActorUserId],
+  );
+
   const exportCsv = useCallback(
     async (from: string, to: string) => {
       const actorUserId = getActorUserId();
@@ -356,9 +380,7 @@ export function AnalyticsClientV2({
         toast.error("Не удалось определить пользователя для экспорта");
         return;
       }
-      const csvApiUrl =
-        `/api/franchize/rentals-csv-export?slug=${encodeURIComponent(initialSlug.trim())}` +
-        `&from=${from}&to=${to}`;
+      const csvApiUrl = buildCsvApiUrl(from, to);
       const filename = `${initialSlug.trim()}-rentals-${from}-to-${to}.csv`;
       // Detect Telegram WebApp context (the SDK sets window.Telegram.WebApp).
       const tgWebApp =
@@ -422,7 +444,7 @@ export function AnalyticsClientV2({
         toast.error("Ошибка экспорта CSV");
       }
     },
-    [getActorUserId, initialSlug],
+    [getActorUserId, buildCsvApiUrl, initialSlug],
   );
 
   // Initial load + refetch on date change. v1 has the same pattern
@@ -477,6 +499,7 @@ export function AnalyticsClientV2({
       initialRentalId={initialRentalId}
       initialSaleId={initialSaleId}
       onExportCsv={exportCsv}
+      onFetchCsvText={fetchCsvText}
     />
   );
 }
