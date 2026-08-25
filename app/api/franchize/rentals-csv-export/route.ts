@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
-import { verifyCrewAccess } from "../../_auth";
+import { verifyCrewAccess } from "../_auth";
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     // Build CSV
     const headers = [
       "Дата", "ЗП Аренда", "Партнеру", "Цена", "Экип", "Залог",
-      "Марка", "Комментарий", "Пробег до", "Пробег после", "Время"
+      "Марка", "Комментарий", "Пробег до", "Пробег после", "Время", "Фото"
     ];
 
     const rows: string[] = [headers.join(",")];
@@ -101,9 +101,13 @@ export async function GET(request: NextRequest) {
       const freeReason = meta.free_rental_reason || "";
       const comment = [renterName, paymentMethod, freeReason].filter(Boolean).join(" ");
 
+      // Photo links (rental detail page on the web app)
+      const rentalId = (r as any).rental_id || "";
+      const photoLink = rentalId ? `https://vip-bike.ru/franchize/${slug}/rental/${rentalId}` : "";
+
       const row = [
         dateStr, "", "", price, equipStr, deposit,
-        bikeName, comment, odoBefore, odoAfter, timeStr
+        bikeName, comment, odoBefore, odoAfter, timeStr, photoLink
       ].map(v => {
         const s = String(v ?? "");
         return s.includes(",") ? `"${s}"` : s;
@@ -127,7 +131,7 @@ export async function GET(request: NextRequest) {
       return sum + c;
     }, 0);
     const totalDeposit = (rentals || []).reduce((sum, r) => sum + Number((r as any).metadata?.deposit_amount || 0), 0);
-    rows.push(`,,,${totalRevenue},${totalEquip},${totalDeposit},,,,,`);
+    rows.push(`,,,${totalRevenue},${totalEquip},${totalDeposit},,,,,,`);
 
     const csv = "\uFEFF" + rows.join("\n"); // BOM for Excel UTF-8
 

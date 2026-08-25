@@ -317,7 +317,7 @@ export function RentalHandoffModal({
     : conditionChecked && helmetReturned && keysReturned && odometerEnd;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm p-4" style={{ backgroundColor: withAlpha("#000000", 0.5) }}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center backdrop-blur-sm p-4 pt-20" style={{ backgroundColor: withAlpha("#000000", 0.5) }}>
       <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl" style={{ background: `linear-gradient(to bottom right, ${bgCard}, ${withAlpha(bgCard, 0.8)})`, borderColor: withAlpha(borderSoft, 0.3) }}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: withAlpha(borderSoft, 0.3) }}>
