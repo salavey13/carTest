@@ -5,9 +5,8 @@
 # Sends an end-of-day KPI digest with equipment extraction, service detail,
 # salary, хозрасходы, deposits, and shift status.
 #
-# Per-bike rental breakdown is NOT included — the dashboard link at the bottom
-# opens the analytics page for today's date where all rentals are visible.
-# This keeps the digest concise.
+# Per-bike rental breakdown IS included. Each rental shows the bike name
+# and amount. Special conditions (free, contest, barter) are noted.
 #
 # Cron schedule: every day at 22:00 Moscow = 19:00 UTC = "0 19 * * *"
 #
@@ -30,13 +29,42 @@ END_UTC="${TODAY}T23:59:59+03:00"
 START_ENC="${START_UTC//+/%2B}"
 END_ENC="${END_UTC//+/%2B}"
 
-# ─── Rentals (totals only — per-bike detail is in the dashboard link) ────────
+# ─── Rentals (per-bike breakdown) ────────────────────────────────────────────────
 RENTALS_DATA=$(supabase_query "rentals" \
-  "select=rental_id,status,total_cost,metadata&crew_id=eq.${CREW_ID}&or=(and(created_at.gte.${START_ENC},created_at.lte.${END_ENC}),and(agreed_start_date.lte.${END_ENC},agreed_end_date.gte.${START_ENC}))&vehicle_id=not.like.vip-bike-svc-*")
+  "select=rental_id,status,total_cost,metadata,vehicle_id,created_at&crew_id=eq.${CREW_ID}&or=(and(created_at.gte.${START_ENC},created_at.lte.${END_ENC}),and(agreed_start_date.lte.${END_ENC},agreed_end_date.gte.${START_ENC}))&vehicle_id=not.like.vip-bike-svc-*")
 
-RENTAL_COUNT=$(echo "$RENTALS_DATA" | jq '[.[] | select(.status == "active" or .status == "completed")] | length' 2>/dev/null || echo 0)
+# Fetch cars for bike names
+CARS_DATA=$(supabase_query "cars" "select=id,make,model&crew_id=eq.${CREW_ID}")
+
+# Count: new rentals created today vs multi-day rentals still active
+RENTAL_NEW=$(echo "$RENTALS_DATA" | jq '[.[] | select(.status == "active" or .status == "completed") | select(.created_at >= "${START_ENC}")] | length' 2>/dev/null || echo 0)
+RENTAL_MULTIDAY=$(echo "$RENTALS_DATA" | jq '[.[] | select(.status == "active" or .status == "completed") | select(.created_at < "${START_ENC}")] | length' 2>/dev/null || echo 0)
+RENTAL_COUNT=$((RENTAL_NEW + RENTAL_MULTIDAY))
 RENTAL_REVENUE=$(echo "$RENTALS_DATA" | jq '[.[] | select(.status == "active" or .status == "completed") | (.total_cost // 0)] | add // 0' 2>/dev/null || echo 0)
 RENTAL_ACTIVE=$(echo "$RENTALS_DATA" | jq '[.[] | select(.status == "active")] | length' 2>/dev/null || echo 0)
+
+# Build count label with new vs multi-day breakdown
+RENTAL_COUNT_LABEL="${RENTAL_NEW} новых"
+if [[ ${RENTAL_MULTIDAY} -gt 0 ]]; then
+  RENTAL_COUNT_LABEL="${RENTAL_COUNT_LABEL} + ${RENTAL_MULTIDAY} переходящ. = ${RENTAL_COUNT}"
+fi
+
+# ─── Build per-bike rental breakdown ─────────────────────────────────────────
+RENTAL_BREAKDOWN=$(jq -rn --argjson rentals "$RENTALS_DATA" --argjson cars "$CARS_DATA" --arg start "${START_ENC}" '
+  ($cars | map({(.id): ("\(.make) \(.model)")}) | add // {}) as $bike_names |
+  [ $rentals[] |
+    select(.status == "active" or .status == "completed") |
+    select(.created_at >= $start) |
+    {
+      id: .rental_id[0:8],
+      bike: ($bike_names[.vehicle_id] // .vehicle_id // "—"),
+      cost: (.total_cost // 0),
+      status: (if .total_cost == 0 then "[бесплатно]" elif .metadata.free_rental_reason then "[конкурс]" else "" end)
+    }
+  ] |
+  if length == 0 then "  (нет аренд)"
+  else map("• \(.bike) — \(.cost) ₽ \(.status)") | join("\n") end
+' 2>/dev/null || echo "  (ошибка)")
 
 # ─── Equipment extraction from rental metadata ───────────────────────────────
 # Equipment is stored in rentals.metadata.equipment as:
@@ -135,6 +163,41 @@ fi
 TESTDRIVE_COUNT=$(supabase_query "testdrive_contract_artifacts" \
   "select=id&crew_id=eq.${CREW_ID}&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}" \
   "private" | jq 'length' 2>/dev/null || echo 0)
+
+# ─── Prepayments (booking fees, separate from revenue) ───────────────────────
+# Prepayments are stored as cash_transactions with transaction_type='income_prepayment'
+# They are NOT included in TOTAL_REVENUE — they're like deposits, held in reserve
+# until the rental is completed.
+PREPAYMENTS_DATA=$(supabase_query "cash_transactions" \
+  "select=amount,description,rental_id&crew_id=eq.${CREW_ID}&transaction_type=eq.income_prepayment&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}")
+
+PREPAYMENT_COUNT=$(echo "$PREPAYMENTS_DATA" | jq 'length' 2>/dev/null || echo 0)
+PREPAYMENT_TOTAL=$(echo "$PREPAYMENTS_DATA" | jq '[.[].amount // 0] | add // 0' 2>/dev/null || echo 0)
+
+# Build prepayment section with bike names (look up rental.vehicle_id → cars)
+PREPAYMENT_SECTION=""
+if [[ ${PREPAYMENT_COUNT} -gt 0 ]]; then
+  # Get rental_ids from prepayments
+  PREPAYMENT_RENTAL_IDS=$(echo "$PREPAYMENTS_DATA" | jq -r '[.[].rental_id // empty] | unique | join(",")' 2>/dev/null)
+
+  PREPAYMENT_DETAIL=$(jq -rn --argjson preps "$PREPAYMENTS_DATA" --argjson cars "$CARS_DATA" '
+    ($cars | map({(.id): ("\(.make) \(.model)")}) | add // {}) as $bike_names |
+    [ $preps[] |
+      {
+        bike: ($bike_names[.rental_id] // .rental_id // "—"),
+        amount: (.amount // 0),
+        desc: (.description // "Предоплата")
+      }
+    ] |
+    map("• \(.bike): \(.desc) — \(.amount) ₽") | join("\n")
+  ' 2>/dev/null || echo "  (ошибка)")
+
+  PREPAYMENT_SECTION="<b>💳 ПРЕДОПЛАТЫ (не в выручке):</b>
+${PREPAYMENT_DETAIL}
+── Итого предоплат: ${PREPAYMENT_TOTAL} ₽
+
+"
+fi
 
 # ─── Deposits (excluded from revenue) ────────────────────────────────────────
 DEPOSIT_DATA=$(supabase_query "deposit_entries" \
@@ -246,8 +309,7 @@ DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
 # ─── Compose message ─────────────────────────────────────────────────────────
 MESSAGE="📊 <b>ЕЖЕДНЕВНЫЙ ВЕЧЕРНИЙ ДАЙДЖЕСТ</b> — ${TODAY}, ${NOW_DISPLAY} МСК
 
-<b>🔑 Аренды:</b> ${RENTAL_COUNT} (активных: ${RENTAL_ACTIVE})
-Выручка: ${RENTAL_REVENUE} ₽"
+<b>🔑 АРЕНДЫ ТЕХНИКИ:</b> ${RENTAL_COUNT_LABEL} (активных: ${RENTAL_ACTIVE})
 
 if [[ -n "$EQUIPMENT_SECTION" ]]; then
   MESSAGE="${MESSAGE}
@@ -272,7 +334,14 @@ fi
 
 MESSAGE="${MESSAGE}
 <b>🛵 Тест-драйвы:</b> ${TESTDRIVE_COUNT}
+"
 
+if [[ -n "$PREPAYMENT_SECTION" ]]; then
+  MESSAGE="${MESSAGE}
+${PREPAYMENT_SECTION}"
+fi
+
+MESSAGE="${MESSAGE}
 <b>🛒 ХОЗРАСХОДЫ (лимит 10 000 ₽/мес):</b>
 ${HOUSEHOLD_SECTION}
 

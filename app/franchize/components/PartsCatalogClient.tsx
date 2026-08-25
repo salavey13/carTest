@@ -5,7 +5,6 @@ import { Search, Package, Send, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 import { catalogCardVariantStyles, crewPaletteForSurface, getContrastingGlowStyle, interactionRingStyle, readableTextOnColor, withAlpha } from "../lib/theme";
-import { localImageSrc, handleImageError } from "@/lib/image-fallback";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { useResolvedPalette } from "../lib/useResolvedPalette";
 
@@ -357,18 +356,25 @@ export function PartsCatalogClient({ initialParts, theme, telegramBotUsername }:
                           <div className="relative aspect-square w-full overflow-hidden">
                             {part.image ? (
                               <Image
-                                src={localImageSrc(part.image)}
+                                src={part.image}
                                 alt={part.name}
                                 fill
                                 sizes="(max-width: 767px) 50vw, (max-width: 1023px) 33vw, (max-width: 1279px) 25vw, (max-width: 1535px) 20vw, 16vw"
                                 className="object-cover"
-                                onError={handleImageError(part.image)}
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  target.parentElement?.querySelector('.fallback-icon')?.classList.remove('hidden');
+                                }}
                               />
                             ) : (
                               <div className="flex h-full w-full items-center justify-center" style={surface.mutedText}>
                                 <Package className="h-12 w-12 opacity-30" />
                               </div>
                             )}
+                            <div className="fallback-icon hidden absolute inset-0 flex items-center justify-center" style={surface.mutedText}>
+                              <Package className="h-12 w-12 opacity-30" />
+                            </div>
                           </div>
 
                           {/* Info + CTA area */}
@@ -446,13 +452,21 @@ export function PartsCatalogClient({ initialParts, theme, telegramBotUsername }:
               {selectedPart.image && (
                 <div className="relative aspect-square w-full overflow-hidden rounded-xl mb-4">
                   <Image
-                    src={localImageSrc(selectedPart.image)}
+                    src={selectedPart.image}
                     alt={selectedPart.name}
                     fill
                     sizes="(max-width: 640px) 100vw, 512px"
                     className="object-cover"
-                    onError={handleImageError(selectedPart.image)}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const fallback = target.parentElement?.querySelector('.fallback-icon');
+                      if (fallback) fallback.classList.remove('hidden');
+                    }}
                   />
+                  <div className="fallback-icon hidden absolute inset-0 flex items-center justify-center bg-gray-100">
+                    <Package className="h-16 w-16 text-gray-400" />
+                  </div>
                 </div>
               )}
 

@@ -126,6 +126,66 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
     },
   ];
 
+  // Shift/Work-related achievements (available to all crews)
+  const workAchievements: FranchizeAchievementDefinition[] = [
+    {
+      id: "shift_first",
+      title: "Начало смены",
+      description: "Отметил первую смену через команду /shift.",
+      category: "operations",
+      triggerSources: ["telegram:/shift"],
+    },
+    {
+      id: "shift_streak_3",
+      title: "Серия из 3 смен",
+      description: "Завершил 3 смены. Вошёл в рабочий ритм!",
+      category: "operations",
+      triggerSources: ["telegram:/shift"],
+    },
+    {
+      id: "shift_week_7",
+      title: "Недельный норматив",
+      description: "Завершил 7 смен за неделю. Отличная работа!",
+      category: "operations",
+      triggerSources: ["telegram:/shift"],
+    },
+    {
+      id: "shift_month_30",
+      title: "Месячный план",
+      description: "30 смен за месяц. Выложился полностью!",
+      category: "operations",
+      triggerSources: ["telegram:/shift"],
+    },
+    {
+      id: "shift_hours_13",
+      title: "13 часов... иди домой!",
+      description: "Накопил 13 часов. Хватит на сегодня, иди отдыхать!",
+      category: "operations",
+      triggerSources: ["telegram:/shift"],
+    },
+    {
+      id: "shift_hours_69",
+      title: "69 часов... ниииче!",
+      description: "Накопил 69 часов. Ниииче! 👀",
+      category: "operations",
+      triggerSources: ["telegram:/shift"],
+    },
+    {
+      id: "shift_hours_100",
+      title: "100 часов... богоподобно!",
+      description: "Накопил 100 часов. Просто бог工作时间! 🏆",
+      category: "operations",
+      triggerSources: ["telegram:/shift"],
+    },
+    {
+      id: "shift_earnings_first",
+      title: "Первый заработок",
+      description: "Получил первую выплату за смену.",
+      category: "operations",
+      triggerSources: ["telegram:/shift"],
+    },
+  ];
+
   const vipBikeOnly: FranchizeAchievementDefinition[] = [
     {
       id: "vipbike_map_riders_ready",
@@ -136,8 +196,8 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
     },
   ];
 
-  if (slug === "vip-bike") return [...shared, ...vipBikeOnly];
-  return shared;
+  if (slug === "vip-bike") return [...shared, ...workAchievements, ...vipBikeOnly];
+  return [...shared, ...workAchievements];
 }
 
 export async function getFranchizeAchievementCatalogAction(slug: string): Promise<FranchizeAchievementDefinition[]> {

@@ -469,11 +469,23 @@ export function FranchizeProfileClient({
             </FranchizeOperatorLinkButton>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-1">
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
             <FranchizeOperatorStatCard
               label="Достижения"
               value={`${unlockedCount}/${catalog.length}`}
               icon={<Trophy className="h-4 w-4" style={{ color: T.accent }} />}
+            />
+            <FranchizeOperatorStatCard
+              label="Смен завершено"
+              value={profile?.counters?.shiftsCompleted || 0}
+              icon={<Briefcase className="h-4 w-4" style={{ color: T.accent }} />}
+            />
+            <FranchizeOperatorStatCard
+              label="Часов работы"
+              value={profile?.counters?.totalHoursWorked
+                ? Math.round(profile.counters.totalHoursWorked)
+                : 0}
+              icon={<Calendar className="h-4 w-4" style={{ color: T.accent }} />}
             />
           </div>
         </FranchizeOperatorPanel>
@@ -1416,6 +1428,20 @@ export function FranchizeProfileClient({
               </div>
             )}
 
+            {/* Leaderboard header with bonus info */}
+            {!teamEarningsLoading && teamEarnings.length > 0 && (
+              <div className="rounded-lg border p-3 mb-3" style={{ borderColor: T.borderSoft, backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }}>
+                <p className="text-xs font-semibold mb-2" style={{ color: T.text }}>
+                  🏆 Бонусы топ-3 лидеров
+                </p>
+                <div className="flex items-center gap-3 text-xs">
+                  <span style={{ color: T.textMuted }}>🥇 1-е место: +10%</span>
+                  <span style={{ color: T.textMuted }}>🥈 2-е место: +5%</span>
+                  <span style={{ color: T.textMuted }}>🥉 3-е место: +3%</span>
+                </div>
+              </div>
+            )}
+
             {/* Team earnings table */}
             {!teamEarningsLoading && teamEarnings.length > 0 ? (
               <div className="rounded-lg border overflow-hidden" style={{ borderColor: T.borderSoft }}>
@@ -1424,36 +1450,60 @@ export function FranchizeProfileClient({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b" style={{ borderColor: T.borderSoft, color: T.textMuted }}>
+                        <th className="px-3 py-2 text-left text-xs font-semibold w-10">#</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold">Сотрудник</th>
                         <th className="px-3 py-2 text-right text-xs font-semibold">Смены</th>
                         <th className="px-3 py-2 text-right text-xs font-semibold">Комиссии</th>
                         <th className="px-3 py-2 text-right text-xs font-semibold">Итого</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold w-16">Бонус</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y" style={{ borderColor: T.borderSoft }}>
-                      {teamEarnings.map((member) => (
-                        <tr
-                          key={member.memberId}
-                          className="hover:bg-opacity-50 transition"
-                          style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 4%, transparent)" }}
-                        >
-                          <td className="px-3 py-2 font-medium" style={{ color: T.text }}>
-                            {member.memberName}
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono" style={{ color: T.text }}>
-                            {member.shifts}ч
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono" style={{ color: T.text }}>
-                            {formatCurrency(member.commissionIncome)}
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono font-semibold" style={{ color: T.accent }}>
-                            {formatCurrency(member.total)}
-                          </td>
-                        </tr>
-                      ))}
+                      {teamEarnings
+                        .sort((a, b) => b.total - a.total)
+                        .map((member, rank) => {
+                          // Bonus calculation: 10% for 1st, 5% for 2nd, 3% for 3rd
+                          const bonusPercent = rank === 0 ? 0.10 : rank === 1 ? 0.05 : rank === 2 ? 0.03 : 0;
+                          const bonus = Math.round(member.total * bonusPercent);
+                          const totalWithBonus = member.total + bonus;
+                          const medal = rank === 0 ? "🥇" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : "";
+
+                          return (
+                            <tr
+                              key={member.memberId}
+                              className="hover:bg-opacity-50 transition"
+                              style={{
+                                backgroundColor: rank < 3
+                                  ? `color-mix(in srgb, var(--franchize-shell-accent) ${12 - rank * 3}%, transparent)`
+                                  : "color-mix(in srgb, var(--franchize-shell-accent) 4%, transparent)",
+                                fontWeight: rank < 3 ? 600 : 400,
+                              }}
+                            >
+                              <td className="px-3 py-2 text-center font-mono" style={{ color: T.textMuted }}>
+                                {medal || rank + 1}
+                              </td>
+                              <td className="px-3 py-2 font-medium" style={{ color: T.text }}>
+                                {member.memberName}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono" style={{ color: T.text }}>
+                                {member.shifts}ч
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono" style={{ color: T.text }}>
+                                {formatCurrency(member.commissionIncome)}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono font-semibold" style={{ color: T.accent }}>
+                                {formatCurrency(member.total)}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono" style={{ color: bonus > 0 ? "#10b981" : T.textMuted }}>
+                                {bonus > 0 ? `+${formatCurrency(bonus)}` : "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
                     </tbody>
                     <tfoot>
                       <tr className="border-t font-semibold" style={{ borderColor: T.borderSoft, backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 10%, transparent)" }}>
+                        <td className="px-3 py-2 text-center" style={{ color: T.textMuted }}></td>
                         <td className="px-3 py-2" style={{ color: T.text }}>Всего</td>
                         <td className="px-3 py-2 text-right font-mono" style={{ color: T.text }}>
                           {teamEarnings.reduce((sum, m) => sum + m.shifts, 0).toFixed(1)}ч
@@ -1463,6 +1513,9 @@ export function FranchizeProfileClient({
                         </td>
                         <td className="px-3 py-2 text-right font-mono font-semibold" style={{ color: T.accent }}>
                           {formatCurrency(teamEarnings.reduce((sum, m) => sum + m.total, 0))}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono" style={{ color: T.textMuted }}>
+                          —
                         </td>
                       </tr>
                     </tfoot>

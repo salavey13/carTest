@@ -12,10 +12,10 @@
  * - Col 4: Part name
  * - Col 5: Empty/unused
  * - Col 6: Description/specs
- * - Col 7: Base price (0 = price on request)
- * - Col 8: Original calculated price (unused, we override with x2.5)
+ * - Col 7: Base price in USD (0 = price on request)
+ * - Col 8: Original calculated price (unused, we override)
  *
- * Pricing formula: Final Price (RUB) = Base Price x 2.5
+ * Pricing formula: Final Price (RUB) = Base Price (USD) x 2.5 (margin) x 100 (exchange rate) = x250
  * Image paths: /supabase-mirror/parts-pics/{folder}/{partNumber}.{ext}
  */
 
@@ -28,8 +28,8 @@ const CSV_DIR_RU = join(process.cwd(), "docs", "crewDocs", "surge_parts_csv_ru")
 /** Fallback directory with the original English section CSVs. */
 const CSV_DIR_EN = join(process.cwd(), "docs", "crewDocs", "surge_parts_csv");
 
-/** Multiplier for pricing formula */
-const PRICE_MULTIPLIER = 2.5;
+/** Multiplier for pricing formula (USD x 2.5 margin x 100 exchange rate = 250x total) */
+const PRICE_MULTIPLIER = 250;
 
 /** Base path for part images */
 const IMAGE_BASE_PATH = "/supabase-mirror/parts-pics";
@@ -81,9 +81,9 @@ export interface SparePart {
   name: string;
   /** Part description/specifications */
   description: string;
-  /** Base price from CSV (original currency). 0 = price on request. */
+  /** Base price from CSV (USD). 0 = price on request. */
   basePrice: number;
-  /** Final price in rubles (basePrice x 2.5). 0 = price on request. */
+  /** Final price in rubles (basePrice x 250 = USD x 2.5 margin x 100 exchange rate). 0 = price on request. */
   finalPrice: number;
   /** Image filename if found */
   imageName?: string;

@@ -3,6 +3,7 @@
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
+import { grantFranchizeAchievementAction } from "@/app/franchize/profile-actions";
 
 export async function shiftCommand(chatId: number, userId: string, username?: string, action?: string) {
     logger.info(`[Shift Command EXEC] User ${userId}, Action: ${action || 'request_keyboard'}`);
@@ -14,7 +15,7 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
         // Use .limit(1) instead of .single() — users can be active members of multiple crews.
         const { data: crewMembers, error: crewError } = await supabaseAdmin
             .from("crew_members")
-            .select("crew_id, live_status, crews(owner_id, name)")
+            .select("crew_id, live_status, crews(owner_id, name, slug)")
             .eq("user_id", userId)
             .eq("membership_status", "active")
             .order("joined_at", { ascending: false })
@@ -28,8 +29,8 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
 
         const { crew_id, crews: crew, live_status } = crewMember;
         if (!crew) throw new Error(`Критическая ошибка: отсутствуют данные экипажа для участника ${userId}`);
-        
-        const { owner_id: ownerId, name: crewName } = crew;
+
+        const { owner_id: ownerId, name: crewName, slug: crewSlug = "vip-bike" } = crew;
         const displayName = username || 'user';
 
         // ── Single source of truth for "active shift" ───────────────────────────
@@ -98,6 +99,15 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                         clock_in_time: new Date().toISOString(),
                         hourly_rate: 169,
                     });
+                    // Grant "shift_first" achievement on first clock-in
+                    grantFranchizeAchievementAction({
+                        slug: crew.slug || "vip-bike",
+                        userId,
+                        achievementId: "shift_first",
+                        source: "telegram:/shift",
+                        context: { action: "clock_in" },
+                        incrementCounters: { shiftsStarted: 1 },
+                    }).catch((err) => logger.warn(`[Shift Achievement] Failed to grant shift_first to ${userId}:`, err));
                 }
                 break;
             case 'clock_out':
@@ -205,6 +215,10 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                   : "\n";
                 userMessage = `✅ Смена завершена.${moneyLine}\nХорошего отдыха!`;
                 ownerMessage = `🔴 @${displayName} завершил смену в экипаже «${crewName}»${shiftEarnedAmount > 0 ? ` (заработал ${shiftEarnedAmount.toLocaleString("ru-RU")} ₽)` : ""}.`;
+
+                // ── Achievement grants after successful shift completion ─────────
+                // Grant shift-related achievements based on totals
+                await grantShiftAchievements(userId, crew_id, crew.slug || "vip-bike");
             }
 
             // Send messages as plain text (no MarkdownV2 — avoids escaping bugs)
@@ -222,5 +236,63 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
     } catch (e: any) {
         logger.error(`[Shift Command FATAL] for user ${userId}:`, e);
         await sendComplexMessage(chatId, `🚨 Критическая ошибка в системе смен: ${e.message}`);
+    }
+}
+
+// ── Achievement Helper for Shift Activities ─────────────────────────────
+// Grants achievements based on shift totals after each clock-out
+async function grantShiftAchievements(userId: string, crewId: string, crewSlug: string) {
+    try {
+        // Fetch all completed shifts for this user in this crew
+        const { data: shifts, error } = await supabaseAdmin
+            .from("crew_member_shifts")
+            .select("duration_minutes, salary_amount")
+            .eq("member_id", userId)
+            .eq("crew_id", crewId)
+            .not("clock_out_time", "is", null);
+
+        if (error || !shifts) {
+            logger.warn(`[Shift Achievements] Could not fetch shifts for ${userId}:`, error?.message);
+            return;
+        }
+
+        const totalShifts = shifts.length;
+        const totalMinutes = shifts.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+        const totalHours = totalMinutes / 60;
+        const totalEarnings = shifts.reduce((sum, s) => sum + (s.salary_amount || 0), 0);
+
+        // Grant achievements based on thresholds
+        const achievementsToGrant: Array<{ id: string; context?: Record<string, unknown> }> = [];
+
+        if (totalShifts >= 1) achievementsToGrant.push({ id: "shift_first" });
+        if (totalShifts >= 3) achievementsToGrant.push({ id: "shift_streak_3", context: { totalShifts } });
+        if (totalShifts >= 7) achievementsToGrant.push({ id: "shift_week_7", context: { totalShifts } });
+        if (totalShifts >= 30) achievementsToGrant.push({ id: "shift_month_30", context: { totalShifts } });
+
+        if (totalHours >= 13) achievementsToGrant.push({ id: "shift_hours_13", context: { totalHours: Math.round(totalHours * 10) / 10 } });
+        if (totalHours >= 69) achievementsToGrant.push({ id: "shift_hours_69", context: { totalHours: Math.round(totalHours * 10) / 10 } });
+        if (totalHours >= 100) achievementsToGrant.push({ id: "shift_hours_100", context: { totalHours: Math.round(totalHours * 10) / 10 } });
+
+        if (totalEarnings > 0) achievementsToGrant.push({ id: "shift_earnings_first", context: { totalEarnings: Math.round(totalEarnings) } });
+
+        // Grant each achievement (non-blocking, don't await each)
+        // Also update profile counters with current totals
+        for (const achievement of achievementsToGrant) {
+            grantFranchizeAchievementAction({
+                slug: crewSlug,
+                userId,
+                achievementId: achievement.id,
+                source: "telegram:/shift",
+                context: achievement.context,
+                incrementCounters: {
+                    shiftsCompleted: totalShifts,
+                    totalHoursWorked: totalHours,
+                },
+            }).catch((err) => logger.warn(`[Shift Achievement] Failed to grant ${achievement.id} to ${userId}:`, err));
+        }
+
+        logger.info(`[Shift Achievements] Processed ${totalShifts} shifts (${totalHours.toFixed(1)}h) for ${userId}, eligible for ${achievementsToGrant.length} achievements`);
+    } catch (e) {
+        logger.error(`[Shift Achievements] Error processing for ${userId}:`, e);
     }
 }
