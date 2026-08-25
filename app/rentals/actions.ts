@@ -1658,6 +1658,28 @@ export async function confirmVehicleReturn(
             logger.warn(`[confirmVehicleReturn] No renter chat_id available (user_id is null AND rental_contract_artefacts.telegram_chat_id is null/missing) — receipt skipped for rental ${rentalId}`);
         }
 
+        // ── FIX (iter4): grant rental closure achievements ───────────────────
+        // Fires AFTER the rental is closed, the receipt is sent, and the
+        // odometer/damage/deposit fields are persisted. Non-fatal — failures
+        // are logged but do not affect the closure outcome the operator sees.
+        try {
+            const { grantRentalClosureAchievements } = await import(
+                "@/app/franchize/server-actions/rental-achievements"
+            );
+            await grantRentalClosureAchievements({
+                rentalId,
+                actingUserId: userId,
+                closureData: {
+                    odometerAfter: closureData?.odometerAfter ?? null,
+                    depositReturned: closureData?.depositReturned ?? null,
+                    damageLevel:
+                        (closureData as any)?.damageLevel ?? null,
+                },
+            });
+        } catch (achErr) {
+            logger.warn(`[confirmVehicleReturn] Achievement grant failed (non-fatal):`, achErr);
+        }
+
         return {
             success: true,
             data: 'OK',

@@ -1,8 +1,8 @@
 # PRD: Meta-CRM Enhancements — Daily Reports, Service Module, Shifts, Gamification
 
-**Status:** Refined v0.7 · 2026-08-25 (ALL P0 + P2 Prepayment COMPLETE — Ready for Sept 1)
-**Source:** Operator transcripts + codebase audit (shift command, profile-actions, crew_member_shifts table, evening-summary.sh)
-**Deadline:** September 1, 2026 (7 days)
+**Status:** Refined v0.8 · 2026-08-26 (ALL P0 + P2 + iter4 Send-to-Telegram + Rental achievements COMPLETE)
+**Source:** Operator transcripts + codebase audit (shift command, profile-actions, crew_member_shifts table, evening-summary.sh, iter4 send-to-telegram + rental achievements)
+**Deadline:** September 1, 2026 (6 days)
 **KPI:** Fully working automated financial + operational reporting from September 1
 
 ---
@@ -551,6 +551,10 @@ Each wish from the transcripts is listed once (deduplicated), categorized into a
 | **P2** | Crew KPI counters in profile | 1-2 iter | §5.1 + §5.4 | ✅ **COMPLETE** |
 | **P2** | Weekly leaderboard with top-3 bonuses | 1 iter | §5.3 | ✅ **COMPLETE** |
 | **P2** | Shift achievement badges (8 badges) | 1 iter | §5.2 | ✅ **COMPLETE** |
+| **iter4** | Send-to-Telegram CSV button (rentals + sales) | 1 iter | §5.5 | ✅ **COMPLETE (2026-08-26)** |
+| **iter4** | Rental closure achievements (8 badges) | 1 iter | §5.6 | ✅ **COMPLETE (2026-08-26)** |
+| **iter4** | Salary column calculation in CSV (`ЗП Аренда` + `ЗП Продажа`) | 1 iter | §1.6.1 | ✅ **COMPLETE (2026-08-26)** |
+| **iter4** | CSV table-view polish (search, totals card, sticky cols, send button) | 1 iter | §1.10 | ✅ **COMPLETE (2026-08-26)** |
 | **P3** | Multiple mechanics on service job | 1 iter | §2.2 | ❌ Pending |
 | **P3** | Bike status (in_service/in_repair) | 1 iter | §2.3 | ❌ Pending |
 | **P3** | Equipment flexible pricing (gifts/discounts) | 1 iter | §4.2 | ❌ Pending |
@@ -588,6 +592,22 @@ Each wish from the transcripts is listed once (deduplicated), categorized into a
   - Evening summary time: 22:00 MSK
   - **NEW:** Prepayment tracking with bike names + total aggregation
   - **NEW:** Prepayments excluded from revenue (labeled "не в выручке")
+- ✅ **NEW (v0.8 / iter4):** Send-to-Telegram + Salary column + Rental achievements
+  - **Send-to-Telegram CSV**: green plane-icon button in the analytics table-view modal (rentals + sales). Calls `sendAnalyticsCsvToTelegram` server-action which builds the CSV server-side and sends via the existing `sendTelegramDocument` bot capability. Solves the TG WebApp iframe sandbox problem where the browser blob-download silently fails.
+  - **Salary column calculation**: the previously-empty `ЗП Аренда` column in the rentals CSV (and `ЗП Продажа` in the sales CSV) is now filled using the `commission_rates` table — the same configuration the operator sets at `/franchize/{slug}/commissions`. Priority: `rental_daily` > `rental_hourly` (matches SalaryClient). Percentage = `price × rate / 100`; fixed_amount = flat fee.
+  - **Rental achievements (8 new badges)** mirroring the shift streak pattern:
+    - `rental_first` — first rental closure
+    - `rental_streak_3` — 3 closures in a row
+    - `rental_streak_10` — 10 closures in a row
+    - `rental_ideal_closure` ⭐ — closure meets all "ideal" criteria (verified + all todos done + odometer captured + deposit returned + no damage)
+    - `rental_ideal_streak_5` — 5 ideal closures
+    - `rental_photo_master` — captured closure photos for 10 rentals
+    - `rental_odometer_pro` — captured final odometer for 25 closures
+    - `rental_monthly_plan` — 20+ closures in the current month
+    Granted from `confirmVehicleReturn` server action after the rental is closed and the receipt is sent. Non-fatal — failures don't affect the closure.
+  - **CSV table-view polish**: sticky first column (Дата) for horizontal scroll on mobile, fuzzy search across all cells, totals card above the table (row count + sum of Цена + sum of ЗП Аренда + sum of Экип+Залог), numeric cells right-aligned with tabular-nums, hover highlight + zebra striping, ESC closes the modal, hidden spacer column (col 7 in rentals sheet).
+  - **Skill documentation**: `docs/SKILL_ANALYTICS_CSV_SEND.md` describes the building blocks (`buildRentalsCsv` / `buildSalesCsv` / `sendAnalyticsCsvToTelegram`), auth contract, signature, caption format, wiring example, extension patterns, and limits (50 MB cap, bot token env, first-time chat constraint).
+  - **Shared builders**: `lib/csv-builders/rentals-csv.ts` and `lib/csv-builders/sales-csv.ts` extracted so both the HTTP CSV routes and the send-to-Telegram server-action share the same logic.
 
 ---
 

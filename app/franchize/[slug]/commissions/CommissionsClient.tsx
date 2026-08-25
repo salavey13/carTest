@@ -235,6 +235,22 @@ export function CommissionsClient({ slug, crew }: CommissionsClientProps) {
             <p className="mt-2 text-sm" style={{ color: T.textMuted }}>
               Определите проценты для расчёта комиссий райдеров
             </p>
+            {/* FIX (iter4): explain that these rates drive the salary column
+                in the CSV exports on the rentals/sales analytics pages. */}
+            <div
+              className="mt-3 rounded-lg border px-3 py-2 text-xs"
+              style={{
+                borderColor: `color-mix(in srgb, ${T.accent} 30%, transparent)`,
+                backgroundColor: `color-mix(in srgb, ${T.accent} 6%, transparent)`,
+                color: T.textMuted,
+              }}
+            >
+              <span className="font-semibold" style={{ color: T.text }}>Где это используется:</span>{" "}
+              Ставка для «Аренда (дневная)» подставляется в колонку{" "}
+              <span className="font-mono">ЗП Аренда</span> в CSV-выгрузке с аналитики аренд;
+              ставка для «Продажа» — в колонку <span className="font-mono">ЗП Продажа</span>{" "}
+              на странице продаж. При отсутствии дневной ставки используется почасовая.
+            </div>
           </div>
           {isOwner && (
             <Button

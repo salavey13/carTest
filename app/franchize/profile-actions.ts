@@ -186,6 +186,80 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
     },
   ];
 
+  // FIX (iter4): Rental achievements — mirror the shift streak/badge pattern
+  // for rental closures. Granted from confirmVehicleReturn (app/rentals/actions.ts)
+  // when an operator closes a rental that they processed.
+  //
+  // Badges:
+  //   rental_first           — first ever rental closure
+  //   rental_streak_3        — 3 closures in a row (no gaps)
+  //   rental_streak_10       — 10 closures in a row
+  //   rental_ideal_closure   — closure that meets the "ideal" criteria
+  //                            (verified + all todos done + odometer captured
+  //                            + deposit returned + no damage)
+  //   rental_ideal_streak_5  — 5 ideal closures in a row
+  //   rental_photo_master    — captured closure photos for 10 rentals
+  //   rental_odometer_pro     — captured final odometer for 25 rentals
+  //   rental_monthly_plan    — closed 20+ rentals in a month
+  const rentalAchievements: FranchizeAchievementDefinition[] = [
+    {
+      id: "rental_first",
+      title: "Первая аренда",
+      description: "Закрыл первую аренду — поездка завершена без аврала. Поехали дальше!",
+      category: "operations",
+      triggerSources: ["rental:return_confirmed"],
+    },
+    {
+      id: "rental_streak_3",
+      title: "Серия из 3 аренд",
+      description: "Три аренды закрыты подряд без пропусков. Вошёл в ритм!",
+      category: "operations",
+      triggerSources: ["rental:return_confirmed"],
+    },
+    {
+      id: "rental_streak_10",
+      title: "Серия из 10 аренд",
+      description: "Десять аренд подряд. Уверенная работа!",
+      category: "operations",
+      triggerSources: ["rental:return_confirmed"],
+    },
+    {
+      id: "rental_ideal_closure",
+      title: "Идеальная аренда ⭐",
+      description: "Закрыл аренду безупречно: контракт проверен, все задачи выполнены, одометр зафиксирован, залог возвращён, без повреждений.",
+      category: "operations",
+      triggerSources: ["rental:return_confirmed"],
+    },
+    {
+      id: "rental_ideal_streak_5",
+      title: "5 идеальных подряд",
+      description: "Пять аренд закрыты безупречно. Эталонный оператор!",
+      category: "operations",
+      triggerSources: ["rental:return_confirmed"],
+    },
+    {
+      id: "rental_photo_master",
+      title: "Мастер фото",
+      description: "Загрузил закрывающие фотографии для 10 аренд.",
+      category: "operations",
+      triggerSources: ["rental:photo_uploaded"],
+    },
+    {
+      id: "rental_odometer_pro",
+      title: "Одометр-про",
+      description: "Зафиксировал финальный одометр для 25 аренд.",
+      category: "operations",
+      triggerSources: ["rental:return_confirmed"],
+    },
+    {
+      id: "rental_monthly_plan",
+      title: "Месячный план аренд",
+      description: "Закрыл 20+ аренд за месяц. Выложился полностью!",
+      category: "operations",
+      triggerSources: ["rental:return_confirmed"],
+    },
+  ];
+
   const vipBikeOnly: FranchizeAchievementDefinition[] = [
     {
       id: "vipbike_map_riders_ready",
@@ -196,8 +270,8 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
     },
   ];
 
-  if (slug === "vip-bike") return [...shared, ...workAchievements, ...vipBikeOnly];
-  return [...shared, ...workAchievements];
+  if (slug === "vip-bike") return [...shared, ...workAchievements, ...rentalAchievements, ...vipBikeOnly];
+  return [...shared, ...workAchievements, ...rentalAchievements];
 }
 
 export async function getFranchizeAchievementCatalogAction(slug: string): Promise<FranchizeAchievementDefinition[]> {
