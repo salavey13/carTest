@@ -4,12 +4,30 @@
 // Query params:
 //   ?slug=vip-bike&from=2026-08-01&to=2026-08-31
 //
-// CSV columns (matching ВипБайк Финансы - Август.csv):
-// Дата,ЗП Аренда,Партнеру,Цена,Экип,Залог,Марка,Комментарий,Пробег до,Пробег после,Время
+// FIX (F9): columns now mirror the operator finance sheet exactly
+// (ВипБайк Финансы - Август.csv):
+//   Дата, ЗП Аренда, Партнеру, Цена, Экип, Залог, Марка, (empty), Пробег до,
+//   Пробег после, Время, Комментарий, дата, ЗП Продажа, Наименование, Цена, Комментарий
+//
+// The rental section (columns 1-12) is filled per rental; the sales section
+// (columns 13-17) is filled from private.sale_contract_artifacts created in
+// the same period. A day's rentals are included by the START of the rent
+// (requested_start_date), matching the dashboard day-scoping rule (F7).
+// Комментарий carries the renter ФИО + phone + payment method (F1/F2).
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { verifyCrewAccess } from "../_auth";
+
+type SupabaseSchemaClient = {
+  schema: (schema: string) => {
+    from: (table: string) => any;
+  };
+};
+
+function privateSchema() {
+  return (supabaseAdmin as unknown as SupabaseSchemaClient).schema("private");
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,7 +52,7 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
     if (!crew) return NextResponse.json({ error: "Crew not found" }, { status: 404 });
 
-    // Fetch rentals in date range (by requested_start_date)
+    // Fetch rentals in date range (by requested_start_date = START of rent)
     const fromIso = `${from}T00:00:00+03:00`;
     const toIso = `${to}T23:59:59+03:00`;
 
@@ -56,25 +74,57 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Build CSV
+    // Fetch sales artifacts for the same period (finance sheet has a sales
+    // section: дата, ЗП Продажа, Наименование, Цена, Комментарий).
+    const { data: crewBikes } = await supabaseAdmin
+      .from("cars")
+      .select("id, make, model")
+      .eq("crew_id", crew.id);
+    const crewBikeIds = (crewBikes || []).map((b) => b.id);
+    const bikeNameById = new Map<string, string>(
+      (crewBikes || []).map((b) => [b.id, `${b.make || ""} ${b.model || ""}`.trim()]),
+    );
+
+    const { data: sales } = await privateSchema()
+      .from("sale_contract_artifacts")
+      .select("id, buyer_full_name, sale_price, created_at, resolved_bike_id")
+      .in("resolved_bike_id", crewBikeIds.length ? crewBikeIds : ["__none__"])
+      .gte("created_at", fromIso)
+      .lte("created_at", toIso)
+      .order("created_at", { ascending: true });
+
+    // Build CSV — 17 columns matching the operator finance sheet
     const headers = [
       "Дата", "ЗП Аренда", "Партнеру", "Цена", "Экип", "Залог",
-      "Марка", "Комментарий", "Пробег до", "Пробег после", "Время", "Фото"
+      "Марка", "", "Пробег до", "Пробег после", "Время", "Комментарий",
+      "дата", "ЗП Продажа", "Наименование", "Цена", "Комментарий",
     ];
 
     const rows: string[] = [headers.join(",")];
 
-    for (const r of (rentals || [])) {
-      const meta = (r as any).metadata || {};
-      const vehicle = Array.isArray((r as any).vehicle) ? (r as any).vehicle[0] : (r as any).vehicle;
+    const formatCell = (v: unknown): string => {
+      const s = String(v ?? "");
+      // Escape cells containing commas, quotes or newlines (RFC 4180)
+      if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+
+    const rowOf = (cells: unknown[]): string => cells.map(formatCell).join(",");
+
+    // ── Rental rows (columns 1-12) ──────────────────────────────────────────
+    for (const r of (rentals || []) as any[]) {
+      const meta = r.metadata || {};
+      const vehicle = Array.isArray(r.vehicle) ? r.vehicle[0] : r.vehicle;
       const bikeName = `${vehicle?.make || ""} ${vehicle?.model || ""}`.trim();
 
-      const startDate = (r as any).requested_start_date || (r as any).agreed_start_date || (r as any).created_at;
-      const dateStr = startDate ? new Date(startDate).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", timeZone: "Europe/Moscow" }) : "";
+      const startDate = r.requested_start_date || r.agreed_start_date || r.created_at;
+      const dateStr = startDate
+        ? new Date(startDate).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", timeZone: "Europe/Moscow" })
+        : "";
 
-      const price = (r as any).total_cost || 0;
+      const price = r.total_cost || 0;
 
-      // Equipment
+      // Equipment (FIX F4): readable shorthand + estimated cost part
       const eq = meta.equipment || {};
       let equipCost = 0;
       const equipParts: string[] = [];
@@ -87,32 +137,58 @@ export async function GET(request: NextRequest) {
       if (eq.backpack) { equipCost += 500; equipParts.push("рюк"); }
       const equipStr = equipParts.length > 0 ? `${equipParts.join("+")} (${equipCost})` : "";
 
-      const deposit = meta.deposit_amount || meta.deposit_rub || 0;
-      const odoBefore = meta.odometer_before || "";
-      const odoAfter = meta.odometer_after || "";
+      // Deposit (FIX F3): metadata.deposit_amount with method label
+      const depositAmount = Number(meta.deposit_amount || 0);
+      const depositMethod =
+        meta.deposit_method === "cash" ? " нал"
+        : meta.deposit_method === "tbank" ? " ТБанк"
+        : meta.deposit_method === "sber" ? " Сбербанк"
+        : "";
+      const depositStr = depositAmount > 0 ? `${depositAmount}${depositMethod}` : "";
 
-      const startTime = startDate ? new Date(startDate).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Moscow" }) : "";
-      const endDate = (r as any).requested_end_date || (r as any).agreed_end_date;
-      const endTime = endDate ? new Date(endDate).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Moscow" }) : "";
+      const odoBefore = meta.odometer_before ?? "";
+      const odoAfter = meta.odometer_after ?? "";
+
+      const startTime = startDate
+        ? new Date(startDate).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Moscow" })
+        : "";
+      const endDate = r.requested_end_date || r.agreed_end_date;
+      const endTime = endDate
+        ? new Date(endDate).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Moscow" })
+        : "";
       const timeStr = startTime && endTime ? `${startTime}-${endTime}` : "";
 
+      // Комментарий: renter ФИО + phone + payment method (FIX F1/F2)
       const renterName = meta.renter_name || "";
-      const paymentMethod = meta.payment_split?.card_destination ? `карта ${meta.payment_split.card_destination}` : (meta.payment_split?.cash > 0 ? "нал" : "");
+      const renterPhone = meta.renter_phone || "";
+      const paymentMethod = meta.payment_split?.card_destination
+        ? `карта ${meta.payment_split.card_destination}`
+        : meta.payment_split?.cash > 0
+          ? "нал"
+          : "";
       const freeReason = meta.free_rental_reason || "";
-      const comment = [renterName, paymentMethod, freeReason].filter(Boolean).join(" ");
+      const comment = [renterName, renterPhone, paymentMethod, freeReason].filter(Boolean).join(" ");
 
-      // Photo links (rental detail page on the web app)
-      const rentalId = (r as any).rental_id || "";
-      const photoLink = rentalId ? `https://vip-bike.ru/franchize/${slug}/rental/${rentalId}` : "";
+      rows.push(rowOf([
+        dateStr, "", "", price, equipStr, depositStr,
+        bikeName, "", odoBefore, odoAfter, timeStr, comment,
+        "", "", "", "", "",
+      ]));
+    }
 
-      const row = [
-        dateStr, "", "", price, equipStr, deposit,
-        bikeName, comment, odoBefore, odoAfter, timeStr, photoLink
-      ].map(v => {
-        const s = String(v ?? "");
-        return s.includes(",") ? `"${s}"` : s;
-      });
-      rows.push(row.join(","));
+    // ── Sales rows (columns 13-17) ──────────────────────────────────────────
+    for (const s of (sales || []) as any[]) {
+      const dateStr = s.created_at
+        ? new Date(s.created_at).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", timeZone: "Europe/Moscow" })
+        : "";
+      const bikeName = bikeNameById.get(s.resolved_bike_id) || "";
+      const price = s.sale_price || "";
+      const comment = s.buyer_full_name || "";
+      rows.push(rowOf([
+        "", "", "", "", "", "",
+        "", "", "", "", "", "",
+        dateStr, "", bikeName, price, comment,
+      ]));
     }
 
     // Totals row
@@ -131,7 +207,12 @@ export async function GET(request: NextRequest) {
       return sum + c;
     }, 0);
     const totalDeposit = (rentals || []).reduce((sum, r) => sum + Number((r as any).metadata?.deposit_amount || 0), 0);
-    rows.push(`,,,${totalRevenue},${totalEquip},${totalDeposit},,,,,,`);
+    const totalSales = (sales || []).reduce((sum, s) => sum + (Number((s as any).sale_price) || 0), 0);
+    rows.push(rowOf([
+      "", "", "", totalRevenue, totalEquip, totalDeposit,
+      "", "", "", "", "", "",
+      "", "", "", totalSales, "",
+    ]));
 
     const csv = "\uFEFF" + rows.join("\n"); // BOM for Excel UTF-8
 

@@ -8,6 +8,8 @@
 //
 // Mobile-first: list is full-width; tapping a card opens the bottom sheet.
 // Desktop (lg+): split-pane — list left (5/12), detail right (7/12).
+// FIX (F9): CSV export button (always visible, mobile included) + date-range
+// modal wired by the parent wrapper.
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -32,8 +34,9 @@ import { AnalyticsMobileSheet } from "./AnalyticsMobileSheet";
 import { RentalDetailDrawer } from "./RentalDetailDrawer";
 import { SaleDetailDrawer } from "./SaleDetailDrawer";
 import { ServiceDetailDrawer } from "./ServiceDetailDrawer";
+import { ExportCsvModal } from "./ExportCsvModal";
 import { motion, AnimatePresence } from "framer-motion";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Download } from "lucide-react";
 
 interface AnalyticsClientProps {
   initialSlug: string;
@@ -51,6 +54,8 @@ interface AnalyticsClientProps {
   initialTab?: string;
   initialRentalId?: string;
   initialSaleId?: string;
+  /** FIX (F9): CSV export handler — receives the picked date range. */
+  onExportCsv?: (from: string, to: string) => Promise<void>;
 }
 
 export function AnalyticsClient({
@@ -68,6 +73,7 @@ export function AnalyticsClient({
   initialTab,
   initialRentalId,
   initialSaleId,
+  onExportCsv,
 }: AnalyticsClientProps) {
   const router = useRouter();
   // Date state: controlled (when parent passes `date` + `onDateChange`) or
@@ -84,6 +90,8 @@ export function AnalyticsClient({
   );
   const [selectedRentalId, setSelectedRentalId] = useState<string | null>(initialRentalId ?? null);
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(initialSaleId ?? null);
+  // FIX (F9): CSV export modal state
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
 
   // Switch tab — reset selection SYNCHRONOUSLY (not via useEffect, which
   // would let the wrong drawer render for one frame).
@@ -133,31 +141,40 @@ export function AnalyticsClient({
     if (!selectedRentalId) return null;
     const rental = rentals.find((r) => r.rental_id === selectedRentalId);
     if (!rental) return null;
-    // v1 CrewTodo doesn't carry rental_id, so we match todos by operator
-    // chat id (same heuristic as buildMechanicMap). If the rental has no
-    // operator chat id, fall back to the rental_id (for forward-compat when
-    // crew_todos.rental_id is backfilled).
+    // FIX (F12): todos link via crew_todos.rental_id (primary). Legacy
+    // heuristic (assignee = operator chat id) kept as fallback for old rows.
     const rentalTodos = todos.filter(
       (t) =>
-        (rental.created_by_operator_chat_id &&
-          t.assigned_to === rental.created_by_operator_chat_id) ||
-        t.rental_id === rental.rental_id,
+        t.rental_id === rental.rental_id ||
+        (t.rental_id == null &&
+          !!rental.created_by_operator_chat_id &&
+          t.assigned_to === rental.created_by_operator_chat_id),
     );
     const md = (rental.metadata || {}) as Record<string, unknown>;
+    // FIX (F5): build the handoff object whenever ANY handoff signal exists —
+    // odometer_before/after are stored directly in rental metadata by the
+    // /doc flow (rental_handoffs rows may not exist at all).
+    const odoBefore = (md.odometer_before as number | undefined) ?? null;
+    const odoAfter = (md.odometer_after as number | undefined) ?? null;
+    const handoffAt = typeof md.handoff_at === "string" ? md.handoff_at : null;
+    const damageNotes =
+      (typeof md.damage_notes === "string" ? md.damage_notes : null) ||
+      (typeof md.return_notes === "string" ? md.return_notes : null);
+    const hasHandoff = !!handoffAt || odoBefore != null || odoAfter != null || !!damageNotes;
     return {
       ...rental,
       todos: rentalTodos,
       notes: [],
       history: [],
-      handoff: md.handoff_at
+      handoff: hasHandoff
         ? {
-            handoff_at: md.handoff_at as string,
+            handoff_at: handoffAt,
             handoff_by: (md.handoff_by as string) || null,
-            odometer_before: (md.odometer_before as number) ?? null,
-            odometer_after: (md.odometer_after as number) ?? null,
+            odometer_before: odoBefore,
+            odometer_after: odoAfter,
             equipment_checklist:
               (md.equipment_checklist as Record<string, boolean>) || null,
-            damage_notes: (md.damage_notes as string) || null,
+            damage_notes: damageNotes,
           }
         : null,
     };
@@ -211,6 +228,38 @@ export function AnalyticsClient({
 
       {/* Date navigator */}
       <AnalyticsDateNav date={date} onChange={setDate} T={T} isToday={isToday} />
+
+      {/* FIX (F9): CSV export button — always visible on mobile and desktop.
+          No `hidden sm:...` classes: the operator tests on a phone. */}
+      {onExportCsv && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setCsvModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 md:text-sm"
+            style={{
+              borderColor: "#3b82f64d",
+              backgroundColor: "#3b82f615",
+              color: "#60a5fa",
+              minHeight: "44px",
+            }}
+            aria-label="Экспорт аренд в CSV за период"
+          >
+            <Download className="h-4 w-4" aria-hidden />
+            Экспорт CSV
+          </button>
+        </div>
+      )}
+
+      {/* CSV export modal (date range picker) */}
+      {onExportCsv && (
+        <ExportCsvModal
+          isOpen={csvModalOpen}
+          onClose={() => setCsvModalOpen(false)}
+          onExport={onExportCsv}
+          T={T}
+        />
+      )}
 
       {/* KPI cards */}
       <AnalyticsKPICards kpis={kpis} T={T} />

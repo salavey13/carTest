@@ -1,10 +1,13 @@
 // /app/franchize/[slug]/rentals-analytics/page.tsx
 //
-// Page entry for the rentals analytics dashboard. v2 is the default UI.
-// v1 accessible via ?ui=v1 query param or localStorage.analytics_ui_v2 = "false".
+// Page entry for the rentals analytics dashboard.
+//
+// FIX (F10): the v1 UI (RentalsAnalyticsClient) and the AnalyticsUiSwitch
+// selector are REMOVED — v2 (AnalyticsClientV2) is the only UI now.
+// Deep-link ?ui=v1/v2 params are ignored.
 //
 // This is a Server Component. It does NOT contain any "use client" code inline.
-// The client-side theme resolution + UI switch lives in UiSwitchWithTheme.tsx.
+// The client-side theme resolution lives inside AnalyticsClientV2.
 
 import type { Metadata } from "next";
 
@@ -13,11 +16,11 @@ import { FranchizePageShell } from "@/app/franchize/components/FranchizePageShel
 import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
-import { UiSwitchWithTheme } from "./UiSwitchWithTheme";
+import { AnalyticsClientV2 } from "./AnalyticsClientV2";
 
 interface FranchizeSlugRentalsAnalyticsPageProps {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ date?: string; ui?: string; tab?: string; rentalId?: string; saleId?: string }>;
+  searchParams: Promise<{ date?: string; tab?: string; rentalId?: string; saleId?: string }>;
 }
 
 export async function generateMetadata({
@@ -39,7 +42,7 @@ export default async function FranchizeSlugRentalsAnalyticsPage({
   searchParams,
 }: FranchizeSlugRentalsAnalyticsPageProps) {
   const { slug } = await params;
-  const { date: dateParam, ui, tab: tabParam, rentalId: rentalIdParam, saleId: saleIdParam } = await searchParams;
+  const { date: dateParam, tab: tabParam, rentalId: rentalIdParam, saleId: saleIdParam } = await searchParams;
   const { crew } = await getFranchizeBySlug(slug);
   const resolvedSlug = crew.slug || slug;
   const activePath = `/franchize/${resolvedSlug}/rentals-analytics`;
@@ -51,9 +54,6 @@ export default async function FranchizeSlugRentalsAnalyticsPage({
   });
   const selectedDate = dateParam || today;
 
-  const forceV2 = ui === "v2";
-  const forceV1 = ui === "v1";
-
   return (
     <main className="min-h-screen" style={surface.page}>
       <CrewHeader
@@ -63,12 +63,10 @@ export default async function FranchizeSlugRentalsAnalyticsPage({
         showRail={false}
       />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4" width="full">
-        <UiSwitchWithTheme
-          forceV2={forceV2}
-          forceV1={forceV1}
+        <AnalyticsClientV2
+          initialSlug={resolvedSlug}
+          initialDate={selectedDate}
           crew={crew}
-          resolvedSlug={resolvedSlug}
-          selectedDate={selectedDate}
           initialTab={tabParam}
           initialRentalId={rentalIdParam}
           initialSaleId={saleIdParam}

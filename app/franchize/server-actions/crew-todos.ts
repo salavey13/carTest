@@ -30,6 +30,7 @@ interface CrewTodoDBRow {
   created_by: string | null;
   updated_at: string;
   completed_at: string | null;
+  rental_id?: string | null;
   created_by_user?: {
     user_id: string;
     full_name: string | null;
@@ -53,6 +54,7 @@ function toCrewTodo(row: CrewTodoDBRow, assigneeUser?: { full_name: string | nul
     created_by: row.created_by,
     updated_at: row.updated_at,
     completed_at: row.completed_at,
+    rental_id: row.rental_id ?? null,
     assigned_to_user: assigneeUser ? { user_id: row.assigned_to || "", ...assigneeUser } : null,
     created_by_user: row.created_by_user,
   };
@@ -126,6 +128,7 @@ export async function getCrewTodos(input: {
         created_by,
         updated_at,
         completed_at,
+        rental_id,
         created_by_user:users!crew_todos_created_by_fkey (
           user_id,
           full_name,

@@ -43,6 +43,20 @@ export interface AnalyticsRentalRow {
   created_by_operator_chat_id: string | null;
   vehicle?: AnalyticsVehicle | null;
   user?: AnalyticsUser | null;
+  /** Contract artifact data (private.rental_contract_artifacts) — the REAL
+   *  renter identity for operator-created (/doc) rentals. */
+  contract?: {
+    renter_full_name: string | null;
+    renter_phone: string | null;
+    deposit_rub: string | null;
+    total_sum: number | null;
+    daily_price: string | null;
+    rent_start_date: string | null;
+    rent_end_date: string | null;
+    created_by_operator_chat_id: string | null;
+  } | null;
+  /** Resolved operator display name (e.g. "@salavey13"). */
+  operatorName?: string | null;
 }
 
 export interface AnalyticsSaleRow {

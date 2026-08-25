@@ -24,6 +24,8 @@ export interface RentalDashboardItem {
   requested_end_date: string | null;
   created_at: string;
   metadata: Record<string, unknown>;
+  /** Telegram chat id of the operator who created this rental (/doc flow). */
+  created_by_operator_chat_id?: string | null;
   vehicle: {
     id: string;
     make: string;
@@ -59,6 +61,21 @@ export interface RentalDashboardItem {
   odometerEnd?: number | null;
   handoutCompleted?: boolean;
   returnCompleted?: boolean;
+  // Contract artifact data from private.rental_contract_artifacts.
+  // The /doc operator flow stores the REAL renter here (rentals.user_id points
+  // at the operator who created the rental, not the renter).
+  contract?: {
+    renter_full_name: string | null;
+    renter_phone: string | null;
+    deposit_rub: string | null;
+    total_sum: number | null;
+    daily_price: string | null;
+    rent_start_date: string | null;
+    rent_end_date: string | null;
+    created_by_operator_chat_id: string | null;
+  } | null;
+  // Resolved operator display name (username/full_name from public.users)
+  operatorName?: string | null;
 }
 
 export interface RentalDashboardSummary {
@@ -227,14 +244,13 @@ export async function getRentalsDashboard(input: {
     const startOfDay = new Date(`${date}T00:00:00.000Z`).toISOString();
     const endOfDay = new Date(`${date}T23:59:59.999Z`).toISOString();
 
-    // Query rentals for the day
-    // FIX: Previously filtered only by created_at BETWEEN startOfDay/endOfDay,
-    // which hid rentals created on a different day (e.g. booked Monday for Friday).
-    // Now uses OR logic: a rental shows up on the selected day if EITHER:
-    //   1. It was created on that day (new booking), OR
-    //   2. Its rental period overlaps that day (active rental)
-    // We fetch by both conditions and dedupe by rental_id since Supabase REST
-    // doesn't support SQL OR across different columns.
+    // Query rentals for the day.
+    // FIX (F7): a rental belongs to the day it STARTS — the day list and the
+    // daily revenue total must not count a rental on the day it ends (or the
+    // day it was created if it starts later). We match on requested_start_date
+    // (fallback agreed_start_date handled per-row below). created_at is NOT a
+    // match condition anymore: a booking created Monday for Friday shows on
+    // Friday only.
     console.log("[rentals-dashboard] Querying rentals for crew:", crew.id, "date:", date, "range:", { startOfDay, endOfDay });
 
     const baseSelect = `
@@ -249,24 +265,16 @@ export async function getRentalsDashboard(input: {
       requested_start_date,
       requested_end_date,
       created_at,
+      created_by_operator_chat_id,
       metadata,
       vehicle:cars!inner(id, make, model, crew_id, type, specs),
       user:users!rentals_user_id_fkey(user_id, full_name, username, metadata)
     `;
 
-    // Query 1: rentals whose START date falls on the selected day.
-    // The daily total should count rentals that STARTED today, not ones that
-    // END today (a multi-day rental from yesterday shouldn't be double-counted).
-    const [createdTodayResult, startedTodayResult] = await Promise.all([
-      supabaseAdmin
-        .from("rentals")
-        .select(baseSelect)
-        .eq("vehicle.crew_id", crew.id)
-        .gte("created_at", startOfDay)
-        .lte("created_at", endOfDay)
-        .order("created_at", { ascending: false }),
-      // Query 2: rentals whose START DATE is on the selected day
-      // (requested_start_date >= startOfDay AND requested_start_date <= endOfDay)
+    // Primary query: rentals whose requested START date falls on the selected day.
+    // A secondary query catches legacy rows where requested_start_date is null
+    // (matched by agreed_start_date, then created_at as a last resort).
+    const [startedTodayResult, noRequestedStartResult] = await Promise.all([
       supabaseAdmin
         .from("rentals")
         .select(baseSelect)
@@ -274,19 +282,28 @@ export async function getRentalsDashboard(input: {
         .gte("requested_start_date", startOfDay)
         .lte("requested_start_date", endOfDay)
         .order("created_at", { ascending: false }),
+      // Legacy rows without requested_start_date: match by agreed_start_date
+      // within the day. Fallback for old data only.
+      supabaseAdmin
+        .from("rentals")
+        .select(baseSelect)
+        .eq("vehicle.crew_id", crew.id)
+        .gte("agreed_start_date", startOfDay)
+        .lte("agreed_start_date", endOfDay)
+        .is("requested_start_date", null)
+        .order("created_at", { ascending: false }),
     ]);
 
-    // Merge + dedupe by rental_id (period rentals win over created-today
-    // because they're more relevant to the selected day)
+    // Merge + dedupe by rental_id
     const rentalMap = new Map<string, any>();
-    for (const r of (createdTodayResult.data || []) as any[]) {
-      rentalMap.set(r.rental_id, r);
-    }
     for (const r of (startedTodayResult.data || []) as any[]) {
       rentalMap.set(r.rental_id, r);
     }
+    for (const r of (noRequestedStartResult.data || []) as any[]) {
+      if (!rentalMap.has(r.rental_id)) rentalMap.set(r.rental_id, r);
+    }
     const rentals = Array.from(rentalMap.values());
-    const rentalsError = createdTodayResult.error || startedTodayResult.error;
+    const rentalsError = startedTodayResult.error || noRequestedStartResult.error;
 
     if (rentalsError) {
       console.error("[rentals-dashboard] Query error:", rentalsError);
@@ -438,6 +455,122 @@ export async function getRentalsDashboard(input: {
           returnCompleted: handoff?.returnCompleted ?? false,
         };
       });
+    }
+
+    // ── FIX (F1/F2/F3): enrich with contract artifacts ──────────────────────
+    // The /doc operator flow stores the REAL renter identity in
+    // private.rental_contract_artifacts (rentals.user_id points at the operator
+    // who created the rental). Match order: metadata.doc_sha256 →
+    // artifacts.original_sha256, then artifacts.rental_id, then
+    // (requested dates + vehicle) as a last-resort heuristic.
+    if (rentalIds.length > 0) {
+      // Collect sha256 keys + rental ids for matching
+      const shaKeys: string[] = [];
+      for (const item of items) {
+        const sha = (item.metadata as Record<string, unknown> | null)?.doc_sha256;
+        if (typeof sha === "string" && sha.length > 0) shaKeys.push(sha);
+      }
+
+      const contractByRentalId = new Map<string, NonNullable<RentalDashboardItem["contract"]>>();
+
+      // 1) Match by doc sha256 (strongest join). NOTE: artifact.rental_id may
+      //    be NULL for manually-recovered rentals — we key by sha256 and map
+      //    back to the rental whose metadata.doc_sha256 matches.
+      const contractBySha = new Map<string, NonNullable<RentalDashboardItem["contract"]>>();
+      if (shaKeys.length > 0) {
+        const { data: bySha } = await privateSchema()
+          .from("rental_contract_artifacts")
+          .select("rental_id, original_sha256, renter_full_name, renter_phone, deposit_rub, total_sum, daily_price, rent_start_date, rent_end_date, created_by_operator_chat_id")
+          .in("original_sha256", shaKeys)
+          .order("created_at", { ascending: false });
+        for (const art of (bySha || []) as any[]) {
+          const contract = {
+            renter_full_name: art.renter_full_name ?? null,
+            renter_phone: art.renter_phone ?? null,
+            deposit_rub: art.deposit_rub ?? null,
+            total_sum: art.total_sum ?? null,
+            daily_price: art.daily_price ?? null,
+            rent_start_date: art.rent_start_date ?? null,
+            rent_end_date: art.rent_end_date ?? null,
+            created_by_operator_chat_id: art.created_by_operator_chat_id ?? null,
+          };
+          if (art.original_sha256 && !contractBySha.has(art.original_sha256)) {
+            contractBySha.set(art.original_sha256, contract);
+          }
+          if (art.rental_id && !contractByRentalId.has(art.rental_id)) {
+            contractByRentalId.set(art.rental_id, contract);
+          }
+        }
+      }
+      // Attach sha-matched contracts to their rentals
+      for (const item of items) {
+        if (contractByRentalId.has(item.rental_id)) continue;
+        const sha = (item.metadata as Record<string, unknown> | null)?.doc_sha256;
+        if (typeof sha === "string" && contractBySha.has(sha)) {
+          contractByRentalId.set(item.rental_id, contractBySha.get(sha)!);
+        }
+      }
+
+      // 2) Match by rental_id directly
+      const missingIds = rentalIds.filter((id) => !contractByRentalId.has(id));
+      if (missingIds.length > 0) {
+        const { data: byRentalId } = await privateSchema()
+          .from("rental_contract_artifacts")
+          .select("rental_id, renter_full_name, renter_phone, deposit_rub, total_sum, daily_price, rent_start_date, rent_end_date, created_by_operator_chat_id")
+          .in("rental_id", missingIds)
+          .order("created_at", { ascending: false });
+        for (const art of (byRentalId || []) as any[]) {
+          if (art.rental_id && !contractByRentalId.has(art.rental_id)) {
+            contractByRentalId.set(art.rental_id, {
+              renter_full_name: art.renter_full_name ?? null,
+              renter_phone: art.renter_phone ?? null,
+              deposit_rub: art.deposit_rub ?? null,
+              total_sum: art.total_sum ?? null,
+              daily_price: art.daily_price ?? null,
+              rent_start_date: art.rent_start_date ?? null,
+              rent_end_date: art.rent_end_date ?? null,
+              created_by_operator_chat_id: art.created_by_operator_chat_id ?? null,
+            });
+          }
+        }
+      }
+
+      // Attach contracts to items
+      items = items.map(item => ({
+        ...item,
+        contract: contractByRentalId.get(item.rental_id) ?? null,
+      }));
+
+      // ── FIX (F11): resolve operator display names ────────────────────────
+      // Map created_by_operator_chat_id (+ artifact operator ids) to a
+      // human-readable username from public.users, so the drawer shows
+      // "@salavey13" instead of a raw Telegram chat id.
+      const operatorIds = new Set<string>();
+      for (const item of items) {
+        const ids = [
+          item.created_by_operator_chat_id,
+          item.contract?.created_by_operator_chat_id,
+        ].filter((v): v is string => typeof v === "string" && v.length > 0);
+        for (const id of ids) operatorIds.add(id);
+      }
+      const operatorNameById = new Map<string, string>();
+      if (operatorIds.size > 0) {
+        const { data: operatorUsers } = await supabaseAdmin
+          .from("users")
+          .select("user_id, full_name, username")
+          .in("user_id", Array.from(operatorIds));
+        for (const u of (operatorUsers || []) as any[]) {
+          const name = u.username ? `@${u.username}` : u.full_name || u.user_id;
+          operatorNameById.set(u.user_id, name);
+        }
+      }
+      items = items.map(item => ({
+        ...item,
+        operatorName:
+          operatorNameById.get(item.created_by_operator_chat_id || "") ??
+          operatorNameById.get(item.contract?.created_by_operator_chat_id || "") ??
+          null,
+      }));
     }
 
     // Calculate summary statistics.

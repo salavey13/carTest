@@ -2,19 +2,24 @@
 
 // /analytics/components/RentalDetailDrawer.tsx
 //
-// Full 10-section rental detail drawer — mirrors LeadDetailDrawer pattern.
+// Full rental detail drawer — mirrors LeadDetailDrawer pattern.
 //
 // Sections:
-//   1. Header          — bike title, renter ФИО, status badge, close button
+//   1. Header          — bike title, renter ФИО (real renter, FIX F1), status badge, close button
 //   2. Primary actions  — Activate / Complete / Cancel / Open rental page
-//   3. SLA overview     — 4 indicators (days active, overdue todos, until return, docs)
-//   4. Info grid        — bike, renter, phone, status, payment, start, end, cost, deposit, operator, crew
-//   5. Documents        — 5-item checklist with verify/request actions
-//   6. Todos            — this rental's todos only, with All/Mine/Overdue sub-filters
-//   7. Handoff          — odometer before/after, equipment checklist, damage notes
-//   8. Notes            — this rental's notes + add-note input
+//   3. SLA overview     — days in rental (FIX F8: start→end), until return
+//   4. Info grid        — bike, renter, phone (F2), status, payment, start, end,
+//                          cost, equipment part (F4), deposit (F3), operator (F11)
+//   5. Todos            — this rental's todos linked via crew_todos.rental_id (F12)
+//   6. Handoff          — odometer before/after (F5), equipment checklist, damage notes
+//   7. Deposit          — deposit_entries live tracking + metadata fallback (F3)
+//   8. Notes            — this rental's notes + add-note input + return notes
 //   9. History          — timeline of events
 //  10. Sticky footer    — "Открыть аренду →"
+//
+// FIX (F11): the documents checklist section is removed — rentals created via
+// the /doc command already have verified documents; a photo-upload checklist
+// is not relevant for this flow.
 //
 // Mobile: rendered inside AnalyticsMobileSheet (slide-up, 88vh).
 // Desktop: right-side panel (max-w-[640px]) — backdrop handled by parent.
@@ -24,15 +29,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
   CheckCircle2,
-  AlertCircle,
-  FileText,
   Briefcase,
-  Wrench,
   ClipboardCheck,
   StickyNote,
   History as HistoryIcon,
   ExternalLink,
-  ShieldCheck,
 } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
 import type {
@@ -54,13 +55,17 @@ import {
   type PrimaryAction,
 } from "./DrawerPrimitives";
 import {
-  computeDocStatus,
   computeSlaSignals,
   formatRubles,
   formatDateTime,
+  getDepositInfo,
+  getEquipmentSummary,
+  getHandoffStatus,
   getInitials,
+  getPaymentSplit,
   getRentalBikeTitle,
   getRenterName,
+  getRenterPhone,
   getRentalStatusMeta,
 } from "./lib/analytics-utils";
 import { DepositSection } from "./DepositSection";
@@ -87,7 +92,6 @@ export function RentalDetailDrawer({
 }: RentalDetailDrawerProps) {
   const [todoFilter, setTodoFilter] = useState<TodoFilter>("all");
   const [newNote, setNewNote] = useState("");
-  const [openDocs, setOpenDocs] = useState(true);
   const [openTasks, setOpenTasks] = useState(true);
   const [openHandoff, setOpenHandoff] = useState(true);
   const [openDeposit, setOpenDeposit] = useState(true);
@@ -99,11 +103,19 @@ export function RentalDetailDrawer({
   const renterName = getRenterName(rental);
   const initials = getInitials(renterName);
   const cost = Number(rental.total_cost) || 0;
-  const docs = computeDocStatus(rental);
   const sla = computeSlaSignals(rental);
-  const phone = (rental.metadata as Record<string, unknown> | null)?.phone as string | undefined;
-  // deposit info now comes from deposit_entries table via DepositSection (not metadata.deposit)
+  // FIX (F2): renter phone from metadata.renter_phone / contract artifact
+  const phone = getRenterPhone(rental);
+  const md = (rental.metadata || {}) as Record<string, unknown>;
+  // FIX (F3): deposit from metadata / contract artifact
+  const deposit = getDepositInfo(rental);
+  // FIX (F4): equipment included in this rent
+  const equipment = getEquipmentSummary(rental);
+  // Payment split (bank/cash/card destination)
+  const paymentSplit = getPaymentSplit(rental);
   const handoff = rental.handoff;
+  // FIX (F6): real handoff status — Передан / Возвращен / Ожидает
+  const handoffStatus = getHandoffStatus(rental);
 
   // Primary actions (Section 2)
   const primaryActions: PrimaryAction[] = [
@@ -114,18 +126,30 @@ export function RentalDetailDrawer({
   ];
 
   // Info grid (Section 4)
+  // FIX (F11): «Экипаж» tile removed (we are already inside the crew context);
+  // operator shows a resolved username instead of a raw chat id.
   const infoItems: InfoTile[] = [
     { label: "Байк",            value: bikeTitle },
     { label: "Арендатор",       value: renterName },
     { label: "Телефон",         value: phone || "—", copyable: !!phone },
     { label: "Статус",          value: statusMeta.label, tone: statusMeta.color === "#22c55e" ? "good" : statusMeta.color === "#ef4444" ? "danger" : "neutral" },
-    { label: "Оплата",          value: rental.payment_status || "—" },
+    { label: "Оплата",          value: paymentSplit.text || rental.payment_status || "—" },
     { label: "Начало",          value: formatDateTime(rental.agreed_start_date || rental.requested_start_date) },
     { label: "Конец",           value: formatDateTime(rental.agreed_end_date || rental.requested_end_date) },
     { label: "Стоимость",       value: formatRubles(cost) },
-    // Deposit info moved to dedicated DepositSection below (reads from deposit_entries table, not metadata)
-    { label: "Оператор",        value: rental.created_by_operator_chat_id || "—" },
-    { label: "Экипаж",          value: rental.crew_id || "—" },
+    // FIX (F4): equipment part of the total as a separate field
+    equipment.text
+      ? { label: "Экипировка",     value: equipment.cost > 0 ? `${equipment.text} (${formatRubles(equipment.cost)})` : equipment.text }
+      : { label: "Экипировка",     value: "не включена" },
+    // FIX (F3): deposit amount + method + return status
+    {
+      label: "Депозит",
+      value:
+        deposit.amount != null && deposit.amount > 0
+          ? `${formatRubles(deposit.amount)}${deposit.methodLabel ? ` · ${deposit.methodLabel}` : ""}${deposit.returned === true ? " · возвращен" : deposit.returned === false ? " · у держателя" : ""}`
+          : "не записан",
+    },
+    { label: "Оператор",        value: rental.operatorName || "—" },
     { label: "Создана",         value: formatDateTime(rental.created_at) },
   ];
 
@@ -159,6 +183,15 @@ export function RentalDetailDrawer({
         ...(rental.status === "completed" && rental.agreed_end_date
           ? [{ type: "completed", timestamp: rental.agreed_end_date, label: "Аренда завершена", color: "#3b82f6" }]
           : []),
+        // /doc flow return confirmation event (metadata.history entries)
+        ...((Array.isArray(md.history) ? md.history : []) as Array<Record<string, unknown>>)
+          .filter((h) => typeof h.at === "string")
+          .map((h) => ({
+            type: String(h.status || "event"),
+            timestamp: String(h.at),
+            label: String(h.message || h.status || "Событие"),
+            color: h.status === "completed" ? "#3b82f6" : "#64748b",
+          })),
       ];
 
   const submitNote = () => {
@@ -166,28 +199,6 @@ export function RentalDetailDrawer({
     onAddNote(newNote.trim());
     setNewNote("");
   };
-
-  // Document checklist (Section 5)
-  const docItems: Array<{ label: string; present: boolean; url?: string | null }> = [
-    { label: "Паспорт (основная)",        present: !!rental.passport_mainpage_photo,         url: rental.passport_mainpage_photo },
-    { label: "Паспорт (регистрация)",     present: !!rental.passport_registration_photo,     url: rental.passport_registration_photo },
-    { label: "Вод. удостоверение (лицо)", present: !!rental.drivers_licence_frontal_photo,   url: rental.drivers_licence_frontal_photo },
-  ];
-  const md = (rental.metadata || {}) as Record<string, unknown>;
-  docItems.push({
-    label: "Паспорт (оборот)",
-    present: typeof md.passport_backpage_photo === "string" && md.passport_backpage_photo.length > 0,
-    url: md.passport_backpage_photo as string | undefined,
-  });
-  docItems.push({
-    label: "Вод. удостоверение (оборот)",
-    present: typeof md.drivers_licence_back_photo === "string" && md.drivers_licence_back_photo.length > 0,
-    url: md.drivers_licence_back_photo as string | undefined,
-  });
-
-  // Equipment checklist (Section 7)
-  const equipmentChecklist = handoff?.equipment_checklist ?? {};
-  const equipmentEntries = Object.entries(equipmentChecklist);
 
   const content = (
     <>
@@ -261,111 +272,8 @@ export function RentalDetailDrawer({
         <DrawerInfoGrid items={infoItems} T={T} />
       </div>
 
-      {/* 5. Documents */}
+      {/* 5. Todos (FIX F12: linked via crew_todos.rental_id) */}
       <div className="mt-5">
-        <DrawerSection
-          title="Документы"
-          icon={FileText}
-          count={docs.count}
-          expanded={openDocs}
-          onToggle={() => setOpenDocs(!openDocs)}
-          T={T}
-          rightAction={
-            <span
-              className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-              style={{
-                backgroundColor: docs.complete ? "#22c55e15" : docs.count <= 1 ? "#ef444415" : "#f59e0b15",
-                color: docs.complete ? "#22c55e" : docs.count <= 1 ? "#ef4444" : "#f59e0b",
-              }}
-            >
-              {docs.count}/{docs.total}
-            </span>
-          }
-        >
-          <div className="space-y-1.5">
-            {docItems.map((d, i) => (
-              <div
-                key={i}
-                className="flex min-h-[44px] items-center justify-between gap-2 rounded-xl border p-2.5"
-                style={{
-                  borderColor: T.border,
-                  backgroundColor: T.bgElevated,
-                }}
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  {d.present ? (
-                    <CheckCircle2
-                      className="h-4 w-4 shrink-0"
-                      style={{ color: "#22c55e" }}
-                      aria-hidden
-                    />
-                  ) : (
-                    <AlertCircle
-                      className="h-4 w-4 shrink-0"
-                      style={{ color: "#ef4444" }}
-                      aria-hidden
-                    />
-                  )}
-                  <span
-                    className="truncate text-sm"
-                    style={{ color: T.text }}
-                  >
-                    {d.label}
-                  </span>
-                </div>
-                {d.present && d.url ? (
-                  <a
-                    href={typeof d.url === "string" ? d.url : "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="shrink-0 rounded-lg px-3 py-2 text-[11px] font-medium transition hover:opacity-80 focus:outline-none focus-visible:ring-2"
-                    style={{
-                      backgroundColor: T.bgCard,
-                      color: T.textMuted,
-                      minHeight: "44px",
-                      display: "inline-flex",
-                      alignItems: "center",
-                    }}
-                    aria-label={`Открыть: ${d.label}`}
-                  >
-                    Открыть
-                  </a>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => onAction("request_docs")}
-                    className="shrink-0 rounded-lg px-3 py-2 text-[11px] font-medium transition hover:opacity-80 focus:outline-none focus-visible:ring-2"
-                    style={{
-                      backgroundColor: "#f59e0b15",
-                      color: "#f59e0b",
-                      minHeight: "44px",
-                    }}
-                  >
-                    Запросить
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => onAction("verify_docs")}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-medium transition focus:outline-none focus-visible:ring-2"
-            style={{
-              borderColor: T.border,
-              backgroundColor: T.bgCard,
-              color: T.text,
-              minHeight: "44px",
-            }}
-          >
-            <ShieldCheck className="h-4 w-4" aria-hidden />
-            Верифицировать документы
-          </button>
-        </DrawerSection>
-      </div>
-
-      {/* 6. Todos */}
-      <div className="mt-4">
         <DrawerSection
           title="Задачи аренды"
           icon={Briefcase}
@@ -423,7 +331,7 @@ export function RentalDetailDrawer({
         </DrawerSection>
       </div>
 
-      {/* 7. Handoff */}
+      {/* 6. Handoff */}
       <div className="mt-4">
         <DrawerSection
           title="Передача байка"
@@ -432,10 +340,17 @@ export function RentalDetailDrawer({
           onToggle={() => setOpenHandoff(!openHandoff)}
           T={T}
           rightAction={
-            handoff?.handoff_at ? (
+            handoffStatus.returned ? (
               <span
                 className="rounded-full px-2 py-0.5 text-[10px] font-medium"
                 style={{ backgroundColor: "#22c55e15", color: "#22c55e" }}
+              >
+                Возвращен
+              </span>
+            ) : handoffStatus.done ? (
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                style={{ backgroundColor: "#3b82f615", color: "#3b82f6" }}
               >
                 Передан
               </span>
@@ -474,41 +389,43 @@ export function RentalDetailDrawer({
             </div>
           </div>
 
-          {equipmentEntries.length > 0 && (
+          {/* FIX (F4): equipment included in this rent — readable list with
+              quantities + estimated cost part, from metadata.equipment */}
+          {equipment.items.length > 0 && (
             <div className="mt-2 space-y-1">
               <p className="text-[10px] uppercase tracking-wider" style={{ color: T.textFaint }}>
-                Снаряжение
+                Снаряжение включено{equipment.cost > 0 ? ` · ~${equipment.cost.toLocaleString("ru-RU")} ₽` : ""}
               </p>
-              {equipmentEntries.map(([key, value]) => (
+              {equipment.items.map((it) => (
                 <div
-                  key={key}
+                  key={it.key}
                   className="flex min-h-[36px] items-center justify-between rounded-lg border p-2 text-xs"
                   style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}
                 >
-                  <span style={{ color: T.text }}>{key}</span>
-                  {value ? (
-                    <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#22c55e" }} aria-hidden />
-                  ) : (
-                    <X className="h-3.5 w-3.5" style={{ color: "#ef4444" }} aria-hidden />
-                  )}
+                  <span style={{ color: T.text }}>
+                    {it.label}
+                    {it.qty > 1 ? ` × ${it.qty}` : ""}
+                  </span>
+                  <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#22c55e" }} aria-hidden />
                 </div>
               ))}
             </div>
           )}
 
-          {handoff?.damage_notes && (
+          {/* Return notes from the /doc flow (e.g. damage description) */}
+          {((typeof md.return_notes === "string" && md.return_notes) || handoff?.damage_notes) ? (
             <div
               className="mt-2 rounded-xl border p-2.5"
               style={{ borderColor: "#ef444433", backgroundColor: "#ef444408" }}
             >
               <p className="text-[10px] uppercase tracking-wider" style={{ color: "#ef4444" }}>
-                Повреждения
+                Замечания при возврате
               </p>
               <p className="mt-0.5 text-sm" style={{ color: T.text }}>
-                {handoff.damage_notes}
+                {(md.return_notes as string) || handoff?.damage_notes}
               </p>
             </div>
-          )}
+          ) : null}
 
           <button
             type="button"
@@ -521,13 +438,17 @@ export function RentalDetailDrawer({
               minHeight: "44px",
             }}
           >
-            <Wrench className="h-4 w-4" aria-hidden />
-            {handoff?.handoff_at ? "Обновить акт передачи" : "Провести передачу"}
+            <ClipboardCheck className="h-4 w-4" aria-hidden />
+            {handoffStatus.returned
+              ? "Акт передачи оформлен"
+              : handoffStatus.done
+                ? "Оформить возврат"
+                : "Провести передачу"}
           </button>
         </DrawerSection>
       </div>
 
-      {/* 7b. Deposit tracking + penalty withholding */}
+      {/* 7. Deposit tracking + penalty withholding */}
       <div className="mt-4">
         <DepositSection
           rentalId={rental.rental_id}
@@ -535,6 +456,7 @@ export function RentalDetailDrawer({
           T={T}
           expanded={openDeposit}
           onToggle={() => setOpenDeposit(!openDeposit)}
+          metadataDeposit={deposit}
         />
       </div>
 

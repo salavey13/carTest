@@ -2,25 +2,26 @@
 
 // /analytics/components/AnalyticsRentalCard.tsx
 //
-// Rental card with bike title, renter ФИО (NOT phone), status badge, dates,
-// cost, document completeness, handoff badge, and SLA countdown.
+// Rental card with bike title, renter ФИО (FIX F1: real renter from contract
+// artifacts / metadata, NOT the operator who created the rental), status badge,
+// dates, cost, deposit badge (FIX F3: metadata-based, no API call) and handoff
+// badge (FIX F6).
 // 3px left edge stripe colored by status. Min 44px touch target.
 
 import { motion } from "framer-motion";
-import { CheckCircle2, AlertCircle, Clock, ArrowRight } from "lucide-react";
+import { Clock, ArrowRight, Wallet } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
 import type { AnalyticsRentalRow } from "./types";
 import {
-  computeDocStatus,
   computeSlaSignals,
   formatRubles,
   formatShortDate,
+  getDepositInfo,
   getHandoffStatus,
   getRentalBikeTitle,
   getRenterName,
   getRentalStatusMeta,
 } from "./lib/analytics-utils";
-import { DepositBadge } from "./DepositBadge";
 
 interface AnalyticsRentalCardProps {
   rental: AnalyticsRentalRow;
@@ -34,10 +35,10 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
   const bikeTitle = getRentalBikeTitle(rental);
   const renterName = getRenterName(rental);
   const cost = Number(rental.total_cost) || 0;
-  const docs = computeDocStatus(rental);
   const handoff = getHandoffStatus(rental);
   const sla = computeSlaSignals(rental);
   const returnSignal = sla.find((s) => s.key === "until_return" || s.key === "return_overdue");
+  const deposit = getDepositInfo(rental);
 
   const startDate = rental.agreed_start_date || rental.requested_start_date;
   const endDate = rental.agreed_end_date || rental.requested_end_date;
@@ -81,7 +82,7 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
             {renterName}
           </p>
 
-          {/* Date range + cost + docs + handoff */}
+          {/* Date range + cost + handoff + deposit */}
           <div
             className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] md:text-[11px]"
             style={{ color: T.textFaint }}
@@ -95,25 +96,24 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
             <span
               className="inline-flex items-center gap-1"
               style={{
-                color: docs.complete ? "#22c55e" : docs.count <= 1 ? "#ef4444" : "#f59e0b",
-              }}
-            >
-              {docs.complete ? (
-                <CheckCircle2 className="h-3 w-3" aria-hidden />
-              ) : (
-                <AlertCircle className="h-3 w-3" aria-hidden />
-              )}
-              {docs.count}/{docs.total}
-            </span>
-            <span
-              className="inline-flex items-center gap-1"
-              style={{
                 color: handoff.done ? "#22c55e" : "#f59e0b",
               }}
             >
-              {handoff.done ? "Передан" : handoff.label}
+              {handoff.label}
             </span>
-            <DepositBadge rentalId={rental.rental_id} T={T} />
+            {/* FIX (F3): deposit badge from rental metadata — no per-card API call */}
+            {deposit.amount != null && deposit.amount > 0 && (
+              <span
+                className="inline-flex items-center gap-1"
+                style={{ color: T.textFaint }}
+              >
+                <Wallet className="h-3 w-3" aria-hidden />
+                <span className="font-medium" style={{ color: T.textMuted }}>
+                  {deposit.amount >= 1000 ? `${Math.round(deposit.amount / 1000)}к` : deposit.amount}₽
+                  {deposit.returned === true ? " возвр." : ""}
+                </span>
+              </span>
+            )}
           </div>
 
           {/* SLA countdown line */}

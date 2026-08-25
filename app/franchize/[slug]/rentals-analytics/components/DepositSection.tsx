@@ -32,6 +32,15 @@ interface DepositSectionProps {
   T: ThemeTokens;
   expanded: boolean;
   onToggle: () => void;
+  /** FIX (F3): deposit info resolved from rental metadata / contract artifact
+   *  (metadata.deposit_amount + deposit_method + deposit_returned). Used when
+   *  there are no deposit_entries rows (typical for /doc-flow rentals). */
+  metadataDeposit?: {
+    amount: number | null;
+    method: string | null;
+    methodLabel: string | null;
+    returned: boolean | null;
+  } | null;
 }
 
 const DEST_META: Record<string, { label: string; icon: string; color: string }> = {
@@ -58,7 +67,7 @@ const ENTRY_LABELS: Record<string, string> = {
  * Fetches from /api/franchize/deposit-summary?rentalId=<id>
  * Penalty POST to /api/franchize/deposit-penalty
  */
-export function DepositSection({ rentalId, rentalStatus, T, expanded, onToggle }: DepositSectionProps) {
+export function DepositSection({ rentalId, rentalStatus, T, expanded, onToggle, metadataDeposit }: DepositSectionProps) {
   const [summary, setSummary] = useState<DepositSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPenaltyUI, setShowPenaltyUI] = useState(false);
@@ -145,6 +154,11 @@ export function DepositSection({ rentalId, rentalStatus, T, expanded, onToggle }
                 style={{ backgroundColor: "#3b82f615", color: "#3b82f6" }}>
             Возвращён
           </span>
+        ) : metadataDeposit && metadataDeposit.amount != null && metadataDeposit.amount > 0 ? (
+          <span className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                style={{ backgroundColor: metadataDeposit.returned === false ? "#f59e0b15" : "#3b82f615", color: metadataDeposit.returned === false ? "#f59e0b" : "#3b82f6" }}>
+            {metadataDeposit.returned === false ? "у держателя" : "возвращён"}
+          </span>
         ) : null
       }
     >
@@ -154,7 +168,30 @@ export function DepositSection({ rentalId, rentalStatus, T, expanded, onToggle }
           Загрузка...
         </div>
       ) : !summary || summary.totalCollected === 0 ? (
-        <DrawerEmptyHint label="Депозит не записан" T={T} />
+        metadataDeposit && metadataDeposit.amount != null && metadataDeposit.amount > 0 ? (
+          // FIX (F3): no deposit_entries rows, but the /doc flow recorded the
+          // deposit in rental metadata / contract artifact — show it instead
+          // of the misleading "Депозит не записан".
+          <div className="rounded-xl border p-2.5" style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: T.textMuted }}>Депозит по договору:</span>
+              <span className="text-sm font-bold tabular-nums" style={{ color: T.text }}>
+                {metadataDeposit.amount.toLocaleString("ru-RU")} ₽
+              </span>
+            </div>
+            <div className="mt-1 flex items-center justify-between text-[10px]" style={{ color: T.textFaint }}>
+              <span>
+                {metadataDeposit.methodLabel || metadataDeposit.method || "способ не указан"}
+                {" · из данных договора"}
+              </span>
+              <span style={{ color: metadataDeposit.returned === false ? "#f59e0b" : "#3b82f6" }}>
+                {metadataDeposit.returned === false ? "у держателя" : metadataDeposit.returned === true ? "возвращён" : ""}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <DrawerEmptyHint label="Депозит не записан" T={T} />
+        )
       ) : (
         <div className="space-y-3">
           {/* Summary per destination */}

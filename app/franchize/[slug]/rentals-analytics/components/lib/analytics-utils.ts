@@ -181,12 +181,161 @@ export function getSaleBikeTitle(sale: AnalyticsSaleRow): string {
   return "Байк";
 }
 
+/**
+ * FIX (F1): resolve the REAL renter ФИО.
+ * For operator-created rentals (/doc flow) rentals.user_id points at the
+ * operator/crew owner, so public.users.full_name shows the wrong person.
+ * Resolution order:
+ *   1. metadata.renter_name  (mirrored by the /doc flow)
+ *   2. contract.renter_full_name (private.rental_contract_artifacts)
+ *   3. user.full_name (self-service bookings — still correct there)
+ */
 export function getRenterName(rental: AnalyticsRentalRow): string {
+  const md = (rental.metadata || {}) as Record<string, unknown>;
+  const mdName = md["renter_name"];
+  if (typeof mdName === "string" && mdName.trim().length > 0) return mdName.trim();
+  const contractName = rental.contract?.renter_full_name;
+  if (contractName && contractName.trim().length > 0) return contractName.trim();
   return rental.user?.full_name || "Без имени";
+}
+
+/** FIX (F2): renter phone — metadata.renter_phone → artifact renter_phone. */
+export function getRenterPhone(rental: AnalyticsRentalRow): string | null {
+  const md = (rental.metadata || {}) as Record<string, unknown>;
+  const mdPhone = md["renter_phone"];
+  if (typeof mdPhone === "string" && mdPhone.trim().length > 0) return mdPhone.trim();
+  const contractPhone = rental.contract?.renter_phone;
+  if (contractPhone && contractPhone.trim().length > 0) return contractPhone.trim();
+  return null;
 }
 
 export function getBuyerName(sale: AnalyticsSaleRow): string {
   return sale.buyer_full_name || "Без имени";
+}
+
+// ── Deposit (F3) ─────────────────────────────────────────────────────────────
+
+export interface DepositInfo {
+  amount: number | null;
+  method: string | null;
+  methodLabel: string | null;
+  returned: boolean | null;
+}
+
+const DEPOSIT_METHOD_LABELS: Record<string, string> = {
+  cash: "наличные",
+  tbank: "Т-Банк карта",
+  t_bank: "Т-Банк карта",
+  sber: "Сбербанк карта",
+  card: "карта",
+};
+
+/** Deposit from metadata.deposit_amount/deposit_method/deposit_returned with
+ *  artifact deposit_rub as fallback (private.rental_contract_artifacts). */
+export function getDepositInfo(rental: AnalyticsRentalRow): DepositInfo {
+  const md = (rental.metadata || {}) as Record<string, unknown>;
+  let amount: number | null = null;
+  const mdAmount = md["deposit_amount"];
+  if (typeof mdAmount === "number") amount = mdAmount;
+  else if (typeof mdAmount === "string" && mdAmount.trim().length > 0) {
+    const parsed = Number(mdAmount.replace(/[^\d.]/g, ""));
+    if (!Number.isNaN(parsed)) amount = parsed;
+  }
+  if (amount == null && rental.contract?.deposit_rub) {
+    const parsed = Number(String(rental.contract.deposit_rub).replace(/[^\d.]/g, ""));
+    if (!Number.isNaN(parsed)) amount = parsed;
+  }
+  const method =
+    (typeof md["deposit_method"] === "string" ? (md["deposit_method"] as string) : null) || null;
+  const returned = typeof md["deposit_returned"] === "boolean" ? (md["deposit_returned"] as boolean) : null;
+  return {
+    amount,
+    method,
+    methodLabel: method ? DEPOSIT_METHOD_LABELS[method.toLowerCase()] || method : null,
+    returned,
+  };
+}
+
+// ── Equipment included in the rent (F4) ───────────────────────────────────────
+
+const EQUIPMENT_LABELS: Record<string, string> = {
+  helmets: "шлем",
+  gloves: "перчатки",
+  jacket: "куртка",
+  pants: "штаны",
+  boots: "ботинки",
+  net: "сетка",
+  bag: "сумка",
+  backpack: "рюкзак",
+  charger: "зарядка",
+};
+
+export interface EquipmentSummary {
+  /** Human-readable list, e.g. "2 шлема, перчатки" */
+  text: string;
+  /** Estimated equipment cost part of the total (₽), using operator prices. */
+  cost: number;
+  items: Array<{ key: string; label: string; qty: number }>;
+}
+
+/** Parse metadata.equipment into a readable list with quantities.
+ *  Numeric values are quantities (helmets: 2 → "2 шлема"), booleans are on/off. */
+export function getEquipmentSummary(rental: AnalyticsRentalRow): EquipmentSummary {
+  const md = (rental.metadata || {}) as Record<string, unknown>;
+  const eq = md["equipment"];
+  const items: Array<{ key: string; label: string; qty: number }> = [];
+  if (eq && typeof eq === "object") {
+    for (const [key, value] of Object.entries(eq as Record<string, unknown>)) {
+      if (typeof value === "number" && value > 0) {
+        items.push({ key, label: EQUIPMENT_LABELS[key] || key, qty: value });
+      } else if (value === true) {
+        items.push({ key, label: EQUIPMENT_LABELS[key] || key, qty: 1 });
+      }
+    }
+  }
+  // Operator price list (mirrors the CSV export pricing rule)
+  const UNIT_PRICES: Record<string, number> = {
+    helmets: 1000, gloves: 500, jacket: 500, pants: 500,
+    boots: 500, net: 500, bag: 500, backpack: 500, charger: 500,
+  };
+  const cost = items.reduce((sum, it) => sum + (UNIT_PRICES[it.key] || 500) * it.qty, 0);
+
+  const parts = items.map((it) => {
+    if (it.qty > 1) {
+      // crude Russian plural: шлем → шлема (2-4) / шлемов (5+)
+      const base = it.label;
+      const plural = it.qty >= 5 ? `${base}ов` : `${base}а`;
+      return `${it.qty} ${plural}`;
+    }
+    return it.label;
+  });
+  return { text: parts.join(", "), cost, items };
+}
+
+// ── Payment split ────────────────────────────────────────────────────────────
+
+export interface PaymentSplit {
+  bank: number | null;
+  cash: number | null;
+  cardDestination: string | null;
+  text: string | null;
+}
+
+export function getPaymentSplit(rental: AnalyticsRentalRow): PaymentSplit {
+  const md = (rental.metadata || {}) as Record<string, unknown>;
+  const ps = md["payment_split"];
+  if (!ps || typeof ps !== "object") return { bank: null, cash: null, cardDestination: null, text: null };
+  const obj = ps as Record<string, unknown>;
+  const bank = typeof obj.bank === "number" ? obj.bank : null;
+  const cash = typeof obj.cash === "number" ? obj.cash : null;
+  const cardDestination =
+    typeof obj.card_destination === "string" && obj.card_destination.length > 0
+      ? obj.card_destination
+      : null;
+  const parts: string[] = [];
+  if (bank != null && bank > 0) parts.push(`${bank.toLocaleString("ru-RU")} ₽ безнал${cardDestination ? ` (${cardDestination})` : ""}`);
+  if (cash != null && cash > 0) parts.push(`${cash.toLocaleString("ru-RU")} ₽ нал`);
+  return { bank, cash, cardDestination, text: parts.length ? parts.join(" + ") : null };
 }
 
 // ── Document completeness ────────────────────────────────────────────────────
@@ -232,10 +381,24 @@ export function computeSlaSignals(rental: AnalyticsRentalRow): SlaSignal[] {
   const now = Date.now();
   const signals: SlaSignal[] = [];
 
-  // Days active
-  const startDate = rental.agreed_start_date || rental.requested_start_date || rental.created_at;
-  if (startDate) {
-    const days = Math.floor((now - new Date(startDate).getTime()) / 86400000);
+  // Days in rental — FIX (F8): compute the contractual duration
+  // (start → end, rounded up, min 1 day), NOT the elapsed wall-clock time
+  // since start. A completed 6-hour rental must show 1д, not 3д.
+  const startDate = rental.agreed_start_date || rental.requested_start_date;
+  const endDate = rental.agreed_end_date || rental.requested_end_date;
+  if (startDate && endDate) {
+    const ms = new Date(endDate).getTime() - new Date(startDate).getTime();
+    const days = Math.max(1, Math.ceil(ms / 86400000));
+    signals.push({
+      key: "days_active",
+      label: "Дней в аренде",
+      value: `${days}д`,
+      tone: "neutral",
+      priority: 1,
+    });
+  } else if (startDate) {
+    // Open-ended rental: elapsed time since start
+    const days = Math.max(1, Math.ceil((now - new Date(startDate).getTime()) / 86400000));
     signals.push({
       key: "days_active",
       label: "Дней в аренде",
@@ -273,16 +436,10 @@ export function computeSlaSignals(rental: AnalyticsRentalRow): SlaSignal[] {
     }
   }
 
-  // Document status
-  const docs = computeDocStatus(rental);
-  signals.push({
-    key: "docs",
-    label: "Документы",
-    value: `${docs.count}/${docs.total}`,
-    tone: docs.complete ? "good" : docs.count <= 1 ? "danger" : "warning",
-    priority: 5,
-    detail: docs.missing.length ? `Не хватает: ${docs.missing.slice(0, 2).join(", ")}${docs.missing.length > 2 ? "…" : ""}` : "Все документы загружены",
-  });
+  // FIX (F11): the documents 0/5 signal is intentionally removed.
+  // Rentals created via the /doc command already have verified documents
+  // (contract_verifier.status = verified in metadata); the photo-uploaded
+  // checklist is not relevant for this flow.
 
   return signals.sort((a, b) => b.priority - a.priority);
 }
@@ -299,16 +456,29 @@ export function toneColor(tone: Tone): string {
 
 // ── Handoff status ───────────────────────────────────────────────────────────
 
-export function getHandoffStatus(rental: AnalyticsRentalRow): { done: boolean; label: string } {
+export interface HandoffStatus {
+  done: boolean;
+  returned: boolean;
+  label: string;
+}
+
+/** FIX (F6): handoff status derived from real /doc-flow signals:
+ *  - handed out when odometer_before is recorded (or metadata.handoff_at set);
+ *  - returned when return_confirmed_at is set or status = completed. */
+export function getHandoffStatus(rental: AnalyticsRentalRow): HandoffStatus {
   const md = (rental.metadata || {}) as Record<string, unknown>;
   const handoffAt = md["handoff_at"];
-  if (typeof handoffAt === "string" && handoffAt.length > 0) {
-    return { done: true, label: "Передан" };
-  }
-  if (rental.status === "active" || rental.status === "completed") {
-    return { done: false, label: "Ожидает" };
-  }
-  return { done: false, label: "—" };
+  const odoBefore = md["odometer_before"];
+  const returnedAt = md["return_confirmed_at"];
+  const handedOut =
+    (typeof handoffAt === "string" && handoffAt.length > 0) ||
+    typeof odoBefore === "number";
+  const returned =
+    (typeof returnedAt === "string" && returnedAt.length > 0) ||
+    rental.status === "completed";
+  if (returned) return { done: true, returned: true, label: "Возвращен" };
+  if (handedOut || rental.status === "active") return { done: true, returned: false, label: "Передан" };
+  return { done: false, returned: false, label: "Ожидает" };
 }
 
 // ── Service detection ────────────────────────────────────────────────────────

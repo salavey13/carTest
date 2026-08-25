@@ -20,6 +20,8 @@ export interface CrewTodo {
   created_by: string;
   updated_at: string | null;
   completed_at: string | null;
+  /** Links the todo to a specific rental (rental analytics drawer filter). */
+  rental_id?: string | null;
   assigned_to_user?: {
     user_id: string;
     full_name: string | null;

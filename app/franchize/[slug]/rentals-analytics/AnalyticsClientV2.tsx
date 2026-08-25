@@ -2,18 +2,17 @@
 
 // /app/franchize/[slug]/rentals-analytics/AnalyticsClientV2.tsx
 //
-// Wrapper that bridges the existing v1 auth + theme + data-fetching flow
-// into the v2 AnalyticsClient component tree.
+// v2 analytics client — the ONLY UI for the rentals analytics page
+// (v1 RentalsAnalyticsClient + AnalyticsUiSwitch were removed, FIX F10).
 //
 // What it does:
-//   1. Mirrors the v1 auth flow (dbUser from AppContext + password auth fallback).
-//   2. Calls the same server actions as v1 (getRentalsDashboard / getSalesDashboard / getCrewTodos).
-//   3. Maps the v1 server-action types (RentalDashboardItem / SaleDashboardItem / CrewTodo)
+//   1. Auth flow (dbUser from AppContext + password auth fallback).
+//   2. Calls the server actions (getRentalsDashboard / getSalesDashboard / getCrewTodos)
+//      and enriches items with contract-artifact data (renter identity, deposit).
+//   3. Maps the server-action types (RentalDashboardItem / SaleDashboardItem / CrewTodo)
 //      to the v2 component types (AnalyticsRentalRow / AnalyticsSaleRow / RentalTodo).
 //   4. Builds ThemeTokens via useTheme from the analytics hooks dir.
-//   5. Renders AnalyticsClient with all props wired.
-//
-// Coexists with RentalsAnalyticsClient.tsx behind ?ui=v2 in page.tsx.
+//   5. Renders AnalyticsClient with all props wired, including CSV export (F9).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -123,6 +122,8 @@ function toAnalyticsRental(item: RentalDashboardItem): AnalyticsRentalRow {
     user: item.user
       ? { full_name: item.user.full_name, username: item.user.username }
       : null,
+    contract: item.contract ?? null,
+    operatorName: item.operatorName ?? null,
   };
 }
 
@@ -160,7 +161,7 @@ function toAnalyticsSale(item: SaleDashboardItem): AnalyticsSaleRow {
 function toRentalTodo(todo: CrewTodo): RentalTodo {
   return {
     id: todo.id,
-    rental_id: null, // CrewTodo doesn't carry rental_id in v1; we filter by category instead
+    rental_id: todo.rental_id ?? null, // linked via crew_todos.rental_id (F12)
     title: todo.title,
     status: todo.status === "in_progress" ? "in_progress" : todo.status === "done" ? "done" : "pending",
     priority: todo.priority,
@@ -336,6 +337,44 @@ export function AnalyticsClientV2({
     }
   }, [getActorUserId, crew.id, passwordAuthOwnerId]);
 
+  // ── FIX (F9): CSV export over the operator finance-sheet format ─────────
+  // GET /api/franchize/rentals-csv-export?slug=...&from=...&to=...
+  // Mirrors the v1 export flow (auth via x-telegram-user-id header) but lives
+  // in the v2 tree and is reachable from the always-visible mobile button.
+  const exportCsv = useCallback(
+    async (from: string, to: string) => {
+      const actorUserId = getActorUserId();
+      if (!actorUserId) {
+        toast.error("Не удалось определить пользователя для экспорта");
+        return;
+      }
+      try {
+        const resp = await fetch(
+          `/api/franchize/rentals-csv-export?slug=${encodeURIComponent(initialSlug.trim())}&from=${from}&to=${to}`,
+          { headers: { "x-telegram-user-id": actorUserId } },
+        );
+        if (!resp.ok) {
+          toast.error("Ошибка экспорта CSV");
+          return;
+        }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${initialSlug.trim()}-rentals-${from}-to-${to}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        toast.success("CSV скачан");
+      } catch (error) {
+        console.error("[AnalyticsV2] exportCsv:", error);
+        toast.error("Ошибка экспорта CSV");
+      }
+    },
+    [getActorUserId, initialSlug],
+  );
+
   // Initial load + refetch on date change. v1 has the same pattern
   // (lines 807-827): useEffect on [selectedDate] triggers loadRentals +
   // loadSales. We mirror that here.
@@ -387,6 +426,7 @@ export function AnalyticsClientV2({
       initialTab={initialTab}
       initialRentalId={initialRentalId}
       initialSaleId={initialSaleId}
+      onExportCsv={exportCsv}
     />
   );
 }
