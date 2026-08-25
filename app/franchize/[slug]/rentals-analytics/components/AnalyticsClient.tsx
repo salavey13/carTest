@@ -141,14 +141,38 @@ export function AnalyticsClient({
     if (!selectedRentalId) return null;
     const rental = rentals.find((r) => r.rental_id === selectedRentalId);
     if (!rental) return null;
-    // FIX (F12): todos link via crew_todos.rental_id (primary). Legacy
-    // heuristic (assignee = operator chat id) kept as fallback for old rows.
-    const rentalTodos = todos.filter(
-      (t) =>
-        t.rental_id === rental.rental_id ||
-        (t.rental_id == null &&
-          !!rental.created_by_operator_chat_id &&
-          t.assigned_to === rental.created_by_operator_chat_id),
+    // FIX (F12-iter2): todos link via crew_todos.rental_id ONLY.
+    // The iter1 fallback (t.rental_id == null && t.assigned_to ===
+    // rental.created_by_operator_chat_id) leaked todos from OTHER rentals
+    // that happened to share the same operator — e.g. Paul's other rentals
+    // "Подготовить ТС к передаче: 79BIKE Falcon Pro" or even sales todos
+    // "Проконтролировать оплату (290000 ₽)" polluted this Ducati rental's
+    // modal. Drop the fallback: a todo with no rental_id is not for THIS
+    // rental. If you want to see unlinked todos, build a separate "Inbox"
+    // view in the future.
+    const rentalTodos = todos.filter((t) => t.rental_id === rental.rental_id);
+
+    // FIX (F12-iter2b): for active/completed rentals, the /doc flow already
+    // verified passport + license + dates — so the corresponding verification
+    // todos ("Верифицировать паспорт...", "Подтвердить даты аренды",
+    // "Подтвердить начальный одометр", "Принять зарядное устройство") should
+    // appear as DONE in the modal, not as pending high-priority items.
+    // Mark them done in-place when the rental has progressed past pending.
+    const isVerifiedRental =
+      rental.status === "active" || rental.status === "completed";
+    const VERIFICATION_TODO_PATTERNS = [
+      /^Верифицировать паспорт/i,
+      /^Верифицировать водительское удостоверение/i,
+      /^Подтвердить даты аренды/i,
+      /^Подтвердить начальный одометр/i,
+      /^Принять зарядное устройство/i,
+    ];
+    const isVerificationTodo = (title: string) =>
+      VERIFICATION_TODO_PATTERNS.some((re) => re.test(title));
+    const normalizedTodos: RentalTodo[] = rentalTodos.map((t) =>
+      isVerifiedRental && t.status !== "done" && isVerificationTodo(t.title)
+        ? { ...t, status: "done" as const }
+        : t,
     );
     const md = (rental.metadata || {}) as Record<string, unknown>;
     // FIX (F5): build the handoff object whenever ANY handoff signal exists —
@@ -163,7 +187,7 @@ export function AnalyticsClient({
     const hasHandoff = !!handoffAt || odoBefore != null || odoAfter != null || !!damageNotes;
     return {
       ...rental,
-      todos: rentalTodos,
+      todos: normalizedTodos,
       notes: [],
       history: [],
       handoff: hasHandoff

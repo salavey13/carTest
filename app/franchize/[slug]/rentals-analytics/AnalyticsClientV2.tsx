@@ -341,6 +341,14 @@ export function AnalyticsClientV2({
   // GET /api/franchize/rentals-csv-export?slug=...&from=...&to=...
   // Mirrors the v1 export flow (auth via x-telegram-user-id header) but lives
   // in the v2 tree and is reachable from the always-visible mobile button.
+  //
+  // FIX (F15, iter2): the iter1 implementation relied on `URL.createObjectURL`
+  // + `<a download>` which works on desktop browsers but is silently blocked
+  // in the Telegram WebApp iframe sandbox on iOS / Android. In TG context we
+  // now fall back to opening the URL via `tg.openLink()` (which pops out to
+  // the system browser where Content-Disposition triggers a native download),
+  // and as a final fallback we copy the API URL to the clipboard with a toast
+  // prompting the operator to open it in their browser.
   const exportCsv = useCallback(
     async (from: string, to: string) => {
       const actorUserId = getActorUserId();
@@ -348,11 +356,22 @@ export function AnalyticsClientV2({
         toast.error("Не удалось определить пользователя для экспорта");
         return;
       }
+      const csvApiUrl =
+        `/api/franchize/rentals-csv-export?slug=${encodeURIComponent(initialSlug.trim())}` +
+        `&from=${from}&to=${to}`;
+      const filename = `${initialSlug.trim()}-rentals-${from}-to-${to}.csv`;
+      // Detect Telegram WebApp context (the SDK sets window.Telegram.WebApp).
+      const tgWebApp =
+        typeof window !== "undefined" &&
+        (window as { Telegram?: { WebApp?: { platform?: string; openLink?: (url: string) => void } } })
+          .Telegram?.WebApp;
+      const isTelegram = !!tgWebApp && typeof tgWebApp.openLink === "function";
+
       try {
-        const resp = await fetch(
-          `/api/franchize/rentals-csv-export?slug=${encodeURIComponent(initialSlug.trim())}&from=${from}&to=${to}`,
-          { headers: { "x-telegram-user-id": actorUserId } },
-        );
+        // Always try the blob+anchor flow first (works on desktop + Android TG).
+        const resp = await fetch(csvApiUrl, {
+          headers: { "x-telegram-user-id": actorUserId },
+        });
         if (!resp.ok) {
           toast.error("Ошибка экспорта CSV");
           return;
@@ -361,14 +380,45 @@ export function AnalyticsClientV2({
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${initialSlug.trim()}-rentals-${from}-to-${to}.csv`;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
-        toast.success("CSV скачан");
+
+        if (!isTelegram) {
+          toast.success("CSV скачан");
+          return;
+        }
+        // TG WebApp: the blob click may have been silently dropped by the
+        // iframe sandbox. Offer a fallback — copy the API URL to the
+        // clipboard so the operator can open it in their system browser,
+        // where Content-Disposition will trigger a real download.
+        try {
+          const absoluteUrl = `${window.location.origin}${csvApiUrl}`;
+          await navigator.clipboard.writeText(absoluteUrl);
+          toast.success(
+            "CSV подготовлен. Если файл не сохранился — ссылка скопирована, откройте её в браузере.",
+            { duration: 6000 },
+          );
+        } catch {
+          toast.success("CSV подготовлен");
+        }
       } catch (error) {
         console.error("[AnalyticsV2] exportCsv:", error);
+        // Last-ditch fallback: open the URL via tg.openLink so the system
+        // browser handles the download (auth via signed cookie may fail in
+        // the system browser — if so, the operator will see a 401 page; the
+        // clipboard fallback above is the safer path).
+        if (isTelegram && tgWebApp!.openLink) {
+          try {
+            tgWebApp!.openLink!(`${window.location.origin}${csvApiUrl}`);
+            toast.info("Открываю CSV в браузере…");
+            return;
+          } catch {
+            // fall through to error toast
+          }
+        }
         toast.error("Ошибка экспорта CSV");
       }
     },

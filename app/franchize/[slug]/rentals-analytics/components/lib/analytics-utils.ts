@@ -270,12 +270,30 @@ const EQUIPMENT_LABELS: Record<string, string> = {
   charger: "зарядка",
 };
 
+export interface EquipmentItem {
+  key: string;
+  label: string;
+  qty: number;
+  /** Unit price in ₽. Charger is 0 (freebie bundled with the bike). */
+  unitPrice: number;
+  /** True when the item is a freebie (charger) — UI shows "бесплатно". */
+  free: boolean;
+}
+
+// Operator price list (mirrors the CSV export pricing rule).
+// FIX (F2-iter2): charger is a freebie — bundled with the bike, never
+// itemised in the equipment cost. Helmet 1000₽, soft gear 500₽ each.
+const UNIT_PRICES: Record<string, number> = {
+  helmets: 1000, gloves: 500, jacket: 500, pants: 500,
+  boots: 500, net: 500, bag: 500, backpack: 500, charger: 0,
+};
+
 export interface EquipmentSummary {
   /** Human-readable list, e.g. "2 шлема, перчатки" */
   text: string;
   /** Estimated equipment cost part of the total (₽), using operator prices. */
   cost: number;
-  items: Array<{ key: string; label: string; qty: number }>;
+  items: EquipmentItem[];
 }
 
 /** Parse metadata.equipment into a readable list with quantities.
@@ -283,22 +301,19 @@ export interface EquipmentSummary {
 export function getEquipmentSummary(rental: AnalyticsRentalRow): EquipmentSummary {
   const md = (rental.metadata || {}) as Record<string, unknown>;
   const eq = md["equipment"];
-  const items: Array<{ key: string; label: string; qty: number }> = [];
+  const items: EquipmentItem[] = [];
   if (eq && typeof eq === "object") {
     for (const [key, value] of Object.entries(eq as Record<string, unknown>)) {
+      const unitPrice = UNIT_PRICES[key] ?? 500;
+      const free = unitPrice === 0;
       if (typeof value === "number" && value > 0) {
-        items.push({ key, label: EQUIPMENT_LABELS[key] || key, qty: value });
+        items.push({ key, label: EQUIPMENT_LABELS[key] || key, qty: value, unitPrice, free });
       } else if (value === true) {
-        items.push({ key, label: EQUIPMENT_LABELS[key] || key, qty: 1 });
+        items.push({ key, label: EQUIPMENT_LABELS[key] || key, qty: 1, unitPrice, free });
       }
     }
   }
-  // Operator price list (mirrors the CSV export pricing rule)
-  const UNIT_PRICES: Record<string, number> = {
-    helmets: 1000, gloves: 500, jacket: 500, pants: 500,
-    boots: 500, net: 500, bag: 500, backpack: 500, charger: 500,
-  };
-  const cost = items.reduce((sum, it) => sum + (UNIT_PRICES[it.key] || 500) * it.qty, 0);
+  const cost = items.reduce((sum, it) => sum + it.unitPrice * it.qty, 0);
 
   const parts = items.map((it) => {
     if (it.qty > 1) {

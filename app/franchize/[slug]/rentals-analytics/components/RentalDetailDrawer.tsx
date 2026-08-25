@@ -24,7 +24,7 @@
 // Mobile: rendered inside AnalyticsMobileSheet (slide-up, 88vh).
 // Desktop: right-side panel (max-w-[640px]) — backdrop handled by parent.
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -82,6 +82,33 @@ interface RentalDetailDrawerProps {
 
 type TodoFilter = "all" | "mine" | "overdue";
 
+// FIX (F13): lightweight shape of the /api/franchize/deposit-summary response
+// — only the fields we read for the info grid tile + DepositSection fallback.
+interface DepositSummaryDestination {
+  destination: string; // 'cash' | 'tbank' | 'sber'
+  collected: number;
+  returned: number;
+  penalty: number;
+  net: number;
+}
+interface DepositSummaryLite {
+  totalCollected: number;
+  totalReturned: number;
+  totalPenalty: number;
+  balance: number;
+  destinations: DepositSummaryDestination[];
+  entries: Array<{
+    id: string;
+    entry_type: string;
+    amount: number;
+    direction: string;
+    destination: string;
+    operator_chat_id: string | null;
+    notes: string | null;
+    created_at: string;
+  }>;
+}
+
 export function RentalDetailDrawer({
   rental,
   onClose,
@@ -97,6 +124,25 @@ export function RentalDetailDrawer({
   const [openDeposit, setOpenDeposit] = useState(true);
   const [openNotes, setOpenNotes] = useState(true);
   const [openHistory, setOpenHistory] = useState(false);
+
+  // FIX (F13): lift the deposit_entries summary into the drawer state so the
+  // info grid tile (not just the DepositSection) can show the destination
+  // card ("T-Банк" / "Сбербанк" / "Наличные") instead of the misleading
+  // "способ не указан". This is a read-only fetch — the DepositSection still
+  // owns the write-back (penalty withholding etc).
+  const [depositSummary, setDepositSummary] = useState<DepositSummaryLite | null>(null);
+  const loadDepositSummary = useCallback(async () => {
+    try {
+      const resp = await fetch(`/api/franchize/deposit-summary?rentalId=${rental.rental_id}`);
+      if (resp.ok) {
+        const data = (await resp.json()) as DepositSummaryLite;
+        setDepositSummary(data);
+      }
+    } catch {
+      // silent — falls back to metadata deposit
+    }
+  }, [rental.rental_id]);
+  useEffect(() => { void loadDepositSummary(); }, [loadDepositSummary]);
 
   const statusMeta = getRentalStatusMeta(rental.status);
   const bikeTitle = getRentalBikeTitle(rental);
@@ -116,6 +162,34 @@ export function RentalDetailDrawer({
   const handoff = rental.handoff;
   // FIX (F6): real handoff status — Передан / Возвращен / Ожидает
   const handoffStatus = getHandoffStatus(rental);
+
+  // FIX (F13): resolve the deposit destination label (CARD1 T-Банк / CARD2
+  // Сбербанк / Наличные) for the info grid tile. Prefer deposit_entries
+  // (authoritative, set by the operator at handout), fall back to metadata
+  // method, then to the contract's deposit_rub string.
+  const depositDestinations = depositSummary?.destinations ?? [];
+  const depositHasEntries = (depositSummary?.totalCollected ?? 0) > 0;
+  const depositDestinationLabel = (() => {
+    if (depositHasEntries && depositDestinations.length > 0) {
+      const parts = depositDestinations.map((d) => {
+        if (d.destination === "tbank") return "T-Банк";
+        if (d.destination === "sber") return "Сбербанк";
+        if (d.destination === "cash") return "Наличные";
+        return d.destination;
+      });
+      return parts.join(" + ");
+    }
+    // Fallback to metadata method label (already Russian-friendly)
+    return deposit.methodLabel;
+  })();
+  const depositReturnedFromEntries = (() => {
+    if (!depositHasEntries) return deposit.returned;
+    const totalReturned = depositSummary?.totalReturned ?? 0;
+    const totalCollected = depositSummary?.totalCollected ?? 0;
+    if (totalReturned === 0 && totalCollected > 0) return false;
+    if (totalReturned >= totalCollected) return true;
+    return null; // partial — neither fully returned nor fully held
+  })();
 
   // Primary actions (Section 2)
   const primaryActions: PrimaryAction[] = [
@@ -141,12 +215,13 @@ export function RentalDetailDrawer({
     equipment.text
       ? { label: "Экипировка",     value: equipment.cost > 0 ? `${equipment.text} (${formatRubles(equipment.cost)})` : equipment.text }
       : { label: "Экипировка",     value: "не включена" },
-    // FIX (F3): deposit amount + method + return status
+    // FIX (F3 + F13): deposit amount + destination card (T-Банк / Сбер / нал)
+    // + return status. Prefer deposit_entries data; fall back to metadata.
     {
       label: "Депозит",
       value:
         deposit.amount != null && deposit.amount > 0
-          ? `${formatRubles(deposit.amount)}${deposit.methodLabel ? ` · ${deposit.methodLabel}` : ""}${deposit.returned === true ? " · возвращен" : deposit.returned === false ? " · у держателя" : ""}`
+          ? `${formatRubles(deposit.amount)}${depositDestinationLabel ? ` · ${depositDestinationLabel}` : ""}${depositReturnedFromEntries === true ? " · возвращен" : depositReturnedFromEntries === false ? " · у держателя" : ""}`
           : "не записан",
     },
     { label: "Оператор",        value: rental.operatorName || "—" },
@@ -390,7 +465,8 @@ export function RentalDetailDrawer({
           </div>
 
           {/* FIX (F4): equipment included in this rent — readable list with
-              quantities + estimated cost part, from metadata.equipment */}
+              quantities + estimated cost part, from metadata.equipment.
+              FIX (F2-iter2): charger shows "бесплатно" because it's free. */}
           {equipment.items.length > 0 && (
             <div className="mt-2 space-y-1">
               <p className="text-[10px] uppercase tracking-wider" style={{ color: T.textFaint }}>
@@ -406,7 +482,16 @@ export function RentalDetailDrawer({
                     {it.label}
                     {it.qty > 1 ? ` × ${it.qty}` : ""}
                   </span>
-                  <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#22c55e" }} aria-hidden />
+                  {it.free ? (
+                    <span
+                      className="rounded-full px-1.5 py-0.5 text-[9px] font-medium"
+                      style={{ backgroundColor: "#22c55e15", color: "#22c55e" }}
+                    >
+                      бесплатно
+                    </span>
+                  ) : (
+                    <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#22c55e" }} aria-hidden />
+                  )}
                 </div>
               ))}
             </div>
@@ -457,6 +542,7 @@ export function RentalDetailDrawer({
           expanded={openDeposit}
           onToggle={() => setOpenDeposit(!openDeposit)}
           metadataDeposit={deposit}
+          initialSummary={depositSummary}
         />
       </div>
 

@@ -541,15 +541,23 @@ export async function getRentalsDashboard(input: {
         contract: contractByRentalId.get(item.rental_id) ?? null,
       }));
 
-      // ── FIX (F11): resolve operator display names ────────────────────────
-      // Map created_by_operator_chat_id (+ artifact operator ids) to a
-      // human-readable username from public.users, so the drawer shows
-      // "@salavey13" instead of a raw Telegram chat id.
+      // ── FIX (F11-iter2): resolve operator display names ────────────────────
+      // BUG (iter1): we preferred rentals.created_by_operator_chat_id over
+      // contract.created_by_operator_chat_id. For rentals where the renter
+      // has claimed via QR, the migration 20260720120100 backfilled
+      // rentals.created_by_operator_chat_id to owner_id (crew owner) as a
+      // last-resort best-effort — so the drawer showed "@I_O_S_NN" (Ilya,
+      // crew owner) instead of "Paul" who actually ran /doc-manual.
+      //
+      // FIX (iter2): prefer the ARTIFACT's created_by_operator_chat_id — it
+      // was sourced from telegram_chat_id at creation time (the operator who
+      // uploaded the doc) and is preserved across QR claims (see
+      // propagate_claim() in 20260720120100_add_operator_chat_id.sql).
       const operatorIds = new Set<string>();
       for (const item of items) {
         const ids = [
-          item.created_by_operator_chat_id,
           item.contract?.created_by_operator_chat_id,
+          item.created_by_operator_chat_id,
         ].filter((v): v is string => typeof v === "string" && v.length > 0);
         for (const id of ids) operatorIds.add(id);
       }
@@ -567,8 +575,8 @@ export async function getRentalsDashboard(input: {
       items = items.map(item => ({
         ...item,
         operatorName:
-          operatorNameById.get(item.created_by_operator_chat_id || "") ??
           operatorNameById.get(item.contract?.created_by_operator_chat_id || "") ??
+          operatorNameById.get(item.created_by_operator_chat_id || "") ??
           null,
       }));
     }

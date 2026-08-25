@@ -41,6 +41,10 @@ interface DepositSectionProps {
     methodLabel: string | null;
     returned: boolean | null;
   } | null;
+  /** FIX (F13): if the parent (RentalDetailDrawer) already fetched the
+   *  deposit summary, accept it as the initial value to avoid a second
+   *  network request. The component still owns the live refetch logic. */
+  initialSummary?: DepositSummary | null;
 }
 
 const DEST_META: Record<string, { label: string; icon: string; color: string }> = {
@@ -67,9 +71,11 @@ const ENTRY_LABELS: Record<string, string> = {
  * Fetches from /api/franchize/deposit-summary?rentalId=<id>
  * Penalty POST to /api/franchize/deposit-penalty
  */
-export function DepositSection({ rentalId, rentalStatus, T, expanded, onToggle, metadataDeposit }: DepositSectionProps) {
-  const [summary, setSummary] = useState<DepositSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+export function DepositSection({ rentalId, rentalStatus, T, expanded, onToggle, metadataDeposit, initialSummary }: DepositSectionProps) {
+  // FIX (F13): seed with the parent's initial summary (if any) so we don't
+  // show a loading flash when the drawer already has the data.
+  const [summary, setSummary] = useState<DepositSummary | null>(initialSummary ?? null);
+  const [loading, setLoading] = useState(!initialSummary);
   const [showPenaltyUI, setShowPenaltyUI] = useState(false);
   const [penaltyAmount, setPenaltyAmount] = useState("");
   const [penaltyDest, setPenaltyDest] = useState("cash");
@@ -91,7 +97,15 @@ export function DepositSection({ rentalId, rentalStatus, T, expanded, onToggle, 
     }
   }, [rentalId]);
 
-  useEffect(() => { loadDeposit(); }, [loadDeposit]);
+  useEffect(() => {
+    // If the parent already gave us a summary, skip the initial fetch but
+    // still allow a manual refresh via the loadDeposit callback.
+    if (initialSummary) {
+      setLoading(false);
+      return;
+    }
+    void loadDeposit();
+  }, [loadDeposit, initialSummary]);
 
   const handlePenalty = async () => {
     const amount = parseFloat(penaltyAmount.replace(/\D/g, ""));

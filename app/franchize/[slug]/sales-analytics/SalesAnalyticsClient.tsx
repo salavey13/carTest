@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Tag, Mail, User, Bike, Shield, Calendar, RefreshCw } from "lucide-react";
+import { Tag, Mail, User, Bike, Shield, Calendar, RefreshCw, Download } from "lucide-react";
 
 import { useAppContext } from "@/contexts/AppContext";
 import {
@@ -18,6 +18,10 @@ import { AnalyticsPasswordEntry } from "../rentals-analytics/analytics-component
 import { AnalyticsDateNav } from "../rentals-analytics/analytics-components/AnalyticsDateNav";
 import { AnalyticsCrossNav } from "../rentals-analytics/analytics-components/AnalyticsCrossNav";
 import { AnalyticsLoading } from "../rentals-analytics/analytics-components/AnalyticsLoading";
+// FIX (F16): reuse the rentals analytics ExportCsvModal — it's just a
+// date-range picker + Download button, agnostic to the export subject.
+import { ExportCsvModal } from "../rentals-analytics/components/ExportCsvModal";
+import type { ThemeTokens } from "../rentals-analytics/hooks/useTheme";
 
 interface SalesAnalyticsClientProps {
   initialSlug: string;
@@ -35,6 +39,8 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [passwordAuthOwnerId, setPasswordAuthOwnerId] = useState<string | null>(null);
+  // FIX (F16): CSV export modal state — mirrors the rentals-analytics pattern.
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
 
   const getActorUserId = useCallback((): string | null => dbUser?.user_id || passwordAuthOwnerId, [dbUser?.user_id, passwordAuthOwnerId]);
 
@@ -65,6 +71,95 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
   const textSecondary = "var(--franchize-text-secondary)";
   const borderSoft = "var(--franchize-border-soft)";
 
+  // FIX (F16): build a ThemeTokens-compatible object so we can reuse the
+  // rentals analytics ExportCsvModal (which expects T.* fields).
+  const T: ThemeTokens = {
+    text: textPrimary,
+    textMuted: textSecondary,
+    textFaint: `color-mix(in srgb, ${textSecondary} 65%, transparent)`,
+    bg: bgBase,
+    bgCard,
+    bgCardHover: `color-mix(in srgb, ${accentMain} 6%, transparent)`,
+    bgElevated: bgCard,
+    border: `color-mix(in srgb, ${borderSoft} 45%, transparent)`,
+    borderSoft: `color-mix(in srgb, ${borderSoft} 25%, transparent)`,
+    borderActive: accentMain,
+    inputBg: bgBase,
+    inputBorder: borderSoft,
+    shadow: "0 10px 30px rgba(0,0,0,0.25)",
+    accent: accentMain,
+    accentContrast: "#ffffff",
+  };
+
+  // FIX (F16): sales CSV export — mirrors the rentals handler but hits the
+  // /api/franchize/sales-csv-export endpoint. Includes the same Telegram
+  // WebApp fallback path as the rentals version (F15).
+  const exportSalesCsv = useCallback(
+    async (from: string, to: string) => {
+      const actorUserId = getActorUserId();
+      if (!actorUserId) {
+        toast.error("Не удалось определить пользователя для экспорта");
+        return;
+      }
+      const csvApiUrl =
+        `/api/franchize/sales-csv-export?slug=${encodeURIComponent(initialSlug.trim())}` +
+        `&from=${from}&to=${to}`;
+      const filename = `${initialSlug.trim()}-sales-${from}-to-${to}.csv`;
+      const tgWebApp =
+        typeof window !== "undefined" &&
+        (window as { Telegram?: { WebApp?: { platform?: string; openLink?: (url: string) => void } } })
+          .Telegram?.WebApp;
+      const isTelegram = !!tgWebApp && typeof tgWebApp.openLink === "function";
+
+      try {
+        const resp = await fetch(csvApiUrl, {
+          headers: { "x-telegram-user-id": actorUserId },
+        });
+        if (!resp.ok) {
+          toast.error("Ошибка экспорта CSV");
+          return;
+        }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+
+        if (!isTelegram) {
+          toast.success("CSV скачан");
+          return;
+        }
+        try {
+          const absoluteUrl = `${window.location.origin}${csvApiUrl}`;
+          await navigator.clipboard.writeText(absoluteUrl);
+          toast.success(
+            "CSV подготовлен. Если файл не сохранился — ссылка скопирована, откройте её в браузере.",
+            { duration: 6000 },
+          );
+        } catch {
+          toast.success("CSV подготовлен");
+        }
+      } catch (error) {
+        console.error("[SalesAnalytics] exportSalesCsv:", error);
+        if (isTelegram && tgWebApp!.openLink) {
+          try {
+            tgWebApp!.openLink!(`${window.location.origin}${csvApiUrl}`);
+            toast.info("Открываю CSV в браузере…");
+            return;
+          } catch {
+            // fall through
+          }
+        }
+        toast.error("Ошибка экспорта CSV");
+      }
+    },
+    [getActorUserId, initialSlug],
+  );
+
   if (authLoading) return <AnalyticsLoading accentMain={accentMain} bgBase={bgBase} />;
   if (!dbUser && !passwordAuthOwnerId) return <AnalyticsPasswordEntry crewName={crew.name} slug={initialSlug} onAuthenticated={setPasswordAuthOwnerId} />;
 
@@ -78,10 +173,36 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
 
       <div className="flex items-center justify-between gap-2 flex-wrap p-3 rounded-xl border" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft }}>
         <AnalyticsDateNav selectedDate={selectedDate} onDateChange={setSelectedDate} accentMain={accentMain} bgCard={bgCard} borderSoft={borderSoft} textPrimary={textPrimary} textSecondary={textSecondary} />
-        <button onClick={() => void loadSales(selectedDate, true)} disabled={refreshing} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold disabled:opacity-50" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft, color: textSecondary }}>
-          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} /> Обновить
-        </button>
+        <div className="flex items-center gap-2">
+          {/* FIX (F16): CSV export button for sales — same look as rentals. */}
+          <button
+            type="button"
+            onClick={() => setCsvModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-bold transition focus:outline-none focus-visible:ring-2"
+            style={{
+              borderColor: withAlpha("#3b82f6", 0.3),
+              backgroundColor: withAlpha("#3b82f6", 0.08),
+              color: "#60a5fa",
+              minHeight: "36px",
+            }}
+            aria-label="Экспорт продаж в CSV за период"
+          >
+            <Download className="w-3.5 h-3.5" aria-hidden />
+            Экспорт CSV
+          </button>
+          <button onClick={() => void loadSales(selectedDate, true)} disabled={refreshing} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold disabled:opacity-50" style={{ backgroundColor: withAlpha(bgCard, 0.5), borderColor: borderSoft, color: textSecondary }}>
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} /> Обновить
+          </button>
+        </div>
       </div>
+
+      {/* CSV export modal (date range picker — reuses rentals component) */}
+      <ExportCsvModal
+        isOpen={csvModalOpen}
+        onClose={() => setCsvModalOpen(false)}
+        onExport={exportSalesCsv}
+        T={T}
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label="Всего продаж" value={String(totalCount)} icon={<Tag className="w-4 h-4" />} accentMain={accentMain} bgCard={bgCard} borderSoft={borderSoft} textPrimary={textPrimary} textSecondary={textSecondary} />

@@ -124,7 +124,9 @@ export async function GET(request: NextRequest) {
 
       const price = r.total_cost || 0;
 
-      // Equipment (FIX F4): readable shorthand + estimated cost part
+      // Equipment (FIX F4): readable shorthand + estimated cost part.
+      // FIX (F2-iter2): charger is free (0₽) — appended to the list with a
+      // "free" marker but does NOT inflate equipCost.
       const eq = meta.equipment || {};
       let equipCost = 0;
       const equipParts: string[] = [];
@@ -135,6 +137,7 @@ export async function GET(request: NextRequest) {
       if (eq.boots) { equipCost += 500; equipParts.push("бот"); }
       if (eq.net) { equipCost += 500; equipParts.push("сет"); }
       if (eq.backpack) { equipCost += 500; equipParts.push("рюк"); }
+      if (eq.charger) { equipParts.push("заряд↔"); /* freebie, no cost */ }
       const equipStr = equipParts.length > 0 ? `${equipParts.join("+")} (${equipCost})` : "";
 
       // Deposit (FIX F3): metadata.deposit_amount with method label
@@ -204,6 +207,7 @@ export async function GET(request: NextRequest) {
       if (eq.boots) c += 500;
       if (eq.net) c += 500;
       if (eq.backpack) c += 500;
+      // charger is free — not counted in equip cost
       return sum + c;
     }, 0);
     const totalDeposit = (rentals || []).reduce((sum, r) => sum + Number((r as any).metadata?.deposit_amount || 0), 0);
