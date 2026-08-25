@@ -10,6 +10,7 @@ import {
   type SaleDashboardItem,
   type SalesDashboardResult,
 } from "@/app/franchize/server-actions/rentals-dashboard";
+import { sendAnalyticsCsvToTelegram } from "@/app/franchize/server-actions/analytics-csv-send";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { withAlpha } from "@/app/franchize/lib/theme";
 import { formatRubles, formatRussianDate, formatRussianDateOnly } from "../rentals-analytics/analytics-utils";
@@ -180,6 +181,45 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
     [getActorUserId, buildSalesCsvApiUrl, initialSlug],
   );
 
+  // FIX (iter4): send the sales CSV to the operator's Telegram chat via the bot.
+  const sendSalesCsvToTelegram = useCallback(
+    async (from: string, to: string) => {
+      const actorUserId = getActorUserId();
+      if (!actorUserId) {
+        toast.error("Не удалось определить пользователя для отправки");
+        return;
+      }
+      try {
+        const result = await sendAnalyticsCsvToTelegram({
+          slug: initialSlug.trim(),
+          from,
+          to,
+          actorUserId,
+          variant: "sales",
+          format: "csv",
+        });
+        if (!result.success) {
+          toast.error(result.error || "Не удалось отправить CSV в Telegram");
+          return;
+        }
+        const s = result.summary;
+        if (s) {
+          toast.success(
+            `Отправлено в Telegram: ${s.sales ?? 0} продаж, ` +
+            `${s.totalRevenue.toLocaleString("ru-RU")} ₽`,
+            { duration: 5000 },
+          );
+        } else {
+          toast.success("CSV отправлен в Telegram");
+        }
+      } catch (err) {
+        console.error("[SalesAnalytics] sendSalesCsvToTelegram:", err);
+        toast.error("Ошибка отправки в Telegram");
+      }
+    },
+    [getActorUserId, initialSlug],
+  );
+
   if (authLoading) return <AnalyticsLoading accentMain={accentMain} bgBase={bgBase} />;
   if (!dbUser && !passwordAuthOwnerId) return <AnalyticsPasswordEntry crewName={crew.name} slug={initialSlug} onAuthenticated={setPasswordAuthOwnerId} />;
 
@@ -219,11 +259,12 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
       </div>
 
       {/* CSV table-view modal (date range picker + huge horizontally-
-          scrollable table + download icon button to actually save the CSV). */}
+          scrollable table + download icon button + send-to-Telegram button). */}
       <ExportCsvModal
         isOpen={csvModalOpen}
         onClose={() => setCsvModalOpen(false)}
         onExport={exportSalesCsv}
+        onSendTelegram={sendSalesCsvToTelegram}
         fetchCsvText={fetchSalesCsvText}
         variant="sales"
         T={T}

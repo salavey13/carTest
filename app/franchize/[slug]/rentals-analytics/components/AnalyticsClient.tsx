@@ -58,6 +58,8 @@ interface AnalyticsClientProps {
   onExportCsv?: (from: string, to: string) => Promise<void>;
   /** FIX (F9 iter3): fetcher that returns CSV text for the in-modal table view. */
   onFetchCsvText?: (from: string, to: string) => Promise<string>;
+  /** FIX (iter4): send the CSV to the operator's Telegram chat via the bot. */
+  onSendCsvToTelegram?: (from: string, to: string) => Promise<void>;
 }
 
 export function AnalyticsClient({
@@ -77,6 +79,7 @@ export function AnalyticsClient({
   initialSaleId,
   onExportCsv,
   onFetchCsvText,
+  onSendCsvToTelegram,
 }: AnalyticsClientProps) {
   const router = useRouter();
   // Date state: controlled (when parent passes `date` + `onDateChange`) or
@@ -280,12 +283,14 @@ export function AnalyticsClient({
       )}
 
       {/* CSV table-view modal — date pickers + huge horizontally-scrollable
-          table + download-icon button to actually save the CSV file. */}
+          table + download-icon button to actually save the CSV file + send
+          icon button to send it via the bot to the operator's TG chat. */}
       {onExportCsv && (
         <ExportCsvModal
           isOpen={csvModalOpen}
           onClose={() => setCsvModalOpen(false)}
           onExport={onExportCsv}
+          onSendTelegram={onSendCsvToTelegram}
           fetchCsvText={onFetchCsvText}
           variant="rentals"
           T={T}

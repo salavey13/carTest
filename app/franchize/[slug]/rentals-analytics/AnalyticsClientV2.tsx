@@ -30,6 +30,7 @@ import {
 } from "@/app/franchize/server-actions/crew-todos";
 import { AnalyticsPasswordEntry } from "@/app/franchize/components/AnalyticsPasswordEntry";
 import { AnalyticsLoading } from "@/app/franchize/components/AnalyticsLoading";
+import { sendAnalyticsCsvToTelegram } from "@/app/franchize/server-actions/analytics-csv-send";
 
 // Local v2 tree — ../components/* relative to this file (which sits in
 // rentals-analytics/ root, next to RentalsAnalyticsClient.tsx).
@@ -447,6 +448,49 @@ export function AnalyticsClientV2({
     [getActorUserId, buildCsvApiUrl, initialSlug],
   );
 
+  // ── FIX (iter4): send the same CSV to the operator's Telegram chat ──────
+  // via the bot. Uses the sendAnalyticsCsvToTelegram server-action which:
+  //   • builds the CSV server-side (no client-side blob)
+  //   • calls sendTelegramDocument(actorUserId, csvBuffer, filename)
+  //   • returns a toast-friendly summary
+  const sendCsvToTelegram = useCallback(
+    async (from: string, to: string) => {
+      const actorUserId = getActorUserId();
+      if (!actorUserId) {
+        toast.error("Не удалось определить пользователя для отправки");
+        return;
+      }
+      try {
+        const result = await sendAnalyticsCsvToTelegram({
+          slug: initialSlug.trim(),
+          from,
+          to,
+          actorUserId,
+          variant: "rentals",
+          format: "csv",
+        });
+        if (!result.success) {
+          toast.error(result.error || "Не удалось отправить CSV в Telegram");
+          return;
+        }
+        const s = result.summary;
+        if (s) {
+          toast.success(
+            `Отправлено в Telegram: ${s.rentals ?? 0} аренд, ` +
+            `${s.totalRevenue.toLocaleString("ru-RU")} ₽`,
+            { duration: 5000 },
+          );
+        } else {
+          toast.success("CSV отправлен в Telegram");
+        }
+      } catch (err) {
+        console.error("[AnalyticsV2] sendCsvToTelegram:", err);
+        toast.error("Ошибка отправки в Telegram");
+      }
+    },
+    [getActorUserId, initialSlug],
+  );
+
   // Initial load + refetch on date change. v1 has the same pattern
   // (lines 807-827): useEffect on [selectedDate] triggers loadRentals +
   // loadSales. We mirror that here.
@@ -500,6 +544,7 @@ export function AnalyticsClientV2({
       initialSaleId={initialSaleId}
       onExportCsv={exportCsv}
       onFetchCsvText={fetchCsvText}
+      onSendCsvToTelegram={sendCsvToTelegram}
     />
   );
 }
