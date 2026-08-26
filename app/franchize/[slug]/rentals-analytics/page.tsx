@@ -17,6 +17,7 @@ import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { crewPaletteForSurface } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 import { AnalyticsClientV2 } from "./AnalyticsClientV2";
+import { AchievementExplorer } from "../../components/AchievementExplorer";
 
 interface FranchizeSlugRentalsAnalyticsPageProps {
   params: Promise<{ slug: string }>;
@@ -56,6 +57,7 @@ export default async function FranchizeSlugRentalsAnalyticsPage({
 
   return (
     <main className="min-h-screen" style={surface.page}>
+      <AchievementExplorer slug={crew.slug || slug} achievementId="explorer_analytics" />
       <CrewHeader
         crew={crew}
         activePath={activePath}

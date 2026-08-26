@@ -7,6 +7,7 @@ import { FranchizePageShell } from "../../components/FranchizePageShell";
 import { getFranchizeBySlug } from "../../actions";
 import { crewPaletteForSurface } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
+import { AchievementExplorer } from "../../components/AchievementExplorer";
 
 interface FranchizeSlugDashboardPageProps {
   params: Promise<{ slug: string }>;
@@ -35,6 +36,7 @@ export default async function FranchizeSlugDashboardPage({
 
   return (
     <main className="min-h-screen" style={surface.page}>
+      <AchievementExplorer slug={crew.slug || slug} achievementId="explorer_dashboard" />
       <CrewHeader
         crew={crew}
         activePath={activePath}

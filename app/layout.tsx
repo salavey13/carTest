@@ -85,6 +85,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `(function(){try{var d=document.documentElement;var stored=localStorage.getItem("theme");var resolved=stored&&stored!=="system"?stored:(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");d.classList.remove("light","dark");d.classList.add(resolved);d.style.colorScheme=resolved;}catch(e){}})();`,
           }}
         />
+        {/* crypto.randomUUID polyfill — runs before hydration.
+            Older iOS Safari (<15.4), some Android WebViews and non-secure
+            contexts lack crypto.randomUUID, which crashed the crew header and
+            catalog ("crypto.randomUUID is not a function") because
+            useFranchizeCart calls it during mount. RFC4122 v4 via Math.random
+            is sufficient for client-side id generation (carts, temp ids). */}
+        <Script
+          id="crypto-randomuuid-polyfill"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var c=window.crypto;if(c&&typeof c.randomUUID==="function")return;var uuid=function(){var h="";for(var i=0;i<32;i++){h+=((Math.random()*16)|0).toString(16);}return h.slice(0,8)+"-"+h.slice(8,12)+"-4"+h.slice(13,16)+"-"+((8+(Math.random()*4|0)).toString(16))+h.slice(17,20)+"-"+h.slice(20,32);};var shim={randomUUID:uuid};if(c){try{Object.defineProperty(c,"randomUUID",{value:uuid,configurable:true,writable:true});}catch(e){c.randomUUID=uuid;}}else{window.crypto=shim;}}catch(e){}})();`,
+          }}
+        />
         <Script
           id="telegram-webapp-script"
           src="https://telegram.org/js/telegram-web-app.js"

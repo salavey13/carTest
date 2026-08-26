@@ -252,7 +252,15 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   };
 
   const isCartEmpty = cartLines.length === 0;
-  const saleLinesCount = useMemo(() => cartLines.filter((line) => line.saleAvailable).length, [cartLines]);
+  // FIX (2026-08-27, "stuck at order stage"): flowType MUST be derived from the
+  // per-line flow (line.flowType === "sale" — only set when the user actually
+  // picked the BUY flow for that line), NOT from `line.saleAvailable`.
+  // `saleAvailable` merely marks that the bike is ALSO listed for sale
+  // (specs.sale === true) — renting a sale-listed bike used to flip the whole
+  // order into flowType "sale", so the server skipped rental-row creation,
+  // sent a "Новый заказ на покупку" notification and created a sale lead
+  // without any rental link. flowType now follows the actual intent.
+  const saleLinesCount = useMemo(() => cartLines.filter((line) => line.flowType === "sale").length, [cartLines]);
   const testdriveLinesCount = useMemo(() => cartLines.filter((line) => (line.options as any).action === "testdrive").length, [cartLines]);
   const serviceLinesCount = useMemo(() => cartLines.filter((line) => line.flowType === "service").length, [cartLines]);
   const flowType: "rental" | "sale" | "mixed" | "testdrive" | "service" = testdriveLinesCount > 0 && testdriveLinesCount === cartLines.length

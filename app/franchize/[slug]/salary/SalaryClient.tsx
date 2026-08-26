@@ -190,7 +190,8 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
         setPlans(formattedPlans);
       } catch (err) {
         console.error("Failed to load salary data:", err);
-        setError("Не удалось загрузить данные зарплаты");
+        // Surface the ACTUAL error alongside the generic message (owner request).
+        setError(`Не удалось загрузить данные зарплаты — ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         setIsLoading(false);
       }

@@ -238,6 +238,55 @@ END AS availability
 
 --
 
+
+### 1.13 Operations & Ownership Keys (salary / subrenter / odometer) 🆕
+
+These keys live in `specs` JSONB but are **operational**, NOT user-facing compare specs — do NOT add them to `spec_labels`. They drive salary bonuses, partner (subrent) access and rental handoff UX. **Every new bike in the catalog SHOULD carry them** so it works in salary calculations and partner flows from day one.
+
+#### `salary` — salary/bonus classification (written by `scripts/apply-salary-specs.mjs`)
+
+```json
+{
+  "salary": {
+    "tier": "premium",                  // "budget" (<7000 RUB/day) | "regular" (>=7000) | "premium" (>=14000)
+    "subrented": false,                 // true ONLY for partner bikes (subrent fleet)
+    "rentalCategory": "premium",        // tier, or "partner_<tier>" when subrented
+    "saleCategory": "premium",          // budget->"enduro_moped", regular->"regular", premium->"premium"
+    "dailyPriceAtSet": 15000,           // daily_price snapshot when the tier was computed
+    "setAt": "2026-08-26T00:00:00.000Z" // when it was written
+  }
+}
+```
+
+- **Tier is judged by PRICE** (`cars.daily_price`), not by model name. Thresholds live in `crews.metadata.franchize.salaryCoefficients.priceThresholds` (premiumThreshold=14000, regularThreshold=7000 for vip-bike).
+- **Subrented fleet (vip-bike, as of 2026-08-26):** `ducati-panigale-s-electro-black-aero`, `yamaha-r7`, `suzuki-gsx-s1000f` — that's it. Everything else is crew-owned.
+- Bonus rates per category live in `crews.metadata.franchize.salaryCoefficients` (see `docs/PRD_SALARY_COEFFICIENTS.md`), editable on `/franchize/{slug}/salary-coefficients`.
+- After adding a new bike, re-run `node scripts/apply-salary-specs.mjs --apply` (or set `salary` manually following the shape above).
+
+#### `subrenter_chat_id` — partner owner (mini admin)
+
+```json
+{
+  "subrenter_chat_id": "123456789",     // Telegram chat id of the partner who owns THIS bike
+  "subrenter_set_at": "2026-08-27T00:00:00.000Z",
+  "subrenter_set_by": "413553377"       // who assigned it (crew owner/admin)
+}
+```
+
+- Set/cleared from the crew admin page (`/franchize/{slug}/admin` -> "Субарендаторы (мини-админы)") or via `setBikeSubrenterAction`.
+- The subrenter gets: read access to rentals of HIS bikes on `/franchize/{slug}/rentals`, a view-oriented mini-admin role on the rental page (photos, checklist), and exploration achievements.
+- Remove all three keys when the partnership ends (the admin panel does this automatically on "Сохранить" with an empty field).
+
+#### `last_known_odometer` — odometer prefill for rental handoff
+
+```json
+{ "last_known_odometer": 1234 }
+```
+
+- In km, integer. When a web-app order creates the rental row, this value is copied into `rentals.metadata.last_known_odometer` and pre-fills the operator's odometer prompt at activation.
+- **Updated automatically** on rental closure (`odometerAfter` is written back to the bike's specs) — but set the initial value when the bike enters the fleet so the FIRST rental has a prefill too.
+- Optional: bikes without it simply show an empty odometer prompt (operator types the value manually).
+
 ## 2. Spec Categories (for grouped display)
 
 The comparator and spec cards should group specs into visual sections. Each category has a Russian heading:
@@ -447,7 +496,8 @@ dailyPrice, price_per_hour, rent_weekday, rent_weekend
 
 ```
 price_per_3h, price_per_6h, price_per_12h,
-rent_2_4d, rent_5_10d, rent_11_30d
+rent_2_4d, rent_5_10d, rent_11_30d,
+last_known_odometer
 ```
 
 > **When to use multi-hour fields:** If a bike is frequently rented for short rides (3h city tour, 6h half-day), set explicit `price_per_3h`/`price_per_6h`/`price_per_12h` to offer a discount vs. straight hourly multiplication. If not set, the system falls back to `price_per_hour × hours`.
@@ -487,7 +537,8 @@ rent_price_label, rent_weekday_hour, rent_weekend_hour
 9. Set `type: "Electric"` (used by contract skill for ICE/electro detection)
 10. Run the INSERT SQL (or add to `seed-bikes-full.sql`)
 11. Verify in compare UI that all rows render correctly
-12. Test contract generation with `make-rental-contract-skill.mjs`
+12. **Set operational keys (§1.13):** `last_known_odometer` (initial reading) — then re-run `node scripts/apply-salary-specs.mjs --apply` so `salary` tier is computed from the price; if the bike is a partner (subrent) unit, ask the crew owner to assign `subrenter_chat_id` via the admin panel
+13. Test contract generation with `make-rental-contract-skill.mjs`
 
 ---
 

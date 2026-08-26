@@ -9,6 +9,8 @@ import { toInternalHref } from "../lib/navigation";
 import { crewPaletteForSurface } from "../lib/theme";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { useResolvedPalette } from "../lib/useResolvedPalette";
+import { useTelegramContentSafeTop, TG_FULLSCREEN_TOP_FALLBACK_PX } from "../hooks/useTelegramContentSafeTop";
+import { useAppContext } from "@/contexts/AppContext";
 
 interface HeaderMenuProps {
   crew: FranchizeCrewVM;
@@ -32,6 +34,10 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
   const menuRef = useRef<HTMLDivElement | null>(null);
   const palette = useResolvedPalette(crew.theme);
   const surface = crewPaletteForSurface(crew.theme);
+  // TG fullscreen: keep the modal (and its close button) below the native buttons
+  const tgContentSafeTop = useTelegramContentSafeTop();
+  const { isInTelegramContext } = useAppContext();
+  const nativeTopPx = isInTelegramContext ? (tgContentSafeTop > 0 ? tgContentSafeTop : TG_FULLSCREEN_TOP_FALLBACK_PX) : 0;
 
   // Apply franchize theme CSS variables
   useFranchizeTheme(crew.theme);
@@ -96,8 +102,9 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
         role="dialog"
         aria-modal="true"
         aria-labelledby="franchize-header-menu-title"
-        className="pointer-events-auto mt-[calc(max(env(safe-area-inset-top),0.5rem)+1.2rem)] max-h-[calc(100dvh-max(env(safe-area-inset-top),0.5rem)-1rem)] w-full max-w-sm overflow-y-auto rounded-2xl border border-[var(--header-menu-border)] bg-[var(--header-menu-bg)] p-4 text-[var(--header-menu-text)] shadow-2xl"
+        className="pointer-events-auto max-h-[calc(100dvh-max(env(safe-area-inset-top),0.5rem)-1rem)] w-full max-w-sm overflow-y-auto rounded-2xl border border-[var(--header-menu-border)] bg-[var(--header-menu-bg)] p-4 text-[var(--header-menu-text)] shadow-2xl"
         style={{
+          marginTop: `calc(max(env(safe-area-inset-top), 0.5rem) + ${nativeTopPx}px + 1.2rem)`,
           ["--header-menu-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
           ["--header-menu-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
           ["--header-menu-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
@@ -105,8 +112,10 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <p id="franchize-header-menu-title" className="text-sm font-semibold uppercase tracking-[0.16em]">Меню экипажа</p>
+        {/* FIX (2026-08-27): close button moved from the top-RIGHT corner to
+            TOP-CENTER. In TG fullscreen mode the native "⋮" button overlays
+            the top-right corner, making the old placement untappable. */}
+        <div className="mb-2 flex items-center justify-center">
           <button
             ref={closeButtonRef}
             type="button"
@@ -117,6 +126,7 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
             <X className="h-4 w-4" />
           </button>
         </div>
+        <p id="franchize-header-menu-title" className="mb-4 text-center text-sm font-semibold uppercase tracking-[0.16em]">Меню экипажа</p>
 
         <p className="mb-5 text-center text-xs italic" style={surface.mutedText}>{crew.header.tagline}</p>
 

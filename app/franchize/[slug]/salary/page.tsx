@@ -9,6 +9,7 @@ import { buildFranchizeSectionMetadata } from "../metadata";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { verifyTelegramActorCookieValue, TELEGRAM_ACTOR_COOKIE } from "@/lib/telegram-actor-cookie";
+import { AchievementExplorer } from "../../components/AchievementExplorer";
 
 export const metadata = buildFranchizeSectionMetadata("vip-bike", {
   sectionTitle: "Зарплата",
@@ -70,6 +71,7 @@ export default async function SalaryPage({ params }: SalaryPageProps) {
   if (!isCrewMember) {
     return (
       <main className="min-h-screen flex items-center justify-center" style={surface.page}>
+      <AchievementExplorer slug={crew.slug || slug} achievementId="explorer_salary" />
         <div className="text-center p-8">
           <p className="text-2xl mb-2">🔒</p>
           <p className="text-sm font-semibold" style={{ color: surface.card.color }}>

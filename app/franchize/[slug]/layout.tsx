@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { getFranchizeBySlug } from "../actions";
 import { resolveFranchizeSiteUrl, toAbsoluteFranchizeUrl } from "./metadata";
+import { AchievementToastSync } from "../components/AchievementToastSync";
 
 interface FranchizeSlugLayoutProps {
   children: ReactNode;
@@ -132,6 +133,17 @@ export async function generateMetadata({ params }: Omit<FranchizeSlugLayoutProps
 // server-load getFranchizeBySlug(slug), render CrewHeader, and use FranchizePageShell
 // for first-paint theme, spacing, and navigation continuity. Any route that opts out
 // must leave a local comment explaining why shared franchize chrome is intentionally skipped.
-export default function FranchizeSlugLayout({ children }: FranchizeSlugLayoutProps) {
-  return children;
+export default async function FranchizeSlugLayout({
+  children,
+  params,
+}: FranchizeSlugLayoutProps) {
+  const { slug } = await params;
+  return (
+    <>
+      {children}
+      {/* Achievement toasts: announces achievements unlocked outside the web app
+          (rental closures, /shift streaks) the next time the user opens the crew. */}
+      <AchievementToastSync slug={slug} />
+    </>
+  );
 }

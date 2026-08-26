@@ -2165,7 +2165,44 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           .join("\n")
       : "| Без доп. опций | 0 | 0 ₽ | 0 ₽ |";
 
-    const flowType = (payload.flowType ?? "rental") as FranchizeOrderFlowType;
+    // FIX (2026-08-27, "stuck at order stage"): re-derive the flow from the cart
+    // lines server-side instead of blindly trusting payload.flowType. The client
+    // used to compute flowType from `line.saleAvailable` (bike is ALSO listed
+    // for sale), which flipped rental orders of sale-listed bikes into "sale" —
+    // no rental row was created, the notification said "Новый заказ на покупку"
+    // and the lead had no rental link. A line is a SALE line only when it has an
+    // explicit buy-flow marker (action=buy / buyConfigId / buyPriceDelta>0 /
+    // duration|auction = "покупка"/"buy"). If the client says sale/mixed but no
+    // line actually carries a buy marker, downgrade to rental.
+    const lineHasBuyMarker = (line: { options?: { action?: string; buyConfigId?: string; buyPriceDelta?: number; duration?: string; auction?: string } }) => {
+      const o = line.options ?? {};
+      if (String(o.action ?? "").trim().toLowerCase() === "buy") return true;
+      if (typeof o.buyConfigId === "string" && o.buyConfigId.trim().length > 0) return true;
+      if (typeof o.buyPriceDelta === "number" && o.buyPriceDelta > 0) return true;
+      const duration = String(o.duration ?? "").trim().toLowerCase();
+      const auction = String(o.auction ?? "").trim().toLowerCase();
+      return duration === "покупка" || duration === "buy" || auction === "покупка" || auction === "buy";
+    };
+    const derivedSaleLineCount = payload.cartLines.filter((line) => lineHasBuyMarker(line as never)).length;
+    const derivedFlowType: FranchizeOrderFlowType =
+      (payload.flowType === "sale" || payload.flowType === "mixed") && derivedSaleLineCount === 0
+        ? "rental"
+        : payload.flowType === "rental" && derivedSaleLineCount > 0 && derivedSaleLineCount === payload.cartLines.length
+          ? "sale"
+          : payload.flowType === "rental" && derivedSaleLineCount > 0
+            ? "mixed"
+            : ((payload.flowType ?? "rental") as FranchizeOrderFlowType);
+    if (derivedFlowType !== (payload.flowType ?? "rental")) {
+      logger.warn("[franchize] flowType corrected server-side", {
+        orderId: payload.orderId,
+        clientFlowType: payload.flowType,
+        derivedFlowType,
+        derivedSaleLineCount,
+        cartLines: payload.cartLines.length,
+      });
+    }
+
+    const flowType = derivedFlowType as FranchizeOrderFlowType;
     const isSaleFlow = flowType === "sale" || flowType === "mixed";
     const isTestdrive = flowType === "testdrive";
     const isServiceFlow = flowType === "service";
@@ -3040,14 +3077,10 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               delivery_method: payload.delivery === "pickup" ? "pickup" : "transport_company",
               transport_company_name: payload.delivery === "delivery" ? (payload.deliveryCompany || null) : null,
               transport_payment_type: payload.delivery === "delivery" ? "buyer_pays" : null,
-              metadata: {
-                flow_type: flowType,
-                order_id: payload.orderId,
-                file_name: doc.fileName,
-                source: "franchize-web-order",
-                bike_id: doc.bikeId,
-                bike_name: doc.bikeName,
-              },
+              // NOTE: sale_contract_artifacts has NO metadata column — the old
+              // `metadata: {...}` field made the whole insert fail (PGRST204,
+              // silently logged) so web-order sale artifacts were NEVER saved.
+              // Order/bike context is recoverable from contract_key + storage path.
             });
           if (artifactError) {
             logger.error("[franchize] Failed to save sale_contract_artifact", {
@@ -3117,14 +3150,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               deposit_rub: null,
               total_sum: bikePrice,
               template_version: CURRENT_RENTAL_TEMPLATE_VERSION,
-              metadata: {
-                flow_type: flowType,
-                order_id: payload.orderId,
-                file_name: doc.fileName,
-                source: "franchize-web-order",
-                bike_id: doc.bikeId,
-                bike_name: doc.bikeName,
-              },
+              // NOTE: rental_contract_artifacts has NO metadata column — the old
+              // `metadata: {...}` field made the whole insert fail (PGRST204,
+              // silently logged) so web-order artifacts were NEVER saved. The
+              // artifact is linked to its rental via rental_id (set below) and
+              // carries order context inside contract_key.
             });
           if (artifactError) {
             logger.error("[franchize] Failed to save rental_contract_artifact", {
@@ -3229,6 +3259,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // ── Create public.rentals row (aligned with /doc flow) ────────────────
     // This ensures the rental appears in analytics and the bike shows as busy
     // Service orders don't create rentals — they create a lead for the crew to process
+    const createdRentals: Array<{ rentalId: string; bikeName: string; bikeId: string; totalRub: number; startIso: string; endIso: string }> = [];
     if ((flowType === "rental" || flowType === "mixed") && !isServiceFlow && payload.rentalStartDate && payload.rentalEndDate) {
       try {
         // time-aware ISO timestamps (use cart-line times if available)
@@ -3259,11 +3290,19 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               ? equipmentLineIndices.reduce((sum, eqIdx) => sum + (payload.cartLines[eqIdx]?.lineTotal || 0), 0)
               : (payload.cartLines[bikeIndex]?.lineTotal || 0);
 
+          // Pick the bike's last known odometer from its specs so the operator
+          // gets a pre-filled odometer prompt at activation (mirrors /doc flow).
+          const bikeSpecs = ((byId.get(doc.bikeId)?.specs as Record<string, unknown> | undefined) ?? {});
+          const lastKnownOdometer = Number(bikeSpecs.last_known_odometer ?? bikeSpecs.odometer ?? NaN);
+
           try {
             const { data: rentalRow, error: rentalInsertError } = await supabaseAdmin
               .from("rentals")
               .insert({
-                user_id: payload.phone || payload.telegramUserId,
+                // FIX: renter's Telegram id first — the profile "Мои аренды" digest
+                // matches rentals by user_id/owner_id, so the renter must see this
+                // rental. Phone stays in metadata.renter_phone for operators.
+                user_id: payload.telegramUserId || payload.phone,
                 owner_id: crewOwnerChatId || payload.telegramUserId,
                 vehicle_id: doc.bikeId, // FIX: was bikeName (a label), now uses actual bike ID
                 crew_id: crewId,
@@ -3281,8 +3320,12 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                   document_key: doc.documentKey,
                   renter_name: payload.recipient,
                   renter_phone: payload.phone,
+                  renter_telegram_id: payload.telegramUserId,
                   flow_type: flowType,
                   bike_name: doc.bikeName,
+                  ...(Number.isFinite(lastKnownOdometer)
+                    ? { last_known_odometer: lastKnownOdometer, odometer_before_hint: lastKnownOdometer }
+                    : {}),
                 },
               })
               .select("rental_id")
@@ -3291,8 +3334,32 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               logger.warn("[franchize] Rental insert error:", { error: rentalInsertError.message, bikeId: doc.bikeId });
             } else if (rentalRow?.rental_id) {
               logger.info("[franchize] Created rental row:", rentalRow.rental_id, "bike:", doc.bikeId);
-              
-              // Create verification todos for this rental (5 todos: passport mainpage, 
+              createdRentals.push({
+                rentalId: rentalRow.rental_id,
+                bikeName: doc.bikeName,
+                bikeId: doc.bikeId,
+                totalRub: Math.round(docTotal || payload.totalAmount),
+                startIso,
+                endIso,
+              });
+
+              // Link the contract artifact to the rental so the rental page can
+              // resolve the renter (telegram_chat_id) + offer the contract download.
+              try {
+                const { error: artifactLinkError } = await supabaseAdmin
+                  .schema("private" as any)
+                  .from("rental_contract_artifacts")
+                  .update({ rental_id: rentalRow.rental_id })
+                  .eq("original_sha256", doc.sha256)
+                  .is("rental_id", null);
+                if (artifactLinkError) {
+                  logger.warn("[franchize] artifact→rental link failed (non-fatal):", artifactLinkError.message);
+                }
+              } catch (artifactLinkErr) {
+                logger.warn("[franchize] artifact→rental link threw (non-fatal):", artifactLinkErr);
+              }
+
+              // Create verification todos for this rental (5 todos: passport mainpage,
               // passport registration, drivers license, odometer, dates)
               try {
                 const { createRentalVerificationTodos } = await import("@/app/franchize/server-actions/rental-verification-todos");
@@ -3309,6 +3376,71 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             }
           } catch (rentalErr) {
             logger.warn("[franchize] Failed to create rental row:", rentalErr);
+          }
+        }
+
+        // ── Notify renter + crew owner + admin with a Mini App deep link ──────
+        // The renter opens /franchize/{slug}/rental/{id} in the web app to add
+        // ДО/ПОСЛЕ photos; the owner/admin activate the rental from the same page.
+        if (createdRentals.length > 0) {
+          const botUsername = process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot";
+          const fmtRu = (iso: string) => {
+            const d = new Date(iso);
+            return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+          };
+          const renterLines = [
+            `🏍 <b>Аренда создана</b>`,
+            ``,
+            ...createdRentals.map((r) => [
+              `🏍 ${r.bikeName}`,
+              `📅 ${fmtRu(r.startIso)} → ${fmtRu(r.endIso)}`,
+              `💰 ${formatMoney(r.totalRub)} ₽`,
+            ].join("\n")),
+            ``,
+            `Откройте страницу аренды в приложении — там можно добавить фото байка ДО поездки, скачать договор и написать менеджеру.`,
+          ].join("\n");
+
+          const notifyTargets = new Set<string>([String(adminChatId), String(crewOwnerChatId || "")]);
+          for (const target of notifyTargets) {
+            if (!target || target === "undefined") continue;
+            try {
+              const { sendComplexMessage } = await import("@/app/webhook-handlers/actions/sendComplexMessage");
+              await sendComplexMessage(
+                target,
+                [
+                  `🔑 <b>Новая аренда ожидает активации</b> (#${payload.orderId})`,
+                  ``,
+                  ...createdRentals.map((r) => `🏍 ${r.bikeName} · ${fmtRu(r.startIso)} → ${fmtRu(r.endIso)} · ${formatMoney(r.totalRub)} ₽`).join("\n"),
+                  ``,
+                  `Получатель: ${payload.recipient}`,
+                  `Телефон: ${payload.phone}`,
+                  `Одометр подскажет страница аренды (последнее известное значение подгружено из карточки байка).`,
+                ].join("\n"),
+                createdRentals.length === 1
+                  ? [[{ text: "🔑 Открыть аренду", url: `https://t.me/${botUsername}/app?startapp=rental_${createdRentals[0].rentalId}` }]]
+                  : createdRentals.map((r) => [{ text: `🔑 ${r.bikeName}`, url: `https://t.me/${botUsername}/app?startapp=rental_${r.rentalId}` }]),
+                { parseMode: "HTML" },
+              );
+            } catch (ownerNotifyErr) {
+              logger.warn("[franchize] Failed to send rental deeplink notification to owner/admin:", { target, error: ownerNotifyErr instanceof Error ? ownerNotifyErr.message : String(ownerNotifyErr) });
+            }
+          }
+
+          try {
+            const { sendComplexMessage } = await import("@/app/webhook-handlers/actions/sendComplexMessage");
+            await sendComplexMessage(
+              payload.telegramUserId,
+              renterLines,
+              createdRentals.length === 1
+                ? [
+                    [{ text: "📸 Открыть страницу аренды", url: `https://t.me/${botUsername}/app?startapp=rental_${createdRentals[0].rentalId}` }],
+                    [{ text: "📄 Мой договор", url: `https://t.me/${botUsername}/app?startapp=profile` }],
+                  ]
+                : createdRentals.map((r) => [{ text: `📸 ${r.bikeName}`, url: `https://t.me/${botUsername}/app?startapp=rental_${r.rentalId}` }]),
+              { parseMode: "HTML" },
+            );
+          } catch (renterNotifyErr) {
+            logger.warn("[franchize] Failed to send rental deeplink notification to renter:", { error: renterNotifyErr instanceof Error ? renterNotifyErr.message : String(renterNotifyErr) });
           }
         }
       } catch (rentalSetupErr) {
@@ -3351,6 +3483,14 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           bikeIds: isServiceFlow ? payload.cartLines.map((l) => l.itemId) : bikeDocs.map((d) => d.bikeId),
           bikeNames: isServiceFlow ? (serviceItemTitles?.split(", ") ?? []) : bikeDocs.map((d) => d.bikeName),
           bikeCount: isServiceFlow ? payload.cartLines.length : bikeDocs.length,
+          // Link the created rental(s) so the leads page can open the rental
+          // directly ("lead with no link to rental" bug fix).
+          ...(createdRentals.length > 0
+            ? {
+                rentalId: createdRentals[0].rentalId,
+                rentalIds: createdRentals.map((r) => r.rentalId),
+              }
+            : {}),
         },
         ensureUser: true,
       });
@@ -3381,6 +3521,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           const bikeModel = car?.model || doc.bikeName.split(" ").slice(1).join(" ") || "";
           const rentEndDate = payload.rentalEndDate || "";
           const rentEndTime = (line as any)?.options?.rentEndTime || "10:00";
+          // Link the todo to the rental row created for this bike (was null
+          // before — "will be linked when rental row is confirmed").
+          const todoRentalId = createdRentals.find((r) => r.bikeId === doc.bikeId)?.rentalId ?? null;
 
           // Parse equipment from this bike's cart line perk string
           const perkStr = String((line as any)?.options?.perk || "").toLowerCase();
@@ -3419,6 +3562,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                 id: todoId,
                 crew_id: crewId,
                 lead_id: leadId,
+                rental_id: todoRentalId,
                 title: todo.title,
                 status: "pending",
                 priority: todo.priority,
@@ -3429,7 +3573,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                   lead_phone: payload.phone || "",
                   lead_name: payload.recipient || "",
                   bike_id: doc.bikeId,
-                  rental_id: null, // will be linked when rental row is confirmed
+                  rental_id: todoRentalId,
                   rent_end_date: rentEndDate || null,
                   order_id: payload.orderId,
                   source: "web_app_checkout",
@@ -3825,6 +3969,11 @@ const franchizeOrderInvoiceSchema = z.object({
         duration: z.string().trim().default("1 день"),
         perk: z.string().trim().default("Стандарт"),
         auction: z.string().trim().default("Без аукциона"),
+        // Buy-flow markers (mirror of isBuyFlow() in useFranchizeCartLines.ts) —
+        // used for the server-side flow re-derivation below.
+        action: z.string().trim().optional(),
+        buyConfigId: z.string().trim().optional(),
+        buyPriceDelta: z.number().finite().optional(),
       })
       .default({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона" }),
   })).min(1),
@@ -4925,6 +5074,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   docSha256: string;             // QR fix: from rental_contract_artefacts.original_sha256 (for QR deep link)
   vehicleId: string;             // QR fix: from rentals.vehicle_id (for QR deep link)
   contractDownloadUrl: string;   // Supabase storage URL for the signed DOCX (empty if not signed)
+  subrenterChatId: string;       // iter7: bike's partner owner (specs.subrenter_chat_id) — mini admin
 }> {
   const safeSlug = slug.trim();
   const safeRentalId = rentalId.trim();
@@ -4958,6 +5108,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       docSha256: "",
       vehicleId: "",
       contractDownloadUrl: "",
+      subrenterChatId: "",
     };
   }
 
@@ -4997,10 +5148,11 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       docSha256: "",
       vehicleId: "",
       contractDownloadUrl: "",
+      subrenterChatId: "",
     };
   }
 
-  const vehicle = data.vehicle as { make?: string; model?: string; image_url?: string; specs?: { gallery?: string[]; image_urls?: string[] } } | null;
+  const vehicle = data.vehicle as { make?: string; model?: string; image_url?: string; specs?: { gallery?: string[]; image_urls?: string[]; subrenter_chat_id?: unknown } } | null;
   // Restore vehicleImageUrl extraction (was lost in a push regression)
   const vehicleImageUrl = (() => {
     if (!vehicle) return "";
@@ -5096,6 +5248,12 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     renterFullName,
     renterTelegramChatId,
     renterPhone,
+    // Subrenter (bike's partner owner, specs.subrenter_chat_id) — gets a
+    // view-oriented mini-admin role on the rental page of HIS bike.
+    subrenterChatId: (() => {
+      const raw = (vehicle?.specs as Record<string, unknown> | undefined)?.subrenter_chat_id;
+      return typeof raw === "string" ? raw : "";
+    })(),
     docSha256,
     vehicleId: (data as any).vehicle_id || "",
     contractDownloadUrl,

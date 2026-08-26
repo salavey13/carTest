@@ -383,6 +383,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                 ownerId={rental.ownerId}
                 renterId={rental.renterId}
                 renterTelegramChatId={rental.renterTelegramChatId}
+            subrenterChatId={rental.subrenterChatId}
                 crewId={crew.id}
                 crewSlug={resolvedSlug}
               >
@@ -420,6 +421,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               ownerId={rental.ownerId}
               renterId={rental.renterId}
               renterTelegramChatId={rental.renterTelegramChatId}
+            subrenterChatId={rental.subrenterChatId}
               crewId={crew.id}
               crewSlug={resolvedSlug}
             >
@@ -467,10 +469,11 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             only, reset on every re-render). RentalReturnChecklist persists via API. */}
         {rental.found && status === "active" && (
           <FranchizeRentalRoleGuard
-            allowedRoles={["operator", "admin", "owner"]}
+            allowedRoles={["operator", "admin", "owner", "subrenter"]}
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
+            subrenterChatId={rental.subrenterChatId}
             crewId={crew.id}
             crewSlug={resolvedSlug}
             fallback={
@@ -493,10 +496,11 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
         )}
 
           <FranchizeRentalRoleGuard
-            allowedRoles={["operator", "admin", "owner", "renter"]}
+            allowedRoles={["operator", "admin", "owner", "renter", "subrenter"]}
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
+            subrenterChatId={rental.subrenterChatId}
             crewId={crew.id}
             crewSlug={resolvedSlug}
           >
@@ -539,6 +543,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           ownerId={rental.ownerId}
           renterId={rental.renterId}
           renterTelegramChatId={rental.renterTelegramChatId}
+            subrenterChatId={rental.subrenterChatId}
           crewId={crew.id}
           crewSlug={resolvedSlug}
         >
@@ -561,10 +566,11 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             Was 2 duplicate buttons (sidebar + action row); now just one. */}
         {rental.found && status === "active" && (
           <FranchizeRentalRoleGuard
-            allowedRoles={["operator", "admin", "owner"]}
+            allowedRoles={["operator", "admin", "owner", "subrenter"]}
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
+            subrenterChatId={rental.subrenterChatId}
             crewId={crew.id}
             crewSlug={resolvedSlug}
           >
@@ -592,6 +598,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           ownerId={rental.ownerId}
           renterId={rental.renterId}
           renterTelegramChatId={rental.renterTelegramChatId}
+            subrenterChatId={rental.subrenterChatId}
           crewId={crew.id}
           crewSlug={resolvedSlug}
         >
@@ -622,6 +629,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
+            subrenterChatId={rental.subrenterChatId}
             crewId={crew.id}
             crewSlug={resolvedSlug}
             contractVerified={isVerified}
@@ -643,6 +651,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
+            subrenterChatId={rental.subrenterChatId}
             crewId={crew.id}
             crewSlug={resolvedSlug}
             bikeTitle={rental.vehicleTitle}
@@ -678,6 +687,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           ownerId={rental.ownerId}
           renterId={rental.renterId}
           renterTelegramChatId={rental.renterTelegramChatId}
+            subrenterChatId={rental.subrenterChatId}
           crewId={crew.id}
           crewSlug={resolvedSlug}
           accentColor={accent}

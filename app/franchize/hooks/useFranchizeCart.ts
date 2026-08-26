@@ -229,8 +229,24 @@ export function useFranchizeCart(slug: string) {
     if (!isHydrated || typeof window === "undefined") return;
     if (dbUser?.user_id || !tempCartFeatureEnabled) return;
 
+    // safeUUID: crypto.randomUUID is missing in older iOS Safari / Android
+    // WebViews / non-secure contexts (root-layout polyfill covers most cases;
+    // this local fallback keeps the header+catalog from crashing regardless).
+    const safeUUID = () => {
+      try {
+        if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+          return crypto.randomUUID();
+        }
+      } catch {
+        /* fall through to Math.random */
+      }
+      let h = "";
+      for (let i = 0; i < 32; i++) h += ((Math.random() * 16) | 0).toString(16);
+      return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${h.slice(17, 20)}-${h.slice(20, 32)}`;
+    };
+
     const existingCartId = window.localStorage.getItem(TEMP_CART_ID_KEY);
-    const cartId = existingCartId || `cart_${crypto.randomUUID()}`;
+    const cartId = existingCartId || `cart_${safeUUID()}`;
     if (!existingCartId) {
       window.localStorage.setItem(TEMP_CART_ID_KEY, cartId);
     }

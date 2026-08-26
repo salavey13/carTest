@@ -16,6 +16,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useResolvedPalette } from "../lib/useResolvedPalette";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
+import { useTelegramContentSafeTop, TG_FULLSCREEN_TOP_FALLBACK_PX } from "../hooks/useTelegramContentSafeTop";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
 import { hasRentPrice, hasSalePrice, hasServicePrice, hasEquipmentPrice } from "../lib/catalog-utils";
@@ -57,6 +58,11 @@ export function CrewHeader({
   const pathname = usePathname();
   const { displayMode, setDisplayMode, isTransitioning } = useDisplayMode();
   const { isInTelegramContext } = useAppContext();
+  // TG fullscreen mode: native buttons (back ‹ + ⋮) overlay the top of the
+  // webview. contentSafeAreaInset.top (Bot API 8.0+) reports their exact px;
+  // older clients fall back to a conservative estimate so the header action
+  // row (profile / cart / hamburger) is never covered.
+  const tgContentSafeTop = useTelegramContentSafeTop();
   const router = useRouter();
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const isOnCatalogPage = pathname === mainCatalogPath || pathname === `${mainCatalogPath}/`;
@@ -130,15 +136,19 @@ export function CrewHeader({
 
   return (
     <header
-      // FIX: Increased top padding to accommodate Telegram MiniApp native buttons
-      // and camera cutouts on iPhone / Galaxy S25 Ultra. We now use 5.0rem (~80px)
-      // minimum plus safe-area, with an extra 0.75rem buffer for devices like S25 Ultra
-      // whose native bar is ~68px.
+      // FIX (2026-08-27): top padding must clear the Telegram native buttons
+      // in FULLSCREEN mode. env(safe-area-inset-top) only covers the OS notch
+      // — the TG controls (~48-56px) need contentSafeAreaInset.top (Bot API
+      // 8.0+) or a conservative fallback on older clients. Without this, the
+      // profile dropdown / cart icon / hamburger were overlapped by the native
+      // back + menu buttons in fullscreen mode.
       className="sticky top-0 z-50 border-b pb-2 backdrop-blur-2xl"
       style={{
         ...FRANCHIZE_HEADER_SAFE_AREA_STYLE,
         paddingTop: isInTelegramContext
-          ? "max(calc(env(safe-area-inset-top) + 4.2rem), 4.95rem)"
+          ? tgContentSafeTop > 0
+            ? `calc(env(safe-area-inset-top) + ${tgContentSafeTop}px + 0.75rem)`
+            : `max(calc(env(safe-area-inset-top) + ${TG_FULLSCREEN_TOP_FALLBACK_PX}px + 0.75rem), 6rem)`
           : "calc(max(env(safe-area-inset-top), 0px) + 1.45rem)",
         // FIX 6: isolation creates a proper stacking context for the entire header.
         isolation: "isolate",

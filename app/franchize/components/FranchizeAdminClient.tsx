@@ -26,6 +26,7 @@ import {
 } from "@/app/franchize/lib/theme";
 import { fallbackCrew } from "@/app/franchize/lib/fallback-crew";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
+import { SubrenterManagerPanel } from "./SubrenterManagerPanel";
 import {
   Select,
   SelectContent,
@@ -230,8 +231,9 @@ export function FranchizeAdminClient({
       actorUserId: dbUser.user_id,
     });
     if (!result.success) {
-      // M4 fix: surface silent loader failures with toast + retry
-      toast.error("Не удалось загрузить уведомления", {
+      // M4 fix: surface silent loader failures with toast + retry.
+      // Include the ACTUAL error so the cause is visible (owner request).
+      toast.error(`Не удалось загрузить уведомления — ${result.error || "неизвестная ошибка"}`, {
         action: { label: "Попробовать снова", onClick: () => loadFailedNotifications() },
       });
       return;
@@ -266,7 +268,7 @@ export function FranchizeAdminClient({
     });
     if (!result.success) {
       // M4 fix: surface silent loader failures with toast + retry
-      toast.error("Не удалось загрузить завершённые аренды", {
+      toast.error(`Не удалось загрузить завершённые аренды — ${result.error || "неизвестная ошибка"}`, {
         action: { label: "Попробовать снова", onClick: () => loadSuccessfulRentals() },
       });
       return;
@@ -283,7 +285,7 @@ export function FranchizeAdminClient({
     });
     if (!result.success) {
       // M4 fix: surface silent loader failures with toast + retry
-      toast.error("Не удалось загрузить отзывы", {
+      toast.error(`Не удалось загрузить отзывы — ${result.error || "неизвестная ошибка"}`, {
         action: { label: "Попробовать снова", onClick: () => loadReviews() },
       });
       return;
@@ -918,6 +920,8 @@ export function FranchizeAdminClient({
           </div>
         )}
       </FranchizeOperatorPanel>
+
+      <SubrenterManagerPanel slug={slug} canManage={isCrewFleetAdmin} />
 
       <FranchizeOperatorPanel className="mt-4">
         <div className="flex items-center justify-between gap-3">

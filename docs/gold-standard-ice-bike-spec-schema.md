@@ -167,6 +167,19 @@ if (isElectric) {
 }
 ```
 
+
+### 1.11 Operations & Ownership Keys (salary / subrenter / odometer) 🆕
+
+Same operational keys as the electro schema (see `gold-standard-electro-bike-spec-schema.md` §1.13) — they live in `specs` JSONB, are NOT compare specs and must NOT appear in `spec_labels`:
+
+| Key | Description |
+|---|---|
+| `salary` | Salary/bonus classification: `{ tier, subrented, rentalCategory, saleCategory, dailyPriceAtSet, setAt }`. Tier is judged by PRICE (`daily_price`): budget < 7000, regular >= 7000, premium >= 14000 (vip-bike thresholds). Written by `scripts/apply-salary-specs.mjs`. |
+| `subrenter_chat_id` | Telegram chat id of the partner owner (mini admin). Plus audit keys `subrenter_set_at` / `subrenter_set_by`. Managed from the crew admin page. |
+| `last_known_odometer` | Integer km — pre-fills the odometer prompt when a rental is created/activated; auto-updated on rental closure. |
+
+Subrented ICE fleet (vip-bike, as of 2026-08-26): `yamaha-r7`, `suzuki-gsx-s1000f` — plus the electro `ducati-panigale-s-electro-black-aero`.
+
 ### 1.10 Social
 
 | Key | Русский лейбл | Category | Unit suffix | Sort (compare) |

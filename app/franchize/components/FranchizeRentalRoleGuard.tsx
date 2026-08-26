@@ -11,12 +11,15 @@ import { useAppContext } from "@/contexts/AppContext";
  * for this rental.
  *
  * Roles:
- *   - "owner"    : rental.owner_id === dbUser.user_id
- *   - "renter"   : rental.renterId === dbUser.user_id
- *                  OR rental.renterTelegramChatId === dbUser.user_id
- *   - "operator" : crew member with role owner/admin/co_owner
- *   - "admin"    : user.metadata.role === "admin" (global admin)
- *   - "guest"    : none of the above
+ *   - "owner"     : rental.owner_id === dbUser.user_id
+ *   - "renter"    : rental.renterId === dbUser.user_id
+ *                   OR rental.renterTelegramChatId === dbUser.user_id
+ *   - "operator"  : crew member with role owner/admin/co_owner
+ *   - "admin"     : user.metadata.role === "admin" (global admin)
+ *   - "subrenter" : dbUser.user_id === subrenterChatId — the partner who
+ *                   owns THIS bike (specs.subrenter_chat_id). Treated as a
+ *                   mini admin for his own bike's rentals.
+ *   - "guest"     : none of the above
  *
  * BUGFIX (goodmorning-fixes): added crewSlug fallback prop.
  * Previously only matched by crewId (UUID), but AppContext's
@@ -30,11 +33,15 @@ import { useAppContext } from "@/contexts/AppContext";
  * couldn't see checklist or close button. The server-side auth still gates
  * the actual mutations, so showing the UI is safe.
  */
+type RentalRole = "owner" | "renter" | "operator" | "admin" | "subrenter" | "guest";
+
 interface FranchizeRentalRoleGuardProps {
-  allowedRoles: Array<"owner" | "renter" | "operator" | "admin" | "guest">;
+  allowedRoles: Array<"owner" | "renter" | "operator" | "admin" | "subrenter" | "guest">;
   ownerId?: string;
   renterId?: string;
   renterTelegramChatId?: string;
+  /** Bike's partner owner (specs.subrenter_chat_id) — mini admin for this bike */
+  subrenterChatId?: string;
   crewId?: string;
   /** Crew slug — more reliable than crewId for matching (use both when available) */
   crewSlug?: string;
@@ -48,6 +55,7 @@ export function FranchizeRentalRoleGuard({
   ownerId,
   renterId,
   renterTelegramChatId,
+  subrenterChatId,
   crewId,
   crewSlug,
   children,
@@ -55,7 +63,7 @@ export function FranchizeRentalRoleGuard({
 }: FranchizeRentalRoleGuardProps) {
   const { dbUser, userCrewMemberships } = useAppContext();
 
-  const role = useMemo<"owner" | "renter" | "operator" | "admin" | "guest">(() => {
+  const role = useMemo<RentalRole>(() => {
     if (!dbUser?.user_id) return "guest";
 
     // Owner of this rental
@@ -86,9 +94,18 @@ export function FranchizeRentalRoleGuard({
       return "admin";
     }
 
-    return "guest";
-  }, [dbUser?.user_id, dbUser?.metadata, ownerId, renterId, renterTelegramChatId, crewId, crewSlug, userCrewMemberships]);
+    // Subrenter — partner owner of THIS bike (checked after stronger roles so
+    // a subrenter who is also a crew member gets the full operator treatment).
+    if (subrenterChatId && dbUser.user_id === subrenterChatId) {
+      return "subrenter";
+    }
 
+    return "guest";
+  }, [dbUser?.user_id, dbUser?.metadata, ownerId, renterId, renterTelegramChatId, subrenterChatId, crewId, crewSlug, userCrewMemberships]);
+
+  // "subrenter" is a VIEW-oriented mini admin: it passes only guards that
+  // explicitly list it. Lifecycle mutations (activate/extend/complete) stay
+  // operator-only — their server actions gate permissions anyway.
   if (allowedRoles.includes(role)) {
     return <>{children}</>;
   }

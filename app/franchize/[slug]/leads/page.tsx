@@ -5,6 +5,7 @@ import { getFranchizeBySlug } from "../../actions";
 import { crewPaletteWithCssVars } from "../../lib/theme";
 import { LeadsClient } from "./LeadsClient";
 import { AnalyticsLeadsNav } from "../../components/AnalyticsLeadsNav";
+import { AchievementExplorer } from "../../components/AchievementExplorer";
 
 interface LeadsPageProps {
   params: Promise<{ slug: string }>;
@@ -31,6 +32,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
 
   return (
     <main className="min-h-screen" style={surface.page}>
+      <AchievementExplorer slug={crew.slug || slug} achievementId="explorer_leads" />
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/leads`} groupLinks={[]} items={[]} />
       <div className="mx-auto w-full max-w-7xl px-4 py-6">
         <h1 className="text-2xl font-bold" style={{ color: "var(--franchize-text-primary, inherit)" }}>

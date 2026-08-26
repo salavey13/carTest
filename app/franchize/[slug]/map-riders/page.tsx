@@ -6,6 +6,7 @@ import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
 import { crewPaletteWithCssVars } from "@/app/franchize/lib/theme";
 import dynamic from "next/dynamic";
 import { buildFranchizeSectionMetadata } from "../metadata";
+import { AchievementExplorer } from "../../components/AchievementExplorer";
 
 const MapRidersClient = dynamic(
   () => import("@/app/franchize/components/MapRidersClient").then((mod) => mod.MapRidersClient),
@@ -32,6 +33,7 @@ export default async function MapRidersPage({ params }: { params: Promise<{ slug
 
   return (
     <main className={`flex flex-col min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
+      <AchievementExplorer slug={crew.slug || slug} achievementId="explorer_map_riders" />
       {/* Wrap header in z-index container to isolate from map */}
       <div className="relative z-10">
         <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} items={items} showRail={false} />

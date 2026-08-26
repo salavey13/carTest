@@ -75,6 +75,18 @@ Every equipment item MUST have:
 
 ---
 
+
+## 2a. Operational Keys (salary / subrenter) 🆕
+
+Equipment items also participate in salary bonuses and partner (subrent) flows. These keys live in `specs` JSONB, are NOT user-facing and must NOT appear in `spec_labels`:
+
+| Key | Description |
+|---|---|
+| `salary` | Salary/bonus classification: `{ tier, subrented, rentalCategory, saleCategory, dailyPriceAtSet, setAt }`. Equipment bonuses use flat rates from `crews.metadata.franchize.salaryCoefficients` (`equipmentRentalUnit` for rentals, `equipmentSale.{helmet, balaclava, jacket, pants, gloves}` for sales). Written by `scripts/apply-salary-specs.mjs`. |
+| `subrenter_chat_id` | Telegram chat id of the partner owner (mini admin) — same semantics as bikes: read access to rentals of his units. Plus audit keys `subrenter_set_at` / `subrenter_set_by`. Managed from the crew admin page. |
+
+`last_known_odometer` does NOT apply to equipment (no odometer).
+
 ## 3. Categories
 
 The `specs.category` field determines the icon, filter group, and display section. Must be one of:

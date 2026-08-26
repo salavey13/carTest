@@ -90,6 +90,12 @@ export interface TelegramWebApp {
   // Fullscreen (v7.7+)
   requestFullscreen?: () => void
   exitFullscreen?: () => void
+  // Safe area insets (v8.0+). contentSafeAreaInset = area free of NATIVE
+  // controls (back/close buttons in fullscreen mode); safeAreaInset = device
+  // safe area (notch, home indicator). Values in px, refresh on event
+  // 'contentSafeAreaChanged' / 'safeAreaChanged'.
+  safeAreaInset?: { top: number; bottom: number; left: number; right: number }
+  contentSafeAreaInset?: { top: number; bottom: number; left: number; right: number }
 }
 
 declare global {

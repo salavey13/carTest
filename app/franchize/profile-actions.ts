@@ -260,6 +260,62 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
     },
   ];
 
+  // FIX (iter7): Exploration achievements — award crew members for DISCOVERING
+  // the crew's working tools in the web app ("opened analytics page" etc.).
+  // Granted from AchievementExplorer (client) via
+  // grantFranchizeExplorationAchievementAction — gated to crew members.
+  const explorationAchievements: FranchizeAchievementDefinition[] = [
+    {
+      id: "explorer_analytics",
+      title: "Аналитик 📊",
+      description: "Открыл страницу аналитики аренд — теперь выручка экипажа как на ладони.",
+      category: "operations",
+      triggerSources: ["web:franchize_analytics_opened"],
+    },
+    {
+      id: "explorer_leads",
+      title: "Лид-хантер 🎯",
+      description: "Открыл воронку лидов — нашёл, где живут клиенты экипажа.",
+      category: "operations",
+      triggerSources: ["web:franchize_leads_opened"],
+    },
+    {
+      id: "explorer_todos",
+      title: "Диспетчер ✅",
+      description: "Открыл доску задач экипажа — ничего не забудется.",
+      category: "operations",
+      triggerSources: ["web:franchize_todos_opened"],
+    },
+    {
+      id: "explorer_salary",
+      title: "Свой экономист 💰",
+      description: "Открыл страницу зарплаты и коэффициентов — посчитал свой бонус.",
+      category: "operations",
+      triggerSources: ["web:franchize_salary_opened"],
+    },
+    {
+      id: "explorer_dashboard",
+      title: "Штурман 🧭",
+      description: "Открыл дашборд экипажа — пульт управления освоен.",
+      category: "operations",
+      triggerSources: ["web:franchize_dashboard_opened"],
+    },
+    {
+      id: "explorer_map_riders",
+      title: "Картограф 🗺️",
+      description: "Открыл карту райдеров — поле боя размечено.",
+      category: "map_riders",
+      triggerSources: ["web:map_riders"],
+    },
+    {
+      id: "explorer_all_tools",
+      title: "Исследователь экипажа 🏆",
+      description: "Открыл ВСЕ рабочие инструменты: аналитику, лиды, задачи, зарплату, дашборд и карту райдеров.",
+      category: "operations",
+      triggerSources: ["web:franchize_exploration_complete"],
+    },
+  ];
+
   const vipBikeOnly: FranchizeAchievementDefinition[] = [
     {
       id: "vipbike_map_riders_ready",
@@ -270,8 +326,8 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
     },
   ];
 
-  if (slug === "vip-bike") return [...shared, ...workAchievements, ...rentalAchievements, ...vipBikeOnly];
-  return [...shared, ...workAchievements, ...rentalAchievements];
+  if (slug === "vip-bike") return [...shared, ...workAchievements, ...rentalAchievements, ...explorationAchievements, ...vipBikeOnly];
+  return [...shared, ...workAchievements, ...rentalAchievements, ...explorationAchievements];
 }
 
 export async function getFranchizeAchievementCatalogAction(slug: string): Promise<FranchizeAchievementDefinition[]> {
@@ -376,6 +432,139 @@ export async function grantFranchizeAchievementAction(params: {
 
   if (updateError) return { success: false, error: updateError.message };
   return { success: true, alreadyUnlocked };
+}
+
+/**
+ * Exploration achievements (iter7): awarded when a CREW MEMBER opens one of the
+ * crew's working pages (analytics, leads, todos, salary, dashboard, map-riders).
+ *
+ * Access gate: crew owner / crew member / global admin / subrenter of a crew
+ * bike (specs.subrenter_chat_id). Plain visitors get nothing — these badges
+ * celebrate learning the crew's tooling, not just browsing.
+ *
+ * Auto-completes the "explorer_all_tools" meta-achievement when all six
+ * exploration badges are unlocked. Returns the list of NEWLY unlocked
+ * achievements (title + description) so the client can toast them.
+ */
+const EXPLORATION_ACHIEVEMENT_IDS = [
+  "explorer_analytics",
+  "explorer_leads",
+  "explorer_todos",
+  "explorer_salary",
+  "explorer_dashboard",
+  "explorer_map_riders",
+] as const;
+
+export async function grantFranchizeExplorationAchievementAction(params: {
+  userId: string;
+  slug: string;
+  achievementId: string;
+  sourceRoute?: string;
+}): Promise<{
+  success: boolean;
+  granted?: Array<{ id: string; title: string; description: string }>;
+  error?: string;
+}> {
+  const slug = normalizeSlug(params.slug);
+  if (!params.userId || !params.achievementId) {
+    return { success: false, error: "userId and achievementId are required" };
+  }
+  if (!EXPLORATION_ACHIEVEMENT_IDS.includes(params.achievementId as (typeof EXPLORATION_ACHIEVEMENT_IDS)[number])) {
+    return { success: false, error: "Unknown exploration achievement" };
+  }
+
+  try {
+    // ── Access gate: crew owner / member / global admin / subrenter ──
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id")
+      .eq("slug", slug)
+      .maybeSingle();
+    if (!crew) return { success: false, error: "Экипаж не найден." };
+
+    let allowed = crew.owner_id === params.userId;
+    if (!allowed) {
+      const { data: member } = await supabaseAdmin
+        .from("crew_members")
+        .select("user_id")
+        .eq("crew_id", crew.id)
+        .eq("user_id", params.userId)
+        .maybeSingle();
+      allowed = Boolean(member);
+    }
+    if (!allowed) {
+      const { data: userRow } = await supabaseAdmin
+        .from("users")
+        .select("metadata")
+        .eq("user_id", params.userId)
+        .maybeSingle();
+      const meta = (userRow?.metadata ?? {}) as Record<string, unknown>;
+      allowed = meta.role === "admin" || meta.status === "admin";
+    }
+    if (!allowed) {
+      // Subrenters (bike owners partnered with the crew) may explore too.
+      const { data: subrentBikes } = await supabaseAdmin
+        .from("cars")
+        .select("id")
+        .eq("crew_id", crew.id)
+        .eq("specs->>subrenter_chat_id", params.userId)
+        .limit(1);
+      allowed = (subrentBikes ?? []).length > 0;
+    }
+    if (!allowed) {
+      return { success: true, granted: [] };
+    }
+
+    // ── Grant the page badge ──
+    const catalog = getCatalogBySlug(slug);
+    const granted: Array<{ id: string; title: string; description: string }> = [];
+    const pageBadge = catalog.find((a) => a.id === params.achievementId);
+    if (pageBadge) {
+      const res = await grantFranchizeAchievementAction({
+        slug,
+        userId: params.userId,
+        achievementId: pageBadge.id,
+        source: pageBadge.triggerSources[0] ?? "web:franchize_exploration",
+        context: { route: params.sourceRoute },
+      });
+      if (res.success && !res.alreadyUnlocked) {
+        granted.push({ id: pageBadge.id, title: pageBadge.title, description: pageBadge.description });
+      }
+    }
+
+    // ── Meta-achievement: all tools explored ──
+    if (granted.length > 0) {
+      const { data: profile } = await supabaseAdmin
+        .from("users")
+        .select("metadata")
+        .eq("user_id", params.userId)
+        .maybeSingle();
+      const meta = (profile?.metadata ?? {}) as Record<string, any>;
+      const unlockedIds = Object.keys(meta.franchizeProfiles?.[slug]?.achievements ?? {}) as string[];
+      const allExplored = EXPLORATION_ACHIEVEMENT_IDS.every((id) => unlockedIds.includes(id));
+      const alreadyHasMeta = unlockedIds.includes("explorer_all_tools");
+      if (allExplored && !alreadyHasMeta) {
+        const metaBadge = catalog.find((a) => a.id === "explorer_all_tools");
+        if (metaBadge) {
+          const res = await grantFranchizeAchievementAction({
+            slug,
+            userId: params.userId,
+            achievementId: "explorer_all_tools",
+            source: "web:franchize_exploration_complete",
+            context: { route: params.sourceRoute },
+          });
+          if (res.success && !res.alreadyUnlocked) {
+            granted.push({ id: metaBadge.id, title: metaBadge.title, description: metaBadge.description });
+          }
+        }
+      }
+    }
+
+    return { success: true, granted };
+  } catch (error) {
+    logger.warn("[grantFranchizeExplorationAchievementAction] failed:", error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export async function getFranchizeFormPrefillAction(params: { userId: string; slug: string }): Promise<{ success: boolean; data?: FranchizeFormPrefill; error?: string }> {
@@ -527,6 +716,7 @@ export async function getFranchizeCrewRentalsListAction(params: {
     if (!crew) return { success: false, error: "Экипаж не найден." };
 
     // Password auth: full access
+    let subrenterVehicleIds: string[] = [];
     if (!isPasswordAuth) {
       // TG auth: check permissions
       const { data: user } = await supabaseAdmin
@@ -548,8 +738,18 @@ export async function getFranchizeCrewRentalsListAction(params: {
         .eq("user_id", actorUserId)
         .maybeSingle();
 
-      if (!isOwner && !isAdmin && !isOrudjov && !crewMember) {
-        return { success: false, error: "Недостаточно прав для просмотра." };
+      // ── Subrenter access (iter7): a user whose chat_id is set in a bike's
+      // specs.subrenter_chat_id sees rentals OF HIS BIKES ONLY (mini admin).
+      if (!isOwner && !isAdmin && !isOrudjov && !crewMember && actorUserId) {
+        const { data: subrentBikes } = await supabaseAdmin
+          .from("cars")
+          .select("id")
+          .eq("crew_id", crew.id)
+          .eq("specs->>subrenter_chat_id", actorUserId);
+        subrenterVehicleIds = (subrentBikes ?? []).map((b: { id: string }) => String(b.id));
+        if (subrenterVehicleIds.length === 0) {
+          return { success: false, error: "Недостаточно прав для просмотра." };
+        }
       }
     }
 
@@ -558,6 +758,11 @@ export async function getFranchizeCrewRentalsListAction(params: {
       .from("rentals")
       .select("rental_id,status,payment_status,vehicle_id,agreed_start_date,agreed_end_date,created_at,metadata,user_id,vehicle:cars!inner(id,make,model,crew_id,image_url)")
       .eq("vehicle.crew_id", crew.id);
+
+    // Subrenter scope: only rentals of the bikes he owns.
+    if (subrenterVehicleIds.length > 0) {
+      query = query.in("vehicle_id", subrenterVehicleIds);
+    }
 
     // "Мои аренды" — filter by the current Telegram user (not password auth)
     if (myOnly && actorUserId && !isPasswordAuth) {

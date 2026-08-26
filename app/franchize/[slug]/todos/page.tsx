@@ -12,6 +12,7 @@ import { useAppContext } from '@/contexts/AppContext'
 import { usePasswordGate } from '../leads/hooks/usePasswordGate'
 import { AnalyticsPasswordEntry } from '../../components/AnalyticsPasswordEntry'
 import { AnalyticsLoading } from '../../components/AnalyticsLoading'
+import { AchievementExplorer } from '../../components/AchievementExplorer'
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -306,6 +307,7 @@ function HomeInner() {
   // ── Render ──
   return (
     <div className="min-h-screen bg-[#121520] text-[#E6D8C4] font-mono">
+      <AchievementExplorer slug={slug} achievementId="explorer_todos" />
       <style>{`
         body { background: #121520; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
