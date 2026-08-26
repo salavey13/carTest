@@ -4,6 +4,7 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase-server";
+import { normalizePhoneDigits } from "@/app/franchize/lib/phone-utils";
 
 export interface UserRentalSecret {
   id: string;
@@ -163,16 +164,9 @@ export async function getUserRentalSecrets(
   }
 }
 
-/** Normalize a phone to the last 10 digits (strips +7 / 8 prefixes, spaces, dashes).
- *  "89960430155" / "+7 996 043 01 55" / "79960430155" → "9960430155" */
-export function normalizePhoneDigits(rawPhone: string): string {
-  const digits = String(rawPhone || "").replace(/\D/g, "");
-  // RU numbers: 11 digits starting with 8 or 7 → drop the leading country code
-  if (digits.length === 11 && (digits.startsWith("8") || digits.startsWith("7"))) {
-    return digits.slice(1);
-  }
-  return digits;
-}
+/** Phone comparison key lives in @/app/franchize/lib/phone-utils
+ *  (normalizePhoneDigits) — a "use server" file may only export async
+ *  functions, so the sync helper cannot live here. */
 
 /**
  * PHONE fallback lookup (iter8): most recent VERIFIED secret for a crew whose
