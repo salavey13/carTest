@@ -22,6 +22,7 @@ import { AnalyticsLoading } from "../rentals-analytics/analytics-components/Anal
 // FIX (F16): reuse the rentals analytics ExportCsvModal — it's just a
 // date-range picker + Download button, agnostic to the export subject.
 import { ExportCsvModal } from "../rentals-analytics/components/ExportCsvModal";
+import { fetchCsvTextWithError } from "../rentals-analytics/components/csvFetch";
 import type { ThemeTokens } from "../rentals-analytics/hooks/useTheme";
 
 interface SalesAnalyticsClientProps {
@@ -105,11 +106,10 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
     async (from: string, to: string): Promise<string> => {
       const actorUserId = getActorUserId();
       if (!actorUserId) throw new Error("no actor user id");
-      const resp = await fetch(buildSalesCsvApiUrl(from, to), {
-        headers: { "x-telegram-user-id": actorUserId },
+      // FIX (iter6): shared helper — surfaces the REAL API error text.
+      return fetchCsvTextWithError(buildSalesCsvApiUrl(from, to), {
+        "x-telegram-user-id": actorUserId,
       });
-      if (!resp.ok) throw new Error(`http ${resp.status}`);
-      return await resp.text();
     },
     [buildSalesCsvApiUrl, getActorUserId],
   );

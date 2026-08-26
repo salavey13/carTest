@@ -55,7 +55,8 @@ import {
   RENTAL_CATEGORY_DESCRIPTIONS,
   SALE_CATEGORY_LABELS,
   EQUIPMENT_SALE_LABELS,
-  getDefaultBikeCategories,
+  PRICE_TIER_LABELS,
+  deriveCategoriesFromPrice,
   computeRentalSalary,
   computeSaleSalary,
   type RentalCategory,
@@ -86,7 +87,11 @@ const RENTAL_CAT_ACCENTS: Record<RentalCategory, string> = {
   partner_premium: "#ec4899",
 };
 
-const OFFICIAL_BIKE_MAP = getDefaultBikeCategories();
+const TIER_ACCENTS: Record<string, string> = {
+  budget: "#94a3b8",
+  regular: "#3b82f6",
+  premium: "#f59e0b",
+};
 
 function rub(n: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n) + " ₽";
@@ -168,11 +173,30 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
   const setBikeSaleCat = (bikeId: string, cat: SaleCategory) =>
     setBikes((bs) => bs.map((b) => (b.bikeId === bikeId ? { ...b, saleCategory: cat } : b)));
 
-  const applyOfficialBikeMapping = () => {
+  /** Toggle the subrented (partner) flag — rental category follows: tier ↔ partner_tier. */
+  const setBikeSubrented = (bikeId: string, subrented: boolean) =>
     setBikes((bs) =>
       bs.map((b) => {
-        const def = OFFICIAL_BIKE_MAP[b.bikeId];
-        return def ? { ...b, rentalCategory: def.rental, saleCategory: def.sale } : b;
+        if (b.bikeId !== bikeId) return b;
+        const derived = deriveCategoriesFromPrice(b.dailyPrice, subrented);
+        return { ...b, subrented, rentalCategory: derived.rental, tier: derived.tier };
+      }),
+    );
+
+  /** Re-derive every bike's categories from its CURRENT price (owner's rule:
+   *  coolness is judged by price). Bikes whose stored category disagrees with
+   *  the price-derived one get snapped back to the price-derived value. */
+  const rederiveFromPrices = () => {
+    setBikes((bs) =>
+      bs.map((b) => {
+        const derived = deriveCategoriesFromPrice(b.dailyPrice, b.subrented);
+        return {
+          ...b,
+          rentalCategory: derived.rental,
+          saleCategory: derived.sale,
+          tier: derived.tier,
+          priceDerived: { rental: derived.rental, sale: derived.sale },
+        };
       }),
     );
   };
@@ -188,6 +212,9 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
           bikeId: b.bikeId,
           rentalCategory: b.rentalCategory,
           saleCategory: b.saleCategory,
+          subrented: b.subrented,
+          tier: b.tier,
+          dailyPrice: b.dailyPrice,
         })),
       });
       if (result.success) {
@@ -249,7 +276,14 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
     return bikes.filter((b) => b.name.toLowerCase().includes(q) || b.bikeId.toLowerCase().includes(q));
   }, [bikes, bikeSearch]);
 
-  const onDefaultsCount = useMemo(() => bikes.filter((b) => !b.isOverridden).length, [bikes]);
+  // Bikes whose stored category disagrees with what the CURRENT price derives.
+  const stalePriceCount = useMemo(
+    () =>
+      bikes.filter(
+        (b) => b.rentalCategory !== b.priceDerived.rental || b.saleCategory !== b.priceDerived.sale,
+      ).length,
+    [bikes],
+  );
 
   if (loading) {
     return (
@@ -433,10 +467,10 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
                 label={SALE_CATEGORY_LABELS[cat]}
                 hint={
                   cat === "enduro_moped"
-                    ? "Эндуро, электроэндуро, мопеды, скутеры, питбайки"
+                    ? "Цена аренды до 7 000 ₽/сутки (мопеды, эндуро, питбайки)"
                     : cat === "regular"
-                      ? "Дорожная техника"
-                      : "Сиквенс, Харлей, Сузуки"
+                      ? "Цена аренды 7 000–13 999 ₽/сутки"
+                      : "Цена аренды от 14 000 ₽/сутки"
                 }
                 value={config.sale[cat]}
                 official={OFFICIAL_SALARY_CONFIG.sale[cat]}
@@ -509,19 +543,30 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
               <Button
                 variant="outline"
                 size="sm"
-                onClick={applyOfficialBikeMapping}
+                onClick={rederiveFromPrices}
                 className="rounded-full text-xs"
                 style={{ borderColor: T.border, color: T.text }}
               >
-                <Wand2 className="mr-1 h-3.5 w-3.5" /> Применить официальные
+                <Wand2 className="mr-1 h-3.5 w-3.5" /> Пересчитать по ценам
               </Button>
             )}
           </div>
           <p className="mt-1 text-xs" style={{ color: T.textMuted }}>
-            {onDefaultsCount > 0
-              ? `${onDefaultsCount} технике назначены категории по умолчанию (из официального документа). Измените при необходимости.`
-              : "Всем единицам техники назначены категории вручную."}
+            Крутизна техники определяется ЦЕНОЙ аренды: премиум от 14 000 ₽/сутки, обычная 7 000–13 999 ₽,
+            бюджет до 7 000 ₽. Субаренда (Дукати Аэро, Ямаха R7, Сузуки 1000) даёт «партнерскую» категорию —
+            бонус ниже. Ручная категория сохраняется в specs и имеет приоритет; жёлтая метка — цена
+            изменилась и категория по цене теперь другая.
           </p>
+          {stalePriceCount > 0 && (
+            <p
+              className="mt-2 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px]"
+              style={{ backgroundColor: "#f59e0b15", color: "#f59e0b" }}
+            >
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              {stalePriceCount} ед. техники: категория отличается от выведенной по текущей цене —
+              нажмите «Пересчитать по ценам» чтобы синхронизировать.
+            </p>
+          )}
 
           <div className="relative mt-3">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: T.textFaint }} />
@@ -535,60 +580,108 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
           </div>
 
           <div className="mt-3 space-y-2">
-            {filteredBikes.map((b) => (
-              <div
-                key={b.bikeId}
-                className="flex flex-col gap-2 rounded-xl border p-2.5 sm:flex-row sm:items-center sm:justify-between"
-                style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}
-              >
-                <div className="min-w-0 sm:max-w-[45%]">
-                  <p className="truncate text-sm font-medium" style={{ color: T.text }}>
-                    {b.name}
-                  </p>
-                  <p className="truncate text-[11px]" style={{ color: T.textFaint }}>
-                    {b.bikeId}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide" style={{ color: T.textMuted }}>
-                      Аренда
-                    </label>
-                    <select
-                      value={b.rentalCategory}
-                      disabled={!isOwner}
-                      onChange={(e) => setBikeRentalCat(b.bikeId, e.target.value as RentalCategory)}
-                      className={`${franchizeOperatorInputClassName} h-9 px-2 text-xs`}
-                      style={{ ...franchizeOperatorInputStyle, appearance: "auto" as any }}
-                    >
-                      {RENTAL_CAT_KEYS.map((c) => (
-                        <option key={c} value={c}>
-                          {RENTAL_CATEGORY_LABELS[c]} · {config.rental[c]} ₽
-                        </option>
-                      ))}
-                    </select>
+            {filteredBikes.map((b) => {
+              const stale = b.rentalCategory !== b.priceDerived.rental || b.saleCategory !== b.priceDerived.sale;
+              return (
+                <div
+                  key={b.bikeId}
+                  className="flex flex-col gap-2 rounded-xl border p-2.5 sm:flex-row sm:items-center sm:justify-between"
+                  style={{
+                    borderColor: stale ? "#f59e0b55" : T.borderSoft,
+                    backgroundColor: T.bgElevated,
+                  }}
+                >
+                  <div className="min-w-0 sm:max-w-[42%]">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-medium" style={{ color: T.text }}>
+                        {b.name}
+                      </p>
+                      {b.subrented && (
+                        <span
+                          className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                          style={{ backgroundColor: "#8b5cf620", color: "#8b5cf6" }}
+                          title="Субаренда — партнерская техника"
+                        >
+                          субаренда
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 truncate text-[11px]" style={{ color: T.textFaint }}>
+                      <span className="tabular-nums">{rub(b.dailyPrice)}/сутки</span>
+                      <span
+                        className="rounded px-1 py-0.5 text-[10px] font-semibold"
+                        style={{
+                          backgroundColor: `color-mix(in srgb, ${TIER_ACCENTS[b.tier] || "#94a3b8"} 15%, transparent)`,
+                          color: TIER_ACCENTS[b.tier] || "#94a3b8",
+                        }}
+                      >
+                        {PRICE_TIER_LABELS[b.tier]}
+                      </span>
+                      {stale && (
+                        <span className="rounded px-1 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "#f59e0b20", color: "#f59e0b" }}>
+                          по цене: {RENTAL_CATEGORY_LABELS[b.priceDerived.rental]}
+                        </span>
+                      )}
+                    </p>
                   </div>
-                  <div>
-                    <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide" style={{ color: T.textMuted }}>
-                      Продажа
-                    </label>
-                    <select
-                      value={b.saleCategory}
-                      disabled={!isOwner}
-                      onChange={(e) => setBikeSaleCat(b.bikeId, e.target.value as SaleCategory)}
-                      className={`${franchizeOperatorInputClassName} h-9 px-2 text-xs`}
-                      style={{ ...franchizeOperatorInputStyle, appearance: "auto" as any }}
-                    >
-                      {SALE_CAT_KEYS.map((c) => (
-                        <option key={c} value={c}>
-                          {SALE_CATEGORY_LABELS[c]} · {config.sale[c]} ₽
-                        </option>
-                      ))}
-                    </select>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    {isOwner && (
+                      <button
+                        type="button"
+                        onClick={() => setBikeSubrented(b.bikeId, !b.subrented)}
+                        title={b.subrented ? "Убрать флаг субаренды" : "Пометить как субаренду (партнерская)"}
+                        className="shrink-0 cursor-pointer rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition hover:opacity-80"
+                        style={{
+                          borderColor: b.subrented ? "#8b5cf655" : T.border,
+                          color: b.subrented ? "#8b5cf6" : T.textMuted,
+                          backgroundColor: b.subrented ? "#8b5cf610" : "transparent",
+                        }}
+                      >
+                        {b.subrented ? "◆ Субаренда" : "◇ Своя"}
+                      </button>
+                    )}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide" style={{ color: T.textMuted }}>
+                          Аренда
+                        </label>
+                        <select
+                          value={b.rentalCategory}
+                          disabled={!isOwner}
+                          onChange={(e) => setBikeRentalCat(b.bikeId, e.target.value as RentalCategory)}
+                          className={`${franchizeOperatorInputClassName} h-9 px-2 text-xs`}
+                          style={{ ...franchizeOperatorInputStyle, appearance: "auto" as any }}
+                        >
+                          {RENTAL_CAT_KEYS.map((c) => (
+                            <option key={c} value={c}>
+                              {RENTAL_CATEGORY_LABELS[c]} · {config.rental[c]} ₽
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide" style={{ color: T.textMuted }}>
+                          Продажа
+                        </label>
+                        <select
+                          value={b.saleCategory}
+                          disabled={!isOwner}
+                          onChange={(e) => setBikeSaleCat(b.bikeId, e.target.value as SaleCategory)}
+                          className={`${franchizeOperatorInputClassName} h-9 px-2 text-xs`}
+                          style={{ ...franchizeOperatorInputStyle, appearance: "auto" as any }}
+                        >
+                          {SALE_CAT_KEYS.map((c) => (
+                            <option key={c} value={c}>
+                              {SALE_CATEGORY_LABELS[c]} · {config.sale[c]} ₽
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {filteredBikes.length === 0 && (
               <p className="py-6 text-center text-sm" style={{ color: T.textMuted }}>
                 Ничего не найдено

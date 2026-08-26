@@ -14,6 +14,7 @@ import { LeadsKPICards } from "./components/LeadsKPICards";
 import { LeadsToolbar } from "./components/LeadsToolbar";
 import { LeadList } from "./components/LeadList";
 import { LeadBoard } from "./components/LeadBoard";
+import { LeadTableView } from "./components/LeadTableView";
 import { MobileLeadSheet } from "./components/MobileLeadSheet";
 import { EmptyState } from "./components/EmptyState";
 import { LeadDetailContent } from "./components/LeadDetailContent";
@@ -352,6 +353,70 @@ export function LeadsClient({
     );
   }
 
+  // ── Desktop detail panel (shared by list + table views) ──────────────────
+  // Extracted (iter6) so the new table view gets the same detail panel as the
+  // card list — click a table row on desktop → panel slides in on the right.
+  const desktopDetailPanel = (
+    <AnimatePresence mode="wait">
+      {(() => {
+        const selectedLead = selectedId ? sortedLeads.find(l => l.user_id === selectedId) : null;
+        if (!selectedLead) {
+          return (
+            <motion.div
+              key="empty-placeholder"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="sticky top-24 flex h-[calc(100vh-200px)] items-center justify-center rounded-2xl border border-dashed"
+              style={{ borderColor: T.border }}
+            >
+              <p className="text-sm" style={{ color: T.textFaint }}>Выберите лида для просмотра деталей</p>
+            </motion.div>
+          );
+        }
+        return (
+          <motion.div
+            key={selectedLead.user_id}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ type: "spring", damping: 24, stiffness: 260, mass: 0.6 }}
+            className="sticky top-24 max-h-[calc(100vh-140px)] overflow-y-auto rounded-2xl border p-4"
+            style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: T.shadow }}
+          >
+            <div className="mb-4 flex items-start gap-3">
+              <Avatar name={selectedLead.full_name} source={selectedLead.source} size={56} />
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-lg font-bold" style={{ color: T.text }}>{selectedLead.full_name || "Без имени"}</h3>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: T.textMuted }}>
+                  {selectedLead.phone && <span>{selectedLead.phone}</span>}
+                  {selectedLead.username && <span>@{selectedLead.username}</span>}
+                  <span>{relativeTime(selectedLead.lastSeenAt || selectedLead.createdAt)}</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <SourceBadge source={selectedLead.source} size="md" />
+                  {selectedLead.identityState && selectedLead.identityState !== 'claimed_user' && (
+                    <IdentityBadge state={selectedLead.identityState} />
+                  )}
+                  {selectedLead.bikeTitle && (
+                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ backgroundColor: T.borderSoft, color: T.text }}>
+                      <Bike className="h-3 w-3" /> {selectedLead.bikeTitle}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button onClick={() => setSelectedId(null)} aria-label="Закрыть детали" className="rounded p-1 transition hover:bg-black/5" style={{ color: T.textFaint }}>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} onTodoUpdate={handleTodoUpdate} />
+          </motion.div>
+        );
+      })()}
+    </AnimatePresence>
+  );
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
@@ -383,6 +448,29 @@ export function LeadsClient({
           getTodosForLead={getTodosForLead}
           T={T}
         />
+      ) : viewMode === "table" ? (
+        // NEW (iter6): analytics-style table view — same interaction model as
+        // the card list (click a row → detail panel on desktop / sheet on
+        // mobile), but dense and scannable.
+        sortedLeads.length === 0 ? (
+          <EmptyState hasFilters={hasFilters} searchQuery={debouncedSearchQuery} T={T} />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+            <div className={`transition-all duration-200 ${selectedId ? "lg:col-span-7" : "lg:col-span-12"}`}>
+              <LeadTableView
+                leads={sortedLeads}
+                selectedId={selectedId}
+                onSelect={(id) => setSelectedId(id)}
+                getTodosForLead={getTodosForLead}
+                sortMode={sortMode}
+                onSortChange={setSortMode}
+                T={T}
+              />
+            </div>
+            {/* Desktop detail panel — shared with the list view */}
+            <div className="hidden lg:block lg:col-span-5">{desktopDetailPanel}</div>
+          </div>
+        )
       ) : sortedLeads.length === 0 ? (
         <EmptyState hasFilters={hasFilters} searchQuery={debouncedSearchQuery} T={T} />
       ) : (
@@ -402,66 +490,7 @@ export function LeadsClient({
           </div>
 
           {/* Desktop detail panel — always rendered; shows empty state or details */}
-          <div className="hidden lg:block lg:col-span-7">
-            <AnimatePresence mode="wait">
-              {(() => {
-                const selectedLead = selectedId ? sortedLeads.find(l => l.user_id === selectedId) : null;
-                if (!selectedLead) {
-                  return (
-                    <motion.div
-                      key="empty-placeholder"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.15 }}
-                      className="sticky top-24 flex h-[calc(100vh-200px)] items-center justify-center rounded-2xl border border-dashed"
-                      style={{ borderColor: T.border }}
-                    >
-                      <p className="text-sm" style={{ color: T.textFaint }}>Выберите лида для просмотра деталей</p>
-                    </motion.div>
-                  );
-                }
-                return (
-                  <motion.div
-                    key={selectedLead.user_id}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ type: "spring", damping: 24, stiffness: 260, mass: 0.6 }}
-                    className="sticky top-24 max-h-[calc(100vh-140px)] overflow-y-auto rounded-2xl border p-4"
-                    style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: T.shadow }}
-                  >
-                    <div className="mb-4 flex items-start gap-3">
-                      <Avatar name={selectedLead.full_name} source={selectedLead.source} size={56} />
-                      <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-lg font-bold" style={{ color: T.text }}>{selectedLead.full_name || "Без имени"}</h3>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: T.textMuted }}>
-                          {selectedLead.phone && <span>{selectedLead.phone}</span>}
-                          {selectedLead.username && <span>@{selectedLead.username}</span>}
-                          <span>{relativeTime(selectedLead.lastSeenAt || selectedLead.createdAt)}</span>
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          <SourceBadge source={selectedLead.source} size="md" />
-                          {selectedLead.identityState && selectedLead.identityState !== 'claimed_user' && (
-                            <IdentityBadge state={selectedLead.identityState} />
-                          )}
-                          {selectedLead.bikeTitle && (
-                            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ backgroundColor: T.borderSoft, color: T.text }}>
-                              <Bike className="h-3 w-3" /> {selectedLead.bikeTitle}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <button onClick={() => setSelectedId(null)} className="rounded p-1 transition hover:bg-black/5" style={{ color: T.textFaint }}>
-                        <X className="h-5 w-5" />
-                      </button>
-                    </div>
-                    <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} onTodoUpdate={handleTodoUpdate} />
-                  </motion.div>
-                );
-              })()}
-            </AnimatePresence>
-          </div>
+          <div className="hidden lg:block lg:col-span-7">{desktopDetailPanel}</div>
         </div>
       )}
 

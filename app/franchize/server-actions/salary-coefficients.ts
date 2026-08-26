@@ -1,7 +1,6 @@
 // app/franchize/server-actions/salary-coefficients.ts
 "use server";
 
-import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import {
   verifyCrewAccess,
@@ -12,19 +11,26 @@ import {
 } from "./shared/auth-helpers";
 import {
   getSalaryConfig,
-  getBikeCategoryOverrides,
-  resolveBikeCategories,
+  getCrewBikeSalaryRows,
+  saveSalaryConfigToMetadata,
+  saveBikeSalarySpecs,
   OFFICIAL_SALARY_CONFIG,
+  deriveCategoriesFromPrice,
   type SalaryConfig,
   type RentalCategory,
   type SaleCategory,
   type EquipmentSaleCategory,
   type BikeSalaryCategories,
+  type PriceTier,
 } from "@/lib/salary-coefficients";
 
 /**
  * Salary coefficients server actions (official bonus scheme).
  * PRD: docs/PRD_SALARY_COEFFICIENTS.md
+ *
+ * REWORK (iter6): storage moved off new tables →
+ *   • rates       → crews.metadata.franchize.salaryCoefficients (jsonb)
+ *   • bike class  → cars.specs.salary (jsonb), derived from price by default
  *
  * getSalaryCoefficientsConfig — crew members can read (transparency);
  * saveSalaryCoefficientsConfig — owner / co_owner / admin only.
@@ -33,10 +39,17 @@ import {
 export interface SalaryBikeRow {
   bikeId: string;
   name: string;
+  dailyPrice: number;
   rentalCategory: RentalCategory;
   saleCategory: SaleCategory;
-  /** true when the categories come from the crew's own override (not defaults) */
-  isOverridden: boolean;
+  /** "specs" = explicit cars.specs.salary override; "price" = derived from price */
+  source: "specs" | "price" | "fallback";
+  /** subrented (partner) bike — Ducati Aero / R7 / Suzuki 1000 */
+  subrented: boolean;
+  /** price tier before the partner prefix */
+  tier: PriceTier;
+  /** what the current price WOULD derive (mismatch ⇒ price changed since set) */
+  priceDerived: { rental: RentalCategory; sale: SaleCategory };
 }
 
 export interface SalaryCoefficientsConfigVM {
@@ -60,6 +73,7 @@ const EQUIPMENT_SALE_CATEGORIES: EquipmentSaleCategory[] = [
   "pants",
   "gloves",
 ];
+const PRICE_TIERS: PriceTier[] = ["budget", "regular", "premium"];
 
 export async function getSalaryCoefficientsConfig(params: {
   slug: string;
@@ -74,28 +88,24 @@ export async function getSalaryCoefficientsConfig(params: {
 
     const crewId = access.crewId!;
 
-    const [config, overrides, bikesResult] = await Promise.all([
+    const [config, bikeRows] = await Promise.all([
       getSalaryConfig(crewId),
-      getBikeCategoryOverrides(crewId),
-      supabaseAdmin
-        .from("cars")
-        .select("id, make, model")
-        .eq("crew_id", crewId)
-        .order("make", { ascending: true }),
+      getCrewBikeSalaryRows(crewId),
     ]);
 
-    if (bikesResult.error) {
-      logger.warn("[salary-coefficients] bikes query failed:", bikesResult.error);
-    }
-
-    const bikes: SalaryBikeRow[] = ((bikesResult.data || []) as any[]).map((b) => {
-      const resolved = resolveBikeCategories(b.id, overrides);
+    const bikes: SalaryBikeRow[] = bikeRows.map((row) => {
+      const subrented = Boolean(row.categories.subrented);
+      const derived = deriveCategoriesFromPrice(row.dailyPrice, subrented);
       return {
-        bikeId: b.id,
-        name: `${b.make || ""} ${b.model || ""}`.trim() || b.id,
-        rentalCategory: resolved.rental,
-        saleCategory: resolved.sale,
-        isOverridden: overrides.has(b.id),
+        bikeId: row.bikeId,
+        name: row.name,
+        dailyPrice: row.dailyPrice,
+        rentalCategory: row.categories.rental,
+        saleCategory: row.categories.sale,
+        source: row.categories.source || "price",
+        subrented,
+        tier: row.categories.tier || derived.tier,
+        priceDerived: { rental: derived.rental, sale: derived.sale },
       };
     });
 
@@ -113,8 +123,15 @@ export async function getSalaryCoefficientsConfig(params: {
 export async function saveSalaryCoefficientsConfig(params: {
   slug: string;
   config: SalaryConfig;
-  bikeCategories: Array<{ bikeId: string; rentalCategory: RentalCategory; saleCategory: SaleCategory }>;
-}): Promise<ActionResponse<{ savedAt: string }>> {
+  bikeCategories: Array<{
+    bikeId: string;
+    rentalCategory: RentalCategory;
+    saleCategory: SaleCategory;
+    subrented?: boolean;
+    tier?: PriceTier;
+    dailyPrice?: number;
+  }>;
+}): Promise<ActionResponse<{ savedAt: string; bikesUpdated: number }>> {
   const { slug, config, bikeCategories } = params;
 
   try {
@@ -156,67 +173,50 @@ export async function saveSalaryCoefficientsConfig(params: {
       return { success: false, error: `Некорректные значения: ${problems.join(", ")}` };
     }
 
-    // ── Upsert salary_coefficients ──
-    const rows: Array<{ crew_id: string; kind: string; category: string; amount: number; is_active: boolean }> = [];
-    for (const cat of RENTAL_CATEGORIES) {
-      rows.push({ crew_id: crewId, kind: "rental", category: cat, amount: Math.round(Number(config.rental[cat])), is_active: true });
-    }
-    rows.push({ crew_id: crewId, kind: "rental", category: "equipment", amount: Math.round(Number(config.equipmentRentalUnit)), is_active: true });
-    for (const cat of SALE_CATEGORIES) {
-      rows.push({ crew_id: crewId, kind: "sale", category: cat, amount: Math.round(Number(config.sale[cat])), is_active: true });
-    }
-    for (const cat of EQUIPMENT_SALE_CATEGORIES) {
-      rows.push({ crew_id: crewId, kind: "equipment_sale", category: cat, amount: Math.round(Number(config.equipmentSale[cat])), is_active: true });
-    }
-    rows.push({ crew_id: crewId, kind: "overprice", category: "percentage", amount: Math.round(op), is_active: true });
-
-    const { error: coefError } = await supabaseAdmin
-      .from("salary_coefficients")
-      .upsert(rows, { onConflict: "crew_id,kind,category" });
-
-    if (coefError) {
-      logger.error("[salary-coefficients] upsert salary_coefficients failed:", coefError);
-      return {
-        success: false,
-        error: "Не удалось сохранить коэффициенты. Возможно, миграция ещё не применена — попробуйте позже.",
-      };
-    }
-
-    // ── Upsert bike categories ──
+    // ── Validate bike categories ──
     const seenBikes = new Set<string>();
-    const bikeRows = bikeCategories
-      .filter((b) => {
-        if (!b?.bikeId || seenBikes.has(b.bikeId)) return false;
-        if (!RENTAL_CATEGORIES.includes(b.rentalCategory)) return false;
-        if (!SALE_CATEGORIES.includes(b.saleCategory)) return false;
-        seenBikes.add(b.bikeId);
-        return true;
-      })
-      .map((b) => ({
-        crew_id: crewId,
-        bike_id: b.bikeId,
-        rental_category: b.rentalCategory,
-        sale_category: b.saleCategory,
-      }));
+    const validBikeEntries = (bikeCategories || []).filter((b) => {
+      if (!b?.bikeId || seenBikes.has(b.bikeId)) return false;
+      if (!RENTAL_CATEGORIES.includes(b.rentalCategory)) return false;
+      if (!SALE_CATEGORIES.includes(b.saleCategory)) return false;
+      if (b.tier && !PRICE_TIERS.includes(b.tier)) return false;
+      seenBikes.add(b.bikeId);
+      return true;
+    });
 
-    if (bikeRows.length > 0) {
-      const { error: bikeError } = await supabaseAdmin
-        .from("bike_salary_categories")
-        .upsert(bikeRows, { onConflict: "crew_id,bike_id" });
+    // ── Save rates → crews.metadata.franchize.salaryCoefficients ──
+    const configResult = await saveSalaryConfigToMetadata(crewId, {
+      rental: config.rental,
+      equipmentRentalUnit: Math.round(Number(config.equipmentRentalUnit)),
+      sale: config.sale,
+      equipmentSale: config.equipmentSale,
+      overpricePercent: Math.round(op),
+    });
+    if (!configResult.ok) {
+      logger.error("[salary-coefficients] saveSalaryConfigToMetadata failed:", configResult.error);
+      return { success: false, error: "Не удалось сохранить коэффициенты: " + configResult.error };
+    }
 
-      if (bikeError) {
-        logger.error("[salary-coefficients] upsert bike_salary_categories failed:", bikeError);
-        return { success: false, error: "Коэффициенты сохранены, но категории техники — нет: " + bikeError.message };
+    // ── Save bike categories → cars.specs.salary ──
+    let bikesUpdated = 0;
+    if (validBikeEntries.length > 0) {
+      const bikesResult = await saveBikeSalarySpecs(crewId, validBikeEntries);
+      if (!bikesResult.ok) {
+        logger.error("[salary-coefficients] saveBikeSalarySpecs failed:", bikesResult.error);
+        return {
+          success: false,
+          error: `Коэффициенты сохранены, но категории техники — нет: ${bikesResult.error}`,
+        };
       }
+      bikesUpdated = bikesResult.updated;
     }
 
     logger.info("[salary-coefficients] saved config", {
       crewId,
-      coefficientRows: rows.length,
-      bikeRows: bikeRows.length,
+      bikesUpdated,
     });
 
-    return successResponse({ savedAt: new Date().toISOString() });
+    return successResponse({ savedAt: new Date().toISOString(), bikesUpdated });
   } catch (err) {
     logger.error("[salary-coefficients] saveSalaryCoefficientsConfig exception:", err);
     return errorResponse(handleError(err, "saveSalaryCoefficientsConfig"));
@@ -239,26 +239,10 @@ export async function resetSalaryCoefficientsToOfficial(params: {
     }
 
     const crewId = access.crewId!;
-    const rows: Array<{ crew_id: string; kind: string; category: string; amount: number; is_active: boolean }> = [];
-    for (const cat of RENTAL_CATEGORIES) {
-      rows.push({ crew_id: crewId, kind: "rental", category: cat, amount: OFFICIAL_SALARY_CONFIG.rental[cat], is_active: true });
-    }
-    rows.push({ crew_id: crewId, kind: "rental", category: "equipment", amount: OFFICIAL_SALARY_CONFIG.equipmentRentalUnit, is_active: true });
-    for (const cat of SALE_CATEGORIES) {
-      rows.push({ crew_id: crewId, kind: "sale", category: cat, amount: OFFICIAL_SALARY_CONFIG.sale[cat], is_active: true });
-    }
-    for (const cat of EQUIPMENT_SALE_CATEGORIES) {
-      rows.push({ crew_id: crewId, kind: "equipment_sale", category: cat, amount: OFFICIAL_SALARY_CONFIG.equipmentSale[cat], is_active: true });
-    }
-    rows.push({ crew_id: crewId, kind: "overprice", category: "percentage", amount: OFFICIAL_SALARY_CONFIG.overpricePercent, is_active: true });
-
-    const { error } = await supabaseAdmin
-      .from("salary_coefficients")
-      .upsert(rows, { onConflict: "crew_id,kind,category" });
-
-    if (error) {
-      logger.error("[salary-coefficients] reset failed:", error);
-      return { success: false, error: "Не удалось сбросить коэффициенты: " + error.message };
+    const result = await saveSalaryConfigToMetadata(crewId, OFFICIAL_SALARY_CONFIG);
+    if (!result.ok) {
+      logger.error("[salary-coefficients] reset failed:", result.error);
+      return { success: false, error: "Не удалось сбросить коэффициенты: " + result.error };
     }
 
     return successResponse({ config: OFFICIAL_SALARY_CONFIG });

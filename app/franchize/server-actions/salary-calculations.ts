@@ -36,8 +36,8 @@ const salaryCalcCache = new Map<string, { data: any; expiry: number }>();
  * Category-bonus method (official scheme, docs/PRD_SALARY_COEFFICIENTS.md):
  * rental + sale bonuses computed directly from rentals / sale_contract_artifacts
  * credited to the member. Used by calculateSalaryForPeriod when the crew has
- * salary_coefficients configured; replaces the percentage commission for
- * rental/sale income (prevents double counting).
+ * salary coefficients configured (crews.metadata.franchize.salaryCoefficients);
+ * replaces the percentage commission for rental/sale income (prevents double counting).
  */
 async function computeCategoryBonuses(params: {
   crewId: string;
@@ -405,7 +405,8 @@ export async function calculateSalaryForPeriod(params: {
     }
 
     // Category-bonus model (official scheme, PRD_SALARY_COEFFICIENTS.md):
-    // active once the salary_coefficients migration is applied + seeded.
+    // active once the crew's metadata.franchize.salaryCoefficients block exists
+    // (iter6 wrote the initial data for vip-bike).
     // Rental/sale income then uses fixed category bonuses computed from the
     // rentals / sale artifacts themselves; percentage rates keep applying only
     // to other income types (service, equipment, …) to avoid double counting.

@@ -1,0 +1,332 @@
+// /app/franchize/[slug]/leads/components/LeadTableView.tsx
+"use client";
+
+//
+// NEW (iter6, user request): "Таблица" view mode for the leads page — the same
+// table-view UX the operator already knows from the analytics CSV modal:
+//   • sticky header + zebra rows + hover highlight
+//   • tabular-nums for money, right-aligned
+//   • horizontal scroll on mobile (swipe), full width on desktop
+//   • click a row → opens the lead detail (same as clicking a LeadCard)
+//   • click a column header → sorts (synced with the toolbar sort dropdown)
+//   • footer with row count + total revenue
+//
+// The kanban (Воронка) and the card list stay as they are; this is a third
+// view aimed at scanning many leads fast.
+//
+
+import { useMemo } from "react";
+import { ArrowDown, ArrowUp, Bike, CircleDollarSign, Table2 } from "lucide-react";
+import type { LeadRow, LeadTodoRow } from "../leads-types";
+import { relativeTime, metaFor } from "../leads-utils";
+import { STAGE_LABELS, type SortMode } from "../leads-constants";
+import { Avatar } from "./Avatar";
+import type { ThemeTokens } from "../hooks/useTheme";
+
+interface LeadTableViewProps {
+  leads: LeadRow[];
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  getTodosForLead: (lead: LeadRow) => LeadTodoRow[];
+  sortMode: SortMode;
+  onSortChange?: (mode: SortMode) => void;
+  T: ThemeTokens;
+}
+
+/** Stage → display label + tint. Falls back to the raw key. */
+function stageMeta(stage: string | null | undefined): { label: string; color: string } {
+  const key = stage || "new";
+  if (STAGE_LABELS[key]) return { label: STAGE_LABELS[key], color: stageColor(key) };
+  return { label: key, color: "#64748b" };
+}
+
+function stageColor(stage: string): string {
+  switch (stage) {
+    case "new": return "#64748b";
+    case "contacted":
+    case "viewed": return "#3b82f6";
+    case "configured": return "#8b5cf6";
+    case "contract_generated":
+    case "contract_sent": return "#f59e0b";
+    case "checkout_started": return "#06b6d4";
+    case "checkout_completed":
+    case "interest_paid": return "#10b981";
+    case "completed": return "#10b981";
+    case "dismissed": return "#ef4444";
+    default: return "#64748b";
+  }
+}
+
+export function LeadTableView({
+  leads,
+  selectedId,
+  onSelect,
+  getTodosForLead,
+  sortMode,
+  onSortChange,
+  T,
+}: LeadTableViewProps) {
+  // Precompute per-lead derived values once (pending todos, spent, activity).
+  const rows = useMemo(
+    () =>
+      leads.map((lead) => {
+        const todos = getTodosForLead(lead);
+        return {
+          lead,
+          pendingTodos: todos.filter((t) => t.status !== "done").length,
+          totalTodos: todos.length,
+          spent: Number(lead.totalSpent || 0),
+          activity: lead.lastSeenAt || lead.createdAt || "",
+        };
+      }),
+    [leads, getTodosForLead],
+  );
+
+  const totalRevenue = useMemo(() => rows.reduce((sum, r) => sum + r.spent, 0), [rows]);
+
+  const fmtMoney = (n: number): string =>
+    n > 0 ? n.toLocaleString("ru-RU", { maximumFractionDigits: 0 }) + " ₽" : "—";
+
+  /** Header cell for sortable columns. */
+  const SortHeader = ({
+    label,
+    mode,
+    align = "left",
+  }: {
+    label: string;
+    mode: SortMode;
+    align?: "left" | "right";
+  }) => {
+    const active = sortMode === mode;
+    const clickable = !!onSortChange;
+    return (
+      <th
+        onClick={clickable ? () => onSortChange?.(mode) : undefined}
+        className={`whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide ${
+          clickable ? "cursor-pointer select-none" : ""
+        }`}
+        style={{
+          borderColor: T.border,
+          color: active ? T.text : T.textMuted,
+          textAlign: align,
+          backgroundColor: T.bgElevated,
+        }}
+        title={clickable ? "Сортировать" : undefined}
+      >
+        <span className="inline-flex items-center gap-1">
+          {label}
+          {active && sortMode === "recent" ? null : null}
+          {active && (mode === "name") ? <ArrowUp className="h-3 w-3" /> : null}
+          {active && (mode === "spent" || mode === "recent") ? <ArrowDown className="h-3 w-3" /> : null}
+        </span>
+      </th>
+    );
+  };
+
+  if (rows.length === 0) {
+    return (
+      <div
+        className="flex min-h-[240px] flex-col items-center justify-center gap-1 rounded-2xl border border-dashed p-8 text-center text-sm"
+        style={{ borderColor: T.border, color: T.textMuted }}
+      >
+        <Table2 className="h-8 w-8 opacity-40" aria-hidden />
+        <p>Нет лидов для отображения</p>
+        <p className="text-[11px]">Измените фильтры или поисковый запрос</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div
+        className="overflow-x-auto rounded-2xl border"
+        style={{ borderColor: T.border, backgroundColor: T.bgCard, WebkitOverflowScrolling: "touch" }}
+      >
+        <table className="w-full border-collapse text-left text-xs" style={{ color: T.text, minWidth: "920px" }}>
+          <thead className="sticky top-0 z-10">
+            <tr>
+              <th
+                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
+                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
+              >
+                Клиент
+              </th>
+              <th
+                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
+                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
+              >
+                Контакты
+              </th>
+              <th
+                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
+                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
+              >
+                Источник
+              </th>
+              <th
+                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
+                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
+              >
+                Стадия
+              </th>
+              <th
+                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
+                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
+              >
+                Ответственный
+              </th>
+              <th
+                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
+                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
+              >
+                Техника
+              </th>
+              <th
+                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
+                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "center" }}
+              >
+                Задачи
+              </th>
+              <SortHeader label="Выручка" mode="spent" align="right" />
+              <SortHeader label="Активность" mode="recent" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ lead, pendingTodos, totalTodos, spent }, idx) => {
+              const selected = selectedId === lead.user_id;
+              const stage = stageMeta(lead.intentStage);
+              const meta = metaFor(lead.source);
+              const owner = lead.assigneeName || lead.ownerName || "—";
+              return (
+                <tr
+                  key={lead.user_id}
+                  data-lead-id={lead.user_id}
+                  onClick={() => onSelect(selected ? null : lead.user_id)}
+                  className="cursor-pointer transition-colors"
+                  style={{
+                    backgroundColor: selected
+                      ? `color-mix(in srgb, ${T.accent} 10%, transparent)`
+                      : idx % 2 === 1
+                        ? `color-mix(in srgb, ${T.text} 3%, transparent)`
+                        : "transparent",
+                    boxShadow: selected ? `inset 3px 0 0 0 ${T.accent}` : undefined,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!selected) e.currentTarget.style.backgroundColor = `color-mix(in srgb, ${T.accent} 6%, transparent)`;
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!selected) e.currentTarget.style.backgroundColor = idx % 2 === 1 ? `color-mix(in srgb, ${T.text} 3%, transparent)` : "transparent";
+                  }}
+                >
+                  {/* Клиент */}
+                  <td className="max-w-[220px] border-b border-r px-2.5 py-2" style={{ borderColor: T.borderSoft }}>
+                    <div className="flex items-center gap-2">
+                      <Avatar name={lead.full_name} source={lead.source} size={28} />
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold" style={{ color: T.text }}>
+                          {lead.full_name || "Без имени"}
+                        </p>
+                        {lead.troubled && (
+                          <span className="text-[10px] font-medium" style={{ color: "#ef4444" }}>
+                            ⚠ проблемный
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  {/* Контакты */}
+                  <td className="max-w-[160px] border-b border-r px-2.5 py-2" style={{ borderColor: T.borderSoft }}>
+                    <p className="truncate tabular-nums" style={{ color: T.textMuted }}>{lead.phone || "—"}</p>
+                    {lead.username && (
+                      <p className="truncate text-[10px]" style={{ color: T.textFaint }}>@{lead.username}</p>
+                    )}
+                  </td>
+                  {/* Источник */}
+                  <td className="border-b border-r px-2.5 py-2" style={{ borderColor: T.borderSoft }}>
+                    <span
+                      className="whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium"
+                      style={{ backgroundColor: meta.bg, color: meta.color }}
+                    >
+                      {meta.label}
+                    </span>
+                  </td>
+                  {/* Стадия */}
+                  <td className="border-b border-r px-2.5 py-2" style={{ borderColor: T.borderSoft }}>
+                    <span
+                      className="whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                      style={{ backgroundColor: `${stage.color}18`, color: stage.color }}
+                    >
+                      {stage.label}
+                    </span>
+                  </td>
+                  {/* Ответственный */}
+                  <td className="max-w-[140px] border-b border-r px-2.5 py-2" style={{ borderColor: T.borderSoft }}>
+                    <p className="truncate" style={{ color: T.textMuted }}>{owner}</p>
+                  </td>
+                  {/* Техника */}
+                  <td className="max-w-[170px] border-b border-r px-2.5 py-2" style={{ borderColor: T.borderSoft }}>
+                    {lead.bikeTitle ? (
+                      <span className="inline-flex max-w-full items-center gap-1 truncate">
+                        <Bike className="h-3 w-3 shrink-0" style={{ color: T.textFaint }} aria-hidden />
+                        <span className="truncate" style={{ color: T.textMuted }}>{lead.bikeTitle}</span>
+                      </span>
+                    ) : (
+                      <span style={{ color: T.textFaint }}>—</span>
+                    )}
+                  </td>
+                  {/* Задачи */}
+                  <td className="border-b border-r px-2.5 py-2 text-center" style={{ borderColor: T.borderSoft }}>
+                    {totalTodos > 0 ? (
+                      <span
+                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                        style={
+                          pendingTodos > 0
+                            ? { backgroundColor: "#f59e0b20", color: "#f59e0b" }
+                            : { backgroundColor: "#10b98120", color: "#10b981" }
+                        }
+                      >
+                        {pendingTodos > 0 ? `${pendingTodos} открыто` : "готово"}
+                        <span style={{ color: T.textFaint }}>/ {totalTodos}</span>
+                      </span>
+                    ) : (
+                      <span style={{ color: T.textFaint }}>—</span>
+                    )}
+                  </td>
+                  {/* Выручка */}
+                  <td
+                    className="whitespace-nowrap border-b border-r px-2.5 py-2 text-right font-semibold tabular-nums"
+                    style={{ borderColor: T.borderSoft, color: spent > 0 ? T.text : T.textFaint }}
+                  >
+                    {spent > 0 ? fmtMoney(spent) : "—"}
+                  </td>
+                  {/* Активность */}
+                  <td
+                    className="whitespace-nowrap border-b px-2.5 py-2 text-[11px]"
+                    style={{ borderColor: T.borderSoft, color: T.textMuted }}
+                  >
+                    {relativeTime(lead.lastSeenAt || lead.createdAt)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Footer — row count + total revenue */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-[11px]" style={{ color: T.textMuted }}>
+        <span>
+          Показано: <b style={{ color: T.text }}>{rows.length}</b>{" "}
+          {rows.length === 1 ? "лид" : rows.length < 5 ? "лида" : "лидов"}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <CircleDollarSign className="h-3 w-3" aria-hidden />
+          Суммарная выручка:{" "}
+          <b className="tabular-nums" style={{ color: T.text }}>
+            {fmtMoney(totalRevenue)}
+          </b>
+        </span>
+      </div>
+    </div>
+  );
+}

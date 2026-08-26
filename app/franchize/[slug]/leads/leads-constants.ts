@@ -47,7 +47,7 @@ export const SEGMENT_META: Record<Segment, { label: string; icon: typeof Flame; 
   troubled:  { label: "Ждут внимания", icon: AlertCircle, color: "#f59e0b" },
 };
 
-export type ViewMode = "list" | "board";
+export type ViewMode = "list" | "board" | "table";
 export type SortMode = "recent" | "urgent" | "name" | "spent";
 export type DetailSection = "contacts" | "deals" | "tasks" | "notes";
 

@@ -1,6 +1,6 @@
 # PRD — Salary Coefficients (Коэффициенты ЗП)
 
-**Status:** v1.0 · 2026-08-26
+**Status:** v1.1 · 2026-08-26 (iter6 rework: price-based classification, jsonb storage)
 **Owner:** Crew owner / admin
 **Source of truth:** official bonus document (Аренда / Продажа / Овер Прайс) provided by business 2026-08-26
 
@@ -17,16 +17,37 @@ crew owner / admin.
 
 ## 2. Official scheme (defaults)
 
+### 2.0 Classification rule (iter6 — «крутизну техники определяет цена»)
+
+Bike category is **judged by the daily rental price** — no hardcoded model lists:
+
+| Tier | Price (₽/сутки) | Rental category (own) | Rental category (subrented) | Sale category |
+|---|---|---|---|---|
+| Бюджет | < 7 000 | `budget` (750 ₽) | — | `enduro_moped` (5000 ₽) |
+| Обычный | 7 000–13 999 | `regular` (1000 ₽) | `partner_regular` (500 ₽) | `regular` (10000 ₽) |
+| Премиум | ≥ 14 000 | `premium` (1500 ₽) | `partner_premium` (750 ₽) | `premium` (15000 ₽) |
+
+**Subrented (партнерские) bikes — the complete list (owner, 2026-08-26):**
+Ducati Aero (`ducati-panigale-s-electro-black-aero`), Yamaha R7 (`yamaha-r7`),
+Suzuki GSX-S1000F (`suzuki-gsx-s1000f`). Everything else is owned.
+
+Thresholds are stored in `crews.metadata.franchize.salaryCoefficients.priceThresholds`
+and used to derive categories for bikes without an explicit `specs.salary` override.
+The admin UI warns when a bike's stored category disagrees with what its CURRENT
+price derives («жёлтая метка») and offers «Пересчитать по ценам».
+
 ### 2.1 Аренда (per closed rental, by bike category)
 
-| Category | Key | Bonus, ₽ | Bikes (default mapping) |
-|---|---|---|---|
-| Бюджетные | `budget` | 750 | U2 Pro, Breakout 300, Nibbler 300 4V, Jilang Max Pro, Leopard Asaka, Kayo TSD 110, HMD M02 |
-| Обычные | `regular` | 1000 | BMW F800R, BMW S1000RR Electro Silver, Ducati 1199 Panigale (Зубик), Falcon GT, Falcon Pro, Rerode R1+, Y-VOLT Surge V |
-| Партнерские обычные | `partner_regular` | 500 | Yamaha R7, Kawasaki EX650K, Aprilia Shiver, Ducati Panigale S Electro (Black, Black Aero, Black Chain, Gold, Green) |
-| Премиум | `premium` | 1500 | Sequence Zero, LiveWire ONE (Харлей) |
-| Партнерские премиум | `partner_premium` | 750 | Suzuki GSX-S1000F |
-| Экип (per unit) | `equipment` | 200 | любой экип в аренде (шлемы, перчатки, куртка, штаны, ботинки, сет, рюкзак; зарядка — бесплатно, не считается) |
+| Category | Key | Bonus, ₽ |
+|---|---|---|
+| Бюджетные | `budget` | 750 |
+| Обычные | `regular` | 1000 |
+| Партнерские обычные | `partner_regular` | 500 |
+| Премиум | `premium` | 1500 |
+| Партнерские премиум | `partner_premium` | 750 |
+| Экип (per unit) | `equipment` | 200 |
+
+(Which bikes land in which category follows §2.0 — by price + subrented flag.)
 
 ### 2.2 Продажа (per sale, by bike category)
 
@@ -36,9 +57,9 @@ crew owner / admin.
 | Обычные | `regular` | 10000 |
 | Премиум | `premium` | 15000 |
 
-Default sale mapping: enduro/scooter/pitbikes → `enduro_moped`; road bikes
-(BMW, Ducati, Honda, Aprilia, Yamaha, Kawa, electro replicas) → `regular`;
-Sequence / LiveWire / Suzuki → `premium`.
+Sale category follows the price tier (§2.0): budget → `enduro_moped`,
+regular → `regular`, premium → `premium`. The subrented flag does not change
+sale bonuses.
 
 ### 2.3 Продажа экипировки (per unit sold)
 
@@ -77,27 +98,45 @@ until `asking_price` is tracked on sale artifacts.
 Equipment unit count: helmets + gloves (counts) + jacket/pants/boots/net/backpack (0/1).
 Charger is free → excluded.
 
-## 4. Data model
+## 4. Data model (iter6 — NO new tables, jsonb only)
 
-```sql
-public.salary_coefficients (
-  crew_id UUID → crews, kind TEXT, category TEXT,
-  amount NUMERIC ≥ 0, is_active BOOL, updated_at,
-  PK (crew_id, kind, category)
-)
--- kind: 'rental' (categories incl. 'equipment'), 'sale',
---       'equipment_sale', 'overprice' (category 'percentage')
+> The v1.0 design created `salary_coefficients` + `bike_salary_categories` tables
+> via migration. The owner rejected table-schema changes: **everything lives in
+> existing jsonb fields**, written via read-merge-write. The migration file was
+> removed (it was never applied to production).
 
-public.bike_salary_categories (
-  crew_id UUID → crews, bike_id TEXT → cars,
-  rental_category TEXT, sale_category TEXT, updated_at,
-  PK (crew_id, bike_id)
-)
+```jsonc
+// crews.metadata.franchize.salaryCoefficients — crew-level ₽ rates + thresholds
+{
+  "rental": { "budget": 750, "regular": 1000, "partner_regular": 500, "premium": 1500, "partner_premium": 750 },
+  "equipmentRentalUnit": 200,
+  "sale": { "enduro_moped": 5000, "regular": 10000, "premium": 15000 },
+  "equipmentSale": { "helmet": 500, "balaclava": 100, "jacket": 500, "pants": 500, "gloves": 200 },
+  "overpricePercent": 10,
+  "priceThresholds": { "premiumThreshold": 14000, "regularThreshold": 7000 },
+  "updatedAt": "…"
+}
+
+// cars.specs.salary — per-bike classification (explicit override wins over price)
+{
+  "tier": "premium",              // budget | regular | premium
+  "subrented": true,              // partner bike (Ducati Aero / R7 / Suzuki 1000)
+  "rentalCategory": "partner_premium",
+  "saleCategory": "premium",
+  "dailyPriceAtSet": 14000,       // price when this was written — mismatch ⇒ UI warning
+  "setAt": "…"
+}
 ```
 
-Code-level defaults (`lib/salary-coefficients.ts`) mirror the official numbers and the
-default bike mapping, so the feature degrades gracefully when the migration is not yet
-applied (same defensive pattern as `has_commission_rates`).
+Resolution order (`resolveCategoriesForBike` in `lib/salary-coefficients-shared.ts`):
+1. `cars.specs.salary.rentalCategory / saleCategory` — explicit, admin-set (source: `specs`)
+2. else derive from `cars.daily_price` + subrented flag (source: `price`)
+3. unknown bike ids → `regular / regular` (source: `fallback`)
+
+Code-level defaults (`OFFICIAL_SALARY_CONFIG`) mirror the official numbers, so
+unconfigured crews degrade gracefully. `hasSalaryCoefficients()` (gates the switch
+from the legacy %-model in salary calculations) now checks the metadata block —
+true for vip-bike since iter6 wrote the initial data.
 
 ## 5. UI — /franchize/[slug]/salary-coefficients
 
@@ -107,9 +146,9 @@ Dedicated page (profile is already 1500+ lines). Sections:
 2. **Продажа** — 3 category cards.
 3. **Продажа экипировки** — 5 item cards.
 4. **Оверпрайс** — percent input + explanation.
-5. **Категории техники** — crew bike list, two dropdowns per bike
-   (категория аренды / категория продажи), search, «не настроено» highlight,
-   quick bulk-assign by default mapping.
+5. **Категории техники** — crew bike list with price + tier chip + «Субаренда/Своя»
+   toggle + two dropdowns per bike (категория аренды / категория продажи), search,
+   «по цене: …» stale-price badges, «Пересчитать по ценам» bulk action.
 6. Sticky save bar, dirty tracking, «Сбросить к официальным» action.
 7. Read-only view for regular members (transparency of how ЗП is computed).
 
@@ -131,8 +170,10 @@ Operator credit: rentals → `created_by_operator_chat_id`; sales → `telegram_
 
 ## 7. Rollout & compatibility
 
-- Migration seeds official defaults for **all** crews (ON CONFLICT DO NOTHING).
-- Before migration: code defaults active — CSV salary column switches from % to
+- **iter6 wrote the initial data directly** (`scripts/apply-salary-specs.mjs`):
+  `specs.salary` on all 28 vip-bike rentable bikes + official rates in crew metadata.
+  No migration, no table changes.
+- Unconfigured crews: code defaults active — CSV salary column switches from % to
   official bonuses immediately after deploy.
 - `commission_rates` remains for shifts/services and legacy crews; commissions page
   gets a banner pointing to the new page for rental/sale bonuses.
@@ -140,9 +181,11 @@ Operator credit: rentals → `created_by_operator_chat_id`; sales → `telegram_
 
 ## 8. Acceptance
 
-- [ ] Owner can view/edit all coefficients + bike categories; save persists (PK upsert).
-- [ ] Rentals CSV «ЗП Аренда»: Ducati Panigale S Electro Black Z → 500 + экип×200 + 10% оверпрайса.
-- [ ] Sales CSV «ЗП Продажа»: enduro sale → 5000.
-- [ ] Zero-config deploy works via code defaults (no migration required).
-- [ ] Profile salary table uses category bonuses when configured.
-- [ ] `tsc --noEmit` — no new errors vs baseline.
+- [x] Owner can view/edit all coefficients + bike categories; save persists
+      (metadata + specs jsonb, read-merge-write).
+- [x] Ducati Aero / R7 rentals → `partner_regular` 500 ₽ + экип×200 + 10% оверпрайса;
+      Suzuki 1000 → `partner_premium` 750 ₽ (verified against live Supabase data).
+- [x] Sales CSV «ЗП Продажа»: enduro sale → 5000.
+- [x] Zero-config deploy works via code defaults (no migration required).
+- [x] Profile salary table uses category bonuses when configured (metadata gate).
+- [x] `tsc --noEmit` — no new errors vs baseline; `eslint app/franchize` clean.

@@ -35,6 +35,7 @@ import { sendAnalyticsCsvToTelegram } from "@/app/franchize/server-actions/analy
 // Local v2 tree — ../components/* relative to this file (which sits in
 // rentals-analytics/ root, next to RentalsAnalyticsClient.tsx).
 import { AnalyticsClient } from "./components/AnalyticsClient";
+import { fetchCsvTextWithError } from "./components/csvFetch";
 import type {
   AnalyticsRentalRow,
   AnalyticsSaleRow,
@@ -365,11 +366,11 @@ export function AnalyticsClientV2({
     async (from: string, to: string): Promise<string> => {
       const actorUserId = getActorUserId();
       if (!actorUserId) throw new Error("no actor user id");
-      const resp = await fetch(buildCsvApiUrl(from, to), {
-        headers: { "x-telegram-user-id": actorUserId },
+      // FIX (iter6): use the shared helper so the thrown error carries the REAL
+      // API error text (JSON `{error}` body) instead of a bare "http 500".
+      return fetchCsvTextWithError(buildCsvApiUrl(from, to), {
+        "x-telegram-user-id": actorUserId,
       });
-      if (!resp.ok) throw new Error(`http ${resp.status}`);
-      return await resp.text();
     },
     [buildCsvApiUrl, getActorUserId],
   );

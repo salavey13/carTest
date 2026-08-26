@@ -422,12 +422,18 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             </DropdownMenuItem>
           ) : null}
 
-          <DropdownMenuItem asChild>
-            <Link href={franchizeDashboardHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
-              <LayoutDashboard className="mr-2 h-4 w-4 shrink-0" />
-              <span className="truncate">Дашборд франшизы</span>
-            </Link>
-          </DropdownMenuItem>
+          {/* FIX (iter6): "Дашборд франшизы" was rendered UNCONDITIONALLY — a
+              simple non-crew visitor on a franchise page saw a link to the
+              crew dashboard. Gate it exactly like leads / analytics:
+              current-crew members, crew admins, or platform admins only. */}
+          {canViewCrewLinks && effectiveSlug && (
+            <DropdownMenuItem asChild>
+              <Link href={franchizeDashboardHref} className="cursor-pointer flex min-w-0 items-center gap-2 w-full">
+                <LayoutDashboard className="mr-2 h-4 w-4 shrink-0" />
+                <span className="truncate">Дашборд франшизы</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
 
           {/* Leads page — visible to current crew members/owner or admin */}
           {canViewCrewLinks && effectiveSlug && (

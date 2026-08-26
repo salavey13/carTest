@@ -10,6 +10,7 @@ import {
   Check,
   LayoutList,
   Columns3,
+  Table2,
   ShieldAlert,
   Flame,
   CheckCircle,
@@ -96,9 +97,9 @@ export function LeadsToolbar({
   segment: Segment;
   setSegment: (v: Segment) => void;
   segmentCounts?: Partial<Record<Segment, number>>;
-  viewMode: "list" | "board";
-  setViewMode?: (v: "list" | "board") => void;
-  onViewModeChange?: (v: "list" | "board") => void;
+  viewMode: "list" | "board" | "table";
+  setViewMode?: (v: "list" | "board" | "table") => void;
+  onViewModeChange?: (v: "list" | "board" | "table") => void;
   hidePlaceholders: boolean;
   setHidePlaceholders: (v: boolean) => void;
   filterFlags?: any;
@@ -108,7 +109,7 @@ export function LeadsToolbar({
 }) {
   // Resolve the view-mode setter — prefer onViewModeChange (newer API),
   // fall back to setViewMode (older API).
-  const handleViewModeChange = (v: "list" | "board") => {
+  const handleViewModeChange = (v: "list" | "board" | "table") => {
     if (onViewModeChange) onViewModeChange(v);
     else if (setViewMode) setViewMode(v);
   };
@@ -123,37 +124,91 @@ export function LeadsToolbar({
         borderColor: T.border,
       }}
     >
-      {/* ── Row 1: search input (full width on mobile) ── */}
-      <div className="relative flex-1 sm:max-w-sm">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
-          style={{ color: T.textFaint }}
-        />
-        <input
-          type="text"
-          placeholder="Имя, телефон, байк, Telegram…"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full rounded-xl border py-2.5 pl-10 pr-9 text-sm outline-none transition focus:ring-2 focus:ring-offset-0"
-          style={{
-            backgroundColor: T.inputBg,
-            borderColor: T.inputBorder,
-            color: T.text,
-            "--tw-ring-color": T.borderActive,
-          } as React.CSSProperties}
-        />
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery("")}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 transition hover:opacity-80"
+      {/* ── Row 1: search input + view toggle (ALWAYS visible) ──
+          FIX (iter6, "kanban view got missing"): the Список/Воронка toggle
+          used to live at the END of the horizontally-scrolling filter row —
+          on a phone it sat off-screen after 4 dropdowns, with the scrollbar
+          hidden (scrollbarWidth: none), so the kanban looked "missing".
+          The view toggle now sits next to the search box on its own row and
+          gains a third mode — Таблица (analytics-style table view). */}
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1 sm:max-w-sm">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
             style={{ color: T.textFaint }}
+          />
+          <input
+            type="text"
+            placeholder="Имя, телефон, байк, Telegram…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-xl border py-2.5 pl-10 pr-9 text-sm outline-none transition focus:ring-2 focus:ring-offset-0"
+            style={{
+              backgroundColor: T.inputBg,
+              borderColor: T.inputBorder,
+              color: T.text,
+              "--tw-ring-color": T.borderActive,
+            } as React.CSSProperties}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              aria-label="Очистить поиск"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 transition hover:opacity-80"
+              style={{ color: T.textFaint }}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* View mode toggle — Список / Воронка / Таблица (icon-only on mobile) */}
+        <div
+          className="flex shrink-0 rounded-xl border p-1"
+          style={{ borderColor: T.border, backgroundColor: T.bgElevated }}
+          role="group"
+          aria-label="Режим просмотра"
+        >
+          <button
+            onClick={() => handleViewModeChange("list")}
+            title="Список"
+            aria-label="Список"
+            aria-pressed={viewMode === "list"}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition sm:px-3 ${
+              viewMode === "list" ? "" : "hover:opacity-70"
+            }`}
+            style={viewMode === "list" ? { backgroundColor: T.accent, color: T.accentContrast } : { color: T.textMuted }}
           >
-            <X className="h-3.5 w-3.5" />
+            <LayoutList className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Список</span>
           </button>
-        )}
+          <button
+            onClick={() => handleViewModeChange("board")}
+            title="Воронка (канбан)"
+            aria-label="Воронка (канбан)"
+            aria-pressed={viewMode === "board"}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition sm:px-3 ${
+              viewMode === "board" ? "" : "hover:opacity-70"
+            }`}
+            style={viewMode === "board" ? { backgroundColor: T.accent, color: T.accentContrast } : { color: T.textMuted }}
+          >
+            <Columns3 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Воронка</span>
+          </button>
+          <button
+            onClick={() => handleViewModeChange("table")}
+            title="Таблица"
+            aria-label="Таблица"
+            aria-pressed={viewMode === "table"}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition sm:px-3 ${
+              viewMode === "table" ? "" : "hover:opacity-70"
+            }`}
+            style={viewMode === "table" ? { backgroundColor: T.accent, color: T.accentContrast } : { color: T.textMuted }}
+          >
+            <Table2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Таблица</span>
+          </button>
+        </div>
       </div>
 
-      {/* ── Row 2: labeled dropdown filters + view toggle ──
+      {/* ── Row 2: labeled dropdown filters ──
           Mobile: horizontal scroll (single row, no page overflow).
           Desktop: normal flex-wrap.
           Each Dropdown + the view toggle is shrink-0 so they keep their
@@ -212,31 +267,6 @@ export function LeadsToolbar({
           T={T}
           options={SORT_OPTIONS}
         />
-
-        {/* View mode toggle — Список / Воронка */}
-        <div
-          className="flex rounded-xl border p-1"
-          style={{ flexShrink: 0, borderColor: T.border, backgroundColor: T.bgElevated }}
-        >
-          <button
-            onClick={() => handleViewModeChange("list")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-              viewMode === "list" ? "" : "hover:opacity-70"
-            }`}
-            style={viewMode === "list" ? { backgroundColor: T.accent, color: T.accentContrast } : { color: T.textMuted }}
-          >
-            <LayoutList className="h-3.5 w-3.5" /> Список
-          </button>
-          <button
-            onClick={() => handleViewModeChange("board")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-              viewMode === "board" ? "" : "hover:opacity-70"
-            }`}
-            style={viewMode === "board" ? { backgroundColor: T.accent, color: T.accentContrast } : { color: T.textMuted }}
-          >
-            <Columns3 className="h-3.5 w-3.5" /> Воронка
-          </button>
-        </div>
 
         {/* Hide operator placeholders toggle */}
         <button

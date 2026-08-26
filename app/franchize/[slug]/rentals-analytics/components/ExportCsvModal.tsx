@@ -27,7 +27,7 @@
 //  • Keyboard support — ESC closes the modal; Enter in the search box is
 //    a no-op (live filter).
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { X, Download, Loader2, Send, Search, Table2 } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
 import { formatDateRu } from "@/app/franchize/components/DateInputRu";
@@ -169,8 +169,11 @@ export function ExportCsvModal({
     try {
       const text = await fetchCsvText(from, to);
       setRows(parseCsv(text));
-    } catch {
-      setError("Не удалось загрузить данные");
+    } catch (e) {
+      // FIX (iter6): show the ACTUAL error next to the generic message so the
+      // operator can tell a 500 from an offline device from a bad date range.
+      const detail = e instanceof Error ? e.message : String(e);
+      setError(`Не удалось загрузить данные — ${detail}`);
       setRows([]);
     } finally {
       setLoading(false);
@@ -252,15 +255,14 @@ export function ExportCsvModal({
   const dataRowsAll = totalsRowIdx === -1 ? bodyRows : bodyRows.slice(0, totalsRowIdx);
   const totalsRow = totalsRowIdx === -1 ? null : bodyRows[totalsRowIdx];
 
-  // Apply search filter
+  // Apply search filter.
+  // NOTE: intentionally NOT useMemo — this sits after the `if (!isOpen) return null`
+  // early return, and a conditional hook violates rules-of-hooks (broke the build).
+  // The filter is cheap (a few hundred rows max) and recomputed per render.
   const q = query.trim().toLowerCase();
-  const dataRows = useMemo(() => {
-    if (!q) return dataRowsAll;
-    return dataRowsAll.filter((r) =>
-      r.some((c) => (c || "").toLowerCase().includes(q)),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataRowsAll, q]);
+  const dataRows = !q
+    ? dataRowsAll
+    : dataRowsAll.filter((r) => r.some((c) => (c || "").toLowerCase().includes(q)));
 
   // Column-kind lookup
   const numericCols = variant === "rentals" ? RENTALS_NUMERIC_COLS : SALES_NUMERIC_COLS;
@@ -487,8 +489,21 @@ export function ExportCsvModal({
               </div>
             </div>
           ) : error ? (
-            <div className="flex h-full min-h-[200px] items-center justify-center p-8 text-sm" style={{ color: "#ef4444" }}>
-              {error}
+            <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-3 p-8 text-center">
+              <div
+                className="max-w-md break-words rounded-lg border px-4 py-3 text-sm"
+                style={{ color: "#ef4444", borderColor: "#ef444455", backgroundColor: "#ef444410" }}
+              >
+                {error}
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadTable()}
+                className="cursor-pointer rounded-lg border px-4 py-2 text-xs font-medium transition hover:opacity-80"
+                style={{ borderColor: T.border, color: T.text, backgroundColor: T.bgElevated }}
+              >
+                Повторить
+              </button>
             </div>
           ) : headerRow.length === 0 ? (
             <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-1 p-8 text-center text-sm" style={{ color: T.textMuted }}>

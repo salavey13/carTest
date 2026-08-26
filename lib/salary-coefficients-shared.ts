@@ -5,6 +5,16 @@
 // components. DB resolution lives in lib/salary-coefficients.ts.
 //
 // PRD: docs/PRD_SALARY_COEFFICIENTS.md
+//
+// REWORK (iter6, owner feedback):
+//   • Bike "coolness" (budget / regular / premium) is judged BY PRICE,
+//     not by hardcoded model lists.
+//   • Subrented (partner) bikes are exactly three: Ducati Aero, Yamaha R7,
+//     Suzuki GSX-S1000F. Partner category = subrented + price tier.
+//   • Per-bike classification is stored in cars.specs.salary (jsonb) —
+//     NO new tables. Crew-level ₽ rates live in
+//     crews.metadata.franchize.salaryCoefficients (jsonb).
+//     The iter5 migration (new tables) was removed.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -26,6 +36,9 @@ export type EquipmentSaleCategory =
   | "pants"
   | "gloves";
 
+/** Price tier — the "coolness" of a bike, judged purely by its daily price. */
+export type PriceTier = "budget" | "regular" | "premium";
+
 export interface SalaryConfig {
   /** ₽ per closed rental by bike category */
   rental: Record<RentalCategory, number>;
@@ -42,6 +55,14 @@ export interface SalaryConfig {
 export interface BikeSalaryCategories {
   rental: RentalCategory;
   sale: SaleCategory;
+  /** Where the classification came from (UI diagnostics). */
+  source?: "specs" | "price" | "fallback";
+  /** Daily rental price used to derive the tier (UI diagnostics). */
+  dailyPrice?: number;
+  /** True when the bike is subrented from a partner (Ducati Aero / R7 / Suzuki). */
+  subrented?: boolean;
+  /** Price tier before the partner prefix (UI diagnostics). */
+  tier?: PriceTier;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -81,11 +102,11 @@ export const RENTAL_CATEGORY_LABELS: Record<RentalCategory, string> = {
 };
 
 export const RENTAL_CATEGORY_DESCRIPTIONS: Record<RentalCategory, string> = {
-  budget: "U2, Брейкаут 300, Ниблер 300, Скутеры, питбайки",
-  regular: "БМВ, Дукати Зубик, Эндуро",
-  partner_regular: "Ямаха, Кава, Априли, электро-реплики Дукати",
-  premium: "Сиквенс, Харлей",
-  partner_premium: "Сузуки",
+  budget: "Цена аренды до 7 000 ₽/сутки (мопеды, питбайки, скутеры)",
+  regular: "Цена аренды 7 000–13 999 ₽/сутки",
+  partner_regular: "Субаренда (Дукати Аэро, Ямаха R7) при цене 7 000–13 999 ₽/сутки",
+  premium: "Цена аренды от 14 000 ₽/сутки",
+  partner_premium: "Субаренда (Сузуки 1000) при цене от 14 000 ₽/сутки",
 };
 
 export const SALE_CATEGORY_LABELS: Record<SaleCategory, string> = {
@@ -102,64 +123,184 @@ export const EQUIPMENT_SALE_LABELS: Record<EquipmentSaleCategory, string> = {
   gloves: "Перчатки",
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Default bike → category mapping (official document, catalog IDs)
-// Unlisted bikes fall back to regular/regular (flagged as unconfigured in UI).
-// ─────────────────────────────────────────────────────────────────────────────
-
-const DEFAULT_BIKE_CATEGORIES: Record<string, BikeSalaryCategories> = {
-  // NOTE: keep in sync with the seed in
-  // supabase/migrations/20260826000001_create_salary_coefficients.sql
-  // budget (750 ₽)
-  "wenbox-u2-pro": { rental: "budget", sale: "enduro_moped" },
-  "motoland-breakout": { rental: "budget", sale: "enduro_moped" },
-  "nibbler-regumoto-4v": { rental: "budget", sale: "enduro_moped" },
-  "jilang-max-pro": { rental: "budget", sale: "enduro_moped" },
-  "leopard-asaka": { rental: "budget", sale: "enduro_moped" },
-  "kayo-tsd110": { rental: "budget", sale: "enduro_moped" },
-  "hmd-m02": { rental: "budget", sale: "enduro_moped" },
-  // regular (1000 ₽)
-  "bmw-f800r": { rental: "regular", sale: "regular" },
-  "bmw-s1000rr-electro-silver": { rental: "regular", sale: "regular" },
-  "ducati-1199-panigale-2012": { rental: "regular", sale: "regular" },
-  "falcon-gt-2026": { rental: "regular", sale: "enduro_moped" },
-  "falcon-pro-2026": { rental: "regular", sale: "enduro_moped" },
-  "rerode-r1-plus": { rental: "regular", sale: "enduro_moped" },
-  "y-volt-surge-v": { rental: "regular", sale: "enduro_moped" },
-  // partner_regular (500 ₽)
-  "yamaha-r7": { rental: "partner_regular", sale: "regular" },
-  "kawasaki-ex650k": { rental: "partner_regular", sale: "regular" },
-  "aprilia-shiver": { rental: "partner_regular", sale: "regular" },
-  "ducati-panigale-s-electro-black": { rental: "partner_regular", sale: "regular" },
-  "ducati-panigale-s-electro-black-aero": { rental: "partner_regular", sale: "regular" },
-  "ducati-panigale-s-electro-black-chain": { rental: "partner_regular", sale: "regular" },
-  "ducati-panigale-s-electro-gold": { rental: "partner_regular", sale: "regular" },
-  "ducati-panigale-s-electro-green": { rental: "partner_regular", sale: "regular" },
-  // premium (1500 ₽)
-  "sequence-zero": { rental: "premium", sale: "premium" },
-  "livewire-one": { rental: "premium", sale: "premium" },
-  // partner_premium (750 ₽)
-  "suzuki-gsx-s1000f": { rental: "partner_premium", sale: "premium" },
+export const PRICE_TIER_LABELS: Record<PriceTier, string> = {
+  budget: "Бюджет",
+  regular: "Обычный",
+  premium: "Премиум",
 };
 
-export const DEFAULT_BIKE_CATEGORY_FALLBACK: BikeSalaryCategories = {
-  rental: "regular",
-  sale: "regular",
-};
+// ─────────────────────────────────────────────────────────────────────────────
+// Price-based classification (iter6 — "judge coolness of bike by price")
+// ─────────────────────────────────────────────────────────────────────────────
 
-/** Default mapping used by the UI's "применить официальные категории" action. */
-export function getDefaultBikeCategories(): Record<string, BikeSalaryCategories> {
-  return { ...DEFAULT_BIKE_CATEGORIES };
+/**
+ * Daily-price thresholds for the price tiers. Calibrated against the official
+ * bonus document + the actual vip-bike fleet prices (2026-08):
+ *
+ *   premium  ≥ 14 000 ₽/сутки — LiveWire ONE (20k), Ducati 1199 (18k),
+ *                                Sequence Zero (15k), Suzuki GSX-S1000F (14k)
+ *   regular  7 000–13 999 ₽   — BMWs, Ducati электро-реплики, Kawasaki,
+ *                                Honda CBR, Aprilia, Falcons, Rerode, Y-Volt
+ *   budget   < 7 000 ₽        — U2, Kayo, Ниблер, Мотолэнд, Джиланг, HMD,
+ *                                Leopard, Sotion EM01
+ *
+ * Configurable per-crew via metadata.franchize.salaryCoefficients.priceThresholds
+ * (falls back to these constants when not set).
+ */
+export const DEFAULT_PRICE_TIERS = {
+  /** daily price ≥ premiumThreshold → premium */
+  premiumThreshold: 14000,
+  /** daily price ≥ regularThreshold (and < premiumThreshold) → regular */
+  regularThreshold: 7000,
+} as const;
+
+/**
+ * Subrented (partner) bikes — the complete list per the owner (2026-08-26):
+ * Ducati Aero, Yamaha R7, Suzuki GSX-S1000F. Everything else is owned.
+ */
+export const SUBRENTED_BIKE_IDS: readonly string[] = [
+  "ducati-panigale-s-electro-black-aero",
+  "yamaha-r7",
+  "suzuki-gsx-s1000f",
+];
+
+export function isSubrentedBike(bikeId: string): boolean {
+  return SUBRENTED_BIKE_IDS.includes(bikeId);
 }
 
-/** Resolve a bike's categories: DB override → default mapping → regular/regular. */
+/** Price → tier. Unpriced / zero-price bikes fall back to "budget". */
+export function deriveTierFromPrice(
+  dailyPrice: number | null | undefined,
+  tiers: { premiumThreshold: number; regularThreshold: number } = DEFAULT_PRICE_TIERS,
+): PriceTier {
+  const price = Number(dailyPrice);
+  if (!Number.isFinite(price) || price <= 0) return "budget";
+  if (price >= tiers.premiumThreshold) return "premium";
+  if (price >= tiers.regularThreshold) return "regular";
+  return "budget";
+}
+
+/** Sale category for a price tier (official document mapping). */
+export function saleCategoryForTier(tier: PriceTier): SaleCategory {
+  switch (tier) {
+    case "premium":
+      return "premium";
+    case "regular":
+      return "regular";
+    default:
+      return "enduro_moped";
+  }
+}
+
+/** Result of deriveCategoriesFromPrice — tier is always set here. */
+export interface DerivedBikeCategories extends BikeSalaryCategories {
+  tier: PriceTier;
+  source: "price";
+}
+
+/**
+ * Full classification from price + subrented flag:
+ *   tier = price → budget | regular | premium
+ *   rental category = subrented ? `partner_${tier}` : tier
+ *   sale category = tier mapping (partner flag does not change sale bonuses)
+ */
+export function deriveCategoriesFromPrice(
+  dailyPrice: number | null | undefined,
+  subrented: boolean,
+  tiers?: { premiumThreshold: number; regularThreshold: number },
+): DerivedBikeCategories {
+  const tier = deriveTierFromPrice(dailyPrice, tiers);
+  return {
+    rental: (subrented ? `partner_${tier}` : tier) as RentalCategory,
+    sale: saleCategoryForTier(tier),
+    source: "price",
+    dailyPrice: Number(dailyPrice) || 0,
+    subrented,
+    tier,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// specs.salary jsonb contract (cars.specs.salary)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Shape stored in cars.specs.salary:
+ *   { tier, subrented, rentalCategory, saleCategory, dailyPriceAtSet, setAt }
+ *
+ * Written by the salary-coefficients admin UI (server action) or by the
+ * maintainer directly. Missing / malformed entries → price-derived fallback.
+ */
+export interface BikeSpecsSalary {
+  tier?: PriceTier;
+  subrented?: boolean;
+  rentalCategory?: RentalCategory;
+  saleCategory?: SaleCategory;
+  dailyPriceAtSet?: number;
+  setAt?: string;
+}
+
+const VALID_RENTAL: readonly string[] = [
+  "budget", "regular", "partner_regular", "premium", "partner_premium",
+];
+const VALID_SALE: readonly string[] = ["enduro_moped", "regular", "premium"];
+const VALID_TIERS: readonly string[] = ["budget", "regular", "premium"];
+
+/** Safely read specs.salary from a car's specs jsonb. Returns null when absent. */
+export function parseSpecsSalary(specs: unknown): BikeSpecsSalary | null {
+  if (!specs || typeof specs !== "object" || Array.isArray(specs)) return null;
+  const salary = (specs as Record<string, unknown>).salary;
+  if (!salary || typeof salary !== "object" || Array.isArray(salary)) return null;
+  return salary as BikeSpecsSalary;
+}
+
+/**
+ * Resolve a bike's categories from its specs + price:
+ *   1. specs.salary.rentalCategory / saleCategory — explicit (admin-set) wins
+ *   2. otherwise derive from price + subrented flag
+ *   3. zero/unpriced bikes → budget + subrented flag from specs
+ */
+export function resolveCategoriesForBike(params: {
+  bikeId: string;
+  specs: unknown;
+  dailyPrice: number | null | undefined;
+  tiers?: { premiumThreshold: number; regularThreshold: number };
+}): BikeSalaryCategories {
+  const { bikeId, specs, dailyPrice, tiers } = params;
+  const stored = parseSpecsSalary(specs);
+  const subrented = stored?.subrented ?? isSubrentedBike(bikeId);
+  const derived = deriveCategoriesFromPrice(dailyPrice, subrented, tiers);
+
+  if (
+    stored &&
+    typeof stored.rentalCategory === "string" &&
+    VALID_RENTAL.includes(stored.rentalCategory) &&
+    typeof stored.saleCategory === "string" &&
+    VALID_SALE.includes(stored.saleCategory)
+  ) {
+    return {
+      rental: stored.rentalCategory as RentalCategory,
+      sale: stored.saleCategory as SaleCategory,
+      source: "specs",
+      dailyPrice: Number(dailyPrice) || 0,
+      subrented,
+      tier:
+        stored.tier && VALID_TIERS.includes(stored.tier)
+          ? (stored.tier as PriceTier)
+          : derived.tier,
+    };
+  }
+  return derived;
+}
+
+/** Back-compat wrapper used by CSV builders / salary calculations. */
 export function resolveBikeCategories(
   bikeId: string,
   overrides: Map<string, BikeSalaryCategories>,
 ): BikeSalaryCategories {
   const override = overrides.get(bikeId);
   if (override) return override;
-  return DEFAULT_BIKE_CATEGORIES[bikeId] || DEFAULT_BIKE_CATEGORY_FALLBACK;
+  return { rental: "regular", sale: "regular", source: "fallback" };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
