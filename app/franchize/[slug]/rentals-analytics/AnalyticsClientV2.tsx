@@ -93,6 +93,13 @@ function toAnalyticsRental(item: RentalDashboardItem): AnalyticsRentalRow {
     handoff_by: md.handoff_by ?? null,
     odometer_before: md.odometer_before ?? item.odometerStart ?? null,
     odometer_after: md.odometer_after ?? item.odometerEnd ?? null,
+    // FIX (iter9): bridge the odometer HINT (recorded at order creation from
+    // the bike's last known mileage) so the drawer can show "≈2465 км" in the
+    // "Одометр до" tile BEFORE the operator saves the actual pickup freeze.
+    // Kept in a SEPARATE key — putting it into odometer_before would flip
+    // getHandoffStatus() to "handed out" (it reads metadata.odometer_before).
+    odometer_before_hint:
+      md.odometer_before_hint ?? md.last_known_odometer ?? null,
     equipment_checklist: md.equipment_checklist ?? null,
     damage_notes: md.damage_notes ?? null,
   };

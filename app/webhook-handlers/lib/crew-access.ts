@@ -11,6 +11,7 @@
 
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
+import { privateSchema } from "@/lib/private-secrets";
 import { sendComplexMessage, type KeyboardButton } from "../actions/sendComplexMessage";
 
 export interface CrewInfo {
@@ -195,13 +196,21 @@ export async function userHasCrewAccess(telegramUserId: string): Promise<boolean
 /**
  * Load crew secrets for contract defaults from crew_secrets table.
  * Handles both JSON and raw object formats.
+ *
+ * FIX (iter9): crew_secrets lives in the PRIVATE schema. The previous
+ * `supabaseAdmin.from("crew_secrets")` resolved to public.crew_secrets which
+ * does NOT exist → PostgREST returned an error object (not a throw), the
+ * handler silently swallowed it and every /doc contract was generated from
+ * the hardcoded fallbacks. It looked correct only because the vip-bike
+ * fallbacks happened to match the crew metadata. Read via privateSchema()
+ * so /doc picks up the ACTUAL crew metadata (same source as the web flow).
  */
 export async function loadCrewSecrets(
   crewSlug: string,
   fallbacks: Record<string, string>,
 ): Promise<Record<string, string>> {
   try {
-    const { data: secretsData } = await supabaseAdmin
+    const { data: secretsData } = await privateSchema()
       .from("crew_secrets")
       .select("contract_defaults")
       .eq("crew_slug", crewSlug)

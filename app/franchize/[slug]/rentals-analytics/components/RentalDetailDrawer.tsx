@@ -448,7 +448,12 @@ export function RentalDetailDrawer({
                 Одометр до
               </p>
               <p className="mt-0.5 text-sm font-medium tabular-nums" style={{ color: T.text }}>
-                {handoff?.odometer_before != null ? `${handoff.odometer_before} км` : "—"}
+                {handoff?.odometer_before != null
+                  ? `${handoff.odometer_before} км`
+                  : handoff?.odometer_before_hint != null
+                    // Order-creation hint (bike's last known mileage) — real value appears after pickup freeze
+                    ? `≈${handoff.odometer_before_hint} км`
+                    : "—"}
               </p>
             </div>
             <div

@@ -1160,6 +1160,85 @@ type PickupFreezePayload = {
     photoUrls?: string[];
 };
 
+/**
+ * FIX (iter9): shared operator-access check for rental handover actions.
+ *
+ * The "Только владелец может зафиксировать выдачу" error blocked ACTIVE
+ * CREW ADMINS from freezing pickup (the crew's global admin salavey13 hit
+ * this on rental 9fc0d73c — he's admin in crew_members but not the
+ * rental's owner_id). Permission chain (any one passes):
+ *
+ *   1. rental.owner_id === userId            — rental owner
+ *   2. cars.owner_id === userId              — owner of THIS bike (public.cars.owner_id)
+ *   3. specs.subrenter_chat_id === userId    — bike's subrent partner (mini-admin)
+ *   4. active crew membership (owner/admin/co_owner/member) of the rental's
+ *      crew — same role list as confirmVehiclePickup
+ *   5. global admin (top-level users.role/status, legacy metadata fallback)
+ */
+async function canUserOperateRentalHandover(
+    userId: string,
+    rental: { owner_id?: string | null; crew_id?: string | null; vehicle_id?: string | null },
+): Promise<boolean> {
+    // 1. Rental owner
+    if (rental.owner_id === userId) return true;
+
+    // 2 + 3. Bike owner (cars.owner_id) and subrent partner (specs.subrenter_chat_id)
+    if (rental.vehicle_id) {
+        const { data: vehicle } = await supabaseAdmin
+            .from("cars")
+            .select("owner_id, specs")
+            .eq("id", rental.vehicle_id)
+            .maybeSingle();
+        if (vehicle?.owner_id === userId) return true;
+        const subrenterChatId = (vehicle?.specs as Record<string, unknown> | null)?.subrenter_chat_id;
+        if (subrenterChatId === userId) return true;
+
+        // 4a. Crew membership via the vehicle's crew (rental.crew_id may be null
+        // on legacy rows) — mirrors the confirmVehiclePickup fallback.
+        if (!rental.crew_id && vehicle) {
+            const { data: vehicleCrew } = await supabaseAdmin
+                .from("cars")
+                .select("crew_id")
+                .eq("id", rental.vehicle_id)
+                .maybeSingle();
+            if (vehicleCrew?.crew_id && await isActiveCrewMember(userId, vehicleCrew.crew_id)) return true;
+        }
+    }
+
+    // 4b. Crew membership via the rental's crew
+    if (rental.crew_id && await isActiveCrewMember(userId, rental.crew_id)) return true;
+
+    // 5. Global admin — top-level users.role/status columns first (the
+    // production admin carries role="vprAdmin" + status="admin" there),
+    // then the legacy metadata keys.
+    const { data: dbUser } = await supabaseAdmin
+        .from("users")
+        .select("role, status, metadata")
+        .eq("user_id", userId)
+        .maybeSingle();
+    const meta = (dbUser?.metadata as Record<string, unknown> | null) ?? null;
+    if (
+        dbUser?.role === "admin" || dbUser?.role === "vprAdmin" || dbUser?.status === "admin"
+        || meta?.role === "admin" || meta?.status === "admin"
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
+async function isActiveCrewMember(userId: string, crewId: string): Promise<boolean> {
+    const { data: membership } = await supabaseAdmin
+        .from("crew_members")
+        .select("role, membership_status")
+        .eq("crew_id", crewId)
+        .eq("user_id", userId)
+        .maybeSingle();
+    return membership?.membership_status === "active"
+        && ["owner", "admin", "co_owner", "member"].includes(membership.role);
+}
+
+
 export async function saveRentalPickupFreeze(
     rentalId: string,
     userId: string,
@@ -1174,11 +1253,17 @@ export async function saveRentalPickupFreeze(
     try {
         const { data: rental, error: fetchError } = await supabaseAdmin
             .from("rentals")
-            .select("owner_id, status, metadata")
+            .select("owner_id, status, metadata, crew_id, vehicle_id")
             .eq("rental_id", rentalId)
             .single();
         if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
-        if (rental.owner_id !== userId) return { success: false, error: "Только владелец может зафиксировать выдачу." };
+        // FIX (iter9): was a strict `owner_id !== userId` check — blocked crew
+        // admins, the bike's owner (cars.owner_id) and subrent partners.
+        // Same permission family as confirmVehiclePickup + addRentalDamageReport.
+        const canOperate = await canUserOperateRentalHandover(userId, rental);
+        if (!canOperate) {
+            return { success: false, error: "Выдачу может зафиксировать владелец аренды, админ экипажа, владелец или субарендатор байка." };
+        }
         if (!["pending_confirmation", "confirmed"].includes(rental.status)) {
             return { success: false, error: "Pickup Freeze доступен только до подтверждения выдачи." };
         }

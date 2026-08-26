@@ -11,6 +11,10 @@ interface FranchizeRentalDocumentsPanelProps {
   rentalId: string;
   ownerId: string;
   crewId: string;
+  /** Crew slug — more reliable than crewId for membership matching (mirrors FranchizeRentalRoleGuard) */
+  crewSlug?: string;
+  /** Bike's partner owner (specs.subrenter_chat_id) — mini admin for this bike */
+  subrenterChatId?: string;
   status: string;
   metadata: RentalMetadata;
   palette: {
@@ -31,7 +35,7 @@ const freezeChecklistOptions = [
   "Клиент подписал условия",
 ];
 
-export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, status, metadata, palette, isAuto = false }: FranchizeRentalDocumentsPanelProps) {
+export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewSlug, subrenterChatId, status, metadata, palette, isAuto = false }: FranchizeRentalDocumentsPanelProps) {
   const { dbUser, userCrewMemberships } = useAppContext();
 
   // All themed values — CSS vars for auto, palette values for manual themes
@@ -61,7 +65,19 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, statu
   }, [isAuto, palette]);
 
   const [isPending, startTransition] = useTransition();
-  const [odometerKm, setOdometerKm] = useState("45000");
+  // FIX (iter9): pre-fill the odometer from the rental's known state instead
+  // of the hardcoded "45000" placeholder. Priority:
+  //   1. already-saved pickup freeze value (re-open after save)
+  //   2. metadata.last_known_odometer (recorded at order creation)
+  //   3. metadata.odometer_before_hint (same, older key)
+  const knownOdometer = useMemo(() => {
+    const freezeOdo = Number((metadata?.pickup_freeze as Record<string, any> | undefined)?.odometer_km);
+    if (Number.isFinite(freezeOdo) && freezeOdo > 0) return String(freezeOdo);
+    const lastKnown = Number(metadata?.last_known_odometer ?? metadata?.odometer_before_hint);
+    if (Number.isFinite(lastKnown) && lastKnown > 0) return String(lastKnown);
+    return "";
+  }, [metadata]);
+  const [odometerKm, setOdometerKm] = useState(knownOdometer);
   const [fuelLevel, setFuelLevel] = useState("4/5");
   const [freezeNotes, setFreezeNotes] = useState("");
   const [checklist, setChecklist] = useState<string[]>(freezeChecklistOptions.slice(0, 2));
@@ -71,12 +87,27 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, statu
   const [damageNotes, setDamageNotes] = useState("");
 
   const isOwner = dbUser?.user_id === ownerId;
+  // FIX (iter9): client-side gate aligned with the server-side
+  // canUserOperateRentalHandover chain — crew matching by crewId OR slug
+  // (crewId formats sometimes diverge — see FranchizeRentalRoleGuard),
+  // plus global admin and the bike's subrent partner.
   const isCrewAdmin = useMemo(() => {
     if (isOwner) return true;
-    return userCrewMemberships.some(
-      (m) => m.crewId === crewId && ["owner", "admin", "co_owner"].includes(m.role)
+    const member = userCrewMemberships.find(
+      (m) => (crewId && m.crewId === crewId) || (crewSlug && m.slug === crewSlug),
     );
-  }, [isOwner, userCrewMemberships, crewId]);
+    if (member && ["owner", "admin", "co_owner", "member"].includes(member.role)) return true;
+    if (subrenterChatId && dbUser?.user_id === subrenterChatId) return true;
+    const dbUserAny = dbUser as unknown as Record<string, unknown> | undefined;
+    const userMeta = (dbUser?.metadata as Record<string, unknown> | null) ?? null;
+    if (
+      dbUserAny?.role === "admin" || dbUserAny?.role === "vprAdmin" || dbUserAny?.status === "admin"
+      || userMeta?.role === "admin" || userMeta?.status === "admin"
+    ) {
+      return true;
+    }
+    return false;
+  }, [isOwner, userCrewMemberships, crewId, crewSlug, subrenterChatId, dbUser]);
   const pickupFreeze = (metadata?.pickup_freeze ?? null) as Record<string, any> | null;
   const damageReports = useMemo(() => (Array.isArray(metadata?.damage_reports) ? metadata?.damage_reports : []), [metadata]);
   const canFreeze = isCrewAdmin && ["pending_confirmation", "confirmed"].includes(status);
@@ -88,6 +119,10 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, statu
   const onSaveFreeze = () => {
     if (!canFreeze || !dbUser?.user_id) return;
     const parsedOdometer = Number(odometerKm);
+    if (!Number.isFinite(parsedOdometer) || parsedOdometer < 0) {
+      toast.error("Укажите пробег (км) — например, подсказку со страницы аренды.");
+      return;
+    }
     startTransition(async () => {
       const result = await saveRentalPickupFreeze(rentalId, dbUser.user_id, {
         odometerKm: parsedOdometer,
@@ -150,7 +185,7 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, statu
         {canFreeze && (
           <div className="mt-3 space-y-2 text-sm">
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className="rounded-lg border px-2 py-1.5" style={{ borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.inputText }} value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} placeholder="Пробег, км" />
+              <input className="rounded-lg border px-2 py-1.5" style={{ borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.inputText }} value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} placeholder={knownOdometer ? knownOdometer : "Пробег, км"} inputMode="numeric" />
               <input className="rounded-lg border px-2 py-1.5" style={{ borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.inputText }} value={fuelLevel} onChange={(e) => setFuelLevel(e.target.value)} placeholder="Топливо (например 4/5)" />
             </div>
             <div className="flex flex-wrap gap-2">

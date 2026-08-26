@@ -2337,6 +2337,12 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // FIX: Key names must match the hydration SQL which uses camelCase
     // (organizationName, organizationShort, etc.), not snake_case.
     // readPath traverses nested paths, so we use readFirst for alternatives.
+    //
+    // FIX (iter9): fallbacks aligned with doc-manual.ts loadCrewSecrets
+    // fallbacks (the /doc ground truth). Previously a failed/empty
+    // crew_secrets read degraded the contract to "Сидоров Илья Олегович"
+    // with EMPTY ОГРНИП/ИНН/bank lines — while /doc degraded to the full
+    // ИП Воробьев Р.В. requisites. Both flows must degrade identically.
     const readFirst = (keys: string[], fallback: string): string => {
       for (const key of keys) {
         const val = readPath<string>(defaults, [key], "");
@@ -2345,20 +2351,20 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       return fallback;
     };
     const crewSecrets: RentalCrewSecrets = {
-      legalAddress: readFirst(["legalAddress", "legal_address"], "г. Нижний Новгород"),
+      legalAddress: readFirst(["legalAddress", "legal_address"], "г. Нижний Новгород, пл. Комсомольская 2"),
       returnAddress: readFirst(["returnAddress", "return_address", "lessor_address"], "г. Нижний Новгород, пл. Комсомольская 2"),
-      issuerName: readFirst(["issuerName", "issuer_name", "organizationShort", "organization_short"], `ИП Воробьева Р.В.`),
+      issuerName: readFirst(["issuerName", "issuer_name", "organizationShort", "organization_short"], "ИП Воробьев Р.В."),
       signatoryRole: readFirst(["issuer_signatory", "signatoryRole"], "Менеджер Мотосалона"),
-      organizationRepresentative: readFirst(["organizationRepresentative", "organization_representative", "issuer_representative"], "Сидоров Илья Олегович"),
+      organizationRepresentative: readFirst(["organizationRepresentative", "organization_representative", "issuer_representative"], "ИП Воробьев Р.В."),
       organizationName: readFirst(["organizationName", "organization_name"], "Мотосалон ВипБайкЭлектро"),
-      organizationShort: readFirst(["organizationShort", "organization_short"], "ИП Воробьева Р.В."),
-      ogrnip: readFirst(["ogrnip", "OGRNIP"], ""),
-      inn: readFirst(["inn", "INN"], ""),
-      bankAccount: readFirst(["bankAccount", "bank_account"], ""),
-      bankName: readFirst(["bankName", "bank_name"], ""),
-      bankCity: readFirst(["bankCity", "bank_city"], ""),
-      bankCorrAccount: readFirst(["bankCorrAccount", "bank_corr_account"], ""),
-      email: readFirst(["email"], ""),
+      organizationShort: readFirst(["organizationShort", "organization_short"], "ИП Воробьев Р.В."),
+      ogrnip: readFirst(["ogrnip", "OGRNIP"], "326527500025145"),
+      inn: readFirst(["inn", "INN"], "525813643035"),
+      bankAccount: readFirst(["bankAccount", "bank_account"], "40802810942710013083"),
+      bankName: readFirst(["bankName", "bank_name"], "Волго-Вятский Банк ПАО Сбербанк"),
+      bankCity: readFirst(["bankCity", "bank_city"], "г. Нижний Новгород"),
+      bankCorrAccount: readFirst(["bankCorrAccount", "bank_corr_account"], "30101810900000000603"),
+      email: readFirst(["email"], "vip_bike@mail.ru"),
       contractDefaults: defaults,
     };
 

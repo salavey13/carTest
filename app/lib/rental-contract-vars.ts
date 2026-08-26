@@ -275,6 +275,21 @@ function buildVehicleTypeLabels(isElectric: boolean) {
 }
 
 /**
+ * All electric bikes capped at 3kW in contracts (regulatory class limit
+ * for L1B/L2B). The cap ALWAYS wins for electric bikes — even when the
+ * catalog carries pre-computed bike_engine_spec_line_1 with the REAL power
+ * (e.g. "мощность двигателя (номинальная) 5 кВт" from seed data) or a
+ * raw specs.power_kw above 3. The catalog keeps the true value for the
+ * storefront; contracts always show the capped one.
+ */
+function capElectricPowerKw(rawPowerKw: unknown): string | null {
+  if (rawPowerKw == null || rawPowerKw === "") return null;
+  const num = Number(rawPowerKw);
+  if (Number.isFinite(num) && num > 3) return "3";
+  return String(rawPowerKw);
+}
+
+/**
  * Build engine spec lines based on bike specs
  */
 function buildEngineSpecLines(bike: BikeSpecs, isElectric: boolean): {
@@ -287,6 +302,24 @@ function buildEngineSpecLines(bike: BikeSpecs, isElectric: boolean): {
   // Use pre-computed lines if available (from seed data)
   // Check for non-empty string to avoid falling through on empty seed data
   if (specs.bike_engine_spec_line_1 && specs.bike_engine_spec_line_1.trim().length > 0) {
+    // FIX (iter9): for ELECTRIC bikes the 3kW regulatory cap must apply even
+    // to pre-computed seed lines — previously a seeded
+    // "мощность двигателя (номинальная) 5 кВт" bypassed the cap and leaked
+    // the real catalog power into the contract.
+    if (isElectric) {
+      const line1 = String(specs.bike_engine_spec_line_1).replace(
+        /мощность\s+двигателя\s+\(номинальная\)\s*([\d.,]+)\s*кВт/i,
+        (_m, p1: string) => {
+          const capped = capElectricPowerKw(p1.replace(",", "."));
+          return `мощность двигателя (номинальная) ${capped ?? p1} кВт`;
+        },
+      );
+      return {
+        line1,
+        line2: String(specs.bike_engine_spec_line_2 || ""),
+        line3: String(specs.bike_engine_spec_line_3 || ""),
+      };
+    }
     return {
       line1: String(specs.bike_engine_spec_line_1),
       line2: String(specs.bike_engine_spec_line_2 || ""),
@@ -296,8 +329,7 @@ function buildEngineSpecLines(bike: BikeSpecs, isElectric: boolean): {
 
   if (isElectric) {
     // All electric bikes capped at 3kW in contracts (regulatory class limit for L1B/L2B)
-    const rawPowerKw = specs.power_kw;
-    const cappedPowerKw = rawPowerKw && Number(rawPowerKw) > 3 ? "3" : rawPowerKw;
+    const cappedPowerKw = capElectricPowerKw(specs.power_kw);
     const line1 = cappedPowerKw
       ? `мощность двигателя (номинальная) ${cappedPowerKw} кВт`
       : "";
@@ -757,12 +789,10 @@ export function buildRentalContractVariables(
     bike_power_hp: String(bikeSpecs.power_hp || bikeSpecs.max_power_hp || "0"),
     // All electric bikes capped at 3kW in contracts (regulatory class limit for L1B/L2B)
     bike_power_kw: (() => {
-      const raw = String(bikeSpecs.power_kw || "0");
       if (isElectric) {
-        const num = Number(raw);
-        return num > 3 ? "3" : raw;
+        return capElectricPowerKw(bikeSpecs.power_kw) ?? "0";
       }
-      return raw;
+      return String(bikeSpecs.power_kw || "0");
     })(),
     bike_max_speed: String(bikeSpecs.max_speed || bikeSpecs.top_speed_kmh || "уточняется"),
     bike_battery: String(bikeSpecs.battery || (isElectric ? "уточняется" : "")),

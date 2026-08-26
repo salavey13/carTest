@@ -186,11 +186,19 @@ export function AnalyticsClient({
     // /doc flow (rental_handoffs rows may not exist at all).
     const odoBefore = (md.odometer_before as number | undefined) ?? null;
     const odoAfter = (md.odometer_after as number | undefined) ?? null;
+    // FIX (iter9): odometer hint — recorded at order creation from the bike's
+    // last known mileage; displayed as "≈N км" until the operator saves the
+    // actual pickup freeze value.
+    const odoHintRaw = (md.odometer_before_hint ?? md.last_known_odometer) as number | undefined;
+    const odoHint = odoHintRaw != null ? Number(odoHintRaw) : null;
     const handoffAt = typeof md.handoff_at === "string" ? md.handoff_at : null;
     const damageNotes =
       (typeof md.damage_notes === "string" ? md.damage_notes : null) ||
       (typeof md.return_notes === "string" ? md.return_notes : null);
-    const hasHandoff = !!handoffAt || odoBefore != null || odoAfter != null || !!damageNotes;
+    // FIX (iter9): the odometer hint also counts as a signal — otherwise a
+    // fresh web-order rental (no handoff yet) renders handoff=null and the
+    // "Одометр до" tile can't show the ≈hint value.
+    const hasHandoff = !!handoffAt || odoBefore != null || odoAfter != null || !!damageNotes || (odoHint != null && Number.isFinite(odoHint));
     return {
       ...rental,
       todos: normalizedTodos,
@@ -202,6 +210,7 @@ export function AnalyticsClient({
             handoff_by: (md.handoff_by as string) || null,
             odometer_before: odoBefore,
             odometer_after: odoAfter,
+            odometer_before_hint: odoHint != null && Number.isFinite(odoHint) ? odoHint : null,
             equipment_checklist:
               (md.equipment_checklist as Record<string, boolean>) || null,
             damage_notes: damageNotes,
@@ -240,6 +249,14 @@ export function AnalyticsClient({
     if (action === "open_rental" && selectedRentalId) {
       // FIX: was pushing to /franchize/{slug}?vehicle={rentalId} which opens the
       // catalog page, not the rental detail page. Correct URL is /franchize/{slug}/rental/{rentalId}
+      router.push(`/franchize/${initialSlug}/rental/${selectedRentalId}`);
+      return;
+    }
+    // FIX (iter9): "more" = the "Провести передачу" / "Оформить возврат" button
+    // in the handoff section. Previously it fell through the if-chain and did
+    // NOTHING when clicked. The rental page hosts the actual handoff flow
+    // (Фиксация выдачи → Подтвердить выдачу → возврат), so navigate there.
+    if (action === "more" && selectedRentalId) {
       router.push(`/franchize/${initialSlug}/rental/${selectedRentalId}`);
       return;
     }

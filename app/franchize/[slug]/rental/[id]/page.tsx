@@ -553,6 +553,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               ownerId={rental.ownerId}
               crewId={crew.id}
               crewSlug={resolvedSlug}
+              subrenterChatId={rental.subrenterChatId}
               status={status}
               metadata={rental.metadata}
               palette={p}

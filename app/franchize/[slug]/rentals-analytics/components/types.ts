@@ -120,6 +120,8 @@ export interface RentalHandoff {
   handoff_by: string | null;
   odometer_before: number | null;
   odometer_after: number | null;
+  /** Order-creation hint (bike's last known mileage) — shown as "≈N км" until the real value is recorded */
+  odometer_before_hint?: number | null;
   equipment_checklist: Record<string, boolean> | null;
   damage_notes: string | null;
 }
