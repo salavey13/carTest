@@ -550,6 +550,16 @@ rent_price_label, rent_weekday_hour, rent_weekend_hour
 12. **Set operational keys (§1.13):** `last_known_odometer` (initial reading) — then re-run `node scripts/apply-salary-specs.mjs --apply` so `salary` tier is computed from the price; if the bike is a partner (subrent) unit, ask the crew owner to assign `subrenter_chat_id` via the admin panel
 13. Test contract generation with `make-rental-contract-skill.mjs`
 
+## 6.1. Rental Contract ПЭП (Digital Signature) — Operator Notes 🆕
+
+Rental contracts generated via the **web-app flow** support ПЭП (простая электронная подпись, ст. 5–6 ФЗ-63) — no paper, no printer:
+
+- **Checkout-time signing:** the renter taps «Подписать договор (ПЭП)» on the order page (in the Telegram Mini App). The server verifies Telegram's HMAC-signed `initData` + matches the Telegram ID to the order, then embeds the ПЭП line («Подписано ПЭП: Telegram ID …, дата/время МСК») into the contract's signature block (clause 12.3).
+- **Post-hoc signing:** for rentals created unsigned, the renter opens their rental page (deep link `rental_<id>` or QR) and taps «Подписать договор (ПЭП)» in the «Ваши действия» panel. The document file is NOT modified — the signature record (`metadata.pep_signature`: Telegram ID, username, timestamp, SHA-256 of the accepted document) binds the renter to the exact document. Operators see the ПЭП status in «Документы аренды».
+- **The doc stays immutable after generation** — the sha256 chain (artifact → rental `doc_sha256` → `user_rental_secrets` QR claim) is never broken by signing.
+- Rental times picked in the catalog Item modal are **Moscow local time** and stored with the +03:00 offset (mirrors `/doc`'s `convertTextDateToTimestamp(..., 3)`).
+- The `/doc` bot flow (`doc-manual.ts`) keeps its current behavior — ПЭП applies to the web-app flow only.
+
 ---
 
 ## 7. File Reference

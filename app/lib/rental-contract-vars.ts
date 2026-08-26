@@ -191,6 +191,21 @@ export type CrewSecrets = {
 };
 
 /**
+ * ПЭП (простая электронная подпись, ст. 5–6 ФЗ-63) — renter signature
+ * captured in the Telegram Mini App (initData HMAC-verified server-side).
+ * When present, the doc's signature block renders the ПЭП line instead of
+ * the blank handwritten-signature line (template п. 12.3 + {{#if pep_signed}}).
+ */
+export type PepSignatureMeta = {
+  /** Telegram user id (verified via initData HMAC) */
+  telegramId: string;
+  /** Telegram @username (optional — not every account has one) */
+  username?: string;
+  /** ISO timestamp of the signature act */
+  signedAt: string;
+};
+
+/**
  * Document metadata
  */
 export type DocumentMeta = {
@@ -206,6 +221,8 @@ export type DocumentMeta = {
   slug?: string;
   orderId?: string;
   verifiedAt?: string;
+  // ПЭП (simple electronic signature via Telegram Mini App)
+  pep?: PepSignatureMeta;
 };
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -912,9 +929,30 @@ export function buildRentalContractVariables(
     legal_address: crewSecrets.legalAddress,
 
     // Signatures
-    signature_timestamp: meta.signatureTimestamp || now.toLocaleString("ru-RU"),
-    signature_fingerprint: meta.signatureFingerprint || "manual",
-    renter_signature: meta.renterSignature || "согласие через Telegram",
+    // ПЭП (ст. 5–6 ФЗ-63): when meta.pep is present the doc's signature block
+    // renders the ПЭП line ({{#if pep_signed}} branch in the template);
+    // otherwise the classic blank handwritten-signature line is kept.
+    ...((): Record<string, string> => {
+      if (meta.pep?.telegramId) {
+        // MSK (UTC+3) human-readable timestamp — matches the doc's audience
+        const mskDate = new Date(new Date(meta.pep.signedAt).getTime() + 3 * 3600 * 1000);
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const mskStamp = `${pad(mskDate.getUTCDate())}.${pad(mskDate.getUTCMonth() + 1)}.${mskDate.getUTCFullYear()} ${pad(mskDate.getUTCHours())}:${pad(mskDate.getUTCMinutes())} (МСК)`;
+        const who = `Telegram ID ${meta.pep.telegramId}${meta.pep.username ? ` (@${meta.pep.username})` : ""}`;
+        return {
+          pep_signed: "1",
+          renter_signature: who,
+          signature_timestamp: mskStamp,
+          signature_fingerprint: meta.signatureFingerprint || `pep:tg:${meta.pep.telegramId}`,
+        };
+      }
+      return {
+        pep_signed: "",
+        signature_timestamp: meta.signatureTimestamp || now.toLocaleString("ru-RU"),
+        signature_fingerprint: meta.signatureFingerprint || "manual",
+        renter_signature: meta.renterSignature || "согласие через Telegram",
+      };
+    })(),
 
     // Document key
     document_key: meta.documentKey || `rental-${bike.id || "unknown"}-${Date.now()}`,

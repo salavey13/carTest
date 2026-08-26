@@ -2368,6 +2368,53 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       contractDefaults: defaults,
     };
 
+    // ── ПЭП (простая электронная подпись, ст. 5–6 ФЗ-63) ──────────────
+    // The renter taps «Подписать договор» at checkout; the client forwards
+    // Telegram's initData (HMAC-SHA256-signed by Telegram itself). We verify
+    // it server-side and require the embedded user.id to match the order's
+    // telegramUserId. If the renter explicitly signed but verification fails,
+    // we REFUSE the order — generating an unsigned doc while the renter
+    // believes he signed would be legally worse than a retry.
+    let pepMeta: { telegramId: string; username?: string; signedAt: string } | null = null;
+    let pepAudit: Record<string, unknown> | null = null;
+    if (payload.pepInitData) {
+      const botToken = process.env.TELEGRAM_BOT_TOKEN;
+      if (!botToken) {
+        throw new Error("ПЭП: на сервере не настроен Telegram-бот — подпись проверить нельзя. Повторите позже или оформите без подписи.");
+      }
+      const { computeTelegramWebAppHash } = await import("@/lib/telegram-webapp-auth");
+      const validation = await computeTelegramWebAppHash(payload.pepInitData, botToken);
+      if (!validation.isValid) {
+        throw new Error("ПЭП: подпись Telegram не прошла проверку. Обновите страницу и подпишите договор заново.");
+      }
+      const pepParams = new URLSearchParams(payload.pepInitData);
+      let tgUser: { id?: number | string; username?: string } = {};
+      try {
+        tgUser = JSON.parse(pepParams.get("user") || "{}");
+      } catch {
+        // fall through — id check below rejects
+      }
+      if (!tgUser.id || String(tgUser.id) !== String(payload.telegramUserId)) {
+        throw new Error("ПЭП: подпись принадлежит другому аккаунту Telegram — оформляйте заказ из своего аккаунта.");
+      }
+      const signedAt = new Date().toISOString();
+      const { createHash } = await import("crypto");
+      pepMeta = {
+        telegramId: String(tgUser.id),
+        username: tgUser.username || undefined,
+        signedAt,
+      };
+      pepAudit = {
+        method: "order_checkout",
+        telegram_id: pepMeta.telegramId,
+        username: pepMeta.username ?? null,
+        signed_at: signedAt,
+        auth_date: pepParams.get("auth_date") || null,
+        init_data_sha256: createHash("sha256").update(payload.pepInitData).digest("hex"),
+      };
+      logger.info("[franchize] ПЭП signature verified", { orderId: payload.orderId, telegramId: pepMeta.telegramId });
+    }
+
     // === MULTI-BIKE DOCUMENT GENERATION ===
     // Generate one DOCX per bike in cart (equipment-only lines are merged
     // into a SINGLE equipment document — see equipmentLineIndices below).
@@ -2752,6 +2799,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           signatureTimestamp: new Date().toLocaleString("ru-RU"),
           signatureFingerprint: payload.signatureFingerprint || "—",
           renterSignature: payload.signatureName || "электронное согласие в Telegram WebApp",
+          // ПЭП: when the renter signed at checkout, the doc's signature block
+          // shows the ПЭП line (template {{#if pep_signed}}); the renterSignature
+          // / signatureTimestamp / signatureFingerprint defaults are ignored by
+          // the builder when pep is present.
+          ...(pepMeta && !isSaleFlow && !isTestdrive ? { pep: pepMeta } : {}),
           documentKey: isEquipmentOnlyLine
             ? `equipment-rental-equipment-${Date.now()}`
             : `${isSaleFlow ? "sale" : isEquipmentOnlyLine ? "equipment-rental" : "rental"}-${car.id || 'equipment-' + bikeIndex}-${Date.now()}`,
@@ -3306,12 +3358,17 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const createdRentals: Array<{ rentalId: string; bikeName: string; bikeId: string; totalRub: number; startIso: string; endIso: string }> = [];
     if ((flowType === "rental" || flowType === "mixed") && !isServiceFlow && payload.rentalStartDate && payload.rentalEndDate) {
       try {
-        // time-aware ISO timestamps (use cart-line times if available)
+        // time-aware ISO timestamps (use cart-line times if available).
+        // FIX (iter10): times picked by the renter are Moscow local time —
+        // append the +03:00 offset. The old `new Date("...T10:00:00")` parsed
+        // in the SERVER's local timezone (UTC on Vercel) → a 10:00 rental
+        // became 13:00 MSK in the DB and the doc. Mirrors /doc's
+        // convertTextDateToTimestamp(date, time, 3).
         const firstLine = payload.cartLines[0];
         const startTime = (firstLine as any)?.options?.rentStartTime || "10:00";
         const endTime = (firstLine as any)?.options?.rentEndTime || "10:00";
-        const startIso = new Date(`${payload.rentalStartDate}T${startTime}:00`).toISOString();
-        const endIso = new Date(`${payload.rentalEndDate}T${endTime}:00`).toISOString();
+        const startIso = new Date(`${payload.rentalStartDate}T${startTime}:00+03:00`).toISOString();
+        const endIso = new Date(`${payload.rentalEndDate}T${endTime}:00+03:00`).toISOString();
 
         // Resolve crew owner once (avoid N+1 queries)
         const { data: crewRow } = await supabaseAdmin.from("crews").select("id, owner_id").eq("slug", payload.slug).maybeSingle();
@@ -3369,6 +3426,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                   bike_name: doc.bikeName,
                   ...(Number.isFinite(lastKnownOdometer)
                     ? { last_known_odometer: lastKnownOdometer, odometer_before_hint: lastKnownOdometer }
+                    : {}),
+                  // ПЭП audit record — binds the renter's Telegram identity to
+                  // the exact document (sha256) he accepted at checkout.
+                  ...(pepAudit
+                    ? { pep_signature: { ...pepAudit, doc_sha256: doc.sha256, document_key: doc.documentKey } }
                     : {}),
                 },
               })
@@ -4018,6 +4080,15 @@ const franchizeOrderInvoiceSchema = z.object({
         action: z.string().trim().optional(),
         buyConfigId: z.string().trim().optional(),
         buyPriceDelta: z.number().finite().optional(),
+        // ── Rental window picked in the Item modal (catalog) ──
+        // FIX (iter10): zod strips unknown keys by default, so the times/dates
+        // the renter picked in the Item modal silently disappeared from the
+        // cart line options during validation → rental rows defaulted to
+        // 10:00 (+ TZ bug → 13:00 MSK). Keep them explicitly.
+        rentStartDate: z.string().trim().optional(),
+        rentEndDate: z.string().trim().optional(),
+        rentStartTime: z.string().trim().optional(),
+        rentEndTime: z.string().trim().optional(),
       })
       .default({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона" }),
   })).min(1),
@@ -4030,6 +4101,14 @@ const franchizeOrderInvoiceSchema = z.object({
   pickupAddress: z.string().trim().optional(),
   requiredDocs: z.array(z.string().trim().min(1).max(120)).max(12).default([]),
   flowType: z.enum(["rental", "sale", "mixed", "testdrive", "service"]).default("rental"),
+  // ── ПЭП (простая электронная подпись, ст. 5–6 ФЗ-63) ──
+  // Full Telegram initData string forwarded by the client when the renter
+  // tapped «Подписать договор» at checkout. Verified server-side via
+  // HMAC-SHA256 against the bot token; the embedded user.id must match
+  // telegramUserId. When valid, the ПЭП line is embedded into the rental
+  // contract's signature block (template п. 12.3) and the audit record is
+  // stored on the rental (metadata.pep_signature).
+  pepInitData: z.string().trim().min(32).max(8192).optional(),
 });
 
 export async function submitFranchizeOrderNotification(input: unknown): Promise<{ success: boolean; error?: string }> {

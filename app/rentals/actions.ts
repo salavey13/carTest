@@ -2354,4 +2354,156 @@ function escapeHtml(s: unknown): string {
     .replace(/'/g, "&#039;");
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ПЭП (простая электронная подпись, ст. 5–6 ФЗ-63)
+// ─────────────────────────────────────────────────────────────────────────────
+// Post-hoc renter signing for an EXISTING rental: the renter opens the rental
+// page (deep link / QR) and taps «Подписать договор». The client forwards
+// Telegram's initData — HMAC-SHA256-signed by Telegram itself — which we verify
+// server-side. The document itself is NOT modified (its sha stays stable for
+// the freeze/QR chain); instead the signature RECORD binds the renter's
+// verified Telegram identity to the document's exact sha256:
+//
+//   metadata.pep_signature = {
+//     method: "rental_page",
+//     telegram_id: "8935491576",
+//     username: "liki2222",
+//     signed_at: "2026-08-27T16:42:11.000Z",
+//     auth_date: "1787…",              // Telegram's own auth timestamp
+//     init_data_sha256: "…",           // fingerprint of the signed initData
+//     doc_sha256: "9d42943e…",         // the exact document accepted
+//   }
+//
+// Combined with clause 12.3 of the rental template this is a proper ПЭП
+// exchange: identity (Telegram), intent (explicit button tap), integrity
+// (document hash), timestamp. RENTER-ONLY — operators cannot sign for the
+// renter; the checkout-time flow (actions-runtime) embeds the ПЭП line into
+// newly generated docs instead.
+export async function signRentalContractPep(
+    rentalId: string,
+    userId: string,
+    initData: string,
+): Promise<{ success: boolean; error?: string; signature?: Record<string, unknown> }> {
+    noStore();
+    if (!rentalId || !userId) return { success: false, error: "Нужны rentalId и userId." };
+    const initDataStr = String(initData || "").trim();
+    if (initDataStr.length < 32) {
+        return { success: false, error: "Подпись доступна только в Telegram — откройте страницу через бота." };
+    }
+
+    try {
+        // 1. Verify the Telegram HMAC signature (the client cannot forge it)
+        const botToken = process.env.TELEGRAM_BOT_TOKEN;
+        if (!botToken) {
+            return { success: false, error: "Сервер не настроен для проверки подписи Telegram. Попробуйте позже." };
+        }
+        const { computeTelegramWebAppHash } = await import("@/lib/telegram-webapp-auth");
+        const validation = await computeTelegramWebAppHash(initDataStr, botToken);
+        if (!validation.isValid) {
+            return { success: false, error: "Подпись Telegram не прошла проверку. Обновите страницу и попробуйте снова." };
+        }
+        const params = new URLSearchParams(initDataStr);
+        let tgUser: { id?: number | string; username?: string } = {};
+        try {
+            tgUser = JSON.parse(params.get("user") || "{}");
+        } catch {
+            // handled by the id check below
+        }
+        if (!tgUser.id || String(tgUser.id) !== String(userId)) {
+            return { success: false, error: "Подпись принадлежит другому аккаунту Telegram." };
+        }
+
+        // 2. Load the rental — RENTER-ONLY permission check
+        const { data: rental, error: fetchError } = await supabaseAdmin
+            .from("rentals")
+            .select("user_id, owner_id, status, metadata")
+            .eq("rental_id", rentalId)
+            .single();
+        if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
+        const currentMetadata = (rental.metadata as Record<string, any>) || {};
+        const renterTelegramId = currentMetadata?.renter_telegram_id;
+        const isRenter =
+            String(rental.user_id || "") === String(userId) ||
+            String(renterTelegramId || "") === String(userId);
+        if (!isRenter) {
+            return { success: false, error: "Подписать договор ПЭП может только арендатор." };
+        }
+        if (rental.status === "cancelled") {
+            return { success: false, error: "Аренда отменена — подписывать договор не нужно." };
+        }
+        if (currentMetadata?.pep_signature?.signed_at) {
+            return { success: false, error: "Договор уже подписан ПЭП — повторная подпись не требуется." };
+        }
+
+        // 3. Resolve the document sha (metadata → artifact fallback)
+        let docSha = String(currentMetadata?.doc_sha256 || "") || null;
+        if (!docSha) {
+            const { data: artifact } = await supabaseAdmin
+                .schema("private" as any)
+                .from("rental_contract_artifacts")
+                .select("original_sha256")
+                .eq("rental_id", rentalId)
+                .maybeSingle();
+            docSha = artifact?.original_sha256 || null;
+        }
+
+        // 4. Persist the signature record (read-modify-write, keeps chain intact)
+        const { createHash } = await import("crypto");
+        const pepSignature: Record<string, unknown> = {
+            method: "rental_page",
+            telegram_id: String(tgUser.id),
+            username: tgUser.username || null,
+            signed_at: new Date().toISOString(),
+            auth_date: params.get("auth_date") || null,
+            init_data_sha256: createHash("sha256").update(initDataStr).digest("hex"),
+            ...(docSha ? { doc_sha256: docSha } : {}),
+        };
+        const { error: updateError } = await supabaseAdmin
+            .from("rentals")
+            .update({
+                metadata: { ...currentMetadata, pep_signature: pepSignature },
+                updated_at: new Date().toISOString(),
+            })
+            .eq("rental_id", rentalId);
+        if (updateError) throw updateError;
+
+        // 5. Audit trail event
+        const { error: eventError } = await supabaseAdmin.from("events").insert({
+            rental_id: rentalId,
+            type: "pep_signed",
+            status: "completed",
+            created_by: userId,
+            payload: {
+                telegram_id: pepSignature.telegram_id,
+                username: pepSignature.username,
+                doc_sha256: docSha ? String(docSha).slice(0, 16) + "…" : null,
+            },
+        });
+        if (eventError) logger.error("[signRentalContractPep] Event insert failed:", eventError);
+
+        // 6. Best-effort: notify the crew owner that the contract is signed
+        try {
+            const msk = new Date(Date.now() + 3 * 3600 * 1000);
+            const pad = (n: number) => String(n).padStart(2, "0");
+            const stamp = `${pad(msk.getUTCDate())}.${pad(msk.getUTCMonth() + 1)}.${msk.getUTCFullYear()} ${pad(msk.getUTCHours())}:${pad(msk.getUTCMinutes())} МСК`;
+            await sendComplexMessage(rental.owner_id, [
+                "✍️ Договор подписан ПЭП",
+                `Аренда #${rentalId.slice(0, 8)}`,
+                `Арендатор: Telegram ID ${pepSignature.telegram_id}${tgUser.username ? ` (@${tgUser.username})` : ""}`,
+                `Время подписи: ${stamp}`,
+                docSha ? `Отпечаток документа (SHA-256): ${String(docSha).slice(0, 16)}…` : "",
+            ].filter(Boolean).join("\n"));
+        } catch (notifyErr) {
+            logger.warn("[signRentalContractPep] owner notify failed (non-fatal)", notifyErr);
+        }
+
+        logger.info("[signRentalContractPep] signed", { rentalId, telegramId: pepSignature.telegram_id });
+        return { success: true, signature: pepSignature };
+    } catch (e: any) {
+        logger.error("[signRentalContractPep] Error:", e);
+        return { success: false, error: e.message || "Unknown error." };
+    }
+}
+
+
 

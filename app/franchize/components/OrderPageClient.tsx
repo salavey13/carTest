@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, Camera, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { Calendar, Camera, Pencil, PenLine, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -150,6 +150,28 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const { clear: clearCart } = useFranchizeCart(slug);
   const [isSubmitting, startSubmitTransition] = useTransition();
   const [paymentRetryHint, setPaymentRetryHint] = useState<string | null>(null);
+  // ── ПЭП (простая электронная подпись, ст. 5–6 ФЗ-63) ──
+  // The renter taps «Подписать договор (ПЭП)» at checkout; we forward
+  // Telegram's initData (HMAC-signed by Telegram) with the order — the
+  // server verifies it and embeds the ПЭП line into the contract (п. 12.3).
+  const [pepInitData, setPepInitData] = useState<string | null>(null);
+  const handlePepSignToggle = () => {
+    if (pepInitData) {
+      setPepInitData(null);
+      return;
+    }
+    try {
+      const initData = (window as any).Telegram?.WebApp?.initData;
+      if (typeof initData !== "string" || initData.length < 32) {
+        toast.error("ПЭП-подпись доступна в Telegram — откройте приложение через бота.");
+        return;
+      }
+      setPepInitData(initData);
+      toast.success("Договор будет подписан вашей ПЭП (аккаунт Telegram) при отправке заказа.");
+    } catch {
+      toast.error("Не удалось получить данные Telegram для подписи.");
+    }
+  };
   const [isPromoValidating, setIsPromoValidating] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
   const [promoMessage, setPromoMessage] = useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
@@ -273,6 +295,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           ? "sale"
           : "mixed";
   const flowLabel = flowType === "sale" ? "покупки" : flowType === "mixed" ? "аренды/покупки" : flowType === "testdrive" ? "тест-драйва" : flowType === "service" ? "сервиса" : "аренды";
+  // ПЭП applies to rental contracts only — sale flow stays as is (user decision)
+  const isPepApplicable = flowType === "rental" || flowType === "mixed";
   const catalogHref = `/franchize/${slug}`;
   const profileHref = isInTelegramContext
     ? `/franchize/${slug}/profile`
@@ -802,6 +826,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         pickupAddress: submitPayload.pickupAddress,
         requiredDocs: submitPayload.requiredDocs,
         flowType: submitPayload.flowType,
+        // ПЭП (ст. 5–6 ФЗ-63): Telegram-signed initData forwarded when the
+        // renter signed at checkout — verified server-side (HMAC + user match).
+        pepInitData: pepInitData ?? undefined,
       });
 
       if (!result.success) {
@@ -1714,6 +1741,45 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                   <span>{totalAmount.toLocaleString("ru-RU")} ₽</span>
                 </p>
               </div>
+
+              {/* ПЭП sign card — renter signs the contract right here in the
+                  Mini App; the server verifies Telegram's initData HMAC and
+                  embeds the ПЭП line into the contract (п. 12.3). */}
+              {isPepApplicable && (
+                <button
+                  type="button"
+                  onClick={handlePepSignToggle}
+                  className="mt-3 flex w-full items-start gap-3 rounded-xl border p-3 text-left transition hover:opacity-85"
+                  style={{
+                    borderColor: pepInitData ? T.accent : T.borderSoft,
+                    backgroundColor: pepInitData ? T.accentSoft : undefined,
+                  }}
+                >
+                  <PenLine className="mt-0.5 h-4 w-4 shrink-0" style={{ color: T.accent }} />
+                  <div className="min-w-0 flex-1 text-xs">
+                    {pepInitData ? (
+                      <>
+                        <p className="font-semibold" style={{ color: T.text }}>
+                          ✓ Договор будет подписан ПЭП
+                        </p>
+                        <p className="mt-0.5" style={{ color: T.textMuted }}>
+                          Простая электронная подпись (ст. 5–6 ФЗ-63) — ваш аккаунт Telegram
+                          {user?.username ? ` (@${user.username})` : user?.id ? ` ID ${user.id}` : ""}. Нажмите ещё раз, чтобы отменить.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-semibold" style={{ color: T.text }}>
+                          Подписать договор (ПЭП)
+                        </p>
+                        <p className="mt-0.5" style={{ color: T.textMuted }}>
+                          Подпишите прямо в Telegram — без печати и бумаги (п. 12.3 договора).
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </button>
+              )}
 
               <button
                 type="submit"

@@ -809,11 +809,21 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       const closeButton = document.querySelector('[data-modal-close="true"]') as HTMLElement;
       closeButton?.focus();
     }, 100);
+    // FIX (iter10): include the rental-window keys in the defaults so the
+    // cart line ALWAYS carries dates + times, even when the renter keeps the
+    // modal defaults (10:00). Previously these keys were absent until the
+    // user actively touched a picker — combined with the zod schema stripping
+    // unknown keys server-side, "untouched" rentals silently fell back to
+    // 10:00 stored as UTC (→ 13:00 MSK).
     const defaultOptions = {
       package: "Базовый",
       duration: "1 день",
       perk: "Стандарт",
       auction: auctionTickOptions[0] ?? "Без аукциона",
+      rentStartDate: todayISO(),
+      rentEndDate: todayISO(),
+      rentStartTime: "10:00",
+      rentEndTime: "10:00",
     };
     setSelectedOptions(defaultOptions);
     void recordRentIntent(item, "viewed", { trigger: "catalog_card", options: defaultOptions });
@@ -857,11 +867,17 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     if (target && lastQueryViewedVehicleRef.current !== target.id) {
       lastQueryViewedVehicleRef.current = target.id;
       setSelectedItem(target);
+      // FIX (iter10): rental-window keys included (see openItem) so cart lines
+      // always carry dates + times.
       const defaultOptions = {
         package: "Базовый",
         duration: "1 день",
         perk: "Стандарт",
         auction: auctionTickOptions[0] ?? "Без аукциона",
+        rentStartDate: todayISO(),
+        rentEndDate: todayISO(),
+        rentStartTime: "10:00",
+        rentEndTime: "10:00",
       };
       setSelectedOptions(defaultOptions);
       void recordRentIntentRef.current?.(target, "viewed", { trigger: "vehicle_query", options: defaultOptions });
@@ -929,10 +945,12 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       duration: "1 день",
       perk: (extrasParts.length > 0 ? extrasParts.join(", ") : (searchParams.get("perk") || "Стандарт")) as never,
       auction: auctionTickOptions[0] ?? "Без аукциона",
-      rentStartDate: searchParams.get("startDate") || "",
-      rentEndDate: searchParams.get("endDate") || "",
-      rentStartTime: searchParams.get("startTime") || "",
-      rentEndTime: searchParams.get("endTime") || "",
+      // FIX (iter10): never leave the window keys empty — the cart line must
+      // always carry dates + times so the rental row gets real MSK timestamps.
+      rentStartDate: searchParams.get("startDate") || todayISO(),
+      rentEndDate: searchParams.get("endDate") || todayISO(),
+      rentStartTime: searchParams.get("startTime") || "10:00",
+      rentEndTime: searchParams.get("endTime") || "10:00",
       extrasSelection: Object.keys(extrasSelection).length > 0 ? extrasSelection : undefined,
     };
 

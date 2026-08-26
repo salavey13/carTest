@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
-import { Camera, Download, MessageSquare, ExternalLink, FileText } from "lucide-react";
+import { signRentalContractPep } from "@/app/rentals/actions";
+import { Camera, Download, MessageSquare, ExternalLink, FileText, PenLine, ShieldCheck } from "lucide-react";
 
 /**
  * RenterActionsPanel
@@ -38,6 +41,10 @@ interface RenterActionsPanelProps {
   photoUploadHref?: string; // web app photo upload route
   messageCrewHref?: string; // route to message input section
   telegramDeepLink?: string;
+  /** Rental status — ПЭП sign button hidden for cancelled rentals */
+  rentalStatus?: string;
+  /** metadata.pep_signature — present once the renter signed (ПЭП, ст. 5–6 ФЗ-63) */
+  pepSignature?: { telegram_id?: string; username?: string | null; signed_at?: string; doc_sha256?: string } | null;
   accentColor: string;
   accentTextOn: string;
   borderColor: string;
@@ -56,6 +63,8 @@ export function RenterActionsPanel({
   photoUploadHref,
   messageCrewHref,
   telegramDeepLink,
+  rentalStatus,
+  pepSignature,
   accentColor,
   accentTextOn,
   borderColor,
@@ -63,6 +72,9 @@ export function RenterActionsPanel({
   textSecondary,
 }: RenterActionsPanelProps) {
   const { dbUser } = useAppContext();
+  const router = useRouter();
+  const [isSigning, startSigningTransition] = useTransition();
+  const [justSigned, setJustSigned] = useState(false);
 
   const isRenter = useMemo(() => {
     if (!dbUser?.user_id) return false;
@@ -70,6 +82,35 @@ export function RenterActionsPanel({
     if (renterTelegramChatId && dbUser.user_id === renterTelegramChatId) return true;
     return false;
   }, [dbUser?.user_id, renterId, renterTelegramChatId]);
+
+  const signedPep = pepSignature?.signed_at ? pepSignature : (justSigned ? { signed_at: "now" } : null);
+
+  const handleSignPep = () => {
+    if (!dbUser?.user_id) {
+      toast.error("Нужна авторизация в Telegram WebApp.");
+      return;
+    }
+    let initData = "";
+    try {
+      initData = String((window as any).Telegram?.WebApp?.initData || "");
+    } catch {
+      // falls to the length check below
+    }
+    if (initData.length < 32) {
+      toast.error("Подпись доступна в Telegram — откройте страницу через бота.");
+      return;
+    }
+    startSigningTransition(async () => {
+      const result = await signRentalContractPep(rentalId, dbUser!.user_id, initData);
+      if (!result.success) {
+        toast.error(result.error || "Не удалось подписать договор.");
+        return;
+      }
+      setJustSigned(true);
+      toast.success("Договор подписан вашей ПЭП — бумажная подпись не нужна (п. 12.3).");
+      router.refresh();
+    });
+  };
 
   // Only render for renters
   if (!isRenter) return null;
@@ -87,6 +128,62 @@ export function RenterActionsPanel({
           Аренда <span className="font-mono">#{rentalId.slice(0, 8)}</span> · что можно сделать
         </p>
       </div>
+
+      {/* ── ПЭП signature (ст. 5–6 ФЗ-63) ──
+          Signed → green confirmation card with signature details.
+          Unsigned → «Подписать договор» button (renter-only, Telegram only). */}
+      {signedPep ? (
+        <div
+          className="flex items-center gap-3 rounded-xl border p-3"
+          style={{ borderColor: accentColor, backgroundColor: `${accentColor}10` }}
+        >
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+            style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
+          >
+            <ShieldCheck className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold" style={{ color: textPrimary }}>
+              Договор подписан ПЭП
+            </p>
+            <p className="text-xs" style={{ color: textSecondary }}>
+              {signedPep.telegram_id ? `Telegram ID ${signedPep.telegram_id}${signedPep.username ? ` (@${signedPep.username})` : ""}` : "Ваш аккаунт Telegram"}
+              {signedPep.signed_at && signedPep.signed_at !== "now"
+                ? ` · ${new Date(signedPep.signed_at).toLocaleString("ru-RU")}`
+                : ""}
+            </p>
+            {signedPep.doc_sha256 && (
+              <p className="mt-0.5 truncate font-mono text-[10px]" style={{ color: textSecondary }}>
+                SHA-256: {signedPep.doc_sha256.slice(0, 24)}…
+              </p>
+            )}
+          </div>
+        </div>
+      ) : rentalStatus !== "cancelled" ? (
+        <button
+          type="button"
+          onClick={handleSignPep}
+          disabled={isSigning}
+          className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50"
+          style={{ borderColor: accentColor, backgroundColor: `${accentColor}08` }}
+        >
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+            style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
+          >
+            <PenLine className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold" style={{ color: textPrimary }}>
+              {isSigning ? "Подписываем…" : "Подписать договор (ПЭП)"}
+            </p>
+            <p className="text-xs" style={{ color: textSecondary }}>
+              Подпишите прямо в Telegram — без печати и бумаги (п. 12.3 договора)
+            </p>
+          </div>
+        </button>
+      ) : null}
 
       {/* Photo upload — only if contract not verified yet */}
       {!contractVerified && photoUploadHref && (

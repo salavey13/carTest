@@ -17,6 +17,8 @@ interface FranchizeRentalDocumentsPanelProps {
   subrenterChatId?: string;
   status: string;
   metadata: RentalMetadata;
+  /** metadata.pep_signature — renter's ПЭП (ст. 5–6 ФЗ-63) status for operators */
+  pepSignature?: { telegram_id?: string; username?: string | null; signed_at?: string; doc_sha256?: string } | null;
   palette: {
     accentMain: string;
     borderSoft: string;
@@ -35,7 +37,7 @@ const freezeChecklistOptions = [
   "Клиент подписал условия",
 ];
 
-export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewSlug, subrenterChatId, status, metadata, palette, isAuto = false }: FranchizeRentalDocumentsPanelProps) {
+export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewSlug, subrenterChatId, status, metadata, pepSignature, palette, isAuto = false }: FranchizeRentalDocumentsPanelProps) {
   const { dbUser, userCrewMemberships } = useAppContext();
 
   // All themed values — CSS vars for auto, palette values for manual themes
@@ -172,6 +174,18 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewS
 
       <div className="mt-3 rounded-xl border p-3" style={{ borderColor: theme.borderSoft }}>
         <p className="text-sm font-medium" style={{ color: theme.textPrimary }}>Фиксация выдачи</p>
+        {/* ПЭП status (ст. 5–6 ФЗ-63): signed by the renter → details;
+            unsigned → paper-signature reminder for the operator. */}
+        {pepSignature?.signed_at ? (
+          <p className="mt-2 text-xs" style={{ color: theme.textSecondary }}>
+            ✍️ ПЭП: подписана {new Date(pepSignature.signed_at).toLocaleString("ru-RU")} · Telegram ID {pepSignature.telegram_id}{pepSignature.username ? ` (@${pepSignature.username})` : ""}
+            {pepSignature.doc_sha256 ? ` · SHA-256 ${pepSignature.doc_sha256.slice(0, 12)}…` : ""} — бумажная подпись не нужна (п. 12.3).
+          </p>
+        ) : (
+          <p className="mt-2 text-xs" style={{ color: theme.textSecondary }}>
+            ✍️ ПЭП: не подписана — договор подписывается на бумаге, либо арендатор может подписать его на своей странице аренды.
+          </p>
+        )}
         {pickupFreeze?.frozen_at ? (
           <div className="mt-2 space-y-1 text-xs" style={{ color: theme.textSecondary }}>
             <p>Статус: зафиксировано {new Date(pickupFreeze.frozen_at).toLocaleString("ru-RU")}</p>
