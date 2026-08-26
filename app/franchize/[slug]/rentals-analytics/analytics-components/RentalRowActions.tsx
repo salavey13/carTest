@@ -194,12 +194,12 @@ export function RentalRowActions({
               <>
                 {/* Backdrop */}
                 <div
-                  className="fixed inset-0 z-40"
+                  className="fixed inset-0 z-[55]"
                   onClick={() => onToggleMessageMenu(null)}
                 />
                 {/* Menu */}
                 <div
-                  className="absolute right-0 top-full mt-1 z-50 rounded-lg shadow-xl py-1 min-w-[200px]"
+                  className="absolute right-0 top-full mt-1 z-[56] rounded-lg shadow-xl py-1 min-w-[200px]"
                   style={{
                     backgroundColor: bgCard,
                     borderColor: borderSoft,

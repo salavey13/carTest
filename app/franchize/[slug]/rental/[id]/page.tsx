@@ -559,6 +559,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               palette={p}
               isAuto={isAuto}
               pepSignature={(rentalMeta?.pep_signature as { telegram_id?: string; username?: string | null; signed_at?: string; doc_sha256?: string } | null) ?? null}
+              currentDocSha={(rentalMeta?.doc_sha256 as string | undefined) ?? null}
             />
           </FranchizeErrorBoundary>
         </FranchizeRentalRoleGuard>
@@ -641,6 +642,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             telegramDeepLink={rental.telegramDeepLink}
             rentalStatus={status}
             pepSignature={(rentalMeta?.pep_signature as { telegram_id?: string; username?: string | null; signed_at?: string; doc_sha256?: string } | null) ?? null}
+            currentDocSha={(rentalMeta?.doc_sha256 as string | undefined) ?? null}
             accentColor={accent}
             accentTextOn={accentTextOn}
             borderColor={borderSoft}

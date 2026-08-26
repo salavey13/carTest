@@ -934,8 +934,10 @@ export function buildRentalContractVariables(
     // otherwise the classic blank handwritten-signature line is kept.
     ...((): Record<string, string> => {
       if (meta.pep?.telegramId) {
-        // MSK (UTC+3) human-readable timestamp — matches the doc's audience
-        const mskDate = new Date(new Date(meta.pep.signedAt).getTime() + 3 * 3600 * 1000);
+        // MSK (UTC+3) human-readable timestamp — matches the doc's audience.
+        // Defensive: an invalid/missing signedAt must not render "NaN.NaN.NaN".
+        const signedMs = new Date(meta.pep.signedAt).getTime();
+        const mskDate = new Date((Number.isFinite(signedMs) ? signedMs : Date.now()) + 3 * 3600 * 1000);
         const pad = (n: number) => String(n).padStart(2, "0");
         const mskStamp = `${pad(mskDate.getUTCDate())}.${pad(mskDate.getUTCMonth() + 1)}.${mskDate.getUTCFullYear()} ${pad(mskDate.getUTCHours())}:${pad(mskDate.getUTCMinutes())} (МСК)`;
         const who = `Telegram ID ${meta.pep.telegramId}${meta.pep.username ? ` (@${meta.pep.username})` : ""}`;

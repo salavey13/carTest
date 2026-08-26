@@ -45,6 +45,8 @@ interface RenterActionsPanelProps {
   rentalStatus?: string;
   /** metadata.pep_signature — present once the renter signed (ПЭП, ст. 5–6 ФЗ-63) */
   pepSignature?: { telegram_id?: string; username?: string | null; signed_at?: string; doc_sha256?: string } | null;
+  /** metadata.doc_sha256 — the CURRENT document fingerprint (stale-signature detection) */
+  currentDocSha?: string | null;
   accentColor: string;
   accentTextOn: string;
   borderColor: string;
@@ -65,6 +67,7 @@ export function RenterActionsPanel({
   telegramDeepLink,
   rentalStatus,
   pepSignature,
+  currentDocSha,
   accentColor,
   accentTextOn,
   borderColor,
@@ -84,6 +87,20 @@ export function RenterActionsPanel({
   }, [dbUser?.user_id, renterId, renterTelegramChatId]);
 
   const signedPep = pepSignature?.signed_at ? pepSignature : (justSigned ? { signed_at: "now" } : null);
+
+  // Stale signature: the document was regenerated AFTER the renter signed
+  // (e.g. via /doc) — the ПЭП record binds to the OLD document's SHA-256, so
+  // the renter should re-sign the current version.
+  const isSignatureStale = Boolean(
+    signedPep &&
+    !justSigned &&
+    signedPep !== null &&
+    typeof signedPep.doc_sha256 === "string" &&
+    signedPep.doc_sha256.length > 0 &&
+    typeof currentDocSha === "string" &&
+    currentDocSha.length > 0 &&
+    signedPep.doc_sha256 !== currentDocSha,
+  );
 
   const handleSignPep = () => {
     if (!dbUser?.user_id) {
@@ -107,7 +124,11 @@ export function RenterActionsPanel({
         return;
       }
       setJustSigned(true);
-      toast.success("Договор подписан вашей ПЭП — бумажная подпись не нужна (п. 12.3).");
+      toast.success(
+        isSignatureStale
+          ? "Текущая версия договора подписана вашей ПЭП (п. 12.3)."
+          : "Договор подписан вашей ПЭП — бумажная подпись не нужна (п. 12.3).",
+      );
       router.refresh();
     });
   };
@@ -158,9 +179,43 @@ export function RenterActionsPanel({
                 SHA-256: {signedPep.doc_sha256.slice(0, 24)}…
               </p>
             )}
+            {isSignatureStale && (
+              <p className="mt-1 rounded-md px-2 py-1 text-[11px] font-medium" style={{ color: "#b45309", backgroundColor: "rgba(245, 158, 11, 0.12)" }}>
+                ⚠ Документ обновлён после подписи — подпись относится к предыдущей версии
+              </p>
+            )}
           </div>
         </div>
-      ) : rentalStatus !== "cancelled" ? (
+      ) : null}
+
+      {/* Stale signature → offer re-signing the CURRENT document version.
+          (The server replaces the old record atomically — see signRentalContractPep.) */}
+      {isSignatureStale && rentalStatus !== "cancelled" && (
+        <button
+          type="button"
+          onClick={handleSignPep}
+          disabled={isSigning}
+          className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50"
+          style={{ borderColor: "#b45309", backgroundColor: "rgba(245, 158, 11, 0.08)" }}
+        >
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+            style={{ backgroundColor: "rgba(245, 158, 11, 0.18)", color: "#b45309" }}
+          >
+            <PenLine className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold" style={{ color: textPrimary }}>
+              {isSigning ? "Подписываем…" : "Подписать текущую версию (ПЭП)"}
+            </p>
+            <p className="text-xs" style={{ color: textSecondary }}>
+              Подпись привяжется к актуальному документу (п. 12.3 договора)
+            </p>
+          </div>
+        </button>
+      )}
+
+      {!signedPep && rentalStatus !== "cancelled" ? (
         <button
           type="button"
           onClick={handleSignPep}

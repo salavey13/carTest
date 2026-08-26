@@ -16,7 +16,6 @@
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
-
 /**
  * Unified permission check for subrenter management.
  *
@@ -112,6 +111,11 @@ export async function setBikeSubrenterAction(input: {
     }
 
     const normalized = (subrenterChatId || "").replace(/\D/g, "");
+    // Sanity: Telegram user ids are at least 5 digits — a stray "12" would
+    // silently create a mini-admin nobody can ever log in as.
+    if (normalized.length > 0 && normalized.length < 5) {
+      return { success: false, error: "Похоже на некорректный Telegram id — нужно минимум 5 цифр (узнать свой id можно у @userinfobot)." };
+    }
     const specs = (bike.specs && typeof bike.specs === "object" && !Array.isArray(bike.specs)
       ? { ...(bike.specs as Record<string, unknown>) }
       : {}) as Record<string, unknown>;
@@ -133,6 +137,37 @@ export async function setBikeSubrenterAction(input: {
 
     if (updateError) return { success: false, error: updateError.message };
 
+    // POLISH: tell the partner he now has mini-admin access — otherwise he
+    // never learns the crew exists. Best-effort (non-fatal on failures).
+    if (normalized.length > 0) {
+      try {
+        const { sendComplexMessage } = await import("@/app/webhook-handlers/actions/sendComplexMessage");
+        const { data: crewRow } = await supabaseAdmin
+          .from("crews")
+          .select("name")
+          .eq("id", crew.id)
+          .maybeSingle();
+        const { data: bikeRow } = await supabaseAdmin
+          .from("cars")
+          .select("make, model")
+          .eq("id", bikeId)
+          .maybeSingle();
+        const bikeLabel = `${bikeRow?.make ?? ""} ${bikeRow?.model ?? ""}`.trim();
+        await sendComplexMessage(
+          normalized,
+          [
+            "🔓 Вам передан байк в аренду",
+            bikeLabel ? `Байк: ${bikeLabel}` : "",
+            `Экипаж: ${crewRow?.name || slug}`,
+            "",
+            "Теперь вы видите аренды своего байка (страница «Аренды») и уведомления по нему.",
+          ].filter(Boolean).join("\n"),
+        );
+      } catch (notifyErr) {
+        logger.warn("[setBikeSubrenterAction] subrenter notify failed (non-fatal)", notifyErr);
+      }
+    }
+
     logger.info("[setBikeSubrenterAction] updated", { slug, bikeId, subrenterChatId: normalized || "(cleared)" });
     return { success: true };
   } catch (error) {
@@ -147,7 +182,7 @@ export async function getCrewBikesSubrenterInfoAction(input: {
   actorUserId: string;
 }): Promise<{
   success: boolean;
-  data?: Array<{ bikeId: string; label: string; subrenterChatId: string | null }>;
+  data?: Array<{ bikeId: string; label: string; subrenterChatId: string | null; subrenterUsername?: string | null }>;
   error?: string;
 }> {
   const parsed = z.object({
@@ -187,7 +222,27 @@ export async function getCrewBikesSubrenterInfoAction(input: {
         subrenterChatId: typeof specs.subrenter_chat_id === "string" ? specs.subrenter_chat_id : null,
       };
     });
-    return { success: true, data };
+
+    // POLISH: resolve subrenter usernames so the panel shows «@user (id)»
+    // instead of a bare number wall. One extra query for the assigned ids.
+    const assignedIds = Array.from(
+      new Set(data.map((b) => b.subrenterChatId).filter((id): id is string => Boolean(id))),
+    );
+    const usernameById = new Map<string, string>();
+    if (assignedIds.length > 0) {
+      const { data: subrenterUsers } = await supabaseAdmin
+        .from("users")
+        .select("user_id, username")
+        .in("user_id", assignedIds);
+      for (const u of subrenterUsers ?? []) {
+        if (u.username) usernameById.set(String(u.user_id), String(u.username));
+      }
+    }
+    const dataWithUsernames = data.map((b) => ({
+      ...b,
+      subrenterUsername: b.subrenterChatId ? usernameById.get(b.subrenterChatId) ?? null : null,
+    }));
+    return { success: true, data: dataWithUsernames };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }

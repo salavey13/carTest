@@ -843,7 +843,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         return;
       }
 
-      toast.success(submitPayload.flowType === "rental" ? "Заявка на аренду отправлена вместе с DOC-файлом." : submitPayload.flowType === "service" ? "Сервисная заявка отправлена." : "Заявка на покупку отправлена вместе с DOC-файлом.");
+      // ПЭП-aware success message: the renter sees that the contract was
+      // actually SIGNED (not just submitted) when they used the ПЭП toggle.
+      const rentalSuccessMsg = pepInitData
+        ? "Заявка на аренду отправлена — договор подписан вашей ПЭП (п. 12.3)."
+        : "Заявка на аренду отправлена вместе с DOC-файлом.";
+      toast.success(submitPayload.flowType === "rental" ? rentalSuccessMsg : submitPayload.flowType === "service" ? "Сервисная заявка отправлена." : submitPayload.flowType === "mixed" ? (pepInitData ? "Заявка отправлена — договоры аренды подписаны вашей ПЭП (п. 12.3)." : "Заявка отправлена вместе с DOC-файлами.") : "Заявка на покупку отправлена вместе с DOC-файлом.");
 
       // Clear cart after successful order
       clearCart();

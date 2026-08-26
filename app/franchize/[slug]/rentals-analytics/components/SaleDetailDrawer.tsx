@@ -203,7 +203,8 @@ export function SaleDetailDrawer({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="fixed inset-0 z-40 hidden justify-end lg:flex"
+        // z-[55]: above the sticky CrewHeader (z-50), below dialogs (z-[60]) / toasts (z-[70])
+        className="fixed inset-0 z-[55] hidden justify-end lg:flex"
         style={{ background: "color-mix(in srgb, #000000 60%, transparent)" }}
         onClick={onClose}
       >

@@ -2436,9 +2436,9 @@ export async function signRentalContractPep(
         if (rental.status === "cancelled") {
             return { success: false, error: "Аренда отменена — подписывать договор не нужно." };
         }
-        if (currentMetadata?.pep_signature?.signed_at) {
-            return { success: false, error: "Договор уже подписан ПЭП — повторная подпись не требуется." };
-        }
+        // NOTE: the "already signed" check moved BELOW doc-sha resolution —
+        // a signature that binds to an OUTDATED document (the doc was
+        // regenerated after signing) must be replaceable with a fresh one.
 
         // 3. Resolve the document sha (metadata → artifact fallback).
         // CODEREVIEW FIX: a ПЭП record MUST bind to the exact document
@@ -2458,6 +2458,19 @@ export async function signRentalContractPep(
             return { success: false, error: "Договор ещё не сформирован — попросите экипаж сформировать документ, затем подпишите." };
         }
 
+        // Already signed THIS version? → refuse. Signed an OLDER version
+        // (doc regenerated since) → allow re-signing: the new record replaces
+        // the stale one and binds to the current document.
+        const existingSignature = currentMetadata?.pep_signature as { signed_at?: string; doc_sha256?: string } | null | undefined;
+        const isResign = Boolean(
+            existingSignature?.signed_at &&
+            typeof existingSignature.doc_sha256 === "string" &&
+            existingSignature.doc_sha256 !== docSha,
+        );
+        if (existingSignature?.signed_at && !isResign) {
+            return { success: false, error: "Договор уже подписан ПЭП — повторная подпись не требуется." };
+        }
+
         // 4. Persist the signature record (read-modify-write, keeps chain intact)
         const { createHash } = await import("crypto");
         const pepSignature: Record<string, unknown> = {
@@ -2468,13 +2481,16 @@ export async function signRentalContractPep(
             auth_date: params.get("auth_date") || null,
             init_data_sha256: createHash("sha256").update(initDataStr).digest("hex"),
             doc_sha256: docSha,
+            // When re-signing a regenerated document, keep the replaced
+            // signature's fingerprint for the audit trail.
+            ...(isResign && existingSignature?.doc_sha256 ? { replaces_doc_sha256: existingSignature.doc_sha256 } : {}),
         };
         // CODEREVIEW FIX: atomic idempotency — the UPDATE only matches rows
-        // where metadata->pep_signature is still absent, so a double-tap (or
-        // two racing requests) can no longer write two signature records.
-        // PostgREST translates .is("metadata->pep_signature", null) into
-        // `metadata->pep_signature IS NULL`, which is TRUE both when the key
-        // is missing and when it holds JSON null.
+        // where the signature is still absent OR binds to a DIFFERENT document
+        // version (stale signature → re-sign allowed). A double-tap (or two
+        // racing requests) on the SAME document can never write twice.
+        // Verified live against PostgREST: null-branch matches absent keys,
+        // the ->>doc_sha256.neq branch matches stale signatures only.
         const { data: updatedRows, error: updateError } = await supabaseAdmin
             .from("rentals")
             .update({
@@ -2482,7 +2498,7 @@ export async function signRentalContractPep(
                 updated_at: new Date().toISOString(),
             })
             .eq("rental_id", rentalId)
-            .is("metadata->pep_signature", null)
+            .or(`metadata->pep_signature.is.null,metadata->pep_signature->>doc_sha256.neq.${docSha}`)
             .select("rental_id");
         if (updateError) throw updateError;
         if (!updatedRows || updatedRows.length === 0) {
@@ -2499,6 +2515,7 @@ export async function signRentalContractPep(
                 telegram_id: pepSignature.telegram_id,
                 username: pepSignature.username,
                 doc_sha256: docSha ? String(docSha).slice(0, 16) + "…" : null,
+                ...(isResign ? { re_signed: true, replaced_doc_sha256: String(existingSignature?.doc_sha256 || "").slice(0, 16) + "…" } : {}),
             },
         });
         if (eventError) logger.error("[signRentalContractPep] Event insert failed:", eventError);
@@ -2509,7 +2526,7 @@ export async function signRentalContractPep(
             const pad = (n: number) => String(n).padStart(2, "0");
             const stamp = `${pad(msk.getUTCDate())}.${pad(msk.getUTCMonth() + 1)}.${msk.getUTCFullYear()} ${pad(msk.getUTCHours())}:${pad(msk.getUTCMinutes())} МСК`;
             await sendComplexMessage(rental.owner_id, [
-                "✍️ Договор подписан ПЭП",
+                isResign ? "✍️ Договор переподписан ПЭП (новая версия документа)" : "✍️ Договор подписан ПЭП",
                 `Аренда #${rentalId.slice(0, 8)}`,
                 `Арендатор: Telegram ID ${pepSignature.telegram_id}${tgUser.username ? ` (@${tgUser.username})` : ""}`,
                 `Время подписи: ${stamp}`,

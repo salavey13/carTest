@@ -22,6 +22,7 @@ interface BikeSubrenterRow {
   bikeId: string;
   label: string;
   subrenterChatId: string | null;
+  subrenterUsername?: string | null;
 }
 
 export function SubrenterManagerPanel({
@@ -115,7 +116,7 @@ export function SubrenterManagerPanel({
         subrenterChatId: value || null,
       });
       if (result.success) {
-        toast.success(value ? "Субарендатор назначен" : "Субарендатор снят");
+        toast.success(value ? "Субарендатор назначен — отправили ему уведомление в Telegram" : "Субарендатор снят");
         setBikes((prev) => prev.map((b) => (b.bikeId === bikeId ? { ...b, subrenterChatId: value || null } : b)));
       } else {
         toast.error(`Не удалось сохранить — ${result.error ?? "неизвестная ошибка"}`);
@@ -198,7 +199,7 @@ export function SubrenterManagerPanel({
                 </p>
                 <p className="mt-0.5 text-xs text-[var(--fr-admin-muted)]">
                   {bike.subrenterChatId
-                    ? `Субарендатор: ${bike.subrenterChatId}`
+                    ? `Субарендатор: ${bike.subrenterUsername ? `@${bike.subrenterUsername} · ` : ""}${bike.subrenterChatId}`
                     : "Субарендатор не назначен"}
                 </p>
               </div>

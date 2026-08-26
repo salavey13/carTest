@@ -721,13 +721,23 @@ export async function getFranchizeCrewRentalsListAction(params: {
       // TG auth: check permissions
       const { data: user } = await supabaseAdmin
         .from("users")
-        .select("metadata, username")
+        .select("role, status, metadata, username")
         .eq("user_id", actorUserId)
         .maybeSingle();
 
       const userMetadata = user?.metadata as Record<string, unknown> | null;
       const userUsername = user?.username as string | null;
-      const isAdmin = userMetadata?.role === "admin";
+      // FIX (iter8 pattern, applied here 2026-08-27): the real global admin
+      // carries his status in TOP-LEVEL users.role/status columns — the old
+      // metadata-only check rejected him at this gate ("Недостаточно прав")
+      // even though every other surface (leads, subrenter panel, role guard)
+      // accepts him.
+      const isAdmin =
+        user?.role === "admin" ||
+        user?.role === "vprAdmin" ||
+        user?.status === "admin" ||
+        userMetadata?.role === "admin" ||
+        userMetadata?.status === "admin";
       const isOwner = crew.owner_id === actorUserId;
       const isOrudjov = userUsername?.toLowerCase().includes("orud");
 
@@ -736,6 +746,9 @@ export async function getFranchizeCrewRentalsListAction(params: {
         .select("user_id")
         .eq("crew_id", crew.id)
         .eq("user_id", actorUserId)
+        // POLISH: only ACTIVE memberships count — a removed member's stale
+        // row (membership_status != active) must not grant rentals access.
+        .eq("membership_status", "active")
         .maybeSingle();
 
       // ── Subrenter access (iter7): a user whose chat_id is set in a bike's

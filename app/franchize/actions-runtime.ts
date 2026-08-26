@@ -3586,6 +3586,43 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           } catch (renterNotifyErr) {
             logger.warn("[franchize] Failed to send rental deeplink notification to renter:", { error: renterNotifyErr instanceof Error ? renterNotifyErr.message : String(renterNotifyErr) });
           }
+
+          // POLISH (subrenter): the bike's partner owner (specs.subrenter_chat_id)
+          // is a mini-admin for his bike — notify him with the same deeplink so
+          // he can follow HIS bike's rental. Skipped when he IS the crew owner /
+          // admin / renter (they already got their copy above).
+          for (const r of createdRentals) {
+            try {
+              const specs = ((byId.get(r.bikeId)?.specs as Record<string, unknown> | undefined) ?? {});
+              const subrenterChatId = typeof specs.subrenter_chat_id === "string" && specs.subrenter_chat_id
+                ? String(specs.subrenter_chat_id)
+                : null;
+              if (
+                !subrenterChatId ||
+                subrenterChatId === String(crewOwnerChatId || "") ||
+                subrenterChatId === String(adminChatId || "") ||
+                subrenterChatId === String(payload.telegramUserId || "")
+              ) {
+                continue;
+              }
+              const { sendComplexMessage } = await import("@/app/webhook-handlers/actions/sendComplexMessage");
+              await sendComplexMessage(
+                subrenterChatId,
+                [
+                  `🔑 <b>Новая аренда вашего байка</b>`,
+                  ``,
+                  `🏍 ${r.bikeName} · ${fmtRu(r.startIso)} → ${fmtRu(r.endIso)} · ${formatMoney(r.totalRub)} ₽`,
+                  ``,
+                  `Получатель: ${payload.recipient}`,
+                  `Аренда ожидает активации оператором экипажа.`,
+                ].join("\n"),
+                [[{ text: "🔑 Открыть аренду", url: `https://t.me/${botUsername}/app?startapp=rental_${r.rentalId}` }]],
+                { parseMode: "HTML" },
+              );
+            } catch (subrenterNotifyErr) {
+              logger.warn("[franchize] Failed to send rental deeplink notification to subrenter:", { bikeId: r.bikeId, error: subrenterNotifyErr instanceof Error ? subrenterNotifyErr.message : String(subrenterNotifyErr) });
+            }
+          }
         }
       } catch (rentalSetupErr) {
         logger.warn("[franchize] Rental creation setup failed:", rentalSetupErr);

@@ -121,6 +121,23 @@ describe("ПЭП (ст. 5–6 ФЗ-63) contract variables", () => {
     expect(vars.pep_signed).toBe("");
     expect(vars.renter_signature).toBe("электронное согласие в Telegram WebApp");
   });
+
+  it("meta.pep with INVALID signedAt → timestamp falls back to now, never NaN", () => {
+    const vars = buildRentalContractVariables({
+      renter: RENTER,
+      bike: BIKE,
+      period: PERIOD,
+      crewSecrets: CREW_SECRETS,
+      // @ts-expect-error — runtime garbage defense
+      meta: { pep: { telegramId: "8935491576", signedAt: "not-a-date" } },
+      equipment: {},
+      priceBreakdown: PRICE_BREAKDOWN,
+    });
+
+    expect(vars.pep_signed).toBe("1");
+    expect(vars.signature_timestamp).toMatch(/\d{2}\.\d{2}\.\d{4} \d{2}:\d{2} \(МСК\)/);
+    expect(vars.signature_timestamp).not.toContain("NaN");
+  });
 });
 
 describe("ПЭП template rendering (RENTAL_DEAL_TEMPLATE + vip-bike crew template)", () => {

@@ -422,8 +422,11 @@ export function LeadDetailDrawer(props: Props) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        // z-40: backdrop sits below mobile sheet (z-50), dialog (z-[60]), toast (z-[70])
-        className="fixed inset-0 z-40 flex justify-end"
+        // z-[55]: ABOVE the sticky CrewHeader (z-50) — the header must never
+        // overlap the drawer content — but below the dialogs (z-[60]) and
+        // toasts (z-[70]). Previously z-40 let the (now taller) sticky header
+        // cover the drawer's title row + close button.
+        className="fixed inset-0 z-[55] flex justify-end"
         style={{ background: "color-mix(in srgb, #000000 60%, transparent)" }}
         onClick={onClose}
       >

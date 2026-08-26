@@ -9,8 +9,7 @@ import { toInternalHref } from "../lib/navigation";
 import { crewPaletteForSurface } from "../lib/theme";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { useResolvedPalette } from "../lib/useResolvedPalette";
-import { useTelegramContentSafeTop, TG_FULLSCREEN_TOP_FALLBACK_PX } from "../hooks/useTelegramContentSafeTop";
-import { useAppContext } from "@/contexts/AppContext";
+import { useTelegramContentSafeTop } from "../hooks/useTelegramContentSafeTop";
 
 interface HeaderMenuProps {
   crew: FranchizeCrewVM;
@@ -34,10 +33,12 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
   const menuRef = useRef<HTMLDivElement | null>(null);
   const palette = useResolvedPalette(crew.theme);
   const surface = crewPaletteForSurface(crew.theme);
-  // TG fullscreen: keep the modal (and its close button) below the native buttons
+  // TG fullscreen: keep the modal (and its close button) below the native
+  // buttons. The hook resolves the exact contentSafeAreaInset.top when
+  // available and the 54px fallback ONLY for mobile layouts in fullscreen
+  // (wide/desktop layouts get 0 — native buttons never overlap there).
   const tgContentSafeTop = useTelegramContentSafeTop();
-  const { isInTelegramContext } = useAppContext();
-  const nativeTopPx = isInTelegramContext ? (tgContentSafeTop > 0 ? tgContentSafeTop : TG_FULLSCREEN_TOP_FALLBACK_PX) : 0;
+  const nativeTopPx = tgContentSafeTop;
 
   // Apply franchize theme CSS variables
   useFranchizeTheme(crew.theme);

@@ -16,7 +16,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useResolvedPalette } from "../lib/useResolvedPalette";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
-import { useTelegramContentSafeTop, TG_FULLSCREEN_TOP_FALLBACK_PX } from "../hooks/useTelegramContentSafeTop";
+import { useTelegramContentSafeTop } from "../hooks/useTelegramContentSafeTop";
 import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
 import { hasRentPrice, hasSalePrice, hasServicePrice, hasEquipmentPrice } from "../lib/catalog-utils";
@@ -137,19 +137,18 @@ export function CrewHeader({
   return (
     <header
       // FIX (2026-08-27): top padding must clear the Telegram native buttons
-      // in FULLSCREEN mode. env(safe-area-inset-top) only covers the OS notch
-      // — the TG controls (~48-56px) need contentSafeAreaInset.top (Bot API
-      // 8.0+) or a conservative fallback on older clients. Without this, the
-      // profile dropdown / cart icon / hamburger were overlapped by the native
-      // back + menu buttons in fullscreen mode.
+      // in FULLSCREEN mode on MOBILE layouts only. The hook resolves:
+      //   contentSafeAreaInset.top (exact, Bot API 8.0+) when available,
+      //   the 54px fallback only for narrow viewports in fullscreen (old
+      //   clients), and 0 for wide/desktop layouts — native buttons never
+      //   overlap there, so the header keeps its compact padding.
       className="sticky top-0 z-50 border-b pb-2 backdrop-blur-2xl"
       style={{
         ...FRANCHIZE_HEADER_SAFE_AREA_STYLE,
-        paddingTop: isInTelegramContext
-          ? tgContentSafeTop > 0
+        paddingTop:
+          isInTelegramContext && tgContentSafeTop > 0
             ? `calc(env(safe-area-inset-top) + ${tgContentSafeTop}px + 0.75rem)`
-            : `max(calc(env(safe-area-inset-top) + ${TG_FULLSCREEN_TOP_FALLBACK_PX}px + 0.75rem), 6rem)`
-          : "calc(max(env(safe-area-inset-top), 0px) + 1.45rem)",
+            : "calc(max(env(safe-area-inset-top), 0px) + 1.45rem)",
         // FIX 6: isolation creates a proper stacking context for the entire header.
         isolation: "isolate",
         borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,

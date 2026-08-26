@@ -86,7 +86,9 @@ export function AnalyticsMobileSheet({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 flex items-end"
+          // z-[55]: above the sticky CrewHeader (z-50) — equal z-50 was fragile
+          // (same-z stacking depends on DOM order) — below dialogs/toasts.
+          className="fixed inset-0 z-[55] flex items-end"
           style={{ background: "color-mix(in srgb, #000000 60%, transparent)" }}
           onClick={onClose}
           role="dialog"
