@@ -1,7 +1,7 @@
 # PRD: Meta-CRM Enhancements — Daily Reports, Service Module, Shifts, Gamification
 
-**Status:** Refined v0.8 · 2026-08-26 (ALL P0 + P2 + iter4 Send-to-Telegram + Rental achievements COMPLETE)
-**Source:** Operator transcripts + codebase audit (shift command, profile-actions, crew_member_shifts table, evening-summary.sh, iter4 send-to-telegram + rental achievements)
+**Status:** Refined v0.9 · 2026-08-26 (ALL P0 + P2 + iter4 + iter5 Salary Coefficients COMPLETE)
+**Source:** Operator transcripts + codebase audit (shift command, profile-actions, crew_member_shifts table, evening-summary.sh, iter4 send-to-telegram + rental achievements, iter5 official bonus document)
 **Deadline:** September 1, 2026 (6 days)
 **KPI:** Fully working automated financial + operational reporting from September 1
 
@@ -555,6 +555,7 @@ Each wish from the transcripts is listed once (deduplicated), categorized into a
 | **iter4** | Rental closure achievements (8 badges) | 1 iter | §5.6 | ✅ **COMPLETE (2026-08-26)** |
 | **iter4** | Salary column calculation in CSV (`ЗП Аренда` + `ЗП Продажа`) | 1 iter | §1.6.1 | ✅ **COMPLETE (2026-08-26)** |
 | **iter4** | CSV table-view polish (search, totals card, sticky cols, send button) | 1 iter | §1.10 | ✅ **COMPLETE (2026-08-26)** |
+| **iter5** | Salary coefficients — official bonus scheme (rental/sale categories + экип + оверпрайс), configurable | 1 iter | PRD_SALARY_COEFFICIENTS | ✅ **COMPLETE (2026-08-26)** |
 | **P3** | Multiple mechanics on service job | 1 iter | §2.2 | ❌ Pending |
 | **P3** | Bike status (in_service/in_repair) | 1 iter | §2.3 | ❌ Pending |
 | **P3** | Equipment flexible pricing (gifts/discounts) | 1 iter | §4.2 | ❌ Pending |
@@ -592,6 +593,12 @@ Each wish from the transcripts is listed once (deduplicated), categorized into a
   - Evening summary time: 22:00 MSK
   - **NEW:** Prepayment tracking with bike names + total aggregation
   - **NEW:** Prepayments excluded from revenue (labeled "не в выручке")
+- ✅ **NEW (v0.9 / iter5):** Salary coefficients — official bonus scheme (see `docs/PRD_SALARY_COEFFICIENTS.md`)
+  - **Model**: «ЗП Аренда» = категорийный бонус техники (бюджетные 750 / обычные 1000 / партнерские обычные 500 / премиум 1500 / партнерские премиум 750 ₽) + экип 200 ₽×единицу + оверпрайс 10%×наценка над каталогом. «ЗП Продажа» = 5000 / 10000 / 15000 ₽ по категории; продажа экипировки — 500/100/500/500/200 ₽ за единицу. Replaces the iter4 percentage-of-price model.
+  - **Tables**: `public.salary_coefficients` (crew_id × kind × category → amount) + `public.bike_salary_categories` (crew × bike → rental + sale categories), migration `20260826000001`, seeded with the official document defaults for every crew + the full 25-bike catalog mapping.
+  - **Config UI**: new page `/franchize/{slug}/salary-coefficients` (edit: owner/co_owner/admin; read-only for members) — live preview calculator, category cards with official-value diff badges, bike category assignment with search + bulk "применить официальные", sticky save bar, reset-to-official. Linked from profile «Операции экипажа», `/commissions` banner and `/salary` banner.
+  - **Engine**: `lib/salary-coefficients-shared.ts` (pure calculators) + `lib/salary-coefficients.ts` (DB resolution, graceful fallback to official defaults when the migration is not applied).
+  - **Integration**: both CSV builders (and therefore TG XLSX/CSV send) + `calculateSalaryForPeriod` — when the crew has coefficients configured, rental/sale bonuses are computed from the rentals/sale artifacts credited to the operator (`created_by_operator_chat_id` / `telegram_chat_id`), and the legacy percentage path is skipped for rental/sale income (no double counting; equipment/service percentages still apply).
 - ✅ **NEW (v0.8 / iter4):** Send-to-Telegram + Salary column + Rental achievements
   - **Send-to-Telegram CSV**: green plane-icon button in the analytics table-view modal (rentals + sales). Calls `sendAnalyticsCsvToTelegram` server-action which builds the CSV server-side and sends via the existing `sendTelegramDocument` bot capability. Solves the TG WebApp iframe sandbox problem where the browser blob-download silently fails.
   - **Salary column calculation**: the previously-empty `ЗП Аренда` column in the rentals CSV (and `ЗП Продажа` in the sales CSV) is now filled using the `commission_rates` table — the same configuration the operator sets at `/franchize/{slug}/commissions`. Priority: `rental_daily` > `rental_hourly` (matches SalaryClient). Percentage = `price × rate / 100`; fixed_amount = flat fee.

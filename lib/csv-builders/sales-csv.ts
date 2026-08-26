@@ -6,12 +6,19 @@
 //
 // Columns: Дата, ЗП Продажа, Наименование, Цена, Комментарий
 //
-// FIX (iter4): now fills the "ЗП Продажа" column (col 2) using the crew's
-// commission_rates table for operation_type = 'sale'. Defaults to 5% (the
-// seed value in CommissionsClient presets).
+// Salary (iter5, docs/PRD_SALARY_COEFFICIENTS.md): «ЗП Продажа» is the fixed
+// category bonus (Эндуро/мопеды 5000 · Обычные 10000 · Премиум 15000 ₽ by
+// default), configurable at /franchize/[slug]/salary-coefficients. Replaces
+// the iter4 percentage-of-price model.
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
+import {
+  getSalaryConfig,
+  getBikeCategoryOverrides,
+  resolveBikeCategories,
+  computeSaleSalary,
+} from "@/lib/salary-coefficients";
 
 type SupabaseSchemaClient = {
   schema: (schema: string) => {
@@ -31,47 +38,6 @@ function formatCell(v: unknown): string {
 
 const rowOf = (cells: unknown[]): string => cells.map(formatCell).join(",");
 
-// Resolve the crew's commission rate for sales.
-// Returns { type, value } or null if no rate configured.
-export async function resolveSaleCommissionRate(
-  crewId: string,
-): Promise<{ type: "percentage" | "fixed_amount"; value: number } | null> {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("commission_rates")
-      .select("commission_type, commission_value, priority")
-      .eq("crew_id", crewId)
-      .eq("operation_type", "sale")
-      .eq("is_active", true)
-      .order("priority", { ascending: false });
-
-    if (error) {
-      logger.warn("[sales-csv] commission_rates query failed:", error);
-      return null;
-    }
-    if (!data || data.length === 0) return null;
-    const top = data[0];
-    return {
-      type: top.commission_type as "percentage" | "fixed_amount",
-      value: Number(top.commission_value) || 0,
-    };
-  } catch (e) {
-    logger.warn("[sales-csv] resolveSaleCommissionRate exception:", e);
-    return null;
-  }
-}
-
-function calcSaleSalary(
-  price: number,
-  rate: { type: "percentage" | "fixed_amount"; value: number } | null,
-): string {
-  if (!rate) return "";
-  if (rate.type === "percentage") {
-    return String(Math.round((price * rate.value) / 100));
-  }
-  return String(rate.value);
-}
-
 export async function buildSalesCsv(
   slug: string,
   from: string,
@@ -84,7 +50,12 @@ export async function buildSalesCsv(
     .maybeSingle();
   if (!crew) throw new Error("Crew not found");
 
-  const commissionRate = await resolveSaleCommissionRate(crew.id);
+  // Salary engine: configurable coefficients + bike categories
+  // (official document defaults when nothing configured / migration not applied).
+  const [salaryConfig, bikeOverrides] = await Promise.all([
+    getSalaryConfig(crew.id),
+    getBikeCategoryOverrides(crew.id),
+  ]);
 
   const { data: crewBikes } = await supabaseAdmin
     .from("cars")
@@ -123,10 +94,17 @@ export async function buildSalesCsv(
     const bikeName = bikeNameById.get(s.resolved_bike_id) || "";
     const price = Number(s.sale_price) || 0;
     totalSales += price;
-    const salaryStr = calcSaleSalary(price, commissionRate);
-    if (salaryStr !== "") totalSalary += Number(salaryStr);
+
+    const categories = resolveBikeCategories(s.resolved_bike_id || "", bikeOverrides);
+    const salary = computeSaleSalary({
+      config: salaryConfig,
+      saleCategory: categories.sale,
+      salePrice: price,
+    });
+    totalSalary += salary.total;
+
     const comment = s.buyer_full_name || "";
-    rows.push(rowOf([dateStr, salaryStr, bikeName, price, comment]));
+    rows.push(rowOf([dateStr, String(salary.total), bikeName, price, comment]));
   }
 
   rows.push("");

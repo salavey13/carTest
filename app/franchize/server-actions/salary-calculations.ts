@@ -10,6 +10,19 @@ import {
   errorResponse,
   type ActionResponse,
 } from "./shared/auth-helpers";
+import {
+  getSalaryConfig,
+  getBikeCategoryOverrides,
+  resolveBikeCategories,
+  countEquipmentUnits,
+  computeRentalSalary,
+  computeSaleSalary,
+  equipmentStandardCost,
+  standardRentalPrice,
+  hasSalaryCoefficients,
+  RENTAL_CATEGORY_LABELS,
+  type RentalEquipment,
+} from "@/lib/salary-coefficients";
 
 /**
  * I5 — Salary calculations server actions.
@@ -18,6 +31,139 @@ import {
 
 // Cache для расчётов зарплаты (24 часа TTL для оптимизации повторных запросов)
 const salaryCalcCache = new Map<string, { data: any; expiry: number }>();
+
+/**
+ * Category-bonus method (official scheme, docs/PRD_SALARY_COEFFICIENTS.md):
+ * rental + sale bonuses computed directly from rentals / sale_contract_artifacts
+ * credited to the member. Used by calculateSalaryForPeriod when the crew has
+ * salary_coefficients configured; replaces the percentage commission for
+ * rental/sale income (prevents double counting).
+ */
+async function computeCategoryBonuses(params: {
+  crewId: string;
+  memberId: string;
+  periodStart: string;
+  periodEnd: string;
+}): Promise<{
+  total: number;
+  details: Array<{ type: string; amount: number; description: string }>;
+}> {
+  const { crewId, memberId, periodStart, periodEnd } = params;
+  const details: Array<{ type: string; amount: number; description: string }> = [];
+
+  const [config, bikeOverrides] = await Promise.all([
+    getSalaryConfig(crewId),
+    getBikeCategoryOverrides(crewId),
+  ]);
+
+  // ── Rental bonuses: rentals credited to this operator in the period ──
+  const { data: rentals, error: rentalsError } = await supabaseAdmin
+    .from("rentals")
+    .select(`
+      rental_id, total_cost, metadata,
+      requested_start_date, requested_end_date, agreed_start_date, agreed_end_date,
+      vehicle:cars!inner(id, make, model, crew_id, specs, daily_price)
+    `)
+    .eq("vehicle.crew_id", crewId)
+    .eq("created_by_operator_chat_id", memberId)
+    .neq("status", "cancelled")
+    .gte("requested_start_date", periodStart)
+    .lt("requested_start_date", periodEnd);
+
+  if (rentalsError) {
+    logger.warn("[calculateSalaryForPeriod] category rentals query failed:", rentalsError);
+  }
+
+  const byRentalCategory = new Map<string, { count: number; amount: number }>();
+  let rentalTotal = 0;
+  for (const r of (rentals || []) as any[]) {
+    const meta = r.metadata || {};
+    const vehicle = Array.isArray(r.vehicle) ? r.vehicle[0] : r.vehicle;
+    const categories = resolveBikeCategories(vehicle?.id || "", bikeOverrides);
+    const eq = (meta.equipment || {}) as RentalEquipment;
+    const price = Number(r.total_cost) || 0;
+    const stdPrice =
+      standardRentalPrice({
+        specs: vehicle?.specs,
+        startIso: r.requested_start_date || r.agreed_start_date,
+        endIso: r.requested_end_date || r.agreed_end_date,
+        dailyPrice: vehicle?.daily_price,
+        fallbackTotalCost: price,
+      }) + equipmentStandardCost(eq);
+    const salary = computeRentalSalary({
+      config,
+      rentalCategory: categories.rental,
+      equipmentUnits: countEquipmentUnits(eq),
+      totalCost: price,
+      standardPrice: stdPrice,
+    });
+    rentalTotal += salary.total;
+    const label = RENTAL_CATEGORY_LABELS[categories.rental];
+    const bucket = byRentalCategory.get(label) || { count: 0, amount: 0 };
+    bucket.count += 1;
+    bucket.amount += salary.total;
+    byRentalCategory.set(label, bucket);
+  }
+
+  if (rentalTotal > 0 || byRentalCategory.size > 0) {
+    for (const [label, agg] of byRentalCategory) {
+      details.push({
+        type: "rental_category_bonus",
+        amount: agg.amount,
+        description: `Аренда (${label}): ${agg.count} × бонусы`,
+      });
+    }
+  }
+
+  // ── Sale bonuses: sale contracts created in the member's chat ──
+  const { data: crewBikes } = await supabaseAdmin
+    .from("cars")
+    .select("id")
+    .eq("crew_id", crewId);
+  const crewBikeIds = (crewBikes || []).map((b: any) => b.id);
+
+  let saleTotal = 0;
+  if (crewBikeIds.length > 0) {
+    const { data: sales, error: salesError } = await (supabaseAdmin as any)
+      .schema("private")
+      .from("sale_contract_artifacts")
+      .select("id, sale_price, resolved_bike_id, created_at")
+      .in("resolved_bike_id", crewBikeIds)
+      .eq("telegram_chat_id", memberId)
+      .gte("created_at", periodStart)
+      .lt("created_at", periodEnd);
+
+    if (salesError) {
+      logger.warn("[calculateSalaryForPeriod] category sales query failed:", salesError);
+    }
+
+    const bySaleCategory = new Map<string, { count: number; amount: number }>();
+    for (const s of (sales || []) as any[]) {
+      const categories = resolveBikeCategories(s.resolved_bike_id || "", bikeOverrides);
+      const salary = computeSaleSalary({
+        config,
+        saleCategory: categories.sale,
+        salePrice: Number(s.sale_price) || 0,
+      });
+      saleTotal += salary.total;
+      const label = categories.sale === "enduro_moped" ? "эндуро/мопеды" : categories.sale === "premium" ? "премиум" : "обычные";
+      const bucket = bySaleCategory.get(label) || { count: 0, amount: 0 };
+      bucket.count += 1;
+      bucket.amount += salary.total;
+      bySaleCategory.set(label, bucket);
+    }
+
+    for (const [label, agg] of bySaleCategory) {
+      details.push({
+        type: "sale_category_bonus",
+        amount: agg.amount,
+        description: `Продажа (${label}): ${agg.count} × бонусы`,
+      });
+    }
+  }
+
+  return { total: rentalTotal + saleTotal, details };
+}
 
 /**
  * Проверяет, пересекаются ли периоды дат.
@@ -258,13 +404,20 @@ export async function calculateSalaryForPeriod(params: {
       logger.warn("[calculateSalaryForPeriod] Failed to detect commission rates, defaulting to recorded method:", err);
     }
 
+    // Category-bonus model (official scheme, PRD_SALARY_COEFFICIENTS.md):
+    // active once the salary_coefficients migration is applied + seeded.
+    // Rental/sale income then uses fixed category bonuses computed from the
+    // rentals / sale artifacts themselves; percentage rates keep applying only
+    // to other income types (service, equipment, …) to avoid double counting.
+    const useCategoryModel = await hasSalaryCoefficients(access.crewId!);
+
     // Get shift income
     // Проверяем кеш для расчётов зарплаты (оптимизация повторных запросов)
     // Priority 1 Fix 3: Include calculation method in cache key.
     // NOTE: cacheKey must be constructed AFTER `useRateCalculation` is
     // determined, otherwise referencing the const here triggers a
     // Temporal Dead Zone ReferenceError.
-    const cacheKey = `${access.crewId}-${memberId}-${periodStart}-${periodEnd}-${useRateCalculation}`;
+    const cacheKey = `${access.crewId}-${memberId}-${periodStart}-${periodEnd}-${useRateCalculation}-${useCategoryModel}`;
     const cached = salaryCalcCache.get(cacheKey);
     if (cached && cached.expiry > Date.now()) {
       logger.debug("[calculateSalaryForPeriod] Cache hit", { cacheKey, useRateCalculation });
@@ -322,6 +475,19 @@ export async function calculateSalaryForPeriod(params: {
     const breakdown: Array<{ type: string; amount: number; description: string }> = [];
     breakdown.push({ type: "shifts", amount: shiftIncome, description: "Смены" });
 
+    // Category-bonus model (official scheme): fixed bonuses per equipment
+    // category for rentals + sales, credited to the operator who closed them.
+    if (useCategoryModel) {
+      const categoryResult = await computeCategoryBonuses({
+        crewId: access.crewId!,
+        memberId,
+        periodStart,
+        periodEnd,
+      });
+      commissionIncome += categoryResult.total;
+      breakdown.push(...categoryResult.details);
+    }
+
     if (useRateCalculation && commissionRates && commissionRates.length > 0) {
       // Method 1: Calculate from commission rates (preferred when configured)
       // Build rate map: operation_type -> { commissionType, commissionValue }
@@ -337,13 +503,19 @@ export async function calculateSalaryForPeriod(params: {
         }
       });
 
-      // Get all income transactions for this member to calculate commissions
+      // Get all income transactions for this member to calculate commissions.
+      // Under the category model, rental/sale income is already paid via fixed
+      // category bonuses above — skip their percentage commissions to avoid
+      // double counting (service/equipment percentages still apply).
+      const txTypes = useCategoryModel
+        ? ["income_equipment"]
+        : ["income_rental", "income_sale", "income_equipment"];
       const { data: incomeTransactions, error: incomeError } = await supabaseAdmin
         .from("cash_transactions")
         .select("id, amount, transaction_type, flow_direction, description, transaction_date")
         .eq("crew_id", access.crewId)
         .eq("created_by", memberId)
-        .in("transaction_type", ["income_rental", "income_sale", "income_equipment"])
+        .in("transaction_type", txTypes)
         .gte("transaction_date", periodStart)
         .lt("transaction_date", periodEnd);
 
@@ -364,6 +536,8 @@ export async function calculateSalaryForPeriod(params: {
           }
 
           if (!operationType) continue;
+          // Category model already paid rental/sale income via fixed bonuses.
+          if (useCategoryModel && (operationType === "rental_daily" || operationType === "sale")) continue;
 
           const rate = rateMap.get(operationType);
           if (!rate) continue;
@@ -383,8 +557,11 @@ export async function calculateSalaryForPeriod(params: {
           });
         }
       }
-    } else {
-      // Method 2: Use recorded expense_commission transactions (fallback when no rates configured)
+    } else if (!useCategoryModel) {
+      // Method 2: Use recorded expense_commission transactions (fallback when no
+      // rates configured). Skipped under the category model — its fixed bonuses
+      // already cover rental/sale income, and recorded commissions would double
+      // count them.
       const { data: commissions, error: commError } = await supabaseAdmin
         .from("cash_transactions")
         .select("amount, description, transaction_date")

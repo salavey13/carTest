@@ -963,6 +963,9 @@ export function FranchizeProfileClient({
               <FranchizeOperatorLinkButton href={`/franchize/${slug}/salary`}>
                 💵 Зарплата
               </FranchizeOperatorLinkButton>
+              <FranchizeOperatorLinkButton href={`/franchize/${slug}/salary-coefficients`}>
+                🎯 Ставки ЗП
+              </FranchizeOperatorLinkButton>
               <FranchizeOperatorLinkButton href={`/franchize/${slug}/admin`}>
                 ⚙️ Админка
               </FranchizeOperatorLinkButton>

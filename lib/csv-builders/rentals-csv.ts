@@ -4,11 +4,13 @@
 //   • /api/franchize/rentals-csv-export  (direct file download)
 //   • server-action sendAnalyticsCsvToTelegram (send via bot to operator's chat)
 //
-// FIX (iter4): now fills the "ЗП Аренда" column (col 2) using the crew's
-// commission_rates table — defaults to 10% (rental_hourly seed). The variant
-// 'rental_daily' is preferred when present (matches how SalaryClient computes
-// earnings); falls back to 'rental_hourly'. If neither exists, the column
-// stays empty (preserves old behaviour).
+// Salary columns (iter5, docs/PRD_SALARY_COEFFICIENTS.md):
+//   «ЗП Аренда»  = категорийный бонус техники (официальная схема)
+//                + бонус за экип (₽ × количество единиц)
+//                + оверпрайс % × наценка над каталогом
+//   «ЗП Продажа» = категорийный бонус продажи техники
+// Coefficients are configurable at /franchize/[slug]/salary-coefficients;
+// defaults come from the official bonus document (lib/salary-coefficients.ts).
 //
 // Columns (17 total):
 //   Дата, ЗП Аренда, Партнеру, Цена, Экип, Залог, Марка, (spacer),
@@ -16,7 +18,17 @@
 //   дата, ЗП Продажа, Наименование, Цена, Комментарий
 
 import { supabaseAdmin } from "@/lib/supabase-server";
-import { logger } from "@/lib/logger";
+import {
+  getSalaryConfig,
+  getBikeCategoryOverrides,
+  resolveBikeCategories,
+  countEquipmentUnits,
+  computeRentalSalary,
+  computeSaleSalary,
+  equipmentStandardCost,
+  standardRentalPrice,
+  type RentalEquipment,
+} from "@/lib/salary-coefficients";
 
 type SupabaseSchemaClient = {
   schema: (schema: string) => {
@@ -36,62 +48,6 @@ function formatCell(v: unknown): string {
 
 const rowOf = (cells: unknown[]): string => cells.map(formatCell).join(",");
 
-// Resolve the crew's commission rate for rentals.
-// Priority: rental_daily > rental_hourly (matches SalaryClient behaviour).
-// Returns { type, value } or null if no rate configured.
-export async function resolveRentalCommissionRate(
-  crewId: string,
-): Promise<{ type: "percentage" | "fixed_amount"; value: number } | null> {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("commission_rates")
-      .select("operation_type, commission_type, commission_value, priority")
-      .eq("crew_id", crewId)
-      .in("operation_type", ["rental_daily", "rental_hourly"])
-      .eq("is_active", true)
-      .order("priority", { ascending: false });
-
-    if (error) {
-      logger.warn("[rentals-csv] commission_rates query failed:", error);
-      return null;
-    }
-    if (!data || data.length === 0) return null;
-
-    const sorted = (data as any[]).slice().sort((a, b) => {
-      const rank = (r: any) =>
-        r.operation_type === "rental_daily" ? 2 : r.operation_type === "rental_hourly" ? 1 : 0;
-      const ra = rank(a);
-      const rb = rank(b);
-      if (ra !== rb) return rb - ra;
-      return Number(b.priority || 0) - Number(a.priority || 0);
-    });
-    const top = sorted[0];
-    if (!top) return null;
-    return {
-      type: top.commission_type as "percentage" | "fixed_amount",
-      value: Number(top.commission_value) || 0,
-    };
-  } catch (e) {
-    logger.warn("[rentals-csv] resolveRentalCommissionRate exception:", e);
-    return null;
-  }
-}
-
-// Calculate salary for a single rental row.
-//   • percentage: salary = price * value / 100 (rounded to whole ₽)
-//   • fixed_amount: salary = value (flat per rental)
-//   • null rate: salary = "" (empty column — preserves backwards compat)
-function calcSalary(
-  price: number,
-  rate: { type: "percentage" | "fixed_amount"; value: number } | null,
-): string {
-  if (!rate) return "";
-  if (rate.type === "percentage") {
-    return String(Math.round((price * rate.value) / 100));
-  }
-  return String(rate.value);
-}
-
 export async function buildRentalsCsv(
   slug: string,
   from: string,
@@ -105,8 +61,12 @@ export async function buildRentalsCsv(
     .maybeSingle();
   if (!crew) throw new Error("Crew not found");
 
-  // Resolve commission rate once for the whole sheet
-  const commissionRate = await resolveRentalCommissionRate(crew.id);
+  // Salary engine: configurable coefficients + bike categories (official
+  // document defaults when nothing configured / migration not applied).
+  const [salaryConfig, bikeOverrides] = await Promise.all([
+    getSalaryConfig(crew.id),
+    getBikeCategoryOverrides(crew.id),
+  ]);
 
   const fromIso = `${from}T00:00:00+03:00`;
   const toIso = `${to}T23:59:59+03:00`;
@@ -117,7 +77,7 @@ export async function buildRentalsCsv(
       rental_id, status, total_cost, payment_status,
       requested_start_date, requested_end_date, agreed_start_date, agreed_end_date,
       metadata, created_at,
-      vehicle:cars!inner(id, make, model, crew_id)
+      vehicle:cars!inner(id, make, model, crew_id, specs, daily_price)
     `)
     .eq("vehicle.crew_id", crew.id)
     .gte("requested_start_date", fromIso)
@@ -162,6 +122,7 @@ export async function buildRentalsCsv(
     const bikeName = `${vehicle?.make || ""} ${vehicle?.model || ""}`.trim();
 
     const startDate = r.requested_start_date || r.agreed_start_date || r.created_at;
+    const endDate = r.requested_end_date || r.agreed_end_date;
     const dateStr = startDate
       ? new Date(startDate).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", timeZone: "Europe/Moscow" })
       : "";
@@ -169,21 +130,39 @@ export async function buildRentalsCsv(
     const price = r.total_cost || 0;
     totalRevenue += price;
 
-    const salaryStr = calcSalary(price, commissionRate);
-    if (salaryStr !== "") totalSalary += Number(salaryStr);
+    // ── ЗП Аренда: категория техники + экип + оверпрайс ──
+    const categories = resolveBikeCategories(vehicle?.id || "", bikeOverrides);
+    const eq = (meta.equipment || {}) as RentalEquipment;
+    const equipmentUnits = countEquipmentUnits(eq);
+    const stdPrice =
+      standardRentalPrice({
+        specs: vehicle?.specs,
+        startIso: startDate,
+        endIso: endDate,
+        dailyPrice: vehicle?.daily_price,
+        fallbackTotalCost: price,
+      }) + equipmentStandardCost(eq);
+    const salary = computeRentalSalary({
+      config: salaryConfig,
+      rentalCategory: categories.rental,
+      equipmentUnits,
+      totalCost: price,
+      standardPrice: stdPrice,
+    });
+    const salaryStr = String(salary.total);
+    totalSalary += salary.total;
 
     // Equipment (FIX F2-iter2): charger is free
-    const eq = meta.equipment || {};
-    let equipCost = 0;
+    const equipCost = equipmentStandardCost(eq);
     const equipParts: string[] = [];
-    if (eq.helmets > 0) { equipCost += eq.helmets * 1000; equipParts.push(`${eq.helmets}шл`); }
-    if (eq.gloves > 0) { equipCost += eq.gloves * 500; equipParts.push(`${eq.gloves}перч`); }
-    if (eq.jacket) { equipCost += 500; equipParts.push("курт"); }
-    if (eq.pants) { equipCost += 500; equipParts.push("шт"); }
-    if (eq.boots) { equipCost += 500; equipParts.push("бот"); }
-    if (eq.net) { equipCost += 500; equipParts.push("сет"); }
-    if (eq.backpack) { equipCost += 500; equipParts.push("рюк"); }
-    if (eq.charger) { equipParts.push("заряд↔"); }
+    if (Number(eq.helmets) > 0) equipParts.push(`${eq.helmets}шл`);
+    if (Number(eq.gloves) > 0) equipParts.push(`${eq.gloves}перч`);
+    if (eq.jacket) equipParts.push("курт");
+    if (eq.pants) equipParts.push("шт");
+    if (eq.boots) equipParts.push("бот");
+    if (eq.net) equipParts.push("сет");
+    if (eq.backpack) equipParts.push("рюк");
+    if (eq.charger) equipParts.push("заряд↔");
     const equipStr = equipParts.length > 0 ? `${equipParts.join("+")} (${equipCost})` : "";
 
     const depositAmount = Number(meta.deposit_amount || 0);
@@ -200,7 +179,6 @@ export async function buildRentalsCsv(
     const startTime = startDate
       ? new Date(startDate).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Moscow" })
       : "";
-    const endDate = r.requested_end_date || r.agreed_end_date;
     const endTime = endDate
       ? new Date(endDate).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Moscow" })
       : "";
@@ -223,7 +201,8 @@ export async function buildRentalsCsv(
     ]));
   }
 
-  // ── Sales rows (cols 13-17) ──
+  // ── Sales rows (cols 13-17) — ЗП Продажа по категории техники ──
+  let totalSalesSalary = 0;
   for (const s of (sales || []) as any[]) {
     const dateStr = s.created_at
       ? new Date(s.created_at).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", timeZone: "Europe/Moscow" })
@@ -231,26 +210,26 @@ export async function buildRentalsCsv(
     const bikeName = bikeNameById.get(s.resolved_bike_id) || "";
     const price = s.sale_price || "";
     const comment = s.buyer_full_name || "";
+
+    const saleCategories = resolveBikeCategories(s.resolved_bike_id || "", bikeOverrides);
+    const saleSalary = computeSaleSalary({
+      config: salaryConfig,
+      saleCategory: saleCategories.sale,
+    });
+    totalSalesSalary += saleSalary.total;
+
     rows.push(rowOf([
       "", "", "", "", "", "",
       "", "", "", "", "", "",
-      dateStr, "", bikeName, price, comment,
+      dateStr, String(saleSalary.total), bikeName, price, comment,
     ]));
   }
+  totalSalary += totalSalesSalary;
 
   // Totals row
   rows.push("");
   const totalEquip = (rentals || []).reduce((sum: number, r: any) => {
-    const eq = (r.metadata?.equipment) || {};
-    let c = 0;
-    if (eq.helmets > 0) c += eq.helmets * 1000;
-    if (eq.gloves > 0) c += eq.gloves * 500;
-    if (eq.jacket) c += 500;
-    if (eq.pants) c += 500;
-    if (eq.boots) c += 500;
-    if (eq.net) c += 500;
-    if (eq.backpack) c += 500;
-    return sum + c;
+    return sum + equipmentStandardCost((r.metadata?.equipment) || {});
   }, 0);
   const totalDeposit = (rentals || []).reduce((sum: number, r: any) => sum + Number(r.metadata?.deposit_amount || 0), 0);
   const totalSales = (sales || []).reduce((sum: number, s: any) => sum + (Number(s.sale_price) || 0), 0);

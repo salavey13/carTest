@@ -345,6 +345,25 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
               <p className="mt-2 text-sm" style={{ color: T.textMuted }}>
                 Управление сменами, комиссиями и выплатами участникам экипажа
               </p>
+              {/* iter5: link to the official bonus coefficients configuration */}
+              <div
+                className="mt-3 rounded-lg border px-3 py-2 text-xs"
+                style={{
+                  borderColor: `color-mix(in srgb, ${T.accent} 30%, transparent)`,
+                  backgroundColor: `color-mix(in srgb, ${T.accent} 6%, transparent)`,
+                  color: T.textMuted,
+                }}
+              >
+                Бонусы за аренды и продажи считаются по официальной схеме (категория
+                техники + экип + оверпрайс).{" "}
+                <a
+                  href={`/franchize/${slug}/salary-coefficients`}
+                  className="font-semibold underline underline-offset-2"
+                  style={{ color: T.accent }}
+                >
+                  Настроить коэффициенты ЗП →
+                </a>
+              </div>
             </div>
           </div>
 

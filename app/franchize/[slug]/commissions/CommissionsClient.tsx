@@ -235,8 +235,9 @@ export function CommissionsClient({ slug, crew }: CommissionsClientProps) {
             <p className="mt-2 text-sm" style={{ color: T.textMuted }}>
               Определите проценты для расчёта комиссий райдеров
             </p>
-            {/* FIX (iter4): explain that these rates drive the salary column
-                in the CSV exports on the rentals/sales analytics pages. */}
+            {/* iter5: salary columns in CSV exports now use the official
+                category-bonus scheme (Коэффициенты ЗП), not these percentages.
+                This banner redirects owners to the right place. */}
             <div
               className="mt-3 rounded-lg border px-3 py-2 text-xs"
               style={{
@@ -245,11 +246,19 @@ export function CommissionsClient({ slug, crew }: CommissionsClientProps) {
                 color: T.textMuted,
               }}
             >
-              <span className="font-semibold" style={{ color: T.text }}>Где это используется:</span>{" "}
-              Ставка для «Аренда (дневная)» подставляется в колонку{" "}
-              <span className="font-mono">ЗП Аренда</span> в CSV-выгрузке с аналитики аренд;
-              ставка для «Продажа» — в колонку <span className="font-mono">ЗП Продажа</span>{" "}
-              на странице продаж. При отсутствии дневной ставки используется почасовая.
+              <span className="font-semibold" style={{ color: T.text }}>
+                Колонки ЗП в аналитике аренд/продаж считаются по официальной схеме бонусов
+              </span>{" "}
+              (категория техники + экип + оверпрайс) — настраивается на странице{" "}
+              <a
+                href={`/franchize/${slug}/salary-coefficients`}
+                className="font-semibold underline underline-offset-2"
+                style={{ color: T.accent }}
+              >
+                Коэффициенты ЗП
+              </a>
+              . Проценты здесь применяются к кассовым операциям (сервис и прочее) в расчёте
+              зарплаты на странице «Зарплата».
             </div>
           </div>
           {isOwner && (
