@@ -11,6 +11,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { buildRentalContractVariables } from "@/app/lib/rental-contract-vars";
 import { applyTemplateVariables } from "@/lib/markdownTemplate";
+import { isTelegramInitDataFresh, getTelegramInitDataAuthDate } from "@/lib/telegram-webapp-auth";
 
 const CREW_SECRETS = {
   legalAddress: "г. Нижний Новгород, пл. Комсомольская 2",
@@ -180,4 +181,110 @@ describe("ПЭП template rendering (RENTAL_DEAL_TEMPLATE + vip-bike crew templa
       expect(out).toContain("(подпись)&emsp;(Ф.И.О. Арендатора)");
     });
   }
+});
+
+// CODEREVIEW: equipment-rental docs share buildRentalContractVariables with
+// rental docs (equipmentMode) — a mixed cart (bike + equipment-only lines)
+// passes meta.pep to ALL rental-flow docs, so the equipment templates MUST
+// carry the same ПЭП clause + conditional signature block.
+describe("ПЭП template rendering (EQUIPMENT_RENTAL templates)", () => {
+  const baseTemplate = readFileSync(join(process.cwd(), "docs", "EQUIPMENT_RENTAL_DEAL_TEMPLATE.html"), "utf8");
+  const crewTemplate = readFileSync(join(process.cwd(), "docs", "crewDocs", "vip-bike_EQUIPMENT_RENTAL_DEAL_TEMPLATE.html"), "utf8");
+
+  const buildVars = (pep?: { telegramId: string; username?: string; signedAt: string }) =>
+    buildRentalContractVariables({
+      renter: RENTER,
+      bike: BIKE,
+      period: PERIOD,
+      crewSecrets: CREW_SECRETS,
+      meta: pep ? { pep } : {},
+      equipment: {},
+      priceBreakdown: {
+        totalRub: 2000,
+        basePriceRub: 2000,
+        helmetRub: 0,
+        depositRub: 0,
+        savingsRub: 0,
+        savingsPercent: 0,
+        tier: "day",
+      },
+    });
+
+  for (const [label, template] of [["base", baseTemplate], ["vip-bike crew", crewTemplate]] as const) {
+    it(`[${label}] contains ПЭП clause 12.3 with ФЗ-63 reference`, () => {
+      expect(template).toContain("12.3");
+      expect(template).toContain("простыми электронными подписями");
+      expect(template).toContain("63-ФЗ");
+      expect(template).toContain("Telegram Mini App");
+    });
+
+    it(`[${label}] signed → renders ПЭП signature block`, () => {
+      const vars = buildVars({ telegramId: "8935491576", username: "liki2222", signedAt: "2026-08-27T16:42:11.000Z" });
+      const out = applyTemplateVariables(template, vars);
+
+      expect(out).toContain("Подписано ПЭП");
+      expect(out).toContain("Telegram ID 8935491576 (@liki2222)");
+      expect(out).toContain("27.08.2026 19:42 (МСК)");
+      expect(out).toContain("(ПЭП Арендатора — акцепт в Telegram, п. 12.3 Договора)");
+      // signed → TWO 17-underscore lines remain: the lessor's section-13
+      // blank line + the act-appendix line (23 underscores, matched as a
+      // substring by the unanchored regex) — but NOT the renter's one
+      expect(out.match(/_________________ \/ _______________/g)?.length).toBe(2);
+    });
+
+    it(`[${label}] unsigned → classic blank signature lines for both parties`, () => {
+      const vars = buildVars(undefined);
+      const out = applyTemplateVariables(template, vars);
+
+      expect(out).not.toContain("Подписано ПЭП");
+      // THREE 17-underscore lines: lessor + renter (section 13) + the
+      // act-appendix line (23 underscores → substring match)
+      expect(out.match(/_________________ \/ _______________/g)?.length).toBe(3);
+      expect(out).toContain("(подпись)&emsp;(Ф.И.О. Арендатора)");
+    });
+  }
+});
+
+// CODEREVIEW: ПЭП is signature-grade — Telegram initData is signed once per
+// Mini App session and NEVER expires, so both verify sites (checkout +
+// post-hoc signing) enforce a 24h freshness window on Telegram's auth_date.
+describe("Telegram initData freshness (replay protection)", () => {
+  const NOW_MS = 1787666400000; // fixed clock: 2026-08-27T18:00:00Z
+  const mkInitData = (authDateSeconds?: number) =>
+    `user=${encodeURIComponent(JSON.stringify({ id: 8935491576 }))}&auth_date=${authDateSeconds ?? ""}&hash=abc`;
+
+  it("auth_date 1h old → fresh", () => {
+    expect(isTelegramInitDataFresh(mkInitData(NOW_MS / 1000 - 3600), undefined, NOW_MS)).toBe(true);
+  });
+
+  it("auth_date 23h old → still fresh (24h window)", () => {
+    expect(isTelegramInitDataFresh(mkInitData(NOW_MS / 1000 - 23 * 3600), undefined, NOW_MS)).toBe(true);
+  });
+
+  it("auth_date 25h old → stale (replay refused)", () => {
+    expect(isTelegramInitDataFresh(mkInitData(NOW_MS / 1000 - 25 * 3600), undefined, NOW_MS)).toBe(false);
+  });
+
+  it("missing auth_date → NOT fresh (defensive default)", () => {
+    expect(isTelegramInitDataFresh("user=%7B%22id%22%3A1%7D&hash=abc", undefined, NOW_MS)).toBe(false);
+  });
+
+  it("auth_date in the future beyond 5min skew → not fresh", () => {
+    expect(isTelegramInitDataFresh(mkInitData(NOW_MS / 1000 + 600), undefined, NOW_MS)).toBe(false);
+  });
+
+  it("auth_date slightly ahead (clock skew) → fresh", () => {
+    expect(isTelegramInitDataFresh(mkInitData(NOW_MS / 1000 + 120), undefined, NOW_MS)).toBe(true);
+  });
+
+  it("custom maxAge is respected", () => {
+    expect(isTelegramInitDataFresh(mkInitData(NOW_MS / 1000 - 30 * 60), 10 * 60 * 1000, NOW_MS)).toBe(false);
+    expect(isTelegramInitDataFresh(mkInitData(NOW_MS / 1000 - 5 * 60), 10 * 60 * 1000, NOW_MS)).toBe(true);
+  });
+
+  it("getTelegramInitDataAuthDate parses seconds and rejects garbage", () => {
+    expect(getTelegramInitDataAuthDate(mkInitData(1787662800))).toBe(1787662800);
+    expect(getTelegramInitDataAuthDate("auth_date=not-a-number&hash=x")).toBeNull();
+    expect(getTelegramInitDataAuthDate("hash=x")).toBeNull();
+  });
 });

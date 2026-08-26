@@ -2382,10 +2382,15 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       if (!botToken) {
         throw new Error("ПЭП: на сервере не настроен Telegram-бот — подпись проверить нельзя. Повторите позже или оформите без подписи.");
       }
-      const { computeTelegramWebAppHash } = await import("@/lib/telegram-webapp-auth");
+      const { computeTelegramWebAppHash, isTelegramInitDataFresh } = await import("@/lib/telegram-webapp-auth");
       const validation = await computeTelegramWebAppHash(payload.pepInitData, botToken);
       if (!validation.isValid) {
         throw new Error("ПЭП: подпись Telegram не прошла проверку. Обновите страницу и подпишите договор заново.");
+      }
+      // Replay protection: initData is signed once per Mini App session and
+      // never expires — refuse anything older than 24h (Telegram auth_date).
+      if (!isTelegramInitDataFresh(payload.pepInitData)) {
+        throw new Error("ПЭП: данные Telegram устарели — закройте и заново откройте приложение, затем подпишите договор ещё раз.");
       }
       const pepParams = new URLSearchParams(payload.pepInitData);
       let tgUser: { id?: number | string; username?: string } = {};
@@ -2803,7 +2808,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           // shows the ПЭП line (template {{#if pep_signed}}); the renterSignature
           // / signatureTimestamp / signatureFingerprint defaults are ignored by
           // the builder when pep is present.
-          ...(pepMeta && !isSaleFlow && !isTestdrive ? { pep: pepMeta } : {}),
+          // CODEREVIEW FIX: per-LINE check (bikeFlowTypes), not the global
+          // isSaleFlow flag — in a MIXED cart (rental + sale bikes) the global
+          // flag is true and the ПЭП line silently never reached the RENTAL
+          // docs while metadata.pep_signature still claimed a signature.
+          ...(pepMeta && bikeFlowTypes[bikeIndex] === "rental" ? { pep: pepMeta } : {}),
           documentKey: isEquipmentOnlyLine
             ? `equipment-rental-equipment-${Date.now()}`
             : `${isSaleFlow ? "sale" : isEquipmentOnlyLine ? "equipment-rental" : "rental"}-${car.id || 'equipment-' + bikeIndex}-${Date.now()}`,
@@ -3364,11 +3373,40 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         // in the SERVER's local timezone (UTC on Vercel) → a 10:00 rental
         // became 13:00 MSK in the DB and the doc. Mirrors /doc's
         // convertTextDateToTimestamp(date, time, 3).
+        // CODEREVIEW FIX: harden against malformed window values (e.g. a
+        // hand-crafted startapp link with startTime=9am). new Date() on a bad
+        // string returns Invalid Date and .toISOString() THROWS, silently
+        // skipping rental creation for the whole order. Validate + fallback.
+        const HH_MM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+        const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+        const normWindowTime = (value: unknown): string =>
+          typeof value === "string" && HH_MM_RE.test(value.trim()) ? value.trim() : "10:00";
+        const normWindowDate = (value: unknown): string => {
+          const s = typeof value === "string" ? value.trim() : "";
+          return ISO_DATE_RE.test(s) ? s : new Date(Date.now() + 3 * 3600 * 1000).toISOString().slice(0, 10);
+        };
         const firstLine = payload.cartLines[0];
-        const startTime = (firstLine as any)?.options?.rentStartTime || "10:00";
-        const endTime = (firstLine as any)?.options?.rentEndTime || "10:00";
-        const startIso = new Date(`${payload.rentalStartDate}T${startTime}:00+03:00`).toISOString();
-        const endIso = new Date(`${payload.rentalEndDate}T${endTime}:00+03:00`).toISOString();
+        const startDate = normWindowDate(payload.rentalStartDate);
+        const endDate = normWindowDate(payload.rentalEndDate);
+        const startTime = normWindowTime((firstLine as any)?.options?.rentStartTime);
+        const endTime = normWindowTime((firstLine as any)?.options?.rentEndTime);
+        const startMs = new Date(`${startDate}T${startTime}:00+03:00`).getTime();
+        const endMs = new Date(`${endDate}T${endTime}:00+03:00`).getTime();
+        let startIso: string;
+        let endIso: string;
+        if (Number.isFinite(startMs) && Number.isFinite(endMs)) {
+          startIso = new Date(startMs).toISOString();
+          endIso = new Date(endMs).toISOString();
+        } else {
+          // Defensive fallback (unreachable via the UI — <input type="time">
+          // always emits HH:MM; only hand-crafted startapp links could get here)
+          const nowMs = Date.now();
+          startIso = new Date(nowMs).toISOString();
+          endIso = new Date(nowMs).toISOString();
+          logger.warn("[franchize] Rental window fell back to now() after validation", {
+            startDate: payload.rentalStartDate, endDate: payload.rentalEndDate, startTime, endTime,
+          });
+        }
 
         // Resolve crew owner once (avoid N+1 queries)
         const { data: crewRow } = await supabaseAdmin.from("crews").select("id, owner_id").eq("slug", payload.slug).maybeSingle();

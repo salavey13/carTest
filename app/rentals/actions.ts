@@ -2397,10 +2397,15 @@ export async function signRentalContractPep(
         if (!botToken) {
             return { success: false, error: "Сервер не настроен для проверки подписи Telegram. Попробуйте позже." };
         }
-        const { computeTelegramWebAppHash } = await import("@/lib/telegram-webapp-auth");
+        const { computeTelegramWebAppHash, isTelegramInitDataFresh } = await import("@/lib/telegram-webapp-auth");
         const validation = await computeTelegramWebAppHash(initDataStr, botToken);
         if (!validation.isValid) {
             return { success: false, error: "Подпись Telegram не прошла проверку. Обновите страницу и попробуйте снова." };
+        }
+        // Replay protection: initData never expires on its own — refuse
+        // anything older than 24h (Telegram auth_date, CODEREVIEW FIX).
+        if (!isTelegramInitDataFresh(initDataStr)) {
+            return { success: false, error: "Данные Telegram устарели — закройте и заново откройте приложение, затем подпишите договор ещё раз." };
         }
         const params = new URLSearchParams(initDataStr);
         let tgUser: { id?: number | string; username?: string } = {};
@@ -2435,7 +2440,10 @@ export async function signRentalContractPep(
             return { success: false, error: "Договор уже подписан ПЭП — повторная подпись не требуется." };
         }
 
-        // 3. Resolve the document sha (metadata → artifact fallback)
+        // 3. Resolve the document sha (metadata → artifact fallback).
+        // CODEREVIEW FIX: a ПЭП record MUST bind to the exact document
+        // content — refuse to store an unbound signature when no doc exists
+        // (would be legally meaningless: "signed" but signed *what*?).
         let docSha = String(currentMetadata?.doc_sha256 || "") || null;
         if (!docSha) {
             const { data: artifact } = await supabaseAdmin
@@ -2445,6 +2453,9 @@ export async function signRentalContractPep(
                 .eq("rental_id", rentalId)
                 .maybeSingle();
             docSha = artifact?.original_sha256 || null;
+        }
+        if (!docSha) {
+            return { success: false, error: "Договор ещё не сформирован — попросите экипаж сформировать документ, затем подпишите." };
         }
 
         // 4. Persist the signature record (read-modify-write, keeps chain intact)
@@ -2456,16 +2467,27 @@ export async function signRentalContractPep(
             signed_at: new Date().toISOString(),
             auth_date: params.get("auth_date") || null,
             init_data_sha256: createHash("sha256").update(initDataStr).digest("hex"),
-            ...(docSha ? { doc_sha256: docSha } : {}),
+            doc_sha256: docSha,
         };
-        const { error: updateError } = await supabaseAdmin
+        // CODEREVIEW FIX: atomic idempotency — the UPDATE only matches rows
+        // where metadata->pep_signature is still absent, so a double-tap (or
+        // two racing requests) can no longer write two signature records.
+        // PostgREST translates .is("metadata->pep_signature", null) into
+        // `metadata->pep_signature IS NULL`, which is TRUE both when the key
+        // is missing and when it holds JSON null.
+        const { data: updatedRows, error: updateError } = await supabaseAdmin
             .from("rentals")
             .update({
                 metadata: { ...currentMetadata, pep_signature: pepSignature },
                 updated_at: new Date().toISOString(),
             })
-            .eq("rental_id", rentalId);
+            .eq("rental_id", rentalId)
+            .is("metadata->pep_signature", null)
+            .select("rental_id");
         if (updateError) throw updateError;
+        if (!updatedRows || updatedRows.length === 0) {
+            return { success: false, error: "Договор уже подписан ПЭП — повторная подпись не требуется." };
+        }
 
         // 5. Audit trail event
         const { error: eventError } = await supabaseAdmin.from("events").insert({

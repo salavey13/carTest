@@ -143,6 +143,8 @@
 
 <p style="text-indent: 1.25cm; text-align: justify;">12.2. Приложения №1 – 2 являются неотъемлемой частью Договора.</p>
 
+<p style="text-indent: 1.25cm; text-align: justify;">12.3. Стороны признают возможность заключения Договора и приложений к нему путем обмена простыми электронными подписями (ПЭП) в значении ст. 5 и 6 Федерального закона от 06.04.2011 № 63-ФЗ «Об электронной подписи». ПЭП Арендатора — подтверждение акцепта Договора, выполненное в Telegram Mini App (интерфейсе бота Арендодателя) от имени аккаунта Telegram, идентифицированного Telegram и указанного в реквизитах Арендатора либо в Договоре, с фиксацией факта подписания, идентификатора аккаунта, даты и времени подписания, а также отпечатка (SHA-256) подписанного документа в информационной системе Арендодателя. ПЭП Арендодателя — электронный документ (файл Договора, сформированный системой Арендодателя), направленный Арендатору, либо собственноручная подпись уполномоченного лица Арендодателя. Стороны признают такой обмен документами равнозначным документам на бумажном носителе, подписанным собственноручными подписями сторон. Экземпляр Договора с реквизитами и учетные сведения о ПЭП предоставляются сторонам по запросу.</p>
+
 <p style="text-align: center; font-weight: bold;">13. Реквизиты и подписи сторон</p>
 
 <table style="width: 100%; border: none; margin-top: 12pt;">
@@ -169,11 +171,13 @@
 <table style="width: 100%; border: none; margin-top: 6pt;">
 <tr>
 <td style="border: none; width: 50%; text-align: center;">_________________ / _______________</td>
-<td style="border: none; width: 50%; text-align: center;">_________________ / _______________</td>
+{{#if pep_signed}}<td style="border: none; width: 50%; text-align: left;"><b>Подписано ПЭП:</b><br>
+{{renter_signature}}<br>
+Дата и время: {{signature_timestamp}}</td>{{else}}<td style="border: none; width: 50%; text-align: center;">_________________ / _______________</td>{{/if}}
 </tr>
 <tr>
 <td style="border: none; width: 50%; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О.)</td>
-<td style="border: none; width: 50%; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О. Арендатора)</td>
+{{#if pep_signed}}<td style="border: none; width: 50%; text-align: left; font-size: 10pt;">(ПЭП Арендатора — акцепт в Telegram, п. 12.3 Договора)</td>{{else}}<td style="border: none; width: 50%; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О. Арендатора)</td>{{/if}}
 </tr>
 </table>
 

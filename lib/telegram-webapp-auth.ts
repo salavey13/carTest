@@ -98,6 +98,37 @@ export function buildTelegramDataCheckString(initDataString: string): { dataChec
   };
 }
 
+// ── auth_date freshness (replay protection) ─────────────────────────────────
+// Telegram initData is signed ONCE when the Mini App session opens and stays
+// valid indefinitely. For signature-grade use (ПЭП) a captured-but-genuine
+// initData must not be replayable much later, so callers enforce a maximum age
+// on Telegram's own auth_date (Telegram docs recommend validating it).
+export const TELEGRAM_INIT_DATA_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/** Telegram's own session timestamp from initData (unix seconds), or null. */
+export function getTelegramInitDataAuthDate(initDataString: string): number | null {
+  const raw = new URLSearchParams(initDataString).get("auth_date");
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+}
+
+/**
+ * True when initData's auth_date is within `maxAgeMs` of now (and not more
+ * than 5 minutes in the future, tolerating clock skew). Missing auth_date →
+ * NOT fresh (defensive default for signature-grade callers).
+ */
+export function isTelegramInitDataFresh(
+  initDataString: string,
+  maxAgeMs: number = TELEGRAM_INIT_DATA_MAX_AGE_MS,
+  nowMs: number = Date.now(),
+): boolean {
+  const authDate = getTelegramInitDataAuthDate(initDataString);
+  if (authDate === null) return false;
+  const ageSeconds = nowMs / 1000 - authDate;
+  return ageSeconds >= -300 && ageSeconds <= maxAgeMs / 1000;
+}
+
 export async function computeTelegramWebAppHash(initDataString: string, botToken: string): Promise<TelegramWebAppValidationResult> {
   const { dataCheckString, hashFromClient } = buildTelegramDataCheckString(initDataString);
 
