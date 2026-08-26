@@ -2,6 +2,7 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
+import { telegramDeliver, bufferToForwardFile } from "@/lib/telegram-transport";
 
 export interface InlineButton {
   text: string;
@@ -112,40 +113,38 @@ export async function sendTelegramDocumentCore(
   fileContent: string | Blob | Uint8Array,
   fileName: string
 ): Promise<{ success: boolean; data?: any; error?: string }> {
-  if (!TELEGRAM_BOT_TOKEN) {
-    return { success: false, error: "Telegram bot token not configured" };
-  }
-
   try {
-    const blob =
-      fileContent instanceof Blob
-        ? fileContent
-        : new Blob([fileContent], {
-            type: fileName.toLowerCase().endsWith(".docx")
-              ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              : "text/plain;charset=utf-8",
-          });
+    const contentType = fileName.toLowerCase().endsWith(".docx")
+      ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      : fileName.toLowerCase().endsWith(".png")
+        ? "image/png"
+        : "text/plain;charset=utf-8";
 
-    const formData = new FormData();
-    formData.append("chat_id", chatId);
-    formData.append("document", blob, fileName);
-
-    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`, {
-      method: "POST",
-      body: formData,
-    });
-
-    const data: TelegramApiResponse = await response.json();
-
-    if (!data.ok) {
-      logger.error(`Telegram API error (sendDocument): ${data.description || "Unknown error"}`, {
-        chatId,
-        errorCode: data.error_code,
-      });
-      throw new Error(data.description || "Failed to send document");
+    // Normalize input → Buffer for the transport layer (Blob is async-read).
+    let buffer: Buffer;
+    if (fileContent instanceof Blob) {
+      buffer = Buffer.from(await fileContent.arrayBuffer());
+    } else if (typeof fileContent === "string") {
+      buffer = Buffer.from(fileContent, "utf8");
+    } else {
+      buffer = Buffer.from(fileContent);
     }
 
-    return { success: true, data: data.result };
+    // iter8: documents (rental contracts, CSV exports) are delivered via the
+    // forwarding API on the Vercel deployment (token stays there) with an
+    // automatic direct-API fallback when a local TELEGRAM_BOT_TOKEN exists.
+    const file = bufferToForwardFile(buffer, fileName, contentType);
+    const result = await telegramDeliver("sendDocument", chatId, {}, { document: file });
+
+    if (!result.ok) {
+      logger.error(`Telegram delivery error (sendDocument, via=${result.via}): ${result.error || "Unknown error"}`, { chatId, fileName });
+      return {
+        success: false,
+        error: result.error || "Failed to send document",
+      };
+    }
+
+    return { success: true, data: result.result };
   } catch (error) {
     logger.error(`Error in sendTelegramDocumentCore (${chatId}):`, error);
     return {

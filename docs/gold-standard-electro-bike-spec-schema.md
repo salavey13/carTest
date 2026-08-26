@@ -273,7 +273,8 @@ These keys live in `specs` JSONB but are **operational**, NOT user-facing compar
 }
 ```
 
-- Set/cleared from the crew admin page (`/franchize/{slug}/admin` -> "Субарендаторы (мини-админы)") or via `setBikeSubrenterAction`.
+- Set/cleared from the crew admin page (`/franchize/{slug}/admin` -> "Субарендаторы (мини-админы)"). The panel lists only bikes/ebikes (not services/equipment), supports search by model / bike id / chat id, and waits for Telegram auth to resolve before loading.
+- Permissions to assign: crew owner, active `crew_members` row with role `owner`/`admin`/`co_owner`, or global admin (top-level `users.role` in `admin`/`vprAdmin` or `users.status = admin`).
 - The subrenter gets: read access to rentals of HIS bikes on `/franchize/{slug}/rentals`, a view-oriented mini-admin role on the rental page (photos, checklist), and exploration achievements.
 - Remove all three keys when the partnership ends (the admin panel does this automatically on "Сохранить" with an empty field).
 
@@ -286,6 +287,15 @@ These keys live in `specs` JSONB but are **operational**, NOT user-facing compar
 - In km, integer. When a web-app order creates the rental row, this value is copied into `rentals.metadata.last_known_odometer` and pre-fills the operator's odometer prompt at activation.
 - **Updated automatically** on rental closure (`odometerAfter` is written back to the bike's specs) — but set the initial value when the bike enters the fleet so the FIRST rental has a prefill too.
 - Optional: bikes without it simply show an empty odometer prompt (operator types the value manually).
+
+#### Onboarding checklist for a NEW catalog bike (operational keys)
+
+When a new bike is added to the catalog (manual SQL, hydration script or admin UI), run through this list so the bike is fully operational from day one:
+
+1. **`salary`** — run `node scripts/apply-salary-specs.mjs --apply` (it classifies by `cars.daily_price` and marks `subrented` for the partner fleet) or insert the JSON manually following the shape above.
+2. **`subrenter_chat_id`** — only for partner bikes. Find the partner's Telegram chat id (e.g. forward one of his messages to @userinfobot, or take it from `crew_members.user_id`), then set it via the admin panel ("Субарендаторы" → поиск по модели → ввести chat id → Сохранить). Leave empty for crew-owned bikes.
+3. **`last_known_odometer`** — copy the value from the physical odometer at intake.
+4. Verify: open `/franchize/{slug}/salary-coefficients` (bike appears in the right tier) and `/franchize/{slug}/admin` → "Субарендаторы" (bike listed with the correct chat id).
 
 ## 2. Spec Categories (for grouped display)
 

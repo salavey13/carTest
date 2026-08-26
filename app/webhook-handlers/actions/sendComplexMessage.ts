@@ -2,7 +2,8 @@
 
 import { logger } from "@/lib/logger";
 import { supabaseAnon } from "@/hooks/supabase";
-import { sendTelegramInvoice } from "@/app/actions"
+import { sendTelegramInvoice } from "@/app/actions";
+import { telegramDeliver, bufferToForwardFile } from "@/lib/telegram-transport";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY;
 const DEFAULT_FALLBACK_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/logo-4fd42ec1-ee7b-4ff1-8ee5-733030e376aa.jpg";
@@ -56,10 +57,6 @@ async function sendComplexMessageRaw(
   replyMarkupStr?: string,
   parseMode?: string,
 ): Promise<{ success: boolean; error?: string; data?: any }> {
-  if (!TELEGRAM_BOT_TOKEN) {
-    return { success: false, error: "Telegram bot token not configured." };
-  }
-
   let finalText = text;
   if ((parseMode || "Markdown") === "MarkdownV2") {
     finalText = escapeTelegramMarkdown(text);
@@ -68,16 +65,15 @@ async function sendComplexMessageRaw(
   }
 
   try {
-    const payload: any = { chat_id: String(chatId), parse_mode: parseMode || "Markdown", text: finalText };
+    const payload: any = { parse_mode: parseMode || "Markdown", text: finalText };
     if (replyMarkupStr) {
       try { payload.reply_markup = JSON.parse(replyMarkupStr); } catch { payload.reply_markup = replyMarkupStr; }
     }
-    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
-    });
-    const data = await response.json();
-    if (!data.ok) throw new Error(data.description || "Failed to sendMessage");
-    return { success: true, data };
+    // iter8: delivered via the forwarding API (bot token lives on the Vercel
+    // deployment) with automatic direct-API fallback when a local token exists.
+    const result = await telegramDeliver("sendMessage", chatId, payload);
+    if (!result.ok) throw new Error(result.error || "Failed to sendMessage");
+    return { success: true, data: result.result };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Error";
     logger.error(`[sendComplexMessage-raw] for chat ${chatId}:`, errorMessage);
@@ -133,10 +129,11 @@ export async function sendComplexMessage(
     keyboardType = "reply",
   } = options || {};
 
-  if (!TELEGRAM_BOT_TOKEN) {
-    return { success: false, error: "Telegram bot token not configured." };
+  if (!TELEGRAM_BOT_TOKEN && !process.env.FORWARD_TELEGRAM_URL && process.env.TELEGRAM_SEND_MODE !== "forward") {
+    // Neither direct token nor forwarding endpoint — nothing can deliver.
+    return { success: false, error: "Telegram delivery is not configured (no bot token, no forwarding endpoint)." };
   }
-  
+
   let sanitizedText = finalText;
   if (parseMode === "MarkdownV2") {
     sanitizedText = escapeTelegramMarkdown(finalText);
@@ -149,7 +146,7 @@ export async function sendComplexMessage(
     if (imageQuery && !messageId) {
       imageUrl = await getRandomUnsplashImage(imageQuery);
     }
-    const payload: any = { chat_id: String(chatId), parse_mode: parseMode };
+    const payload: any = { parse_mode: parseMode };
 
     if (removeKeyboard) payload.reply_markup = { remove_keyboard: true };
     else if (finalButtons.length > 0) {
@@ -164,23 +161,18 @@ export async function sendComplexMessage(
         };
       }
     }
-    
-    let endpoint = imageUrl ? "sendPhoto" : "sendMessage";
-    if (attachment?.type === "document") {
-      endpoint = "sendDocument";
-      const formData = new FormData();
-      formData.append("chat_id", String(chatId));
-      formData.append("document", new Blob([attachment.content], { type: "text/csv;charset=utf-8" }), attachment.filename);
-      formData.append("caption", sanitizedText);
-      if (payload.reply_markup) formData.append("reply_markup", JSON.stringify(payload.reply_markup));
-      if (parseMode) formData.append("parse_mode", parseMode);
 
-      const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${endpoint}`, {
-        method: "POST", body: formData
-      });
-      const data = await response.json();
-      if (!data.ok) throw new Error(data.description || `Failed to ${endpoint}`);
-      return { success: true, data };
+    if (attachment?.type === "document") {
+      // iter8: documents go through the forwarding API (base64 file) with a
+      // direct multipart fallback — no local bot token required.
+      const file = bufferToForwardFile(
+        Buffer.from(attachment.content, "utf8"),
+        attachment.filename,
+        "text/csv;charset=utf-8",
+      );
+      const result = await telegramDeliver("sendDocument", chatId, { caption: sanitizedText, ...payload }, { document: file });
+      if (!result.ok) throw new Error(result.error || "Failed to sendDocument");
+      return { success: true, data: result.result };
     } else if (imageUrl) {
       payload.photo = imageUrl;
       payload.caption = sanitizedText;
@@ -188,12 +180,10 @@ export async function sendComplexMessage(
       payload.text = sanitizedText;
     }
 
-    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${endpoint}`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
-    });
-    const data = await response.json();
-    if (!data.ok) throw new Error(data.description || `Failed to ${endpoint}`);
-    return { success: true, data };
+    const method = imageUrl ? "sendPhoto" : "sendMessage";
+    const result = await telegramDeliver(method, chatId, payload);
+    if (!result.ok) throw new Error(result.error || `Failed to ${method}`);
+    return { success: true, data: result.result };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
     logger.error(`[sendComplexMessage-main] for chat ${chatId}:`, errorMessage);

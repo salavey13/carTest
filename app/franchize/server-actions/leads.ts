@@ -11,17 +11,72 @@ import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 
 // ── Auth helper ─────────────────────────────────────────────────────────────
 // Verifies that the caller has access to the given crew.
-// Uses TWO verification paths (both server-side, no client-supplied booleans):
+// Uses THREE verification paths (all server-side, no client-supplied booleans):
 //
 // 1. Telegram WebApp: reads TELEGRAM_ACTOR_COOKIE (signed HMAC-SHA256) → gets real userId
 //    → checks crew owner / admin / active crew member
-// 2. Password auth: caller passes actorUserId (the crew owner's ID from validateAnalyticsPassword)
+// 2. initData fallback (NEW — Telegram Web desktop / Safari): when the browser
+//    blocks third-party cookies the actor cookie never reaches the server, so
+//    the client forwards the Telegram-signed initData string; we verify its
+//    HMAC-SHA256 signature server-side, extract user.id and require it to match
+//    the client-claimed actorUserId before running the same crew checks.
+// 3. Password auth: caller passes actorUserId (the crew owner's ID from validateAnalyticsPassword)
 //    → server verifies actorUserId === crew.owner_id (only the real owner would know this UUID)
 //
 // LA-001 FIX: was trusting a client-supplied isPasswordAuth boolean — anyone could bypass
-// auth by passing isPasswordAuth=true. Now the server verifies identity in both paths.
+// auth by passing isPasswordAuth=true. Now the server verifies identity in all paths.
+
+/** Admin check that covers BOTH storage locations used in production:
+ *  top-level users.role/status (salavey13 = role:vprAdmin, status:admin) and
+ *  the legacy users.metadata.role/status keys. */
+async function isGlobalAdminUser(userId: string): Promise<boolean> {
+  const { data: user } = await supabaseAdmin
+    .from("users")
+    .select("role, status, metadata")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!user) return false;
+  if (user.role === "admin" || user.role === "vprAdmin" || user.status === "admin") return true;
+  const meta = user.metadata as Record<string, unknown> | null;
+  return meta?.role === "admin" || meta?.status === "admin";
+}
+
+/** Crew access check for a KNOWN userId: owner / global admin / active member. */
+async function checkUserCrewAccess(
+  userId: string,
+  crewId: string,
+): Promise<{ allowed: boolean; error?: string }> {
+  // Global admin?
+  if (await isGlobalAdminUser(userId)) return { allowed: true };
+
+  const { data: crew, error: crewErr } = await supabaseAdmin
+    .from("crews")
+    .select("owner_id")
+    .eq("id", crewId)
+    .maybeSingle();
+  if (crewErr) logger.warn("[checkUserCrewAccess] crews query failed:", crewErr.message);
+  if (crew?.owner_id === userId) return { allowed: true };
+
+  // Check crew member (LR3-006 FIX: filter by membership_status='active' — was missing,
+  // so removed/inactive members retained access indefinitely)
+  const { data: crewMember, error: memberErr } = await supabaseAdmin
+    .from("crew_members")
+    .select("user_id")
+    .eq("crew_id", crewId)
+    .eq("user_id", userId)
+    .eq("membership_status", "active")
+    .maybeSingle();
+
+  if (memberErr) logger.warn("[checkUserCrewAccess] crew_members query failed:", memberErr.message);
+  if (crewMember) return { allowed: true };
+
+  return { allowed: false, error: "Недостаточно прав для просмотра данных этого экипажа." };
+}
+
 async function verifyCrewAccess(
   crewId: string,
+  initDataFallback?: string,
+  fallbackActorUserId?: string,
 ): Promise<{ allowed: boolean; actorUserId?: string; error?: string }> {
   // Dynamic imports to avoid module-level server-only chain
   const { cookies } = await import("next/headers");
@@ -33,48 +88,48 @@ async function verifyCrewAccess(
   );
 
   if (cookieUserId) {
-    // Telegram auth — verify crew access via DB
-    const { data: user, error: userErr } = await supabaseAdmin
-      .from("users")
-      .select("metadata")
-      .eq("user_id", cookieUserId)
-      .maybeSingle();
-
-    if (userErr) logger.warn("[verifyCrewAccess] users query failed:", userErr.message);
-
-    const userMetadata = user?.metadata as Record<string, unknown> | null;
-    const isAdmin = userMetadata?.role === "admin" || userMetadata?.status === "admin";
-
-    // Check crew owner
-    const { data: crew, error: crewErr } = await supabaseAdmin
-      .from("crews")
-      .select("owner_id")
-      .eq("id", crewId)
-      .maybeSingle();
-
-    if (crewErr) logger.warn("[verifyCrewAccess] crews query failed:", crewErr.message);
-    const isOwner = crew?.owner_id === cookieUserId;
-
-    // Check crew member (LR3-006 FIX: filter by membership_status='active' — was missing,
-    // so removed/inactive members retained access indefinitely)
-    const { data: crewMember, error: memberErr } = await supabaseAdmin
-      .from("crew_members")
-      .select("user_id")
-      .eq("crew_id", crewId)
-      .eq("user_id", cookieUserId)
-      .eq("membership_status", "active")
-      .maybeSingle();
-
-    if (memberErr) logger.warn("[verifyCrewAccess] crew_members query failed:", memberErr.message);
-    const isCrewMember = !!crewMember;
-
-    if (isOwner || isAdmin || isCrewMember) {
-      return { allowed: true, actorUserId: cookieUserId };
-    }
-    return { allowed: false, error: "Недостаточно прав для просмотра данных этого экипажа." };
+    const check = await checkUserCrewAccess(cookieUserId, crewId);
+    if (check.allowed) return { allowed: true, actorUserId: cookieUserId };
+    return { allowed: false, error: check.error };
   }
 
-  // Path 2: No Telegram cookie — not authenticated via WebApp
+  // Path 2 (NEW): no cookie — verify the Telegram-signed initData forwarded by
+  // the client. Only trusted because we validate the HMAC-SHA256 signature
+  // against the bot token ourselves; the client cannot forge it.
+  if (initDataFallback && fallbackActorUserId) {
+    try {
+      const { computeTelegramWebAppHash } = await import("@/lib/telegram-webapp-auth");
+      const botToken = process.env.TELEGRAM_BOT_TOKEN;
+      if (botToken) {
+        const validation = await computeTelegramWebAppHash(initDataFallback, botToken);
+        if (validation.isValid) {
+          const params = new URLSearchParams(initDataFallback);
+          let tgUserId: string | null = null;
+          try {
+            const userJson = params.get("user");
+            if (userJson) tgUserId = String((JSON.parse(userJson) as { id?: number | string }).id ?? "");
+          } catch {
+            tgUserId = null;
+          }
+          if (tgUserId && tgUserId === String(fallbackActorUserId).trim()) {
+            const check = await checkUserCrewAccess(tgUserId, crewId);
+            if (check.allowed) {
+              logger.info("[verifyCrewAccess] initData fallback accepted for user", { userId: tgUserId });
+              return { allowed: true, actorUserId: tgUserId };
+            }
+            return { allowed: false, error: check.error };
+          }
+          logger.warn("[verifyCrewAccess] initData user does not match claimed actorUserId — rejecting");
+        } else {
+          logger.warn("[verifyCrewAccess] initData fallback signature invalid — rejecting");
+        }
+      }
+    } catch (initDataErr) {
+      logger.warn("[verifyCrewAccess] initData fallback failed:", initDataErr instanceof Error ? initDataErr.message : String(initDataErr));
+    }
+  }
+
+  // Path 3: No Telegram cookie / initData — not authenticated via WebApp
   // (Password auth is handled by the caller passing actorUserId, which is verified
   //  by checking actorUserId === crew.owner_id. This is done in the calling function
   //  because it needs the crew owner_id which is fetched there.)
@@ -103,15 +158,9 @@ async function verifyCrewOwnerAccess(
   }
 
   // Also check if actorUserId is a global admin (in case the password was
-  // generated by an admin for a crew they don't own)
-  const { data: user } = await supabaseAdmin
-    .from("users")
-    .select("metadata")
-    .eq("user_id", actorUserId)
-    .maybeSingle();
-
-  const userMetadata = user?.metadata as Record<string, unknown> | null;
-  if (userMetadata?.role === "admin" || userMetadata?.status === "admin") {
+  // generated by an admin for a crew they don't own) — top-level role/status
+  // plus the legacy metadata keys.
+  if (await isGlobalAdminUser(actorUserId)) {
     return { allowed: true };
   }
 
@@ -263,6 +312,14 @@ export async function getFranchizeLeads(
   slug: string,
   actorUserId?: string,
   isPasswordAuth?: boolean,
+  /**
+   * Telegram WebApp initData (raw query string). OPTIONAL fallback for
+   * browsers that block third-party cookies (Telegram Web on desktop, Safari)
+   * where the signed actor cookie never reaches the server. Verified by
+   * HMAC-SHA256 against the bot token inside verifyCrewAccess — never trusted
+   * by itself.
+   */
+  initData?: string,
 ): Promise<GetFranchizeLeadsResult> {
   noStore();
   const safeSlug = slug.trim();
@@ -270,6 +327,7 @@ export async function getFranchizeLeads(
     const { privateSchema } = await import("@/lib/private-secrets");
     // ── Auth check (LA-001 FIX: no more trusting isPasswordAuth boolean) ──
     // Path 1: Telegram WebApp — verifyCrewAccess reads the signed cookie
+    // Path 1b: initData fallback — same checks, Telegram-signed identity
     // Path 2: Password auth — verify actorUserId is the crew owner (server-side)
     // Previously: NO auth at all, then isPasswordAuth boolean bypass — both fixed.
     const { ids: crewOperatorIds, crewId } = await getCrewOperatorIds(safeSlug);
@@ -277,8 +335,8 @@ export async function getFranchizeLeads(
       return { success: false, error: "Экипаж не найден" };
     }
 
-    // Try Telegram cookie auth first
-    const access = await verifyCrewAccess(crewId);
+    // Try Telegram cookie auth first (then signed initData fallback)
+    const access = await verifyCrewAccess(crewId, initData, actorUserId);
     if (!access.allowed) {
       // Cookie auth failed — try password auth (actorUserId must be crew owner)
       if (actorUserId && isPasswordAuth) {

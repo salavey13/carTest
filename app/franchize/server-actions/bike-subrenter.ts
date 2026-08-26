@@ -17,6 +17,57 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
 
+/**
+ * Unified permission check for subrenter management.
+ *
+ * HISTORY BUG (iter8): the original check only accepted
+ *   crew.owner_id === actorUserId  OR  users.metadata.role/status === "admin"
+ * But the real global admin (salavey13 / 413553377) carries his admin status in
+ * the TOP-LEVEL users.role="vprAdmin" + users.status="admin" columns, and crew
+ * admins live in crew_members.role — so the action returned "Недостаточно прав"
+ * and the admin panel's «Субарендаторы» section showed "0 записей / В экипаже
+ * пока нет техники" even though yamaha-r7 already had specs.subrenter_chat_id.
+ *
+ * Allowed actors (mirrors the client-side isCrewFleetAdmin gate in
+ * FranchizeAdminClient so the panel never shows UI the server rejects):
+ *   • crew owner
+ *   • active crew_members row with role owner / admin / co_owner
+ *   • global admin: users.role in (admin, vprAdmin) or users.status = admin
+ *     (top-level columns) or metadata.role / metadata.status = admin (legacy)
+ */
+async function canManageSubrenters(
+  crewId: string,
+  crewOwnerId: string | null,
+  actorUserId: string,
+): Promise<boolean> {
+  if (crewOwnerId && crewOwnerId === actorUserId) return true;
+
+  // Active crew membership with an admin-grade role
+  const { data: membership } = await supabaseAdmin
+    .from("crew_members")
+    .select("role, membership_status")
+    .eq("crew_id", crewId)
+    .eq("user_id", actorUserId)
+    .maybeSingle();
+  if (
+    membership?.membership_status === "active" &&
+    ["owner", "admin", "co_owner"].includes(membership.role || "")
+  ) {
+    return true;
+  }
+
+  // Global admin — top-level columns first, then legacy metadata keys
+  const { data: user } = await supabaseAdmin
+    .from("users")
+    .select("role, status, metadata")
+    .eq("user_id", actorUserId)
+    .maybeSingle();
+  if (!user) return false;
+  if (user.role === "admin" || user.role === "vprAdmin" || user.status === "admin") return true;
+  const meta = (user.metadata ?? {}) as Record<string, unknown>;
+  return meta.role === "admin" || meta.status === "admin";
+}
+
 const inputSchema = z.object({
   slug: z.string().trim().min(1),
   actorUserId: z.string().trim().min(1),
@@ -54,19 +105,10 @@ export async function setBikeSubrenterAction(input: {
       .maybeSingle();
     if (!bike) return { success: false, error: "Байк не найден в этом экипаже." };
 
-    // Permission: crew owner or global admin
-    let allowed = crew.owner_id === actorUserId;
+    // Permission: crew owner / crew admin / co_owner / global admin
+    const allowed = await canManageSubrenters(crew.id, crew.owner_id, actorUserId);
     if (!allowed) {
-      const { data: user } = await supabaseAdmin
-        .from("users")
-        .select("metadata")
-        .eq("user_id", actorUserId)
-        .maybeSingle();
-      const meta = (user?.metadata ?? {}) as Record<string, unknown>;
-      allowed = meta.role === "admin" || meta.status === "admin";
-    }
-    if (!allowed) {
-      return { success: false, error: "Только владелец экипажа или администратор может назначать субарендаторов." };
+      return { success: false, error: "Только владелец экипажа, админ экипажа или администратор может назначать субарендаторов." };
     }
 
     const normalized = (subrenterChatId || "").replace(/\D/g, "");
@@ -123,22 +165,18 @@ export async function getCrewBikesSubrenterInfoAction(input: {
       .maybeSingle();
     if (!crew) return { success: false, error: "Экипаж не найден." };
 
-    let allowed = crew.owner_id === actorUserId;
-    if (!allowed) {
-      const { data: user } = await supabaseAdmin
-        .from("users")
-        .select("metadata")
-        .eq("user_id", actorUserId)
-        .maybeSingle();
-      const meta = (user?.metadata ?? {}) as Record<string, unknown>;
-      allowed = meta.role === "admin" || meta.status === "admin";
-    }
+    const allowed = await canManageSubrenters(crew.id, crew.owner_id, actorUserId);
     if (!allowed) return { success: false, error: "Недостаточно прав." };
 
+    // Only rentable vehicles (bikes / ebikes) — a subrenter is a partner who
+    // owns a BIKE. The crew fleet also contains services, equipment and
+    // marketplace items (vip-bike has 100+ rows) which made the panel an
+    // endless wall of noise where the actual bikes were hard to find.
     const { data: bikes } = await supabaseAdmin
       .from("cars")
       .select("id, make, model, specs")
       .eq("crew_id", crew.id)
+      .in("type", ["bike", "ebike"])
       .order("make", { ascending: true });
 
     const data = (bikes ?? []).map((b) => {

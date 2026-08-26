@@ -110,11 +110,21 @@ export function LeadsClient({
   }, [searchQuery]);
 
   // Password gate
+  // NOTE: was a frozen useMemo([]) — if the Telegram SDK hadn't loaded at first
+  // render (desktop web Telegram loads the iframe + SDK lazily), isInTelegram
+  // stuck at false forever and the password gate could flash / mis-gate.
+  // Now re-checked a few times while the SDK boots.
+  const [tgReadyTick, setTgReadyTick] = useState(0);
+  useEffect(() => {
+    const timers = [600, 1500, 3000].map((ms) => setTimeout(() => setTgReadyTick((t) => t + 1), ms));
+    return () => timers.forEach(clearTimeout);
+  }, []);
   const isInTelegram = useMemo(() => {
+    void tgReadyTick; // re-evaluate when the SDK has had time to boot
     if (typeof window === "undefined") return false;
     const tg = (window as any).Telegram?.WebApp;
     return !!(tg?.initData && tg.initData.length > 0);
-  }, []);
+  }, [tgReadyTick]);
 
   const {
     showPasswordEntry,
@@ -133,12 +143,33 @@ export function LeadsClient({
   const shouldShowPassword = !isInTelegram && !dbUser?.user_id && !passwordAuthed;
 
   // Fetch leads client-side after auth passes (page.tsx passes empty arrays for security)
-  useEffect(() => {
-    if (!isAuthed || shouldShowPassword) return;
-    if (leadsFetchedRef.current) return;
-
-    let cancelled = false;
-    (async () => {
+  //
+  // ROBUSTNESS FIX (iter8, "leads sometimes don't load in desktop web Telegram"):
+  //  • the old code fired ONCE — a single transient failure (cold-start timeout,
+  //    cookie not yet re-set after session resume, network hiccup) left the page
+  //    permanently empty until a manual full reload. Mobile worked because the
+  //    native WebView keeps the app warm and first-party cookies flowing.
+  //  • now: up to 3 attempts with growing backoff + the Telegram-signed initData
+  //    is forwarded as an auth fallback for browsers that block third-party
+  //    cookies (the actor cookie never reaches the server inside the
+  //    web.telegram.org iframe).
+  //  • a dismissible error banner with a manual retry button appears when all
+  //    automatic attempts fail — no more silent empty page.
+  const [leadsLoadError, setLeadsLoadError] = useState<string | null>(null);
+  const [isFetchingLeads, setIsFetchingLeads] = useState(false);
+  const [manualRetryTick, setManualRetryTick] = useState(0);
+  const fetchLeads = useCallback(async (isCancelled: () => boolean): Promise<boolean> => {
+    const initData = (() => {
+      try {
+        const tg = (window as any).Telegram?.WebApp;
+        return typeof tg?.initData === "string" && tg.initData.length > 0 ? tg.initData : undefined;
+      } catch {
+        return undefined;
+      }
+    })();
+    const maxAttempts = 3;
+    let lastError = "";
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         // STATIC import — safe now because leads.ts has NO module-level server-only imports.
         // Dynamic import() of server actions breaks Next.js server action registration
@@ -149,21 +180,45 @@ export function LeadsClient({
           slug,
           dbUser?.user_id || "",
           false, // isPasswordAuth=false — server tries cookie auth first
+          initData,
         );
-        if (cancelled) return;
+        if (isCancelled()) return false;
         if (result.success) {
-          leadsFetchedRef.current = true;
           setLeadsState((result.leads || []).filter(Boolean) as LeadRow[]);
           setTodosState((result.todos || []).filter(Boolean) as LeadTodoRow[]);
-        } else {
-          console.error("[LeadsClient] getFranchizeLeads failed:", result.error);
+          setLeadsLoadError(null);
+          return true;
         }
+        lastError = result.error || "неизвестная ошибка";
+        console.error(`[LeadsClient] getFranchizeLeads failed (attempt ${attempt}/${maxAttempts}):`, lastError);
       } catch (e) {
-        if (!cancelled) console.error("[LeadsClient] getFranchizeLeads error:", e);
+        lastError = e instanceof Error ? e.message : String(e);
+        if (isCancelled()) return false;
+        console.error(`[LeadsClient] getFranchizeLeads error (attempt ${attempt}/${maxAttempts}):`, e);
       }
+      if (attempt < maxAttempts) {
+        // growing backoff: 1.5s → 4s (covers cookie-set races and cold starts)
+        await new Promise((resolve) => setTimeout(resolve, attempt === 1 ? 1500 : 4000));
+        if (isCancelled()) return false;
+      }
+    }
+    setLeadsLoadError(lastError);
+    return false;
+  }, [slug, dbUser?.user_id]);
+
+  useEffect(() => {
+    if (!isAuthed || shouldShowPassword) return;
+    if (leadsFetchedRef.current) return;
+
+    let cancelled = false;
+    setIsFetchingLeads(true);
+    (async () => {
+      const ok = await fetchLeads(() => cancelled);
+      if (!cancelled && ok) leadsFetchedRef.current = true;
+      if (!cancelled) setIsFetchingLeads(false);
     })();
     return () => { cancelled = true; };
-  }, [isAuthed, shouldShowPassword, slug, dbUser?.user_id, storedPassword, passwordAuthed]);
+  }, [isAuthed, shouldShowPassword, slug, dbUser?.user_id, storedPassword, passwordAuthed, manualRetryTick, fetchLeads]);
 
   // Todo mapping — use writable state so TodoList callbacks sync the parent array
   const { getTodosForLead } = useTodosMapping(todosState);
@@ -421,6 +476,43 @@ export function LeadsClient({
   return (
     <div className="space-y-5">
       <LeadsKPICards leads={activeLeads} hot={hot} verified={verified} todos={todos} T={T} />
+
+      {/* Load-error banner — silent empty pages were the #1 desktop-web-Telegram
+          complaint. Shows the actual server error + manual retry. The loading
+          variant only appears on a cold first load (no data yet). */}
+      {(leadsLoadError || (isFetchingLeads && leadsState.length === 0)) && (
+        <div
+          className="mb-4 flex flex-col gap-2 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+          style={{
+            borderColor: leadsLoadError ? "rgba(245,158,11,0.5)" : "rgba(59,130,246,0.4)",
+            backgroundColor: leadsLoadError ? "rgba(245,158,11,0.08)" : "rgba(59,130,246,0.06)",
+          }}
+        >
+          <p className="text-xs leading-relaxed" style={{ color: T.text }}>
+            {leadsLoadError ? (
+              <>
+                <span className="font-semibold">Не удалось загрузить лиды.</span>{" "}
+                <span className="opacity-75">{leadsLoadError}</span>
+              </>
+            ) : (
+              <span className="opacity-75">Загружаю лиды{isFetchingLeads ? " (повторная попытка…)" : "…"} — если веб-приложение только что открылось, это займёт пару секунд.</span>
+            )}
+          </p>
+          {leadsLoadError && (
+            <button
+              type="button"
+              onClick={() => {
+                setLeadsLoadError(null);
+                setManualRetryTick((t) => t + 1);
+              }}
+              className="shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:opacity-80"
+              style={{ borderColor: "rgba(245,158,11,0.5)", color: T.text }}
+            >
+              Повторить загрузку
+            </button>
+          )}
+        </div>
+      )}
 
       <LeadsToolbar
         searchQuery={searchQuery} setSearchQuery={setSearchQuery}

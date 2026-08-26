@@ -11,7 +11,7 @@ import { randomUUID } from "crypto";
 import { readFile } from "fs/promises";
 import path from "path";
 import { getCrewSensitiveDataOrDefault, getUserSensitiveDataOrDefault, saveCrewSensitiveData } from "@/lib/private-secrets";
-import { getUserRentalSecrets as getVerifiedRentalSecrets, saveUserRentalSecrets } from "@/app/lib/user-rental-secrets";
+import { getUserRentalSecrets as getVerifiedRentalSecrets, getUserRentalSecretsByPhone, saveUserRentalSecrets } from "@/app/lib/user-rental-secrets";
 import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
 import { upsertFranchizeIntent } from "@/app/franchize/server-actions/intents";
 import { cloneFranchizeContentBlocks, readFranchizeContentBlocks, type FranchizeContentBlocks } from "@/app/franchize/lib/content-blocks";
@@ -2277,7 +2277,22 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
     // Fetch verified rental secrets from past rentals — richest personal data source
     // Priority chain: rental secrets (verified OCR/past contract) > userSensitive > placeholder
-    const rentalSecretsRecord = await getVerifiedRentalSecrets(payload.telegramUserId, payload.slug);
+    //
+    // iter8: PHONE FALLBACK — the chat_id lookup misses returning renters whose
+    // QR claim never landed (rent_{bike}_{sha} scan aborted / app crashed before
+    // the startapp router ran). Their verified /doc secret sits with chat_id=NULL,
+    // so the doc came out with placeholder passport lines. Fall back to matching
+    // the crew's verified secrets by the order's phone (10-digit normalized).
+    let rentalSecretsRecord = await getVerifiedRentalSecrets(payload.telegramUserId, payload.slug);
+    if (!rentalSecretsRecord && payload.phone) {
+      rentalSecretsRecord = await getUserRentalSecretsByPhone(payload.phone, payload.slug);
+      if (rentalSecretsRecord) {
+        logger.info("[franchize] rental secrets resolved via PHONE fallback", {
+          orderId: payload.orderId,
+          secretId: rentalSecretsRecord.id,
+        });
+      }
+    }
     // Extract non-null string fields for convenient access in variables map
     const rentalSecrets: Record<string, string> = {};
     if (rentalSecretsRecord) {
@@ -2939,6 +2954,29 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     }
 
     await notifyAdmin(notificationParts.join("\n"));
+
+    // ── Send the order notification to the CREW OWNER too (iter8) ──────────
+    // Previously only the global admin received the "new order" text — the
+    // owner got the generated DOCX but no order details (no phone, no period,
+    // no payment). Resolve the owner via crews.owner_id (owner_id IS the
+    // Telegram chat id) and skip the admin to avoid a duplicate message.
+    try {
+      const { data: ownerCrewRow } = await supabaseAdmin
+        .from("crews")
+        .select("owner_id")
+        .eq("slug", payload.slug)
+        .maybeSingle();
+      const ownerChatId = ownerCrewRow?.owner_id ? String(ownerCrewRow.owner_id) : "";
+      if (ownerChatId && ownerChatId !== String(adminChatId)) {
+        const { sendComplexMessage } = await import("@/app/webhook-handlers/actions/sendComplexMessage");
+        await sendComplexMessage(ownerChatId, notificationParts.join("\n"), undefined, { parseMode: "HTML" });
+      }
+    } catch (ownerNotifyErr) {
+      logger.warn("[franchize] Failed to send order notification to crew owner", {
+        slug: payload.slug,
+        error: ownerNotifyErr instanceof Error ? ownerNotifyErr.message : String(ownerNotifyErr),
+      });
+    }
 
     // ── Send notification to creator too (Issue 4) ──
     if (payload.telegramUserId && payload.telegramUserId !== adminChatId) {

@@ -149,10 +149,19 @@ export async function POST(req: NextRequest) {
         : null;
 
     if (actorCookie) {
+      // TELEGRAM WEB (desktop) FIX: the Mini App runs inside a web.telegram.org
+      // IFRAME, making every request to this origin third-party. A SameSite=Lax
+      // cookie is NOT attached to cross-site subrequests, so server actions
+      // (getFranchizeLeads & co) saw "no cookie" → "Не авторизован" → the leads
+      // page stayed empty on PC while working fine in the mobile apps (native
+      // WebView = first-party context). SameSite=None (+Secure in prod) is the
+      // standard Mini App setting; on localhost/dev we keep Lax because
+      // browsers reject Secure-less SameSite=None over plain http.
+      const isProd = process.env.NODE_ENV === "production";
       response.cookies.set(TELEGRAM_ACTOR_COOKIE, actorCookie, {
         httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        sameSite: isProd ? "none" : "lax",
+        secure: isProd,
         path: "/",
         maxAge: TELEGRAM_ACTOR_COOKIE_MAX_AGE_SECONDS,
       });

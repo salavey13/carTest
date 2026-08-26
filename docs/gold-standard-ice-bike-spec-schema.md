@@ -175,10 +175,12 @@ Same operational keys as the electro schema (see `gold-standard-electro-bike-spe
 | Key | Description |
 |---|---|
 | `salary` | Salary/bonus classification: `{ tier, subrented, rentalCategory, saleCategory, dailyPriceAtSet, setAt }`. Tier is judged by PRICE (`daily_price`): budget < 7000, regular >= 7000, premium >= 14000 (vip-bike thresholds). Written by `scripts/apply-salary-specs.mjs`. |
-| `subrenter_chat_id` | Telegram chat id of the partner owner (mini admin). Plus audit keys `subrenter_set_at` / `subrenter_set_by`. Managed from the crew admin page. |
+| `subrenter_chat_id` | Telegram chat id of the partner owner (mini admin). Plus audit keys `subrenter_set_at` / `subrenter_set_by`. Managed from the crew admin page («Субарендаторы» panel: bikes only, searchable by model / bike id / chat id; assignable by crew owner, crew admin/co_owner or global admin). |
 | `last_known_odometer` | Integer km — pre-fills the odometer prompt when a rental is created/activated; auto-updated on rental closure. |
 
 Subrented ICE fleet (vip-bike, as of 2026-08-26): `yamaha-r7`, `suzuki-gsx-s1000f` — plus the electro `ducati-panigale-s-electro-black-aero`.
+
+**New-bike onboarding checklist (operational keys):** 1) run `node scripts/apply-salary-specs.mjs --apply`; 2) set `subrenter_chat_id` via the admin panel for partner bikes only (find the chat id via @userinfobot or `crew_members.user_id`); 3) set `last_known_odometer` from the physical odometer; 4) verify on `/franchize/{slug}/salary-coefficients` and the «Субарендаторы» panel. Full details in the electro schema §1.13.
 
 ### 1.10 Social
 

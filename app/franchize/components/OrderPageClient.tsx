@@ -15,7 +15,7 @@ import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { saveUserFranchizeCartAction } from "@/contexts/actions";
 import { focusRingOutlineStyle, readablePaletteTextOnColor, withAlpha } from "../lib/theme";
 import { getTelegramHandleHref, getTelegramWebAppFallbackHref, getTelegramWebAppPageHref, getTelegramWebAppAdaptiveHref } from "../lib/telegram-links";
-import { getFranchizeFormPrefillAction, getFranchizeUserRentalSecretsAction, getRentalDocsPrefillAction, getLatestRentalDataWithSource } from "../profile-actions";
+import { getFranchizeFormPrefillAction, getFranchizeUserRentalSecretsAction, getRentalDocsPrefillAction, getRentalDocsPrefillByPhoneAction, getLatestRentalDataWithSource } from "../profile-actions";
 import { useCrewTokens } from "../lib/use-crew-tokens";
 import { useResolvedPalette } from "../lib/useResolvedPalette";
 import {
@@ -628,6 +628,51 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     };
     void loadRentalSecrets();
   }, [dbUser?.user_id, setValue, slug]);
+
+  // ── PHONE-based returning-renter prefill (iter8) ─────────────────────────
+  // Watches the phone field; when the renter has typed ≥10 digits and the
+  // chat_id-keyed prefill chain found NOTHING (unclaimed QR secret from a
+  // previous /doc rental — the Наумов case), look the crew's verified secrets
+  // up by phone and offer the same "мы нашли ваши данные" banner.
+  const phoneLookupDoneRef = useRef(false);
+  useEffect(() => {
+    if (!dbUser?.user_id || phoneLookupDoneRef.current) return;
+    if (prefillData?.hasData) return; // chat_id prefill already kicked in
+    const digits = (phone || "").replace(/\D/g, "");
+    if (digits.length < 10) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await getRentalDocsPrefillByPhoneAction({ userId: dbUser.user_id, slug, phone });
+        if (!res.success || !res.data) return;
+        const d = res.data;
+        if (!d.passportSeries && !d.passportNumber && !d.fullName) return;
+        phoneLookupDoneRef.current = true;
+        setPrefillData({
+          hasData: true,
+          source: "previous_rental",
+          lastRentalDate: d.lastRentalDate,
+          fullName: d.fullName,
+          phone: d.phone,
+          birthDate: d.birthDate,
+          passportSeries: d.passportSeries,
+          passportNumber: d.passportNumber,
+          passportIssuedBy: d.passportIssuedBy,
+          passportIssueDate: d.passportIssueDate,
+          registrationAddress: d.registrationAddress,
+          licenseSeries: d.licenseSeries,
+          licenseNumber: d.licenseNumber,
+          licenseCategories: d.licenseCategories,
+          licenseExpiryDate: d.licenseExpiryDate,
+          hasLicense: Boolean(d.licenseSeries || d.licenseNumber),
+        });
+        setPrefillBannerVisible(true);
+      } catch {
+        // Non-fatal: silent catch — the user simply types his data manually.
+      }
+    }, 700); // debounce while typing
+    return () => clearTimeout(timer);
+  }, [dbUser?.user_id, phone, slug, prefillData?.hasData]);
 
   // Prefill the form's rentalStartDate from the cart (read-only echo
   // back to the user). The dates are owned by the cart line now — this

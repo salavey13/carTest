@@ -163,6 +163,76 @@ export async function getUserRentalSecrets(
   }
 }
 
+/** Normalize a phone to the last 10 digits (strips +7 / 8 prefixes, spaces, dashes).
+ *  "89960430155" / "+7 996 043 01 55" / "79960430155" → "9960430155" */
+export function normalizePhoneDigits(rawPhone: string): string {
+  const digits = String(rawPhone || "").replace(/\D/g, "");
+  // RU numbers: 11 digits starting with 8 or 7 → drop the leading country code
+  if (digits.length === 11 && (digits.startsWith("8") || digits.startsWith("7"))) {
+    return digits.slice(1);
+  }
+  return digits;
+}
+
+/**
+ * PHONE fallback lookup (iter8): most recent VERIFIED secret for a crew whose
+ * renter_phone normalizes to the same 10 digits as the given phone.
+ *
+ * WHY: the primary lookup is keyed by chat_id, which is only set after the
+ * renter completes a QR claim (rent_{bikeId}_{docSha256}) or places a web
+ * order. When a returning renter's QR claim never landed (scan aborted, app
+ * crash before the startapp router ran — exactly the Наумов case from
+ * 2026-08-26), his verified /doc secret sits with chat_id=NULL and the order
+ * form showed empty passport fields even though the data was in the DB.
+ *
+ * Phone matching is the natural join key operators already rely on.
+ * SCOPE: crew-scoped, verified rows only. Rows claimed by ANOTHER telegram
+ * account (chat_id set and different) are skipped by the CALLER-facing wrapper
+ * (getRentalDocsPrefillByPhoneAction) — see there for the privacy rules. The
+ * raw helper itself is used by the server-side doc pipeline where the order
+ * creator's own phone drives the lookup.
+ */
+export async function getUserRentalSecretsByPhone(
+  phone: string,
+  crewSlug: string,
+  excludeChatId?: string,
+): Promise<UserRentalSecret | null> {
+  const normalizedPhone = normalizePhoneDigits(phone);
+  const normalizedCrewSlug = normalizeRequiredId(crewSlug, "crewSlug");
+  if (normalizedPhone.length < 10 || !normalizedCrewSlug) return null;
+
+  try {
+    // Fetch the crew's recent verified secrets and match on normalized phone
+    // in code (stored formats vary: "89960430155", "+79827709051", "89308170969").
+    const { data, error } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("crew_slug", normalizedCrewSlug)
+      .eq("verification_status", "verified")
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error) {
+      logUserRentalSecretsError("getUserRentalSecretsByPhone", error);
+      return null;
+    }
+
+    const rows = (data as UserRentalSecret[] | null) ?? [];
+    for (const row of rows) {
+      if (!row.renter_phone) continue;
+      if (normalizePhoneDigits(row.renter_phone) !== normalizedPhone) continue;
+      // Skip the caller's own claimed row — that's the chat_id path's job;
+      // here we want the LATEST row (claimed or not) for this phone.
+      void excludeChatId;
+      return row;
+    }
+    return null;
+  } catch (error) {
+    logUserRentalSecretsError("getUserRentalSecretsByPhone", error);
+    return null;
+  }
+}
+
 // Get rental secret by doc hash (for QR verification / claim flow).
 export async function getUserRentalSecretsByDocSha(
   docSha256: string,

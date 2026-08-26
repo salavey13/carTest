@@ -3,7 +3,7 @@
 import { createHash } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { privateSchema } from "@/lib/private-secrets";
-import { isCrewMember } from "@/app/lib/user-rental-secrets";
+import { isCrewMember, getUserRentalSecretsByPhone } from "@/app/lib/user-rental-secrets";
 import { logger } from "@/lib/logger";
 
 export type FranchizeAchievementDefinition = {
@@ -1452,6 +1452,101 @@ export async function getRentalDocsPrefillAction(params: {
       },
     };
   } catch {
+    return { success: false };
+  }
+}
+
+/**
+ * PHONE-BASED prefill lookup (iter8) — the "returning renter typed his phone,
+ * wow-effect pre-fill" fallback.
+ *
+ * WHY THIS EXISTS: the primary prefill chain is keyed by chat_id, which is
+ * only populated after the renter completes a QR claim (rent_{bike}_{sha}) or
+ * places a web order. Real-world case (2026-08-26, order-mtaan88x): Наумов
+ * Кирилл rented via /doc on Aug 23, the QR scan never landed (chat_id stayed
+ * NULL), so on his first WEB order the passport fields came up empty and he
+ * re-typed everything. With this action the form reacts to the typed phone
+ * and offers the verified data from the previous rental.
+ *
+ * PRIVACY RULES:
+ *  • caller must be an authenticated Telegram user (userId required);
+ *  • crew-scoped, VERIFIED rows only;
+ *  • rows CLAIMED by a DIFFERENT telegram account are skipped — those belong
+ *    to someone else's active identity; only unclaimed rows (QR never
+ *    completed, operator-keyed from /doc) or rows claimed by the CALLER
+ *    himself are returned;
+ *  • every hit is audit-logged (who looked up which phone).
+ */
+export async function getRentalDocsPrefillByPhoneAction(params: {
+  userId: string;
+  slug: string;
+  phone: string;
+}): Promise<{
+  success: boolean;
+  data?: {
+    fullName?: string;
+    phone?: string;
+    birthDate?: string;
+    passportSeries?: string;
+    passportNumber?: string;
+    passportIssuedBy?: string;
+    passportIssueDate?: string;
+    registrationAddress?: string;
+    licenseSeries?: string;
+    licenseNumber?: string;
+    licenseCategories?: string;
+    licenseExpiryDate?: string;
+    lastRentalDate?: string;
+  };
+}> {
+  try {
+    const normalizedUserId = String(params.userId || "").trim();
+    const phone = String(params.phone || "").trim();
+    if (!normalizedUserId || phone.replace(/\D/g, "").length < 10) {
+      return { success: false };
+    }
+
+    // Fetch candidates by phone (crew-scoped, verified)
+    const secret = await getUserRentalSecretsByPhone(phone, params.slug);
+    if (!secret) return { success: true };
+
+    // Privacy guard: a secret claimed by a DIFFERENT user is not ours to serve.
+    if (secret.chat_id && secret.chat_id !== normalizedUserId) {
+      return { success: true };
+    }
+
+    logger.info("[getRentalDocsPrefillByPhoneAction] prefill hit", {
+      userId: normalizedUserId,
+      slug: params.slug,
+      secretId: secret.id,
+      claimed: Boolean(secret.chat_id),
+    });
+
+    const passportParts = (secret.renter_passport || "").trim().split(/\s+/);
+    const licenseParts = (secret.renter_driver_license || "").trim().split(/\s+/);
+
+    return {
+      success: true,
+      data: {
+        fullName: secret.renter_full_name || undefined,
+        phone: secret.renter_phone || undefined,
+        birthDate: secret.renter_birth_date || undefined,
+        passportSeries: passportParts[0] || undefined,
+        passportNumber: passportParts[1] || undefined,
+        passportIssuedBy: secret.renter_passport_issued_by || undefined,
+        passportIssueDate: secret.renter_passport_issue_date || undefined,
+        registrationAddress: secret.renter_registration || undefined,
+        licenseSeries: licenseParts[0] || undefined,
+        licenseNumber: licenseParts[1] || undefined,
+        licenseCategories: secret.license_categories || undefined,
+        licenseExpiryDate: secret.license_expiry_date || undefined,
+        lastRentalDate: secret.created_at
+          ? new Date(secret.created_at).toISOString().split("T")[0]
+          : undefined,
+      },
+    };
+  } catch (error) {
+    logger.warn("[getRentalDocsPrefillByPhoneAction] failed:", error instanceof Error ? error.message : String(error));
     return { success: false };
   }
 }

@@ -88,9 +88,18 @@ export function FranchizeRentalRoleGuard({
       }
     }
 
-    // Global admin (user.metadata.role === "admin")
+    // Global admin — top-level users.role/status columns first (the actual
+    // production admin salavey13 carries role="vprAdmin" + status="admin"
+    // there, NOT in metadata), then legacy metadata keys.
     const userMeta = (dbUser.metadata as Record<string, unknown> | null) ?? null;
-    if (userMeta?.role === "admin" || userMeta?.status === "admin") {
+    const dbUserAny = dbUser as unknown as Record<string, unknown>;
+    if (
+      dbUserAny?.role === "admin" ||
+      dbUserAny?.role === "vprAdmin" ||
+      dbUserAny?.status === "admin" ||
+      userMeta?.role === "admin" ||
+      userMeta?.status === "admin"
+    ) {
       return "admin";
     }
 
@@ -101,7 +110,7 @@ export function FranchizeRentalRoleGuard({
     }
 
     return "guest";
-  }, [dbUser?.user_id, dbUser?.metadata, ownerId, renterId, renterTelegramChatId, subrenterChatId, crewId, crewSlug, userCrewMemberships]);
+  }, [dbUser, ownerId, renterId, renterTelegramChatId, subrenterChatId, crewId, crewSlug, userCrewMemberships]);
 
   // "subrenter" is a VIEW-oriented mini admin: it passes only guards that
   // explicitly list it. Lifecycle mutations (activate/extend/complete) stay

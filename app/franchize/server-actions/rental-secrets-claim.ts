@@ -215,6 +215,82 @@ async function createRentalFromClaimedSecret(
 }
 
 /**
+ * FALLBACK for the (currently broken in prod) claim_rental_by_qr RPC.
+ *
+ * The deployed RPC fails with 42702 ("column reference rental_id is
+ * ambiguous" — its OUT parameter `rental_id` collides with the rentals
+ * column), so QR claims silently no-op'd while the client showed
+ * "✅ Ваши данные привязаны". Until the fixed migration
+ * (20260827120000_fix_claim_qr_rpc_ambiguity.sql) is applied, we replicate
+ * the RPC's propagation in TypeScript:
+ *   • rentals.created_by_operator_chat_id preserved, user_id → renter
+ *   • rental_contract_artifacts.telegram_chat_id → renter (operator preserved)
+ *   • user_rental_secrets.chat_id + qr_claimed_at → renter
+ */
+async function propagateClaimFallback(
+  renterChatId: string,
+  docSha256: string,
+): Promise<string | null> {
+  try {
+    const { data: artifact } = await (supabaseAdmin as any)
+      .schema('private')
+      .from('rental_contract_artifacts')
+      .select('id, rental_id, telegram_chat_id, created_by_operator_chat_id')
+      .eq('original_sha256', docSha256)
+      .maybeSingle();
+    if (!artifact?.rental_id) return null;
+
+    // Preserve the operator identity before overwriting telegram_chat_id.
+    if (!artifact.created_by_operator_chat_id && artifact.telegram_chat_id) {
+      await (supabaseAdmin as any)
+        .schema('private')
+        .from('rental_contract_artifacts')
+        .update({ created_by_operator_chat_id: artifact.telegram_chat_id })
+        .eq('id', artifact.id);
+    }
+    await (supabaseAdmin as any)
+      .schema('private')
+      .from('rental_contract_artifacts')
+      .update({ telegram_chat_id: renterChatId })
+      .eq('id', artifact.id);
+
+    // rentals: preserve operator, then re-key user_id to the renter.
+    await supabaseAdmin
+      .from('rentals')
+      .update({ created_by_operator_chat_id: artifact.created_by_operator_chat_id || artifact.telegram_chat_id })
+      .eq('rental_id', artifact.rental_id)
+      .is('created_by_operator_chat_id', null);
+    await supabaseAdmin
+      .from('rentals')
+      .update({ user_id: renterChatId })
+      .eq('rental_id', artifact.rental_id);
+
+    // secret: claim. Guard: only rows that are unclaimed, still keyed to the
+    // OLD operator, or already ours (idempotent re-claim).
+    const orParts = ["chat_id.is.null", `chat_id.eq.${renterChatId}`];
+    if (artifact.telegram_chat_id && artifact.telegram_chat_id !== renterChatId) {
+      orParts.push(`chat_id.eq.${artifact.telegram_chat_id}`);
+    }
+    await (supabaseAdmin as any)
+      .schema('private')
+      .from('user_rental_secrets')
+      .update({
+        chat_id: renterChatId,
+        qr_claimed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('doc_sha256', docSha256)
+      .or(orParts.join(","));
+
+    console.log('[rental-secrets-claim] propagateClaimFallback applied for doc', docSha256.slice(0, 12));
+    return artifact.rental_id;
+  } catch (error) {
+    console.error('[rental-secrets-claim] propagateClaimFallback failed:', error);
+    return null;
+  }
+}
+
+/**
  * Server action wrapper for the QR deep-link claim flow.
  *
  * Called from the client-side useStartParamRouter when a user opens
@@ -266,9 +342,18 @@ export async function claimRentalSecretsAction(
   if (createdRentalId) {
     rentalId = createdRentalId;
   } else {
-    // Fallback: try source_rental_id from secret (pre-claim state, should not happen
-    // if RPC succeeded, but keeps backward compat for edge cases)
-    rentalId = result.secret.source_rental_id || undefined;
+    // RPC path failed. The DEPLOYED claim_rental_by_qr currently raises 42702
+    // ("column rental_id is ambiguous") which made every QR claim a silent
+    // no-op — the renter saw "✅ данные привязаны" but chat_id was never
+    // persisted. Retry the propagation in TS until the fixed migration is
+    // applied on the live DB.
+    const fallbackRentalId = await propagateClaimFallback(chatId, docSha256);
+    if (fallbackRentalId) {
+      rentalId = fallbackRentalId;
+    } else {
+      // Last resort: try source_rental_id from secret (pre-claim state)
+      rentalId = result.secret.source_rental_id || undefined;
+    }
   }
 
   // Return only the crew_slug (needed for routing) — NOT the sensitive data

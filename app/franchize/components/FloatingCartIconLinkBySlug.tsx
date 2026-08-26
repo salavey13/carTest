@@ -132,7 +132,10 @@ function computeSubtotal(
         if (!item) continue;
         const line = lineVal as { itemId: string; qty: number; options: Record<string, unknown> };
         const qty = line?.qty ?? 1;
-        const price = item.saleAvailable && item.salePrice ? item.salePrice : item.pricePerDay;
+        // RENT-cart badge: prefer the daily rent price. A sale-listed bike
+        // (saleAvailable) still lands in the RENT cart by default — using its
+        // salePrice here showed 600 000 ₽ badges for a 10 000 ₽/day rental.
+        const price = item.pricePerDay || item.salePrice || 0;
         if (price > 0) {
           sum += price * qty;
         }
@@ -157,7 +160,8 @@ function computeSubtotal(
             if (!item) continue;
             const qty = typeof entryVal === "number" ? entryVal
               : (entryVal as Record<string, unknown>)?.quantity ?? 1;
-            const price = item.saleAvailable && item.salePrice ? item.salePrice : item.pricePerDay;
+            // Same rent-first rule as above (sale-listed bikes rent too).
+            const price = item.pricePerDay || item.salePrice || 0;
             if (price > 0) {
               sum += price * (typeof qty === "number" ? qty : 1);
             }
