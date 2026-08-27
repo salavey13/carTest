@@ -769,14 +769,33 @@ export async function createLeadFollowupTodos(input: {
     // Accept rental_id from either explicit param or metadata (backward compat)
     const effectiveRentalId = rentalId || (metadata?.rental_id as string | undefined) || null;
 
-    // Idempotency: check if todos already exist for this lead
-    const { data: existingTodos } = await supabaseAdmin
+    // Idempotency: check if todos already exist for this lead.
+    //
+    // FIX (2026-08-27): scope the dedup to the RENTAL when rentalId is present.
+    // Previously the check matched by TITLE across ALL of the lead's pending
+    // todos — but todo titles are only unique within a rental, not across
+    // rentals: "🔑 Принять ключи от BMW F800R", "🔍 Осмотр на повреждения:
+    // BMW F800R", "🪖 Принять 1 шлем(а/ов)" repeat for every rental of the
+    // same bike/equipment. A stale pending todo from an OLD rental (return
+    // never confirmed in the todo list) silently swallowed the new rental's
+    // whole checklist — live case: rental 31229193 got exactly ONE todo
+    // ("Проверить ТС…" — unique only because it embeds the return date)
+    // while 11 items were skipped as "duplicates" of rental c14e9f79.
+    // Per-rental scoping keeps retry-idempotency for the same rental and
+    // never blocks a different rental.
+    let existingQuery = supabaseAdmin
       .from("crew_todos")
       .select("id, title")
       .eq("crew_id", crewId)
       .eq("lead_id", leadId)
       .eq("category", "lead_followup")
       .eq("status", "pending");
+
+    if (effectiveRentalId) {
+      existingQuery = existingQuery.eq("rental_id", effectiveRentalId);
+    }
+
+    const { data: existingTodos } = await existingQuery;
 
     const existingTitles = new Set((existingTodos || []).map((t: any) => t.title));
     const newTodos = todos.filter((t) => !existingTitles.has(t.title));

@@ -17,8 +17,11 @@ import { Gauge, TrendingUp, AlertTriangle } from "lucide-react";
  *   - dailyLimitKm + overageRatePerKm: from metadata or contract (optional)
  *
  * Visibility:
- *   - Renders only when BOTH odometerBefore and odometerAfter are non-null numbers
- *   - Otherwise returns null
+ *   - Renders the full start → end + delta card when BOTH readings are known
+ *   - Renders a "Одометр при выдаче" card when only the start reading is known
+ *     (active rental — the operator sees the value he entered in /doc right on
+ *     the rental page instead of a blank spot)
+ *   - Returns null only when even the start reading is unknown
  *
  * Style:
  *   - Compact card with gauge icon
@@ -48,11 +51,50 @@ export function RentalOdometerDelta({
   borderSoft,
   accentColor,
 }: RentalOdometerDeltaProps) {
-  // Require both readings
+  // Require at least the start reading — the value the operator entered at
+  // handover (/doc step or pickup freeze). Without it there is nothing useful
+  // to show.
   const before = typeof odometerBefore === "number" ? odometerBefore : null;
   const after = typeof odometerAfter === "number" ? odometerAfter : null;
 
-  if (before == null || after == null) return null;
+  if (before == null) return null;
+
+  // Start reading only — active rental, return not yet processed. Show the
+  // handover value so the operator knows what to expect at closure (and can
+  // spot a suspicious delta right away when comparing with the odometer on
+  // the physical bike).
+  if (after == null) {
+    return (
+      <div
+        className="flex items-center justify-between gap-3 rounded-xl border p-3"
+        style={{ borderColor: borderSoft }}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+            style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
+          >
+            <Gauge className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-wider opacity-60" style={{ color: textSecondary }}>
+              Одометр при выдаче
+            </p>
+            <p className="text-sm font-bold" style={{ color: textPrimary }}>
+              {before.toLocaleString("ru-RU")} км
+            </p>
+          </div>
+        </div>
+
+        <span
+          className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold"
+          style={{ backgroundColor: "#f59e0b20", color: "#f59e0b" }}
+        >
+          зафиксируйте при возврате
+        </span>
+      </div>
+    );
+  }
 
   // Detect odometer rollback / data entry error — don't silently clamp to 0.
   // Show a red warning state instead so the operator notices and corrects.

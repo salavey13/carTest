@@ -3725,6 +3725,13 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             { title: `🔑 Принять ключи от ${bikeLabel}`, priority: "high" },
             { title: `📄 Проверить документы при возврате ${bikeLabel}`, priority: "medium" },
             { title: `🔍 Осмотр на повреждения: ${bikeLabel}`, priority: "high" },
+            // Parity with /doc flow (2026-08-27): photo + odometer return reminders
+            // so the web-checkout rental gets the same complete «Что вернуть» list.
+            { title: `📸 Сфотографировать байк при возврате: ${bikeLabel}`, priority: "high" },
+            {
+              title: `📊 Зафиксировать одометр при возврате: ${bikeLabel}`,
+              priority: "high",
+            },
           ];
           if (equip.helmets > 0) todos.push({ title: `🪖 Принять ${equip.helmets} шлем(а/ов) от ${bikeLabel}`, priority: "medium" });
           if (equip.gloves > 0) todos.push({ title: `🧤 Принять ${equip.gloves} перчатки от ${bikeLabel}`, priority: "low" });

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, Camera, Pencil, PenLine, RotateCcw, Trash2 } from "lucide-react";
+import { Calendar, Camera, CheckCircle2, Pencil, PenLine, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -197,6 +197,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     hasLicense?: boolean;
   } | null>(null);
   const [prefillBannerVisible, setPrefillBannerVisible] = useState(false);
+  // True when the verified renter data was applied to the form automatically
+  // (no tap required). The section header promises «при следующей аренде данные
+  // подставятся автоматически» — previously only a question banner was shown and
+  // the fields stayed empty unless the user tapped "Да, использовать", which
+  // read as "docs are not pulled into the order page".
+  const [prefillAutoApplied, setPrefillAutoApplied] = useState(false);
   const [fieldSources, setFieldSources] = useState<Record<string, "previous_rental" | "ocr" | "profile_prefill" | "manual">>({});
   const lastSubmitFingerprintRef = useRef<string | null>(null);
   const lastRecoveryFingerprintRef = useRef<string | null>(null);
@@ -570,17 +576,16 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
       if (docsRes.success && docsRes.data) {
         const d = docsRes.data;
-        
+
         // Check if we have verified data from profile
         const hasVerifiedProfileData = d.hasVerifiedData && (
           d.passportSeries || d.passportNumber || d.licenseSeries || d.licenseNumber
         );
 
         if (hasVerifiedProfileData) {
-          // Store prefill data and show banner instead of auto-filling
-          setPrefillData({
-            hasData: true,
-            source: d.verificationStatus === "verified" ? "previous_rental" : "profile_prefill",
+          const appliedData = {
+            hasData: true as const,
+            source: d.verificationStatus === "verified" ? "previous_rental" as const : "profile_prefill" as const,
             lastRentalDate: res.data?.lastRentalDate,
             fullName: d.fullName,
             phone: d.phone,
@@ -595,8 +600,67 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             licenseCategories: d.licenseCategories,
             licenseExpiryDate: d.licenseExpiryDate,
             hasLicense: Boolean(d.licenseSeries || d.licenseNumber),
-          });
+          };
+          // Store prefill data (banner + field sources) …
+          setPrefillData(appliedData);
           setPrefillBannerVisible(true);
+          // … and AUTO-APPLY it right away. Verified data (operator-checked
+          // during a previous rental or via photo OCR verification) belongs in
+          // the form without an extra tap — the user still reviews everything
+          // before submitting the order.
+          setPrefillAutoApplied(true);
+          const source = appliedData.source;
+          const newSources: Record<string, "previous_rental" | "ocr" | "profile_prefill" | "manual"> = {};
+          if (appliedData.fullName) {
+            setValue("recipient", appliedData.fullName, { shouldDirty: true, shouldValidate: true });
+            newSources.recipient = source;
+          }
+          if (appliedData.phone) {
+            setValue("phone", appliedData.phone, { shouldDirty: true, shouldValidate: true });
+            newSources.phone = source;
+          }
+          if (appliedData.birthDate) {
+            setValue("birthDate", appliedData.birthDate, { shouldDirty: true, shouldValidate: true });
+            newSources.birthDate = source;
+          }
+          if (appliedData.passportSeries) {
+            setValue("passportSeries", appliedData.passportSeries, { shouldDirty: true, shouldValidate: true });
+            newSources.passportSeries = source;
+          }
+          if (appliedData.passportNumber) {
+            setValue("passportNumber", appliedData.passportNumber, { shouldDirty: true, shouldValidate: true });
+            newSources.passportNumber = source;
+          }
+          if (appliedData.passportIssuedBy) {
+            setValue("passportIssuedBy", appliedData.passportIssuedBy, { shouldDirty: true, shouldValidate: true });
+            newSources.passportIssuedBy = source;
+          }
+          if (appliedData.passportIssueDate) {
+            setValue("passportIssueDate", appliedData.passportIssueDate, { shouldDirty: true, shouldValidate: true });
+            newSources.passportIssueDate = source;
+          }
+          if (appliedData.registrationAddress) {
+            setValue("registrationAddress", appliedData.registrationAddress, { shouldDirty: true, shouldValidate: true });
+            newSources.registrationAddress = source;
+          }
+          if (appliedData.licenseSeries) {
+            setValue("hasLicense", true, { shouldDirty: true, shouldValidate: true });
+            setValue("licenseSeries", appliedData.licenseSeries, { shouldDirty: true, shouldValidate: true });
+            newSources.licenseSeries = source;
+          }
+          if (appliedData.licenseNumber) {
+            setValue("licenseNumber", appliedData.licenseNumber, { shouldDirty: true, shouldValidate: true });
+            newSources.licenseNumber = source;
+          }
+          if (appliedData.licenseCategories) {
+            setValue("licenseCategories", appliedData.licenseCategories, { shouldDirty: true, shouldValidate: true });
+            newSources.licenseCategories = source;
+          }
+          if (appliedData.licenseExpiryDate) {
+            setValue("licenseExpiryDate", appliedData.licenseExpiryDate, { shouldDirty: true, shouldValidate: true });
+            newSources.licenseExpiryDate = source;
+          }
+          setFieldSources(newSources);
         } else if (latestRes.success && latestRes.data?.hasData) {
           // Fallback to latest rental data with source tracking
           const latest = latestRes.data;
@@ -1095,44 +1159,82 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         <div
           className="mt-4 rounded-2xl border-2 p-4"
           style={{
-            borderColor: accentMain,
-            backgroundColor: isAuto ? "color-mix(in srgb, var(--franchize-accent-main) 8%, transparent)" : `${palette.accentMain}14`,
+            borderColor: prefillAutoApplied ? "#22c55e" : accentMain,
+            backgroundColor: prefillAutoApplied
+              ? "color-mix(in srgb, #22c55e 8%, transparent)"
+              : isAuto
+                ? "color-mix(in srgb, var(--franchize-accent-main) 8%, transparent)"
+                : `${palette.accentMain}14`,
           }}
         >
           <div className="flex items-start gap-3">
-            <RotateCcw className="mt-0.5 h-6 w-6 shrink-0" style={{ color: accentMain }} aria-hidden />
+            {prefillAutoApplied ? (
+              <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0" style={{ color: "#22c55e" }} aria-hidden />
+            ) : (
+              <RotateCcw className="mt-0.5 h-6 w-6 shrink-0" style={{ color: accentMain }} aria-hidden />
+            )}
             <div className="flex-1">
-              <p className="text-sm font-semibold" style={{ color: textPrimary }}>
-                Использовать данные из предыдущей аренды?
-              </p>
-              <p className="mt-1 text-xs" style={surface.mutedText}>
-                {prefillData.lastRentalDate && `Последняя аренда: ${prefillData.lastRentalDate}. `}
-                Мы можем заполнить все поля автоматически — вам останется только проверить.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={applyPrefillData}
-                  className="rounded-xl px-4 py-2 text-xs font-semibold transition hover:brightness-110"
-                  style={{
-                    backgroundColor: accentMain,
-                    color: accentTextOn,
-                  }}
-                >
-                  Да, использовать
-                </button>
-                <button
-                  type="button"
-                  onClick={dismissPrefillBanner}
-                  className="rounded-xl border px-4 py-2 text-xs transition hover:opacity-80"
-                  style={{
-                    borderColor: borderSoft,
-                    color: textSecondary,
-                  }}
-                >
-                  Нет, ввести новые
-                </button>
-              </div>
+              {prefillAutoApplied ? (
+                <>
+                  <p className="text-sm font-semibold" style={{ color: textPrimary }}>
+                    Данные из предыдущей аренды подставлены автоматически
+                  </p>
+                  <p className="mt-1 text-xs" style={surface.mutedText}>
+                    {prefillData.lastRentalDate && `Последняя аренда: ${prefillData.lastRentalDate}. `}
+                    Проверьте данные перед отправкой заказа — при необходимости исправьте любое поле прямо в форме.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearAllPrefillFields();
+                        setPrefillBannerVisible(false);
+                      }}
+                      className="rounded-xl border px-4 py-2 text-xs transition hover:opacity-80"
+                      style={{
+                        borderColor: borderSoft,
+                        color: textSecondary,
+                      }}
+                    >
+                      Очистить и ввести заново
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold" style={{ color: textPrimary }}>
+                    Использовать данные из предыдущей аренды?
+                  </p>
+                  <p className="mt-1 text-xs" style={surface.mutedText}>
+                    {prefillData.lastRentalDate && `Последняя аренда: ${prefillData.lastRentalDate}. `}
+                    Мы можем заполнить все поля автоматически — вам останется только проверить.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={applyPrefillData}
+                      className="rounded-xl px-4 py-2 text-xs font-semibold transition hover:brightness-110"
+                      style={{
+                        backgroundColor: accentMain,
+                        color: accentTextOn,
+                      }}
+                    >
+                      Да, использовать
+                    </button>
+                    <button
+                      type="button"
+                      onClick={dismissPrefillBanner}
+                      className="rounded-xl border px-4 py-2 text-xs transition hover:opacity-80"
+                      style={{
+                        borderColor: borderSoft,
+                        color: textSecondary,
+                      }}
+                    >
+                      Нет, ввести новые
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

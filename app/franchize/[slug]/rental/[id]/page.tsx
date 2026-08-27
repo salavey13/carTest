@@ -158,7 +158,16 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
   // ── Polish v2: extract closure data for IdealBadge + OdometerDelta + DepositTracker ──
   const rentalMeta = (rental.metadata as Record<string, any> | null) ?? null;
   const closureData = rentalMeta?.closure_data ?? rentalMeta?.closure ?? null;
-  const odometerBefore = rentalMeta?.pickup_freeze?.odometer_km ?? rentalMeta?.odometer_before ?? null;
+  // Odometer chain: freeze (operator entered at handover) → odometer_before
+  // (from /doc contract) → last_known_odometer / odometer_before_hint (seeded
+  // from bike specs at web-order creation so the card shows a reference value
+  // even before the handover is frozen).
+  const odometerBefore =
+    rentalMeta?.pickup_freeze?.odometer_km
+    ?? rentalMeta?.odometer_before
+    ?? rentalMeta?.last_known_odometer
+    ?? rentalMeta?.odometer_before_hint
+    ?? null;
   const odometerAfter = closureData?.odometer_after ?? rentalMeta?.odometer_after ?? null;
   const depositReturned =
     typeof closureData?.deposit_returned === "boolean"

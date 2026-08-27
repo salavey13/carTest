@@ -1175,6 +1175,66 @@ export function FranchizeProfileClient({
           <p className="mt-1 text-xs " style={{ color: T.textMuted }}>
             Загрузите фото документов для ускорения оформления аренды. Данные будут распознаны автоматически.
           </p>
+
+          {/* Verified renter data from previous rentals (e.g. collected by the
+              operator via /doc and claimed through the rental QR code). The
+              photo statuses below only reflect manual photo uploads — without
+              this card a renter with fully verified /doc data saw "❌ Не
+              загружен" everywhere and assumed his documents were lost. */}
+          {docsPrefill?.hasVerifiedData && (
+            <div
+              className="mt-4 rounded-xl border p-3"
+              style={{ borderColor: withAlpha("#10b981", 0.4), backgroundColor: withAlpha("#10b981", 0.06) }}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-semibold" style={{ color: T.text }}>
+                  Проверенные данные арендатора
+                </span>
+                <span
+                  className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                  style={{ backgroundColor: withAlpha("#10b981", 0.15), color: "#10b981" }}
+                >
+                  <CheckCircle className="h-3 w-3" />
+                  Верифицировано оператором
+                </span>
+              </div>
+              <p className="mt-1 text-xs" style={{ color: T.textMuted }}>
+                Данные из вашей предыдущей аренды — при следующем заказе поля договора заполнятся автоматически.
+              </p>
+              <div className="mt-2 grid gap-1.5 text-xs sm:grid-cols-2 max-sm:grid-cols-1">
+                {docsPrefill.fullName && (
+                  <p><span style={{ color: T.textMuted }}>ФИО:</span> <span className="font-semibold" style={{ color: T.text }}>{docsPrefill.fullName}</span></p>
+                )}
+                {(docsPrefill.passportSeries || docsPrefill.passportNumber) && (
+                  <p>
+                    <span style={{ color: T.textMuted }}>Паспорт:</span>{" "}
+                    <span className="font-mono font-semibold" style={{ color: T.text }}>
+                      {docsPrefill.passportSeries} {docsPrefill.passportNumber}
+                    </span>
+                  </p>
+                )}
+                {docsPrefill.birthDate && (
+                  <p><span style={{ color: T.textMuted }}>Дата рождения:</span> <span className="font-semibold" style={{ color: T.text }}>{docsPrefill.birthDate}</span></p>
+                )}
+                {(docsPrefill.licenseSeries || docsPrefill.licenseNumber) && (
+                  <p>
+                    <span style={{ color: T.textMuted }}>Вод. удостоверение:</span>{" "}
+                    <span className="font-mono font-semibold" style={{ color: T.text }}>
+                      {docsPrefill.licenseSeries} {docsPrefill.licenseNumber}
+                    </span>
+                    {docsPrefill.licenseCategories ? ` (кат. ${docsPrefill.licenseCategories})` : ""}
+                  </p>
+                )}
+                {docsPrefill.registrationAddress && (
+                  <p className="sm:col-span-2 max-sm:col-span-1"><span style={{ color: T.textMuted }}>Прописка:</span> <span style={{ color: T.text }}>{docsPrefill.registrationAddress}</span></p>
+                )}
+              </div>
+              <p className="mt-2 text-[10px]" style={{ color: T.textMuted }}>
+                Если данные изменились (замена паспорта/прав) — загрузите новые фото ниже или сообщите оператору при следующей аренде.
+              </p>
+            </div>
+          )}
+
           <div className="mt-4 space-y-4">
             {/* Passport Main Page */}
             <div className="space-y-2">

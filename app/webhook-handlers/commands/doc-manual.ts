@@ -2474,9 +2474,16 @@ ${qrDeepLink}`);
         { title: `🔑 Принять ключи от ${bike.make} ${bike.model}`, priority: "high" },
         { title: `📄 Проверить документы при возврате ${bike.make} ${bike.model}`, priority: "medium" },
         { title: `🔍 Осмотр на повреждения: ${bike.make} ${bike.model}`, priority: "high" },
-        // NEW (per user request): photo reminder. Final odometer is captured by
-        // the closure modal — no longer in the todo list (was redundant).
+        // Photo reminder (per user request).
         { title: `📸 Сфотографировать байк при возврате: ${bike.make} ${bike.model}`, priority: "high" },
+        // Odometer check (per user request 2026-08-27): even though the closure
+        // modal captures the final reading, an explicit todo item keeps the
+        // return checklist self-contained — the operator sees the full list of
+        // what to check in one place (bot + rental page «Что вернуть»).
+        {
+          title: `📊 Зафиксировать одометр при возврате: ${bike.make} ${bike.model}${context.odometerBefore ? ` (при выдаче: ${context.odometerBefore.toLocaleString("ru-RU")} км)` : ""}`,
+          priority: "high",
+        },
       ];
       if ((context.helmets || 0) > 0) todos.push({ title: `🪖 Принять ${context.helmets} шлем(а/ов)`, priority: "medium" });
       if ((context.gloves || 0) > 0) todos.push({ title: `🧤 Принять ${context.gloves} перчатки`, priority: "low" });
@@ -2724,16 +2731,79 @@ async function gotoEquipment(chatId: number, userId: string, context: DocFlowCon
 /**
  * Odometer reading step.
  * Asks operator to enter odometer value before rental.
+ *
+ * UX (2026-08-27): shows the bike's last known odometer as a one-tap
+ * suggestion (from cars.specs.last_known_odometer — maintained at rental
+ * closure — with a fallback to the most recent rental of this bike). The
+ * operator still can type any value manually: bikes get ridden between
+ * rentals, so the suggestion is a starting point, not the truth.
  */
+async function getLastKnownOdometerForBike(bikeId: string): Promise<number | null> {
+  // Guard: Number(null) === 0 and Number("") === 0 — a JSON null / empty
+  // string must NOT be accepted as a "0 km" reading.
+  const asValidKm = (v: unknown): number | null => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0 || n > 999999) return null;
+    return Math.round(n);
+  };
+
+  try {
+    // 1. Canonical source: bike specs (updated every time a rental is closed
+    //    with a final odometer reading).
+    const bike = await resolveBikeById(bikeId);
+    const specs = (bike?.specs || {}) as Record<string, unknown>;
+    const fromSpecs = asValidKm(specs.last_known_odometer ?? specs.odometer);
+    if (fromSpecs != null) return fromSpecs;
+
+    // 2. Fallback: scan the latest rentals of this bike for any recorded
+    //    odometer reading (after > freeze > before), newest first.
+    const { data: recentRentals } = await supabaseAdmin
+      .from("rentals")
+      .select("metadata")
+      .eq("vehicle_id", bike.id)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    for (const row of recentRentals || []) {
+      const md = (row?.metadata || {}) as Record<string, any>;
+      const candidates = [
+        md.odometer_after,
+        md.pickup_freeze?.odometer_km,
+        md.odometer_before,
+      ];
+      for (const c of candidates) {
+        const n = asValidKm(c);
+        if (n != null) return n;
+      }
+    }
+    return null;
+  } catch (e) {
+    logger.warn("[/doc] getLastKnownOdometerForBike failed (non-fatal):", e);
+    return null;
+  }
+}
+
 async function gotoOdometer(chatId: number, userId: string, context: DocFlowContext): Promise<void> {
   await setState(userId, "odometer", context);
-  await sendComplexMessage(
-    chatId,
+  const suggestion = context.bikeId ? await getLastKnownOdometerForBike(context.bikeId) : null;
+
+  const message =
     `*Показания одометра*\n\n` +
     `Введите текущий пробег байка (в км):\n\n` +
-    `Пример: \`1234\``,
-    [],
-    { removeKeyboard: true, parseMode: 'Markdown' },
+    `Пример: \`1234\`` +
+    (suggestion != null
+      ? `\n\n🔢 Последнее известное значение: *${suggestion.toLocaleString("ru-RU")} км* — если байк не ездил с прошлого возврата, можно использовать его одной кнопкой.`
+      : "");
+
+  const keyboard: Array<Array<{ text: string; callback_data: string }>> = suggestion != null
+    ? [[{ text: `🔢 ${suggestion.toLocaleString("ru-RU")} км (последнее известное)`, callback_data: `odo_use_${suggestion}` }]]
+    : [];
+
+  await sendComplexMessage(
+    chatId,
+    message,
+    keyboard,
+    { keyboardType: 'inline', parseMode: 'Markdown' },
   );
 }
 
@@ -3743,6 +3813,21 @@ export async function handleDocCallback(
   if (callbackData === "restart") {
     await clearState(userId);
     await docCommand(chatId, parseInt(userId), undefined, "/doc");
+    return true;
+  }
+
+  // ── Odometer suggestion one-tap (gotoOdometer keyboard) ──
+  // "odo_use_<km>" — accepts the last known odometer as the current reading.
+  if (callbackData.startsWith("odo_use_")) {
+    if (state !== "odometer") return false; // stale button from another step
+    const value = parseInt(callbackData.replace("odo_use_", ""), 10);
+    if (!Number.isFinite(value) || value < 0 || value > 999999) {
+      await sendComplexMessage(chatId, "❌ Некорректное значение одометра. Введите пробег в км (0-999999).", [], { removeKeyboard: true });
+      return true;
+    }
+    context.odometerBefore = value;
+    logger.info(`[/doc] odo_use: ${userId} → odometerBefore=${value} (from suggestion button)`);
+    await gotoPaymentSplit(chatId, userId, context);
     return true;
   }
 

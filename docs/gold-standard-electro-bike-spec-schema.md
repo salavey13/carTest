@@ -289,6 +289,10 @@ These keys live in `specs` JSONB but are **operational**, NOT user-facing compar
 - In km, integer. When a web-app order creates the rental row, this value is copied into `rentals.metadata.last_known_odometer` and pre-fills the operator's odometer prompt at activation.
 - **Updated automatically** on rental closure (`odometerAfter` is written back to the bike's specs) — but set the initial value when the bike enters the fleet so the FIRST rental has a prefill too.
 - Optional: bikes without it simply show an empty odometer prompt (operator types the value manually).
+- **Where the value surfaces (2026-08-27):**
+  - `/doc` bot flow: the odometer step shows the last known value as a one-tap button («🔢 N км (последнее известное)») — manual input still available.
+  - Rental page (`/franchize/{slug}/rental/{id}`): the «Одометр при выдаче» card shows the handover reading for ACTIVE rentals (full start→end delta card appears once the return is processed).
+  - Resolution chain for the suggestion: `specs.last_known_odometer` → `specs.odometer` → newest rental's `odometer_after` / `pickup_freeze.odometer_km` / `odometer_before`. JSON `null`/empty values are never treated as «0 km».
 
 #### Onboarding checklist for a NEW catalog bike (operational keys)
 
