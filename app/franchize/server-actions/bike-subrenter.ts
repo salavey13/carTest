@@ -33,8 +33,11 @@ import { z } from "zod";
  *   • active crew_members row with role owner / admin / co_owner
  *   • global admin: users.role in (admin, vprAdmin) or users.status = admin
  *     (top-level columns) or metadata.role / metadata.status = admin (legacy)
+ *
+ * Exported (iter12) for reuse by subrenter-monitoring.ts (owner's profile
+ * subrenters overview uses the same gate).
  */
-async function canManageSubrenters(
+export async function canManageSubrenters(
   crewId: string,
   crewOwnerId: string | null,
   actorUserId: string,

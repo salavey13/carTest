@@ -19,13 +19,18 @@
 <table style="width: 100%; border: 2px solid #333; margin-top: 12pt; margin-bottom: 12pt; font-size: 11pt;">
 <tr><td style="border: 1px solid #999; padding: 4pt 8pt; font-weight: bold; background: #f0f0f0;" colspan="2">КРАТКАЯ ИНФОРМАЦИЯ</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt; width: 40%;">Собственник:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{owner_full_name}}</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">ТС:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{bike_make}} {{bike_model}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">ТС:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{bike_make}} {{bike_model}}{{#if bike_year}} ({{bike_year}} г.в.){{/if}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">VIN / номер рамы:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{bike_vin}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Гос. номер:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{bike_plate}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">СТС:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{bike_registration_cert}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Полис ОСАГО:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{bike_insurance_policy}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Оценочная стоимость:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{bike_value_rub}} рублей</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Процент собственника:</td><td style="border: 1px solid #999; padding: 3pt 8pt; font-weight: bold;">{{owner_percentage}}%</td></tr>
-<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Срок:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{rent_start_date}} — {{rent_end_date}}</td></tr>
+<tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Срок:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{contract_start_date}} — {{contract_end_date}}</td></tr>
 <tr><td style="border: 1px solid #999; padding: 3pt 8pt;">Телефон:</td><td style="border: 1px solid #999; padding: 3pt 8pt;">{{owner_phone}}</td></tr>
 </table>
 
-<p style="text-align: justify;">{{organization_name}} {{organization_short}} {{organization_representative}} Адрес: {{legal_address}} ОГРНИП: {{ogrnip}} ИНН: {{inn}} р/сч {{bank_account}} {{bank_name}} {{bank_city}} к/сч {{bank_corr_account}} именуемый в дальнейшем «Арендатор», с одной стороны, и гражданин {{owner_full_name}} {{owner_birth_date}} года рождения, паспорт, серия: {{owner_passport_series}} {{owner_passport_number}} выдан: {{owner_passport_issued_by}}, {{owner_passport_issue_date}}, именуемый в дальнейшем «Арендодатель», с другой стороны, совместно именуемые «Стороны», заключили настоящий договор о нижеследующем.</p>
+<p style="text-align: justify;">{{organization_name}} {{organization_short}} {{organization_representative}} Адрес: {{legal_address}} ОГРНИП: {{ogrnip}} ИНН: {{inn}} р/сч {{bank_account}} {{bank_name}} {{bank_city}} к/сч {{bank_corr_account}}, телефон: {{organization_phone}}, именуемый в дальнейшем «Арендатор», с одной стороны, и гражданин {{owner_full_name}} {{owner_birth_date}} года рождения, паспорт серия/номер: {{owner_passport_series}} {{owner_passport_number}} выдан: {{owner_passport_issued_by}}, {{owner_passport_issue_date}}, зарегистрирован: {{owner_registration}}, телефон: {{owner_phone}}, именуемый в дальнейшем «Арендодатель», с другой стороны, совместно именуемые «Стороны», заключили настоящий договор о нижеследующем.</p>
 
 <p style="text-align: center; font-weight: bold;">1. Термины и правовая модель договора</p>
 
@@ -82,7 +87,9 @@
 
 <p style="text-indent: 1.25cm; text-align: justify;">5.1. Вознаграждение Арендодателя составляет {{owner_percentage}}% ({{owner_percentage_text}}) от всех платежей клиентов за сдачу мотоцикла в субаренду, фактически полученных Арендатором в соответствующем отчетном периоде.</p>
 
-<p style="text-indent: 1.25cm; text-align: justify;">5.1.1. Минимальная стоимость сдачи мотоцикла клиентам в аренду/субаренду устанавливается в следующих размерах: {{min_daily_price_rub}} ({{min_daily_price_text}}) рублей за 1 сутки аренды.</p>
+<p style="text-indent: 1.25cm; text-align: justify;">5.1.1. Минимальная стоимость сдачи мотоцикла клиентам в аренду/субаренду устанавливается в следующих размерах: {{min_daily_price_rub}} ({{min_daily_price_text}}) рублей за 1 сутки аренды; {{min_2plus_daily_price_rub}} ({{min_2plus_daily_price_text}}) рублей за каждые сутки аренды при сроке аренды от 2 суток; {{min_3plus_daily_price_rub}} ({{min_3plus_daily_price_text}}) рублей за каждые сутки аренды при сроке аренды 3 и более суток. Долгосрочная аренда обсуждается в индивидуальном порядке.</p>
+
+<p style="text-indent: 1.25cm; text-align: justify;">На старте сезона арендная плата составляет {{weekday_daily_price_rub}} рублей в будни и {{weekend_daily_price_rub}} рублей в выходные. Может быть увеличена в большую сторону без согласования с Арендодателем; уменьшена — после согласования с Арендодателем по телефону или в сообщениях.</p>
 
 <p style="text-indent: 1.25cm; text-align: justify;">5.1.2. Почасовая аренда оплачивается клиентом по тарифу {{hourly_3h_price_rub}}р на 3 часа, {{hourly_6h_price_rub}}р на 6 часов, {{hourly_12h_price_rub}}р на 12 часов.</p>
 
@@ -231,29 +238,35 @@
 <table style="width: 100%; border: none; margin-top: 12pt;">
 <tr>
 <td style="border: none; width: 50%; vertical-align: top;"><b>Арендатор</b><br>
-{{organization_name}} {{organization_short}} {{organization_representative}} Адрес: {{legal_address}} ОГРНИП: {{ogrnip}} ИНН: {{inn}} р/сч {{bank_account}} {{bank_name}} {{bank_city}} к/сч {{bank_corr_account}}</td>
+{{organization_name}} {{organization_short}} {{organization_representative}}<br>
+Адрес: {{legal_address}}<br>
+ОГРНИП: {{ogrnip}} ИНН: {{inn}}<br>
+р/сч {{bank_account}} {{bank_name}} {{bank_city}} к/сч {{bank_corr_account}}<br>
+Телефон: {{organization_phone}}{{#if email}}<br>Email: {{email}}{{/if}}</td>
 <td style="border: none; width: 50%; vertical-align: top;"><b>Арендодатель</b><br>
-{{owner_full_name}} {{owner_birth_date}} года рождения, паспорт, серия: {{owner_passport_series}} {{owner_passport_number}} выдан: {{owner_passport_issued_by}}, {{owner_passport_issue_date}}</td>
+{{owner_full_name}}, {{owner_birth_date}} года рождения<br>
+Паспорт: {{owner_passport_series}} {{owner_passport_number}}, выдан: {{owner_passport_issued_by}}, {{owner_passport_issue_date}}<br>
+Зарегистрирован: {{owner_registration}}<br>
+Телефон: {{owner_phone}}{{#if owner_email}}<br>Email: {{owner_email}}{{/if}}</td>
 </tr>
 </table>
 
 <table style="width: 100%; border: none; margin-top: 12pt;">
 <tr>
 <td style="border: none; width: 50%; text-align: center; vertical-align: bottom; padding-bottom: 24pt;">
-Подпись: __________________ / _______________/
+Подпись: __________________ / {{organization_initials}} /
 </td>
 <td style="border: none; width: 50%; text-align: center; vertical-align: bottom; padding-bottom: 24pt;">
-Подпись: __________________ / _______________/
+Подпись: __________________ / {{owner_initials}} /
 </td>
 </tr>
 </table>
 
 <div style="page-break-before: always;"></div>
-
 <p style="text-align: right;">Приложение № 1</p>
 <p style="text-align: right;">к договору аренды транспортного средства без экипажа № {{contract_number}} от «{{day}}» {{month_num}} {{year}} года</p>
 
-<p style="text-align: center; font-weight: bold;">АКТ ПРИЕМА-ПЕРЕДАЧИ МОТОЦИКЛА</p>
+<p style="text-align: center; font-weight: bold; margin-top: 12pt;">АКТ ПРИЕМА-ПЕРЕДАЧИ МОТОЦИКЛА</p>
 
 <table style="width: 100%; border: none; margin-top: 12pt;">
 <tr><td style="border: none; width: 50%;">г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">«{{day}}» {{month_num}} {{year}} года</td></tr>
@@ -261,19 +274,30 @@
 
 <p style="text-align: justify;">Арендодатель передал, а Арендатор принял мотоцикл по договору аренды транспортного средства без экипажа на следующих условиях:</p>
 
-<p style="text-align: justify;">При передаче обнаружены следующие повреждения / особенности состояния мотоцикла:</p>
-
 <table style="width: 100%; border: 1px solid #000; border-collapse: collapse; margin: 12pt 0;">
-<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Марка / модель</td><td style="border: 1px solid #000; padding: 4px;">{{bike_make}} {{bike_model}}</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; width: 35%; font-weight: bold;">Марка / модель</td><td style="border: 1px solid #000; padding: 4px;">{{bike_make}} {{bike_model}}</td></tr>
 <tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Государственный регистрационный номер</td><td style="border: 1px solid #000; padding: 4px;">{{bike_plate}}</td></tr>
 <tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Номер рамы / VIN</td><td style="border: 1px solid #000; padding: 4px;">{{bike_vin}}</td></tr>
 <tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Свидетельство о регистрации</td><td style="border: 1px solid #000; padding: 4px;">{{bike_registration_cert}}</td></tr>
-<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Оценочная стоимость мотоцикла</td><td style="border: 1px solid #000; padding: 4px;">{{bike_value_rub}}</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Пробег на момент передачи</td><td style="border: 1px solid #000; padding: 4px;">________________</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Уровень топлива</td><td style="border: 1px solid #000; padding: 4px;">________________</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Количество ключей</td><td style="border: 1px solid #000; padding: 4px;">________________</td></tr>
 <tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Страховой полис ОСАГО</td><td style="border: 1px solid #000; padding: 4px;">{{bike_insurance_policy}}</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Документы</td><td style="border: 1px solid #000; padding: 4px;">________________</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Дополнительное оборудование</td><td style="border: 1px solid #000; padding: 4px;">________________</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Состояние шин / тормозов / АКБ</td><td style="border: 1px solid #000; padding: 4px;">________________</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Иные сведения</td><td style="border: 1px solid #000; padding: 4px;">________________</td></tr>
 </table>
 
+<p style="text-align: justify;">При передаче обнаружены следующие повреждения / особенности состояния мотоцикла:</p>
+
 <table style="width: 100%; border: 1px solid #000; border-collapse: collapse; margin: 12pt 0;">
-<tr style="background-color: #f0f0f0;"><th style="border: 1px solid #000; padding: 4px; text-align: center;">№</th><th style="border: 1px solid #000; padding: 4px;">Деталь / зона</th><th style="border: 1px solid #000; padding: 4px;">Вид повреждения</th><th style="border: 1px solid #000; padding: 4px;">Примечание</th></tr>
+<tr style="background-color: #f0f0f0;">
+<td style="border: 1px solid #000; padding: 4px; width: 8%; font-weight: bold; text-align: center;">№</td>
+<td style="border: 1px solid #000; padding: 4px; width: 27%; font-weight: bold;">Деталь / зона</td>
+<td style="border: 1px solid #000; padding: 4px; width: 35%; font-weight: bold;">Вид повреждения</td>
+<td style="border: 1px solid #000; padding: 4px; width: 30%; font-weight: bold;">Примечание</td>
+</tr>
 <tr><td style="border: 1px solid #000; padding: 4px; text-align: center;">1</td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
 <tr><td style="border: 1px solid #000; padding: 4px; text-align: center;">2</td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
 <tr><td style="border: 1px solid #000; padding: 4px; text-align: center;">3</td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
@@ -290,62 +314,76 @@
 
 <p style="text-align: justify;">Стороны подтверждают, что комплектность, пробег, техническое и внешнее состояние мотоцикла проверены, замечания указаны в настоящем акте.</p>
 
-<table style="width: 100%; border: none; margin-top: 24pt;">
+<table style="width: 100%; border: none; margin-top: 12pt;">
 <tr>
-<td style="border: none; width: 50%;">Арендатор:</p>
-<p>__________________ / _______________ /</td>
-<td style="border: none; width: 50%;">Арендодатель:</p>
-<p>__________________ / _______________ /</td>
+<td style="border: none; width: 50%; text-align: center; vertical-align: bottom; padding-bottom: 24pt;">
+Арендодатель: __________________ / {{owner_initials}} /
+</td>
+<td style="border: none; width: 50%; text-align: center; vertical-align: bottom; padding-bottom: 24pt;">
+Арендатор: __________________ / {{organization_initials}} /
+</td>
 </tr>
 </table>
 
 <div style="page-break-before: always;"></div>
-
 <p style="text-align: right;">Приложение № 2</p>
 <p style="text-align: right;">к договору аренды транспортного средства без экипажа № {{contract_number}} от «{{day}}» {{month_num}} {{year}} года</p>
 
-<p style="text-align: center; font-weight: bold;">АКТ ВОЗВРАТА МОТОЦИКЛА</p>
+<p style="text-align: center; font-weight: bold; margin-top: 12pt;">АКТ ВОЗВРАТА МОТОЦИКЛА</p>
 
 <table style="width: 100%; border: none; margin-top: 12pt;">
-<tr><td style="border: none; width: 50%;">г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">«___» __________ {{year}} года</td></tr>
+<tr><td style="border: none; width: 50%;">г. Нижний Новгород</td><td style="border: none; text-align: right; width: 50%;">«___» __________ ____ года</td></tr>
 </table>
 
 <p style="text-align: justify;">Арендатор передал, а Арендодатель принял мотоцикл по договору аренды транспортного средства без экипажа на следующих условиях:</p>
 
 <table style="width: 100%; border: 1px solid #000; border-collapse: collapse; margin: 12pt 0;">
-<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Марка / модель</td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
-<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Государственный регистрационный номер</td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
-<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Номер рамы / VIN</td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
-<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Пробег на момент возврата</td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
-<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Пробег за период аренды</td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
-<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Уровень топлива</td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
-<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Количество ключей</td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
-<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Документы возвращены</td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
-<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Дополнительное оборудование возвращено</td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; width: 35%; font-weight: bold;">Марка / модель</td><td style="border: 1px solid #000; padding: 4px;">{{bike_make}} {{bike_model}}</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Государственный регистрационный номер</td><td style="border: 1px solid #000; padding: 4px;">{{bike_plate}}</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Номер рамы / VIN</td><td style="border: 1px solid #000; padding: 4px;">{{bike_vin}}</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Пробег на момент возврата</td><td style="border: 1px solid #000; padding: 4px;">________________</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Пробег за период аренды</td><td style="border: 1px solid #000; padding: 4px;">________________</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Уровень топлива</td><td style="border: 1px solid #000; padding: 4px;">________________</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Количество ключей</td><td style="border: 1px solid #000; padding: 4px;">________________</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Документы возвращены</td><td style="border: 1px solid #000; padding: 4px;">________________</td></tr>
+<tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Дополнительное оборудование возвращено</td><td style="border: 1px solid #000; padding: 4px;">________________</td></tr>
 <tr style="background-color: #f0f0f0;"><td style="border: 1px solid #000; padding: 4px; font-weight: bold;">Общее состояние</td><td style="border: 1px solid #000; padding: 4px;">Без замечаний / С замечаниями, указанными ниже</td></tr>
 </table>
 
 <p style="text-align: justify;">Повреждения, недостатки, утрата документов, ключей или оборудования, выявленные при возврате:</p>
 
 <table style="width: 100%; border: 1px solid #000; border-collapse: collapse; margin: 12pt 0;">
-<tr style="background-color: #f0f0f0;"><th style="border: 1px solid #000; padding: 4px; text-align: center;">№</th><th style="border: 1px solid #000; padding: 4px;">Деталь / зона</th><th style="border: 1px solid #000; padding: 4px;">Состояние</th><th style="border: 1px solid #000; padding: 4px;">Предварительная причина</th><th style="border: 1px solid #000; padding: 4px;">Примечание</th></tr>
+<tr style="background-color: #f0f0f0;">
+<td style="border: 1px solid #000; padding: 4px; width: 8%; font-weight: bold; text-align: center;">№</td>
+<td style="border: 1px solid #000; padding: 4px; width: 27%; font-weight: bold;">Деталь / зона</td>
+<td style="border: 1px solid #000; padding: 4px; width: 30%; font-weight: bold;">Состояние</td>
+<td style="border: 1px solid #000; padding: 4px; width: 20%; font-weight: bold;">Предварительная причина</td>
+<td style="border: 1px solid #000; padding: 4px; width: 15%; font-weight: bold;">Примечание</td>
+</tr>
 <tr><td style="border: 1px solid #000; padding: 4px; text-align: center;">1</td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
 <tr><td style="border: 1px solid #000; padding: 4px; text-align: center;">2</td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
 <tr><td style="border: 1px solid #000; padding: 4px; text-align: center;">3</td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
 <tr><td style="border: 1px solid #000; padding: 4px; text-align: center;">4</td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
 <tr><td style="border: 1px solid #000; padding: 4px; text-align: center;">5</td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
+<tr><td style="border: 1px solid #000; padding: 4px; text-align: center;">6</td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
+<tr><td style="border: 1px solid #000; padding: 4px; text-align: center;">7</td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
+<tr><td style="border: 1px solid #000; padding: 4px; text-align: center;">8</td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
+<tr><td style="border: 1px solid #000; padding: 4px; text-align: center;">9</td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
+<tr><td style="border: 1px solid #000; padding: 4px; text-align: center;">10</td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td><td style="border: 1px solid #000; padding: 4px;"></td></tr>
 </table>
 
-<p style="text-align: justify;">Фото- и/или видеофиксация состояния мотоцикла при возврате произведена: Да / Нет. Ссылка/описание материалов: ________________________________________________</p>
+<p style="text-align: justify;">Фото- и/или видеофиксация состояния мотоцикла при возврате произведена: Да / Нет. Ссылка/описание материалов: ________________________________________</p>
 
-<p style="text-align: justify;">Предварительный размер задолженности, ущерба, штрафов, простоя или иных удержаний на дату возврата: ________________________________________________</p>
+<p style="text-align: justify;">Предварительный размер задолженности, ущерба, штрафов, простоя или иных удержаний на дату возврата: ________________________________________</p>
 
-<table style="width: 100%; border: none; margin-top: 24pt;">
+<table style="width: 100%; border: none; margin-top: 12pt;">
 <tr>
-<td style="border: none; width: 50%;">Арендатор:</p>
-<p>__________________ / _______________ /</td>
-<td style="border: none; width: 50%;">Арендодатель:</p>
-<p>__________________ / _______________ /</td>
+<td style="border: none; width: 50%; text-align: center; vertical-align: bottom; padding-bottom: 24pt;">
+Арендодатель: __________________ / {{owner_initials}} /
+</td>
+<td style="border: none; width: 50%; text-align: center; vertical-align: bottom; padding-bottom: 24pt;">
+Арендатор: __________________ / {{organization_initials}} /
+</td>
 </tr>
 </table>
 

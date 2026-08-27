@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Trophy, MapPin, ShoppingCart, Lock, CheckCircle, Wallet, Briefcase, Calendar, Users, RotateCw } from "lucide-react";
+import { Trophy, MapPin, ShoppingCart, Lock, CheckCircle, Wallet, Briefcase, Calendar, Users, RotateCw, Bike, Handshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
@@ -45,6 +45,12 @@ import {
 } from "../../components/FranchizeOperatorSurface";
 import { getMyEarnings } from "../../server-actions/salary-calculations";
 import { getMyWorkTodayAction } from "../../server-actions/my-work";
+import {
+  getSubrenterOwnedBikesAction,
+  getFranchizeSubrentersOverviewAction,
+  type SubrenterOwnedBikesData,
+  type SubrenterOverviewRow,
+} from "../../server-actions/subrenter-monitoring";
 
 // 2026-08-19 review: use the shared fallbackCrew constant from
 // lib/fallback-crew.ts — was duplicated inline here, which meant it
@@ -179,6 +185,12 @@ export function FranchizeProfileClient({
   });
   const [canOpenCloserDashboard, setCanOpenCloserDashboard] = useState(false);
 
+  // Subrent partner monitoring (iter12): the user's OWN partner bikes
+  // (specs.subrenter_chat_id = his chat id) and, for crew owner/admins,
+  // the dedicated subrenters list.
+  const [subrenterOwned, setSubrenterOwned] = useState<SubrenterOwnedBikesData | null>(null);
+  const [subrentersOverview, setSubrentersOverview] = useState<SubrenterOverviewRow[] | null>(null);
+
   // Earnings and work state
   const [earnings, setEarnings] = useState<{
     currentPlan: { accrued: number; balanceDue: number; nextPayoutDate: string | null };
@@ -257,19 +269,24 @@ export function FranchizeProfileClient({
       }
       setProfile(result.data);
       setCatalog(result.catalog || []);
-      const [digestRes, prefillRes, operatorAccessRes, rentalSecretsRes, docsRes, profileDocsRes] = await Promise.all([
+      const [digestRes, prefillRes, operatorAccessRes, rentalSecretsRes, docsRes, profileDocsRes, subrenterOwnedRes, subrentersOverviewRes] = await Promise.all([
         getFranchizeActivityDigestAction({ slug, userId: dbUser.user_id }),
         getFranchizeFormPrefillAction({ slug, userId: dbUser.user_id }),
         getFranchizeOperatorDashboardAccess({ slug }),
         getFranchizeUserRentalSecretsAction({ slug, userId: dbUser.user_id }),
         getRentalDocsPrefillAction({ slug, userId: dbUser.user_id }),
         getProfileDocsStatusAction({ slug, userId: dbUser.user_id }),
+        // Partner monitoring — never blocks the profile: failures are swallowed.
+        getSubrenterOwnedBikesAction({ slug, userId: dbUser.user_id }).catch(() => null),
+        getFranchizeSubrentersOverviewAction({ slug, actorUserId: dbUser.user_id }).catch(() => null),
       ]);
       if (digestRes.success && digestRes.data) setDigest(digestRes.data);
       if (prefillRes.success && prefillRes.data) setPrefill(prefillRes.data);
       if (rentalSecretsRes.success && rentalSecretsRes.data) setRentalSecrets(rentalSecretsRes.data);
       if (docsRes.success && docsRes.data) setDocsPrefill(docsRes.data);
       if (profileDocsRes.success && profileDocsRes.data) setProfileDocsStatus(profileDocsRes.data);
+      if (subrenterOwnedRes?.success && subrenterOwnedRes.data) setSubrenterOwned(subrenterOwnedRes.data);
+      if (subrentersOverviewRes?.success && subrentersOverviewRes.data) setSubrentersOverview(subrentersOverviewRes.data);
       setCanOpenCloserDashboard(
         Boolean(operatorAccessRes.success && operatorAccessRes.canOpen),
       );
@@ -653,6 +670,169 @@ export function FranchizeProfileClient({
           </div>
         </FranchizeOperatorPanel>
       </motion.div>
+
+      {/* Subrenter panel: rentals of MY bikes in the park (partner monitoring) */}
+      {subrenterOwned && subrenterOwned.bikes.length > 0 && (
+        <motion.div variants={itemVariants}>
+          <FranchizeOperatorPanel>
+            <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
+              <Bike className="h-4 w-4" /> Мои байки в парке
+            </h2>
+            <p className="mt-1 text-xs" style={{ color: T.textMuted }}>
+              Аренды байков, которые вы передали экипажу — вы видите их статус
+              в реальном времени.
+            </p>
+
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              {subrenterOwned.bikes.map((bike) => (
+                <div
+                  key={bike.bikeId}
+                  className="flex items-center gap-3 rounded-xl border p-3"
+                  style={T.styles.card}
+                >
+                  {bike.imageUrl && (
+                    <img
+                      src={bike.imageUrl}
+                      alt={bike.label}
+                      className="h-12 w-12 flex-shrink-0 rounded-lg object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold" style={{ color: T.text }}>
+                      {bike.label}
+                    </span>
+                    <span className="mt-0.5 block text-[11px]" style={{ color: T.textMuted }}>
+                      Аренд всего: {bike.totalRentals}
+                      {bike.activeRentals > 0 && (
+                        <span className="ml-1 font-semibold" style={{ color: T.accent }}>
+                          · сейчас в аренде: {bike.activeRentals}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {subrenterOwned.rentals.length > 0 && (
+              <div className="mt-4">
+                <p className="mb-2 text-xs font-semibold" style={{ color: T.textMuted }}>
+                  Последние аренды моих байков
+                </p>
+                <div className="space-y-2">
+                  {subrenterOwned.rentals.slice(0, 5).map((r) => (
+                    <div
+                      key={r.rentalId}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => navigateSpa(r.docLink)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          navigateSpa(r.docLink);
+                        }
+                      }}
+                      className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border p-3 text-sm transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                      style={T.styles.card}
+                    >
+                      <div className="min-w-0">
+                        <span className="font-semibold" style={{ color: T.text }}>
+                          {r.bikeLabel}
+                        </span>
+                        {r.agreedStartDate && r.agreedEndDate && (
+                          <p className="mt-0.5 text-[11px]" style={{ color: T.textMuted }}>
+                            {new Date(r.agreedStartDate).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                            {" → "}
+                            {new Date(r.agreedEndDate).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[10px] whitespace-nowrap"
+                        style={{ ...T.styles.accentPill, opacity: r.status === "active" ? 1 : 0.6 }}
+                      >
+                        {(() => {
+                          const STATUS_LABELS: Record<string, string> = {
+                            active: "Активна",
+                            completed: "Завершена",
+                            cancelled: "Отменена",
+                            disputed: "Спорная",
+                            confirmed: "Подтверждена",
+                            pending_confirmation: "Ждёт подтверждения",
+                          };
+                          return STATUS_LABELS[r.status] || r.status;
+                        })()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </FranchizeOperatorPanel>
+        </motion.div>
+      )}
+
+      {/* Crew owner/admin panel: dedicated subrenters list */}
+      {subrentersOverview && subrentersOverview.length > 0 && (
+        <motion.div variants={itemVariants}>
+          <FranchizeOperatorPanel>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
+                  <Handshake className="h-4 w-4" /> Субарендаторы
+                </h2>
+                <p className="mt-1 text-xs" style={{ color: T.textMuted }}>
+                  Партнёры, передавшие свои байки в парк экипажа. Назначить или
+                  снять субарендатора можно в админ-панели.
+                </p>
+              </div>
+              <FranchizeOperatorLinkButton href={`/franchize/${slug}/admin`}>
+                Управлять
+              </FranchizeOperatorLinkButton>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {subrentersOverview.map((s) => (
+                <div key={s.chatId} className="rounded-xl border p-3" style={T.styles.card}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="font-semibold" style={{ color: T.text }}>
+                        {s.name || (s.username ? `@${s.username}` : `id ${s.chatId}`)}
+                      </span>
+                      <span className="ml-2 text-[11px]" style={{ color: T.textMuted }}>
+                        {s.username ? `@${s.username} · ` : ""}id {s.chatId}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px]" style={{ color: T.textMuted }}>
+                      <span>Аренд: {s.totalRentals}</span>
+                      {s.activeRentals > 0 && (
+                        <span className="rounded-full px-2 py-0.5 font-semibold" style={{ ...T.styles.accentPill }}>
+                          активных: {s.activeRentals}
+                        </span>
+                      )}
+                      {s.lastRentalAt && (
+                        <span>· последняя {new Date(s.lastRentalAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {s.bikes.map((b) => (
+                      <span
+                        key={b.bikeId}
+                        className="rounded-full border px-2 py-0.5 text-[11px]"
+                        style={{ borderColor: T.borderSoft, color: T.textMuted }}
+                      >
+                        {b.label} · {b.totalRentals} аренд{b.activeRentals > 0 ? ` · ${b.activeRentals} активна` : ""}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </FranchizeOperatorPanel>
+        </motion.div>
+      )}
 
       {/* My Earnings Panel */}
       <motion.div variants={itemVariants}>

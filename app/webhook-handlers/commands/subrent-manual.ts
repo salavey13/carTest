@@ -5,6 +5,7 @@
  *
  * Flow for park to rent bike from owner for commercial subrenting:
  *   1. Bike → select from catalog or enter new
+ *   1b. Bike documents (plate / СТС / ОСАГО) — prefilled from specs when known
  *   2. Owner full name
  *   3. Owner passport
  *   4. Owner birth date
@@ -12,12 +13,13 @@
  *   6. Owner phone
  *   7. Owner email (optional)
  *   8. Owner percentage (default 50%)
- *   9. Minimum daily price (default 9000)
- *   10. Hourly prices (3h/6h/12h defaults)
- *   11. Contract start date/time
- *   12. Contract duration (default to Nov 22 seasonal)
- *   13. Confirm
- *   → Generate subrental agreement
+ *   9. Minimum tiered daily prices (1d / 2+d / 3+d — defaults from bike specs)
+ *   10. Hourly prices (3h/6h/12h — defaults from bike specs)
+ *   11. Seasonal prices (weekday/weekend — defaults from bike specs)
+ *   12. Contract start date/time
+ *   13. Contract duration (default to Nov 22 seasonal)
+ *   14. Confirm
+ *   → Generate subrental agreement (contract + Приложение 1/2 acts)
  */
 
 "use server";
@@ -58,6 +60,9 @@ async function getSubrentCrewSlug(userId: string): Promise<string> {
 
 const DEFAULT_OWNER_PERCENTAGE = 50;
 const DEFAULT_MIN_DAILY_PRICE = 9000;
+/** Fallback tier prices when the bike has no specs rent tiers (paper-contract
+ *  pattern: 8000/7000/6000 per the Yamaha R7 reference agreement). */
+const DEFAULT_MIN_PRICES = { tier1: 9000, tier2: 8000, tier3: 7000 };
 const DEFAULT_HOURLY_PRICES = { "3h": 6000, "6h": 7000, "12h": 8000 };
 const DEFAULT_SEASONAL_PRICES = { weekday: 14000, weekend: 16000 };
 const DEFAULT_REGULAR_DEPOSIT = 10000;
@@ -67,6 +72,50 @@ const DEFAULT_EXTRA_KM_FEE = 30;
 const DEFAULT_DOWNTIME_COMPENSATION = 4000;
 const DEFAULT_REPORTING_DAYS = 2;
 const DEFAULT_LATE_PENALTY_PERCENT = 0.2;
+
+/** Catalog specs defaults for an existing bike (rent tiers, hourly, seasonal). */
+interface BikeSpecDefaults {
+  tier1?: number;
+  tier2?: number;
+  tier3?: number;
+  hourly3h?: number;
+  hourly6h?: number;
+  hourly12h?: number;
+  weekday?: number;
+  weekend?: number;
+}
+
+const toNum = (v: unknown): number | undefined => {
+  const n = parseInt(String(v ?? "").replace(/\D/g, ""), 10);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+};
+
+/** Coerce a JSONB spec value to a trimmed string ("" for missing/non-scalar). */
+const toSpecStr = (v: unknown): string =>
+  typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "";
+
+function extractBikeSpecDefaults(specs: Record<string, unknown> | null | undefined): BikeSpecDefaults {
+  const s = specs ?? {};
+  return {
+    tier1: toNum(s.dailyPrice) ?? toNum(s.price_per_day),
+    tier2: toNum(s["rent_2-4d"]) ?? toNum(s.rent_2_4d) ?? toNum(s["rent_5-10d"]) ?? toNum(s.rent_5_10d),
+    tier3: toNum(s.rent_11_30d) ?? toNum(s["rent_5-10d"]) ?? toNum(s.rent_5_10d),
+    hourly3h: toNum(s.price_per_3h),
+    hourly6h: toNum(s.price_per_6h),
+    hourly12h: toNum(s.price_per_12h),
+    weekday: toNum(s.rent_weekday),
+    weekend: toNum(s.rent_weekend),
+  };
+}
+
+/** "Молев Георгий Анатольевич" → "Молев Г.А." — signature-line initials. */
+function formatInitials(fullName: string | undefined): string {
+  const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  const surname = parts[0];
+  const initials = parts.slice(1).map((p) => (p[0] ? `${p[0].toUpperCase()}.` : "")).join("");
+  return initials ? `${surname} ${initials}` : surname;
+}
 
 // ── Keyboard builders ─────────────────────────────────────────────────────────────
 
@@ -108,30 +157,12 @@ function buildPercentageKeyboard(selected: number): KeyboardButton[][] {
   return rows;
 }
 
-function buildPriceKeyboard(defaultPrice: number, selected?: number): KeyboardButton[][] {
-  const prices = [
-    Math.round(defaultPrice * 0.8),
-    defaultPrice,
-    Math.round(defaultPrice * 1.2),
+function buildPriceKeyboard(defaults: { tier1: number; tier2: number; tier3: number }): KeyboardButton[][] {
+  return [
+    [{ text: `✅ Тарифы каталога: ${defaults.tier1} / ${defaults.tier2} / ${defaults.tier3} ₽`, callback_data: "price_default" }],
+    [{ text: "✏️ Свои тарифы", callback_data: "price_custom" }],
+    [{ text: "❌ Отменить", callback_data: "cancel" }],
   ];
-
-  const rows: KeyboardButton[][] = [];
-  const row: KeyboardButton[] = [];
-
-  for (const price of prices) {
-    row.push({
-      text: `${price.toLocaleString("ru-RU")} ₽ ${price === selected ? "✅" : ""}`,
-      callback_data: `price_${price}`,
-    });
-  }
-  rows.push(row);
-
-  rows.push([
-    { text: "✏️ Своя цена", callback_data: "price_custom" },
-  ]);
-  rows.push([{ text: "❌ Отменить", callback_data: "cancel" }]);
-
-  return rows;
 }
 
 function buildDurationKeyboard(): KeyboardButton[][] {
@@ -205,6 +236,9 @@ interface SubrentFlowContext {
   bikeRegistrationCert?: string;
   bikeInsurancePolicy?: string;
 
+  // Catalog-derived price defaults (from cars.specs of the selected bike)
+  specDefaults?: BikeSpecDefaults;
+
   // Owner data
   ownerFullName?: string;
   ownerBirthDate?: string;
@@ -219,6 +253,8 @@ interface SubrentFlowContext {
   // Payment terms
   ownerPercentage?: number;
   minDailyPrice?: number;
+  min2plusPrice?: number;
+  min3plusPrice?: number;
   hourly3hPrice?: number;
   hourly6hPrice?: number;
   hourly12hPrice?: number;
@@ -580,7 +616,7 @@ export async function handleSubrentManualCommand(params: {
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
-        text: `🏍 *Субаренда мотоцикла в парк* (1/7)\n\nВыберите мотоцикл, который собственник передаёт в аренду вашему парку:`,
+        text: `🏍 *Субаренда мотоцикла в парк* (1/8)\n\nВыберите мотоцикл, который собственник передаёт в аренду вашему парку:`,
         parseMode: "Markdown",
         replyMarkup: JSON.stringify({ inline_keyboard: buildBikeKeyboard(bikes) }),
       });
@@ -649,7 +685,7 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: `📝 ${isEditMode ? "Изменить" : "Субаренда мотоцикла в парк (2/7)"} данные мотоцикла:\n\n*Марка Модель*\n_Yamaha R7_\n\n*VIN*\n_JYA2... (17 символов)_\n\n*Гос. номер*\n_А123БВ777_\n\n*Год*\n_2023_\n\n*Стоимость (₽)*\n_500000_\n\n📋 Каждое поле с новой строки:`,
+          text: `📝 ${isEditMode ? "Изменить" : "Субаренда мотоцикла в парк (2/8)"} данные мотоцикла:\n\n*Марка Модель*\n_Yamaha R7_\n\n*VIN*\n_JYA2... (17 символов)_\n\n*Гос. номер*\n_А123БВ777_\n\n*Год*\n_2023_\n\n*Стоимость (₽)*\n_500000_\n\n*СТС*\n_99 87 356594_\n\n*Полис ОСАГО*\n_ХХХ 0659225087_\n\n📋 Каждое поле с новой строки (последние два можно оставить пустыми):`,
           parseMode: "Markdown",
         });
         context.step = isEditMode ? "edit_bike_new" : "bike_new";
@@ -661,14 +697,43 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
           context.bikeMake = bike.make;
           context.bikeModel = bike.model;
 
+          // POLISH (iter12): prefill bike data from catalog specs — the doc's
+          // §2.1 table needs VIN / год / оценочная стоимость, and specs carries
+          // them (specs.vin, specs.year, specs.price_rub). Previously only
+          // make/model were copied and the contract shipped with empty rows.
+          const specs = (bike.specs ?? {}) as Record<string, unknown>;
+          context.bikeVin = toSpecStr(specs.vin) || context.bikeVin || "";
+          context.bikeYear = toSpecStr(specs.year) || context.bikeYear || "";
+          context.bikeValue = toSpecStr(specs.price_rub) || context.bikeValue || "";
+          context.bikePlate = toSpecStr(specs.plate) || context.bikePlate || "";
+          context.bikeRegistrationCert = toSpecStr(specs.registration_cert) || context.bikeRegistrationCert || "";
+          context.bikeInsurancePolicy = toSpecStr(specs.insurance_policy) || context.bikeInsurancePolicy || "";
+          context.specDefaults = extractBikeSpecDefaults(specs);
+
           // FIX: edit_bike — after selecting a new bike, go back to confirmation
           if (context.step === "edit_bike") {
             await showConfirmation(context, userId);
+          } else if (!context.bikePlate || !context.bikeRegistrationCert || !context.bikeInsurancePolicy) {
+            // Документы байка (гос. номер / СТС / ОСАГО) нужны для §2.1
+            // договора и Приложения №1 — спрашиваем только недостающие.
+            const known = [
+              context.bikePlate ? `Гос. номер: ${context.bikePlate}` : null,
+              context.bikeRegistrationCert ? `СТС: ${context.bikeRegistrationCert}` : null,
+              context.bikeInsurancePolicy ? `ОСАГО: ${context.bikeInsurancePolicy}` : null,
+            ].filter(Boolean);
+            await sendComplexMessage({
+              botToken: TELEGRAM_BOT_TOKEN,
+              chatId: userId,
+              text: `📄 *Субаренда мотоцикла в парк* (3/8)\n\nДанные для договора (каждое поле с новой строки, лишние можно оставить пустыми):\n\n*Гос. номер*\n_3323BE52_\n\n*СТС (свидетельство о регистрации)*\n_99 87 356594_\n\n*Полис ОСАГО*\n_ХХХ 0659225087_${known.length ? `\n\nУже известно:\n${known.join("\n")}` : ""}`,
+              parseMode: "Markdown",
+            });
+            context.step = "bike_docs";
+            await saveState(userId, context);
           } else {
             await sendComplexMessage({
               botToken: TELEGRAM_BOT_TOKEN,
               chatId: userId,
-              text: `✅ *Субаренда мотоцикла в парк* (3/7)\n\nВыбран: *${bike.make} ${bike.model}*\n\n👤 Введите ФИО собственника (полностью):`,
+              text: `✅ *Субаренда мотоцикла в парк* (4/8)\n\nВыбран: *${bike.make} ${bike.model}*\nVIN: ${context.bikeVin || "—"}\n\n👤 Введите ФИО собственника (полностью):`,
               parseMode: "Markdown",
             });
             context.step = "owner_name";
@@ -701,13 +766,29 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: "💰 Введите минимальную суточную стоимость аренды:",
+          text: "💰 Введите минимальные суточные тарифы за 1 сутки / 2+ суток / 3+ суток (через пробел):",
         });
         context.step = "price_custom";
         await saveState(userId, context);
-      } else {
-        context.minDailyPrice = parseInt(value);
+      } else if (value === "default") {
+        // Тарифы каталога — one tap instead of typing three numbers.
+        const d = context.specDefaults ?? {};
+        const t1 = d.tier1 ?? DEFAULT_MIN_PRICES.tier1;
+        const t2 = d.tier2 ?? DEFAULT_MIN_PRICES.tier2;
+        const t3 = d.tier3 ?? DEFAULT_MIN_PRICES.tier3;
+        context.minDailyPrice = t1;
+        context.min2plusPrice = t2;
+        context.min3plusPrice = t3;
         await promptNextStep(context, userId);
+      } else {
+        // Legacy single-price callbacks (price_9000) still accepted.
+        const price = parseInt(value);
+        if (!isNaN(price) && price > 0) {
+          context.minDailyPrice = price;
+          context.min2plusPrice = Math.max(1000, Math.round(price * 0.9));
+          context.min3plusPrice = Math.max(1000, Math.round(price * 0.8));
+          await promptNextStep(context, userId);
+        }
       }
       break;
 
@@ -716,6 +797,13 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
         context.hourly3hPrice = DEFAULT_HOURLY_PRICES["3h"];
         context.hourly6hPrice = DEFAULT_HOURLY_PRICES["6h"];
         context.hourly12hPrice = DEFAULT_HOURLY_PRICES["12h"];
+        await promptNextStep(context, userId);
+      } else if (value === "default") {
+        // Почасовые из каталога (specs.price_per_3h/6h/12h).
+        const d = context.specDefaults ?? {};
+        context.hourly3hPrice = d.hourly3h ?? DEFAULT_HOURLY_PRICES["3h"];
+        context.hourly6hPrice = d.hourly6h ?? DEFAULT_HOURLY_PRICES["6h"];
+        context.hourly12hPrice = d.hourly12h ?? DEFAULT_HOURLY_PRICES["12h"];
         await promptNextStep(context, userId);
       } else {
         await sendComplexMessage({
@@ -732,6 +820,12 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
       if (value === "skip") {
         context.weekdayPrice = DEFAULT_SEASONAL_PRICES.weekday;
         context.weekendPrice = DEFAULT_SEASONAL_PRICES.weekend;
+        await promptNextStep(context, userId);
+      } else if (value === "default") {
+        // Сезонные тарифы из каталога (specs.rent_weekday / rent_weekend).
+        const d = context.specDefaults ?? {};
+        context.weekdayPrice = d.weekday ?? DEFAULT_SEASONAL_PRICES.weekday;
+        context.weekendPrice = d.weekend ?? DEFAULT_SEASONAL_PRICES.weekend;
         await promptNextStep(context, userId);
       } else {
         await sendComplexMessage({
@@ -916,6 +1010,9 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
         context.bikePlate = bikeLines[3] || "";
         context.bikeYear = bikeLines[4] || "";
         context.bikeValue = bikeLines[5] || "";
+        // POLISH (iter12): СТС и ОСАГО — строки 6 и 7 (необязательные).
+        context.bikeRegistrationCert = bikeLines[6] || "";
+        context.bikeInsurancePolicy = bikeLines[7] || "";
       }
 
       // Validate required fields
@@ -941,12 +1038,33 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       }
       break;
 
+    case "bike_docs":
+      // Гос. номер / СТС / ОСАГО — по одному в строке. Пустая строка сохраняет
+      // уже известное значение (или оставляет поле пустым в договоре).
+      {
+        const docLines = text.split('\n').map(l => l.trim());
+        const plate = docLines[0] || context.bikePlate || "";
+        const sts = docLines[1] || context.bikeRegistrationCert || "";
+        const osago = docLines[2] || context.bikeInsurancePolicy || "";
+        context.bikePlate = plate;
+        context.bikeRegistrationCert = sts;
+        context.bikeInsurancePolicy = osago;
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: `✅ Данные байка сохранены\nГос. номер: ${plate || "—"}\nСТС: ${sts || "—"}\nОСАГО: ${osago || "—"}\n\n👤 Введите ФИО собственника (полностью):`,
+        });
+        context.step = "owner_name";
+        await saveState(userId, context);
+      }
+      break;
+
     case "owner_name":
       context.ownerFullName = capitalizeFullName(text);
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
-        text: `📄 *Субаренда мотоцикла в парк* (4/7)\n\nВведите паспортные данные:\n\n*Серия Номер*\n_4509 123456_\n\n*Дата выдачи*\n_15.03.2020_\n\n*Кем выдано*\n_ОМВД по Н.Новгороду_\n\n📋 Пример в одну строку:\n_4509 123456 15.03.2020 ОМВД по Н.Новгороду_`,
+        text: `📄 *Субаренда мотоцикла в парк* (5/8)\n\nВведите паспортные данные:\n\n*Серия Номер*\n_4509 123456_\n\n*Дата выдачи*\n_15.03.2020_\n\n*Кем выдано*\n_ОМВД по Н.Новгороду_\n\n📋 Пример в одну строку:\n_4509 123456 15.03.2020 ОМВД по Н.Новгороду_`,
         parseMode: "Markdown",
       });
       context.step = "owner_passport";
@@ -964,7 +1082,7 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: `📅 *Субаренда мотоцикла в парк* (5/7)\n\nВведите дату рождения собственника:\n\n*ДД.ММ.ГГГГ*\n_01.01.1990_`,
+          text: `📅 *Субаренда мотоцикла в парк* (6/8)\n\nВведите дату рождения собственника:\n\n*ДД.ММ.ГГГГ*\n_01.01.1990_`,
           parseMode: "Markdown",
         });
         context.step = "owner_birth";
@@ -985,7 +1103,7 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: `🏠 *Субаренда мотоцикла в парк* (6/7)\n\nВведите адрес регистрации собственника:\n\n_г. Нижний Новгород, ул. Примерная, д. 1, кв. 1_`,
+          text: `🏠 *Субаренда мотоцикла в парк* (7/8)\n\nВведите адрес регистрации собственника:\n\n_г. Нижний Новгород, ул. Примерная, д. 1, кв. 1_`,
           parseMode: "Markdown",
         });
         context.step = "owner_address";
@@ -1004,7 +1122,7 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
-        text: `📱 *Субаренда мотоцикла в парк* (7/7)\n\nВведите телефон собственника:\n\n_+7 (999) 123-45-67_`,
+        text: `📱 *Субаренда мотоцикла в парк* (8/8)\n\nВведите телефон собственника:\n\n_+7 (999) 123-45-67_`,
         parseMode: "Markdown",
       });
       context.step = "owner_phone";
@@ -1045,10 +1163,26 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       }
       break;
 
-    case "price_custom":
-      const price = parseInt(text.replace(/\D/g, ''));
-      if (!isNaN(price) && price > 0) {
-        context.minDailyPrice = price;
+    case "price_custom": {
+      // Tiered minimum daily prices: 1 сутки / 2+ суток / 3+ суток (one line,
+      // space-separated) — mirrors §5.1.1 of the reference paper contract.
+      const nums = text.split(/\s+/).map(n => parseInt(n.replace(/\D/g, '')));
+      const valid = nums.filter(n => !isNaN(n) && n > 0);
+      if (valid.length >= 3) {
+        [context.minDailyPrice, context.min2plusPrice, context.min3plusPrice] = valid;
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "⏰ Введите почасовые тарифы через пробел (3ч 6ч 12ч) или нажмите 'Пропустить':",
+          replyMarkup: JSON.stringify({ inline_keyboard: [[{ text: "⏭ Пропустить", callback_data: "hourly_skip" }]] }),
+        });
+        context.step = "hourly";
+        await saveState(userId, context);
+      } else if (valid.length === 1) {
+        // Single value typed — derive tiers with the usual −10%/−20% steps.
+        context.minDailyPrice = valid[0];
+        context.min2plusPrice = Math.max(1000, Math.round(valid[0] * 0.9));
+        context.min3plusPrice = Math.max(1000, Math.round(valid[0] * 0.8));
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
@@ -1061,10 +1195,11 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: "❌ Введите корректную сумму:",
+          text: "❌ Введите 3 числа через пробел (1 сутки / 2+ суток / 3+ суток), например: 10000 9000 7000",
         });
       }
       break;
+    }
 
     case "hourly":
     case "hourly_custom":
@@ -1325,18 +1460,33 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
 
       // "price" step expects selection — user typed instead of clicking
       if (context.step === "price") {
-        const typedPrice = parseInt(text.replace(/\D/g, ''));
-        if (!isNaN(typedPrice) && typedPrice > 0) {
-          context.minDailyPrice = typedPrice;
+        const typedPrices = text.split(/\s+/).map(n => parseInt(n.replace(/\D/g, ''))).filter(n => !isNaN(n) && n > 0);
+        if (typedPrices.length >= 3) {
+          [context.minDailyPrice, context.min2plusPrice, context.min3plusPrice] = typedPrices;
           context.step = "price";
           await promptNextStep(context, userId);
           return;
         }
+        if (typedPrices.length === 1) {
+          context.minDailyPrice = typedPrices[0];
+          context.min2plusPrice = Math.max(1000, Math.round(typedPrices[0] * 0.9));
+          context.min3plusPrice = Math.max(1000, Math.round(typedPrices[0] * 0.8));
+          context.step = "price";
+          await promptNextStep(context, userId);
+          return;
+        }
+        const d = context.specDefaults ?? {};
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: `ℹ️ Выберите цену из кнопок или нажмите '✏️ Своя цена':`,
-          replyMarkup: JSON.stringify({ inline_keyboard: buildPriceKeyboard(DEFAULT_MIN_DAILY_PRICE) }),
+          text: `ℹ️ Введите 3 числа через пробел (1 сутки / 2+ суток / 3+ суток) или выберите кнопку:`,
+          replyMarkup: JSON.stringify({
+            inline_keyboard: buildPriceKeyboard({
+              tier1: d.tier1 ?? DEFAULT_MIN_PRICES.tier1,
+              tier2: d.tier2 ?? DEFAULT_MIN_PRICES.tier2,
+              tier3: d.tier3 ?? DEFAULT_MIN_PRICES.tier3,
+            }),
+          }),
         });
         return;
       }
@@ -1458,32 +1608,54 @@ async function promptNextStep(context: SubrentFlowContext, userId: string): Prom
       });
       break;
 
-    case "price":
+    case "price": {
+      const d = context.specDefaults ?? {};
+      const t1 = d.tier1 ?? DEFAULT_MIN_PRICES.tier1;
+      const t2 = d.tier2 ?? DEFAULT_MIN_PRICES.tier2;
+      const t3 = d.tier3 ?? DEFAULT_MIN_PRICES.tier3;
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
-        text: `💰 Минимальная суточная стоимость (${DEFAULT_MIN_DAILY_PRICE} ₽):`,
-        replyMarkup: JSON.stringify({ inline_keyboard: buildPriceKeyboard(DEFAULT_MIN_DAILY_PRICE) }),
+        text: `💰 Минимальные суточные тарифы за 1 сутки / 2+ суток / 3+ суток (₽):`,
+        replyMarkup: JSON.stringify({ inline_keyboard: buildPriceKeyboard({ tier1: t1, tier2: t2, tier3: t3 }) }),
       });
       break;
+    }
 
-    case "hourly":
+    case "hourly": {
+      const d = context.specDefaults ?? {};
+      const h3 = d.hourly3h ?? DEFAULT_HOURLY_PRICES["3h"];
+      const h6 = d.hourly6h ?? DEFAULT_HOURLY_PRICES["6h"];
+      const h12 = d.hourly12h ?? DEFAULT_HOURLY_PRICES["12h"];
+      const kb: KeyboardButton[][] = [[{ text: "⏭ Пропустить", callback_data: "hourly_skip" }]];
+      if (d.hourly3h || d.hourly6h || d.hourly12h) {
+        kb.unshift([{ text: `✅ Из каталога: ${h3} / ${h6} / ${h12} ₽`, callback_data: "hourly_default" }]);
+      }
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
         text: "⏰ Введите почасовые тарифы через пробел (3ч 6ч 12ч) или нажмите 'Пропустить':",
-        replyMarkup: JSON.stringify({ inline_keyboard: [[{ text: "⏭ Пропустить", callback_data: "hourly_skip" }]] }),
+        replyMarkup: JSON.stringify({ inline_keyboard: kb }),
       });
       break;
+    }
 
-    case "seasonal":
+    case "seasonal": {
+      const d = context.specDefaults ?? {};
+      const wd = d.weekday ?? DEFAULT_SEASONAL_PRICES.weekday;
+      const we = d.weekend ?? DEFAULT_SEASONAL_PRICES.weekend;
+      const kb: KeyboardButton[][] = [[{ text: "⏭ Пропустить", callback_data: "seasonal_skip" }]];
+      if (d.weekday || d.weekend) {
+        kb.unshift([{ text: `✅ Из каталога: будни ${wd} / выходные ${we} ₽`, callback_data: "seasonal_default" }]);
+      }
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
         text: "📈 Введите сезонные тарифы (будни выходные) или нажмите 'Пропустить':",
-        replyMarkup: JSON.stringify({ inline_keyboard: [[{ text: "⏭ Пропустить", callback_data: "seasonal_skip" }]] }),
+        replyMarkup: JSON.stringify({ inline_keyboard: kb }),
       });
       break;
+    }
 
     case "start":
       await sendComplexMessage({
@@ -1531,6 +1703,9 @@ async function showConfirmation(context: SubrentFlowContext, userId: string): Pr
 🏍 *Мотоцикл:* ${context.bikeMake} ${context.bikeModel}
 ${context.bikeVin ? `VIN: ${context.bikeVin}` : ""}
 ${context.bikePlate ? `Гос. номер: ${context.bikePlate}` : ""}
+${context.bikeRegistrationCert ? `СТС: ${context.bikeRegistrationCert}` : ""}
+${context.bikeInsurancePolicy ? `ОСАГО: ${context.bikeInsurancePolicy}` : ""}
+${context.bikeValue ? `Оценочная стоимость: ${context.bikeValue} ₽` : ""}
 
 👤 *Собственник:* ${context.ownerFullName}
 Паспорт: ${context.ownerPassportSeries} ${context.ownerPassportNumber}
@@ -1540,7 +1715,7 @@ ${context.ownerEmail ? `Email: ${context.ownerEmail}` : ""}
 
 💰 *Условия:*
 Процент собственника: ${context.ownerPercentage}%
-Мин. суточная цена: ${context.minDailyPrice?.toLocaleString("ru-RU")} ₽
+Мин. тарифы: 1 сут ${(context.minDailyPrice ?? DEFAULT_MIN_PRICES.tier1).toLocaleString("ru-RU")} ₽ / 2+ сут ${(context.min2plusPrice ?? DEFAULT_MIN_PRICES.tier2).toLocaleString("ru-RU")} ₽ / 3+ сут ${(context.min3plusPrice ?? DEFAULT_MIN_PRICES.tier3).toLocaleString("ru-RU")} ₽
 ${context.hourly3hPrice ? `Почасово: 3ч=${context.hourly3hPrice}₽ 6ч=${context.hourly6hPrice}₽ 12ч=${context.hourly12hPrice}₽` : ""}
 ${context.weekdayPrice ? `Сезон: будни=${context.weekdayPrice}₽ выходные=${context.weekendPrice}₽` : ""}
 
@@ -1568,13 +1743,46 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
       throw new Error("Missing contract start date or time");
     }
 
-    // Load crew secrets
+    // Load crew secrets (Арендатор side). FIX (iter12): private.crew_secrets
+    // stores contract data inside the contract_defaults JSONB with camelCase
+    // keys — the previous direct `crewSecrets?.organization_short` accesses
+    // hit nonexistent columns and silently always used hardcoded fallbacks.
     const resolvedCrewSlug = context.crewId || (await getSubrentCrewSlug(userId)) || "vip-bike";
-    const { data: crewSecrets } = await privateSchema()
-      .from("crew_secrets")
-      .select("*")
-      .eq("crew_slug", resolvedCrewSlug)
-      .maybeSingle();
+    let crewCd: Record<string, any> = {};
+    try {
+      const { data: crewSecretsRow } = await privateSchema()
+        .from("crew_secrets")
+        .select("contract_defaults")
+        .eq("crew_slug", resolvedCrewSlug)
+        .maybeSingle();
+      if (crewSecretsRow?.contract_defaults) {
+        crewCd =
+          typeof crewSecretsRow.contract_defaults === "string"
+            ? JSON.parse(crewSecretsRow.contract_defaults)
+            : crewSecretsRow.contract_defaults;
+      }
+    } catch (secretsErr) {
+      logger.warn("[subrent] crew_secrets load failed, using fallbacks:", secretsErr);
+    }
+    const pick = (v: unknown, fallback: string): string =>
+      typeof v === "string" && v.trim() ? v.trim() : fallback;
+    const crew = {
+      organization_name: pick(crewCd.organizationName, "Мотосалон ВипБайкЭлектро"),
+      organization_short: pick(crewCd.organizationShort, "ИП Воробьев Р.В."),
+      organization_representative: pick(crewCd.organizationRepresentative, ""),
+      legal_address: pick(crewCd.legalAddress, "г. Нижний Новгород, пл. Комсомольская 2"),
+      ogrnip: pick(crewCd.ogrnip, "326527500025145"),
+      inn: pick(crewCd.inn, "525813643035"),
+      bank_account: pick(crewCd.bankAccount, "40802810942710013083"),
+      bank_name: pick(crewCd.bankName, "Волго-Вятский Банк ПАО Сбербанк"),
+      bank_city: pick(crewCd.bankCity, "г. Нижний Новгород"),
+      bank_corr_account: pick(crewCd.bankCorrAccount, "30101810900000000603"),
+      email: pick(crewCd.email, ""),
+      organization_phone: pick(crewCd.phone ?? crewCd.organizationPhone, ""),
+      organization_initials:
+        formatInitials(pick(crewCd.issuerName, "")) || pick(crewCd.organizationShort, ""),
+      return_address: pick(crewCd.returnAddress, "г. Нижний Новгород, пл. Комсомольская 2"),
+    };
 
     // Generate contract number
     const contractNumber = context.contractNumber || Math.floor(Math.random() * 9000) + 1000;
@@ -1597,17 +1805,19 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
       year: year,
 
       // Park/crew details
-      organization_name: crewSecrets?.organization_name || "Мотосалон ВипБайкЭлектро",
-      organization_short: crewSecrets?.organization_short || "ИП Воробьев Р.В.",
-      organization_representative: crewSecrets?.organization_representative || "",
-      legal_address: crewSecrets?.legal_address || "Комсомольская пл. д.2",
-      ogrnip: crewSecrets?.ogrnip || "326527500025145",
-      inn: crewSecrets?.inn || "525813643035",
-      bank_account: crewSecrets?.bank_account || "40802810942710013083",
-      bank_name: crewSecrets?.bank_name || "Волго-Вятский Банк ПАО Сбербанк",
-      bank_city: crewSecrets?.bank_city || "г. Нижний Новгород",
-      bank_corr_account: crewSecrets?.bank_corr_account || "30101810900000000603",
-      email: crewSecrets?.email || "",
+      organization_name: crew.organization_name,
+      organization_short: crew.organization_short,
+      organization_representative: crew.organization_representative,
+      legal_address: crew.legal_address,
+      ogrnip: crew.ogrnip,
+      inn: crew.inn,
+      bank_account: crew.bank_account,
+      bank_name: crew.bank_name,
+      bank_city: crew.bank_city,
+      bank_corr_account: crew.bank_corr_account,
+      email: crew.email,
+      organization_phone: crew.organization_phone,
+      organization_initials: crew.organization_initials,
 
       // Owner details
       owner_full_name: context.ownerFullName || "",
@@ -1619,6 +1829,7 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
       owner_registration: context.ownerRegistration || "",
       owner_phone: context.ownerPhone || "",
       owner_email: context.ownerEmail || "",
+      owner_initials: formatInitials(context.ownerFullName),
 
       // Bike details
       bike_make: context.bikeMake || "",
@@ -1633,8 +1844,12 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
       // Payment terms
       owner_percentage: String(context.ownerPercentage || DEFAULT_OWNER_PERCENTAGE),
       owner_percentage_text: numberToRussianWords(context.ownerPercentage || DEFAULT_OWNER_PERCENTAGE),
-      min_daily_price_rub: String(context.minDailyPrice || DEFAULT_MIN_DAILY_PRICE),
-      min_daily_price_text: numberToRussianWords(context.minDailyPrice || DEFAULT_MIN_DAILY_PRICE),
+      min_daily_price_rub: String(context.minDailyPrice || DEFAULT_MIN_PRICES.tier1),
+      min_daily_price_text: numberToRussianWords(context.minDailyPrice || DEFAULT_MIN_PRICES.tier1),
+      min_2plus_daily_price_rub: String(context.min2plusPrice || DEFAULT_MIN_PRICES.tier2),
+      min_2plus_daily_price_text: numberToRussianWords(context.min2plusPrice || DEFAULT_MIN_PRICES.tier2),
+      min_3plus_daily_price_rub: String(context.min3plusPrice || DEFAULT_MIN_PRICES.tier3),
+      min_3plus_daily_price_text: numberToRussianWords(context.min3plusPrice || DEFAULT_MIN_PRICES.tier3),
       hourly_3h_price_rub: String(context.hourly3hPrice || DEFAULT_HOURLY_PRICES["3h"]),
       hourly_6h_price_rub: String(context.hourly6hPrice || DEFAULT_HOURLY_PRICES["6h"]),
       hourly_12h_price_rub: String(context.hourly12hPrice || DEFAULT_HOURLY_PRICES["12h"]),
@@ -1662,10 +1877,10 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
       downtime_compensation_daily_text: numberToRussianWords(DEFAULT_DOWNTIME_COMPENSATION),
 
       // Return address (from crew secrets or default)
-      return_address: crewSecrets?.return_address || "г. Нижний Новгород, ул. Генкиной 39 А/16 кв 17",
+      return_address: crew.return_address,
 
       // Territory
-      insurance_territory: crewSecrets?.insurance_territory || "Нижегородской области",
+      insurance_territory: pick(crewCd.insuranceTerritory, "Нижегородской области"),
     };
 
     // Load template — check crew-specific first
@@ -1751,11 +1966,14 @@ ${context.bikeMake} ${context.bikeModel}
     // --- Save to subrent_contract_artifacts (private schema) ---
     // CRITICAL: schema uses owner_* columns (NOT renter_*), see migration 20260624000000
     try {
-      // Dedup by semantic key: same owner + same bike + same start date = duplicate (retry)
+      // Dedup by semantic key: same owner + same bike + same start date = duplicate (retry).
+      // FIX (iter12): the table has NO crew_slug column (crew_id stores the
+      // slug) — the old filter errored silently on every call, so the dedup
+      // never matched and every retry inserted a duplicate artifact row.
       const { data: existingSubrent } = await privateSchema()
         .from("subrent_contract_artifacts")
         .select("id, storage_path")
-        .eq("crew_slug", resolvedCrewSlug)
+        .eq("crew_id", resolvedCrewSlug)
         .eq("owner_full_name", context.ownerFullName || "")
         .eq("bike_make", context.bikeMake || "")
         .eq("bike_model", context.bikeModel || "")
@@ -1769,7 +1987,11 @@ ${context.bikeMake} ${context.bikeModel}
           logger.info("[subrent] Backfilled storage_path on existing artifact");
         }
       } else {
-        await privateSchema().from("subrent_contract_artifacts").insert({
+        // Base insert: columns that existed since the 20260624 migration.
+        // Tiered min prices (min_2plus/min_3plus) come from a newer migration —
+        // if it is not applied yet, PostgREST rejects the whole insert with
+        // PGRST204, so we retry once without the new columns.
+        const baseArtifact: Record<string, unknown> = {
           contract_key: `subrent-${contractNumber}-${Date.now()}`,
           storage_path: storagePath,
           original_sha256: fileHash,
@@ -1789,8 +2011,10 @@ ${context.bikeMake} ${context.bikeModel}
           bike_plate: context.bikePlate || null,
           bike_year: context.bikeYear || null,
           bike_value_rub: context.bikeValue || null,
+          bike_registration_cert: context.bikeRegistrationCert || null,
+          bike_insurance_policy: context.bikeInsurancePolicy || null,
           owner_percentage: String(context.ownerPercentage || DEFAULT_OWNER_PERCENTAGE),
-          min_daily_price_rub: String(context.minDailyPrice || DEFAULT_MIN_DAILY_PRICE),
+          min_daily_price_rub: String(context.minDailyPrice || DEFAULT_MIN_PRICES.tier1),
           hourly_3h_price_rub: String(context.hourly3hPrice || DEFAULT_HOURLY_PRICES["3h"]),
           hourly_6h_price_rub: String(context.hourly6hPrice || DEFAULT_HOURLY_PRICES["6h"]),
           hourly_12h_price_rub: String(context.hourly12hPrice || DEFAULT_HOURLY_PRICES["12h"]),
@@ -1801,8 +2025,27 @@ ${context.bikeMake} ${context.bikeModel}
           contract_end_date: context.contractEndDate || null,
           contract_end_time: context.contractEndTime || null,
           crew_id: resolvedCrewSlug || null,
-          template_version: 1,
-        });
+          template_version: 2,
+        };
+        const tieredArtifact = {
+          ...baseArtifact,
+          min_2plus_daily_price_rub: String(context.min2plusPrice || DEFAULT_MIN_PRICES.tier2),
+          min_3plus_daily_price_rub: String(context.min3plusPrice || DEFAULT_MIN_PRICES.tier3),
+        };
+        let insertError = await privateSchema()
+          .from("subrent_contract_artifacts")
+          .insert(tieredArtifact)
+          .then(({ error }: { error: unknown }) => error);
+        if (insertError) {
+          // Migration with tiered columns not applied yet — retry with the
+          // base column set so the artifact is never lost.
+          logger.warn("[subrent] tiered insert failed, retrying without min_2plus/min_3plus:", insertError);
+          insertError = await privateSchema()
+            .from("subrent_contract_artifacts")
+            .insert(baseArtifact)
+            .then(({ error }: { error: unknown }) => error);
+        }
+        if (insertError) throw insertError;
         logger.info("[subrent] Contract artifact saved");
       }
     } catch (dbErr) {
@@ -1819,7 +2062,7 @@ ${context.bikeMake} ${context.bikeModel}
       const smtpUser = process.env.SMTP_USER || process.env.SMTP_YANDEX_USER;
       const smtpPass = process.env.SMTP_PASS || process.env.SMTP_YANDEX_PASS;
       const emailFrom = process.env.EMAIL_FROM || smtpUser;
-      const emailTo = process.env.EMAIL_DEFAULT_TO || crewSecrets?.email || "vip_bike@mail.ru";
+      const emailTo = process.env.EMAIL_DEFAULT_TO || crew.email || "vip_bike@mail.ru";
 
       if (smtpHost && smtpUser && smtpPass) {
         const transporter = nodemailer.createTransport({

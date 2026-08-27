@@ -50,6 +50,9 @@ const subrentSchema = z.object({
   ownerRegistration: z.string().min(10),
   ownerPercentage: z.number().min(1).max(99),
   minDailyPrice: z.number().min(1000),
+  /** Minimum price per day for 2+ / 3+ day rentals (contract §5.1.1). */
+  min2plusPrice: z.number().min(500).optional(),
+  min3plusPrice: z.number().min(500).optional(),
   contractStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   contractDuration: z.enum(["season", "3m", "6m", "1y"]),
 });
@@ -136,10 +139,11 @@ export async function POST(request: NextRequest) {
     const bikeValue = data.bikeValue || "";
     const bikeValueNum = Number(bikeValue) || 0;
 
-    // Store the application in subrent_contract_artifacts (existing table)
-    const { error: insertError } = await privateSchema()
-      .from("subrent_contract_artifacts")
-      .insert({
+    // Store the application in subrent_contract_artifacts (existing table).
+    // Tiered min prices (min_2plus/min_3plus) live in a newer migration —
+    // insert with them first, retry without on PGRST204 so the application
+    // is never lost before the migration is applied.
+    const applicationRow: Record<string, unknown> = {
         id: crypto.randomUUID(),
         contract_key: contractNumber,
         requested_bike_id: data.bikeId,
@@ -171,7 +175,6 @@ export async function POST(request: NextRequest) {
         owner_percentage_text: numberToRussianWords(data.ownerPercentage),
         min_daily_price_rub: String(data.minDailyPrice),
         min_daily_price_text: numberToRussianWords(data.minDailyPrice),
-
         // Default hourly prices (aligned with /subrent command)
         hourly_3h_price_rub: "6000",
         hourly_6h_price_rub: "7000",
@@ -198,7 +201,21 @@ export async function POST(request: NextRequest) {
 
         // Metadata
         created_at: new Date().toISOString(),
-      });
+    };
+    const tieredApplicationRow = {
+      ...applicationRow,
+      min_2plus_daily_price_rub: String(data.min2plusPrice || Math.max(1000, Math.round(data.minDailyPrice * 0.9))),
+      min_3plus_daily_price_rub: String(data.min3plusPrice || Math.max(1000, Math.round(data.minDailyPrice * 0.8))),
+    };
+    let insertError = (await privateSchema()
+      .from("subrent_contract_artifacts")
+      .insert(tieredApplicationRow)).error;
+    if (insertError) {
+      logger.warn("[subrent-submit] tiered insert failed, retrying without min_2plus/min_3plus:", insertError);
+      insertError = (await privateSchema()
+        .from("subrent_contract_artifacts")
+        .insert(applicationRow)).error;
+    }
 
     if (insertError) {
       logger.error("[subrent-submit] Insert error:", insertError);

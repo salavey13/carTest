@@ -14,6 +14,8 @@ type FormStep = "bike" | "owner" | "payment" | "duration" | "confirm" | "success
 const DEFAULT_PRICES = {
   ownerPercentage: 50,
   minDailyPrice: 9000,
+  min2plusPrice: 8000,
+  min3plusPrice: 7000,
   hourly3h: 6000,
   hourly6h: 7000,
   hourly12h: 8000,
@@ -52,6 +54,8 @@ export function SubrentForm() {
     // Payment terms
     ownerPercentage: DEFAULT_PRICES.ownerPercentage,
     minDailyPrice: DEFAULT_PRICES.minDailyPrice,
+    min2plusPrice: DEFAULT_PRICES.min2plusPrice,
+    min3plusPrice: DEFAULT_PRICES.min3plusPrice,
     hourly3hPrice: DEFAULT_PRICES.hourly3h,
     hourly6hPrice: DEFAULT_PRICES.hourly6h,
     hourly12hPrice: DEFAULT_PRICES.hourly12h,
@@ -391,7 +395,7 @@ export function SubrentForm() {
 
         <div className="space-y-2">
           <label className="text-sm font-mono text-muted-foreground">
-            Мин. суточная цена (₽) *
+            Мин. суточная цена, 1 сутки (₽) *
           </label>
           <Input
             value={formData.minDailyPrice}
@@ -402,6 +406,30 @@ export function SubrentForm() {
           />
           {errors.minDailyPrice && <p className="text-xs text-red-500">{errors.minDailyPrice}</p>}
           <p className="text-xs text-muted-foreground">Рекомендуется: 9000 ₽</p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-mono text-muted-foreground">Мин. цена, 2+ суток (₽)</label>
+          <Input
+            value={formData.min2plusPrice ?? ""}
+            onChange={e => updateField("min2plusPrice", parseInt(e.target.value) || 0)}
+            type="number"
+            min={500}
+            placeholder="8000"
+          />
+          <p className="text-xs text-muted-foreground">Тариф за каждые сутки при аренде от 2 суток</p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-mono text-muted-foreground">Мин. цена, 3+ суток (₽)</label>
+          <Input
+            value={formData.min3plusPrice ?? ""}
+            onChange={e => updateField("min3plusPrice", parseInt(e.target.value) || 0)}
+            type="number"
+            min={500}
+            placeholder="7000"
+          />
+          <p className="text-xs text-muted-foreground">Тариф за каждые сутки при аренде 3+ суток</p>
         </div>
 
         <div className="space-y-2">
@@ -543,7 +571,8 @@ export function SubrentForm() {
           <div>
             <p className="text-xs font-mono text-muted-foreground">💰 Условия</p>
             <p className="font-mono">Процент собственника: {formData.ownerPercentage}%</p>
-            <p className="font-mono">Мин. суточная: {formData.minDailyPrice.toLocaleString("ru-RU")} ₽</p>
+            <p className="font-mono">Мин. тарифы: 1 сут {formData.minDailyPrice.toLocaleString("ru-RU")} ₽ / 2+ сут {(formData.min2plusPrice || Math.round(formData.minDailyPrice * 0.9)).toLocaleString("ru-RU")} ₽ / 3+ сут {(formData.min3plusPrice || Math.round(formData.minDailyPrice * 0.8)).toLocaleString("ru-RU")} ₽</p>
+            {formData.hourly3hPrice ? <p className="text-xs text-muted-foreground">Почасово: 3ч {formData.hourly3hPrice} ₽ · 6ч {formData.hourly6hPrice} ₽ · 12ч {formData.hourly12hPrice} ₽</p> : null}
           </div>
 
           <div>
@@ -618,6 +647,8 @@ export function SubrentForm() {
             bikeInsurancePolicy: "",
             ownerPercentage: DEFAULT_PRICES.ownerPercentage,
             minDailyPrice: DEFAULT_PRICES.minDailyPrice,
+            min2plusPrice: DEFAULT_PRICES.min2plusPrice,
+            min3plusPrice: DEFAULT_PRICES.min3plusPrice,
             hourly3hPrice: DEFAULT_PRICES.hourly3h,
             hourly6hPrice: DEFAULT_PRICES.hourly6h,
             hourly12hPrice: DEFAULT_PRICES.hourly12h,

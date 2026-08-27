@@ -10,6 +10,34 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { privateSchema } from "@/lib/private-secrets";
 
+/** "Молев Георгий Анатольевич" → "Молев Г.А." — signature-line initials. */
+function formatInitials(fullName: string | undefined): string {
+  const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  const surname = parts[0];
+  const initials = parts.slice(1).map((p) => (p[0] ? `${p[0].toUpperCase()}.` : "")).join("");
+  return initials ? `${surname} ${initials}` : surname;
+}
+
+/**
+ * Load the subrental template, preferring the crew-specific override
+ * (docs/crewDocs/{slug}_SUBRENTAL_DEAL_TEMPLATE.html) over the base one.
+ * Mirrors loadTemplateForCrew() from webhook-handlers/lib/crew-access.ts —
+ * inlined here to avoid pulling the whole bot-command module graph into a
+ * web server action.
+ */
+function loadSubrentTemplateForCrew(crewSlug: string): string {
+  const fileName = "SUBRENTAL_DEAL_TEMPLATE.html";
+  const crewPath = join(process.cwd(), "docs", "crewDocs", `${crewSlug}_${fileName}`);
+  try {
+    const crewTemplate = readFileSync(crewPath, "utf-8");
+    if (crewTemplate.trim().length > 0) return crewTemplate;
+  } catch {
+    // fall through to the general template
+  }
+  return readFileSync(join(process.cwd(), "docs", fileName), "utf-8");
+}
+
 // ── Helper functions ─────────────────────────────────────────────────────────────
 
 function numberToRussianWords(num: number): string {
@@ -65,6 +93,8 @@ const DEFAULT_EXTRA_KM_FEE = 30;
 const DEFAULT_DOWNTIME_COMPENSATION = 4000;
 const DEFAULT_REPORTING_DAYS = 2;
 const DEFAULT_LATE_PENALTY_PERCENT = 0.2;
+/** Tiered minimums per the reference paper contract §5.1.1 (8000/7000/6000). */
+const DEFAULT_MIN_PRICES = { tier1: 9000, tier2: 8000, tier3: 7000 };
 
 // ── Main generator function ───────────────────────────────────────────────────────
 
@@ -85,12 +115,22 @@ export async function generateSubrentContract(
   try {
     const { application, crewSlug } = input;
 
-    // Load crew secrets
-    const { data: crewSecrets } = await privateSchema()
+    // Load crew secrets — private.crew_secrets keeps contract data inside the
+    // contract_defaults JSONB with camelCase keys (flat columns do not exist).
+    let crewCd: Record<string, any> = {};
+    const { data: crewSecretsRow } = await privateSchema()
       .from("crew_secrets")
-      .select("*")
+      .select("contract_defaults")
       .eq("crew_slug", crewSlug)
       .maybeSingle();
+    if (crewSecretsRow?.contract_defaults) {
+      crewCd =
+        typeof crewSecretsRow.contract_defaults === "string"
+          ? JSON.parse(crewSecretsRow.contract_defaults)
+          : crewSecretsRow.contract_defaults;
+    }
+    const pick = (v: unknown, fallback: string): string =>
+      typeof v === "string" && v.trim() ? v.trim() : fallback;
 
     // Generate contract number from contract_key
     const contractNumber = application.contract_key || `SR-${Date.now().toString(36).toUpperCase()}`;
@@ -111,7 +151,9 @@ export async function generateSubrentContract(
 
     // Parse owner percentage and prices
     const ownerPercentage = parseInt(application.owner_percentage || "50") || 50;
-    const minDailyPrice = parseInt(application.min_daily_price_rub || "9000") || 9000;
+    const minDailyPrice = parseInt(application.min_daily_price_rub || "9000") || DEFAULT_MIN_PRICES.tier1;
+    const min2plusPrice = parseInt(application.min_2plus_daily_price_rub || "") || Math.max(1000, Math.round(minDailyPrice * 0.9));
+    const min3plusPrice = parseInt(application.min_3plus_daily_price_rub || "") || Math.max(1000, Math.round(minDailyPrice * 0.8));
 
     // Build template variables
     const variables = {
@@ -121,18 +163,21 @@ export async function generateSubrentContract(
       month_num: startDate.month,
       year: startDate.year,
 
-      // Park/crew details
-      organization_name: crewSecrets?.organization_name || "Мотосалон ВипБайкЭлектро",
-      organization_short: crewSecrets?.organization_short || "ИП Воробьев Р.В.",
-      organization_representative: crewSecrets?.organization_representative || "",
-      legal_address: crewSecrets?.legal_address || "Комсомольская пл. д.2",
-      ogrnip: crewSecrets?.ogrnip || "326527500025145",
-      inn: crewSecrets?.inn || "525813643035",
-      bank_account: crewSecrets?.bank_account || "40802810942710013083",
-      bank_name: crewSecrets?.bank_name || "Волго-Вятский Банк ПАО Сбербанк",
-      bank_city: crewSecrets?.bank_city || "г. Нижний Новгород",
-      bank_corr_account: crewSecrets?.bank_corr_account || "30101810900000000603",
-      email: crewSecrets?.email || "",
+      // Park/crew details (from contract_defaults JSONB, camelCase keys)
+      organization_name: pick(crewCd.organizationName, "Мотосалон ВипБайкЭлектро"),
+      organization_short: pick(crewCd.organizationShort, "ИП Воробьев Р.В."),
+      organization_representative: pick(crewCd.organizationRepresentative, ""),
+      legal_address: pick(crewCd.legalAddress, "г. Нижний Новгород, пл. Комсомольская 2"),
+      ogrnip: pick(crewCd.ogrnip, "326527500025145"),
+      inn: pick(crewCd.inn, "525813643035"),
+      bank_account: pick(crewCd.bankAccount, "40802810942710013083"),
+      bank_name: pick(crewCd.bankName, "Волго-Вятский Банк ПАО Сбербанк"),
+      bank_city: pick(crewCd.bankCity, "г. Нижний Новгород"),
+      bank_corr_account: pick(crewCd.bankCorrAccount, "30101810900000000603"),
+      email: pick(crewCd.email, ""),
+      organization_phone: pick(crewCd.phone ?? crewCd.organizationPhone, ""),
+      organization_initials:
+        formatInitials(pick(crewCd.issuerName, "")) || pick(crewCd.organizationShort, ""),
 
       // Owner details
       owner_full_name: application.owner_full_name || "",
@@ -144,6 +189,7 @@ export async function generateSubrentContract(
       owner_registration: application.owner_registration || "",
       owner_phone: application.owner_phone || "",
       owner_email: application.owner_email || "",
+      owner_initials: formatInitials(application.owner_full_name),
 
       // Bike details
       bike_make: application.bike_make || "",
@@ -160,6 +206,10 @@ export async function generateSubrentContract(
       owner_percentage_text: numberToRussianWords(ownerPercentage),
       min_daily_price_rub: String(minDailyPrice),
       min_daily_price_text: numberToRussianWords(minDailyPrice),
+      min_2plus_daily_price_rub: String(min2plusPrice),
+      min_2plus_daily_price_text: numberToRussianWords(min2plusPrice),
+      min_3plus_daily_price_rub: String(min3plusPrice),
+      min_3plus_daily_price_text: numberToRussianWords(min3plusPrice),
       hourly_3h_price_rub: String(application.hourly_3h_price_rub || DEFAULT_HOURLY_PRICES["3h"]),
       hourly_6h_price_rub: String(application.hourly_6h_price_rub || DEFAULT_HOURLY_PRICES["6h"]),
       hourly_12h_price_rub: String(application.hourly_12h_price_rub || DEFAULT_HOURLY_PRICES["12h"]),
@@ -187,15 +237,15 @@ export async function generateSubrentContract(
       downtime_compensation_daily_text: numberToRussianWords(DEFAULT_DOWNTIME_COMPENSATION),
 
       // Return address (from crew secrets or default)
-      return_address: crewSecrets?.return_address || "г. Нижний Новгород, ул. Генкиной 39 А/16 кв 17",
+      return_address: pick(crewCd.returnAddress, "г. Нижний Новгород, пл. Комсомольская 2"),
 
       // Territory
-      insurance_territory: crewSecrets?.insurance_territory || "Нижегородской области",
+      insurance_territory: pick(crewCd.insuranceTerritory, "Нижегородской области"),
     };
 
-    // Load template
-    const templatePath = join(process.cwd(), "docs", "SUBRENTAL_DEAL_TEMPLATE.html");
-    const template = readFileSync(templatePath, "utf-8");
+    // Load template — crew-specific override first (e.g. vip-bike layout),
+    // general template as fallback.
+    const template = loadSubrentTemplateForCrew(crewSlug);
 
     // Generate DOCX
     const docFileName = `subrental-${application.bike_make}-${application.bike_model}-${now.toISOString().split("T")[0]}.docx`
