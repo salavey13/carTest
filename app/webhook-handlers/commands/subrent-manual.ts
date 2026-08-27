@@ -249,6 +249,9 @@ interface SubrentFlowContext {
   ownerRegistration?: string;
   ownerPhone?: string;
   ownerEmail?: string;
+  /** Owner's Telegram chat id — set when the operator provides it; enables
+   *  automatic specs.subrenter_chat_id marking after contract generation. */
+  ownerTelegramId?: string;
 
   // Payment terms
   ownerPercentage?: number;
@@ -616,7 +619,7 @@ export async function handleSubrentManualCommand(params: {
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
-        text: `🏍 *Субаренда мотоцикла в парк* (1/8)\n\nВыберите мотоцикл, который собственник передаёт в аренду вашему парку:`,
+        text: `🏍 *Субаренда мотоцикла в парк* (1/9)\n\nВыберите мотоцикл, который собственник передаёт в аренду вашему парку:`,
         parseMode: "Markdown",
         replyMarkup: JSON.stringify({ inline_keyboard: buildBikeKeyboard(bikes) }),
       });
@@ -670,6 +673,17 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
   const value = parts.slice(1).join("_"); // Capture everything after first underscore
 
   switch (action) {
+    case "owner_tg_skip":
+      // Skip the owner-telegram step — no auto-marking; the operator can
+      // assign the subrenter later via the admin panel (specs.subrenter_chat_id).
+      if (context.step === "owner_tg") {
+        context.ownerTelegramId = undefined;
+        await promptNextStep(context, userId);
+      } else {
+        await sendComplexMessage({ botToken: TELEGRAM_BOT_TOKEN, chatId: userId, text: "ℹ️ Кнопка неактуальна — /subrent заново, если нужно." });
+      }
+      break;
+
     case "cancel":
       await clearState(userId);
       await sendComplexMessage({
@@ -685,7 +699,7 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: `📝 ${isEditMode ? "Изменить" : "Субаренда мотоцикла в парк (2/8)"} данные мотоцикла:\n\n*Марка Модель*\n_Yamaha R7_\n\n*VIN*\n_JYA2... (17 символов)_\n\n*Гос. номер*\n_А123БВ777_\n\n*Год*\n_2023_\n\n*Стоимость (₽)*\n_500000_\n\n*СТС*\n_99 87 356594_\n\n*Полис ОСАГО*\n_ХХХ 0659225087_\n\n📋 Каждое поле с новой строки (последние два можно оставить пустыми):`,
+          text: `📝 ${isEditMode ? "Изменить" : "Субаренда мотоцикла в парк (2/9)"} данные мотоцикла:\n\n*Марка Модель*\n_Yamaha R7_\n\n*VIN*\n_JYA2... (17 символов)_\n\n*Гос. номер*\n_А123БВ777_\n\n*Год*\n_2023_\n\n*Стоимость (₽)*\n_500000_\n\n*СТС*\n_99 87 356594_\n\n*Полис ОСАГО*\n_ХХХ 0659225087_\n\n📋 Каждое поле с новой строки (последние два можно оставить пустыми):`,
           parseMode: "Markdown",
         });
         context.step = isEditMode ? "edit_bike_new" : "bike_new";
@@ -724,7 +738,7 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
             await sendComplexMessage({
               botToken: TELEGRAM_BOT_TOKEN,
               chatId: userId,
-              text: `📄 *Субаренда мотоцикла в парк* (3/8)\n\nДанные для договора (каждое поле с новой строки, лишние можно оставить пустыми):\n\n*Гос. номер*\n_3323BE52_\n\n*СТС (свидетельство о регистрации)*\n_99 87 356594_\n\n*Полис ОСАГО*\n_ХХХ 0659225087_${known.length ? `\n\nУже известно:\n${known.join("\n")}` : ""}`,
+              text: `📄 *Субаренда мотоцикла в парк* (3/9)\n\nДанные для договора (каждое поле с новой строки, лишние можно оставить пустыми):\n\n*Гос. номер*\n_3323BE52_\n\n*СТС (свидетельство о регистрации)*\n_99 87 356594_\n\n*Полис ОСАГО*\n_ХХХ 0659225087_${known.length ? `\n\nУже известно:\n${known.join("\n")}` : ""}`,
               parseMode: "Markdown",
             });
             context.step = "bike_docs";
@@ -733,7 +747,7 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
             await sendComplexMessage({
               botToken: TELEGRAM_BOT_TOKEN,
               chatId: userId,
-              text: `✅ *Субаренда мотоцикла в парк* (4/8)\n\nВыбран: *${bike.make} ${bike.model}*\nVIN: ${context.bikeVin || "—"}\n\n👤 Введите ФИО собственника (полностью):`,
+              text: `✅ *Субаренда мотоцикла в парк* (4/9)\n\nВыбран: *${bike.make} ${bike.model}*\nVIN: ${context.bikeVin || "—"}\n\n👤 Введите ФИО собственника (полностью):`,
               parseMode: "Markdown",
             });
             context.step = "owner_name";
@@ -1064,7 +1078,7 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
-        text: `📄 *Субаренда мотоцикла в парк* (5/8)\n\nВведите паспортные данные:\n\n*Серия Номер*\n_4509 123456_\n\n*Дата выдачи*\n_15.03.2020_\n\n*Кем выдано*\n_ОМВД по Н.Новгороду_\n\n📋 Пример в одну строку:\n_4509 123456 15.03.2020 ОМВД по Н.Новгороду_`,
+        text: `📄 *Субаренда мотоцикла в парк* (5/9)\n\nВведите паспортные данные:\n\n*Серия Номер*\n_4509 123456_\n\n*Дата выдачи*\n_15.03.2020_\n\n*Кем выдано*\n_ОМВД по Н.Новгороду_\n\n📋 Пример в одну строку:\n_4509 123456 15.03.2020 ОМВД по Н.Новгороду_`,
         parseMode: "Markdown",
       });
       context.step = "owner_passport";
@@ -1082,7 +1096,7 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: `📅 *Субаренда мотоцикла в парк* (6/8)\n\nВведите дату рождения собственника:\n\n*ДД.ММ.ГГГГ*\n_01.01.1990_`,
+          text: `📅 *Субаренда мотоцикла в парк* (6/9)\n\nВведите дату рождения собственника:\n\n*ДД.ММ.ГГГГ*\n_01.01.1990_`,
           parseMode: "Markdown",
         });
         context.step = "owner_birth";
@@ -1103,7 +1117,7 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
         await sendComplexMessage({
           botToken: TELEGRAM_BOT_TOKEN,
           chatId: userId,
-          text: `🏠 *Субаренда мотоцикла в парк* (7/8)\n\nВведите адрес регистрации собственника:\n\n_г. Нижний Новгород, ул. Примерная, д. 1, кв. 1_`,
+          text: `🏠 *Субаренда мотоцикла в парк* (7/9)\n\nВведите адрес регистрации собственника:\n\n_г. Нижний Новгород, ул. Примерная, д. 1, кв. 1_`,
           parseMode: "Markdown",
         });
         context.step = "owner_address";
@@ -1122,7 +1136,7 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
         chatId: userId,
-        text: `📱 *Субаренда мотоцикла в парк* (8/8)\n\nВведите телефон собственника:\n\n_+7 (999) 123-45-67_`,
+        text: `📱 *Субаренда мотоцикла в парк* (8/9)\n\nВведите телефон собственника:\n\n_+7 (999) 123-45-67_`,
         parseMode: "Markdown",
       });
       context.step = "owner_phone";
@@ -1145,6 +1159,22 @@ async function handleTextInput(context: SubrentFlowContext, text: string, userId
       context.ownerEmail = text;
       await promptNextStep(context, userId);
       break;
+
+    case "owner_tg": {
+      const tgId = text.replace(/\D/g, "");
+      if (tgId.length < 5) {
+        await sendComplexMessage({
+          botToken: TELEGRAM_BOT_TOKEN,
+          chatId: userId,
+          text: "ℹ️ ID выглядит как число (обычно 9-10 цифр). Введите числовой ID собственника или нажмите 'Пропустить'.",
+          replyMarkup: JSON.stringify({ inline_keyboard: [[{ text: "⏭ Пропустить", callback_data: "owner_tg_skip" }]] }),
+        });
+        return;
+      }
+      context.ownerTelegramId = tgId;
+      await promptNextStep(context, userId);
+      break;
+    }
 
     case "owner_pct_custom":
       const pct = parseInt(text);
@@ -1560,8 +1590,9 @@ async function promptNextStep(context: SubrentFlowContext, userId: string): Prom
   // text-input variants that should set context.step to their parent before
   // calling promptNextStep.
   const stepTransitions: Record<string, string> = {
-    ask_email: "payment",
-    owner_email: "payment",
+    ask_email: "owner_tg",
+    owner_email: "owner_tg",
+    owner_tg: "payment",
     payment: "price",
     price: "hourly",
     hourly: "seasonal",
@@ -1599,6 +1630,15 @@ async function promptNextStep(context: SubrentFlowContext, userId: string): Prom
   }
 
   switch (next) {
+    case "owner_tg":
+      await sendComplexMessage({
+        botToken: TELEGRAM_BOT_TOKEN,
+        chatId: userId,
+        text: "📲 Telegram собственника: введите его числовой ID (можно узнать у него или через @userinfobot).\n\nЕсли укажете — после генерации договора байк автоматически получит отметку субаренды (specs.subrenter_chat_id) и собственник увидит аренды своего байка в приложении.",
+        replyMarkup: JSON.stringify({ inline_keyboard: [[{ text: "⏭ Пропустить", callback_data: "owner_tg_skip" }]] }),
+      });
+      break;
+
     case "payment":
       await sendComplexMessage({
         botToken: TELEGRAM_BOT_TOKEN,
@@ -1712,6 +1752,7 @@ ${context.bikeValue ? `Оценочная стоимость: ${context.bikeValu
 День рождения: ${context.ownerBirthDate}
 Телефон: ${context.ownerPhone}
 ${context.ownerEmail ? `Email: ${context.ownerEmail}` : ""}
+${context.ownerTelegramId ? `Telegram ID: ${context.ownerTelegramId} ✅ субарендатор будет назначен автоматически` : "Telegram ID: не указан (отметку субаренды можно поставить в админке)"}
 
 💰 *Условия:*
 Процент собственника: ${context.ownerPercentage}%
@@ -1935,7 +1976,53 @@ ${context.bikeMake} ${context.bikeModel}
 Собственник: ${context.ownerFullName}`,
     });
     // Notify admin
-    await notifyAdmin(`📄 Новый договор субаренды\n\nБайк: ${context.bikeMake} ${context.bikeModel}\nСобственник: ${context.ownerFullName}\nПроцент: ${context.ownerPercentage}%`);
+    await notifyAdmin(`📄 Новый договор субаренды\n\nБайк: ${context.bikeMake} ${context.bikeModel}\nСобственник: ${context.ownerFullName}\nПроцент: ${context.ownerPercentage}%${context.ownerTelegramId ? `\nTelegram: ${context.ownerTelegramId} (автоназначение субарендатора)` : ""}`);
+
+    // ── POLISH (iter14): auto-mark the bike as SUBRENTED (specs.subrenter_chat_id)
+    // so the catalog-first → subrent-via-specs chain completes in ONE flow.
+    // Only possible when: the operator selected an EXISTING catalog bike
+    // (context.bikeId) AND provided the owner's Telegram id. Otherwise the
+    // admin-panel path stays available.
+    if (context.ownerTelegramId && context.bikeId) {
+      try {
+        const sbMod = await import("@/lib/supabase-server");
+        const sb = sbMod.supabaseAdmin;
+        const { data: carRow } = await sb.from("cars").select("id, specs").eq("id", context.bikeId).maybeSingle();
+        if (carRow?.id) {
+          const currentSpecs = (carRow.specs && typeof carRow.specs === "object" ? carRow.specs : {}) as Record<string, unknown>;
+          const { error: markError } = await sb
+            .from("cars")
+            .update({ specs: { ...currentSpecs, subrenter_chat_id: context.ownerTelegramId } })
+            .eq("id", context.bikeId);
+          if (markError) {
+            logger.warn("[subrent] auto-mark subrenter failed:", markError.message);
+            await sendComplexMessage({
+              botToken: TELEGRAM_BOT_TOKEN,
+              chatId: userId,
+              text: "⚠️ Не удалось автоматически назначить субарендатора — поставьте отметку в админ-панели (Субарендаторы).",
+            });
+          } else {
+            await sendComplexMessage({
+              botToken: TELEGRAM_BOT_TOKEN,
+              chatId: userId,
+              text: `✅ Байк отмечен как субарендный: specs.subrenter_chat_id = ${context.ownerTelegramId}\n\nСобственник теперь видит аренды своего байка в приложении и получает уведомления.`,
+            });
+            // Notify the partner he got mini-admin access (mirrors setBikeSubrenterAction)
+            try {
+              await sendComplexMessage({
+                botToken: TELEGRAM_BOT_TOKEN,
+                chatId: context.ownerTelegramId,
+                text: `🏍 Ваш байк передан в парк «${resolvedCrewSlug}»\n\n${context.bikeMake} ${context.bikeModel}\nДоговор субаренды №${contractNumber} сформирован.\n\nОткрывайте приложение бота — в профиле появился раздел «Мои байки в парке» с арендами вашего мотоцикла.`,
+              });
+            } catch (partnerNotifyErr) {
+              logger.warn("[subrent] partner notify failed (non-fatal):", partnerNotifyErr);
+            }
+          }
+        }
+      } catch (markErr) {
+        logger.warn("[subrent] auto-mark subrenter threw (non-fatal):", markErr);
+      }
+    }
 
     // --- Generate QR code for quick access ---
     let qrPngBuffer = null;

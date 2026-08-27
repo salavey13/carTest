@@ -1079,7 +1079,13 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
             : Number(readPath(specs, ["purchase_price"], 0)) > 0
               ? Number(readPath(specs, ["purchase_price"], 0))
               : null,
-        rawSpecs: specs,
+        // FIX (iter14): raw specs used to ship the FULL JSONB to every
+        // catalog visitor — including INTERNAL keys (subrenter_chat_id,
+        // VIN, plate, insurance, odometer, salary tier, purchase price).
+        // Strip them server-side; clients only read public display keys
+        // (accessories/badge/category/dailyPrice/deposit_rub/features/
+        // materials/sale/sizes/spec_labels/video*).
+        rawSpecs: sanitizePublicRawSpecs(specs),
         type: car.type,
         reviewSummary: buildReviewSummary(reviewsByBike.get(car.id) ?? []),
         specs: (() => {
@@ -3276,91 +3282,6 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       }
     }
 
-    // ── Send DOCX for each bike ─────────────────────────────────────────────
-    // Web app users are already authenticated; QR for repeat rental is unnecessary.
-    // The /doc command flow (different code path) handles QR generation for unauthenticated users.
-
-    for (const recipientId of recipientSet) {
-      for (const doc of bikeDocs) {
-        const sendDocResult = await sendTelegramDocument(recipientId, new Blob([doc.bytes]), doc.fileName);
-        if (!sendDocResult.success) {
-          throw new Error(sendDocResult.error || `Failed to send DOCX ${doc.fileName} to ${recipientId}`);
-        }
-      }
-    }
-
-    // Use the first bike's document info for the notification log
-    await updateFranchizeOrderNotificationLog(logId, {
-      send_status: "sent",
-      rendered_markdown: `Generated ${bikeDocs.length} contract${bikeDocs.length > 1 ? "s" : ""}: ${bikeDocs.map(d => d.fileName).join(", ")}`,
-      doc_file_name: bikeDocs.map(d => d.fileName).join(", "),
-      last_error: "",
-    });
-
-    let sourceRentalId: string | null = null;
-
-    if (flowType === "rental") {
-      const { data: rentalRow, error: rentalLookupError } = await supabaseAdmin
-        .from("rentals")
-        .select("rental_id, metadata")
-        .eq("metadata->>orderId", payload.orderId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (rentalLookupError) {
-        logger.warn("[franchize] rental lookup for contract attachment failed", {
-          orderId: payload.orderId,
-          slug: payload.slug,
-          error: rentalLookupError.message,
-        });
-      } else if (!rentalRow?.rental_id) {
-        logger.warn("[franchize] rental not found for contract attachment", {
-          orderId: payload.orderId,
-          slug: payload.slug,
-        });
-      } else {
-        sourceRentalId = String(rentalRow.rental_id);
-        const existingMetadata =
-          rentalRow.metadata && typeof rentalRow.metadata === "object" ? (rentalRow.metadata as Record<string, unknown>) : {};
-        const rentalScope = `rental:${rentalRow.rental_id}`;
-
-        // Attach all bike documents to the rental metadata
-        const contractVerifiers = bikeDocs.map((doc, idx) => {
-          const verifierScope = `${flowType}:${payload.slug}:${payload.orderId}:bike${idx}`;
-          return {
-            scope: rentalScope,
-            sourceScope: verifierScope,
-            documentKey: doc.documentKey,
-            originalSha256: doc.sha256,
-            status: "verified" as const,
-            verifiedAt: new Date().toISOString(),
-            expiresAt: null,
-          };
-        });
-
-        const { error: rentalUpdateError } = await supabaseAdmin
-          .from("rentals")
-          .update({
-            metadata: {
-              ...existingMetadata,
-              contract_verifiers: contractVerifiers,
-              // Also keep the first one as the primary for backward compatibility
-              contract_verifier: contractVerifiers[0],
-            },
-          })
-          .eq("rental_id", rentalRow.rental_id);
-
-        if (rentalUpdateError) {
-          logger.warn("[franchize] rental contract verifier attachment failed", {
-            rentalId: rentalRow.rental_id,
-            orderId: payload.orderId,
-            error: rentalUpdateError.message,
-          });
-        }
-      }
-    }
-
     // ── Create public.rentals row (aligned with /doc flow) ────────────────
     // This ensures the rental appears in analytics and the bike shows as busy
     // Service orders don't create rentals — they create a lead for the crew to process
@@ -3523,7 +3444,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           }
         }
 
-        // ── Notify renter + crew owner + admin with a Mini App deep link ──────
+    // ── Notify renter + crew owner + admin with a Mini App deep link ──────
         // The renter opens /franchize/{slug}/rental/{id} in the web app to add
         // ДО/ПОСЛЕ photos; the owner/admin activate the rental from the same page.
         if (createdRentals.length > 0) {
@@ -3628,6 +3549,128 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         logger.warn("[franchize] Rental creation setup failed:", rentalSetupErr);
       }
     }
+
+    let sourceRentalId: string | null = null;
+
+    // FIX (iter14): this used to run UNPROTECTED between the TG sends and the
+    // rental-creation block — a transient DB error here aborted the whole
+    // order AFTER the doc was already delivered (rental row never written).
+    // Also note: it now runs AFTER the rental rows are created, so the
+    // orderId lookup actually FINDS the fresh rental (previously it always
+    // missed and the contract_verifiers attachment never worked in the web
+    // flow).
+    try {
+      if (flowType === "rental") {
+        const { data: rentalRow, error: rentalLookupError } = await supabaseAdmin
+          .from("rentals")
+          .select("rental_id, metadata")
+          .eq("metadata->>orderId", payload.orderId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (rentalLookupError) {
+          logger.warn("[franchize] rental lookup for contract attachment failed", {
+            orderId: payload.orderId,
+            slug: payload.slug,
+            error: rentalLookupError.message,
+          });
+        } else if (!rentalRow?.rental_id) {
+          logger.warn("[franchize] rental not found for contract attachment", {
+            orderId: payload.orderId,
+            slug: payload.slug,
+          });
+        } else {
+          sourceRentalId = String(rentalRow.rental_id);
+          const existingMetadata =
+            rentalRow.metadata && typeof rentalRow.metadata === "object" ? (rentalRow.metadata as Record<string, unknown>) : {};
+          const rentalScope = `rental:${rentalRow.rental_id}`;
+
+          // Attach all bike documents to the rental metadata
+          const contractVerifiers = bikeDocs.map((doc, idx) => {
+            const verifierScope = `${flowType}:${payload.slug}:${payload.orderId}:bike${idx}`;
+            return {
+              scope: rentalScope,
+              sourceScope: verifierScope,
+              documentKey: doc.documentKey,
+              originalSha256: doc.sha256,
+              status: "verified" as const,
+              verifiedAt: new Date().toISOString(),
+              expiresAt: null,
+            };
+          });
+
+          const { error: rentalUpdateError } = await supabaseAdmin
+            .from("rentals")
+            .update({
+              metadata: {
+                ...existingMetadata,
+                contract_verifiers: contractVerifiers,
+                // Also keep the first one as the primary for backward compatibility
+                contract_verifier: contractVerifiers[0],
+              },
+            })
+            .eq("rental_id", rentalRow.rental_id);
+
+          if (rentalUpdateError) {
+            logger.warn("[franchize] rental contract verifier attachment failed", {
+              rentalId: rentalRow.rental_id,
+              orderId: payload.orderId,
+              error: rentalUpdateError.message,
+            });
+          }
+        }
+      }
+    } catch (attachErr) {
+      logger.warn("[franchize] contract attachment failed (non-fatal)", { orderId: payload.orderId, error: attachErr instanceof Error ? attachErr.message : String(attachErr) });
+    }
+
+    // ── Send DOCX for each bike ─────────────────────────────────────────────
+    // Web app users are already authenticated; QR for repeat rental is unnecessary.
+    // The /doc command flow (different code path) handles QR generation for unauthenticated users.
+    //
+    // FIX (iter14): the sends used to run BEFORE the rentals/artifacts were
+    // persisted and SEQUENTIALLY (~1-3s per recipient). On slow Telegram API
+    // responses the whole serverless invocation hit the platform timeout
+    // right after the doc was delivered — the operator got the DOCX but the
+    // rental row / artifact / todos were never written (live case:
+    // order-mtbnsf97-zukmfy, kawasaki-ex650k, 2026-08-27). Now: (a) the
+    // critical DB writes (artifacts + rentals + attachment) happen FIRST,
+    // (b) the sends fan out in PARALLEL, (c) a partial send failure (some
+    // recipients unreachable) no longer aborts the remaining setup — the
+    // order data is already safe. Only a TOTAL send failure fails the action
+    // so the renter can retry.
+    const sendTargets = Array.from(recipientSet);
+    const sendResults = await Promise.all(
+      sendTargets.flatMap((recipientId) =>
+        bikeDocs.map((doc) =>
+          sendTelegramDocument(recipientId, new Blob([doc.bytes]), doc.fileName)
+            .then((r) => ({ recipientId, fileName: doc.fileName, ok: Boolean(r?.success), error: r?.error || null }))
+            .catch((e: unknown) => ({ recipientId, fileName: doc.fileName, ok: false, error: e instanceof Error ? e.message : String(e) })),
+        ),
+      ),
+    );
+    const failedSends = sendResults.filter((r) => !r.ok);
+    if (sendTargets.length > 0 && failedSends.length === sendResults.length) {
+      // EVERY send failed — nothing was delivered; surface a retryable error.
+      throw new Error(failedSends[0]?.error || `Failed to send DOCX to all recipients (${sendTargets.length})`);
+    }
+    if (failedSends.length > 0) {
+      logger.warn("[franchize] Partial DOCX delivery failure (order data already saved)", {
+        orderId: payload.orderId,
+        failed: failedSends.map((f) => `${f.recipientId}:${f.fileName}`).join(", "),
+      });
+    }
+
+    // Use the first bike's document info for the notification log
+    await updateFranchizeOrderNotificationLog(logId, {
+      send_status: "sent",
+      rendered_markdown: `Generated ${bikeDocs.length} contract${bikeDocs.length > 1 ? "s" : ""}: ${bikeDocs.map(d => d.fileName).join(", ")}`,
+      doc_file_name: bikeDocs.map(d => d.fileName).join(", "),
+      ...(failedSends.length > 0
+        ? { last_error: `Частичная доставка: ${failedSends.map((f) => f.recipientId).join(", ")}` }
+        : { last_error: "" }),
+    });
 
     // ── Create franchize_intents lead (aligned with /doc flow) ──────────
     // ONE lead per order (same person), even with multiple bikes.
@@ -5613,3 +5656,4 @@ export type {
   CrewContractSecrets,
   BikeSpecs,
 } from './lib/rental-contract-types';
+import { sanitizePublicRawSpecs } from "./lib/public-specs";

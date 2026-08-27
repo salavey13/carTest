@@ -1,4 +1,12 @@
 import type { Metadata } from "next";
+
+// FIX (iter14): the checkout server action (doc generation + DB writes +
+// Telegram fan-out) regularly exceeds the default serverless timeout — the
+// live kawasaki order (order-mtbnsf97-zukmfy) died right after the doc was
+// delivered, before the rental row was written. Allow up to 5 minutes
+// (Vercel caps by plan; longer values are simply clamped).
+export const maxDuration = 300;
+
 import { getFranchizeBySlug } from "../../../actions";
 import { CrewFooter } from "../../../components/CrewFooter";
 import { CrewHeader } from "../../../components/CrewHeader";

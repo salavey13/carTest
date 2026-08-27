@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Trophy } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { getFranchizeProfileBySlugAction } from "@/app/franchize/profile-actions";
+import { getFranchizeOperatorDashboardAccess } from "@/app/franchize/actions";
 
 const SEEN_STORAGE_PREFIX = "franchize-ach-seen:";
 
@@ -31,6 +32,12 @@ export function AchievementToastSync({ slug }: { slug: string }) {
     const delay = window.setTimeout(() => {
       void (async () => {
         try {
+          // FIX (iter14): achievements are crew gamification — ordinary
+          // renters must not get achievement toasts. Skip silently for
+          // non-crew users before even fetching the profile.
+          const access = await getFranchizeOperatorDashboardAccess({ slug });
+          if (cancelled || !access?.canOpen) return;
+
           const result = await getFranchizeProfileBySlugAction({ slug, userId: dbUser.user_id! });
           if (cancelled || !result.success || !result.data?.achievements) return;
 

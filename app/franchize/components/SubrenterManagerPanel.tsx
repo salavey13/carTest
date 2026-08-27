@@ -9,13 +9,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
+import { FileDown, RefreshCw, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   getCrewBikesSubrenterInfoAction,
   setBikeSubrenterAction,
 } from "@/app/franchize/server-actions/bike-subrenter";
+import {
+  generateSubrenterWeeklyReportAction,
+  type SubrentWeeklyReportResult,
+} from "@/app/franchize/server-actions/subrenter-monitoring";
 import { FranchizeOperatorPanel } from "./FranchizeOperatorSurface";
 
 interface BikeSubrenterRow {
@@ -43,6 +47,87 @@ export function SubrenterManagerPanel({
   const [search, setSearch] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
+
+  // ── Weekly owner report (§5.5 / Приложение № 3) ──
+  // Default period: the CURRENT week Mon–Sun in the MSK calendar.
+  const [reportFrom, setReportFrom] = useState("");
+  const [reportTo, setReportTo] = useState("");
+  const [reportChatId, setReportChatId] = useState("");
+  const [reportPct, setReportPct] = useState("");
+  const [reportBusy, setReportBusy] = useState<"download" | "send" | null>(null);
+
+  useEffect(() => {
+    // MSK current week boundaries (Mon..Sun)
+    const nowMsk = new Date(Date.now() + 3 * 3600 * 1000);
+    const day = nowMsk.getUTCDay(); // 0=Sun
+    const mondayOffset = day === 0 ? 6 : day - 1;
+    const monday = new Date(nowMsk.getTime() - mondayOffset * 24 * 3600 * 1000);
+    const sunday = new Date(monday.getTime() + 6 * 24 * 3600 * 1000);
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    setReportFrom(iso(monday));
+    setReportTo(iso(sunday));
+  }, []);
+
+  const partners = useMemo(() => {
+    const byChat = new Map<string, { chatId: string; username: string | null; bikes: string[] }>();
+    for (const b of bikes) {
+      if (!b.subrenterChatId) continue;
+      const entry = byChat.get(b.subrenterChatId) ?? { chatId: b.subrenterChatId, username: b.subrenterUsername ?? null, bikes: [] };
+      entry.bikes.push(b.label);
+      byChat.set(b.subrenterChatId, entry);
+    }
+    return Array.from(byChat.values());
+  }, [bikes]);
+
+  useEffect(() => {
+    if (!reportChatId && partners.length > 0) setReportChatId(partners[0].chatId);
+  }, [partners, reportChatId]);
+
+  const runWeeklyReport = async (mode: "download" | "send") => {
+    const userId = dbUser?.user_id;
+    if (!userId) {
+      toast.error("Пользователь ещё авторизуется — попробуйте ещё раз.");
+      return;
+    }
+    if (!reportChatId || !reportFrom || !reportTo) {
+      toast.error("Выберите партнёра и даты отчётного периода.");
+      return;
+    }
+    setReportBusy(mode);
+    try {
+      const result: SubrentWeeklyReportResult = await generateSubrenterWeeklyReportAction({
+        slug,
+        actorUserId: userId,
+        chatId: reportChatId,
+        from: reportFrom,
+        to: reportTo,
+        ...(reportPct.trim() ? { ownerPercentage: Number(reportPct) } : {}),
+        sendToPartner: mode === "send",
+      });
+      if (!result.success || !result.docBase64) {
+        toast.error(`Отчёт не сформирован — ${result.error ?? "неизвестная ошибка"}`);
+        return;
+      }
+      const s = result.summary;
+      const summaryText = s ? `${s.rentalCount} аренд · ${s.totalPaymentsRub.toLocaleString("ru-RU")} ₽ · доля партнёра ${s.ownerPayoutRub.toLocaleString("ru-RU")} ₽ (${s.ownerPercentage}%)` : "";
+      if (mode === "download") {
+        const binary = Uint8Array.from(atob(result.docBase64), (c) => c.charCodeAt(0));
+        const url = URL.createObjectURL(new Blob([binary], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = result.fileName ?? `subrent-weekly-report-${reportFrom}.docx`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success(`Отчёт сформирован${summaryText ? `: ${summaryText}` : ""}`);
+      } else {
+        toast.success(result.sentToPartner ? `Отчёт отправлен партнёру в Telegram${summaryText ? ` — ${summaryText}` : ""}` : "Отчёт сформирован, но отправка партнёру не удалась (проверьте chat id).") ;
+      }
+    } catch (err) {
+      toast.error(`Отчёт не сформирован — ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setReportBusy(null);
+    }
+  };
 
   const visibleBikes = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -157,6 +242,84 @@ export function SubrenterManagerPanel({
 
       {expanded && (
         <div className="mt-3 space-y-2">
+          {/* ── Weekly owner report (§5.5 / Приложение № 3) ── */}
+          {partners.length > 0 && (
+            <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-admin-border)" }}>
+              <p className="text-xs font-semibold text-[var(--fr-admin-text)]">
+                Еженедельный отчёт партнёру (п. 5.5 договора, Приложение № 3)
+              </p>
+              <p className="mt-1 text-xs text-[var(--fr-admin-muted)]">
+                Отчёт по арендам мотоциклов партнёра за период + его доля платежей. По умолчанию — текущая неделя (пн–вс).
+              </p>
+              <div className="mt-2 flex flex-wrap items-end gap-2">
+                <label className="flex flex-col gap-1 text-xs text-[var(--fr-admin-muted)]">
+                  Партнёр
+                  <select
+                    value={reportChatId}
+                    onChange={(e) => setReportChatId(e.target.value)}
+                    className="h-9 rounded-lg border bg-transparent px-2 text-xs text-[var(--fr-admin-text)] outline-none focus:border-[var(--fr-admin-accent)]"
+                    style={{ borderColor: "var(--fr-admin-border)" }}
+                  >
+                    {partners.map((p) => (
+                      <option key={p.chatId} value={p.chatId} className="bg-zinc-900">
+                        {p.username ? `@${p.username}` : `ID ${p.chatId}`} · {p.bikes.length} мото
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-[var(--fr-admin-muted)]">
+                  С
+                  <input
+                    type="date"
+                    value={reportFrom}
+                    onChange={(e) => setReportFrom(e.target.value)}
+                    className="h-9 rounded-lg border bg-transparent px-2 text-xs text-[var(--fr-admin-text)] outline-none focus:border-[var(--fr-admin-accent)]"
+                    style={{ borderColor: "var(--fr-admin-border)" }}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-[var(--fr-admin-muted)]">
+                  По
+                  <input
+                    type="date"
+                    value={reportTo}
+                    onChange={(e) => setReportTo(e.target.value)}
+                    className="h-9 rounded-lg border bg-transparent px-2 text-xs text-[var(--fr-admin-text)] outline-none focus:border-[var(--fr-admin-accent)]"
+                    style={{ borderColor: "var(--fr-admin-border)" }}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-[var(--fr-admin-muted)]">
+                  Доля, %
+                  <input
+                    value={reportPct}
+                    onChange={(e) => setReportPct(e.target.value.replace(/[^\d]/g, "").slice(0, 2))}
+                    placeholder="из договора"
+                    inputMode="numeric"
+                    className="h-9 w-24 rounded-lg border bg-transparent px-2 text-xs text-[var(--fr-admin-text)] outline-none focus:border-[var(--fr-admin-accent)]"
+                    style={{ borderColor: "var(--fr-admin-border)" }}
+                  />
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 text-xs"
+                  disabled={reportBusy !== null}
+                  onClick={() => void runWeeklyReport("download")}
+                >
+                  <FileDown className="mr-1 h-3 w-3" />
+                  {reportBusy === "download" ? "Формирую…" : "Скачать отчёт"}
+                </Button>
+                <Button
+                  type="button"
+                  className="h-9 text-xs font-semibold"
+                  disabled={reportBusy !== null}
+                  onClick={() => void runWeeklyReport("send")}
+                >
+                  <Send className="mr-1 h-3 w-3" />
+                  {reportBusy === "send" ? "Отправляю…" : "Отправить партнёру"}
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between gap-2">
             <input
               value={search}

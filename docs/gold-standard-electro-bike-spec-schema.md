@@ -294,6 +294,8 @@ These keys live in `specs` JSONB but are **operational**, NOT user-facing compar
   - Rental page (`/franchize/{slug}/rental/{id}`): the «Одометр при выдаче» card shows the handover reading for ACTIVE rentals (full start→end delta card appears once the return is processed).
   - Resolution chain for the suggestion: `specs.last_known_odometer` → `specs.odometer` → newest rental's `odometer_after` / `pickup_freeze.odometer_km` / `odometer_before`. JSON `null`/empty values are never treated as «0 km».
 
+**⚠️ Privacy (iter14):** these operational keys (§1.13 — `subrenter_chat_id`, `last_known_odometer`, `salary`, `vin`, `plate`, insurance) are STRIPPED from the public catalog payload server-side (`app/franchize/lib/public-specs.ts`, exact keys + prefixes `subrenter_`, `salary`, `owner_`, `sts_`, `vin`, `plate`, `passport`, `insurance`). Server-side consumers (webhook commands, server actions) still read them from the DB directly — the strip only affects what ships to the browser. Add future internal keys either to the exact set or to a prefix.
+
 #### Onboarding checklist for a NEW catalog bike (operational keys)
 
 When a new bike is added to the catalog (manual SQL, hydration script or admin UI), run through this list so the bike is fully operational from day one:

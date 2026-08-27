@@ -274,7 +274,17 @@ export async function getRentalsDashboard(input: {
     // Primary query: rentals whose requested START date falls on the selected day.
     // A secondary query catches legacy rows where requested_start_date is null
     // (matched by agreed_start_date, then created_at as a last resort).
-    const [startedTodayResult, noRequestedStartResult] = await Promise.all([
+    //
+    // FIX (iter14): a THIRD query now also matches rentals whose END date
+    // falls on the selected day (±1 day UTC window to absorb the MSK offset).
+    // Previously the day page was start-only — a rental started on the 26th
+    // and ending on the 27th was INVISIBLE on the 27th, so its return could
+    // never be tracked from that day's page ("Возвратов" was always 0 for
+    // such rentals). The client does the precise MSK-calendar split
+    // (started-today vs returns-today) for the KPIs — see AnalyticsClient.
+    const dayBeforeStart = new Date(new Date(startOfDay).getTime() - 24 * 3600 * 1000).toISOString();
+    const dayAfterEnd = new Date(new Date(endOfDay).getTime() + 24 * 3600 * 1000).toISOString();
+    const [startedTodayResult, noRequestedStartResult, endsOnDayResult] = await Promise.all([
       supabaseAdmin
         .from("rentals")
         .select(baseSelect)
@@ -292,6 +302,20 @@ export async function getRentalsDashboard(input: {
         .lte("agreed_start_date", endOfDay)
         .is("requested_start_date", null)
         .order("created_at", { ascending: false }),
+      // Rentals RETURNING on the selected day (agreed_end_date within the
+      // widened window; requested_end_date as a fallback match for rows
+      // where agreed end was never set).
+      supabaseAdmin
+        .from("rentals")
+        .select(baseSelect)
+        .eq("vehicle.crew_id", crew.id)
+        .or(
+          `and(agreed_end_date.gte.${dayBeforeStart},agreed_end_date.lte.${dayAfterEnd}),` +
+          `and(requested_end_date.gte.${dayBeforeStart},requested_end_date.lte.${dayAfterEnd}),` +
+          `and(agreed_end_date.is.null,requested_end_date.gte.${startOfDay},requested_end_date.lte.${endOfDay})`,
+        )
+        .neq("status", "cancelled")
+        .order("created_at", { ascending: false }),
     ]);
 
     // Merge + dedupe by rental_id
@@ -302,8 +326,11 @@ export async function getRentalsDashboard(input: {
     for (const r of (noRequestedStartResult.data || []) as any[]) {
       if (!rentalMap.has(r.rental_id)) rentalMap.set(r.rental_id, r);
     }
+    for (const r of (endsOnDayResult.data || []) as any[]) {
+      if (!rentalMap.has(r.rental_id)) rentalMap.set(r.rental_id, r);
+    }
     const rentals = Array.from(rentalMap.values());
-    const rentalsError = startedTodayResult.error || noRequestedStartResult.error;
+    const rentalsError = startedTodayResult.error || noRequestedStartResult.error || endsOnDayResult.error;
 
     if (rentalsError) {
       console.error("[rentals-dashboard] Query error:", rentalsError);

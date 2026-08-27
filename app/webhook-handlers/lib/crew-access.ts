@@ -257,6 +257,7 @@ const TEMPLATE_FILES: Record<string, string> = {
   commercial_proposal: "COMMERCIAL_PROPOSAL_TEMPLATE.html",
   equipment_rental: "EQUIPMENT_RENTAL_DEAL_TEMPLATE.html",
   equipment_sale: "EQUIPMENT_SALE_DEAL_TEMPLATE.html",
+  subrent_weekly_report: "SUBRENT_WEEKLY_REPORT_TEMPLATE.html",
 };
 
 /**

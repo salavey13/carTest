@@ -10,18 +10,21 @@
 // / status bar), so a header padded by safe-area alone gets its action row
 // (profile dropdown, cart icon, hamburger) covered by the native buttons.
 //
-// Resolution order (POLISH 2026-08-27: fallback is MOBILE-ONLY):
+// Resolution order (POLISH 2026-08-27, FIX 2026-08-28):
 //   1. tg.contentSafeAreaInset.top (Bot API 8.0+) — exact px occupied by the
 //      native controls inside the Mini App viewport (0 in normal mode,
-//      ~48-56px in fullscreen). Trusted on any viewport — it is a real
+//      ~47-56px in fullscreen). Trusted on any viewport — it is a real
 //      measurement.
-//   2. Fallback TG_FULLSCREEN_TOP_FALLBACK_PX — applied ONLY when the viewport
-//      is NARROW (the app's mobile layout, < 1024px) and the client is in
-//      fullscreen (or the fullscreen state is unknown, i.e. a very old client
-//      without Bot API 7.7). Wide/desktop layouts NEVER have overlapping
-//      native buttons, so they get 0 and keep the normal compact padding —
-//      previously the fallback was applied unconditionally, wasting ~96px of
-//      header space on desktop Telegram.
+//   2. Fallback TG_FULLSCREEN_TOP_FALLBACK_PX — applied when the viewport is
+//      NARROW (the app's mobile layout, < 1024px). FIX iter14: the old
+//      `fullscreen !== false` gate is GONE — real clients report isFullscreen
+//      unreliably (some say false while the native buttons still overlay the
+//      webview), which collapsed the header padding to ~1.45rem and covered
+//      the action row. On mobile the fallback now applies unconditionally;
+//      the extra headroom in non-fullscreen matches the comfortable look the
+//      user historically had (the 6rem floor) and is the safe direction.
+//      Wide/desktop layouts NEVER have overlapping native buttons → 0 →
+//      compact padding (no dead space on desktop Telegram).
 //   3. 0 otherwise.
 //
 // The hook listens to `contentSafeAreaChanged` and `fullscreenChanged` events
@@ -52,9 +55,22 @@ function readContentTopPx(source?: TgWebAppLike | null): number {
   return Number.isFinite(top) && top > 0 ? top : 0;
 }
 
-function readFullscreenState(source?: TgWebAppLike | null): boolean | "unknown" {
-  const value = source?.isFullscreen;
-  return typeof value === "boolean" ? value : "unknown";
+/**
+ * Tracks whether the app renders its MOBILE layout (Tailwind `lg` breakpoint
+ * = 1024px). Shared by the header padding policy so the generous Telegram
+ * clearance only applies to narrow viewports.
+ */
+export function useIsMobileLayout(): boolean {
+  const [isNarrow, setIsNarrow] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(MOBILE_LAYOUT_MEDIA_QUERY);
+    const apply = () => setIsNarrow(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  return isNarrow;
 }
 
 export function useTelegramContentSafeTop(): number {
@@ -63,9 +79,6 @@ export function useTelegramContentSafeTop(): number {
   // First-render synchronous read (client only; SSR stays 0 — settled after mount)
   const [contentTop, setContentTop] = useState<number>(() =>
     isInTelegramContext ? readContentTopPx(readWebApp()) : 0,
-  );
-  const [fullscreen, setFullscreen] = useState<boolean | "unknown">(() =>
-    isInTelegramContext ? readFullscreenState(readWebApp()) : "unknown",
   );
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
 
@@ -79,7 +92,6 @@ export function useTelegramContentSafeTop(): number {
 
     const read = () => {
       setContentTop(readContentTopPx(source));
-      setFullscreen(readFullscreenState(source));
     };
 
     read();
@@ -123,8 +135,9 @@ export function useTelegramContentSafeTop(): number {
   if (!isInTelegramContext) return 0;
   // 1. Exact measurement from the client (any viewport, fullscreen or not)
   if (contentTop > 0) return contentTop;
-  // 2. Mobile layout + fullscreen (or unknown on very old clients) → fallback
-  if (isNarrowViewport && fullscreen !== false) return TG_FULLSCREEN_TOP_FALLBACK_PX;
-  // 3. Wide layout / regular mobile mode — no overlapping native buttons
+  // 2. Mobile layout → fallback (fullscreen state deliberately NOT trusted —
+  //    clients report it unreliably; see header comment)
+  if (isNarrowViewport) return TG_FULLSCREEN_TOP_FALLBACK_PX;
+  // 3. Wide layout — no overlapping native buttons
   return 0;
 }

@@ -16,8 +16,12 @@ import { useAppContext } from "@/contexts/AppContext";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useResolvedPalette } from "../lib/useResolvedPalette";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
-import { useTelegramContentSafeTop } from "../hooks/useTelegramContentSafeTop";
-import { FRANCHIZE_HEADER_CORNER_GUARD_STYLE, FRANCHIZE_HEADER_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
+import { useTelegramContentSafeTop, useIsMobileLayout } from "../hooks/useTelegramContentSafeTop";
+import {
+  FRANCHIZE_HEADER_CORNER_GUARD_STYLE,
+  FRANCHIZE_HEADER_SAFE_AREA_STYLE,
+  resolveFranchizeHeaderPaddingTop,
+} from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
 import { hasRentPrice, hasSalePrice, hasServicePrice, hasEquipmentPrice } from "../lib/catalog-utils";
 import { readablePaletteTextOnColor, withAlpha } from "../lib/theme";
@@ -58,11 +62,13 @@ export function CrewHeader({
   const pathname = usePathname();
   const { displayMode, setDisplayMode, isTransitioning } = useDisplayMode();
   const { isInTelegramContext } = useAppContext();
-  // TG fullscreen mode: native buttons (back ‹ + ⋮) overlay the top of the
-  // webview. contentSafeAreaInset.top (Bot API 8.0+) reports their exact px;
-  // older clients fall back to a conservative estimate so the header action
-  // row (profile / cart / hamburger) is never covered.
+  // FIX (2026-08-28, iter14): top padding policy moved to route-cta-policy —
+  // resolveFranchizeHeaderPaddingTop. MOBILE Telegram layouts get
+  // max(exact-clearance, 96px floor) so the native fullscreen buttons can
+  // never cover the action row (clients under-report / lie about fullscreen);
+  // wide/desktop layouts keep the compact padding.
   const tgContentSafeTop = useTelegramContentSafeTop();
+  const isMobileLayout = useIsMobileLayout();
   const router = useRouter();
   const mainCatalogPath = `/franchize/${crew.slug}`;
   const isOnCatalogPage = pathname === mainCatalogPath || pathname === `${mainCatalogPath}/`;
@@ -134,21 +140,18 @@ export function CrewHeader({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const headerPaddingTop = resolveFranchizeHeaderPaddingTop({
+    inTelegram: isInTelegramContext,
+    mobileLayout: isMobileLayout,
+    contentSafeTopPx: tgContentSafeTop,
+  });
+
   return (
     <header
-      // FIX (2026-08-27): top padding must clear the Telegram native buttons
-      // in FULLSCREEN mode on MOBILE layouts only. The hook resolves:
-      //   contentSafeAreaInset.top (exact, Bot API 8.0+) when available,
-      //   the 54px fallback only for narrow viewports in fullscreen (old
-      //   clients), and 0 for wide/desktop layouts — native buttons never
-      //   overlap there, so the header keeps its compact padding.
       className="sticky top-0 z-50 border-b pb-2 backdrop-blur-2xl"
       style={{
         ...FRANCHIZE_HEADER_SAFE_AREA_STYLE,
-        paddingTop:
-          isInTelegramContext && tgContentSafeTop > 0
-            ? `calc(env(safe-area-inset-top) + ${tgContentSafeTop}px + 0.75rem)`
-            : "calc(max(env(safe-area-inset-top), 0px) + 1.45rem)",
+        paddingTop: headerPaddingTop,
         // FIX 6: isolation creates a proper stacking context for the entire header.
         isolation: "isolate",
         borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,

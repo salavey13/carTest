@@ -9,7 +9,8 @@ import { toInternalHref } from "../lib/navigation";
 import { crewPaletteForSurface } from "../lib/theme";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { useResolvedPalette } from "../lib/useResolvedPalette";
-import { useTelegramContentSafeTop } from "../hooks/useTelegramContentSafeTop";
+import { useTelegramContentSafeTop, useIsMobileLayout } from "../hooks/useTelegramContentSafeTop";
+import { resolveFranchizeOverlayTopOffsetPx } from "../lib/route-cta-policy";
 
 interface HeaderMenuProps {
   crew: FranchizeCrewVM;
@@ -34,11 +35,15 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
   const palette = useResolvedPalette(crew.theme);
   const surface = crewPaletteForSurface(crew.theme);
   // TG fullscreen: keep the modal (and its close button) below the native
-  // buttons. The hook resolves the exact contentSafeAreaInset.top when
-  // available and the 54px fallback ONLY for mobile layouts in fullscreen
-  // (wide/desktop layouts get 0 — native buttons never overlap there).
+  // buttons. iter14: overlay offset resolved through the shared policy
+  // (resolveFranchizeOverlayTopOffsetPx) — mobile layouts keep a minimum
+  // clearance even when the client under-reports contentSafeAreaInset.top.
   const tgContentSafeTop = useTelegramContentSafeTop();
-  const nativeTopPx = tgContentSafeTop;
+  const isMobileLayout = useIsMobileLayout();
+  const nativeTopPx = resolveFranchizeOverlayTopOffsetPx({
+    mobileLayout: isMobileLayout,
+    contentSafeTopPx: tgContentSafeTop,
+  });
 
   // Apply franchize theme CSS variables
   useFranchizeTheme(crew.theme);

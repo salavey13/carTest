@@ -526,3 +526,60 @@ export function isClientServiceRental(rental: AnalyticsRentalRow): boolean {
 export function isCrewServiceRental(rental: AnalyticsRentalRow): boolean {
   return isServiceRental(rental) && getServiceClient(rental) === null;
 }
+
+// ── Day-page KPI computation (iter14) ─────────────────────────────────────────
+
+export interface KpiRentalRow {
+  status?: string | null;
+  total_cost?: number | string | null;
+  requested_start_date?: string | null;
+  agreed_start_date?: string | null;
+  agreed_end_date?: string | null;
+  requested_end_date?: string | null;
+}
+
+export interface AnalyticsKpiValues {
+  totalToday: number;
+  revenueToday: number;
+  activeCount: number;
+  returnsDue: number;
+}
+
+/**
+ * Day-scoped KPIs over the day's page rows (started OR returned on the day):
+ *   Аренд сегодня — rentals STARTED on the selected MSK day (non-cancelled)
+ *   Выручка       — revenue of the day's STARTED rentals (real statuses only)
+ *   Активных      — day-page rows currently active
+ *   Возвратов     — rentals whose END falls on the selected MSK day
+ */
+export function computeAnalyticsKpis(
+  rows: KpiRentalRow[],
+  date: string,
+): AnalyticsKpiValues {
+  const localStart = (r: KpiRentalRow) => localDateOnly(r.requested_start_date || r.agreed_start_date);
+  const localEnd = (r: KpiRentalRow) => localDateOnly(r.agreed_end_date || r.requested_end_date);
+  const startedToday = rows.filter((r) => localStart(r) === date);
+  const returnsToday = rows.filter((r) => localEnd(r) === date);
+  const revenueToday = startedToday
+    .filter((r) => ["active", "completed", "confirmed", "pending_confirmation"].includes(String(r.status ?? "")))
+    .reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0);
+  return {
+    totalToday: startedToday.length,
+    revenueToday,
+    activeCount: rows.filter((r) => r.status === "active").length,
+    returnsDue: returnsToday.length,
+  };
+}
+
+/**
+ * Day-page relevance filter (iter14): keep rows whose MSK start OR end date
+ * equals the selected day. `rows` should already exclude cancelled rows.
+ */
+export function isRentalRelevantForDate(
+  r: KpiRentalRow,
+  date: string,
+): boolean {
+  const start = localDateOnly(r.requested_start_date || r.agreed_start_date);
+  const end = localDateOnly(r.agreed_end_date || r.requested_end_date);
+  return start === date || end === date;
+}

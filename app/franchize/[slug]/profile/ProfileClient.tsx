@@ -392,13 +392,15 @@ export function FranchizeProfileClient({
     setTeamEarningsLoading(false);
   };
 
-  // Auto-load period earnings on mount with default period
+  // Auto-load period earnings on mount with default period.
+  // FIX (iter14): earnings are CREW-ONLY — ordinary renters must not see
+  // salary data (and we skip the API call for them entirely).
   useEffect(() => {
-    if (dbUser?.user_id && !periodEarnings) {
+    if (dbUser?.user_id && canOpenCloserDashboard && !periodEarnings) {
       void fetchPeriodEarnings();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dbUser?.user_id]);
+  }, [dbUser?.user_id, canOpenCloserDashboard]);
 
   const unlockedSet = useMemo(
     () => new Set(Object.keys(profile?.achievements || {})),
@@ -834,7 +836,8 @@ export function FranchizeProfileClient({
         </motion.div>
       )}
 
-      {/* My Earnings Panel */}
+      {/* My Earnings Panel — CREW ONLY (iter14): hidden for ordinary renters */}
+      {canOpenCloserDashboard && (
       <motion.div variants={itemVariants}>
         <FranchizeOperatorPanel>
           <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
@@ -1064,8 +1067,11 @@ export function FranchizeProfileClient({
           )}
         </FranchizeOperatorPanel>
       </motion.div>
+      )}
 
-      {/* My Work Panel */}
+      {/* My Work Panel — CREW ONLY (iter14): shift/commission work stats are
+          internal crew info, hidden for ordinary renters. */}
+      {canOpenCloserDashboard && (
       <motion.div variants={itemVariants}>
         <FranchizeOperatorPanel>
           <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
@@ -1119,6 +1125,7 @@ export function FranchizeProfileClient({
           )}
         </FranchizeOperatorPanel>
       </motion.div>
+      )}
 
       {/* Crew Operations Panel — shown only for crew members */}
       {canOpenCloserDashboard && (
@@ -1545,7 +1552,9 @@ export function FranchizeProfileClient({
 
       {/* Quick Actions — removed (Заявки, Map Riders not needed in profile) */}
 
-      {/* Achievements Panel — at the very end */}
+      {/* Achievements Panel — at the very end — CREW ONLY (iter14):
+          crew gamification is not for ordinary renters. */}
+      {canOpenCloserDashboard && (
       <motion.div variants={itemVariants}>
         <FranchizeOperatorPanel>
           <h2 className="flex items-center gap-2 text-base font-semibold " style={{ color: T.text }}>
@@ -1635,6 +1644,7 @@ export function FranchizeProfileClient({
           {!!error && <p className="text-xs text-red-400">{error}</p>}
         </FranchizeOperatorPanel>
       </motion.div>
+      )}
 
       {/* Team Earnings Modal (for owners) */}
       <Dialog open={showTeamEarningsModal} onOpenChange={setShowTeamEarningsModal}>

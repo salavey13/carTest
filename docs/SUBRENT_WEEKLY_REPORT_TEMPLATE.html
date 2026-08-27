@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Приложение № 3 — Еженедельный отчет о сдаче мотоцикла</title>
+<style>
+  body { font-family: "Times New Roman", serif; font-size: 11pt; margin: 0; }
+  p { margin: 4pt 0; }
+  table { border-collapse: collapse; width: 100%; }
+</style>
+</head>
+<body>
+
+<p style="text-align: right;">Приложение № 3</p>
+<p style="text-align: right;">к Договору аренды мотоцикла в парк<br>{{owner_full_name}} — {{organization_short}}</p>
+
+<p style="text-align: center; font-weight: bold; margin-top: 16pt;">ЕЖЕНЕДЕЛЬНЫЙ ОТЧЕТ</p>
+<p style="text-align: center;">о сдаче мотоцикла(ов) в аренду/субаренду за период</p>
+<p style="text-align: center; font-weight: bold;">с {{date_from}} по {{date_to}}</p>
+
+<p style="margin-top: 10pt;">Арендатор (экипаж): {{organization_name}}, ИНН {{inn}}, {{legal_address}}</p>
+<p>Арендодатель (собственник): {{owner_full_name}}, тел. {{owner_phone}}</p>
+
+<p style="font-weight: bold; margin-top: 12pt;">1. Сдачи в аренду за отчетный период</p>
+
+{{#if zero_report}}
+<p style="text-align: justify;">Сдач мотоцикла(ов) в аренду/субаренду за отчетный период не было (нулевой отчет, п. 5.6 Договора).</p>
+{{else}}
+<table style="border: 1px solid #000; margin-top: 6pt;">
+<tr>
+  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 6%;">№</th>
+  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 17%;">Период аренды</th>
+  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 24%;">Мотоцикл</th>
+  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 27%;">Клиент</th>
+  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 13%;">Сумма, руб.</th>
+  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 13%;">Статус</th>
+</tr>
+{{rental_rows}}
+</table>
+{{/if}}
+
+<p style="font-weight: bold; margin-top: 12pt;">2. Итоги за период</p>
+<table style="border: 1px solid #000; margin-top: 6pt; width: 100%;">
+<tr>
+  <td style="border: 1px solid #000; padding: 4pt 8pt; width: 70%;">Всего аренд за период</td>
+  <td style="border: 1px solid #000; padding: 4pt 8pt; text-align: right;">{{rental_count}}</td>
+</tr>
+<tr>
+  <td style="border: 1px solid #000; padding: 4pt 8pt;">Всего получено платежей от клиентов, руб.</td>
+  <td style="border: 1px solid #000; padding: 4pt 8pt; text-align: right;">{{total_payments_rub}}</td>
+</tr>
+<tr>
+  <td style="border: 1px solid #000; padding: 4pt 8pt;">Вознаграждение Арендодателя ({{owner_percentage}}% по п. 5.1 Договора), руб.</td>
+  <td style="border: 1px solid #000; padding: 4pt 8pt; text-align: right; font-weight: bold;">{{owner_payout_rub}}</td>
+</tr>
+</table>
+
+<p style="text-align: justify; margin-top: 10pt; font-size: 10pt;">Отчет сформирован автоматически системой учета экипажа {{generated_at}} (МСК) на основании данных о завершенных и активных арендах. Отчет предоставляется в соответствии с п. 5.5 Договора; выплата вознаграждения — не позднее {{payment_deadline_days}} (двух) рабочих дней с даты окончания отчетного периода (п. 5.6 Договора).</p>
+
+<p style="font-weight: bold; margin-top: 14pt; text-align: center;">Подписи сторон</p>
+<table style="width: 100%; border: none; margin-top: 6pt;">
+<tr>
+  <td style="border: none; width: 50%; text-align: center;">Арендатор (экипаж)</td>
+  <td style="border: none; width: 50%; text-align: center;">Арендодатель (собственник)</td>
+</tr>
+<tr>
+  <td style="border: none; width: 50%; text-align: center;">_____________________ / {{issuer_representative}} /</td>
+  <td style="border: none; width: 50%; text-align: center;">_____________________ / {{owner_full_name}} /</td>
+</tr>
+</table>
+
+</body>
+</html>

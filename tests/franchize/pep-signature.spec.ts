@@ -181,9 +181,13 @@ describe("ПЭП template rendering (RENTAL_DEAL_TEMPLATE + vip-bike crew templa
       expect(out).toContain("Telegram ID 8935491576 (@liki2222)");
       expect(out).toContain("27.08.2026 19:42 (МСК)");
       expect(out).toContain("(ПЭП Арендатора — акцепт в Telegram, п. 12.3 Договора)");
-      // TWO blank underscores lines remain: the lessor's side (section 13) +
-      // the personal-data consent appendix — but NOT the renter's section-13 line
-      expect(out.match(/_________________ \/ _______________/g)?.length).toBe(2);
+      // iter14: name-prefilled signature lines. Signed → the renter's ПЭП
+      // block replaces his line; the issuer's line prefills his name; the
+      // personal-data consent line prefills the renter's name. No fully-blank
+      // 17-underscore pair remains in section 13.
+      expect(out.match(/_________________ \/ _______________/g)?.length ?? 0).toBe(0);
+      // issuer + consent lines carry pre-printed names now
+      expect(out).toContain("_________________ / " + (vars.issuer_representative ?? ""));
       // template keeps the HTML entity — htmlToDocx converts &emsp; later
       expect(out).not.toContain("(подпись)&emsp;(Ф.И.О. Арендатора)");
     });
@@ -193,8 +197,11 @@ describe("ПЭП template rendering (RENTAL_DEAL_TEMPLATE + vip-bike crew templa
       const out = applyTemplateVariables(template, vars);
 
       expect(out).not.toContain("Подписано ПЭП");
-      // THREE blank underscore lines: lessor + renter (section 13) + consent appendix
-      expect(out.match(/_________________ \/ _______________/g)?.length).toBe(3);
+      // iter14: unsigned keeps BOTH section-13 lines, now with pre-printed
+      // names (issuer + renter) — only the pen stroke stays blank.
+      expect(out.match(/_________________ \/ _______________/g)?.length ?? 0).toBe(0);
+      expect(out).toContain("_________________ / " + (vars.issuer_representative ?? ""));
+      expect(out).toContain("_________________ / " + (vars.renter_full_name ?? ""));
       expect(out).toContain("(подпись)&emsp;(Ф.И.О. Арендатора)");
     });
   }
@@ -243,10 +250,9 @@ describe("ПЭП template rendering (EQUIPMENT_RENTAL templates)", () => {
       expect(out).toContain("Telegram ID 8935491576 (@liki2222)");
       expect(out).toContain("27.08.2026 19:42 (МСК)");
       expect(out).toContain("(ПЭП Арендатора — акцепт в Telegram, п. 12.3 Договора)");
-      // signed → TWO 17-underscore lines remain: the lessor's section-13
-      // blank line + the act-appendix line (23 underscores, matched as a
-      // substring by the unanchored regex) — but NOT the renter's one
-      expect(out.match(/_________________ \/ _______________/g)?.length).toBe(2);
+      // iter14: signed → renter's line becomes the ПЭП block, issuer's line
+      // prefills his name; the appendix act lines prefill both names.
+      expect(out.match(/_________________ \/ _______________/g)?.length ?? 0).toBe(0);
     });
 
     it(`[${label}] unsigned → classic blank signature lines for both parties`, () => {
@@ -254,9 +260,9 @@ describe("ПЭП template rendering (EQUIPMENT_RENTAL templates)", () => {
       const out = applyTemplateVariables(template, vars);
 
       expect(out).not.toContain("Подписано ПЭП");
-      // THREE 17-underscore lines: lessor + renter (section 13) + the
-      // act-appendix line (23 underscores → substring match)
-      expect(out.match(/_________________ \/ _______________/g)?.length).toBe(3);
+      // iter14: unsigned keeps both section-13 lines with pre-printed names.
+      expect(out.match(/_________________ \/ _______________/g)?.length ?? 0).toBe(0);
+      expect(out).toContain("_________________ / " + (vars.renter_full_name ?? ""));
       expect(out).toContain("(подпись)&emsp;(Ф.И.О. Арендатора)");
     });
   }

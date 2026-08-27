@@ -850,7 +850,14 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     lastSubmitFingerprintRef.current = submitFingerprint;
 
     startSubmitTransition(async () => {
-      const result = await createFranchizeOrderCheckout({
+      // FIX (iter14): a server action can resolve to `undefined` when the
+      // invocation is aborted at the platform level (timeout / connection
+      // drop mid-action). Reading `.success` on that crashed with the raw
+      // "Cannot read properties of undefined (reading 'success')" toast.
+      // Null-coalesce + try/catch so the renter always sees a sane message.
+      let result: Awaited<ReturnType<typeof createFranchizeOrderCheckout>> | undefined;
+      try {
+        result = await createFranchizeOrderCheckout({
         slug,
         orderId,
         telegramUserId: String(user?.id ?? "manual-order"),
@@ -894,9 +901,21 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         // renter signed at checkout — verified server-side (HMAC + user match).
         pepInitData: pepInitData ?? undefined,
       });
-
-      if (!result.success) {
-        toast.error(result.error ?? "Не удалось отправить заказ.", {
+      } catch (submitError) {
+        // eslint-disable-next-line no-console -- client-side diagnostics for aborted actions
+        console.warn("[order] checkout action aborted", submitError);
+        toast.error("Не удалось отправить заказ — соединение прервано. Проверьте чат: возможно, договор уже отправлен.", {
+          duration: 10000,
+          action: {
+            label: "Повторить",
+            onClick: () => handleSubmit(onSubmitValid)(),
+          },
+        });
+        lastSubmitFingerprintRef.current = null;
+        return;
+      }
+      if (!result || typeof result !== "object" || !result.success) {
+        toast.error((result && result.error) ?? "Не удалось отправить заказ.", {
           duration: 10000,
           action: {
             label: "Повторить",

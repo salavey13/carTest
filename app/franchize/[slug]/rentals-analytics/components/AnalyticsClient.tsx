@@ -23,7 +23,7 @@ import type {
   DrawerAction,
   RentalTodo,
 } from "./types";
-import { isServiceRental, localDateOnly, todayLocalIso } from "./lib/analytics-utils";
+import { computeAnalyticsKpis, isRentalRelevantForDate, isServiceRental, localDateOnly, todayLocalIso } from "./lib/analytics-utils";
 import { AnalyticsTabNav } from "./AnalyticsTabNav";
 import { AnalyticsDateNav } from "./AnalyticsDateNav";
 import { AnalyticsKPICards } from "./AnalyticsKPICards";
@@ -116,31 +116,46 @@ export function AnalyticsClient({
   // Display rentals (exclude services from rentals tab + cancelled rentals from KPIs)
   // FIX: cancelled rentals (aborted pre-created) should not pollute KPIs.
   // They remain queryable in the rentals list (for audit) but are excluded here.
-  const displayRentals = useMemo(
-    () => rentals.filter((r) => !isServiceRental(r) && r.status !== "cancelled"),
+  const nonServiceRentals = useMemo(
+    () => rentals.filter((r) => !isServiceRental(r)),
     [rentals],
   );
+  const displayRentals = useMemo(
+    () => nonServiceRentals.filter((r) => r.status !== "cancelled"),
+    [nonServiceRentals],
+  );
 
-  // KPIs (computed from current data + selected date)
-  const kpis: AnalyticsKpis = useMemo(() => {
-    // Use LOCAL date comparison — agreed_end_date is a UTC ISO string but
-    // "returns today" means "in the user's local calendar day".
-    const todayIso = date;
-    const activeCount = displayRentals.filter((r) => r.status === "active").length;
-    const returnsDue = displayRentals.filter((r) => {
-      if (r.status !== "active" || !r.agreed_end_date) return false;
-      return localDateOnly(r.agreed_end_date) === todayIso;
-    }).length;
-    const revenueToday = displayRentals
-      .filter((r) => r.status === "active" || r.status === "completed")
-      .reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0);
-    return {
-      totalToday: displayRentals.length,
-      revenueToday,
-      activeCount,
-      returnsDue,
-    };
-  }, [displayRentals, date]);
+  // FIX (iter14): day-page relevance. The server now returns rentals that
+  // START on the selected day OR END (are returned) on it (±1 day UTC to
+  // absorb MSK). Precisely keep the rows whose MSK calendar start or end
+  // date equals the selected day — a 26→27 rental shows on the 27th as a
+  // return, not as a "started today" rental.
+  const dayPageRentals = useMemo(
+    () => displayRentals.filter((r) => isRentalRelevantForDate(r, date)),
+    [displayRentals, date],
+  );
+  // Rentals visible in the day LIST: the day page + cancelled rows created
+  // that day (audit) — keep the previous audit affordance.
+  const listRentals = useMemo(
+    () =>
+      nonServiceRentals.filter((r) => {
+        if (r.status !== "cancelled") return dayPageRentals.includes(r);
+        const start = localDateOnly(r.requested_start_date || r.agreed_start_date || r.created_at);
+        return start === date;
+      }),
+    [nonServiceRentals, dayPageRentals, date],
+  );
+
+  // KPIs (computed from current data + selected date) — FIX (iter14): each
+  // counter is now scoped to the SELECTED day (MSK calendar):
+  //   Аренд сегодня = rentals STARTED on the day (any non-cancelled status)
+  //   Выручка       = revenue of rentals started on the day (active+completed)
+  //   Активных      = rentals from the day's page currently active
+  //   Возвратов     = rentals whose END date is the day (returned or due back)
+  const kpis: AnalyticsKpis = useMemo(
+    () => computeAnalyticsKpis(dayPageRentals, date),
+    [dayPageRentals, date],
+  );
 
   // Selected rental (with todos + notes + handoff derived from metadata)
   const selectedRental: DrawerRentalRow | null = useMemo(() => {
@@ -330,7 +345,7 @@ export function AnalyticsClient({
                 Загрузка…
               </p>
             </div>
-          ) : activeTab === "rentals" && displayRentals.length === 0 ? (
+          ) : activeTab === "rentals" && listRentals.length === 0 ? (
             <AnalyticsEmptyState
               label={`Нет аренд за ${new Date(date).toLocaleDateString("ru-RU")}`}
               hint="Выберите другую дату или переключите вкладку"
@@ -353,7 +368,7 @@ export function AnalyticsClient({
             />
           ) : activeTab === "rentals" ? (
             <AnalyticsRentalList
-              rentals={displayRentals}
+              rentals={listRentals}
               selectedId={selectedRentalId}
               onSelect={setSelectedRentalId}
               T={T}
