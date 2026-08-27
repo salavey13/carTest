@@ -1,5 +1,8 @@
 import { supabaseAnon } from '@/hooks/supabase'; // Anon for read
 import { NextResponse } from 'next/server';
+
+// Query-param driven GET (reads request.url) → never statically prerender.
+export const dynamic = "force-dynamic";
 import { logger } from '@/lib/logger';
 
 export async function GET(request: Request) {

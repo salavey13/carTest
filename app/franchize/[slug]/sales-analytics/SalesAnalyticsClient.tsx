@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Tag, Mail, User, Bike, Shield, Calendar, RefreshCw, Table2 } from "lucide-react";
+import { Tag, Mail, User, Bike, Shield, Calendar, RefreshCw, Table2, Phone } from "lucide-react";
 
 import { useAppContext } from "@/contexts/AppContext";
 import {
@@ -291,6 +291,15 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
               <div key={sale.id} className="p-4 flex flex-col md:flex-row md:items-center gap-3" style={{ borderColor: borderSoft }}>
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2"><User className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textSecondary }} /><span className="text-sm font-semibold" style={{ color: textPrimary }}>{sale.buyer_full_name || "Без имени"}</span></div>
+                  {/* iter15: buyer phone straight from sale_contract_artifacts.buyer_phone */}
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textSecondary }} />
+                    {sale.buyer_phone ? (
+                      <a href={`tel:${sale.buyer_phone.replace(/[^+\d]/g, "")}`} className="text-xs font-semibold hover:underline" style={{ color: accentMain }}>{sale.buyer_phone}</a>
+                    ) : (
+                      <span className="text-xs italic" style={{ color: textSecondary }}>телефон не указан</span>
+                    )}
+                  </div>
                   {sale.buyer_email && (<div className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textSecondary }} /><a href={`mailto:${sale.buyer_email}`} className="text-xs hover:underline" style={{ color: accentMain }}>{sale.buyer_email}</a></div>)}
                   <div className="flex items-center gap-2"><Bike className="w-3.5 h-3.5 flex-shrink-0" style={{ color: textSecondary }} /><span className="text-xs" style={{ color: textSecondary }}>{sale.vehicle ? `${sale.vehicle.make || ""} ${sale.vehicle.model || ""}`.trim() : "Техника не определена"}</span></div>
                 </div>
@@ -298,6 +307,14 @@ export function SalesAnalyticsClient({ initialSlug, initialDate, crew }: SalesAn
                   <div className="text-lg font-black" style={{ color: accentMain }}>{formatRubles(sale.sale_price)}</div>
                   {sale.warranty_months && (<div className="text-[10px] uppercase tracking-wide" style={{ color: textSecondary }}>Гарантия: {sale.warranty_months} мес.</div>)}
                   <div className="text-[10px]" style={{ color: textSecondary }}>{formatRussianDate(sale.created_at)}</div>
+                  {/* iter15: open the v2 sale drawer (notes + doc download) */}
+                  <a
+                    href={`/franchize/${initialSlug}/rentals-analytics?ui=v2&tab=sales&date=${sale.created_at?.slice(0, 10) || selectedDate}&saleId=${sale.id}`}
+                    className="mt-1 inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-bold transition hover:brightness-110"
+                    style={{ borderColor: withAlpha(accentMain, 0.4), backgroundColor: withAlpha(accentMain, 0.08), color: accentMain }}
+                  >
+                    Детали и договор →
+                  </a>
                 </div>
               </div>
             ))}

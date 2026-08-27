@@ -508,7 +508,7 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
       // resolved against THIS box — which sits below the header in the flex
       // column — so the map starts exactly where the header ends.
       className="relative flex-1 h-full w-full overflow-hidden"
-      style={{ ...cssVars }}
+      style={{ ...cssVars } as React.CSSProperties}
     >
       {/* ── MAP (fullscreen background) ── */}
       <section className="absolute inset-0 z-0">

@@ -196,6 +196,9 @@ export async function POST(request: Request) {
   }
 }
 
+// Query-param driven GET (reads request.url) → never statically prerender.
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);

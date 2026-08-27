@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+
+// Query-param driven GET (reads request.url) → never statically prerender.
+export const dynamic = "force-dynamic";
 import { supabaseAdmin, upsertRow } from "@/lib/supabaseAdmin";
 
 export async function GET(request: Request) {

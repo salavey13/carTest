@@ -97,12 +97,18 @@ export interface SaleDashboardItem {
   id: string;
   contract_key: string;
   buyer_full_name: string | null;
+  buyer_phone: string | null;
   buyer_passport_number: string | null;
   buyer_email: string | null;
   sale_price: string | null;
   price_words: string | null;
   warranty_months: string | null;
   created_at: string;
+  // iter15: delivery + doc-storage context for the sale detail drawer
+  delivery_method: string | null;
+  transport_company_name: string | null;
+  telegram_chat_id: string | null;
+  storage_path: string | null;
   vehicle: {
     id: string;
     make: string;
@@ -739,13 +745,18 @@ export async function getSalesDashboard(input: {
         id,
         contract_key,
         buyer_full_name,
+        buyer_phone,
         buyer_passport_number,
         buyer_email,
         sale_price,
         price_words,
         warranty_months,
         created_at,
-        resolved_bike_id
+        resolved_bike_id,
+        delivery_method,
+        transport_company_name,
+        telegram_chat_id,
+        storage_path
       `)
       .in("resolved_bike_id", crewBikeIds.length ? crewBikeIds : ["__none__"])
       .gte("created_at", startOfDay)
@@ -789,12 +800,17 @@ export async function getSalesDashboard(input: {
           id: sale.id,
           contract_key: sale.contract_key,
           buyer_full_name: sale.buyer_full_name,
+          buyer_phone: sale.buyer_phone ?? null,
           buyer_passport_number: sale.buyer_passport_number,
           buyer_email: sale.buyer_email,
           sale_price: sale.sale_price,
           price_words: sale.price_words,
           warranty_months: sale.warranty_months,
           created_at: sale.created_at,
+          delivery_method: sale.delivery_method ?? null,
+          transport_company_name: sale.transport_company_name ?? null,
+          telegram_chat_id: sale.telegram_chat_id ? String(sale.telegram_chat_id) : null,
+          storage_path: sale.storage_path ?? null,
           vehicle: bike || null,
         });
       }

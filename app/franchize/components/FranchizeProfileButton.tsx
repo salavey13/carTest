@@ -576,7 +576,7 @@ export class CrewButtonErrorBoundary extends Component<CrewButtonErrorBoundaryPr
     return null;
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       return (
         <button

@@ -154,8 +154,10 @@ function normalizeRentalStatus(s: string): RentalStatus {
 function toAnalyticsSale(item: SaleDashboardItem): AnalyticsSaleRow {
   return {
     id: item.id,
+    contract_key: item.contract_key ?? null,
     buyer_full_name: item.buyer_full_name,
-    buyer_phone: null, // v1 SaleDashboardItem doesn't expose phone; v2 reads it from metadata if needed
+    // iter15: getSalesDashboard now selects buyer_phone + delivery context
+    buyer_phone: item.buyer_phone ?? null,
     buyer_email: item.buyer_email,
     sale_price: item.sale_price,
     total_sum: item.sale_price ? Number(item.sale_price) || 0 : null,
@@ -164,6 +166,9 @@ function toAnalyticsSale(item: SaleDashboardItem): AnalyticsSaleRow {
     vehicle: item.vehicle
       ? { make: item.vehicle.make, model: item.vehicle.model }
       : null,
+    delivery_method: item.delivery_method ?? null,
+    transport_company_name: item.transport_company_name ?? null,
+    storage_path: item.storage_path ?? null,
   };
 }
 

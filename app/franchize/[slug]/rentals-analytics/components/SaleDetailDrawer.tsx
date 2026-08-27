@@ -2,21 +2,25 @@
 
 // /analytics/components/SaleDetailDrawer.tsx
 //
-// Lighter sale detail drawer (5 sections):
+// Sale detail drawer (v2 — iter15):
 //   1. Header          — bike title, buyer ФИО, sale badge, close
-//   2. Primary actions  — Open contract / Send by email / Mark signed / Cancel
-//   3. Info grid        — bike, buyer, phone, email, price, total, created, bike_id
-//   4. Notes            — short notes section
-//   5. Sticky footer    — "Открыть продажу →"
+//   2. Primary actions — Download contract (signed URL from Supabase storage)
+//                        / Send by email / Mark signed / Cancel
+//   3. Info grid       — bike, buyer, phone, email, price, total, created, bike_id,
+//                        delivery method (+ transport company when set)
+//   4. Notes           — PERSISTED operator notes (lead_notes keyed "sale:<contract_key>"),
+//                        e.g. «шлем в подарок» — same UX as the rental page notes
+//   5. Sticky footer   — "Открыть продажу →"
 //
-// Mobile: rendered inside AnalyticsMobileSheet.
-// Desktop: right-side panel (max-w-[640px]).
+// Data: instant render from the dashboard row; getSaleDetails enriches with
+// passport/delivery fields, the signed DOCX URL and notes (graceful on failure).
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import {
   X,
-  FileText,
+  FileDown,
   Mail,
   CheckCircle2,
   XCircle,
@@ -24,6 +28,8 @@ import {
   StickyNote,
   Banknote,
 } from "lucide-react";
+import { useAppContext } from "@/contexts/AppContext";
+import { getSaleDetails, addSaleNote, type SaleNoteItem } from "@/app/franchize/server-actions/sale-details";
 import type { ThemeTokens } from "../hooks/useTheme";
 import type { AnalyticsSaleRow, DrawerAction } from "./types";
 import {
@@ -46,35 +52,119 @@ import {
 
 interface SaleDetailDrawerProps {
   sale: AnalyticsSaleRow;
+  /** crew slug for server-action auth */
+  crewSlug: string;
   onClose: () => void;
   onAction: (action: DrawerAction) => void;
-  onAddNote?: (text: string) => void;
   T: ThemeTokens;
   asSheetChild?: boolean;
 }
 
 export function SaleDetailDrawer({
   sale,
+  crewSlug,
   onClose,
   onAction,
-  onAddNote,
   T,
   asSheetChild = false,
 }: SaleDetailDrawerProps) {
+  const { dbUser } = useAppContext();
   const [newNote, setNewNote] = useState("");
   const [openNotes, setOpenNotes] = useState(true);
+  const [notes, setNotes] = useState<SaleNoteItem[]>([]);
+  const [notesLoaded, setNotesLoaded] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [docLoading, setDocLoading] = useState(false);
+  const [savingNote, setSavingNote] = useState(false);
 
   const bikeTitle = getSaleBikeTitle(sale);
   const buyerName = getBuyerName(sale);
   const price = Number(sale.total_sum ?? sale.sale_price) || 0;
   const initials = getInitials(buyerName);
 
+  // ── Enrich: notes + signed DOCX url ─────────────────────────────────────
+  const loadDetails = useCallback(async () => {
+    const actorUserId = dbUser?.user_id;
+    if (!actorUserId) return;
+    try {
+      const result = await getSaleDetails({ actorUserId, crewSlug, saleId: sale.id });
+      if (result.success && result.data) {
+        setNotes(result.data.notes);
+        setDownloadUrl(result.data.downloadUrl);
+      }
+    } catch {
+      // non-fatal — drawer still renders the row data
+    } finally {
+      setNotesLoaded(true);
+    }
+  }, [dbUser?.user_id, crewSlug, sale.id]);
+
+  useEffect(() => {
+    setNotes([]);
+    setNotesLoaded(false);
+    setDownloadUrl(null);
+    void loadDetails();
+  }, [loadDetails]);
+
+  const submitNote = async () => {
+    const text = newNote.trim();
+    const actorUserId = dbUser?.user_id;
+    if (!text || !actorUserId || savingNote) return;
+    setSavingNote(true);
+    try {
+      const result = await addSaleNote({ actorUserId, crewSlug, saleId: sale.id, text });
+      if (result.success && result.data) {
+        setNotes((prev) => [...prev, result.data!]);
+        setNewNote("");
+        toast.success("Заметка сохранена");
+      } else {
+        toast.error(result.error || "Не удалось сохранить заметку");
+      }
+    } catch {
+      toast.error("Не удалось сохранить заметку");
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  // ── Contract download: signed URL opens in a new tab ─────────────────────
+  const onDownloadContract = async () => {
+    if (downloadUrl) {
+      window.open(downloadUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    // Maybe the first fetch failed or the doc was stored after page load — retry once.
+    setDocLoading(true);
+    try {
+      await loadDetails();
+      toast.info("Документ обновляется — нажмите ещё раз");
+    } finally {
+      setDocLoading(false);
+    }
+  };
+
   const primaryActions: PrimaryAction[] = [
-    { icon: FileText,      label: "Договор",     action: "open_rental", color: "#3b82f6" },
-    { icon: Mail,          label: "Отправить",   action: "telegram",    color: "#22c55e" },
-    { icon: CheckCircle2,  label: "Подписан",    action: "complete",    color: "#8b5cf6" },
-    { icon: XCircle,       label: "Отменить",    action: "cancel",      color: "#ef4444" },
+    { icon: FileDown,     label: docLoading ? "Ищем…" : "Договор", action: "open_rental", color: "#3b82f6" },
+    { icon: Mail,         label: "Отправить",   action: "telegram",    color: "#22c55e" },
+    { icon: CheckCircle2, label: "Подписан",    action: "complete",    color: "#8b5cf6" },
+    { icon: XCircle,      label: "Отменить",    action: "cancel",      color: "#ef4444" },
   ];
+
+  const handleAction = (a: DrawerAction) => {
+    if (a === "open_rental") {
+      void onDownloadContract();
+      return;
+    }
+    onAction(a);
+  };
+
+  const deliveryLabel = (() => {
+    if (sale.delivery_method === "transport_company") {
+      return sale.transport_company_name ? `ТК (${sale.transport_company_name})` : "Транспортная компания";
+    }
+    if (sale.delivery_method === "pickup") return "Самовывоз";
+    return sale.delivery_method || null;
+  })();
 
   const infoItems: InfoTile[] = [
     { label: "Байк",       value: bikeTitle },
@@ -83,15 +173,9 @@ export function SaleDetailDrawer({
     { label: "Email",      value: sale.buyer_email || "—", copyable: !!sale.buyer_email },
     { label: "Цена",       value: formatRubles(price), tone: "good" },
     { label: "Сумма итого", value: sale.total_sum != null ? formatRubles(sale.total_sum) : "—" },
+    { label: "Доставка",   value: deliveryLabel || "—" },
     { label: "Создана",    value: formatDateTime(sale.created_at) },
-    { label: "Байк ID",    value: sale.resolved_bike_id || "—" },
   ];
-
-  const submitNote = () => {
-    if (!newNote.trim() || !onAddNote) return;
-    onAddNote(newNote.trim());
-    setNewNote("");
-  };
 
   const content = (
     <>
@@ -129,6 +213,15 @@ export function SaleDetailDrawer({
                 <Banknote className="h-3 w-3" aria-hidden />
                 {formatRubles(price)}
               </span>
+              {sale.contract_key && (
+                <span
+                  className="inline-flex max-w-full items-center gap-1 truncate rounded-full px-3 py-1 text-[11px]"
+                  style={{ background: T.bgCard, color: T.textMuted }}
+                  title={sale.contract_key}
+                >
+                  #{String(sale.contract_key).slice(0, 24)}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -151,9 +244,14 @@ export function SaleDetailDrawer({
       <div className="mt-5">
         <DrawerPrimaryActions
           actions={primaryActions}
-          onAction={(a) => onAction(a as DrawerAction)}
+          onAction={(a) => handleAction(a as DrawerAction)}
           T={T}
         />
+        {!sale.storage_path && notesLoaded && (
+          <p className="mt-2 text-xs" style={{ color: T.textMuted }}>
+            DOCX договора не найден в хранилище — скачайте через CSV-выгрузку или уточните у администратора.
+          </p>
+        )}
       </div>
 
       {/* 3. Info grid */}
@@ -161,7 +259,7 @@ export function SaleDetailDrawer({
         <DrawerInfoGrid items={infoItems} T={T} />
       </div>
 
-      {/* 4. Notes */}
+      {/* 4. Notes — persisted per contract */}
       <div className="mt-5">
         <DrawerSection
           title="Заметки"
@@ -170,17 +268,34 @@ export function SaleDetailDrawer({
           onToggle={() => setOpenNotes(!openNotes)}
           T={T}
         >
-          {onAddNote && (
-            <div className="mb-2">
-              <DrawerAddNoteInput
-                value={newNote}
-                onChange={setNewNote}
-                onSubmit={submitNote}
-                T={T}
-              />
-            </div>
+          <div className="mb-2">
+            <DrawerAddNoteInput
+              value={newNote}
+              onChange={setNewNote}
+              onSubmit={() => void submitNote()}
+              placeholder="Например: шлем в подарок"
+              T={T}
+            />
+          </div>
+          {notes.length === 0 ? (
+            <DrawerEmptyHint label={notesLoaded ? "Заметок нет" : "Загрузка заметок…"} T={T} />
+          ) : (
+            <ul className="space-y-2">
+              {notes.map((n) => (
+                <li
+                  key={n.id}
+                  className="rounded-lg border px-3 py-2 text-sm"
+                  style={{ borderColor: T.borderSoft, background: T.bgCard, color: T.text }}
+                >
+                  <p>{n.text}</p>
+                  <p className="mt-1 text-[11px]" style={{ color: T.textMuted }}>
+                    {n.created_at ? formatDateTime(n.created_at) : ""}
+                    {n.created_by ? ` · ${n.created_by}` : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
           )}
-          <DrawerEmptyHint label="Заметок нет" T={T} />
         </DrawerSection>
       </div>
 

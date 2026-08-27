@@ -129,7 +129,7 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY, extern
       >
         <Drawer.Handle
           className="pointer-events-auto mx-auto mb-1 h-1.5 w-12 rounded-full bg-white/30"
-          onClick={() => setIsOpen((prev) => !prev)}
+          onClick={() => setInternalIsOpen((prev) => !prev)}
         />
         {isOpen ? (
           <Drawer.Content

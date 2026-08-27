@@ -61,6 +61,7 @@ export interface AnalyticsRentalRow {
 
 export interface AnalyticsSaleRow {
   id: string;
+  contract_key?: string | null;
   buyer_full_name: string | null;
   buyer_phone: string | null;
   buyer_email: string | null;
@@ -72,6 +73,7 @@ export interface AnalyticsSaleRow {
   delivery_method?: string | null;
   transport_company_name?: string | null;
   transport_payment_type?: string | null;
+  storage_path?: string | null;
 }
 
 export interface AnalyticsKpis {

@@ -751,6 +751,34 @@ node scripts/backup-supabase.mjs --schema=private
 
 ---
 
+## 🧾 iter15: СДЕЛКИ/АРЕНДЫ — ГДЕ ЧТО ЛЕЖИТ (после правок 2026-08-28)
+
+### Депозит в веб-заказах
+- `payload.depositAmount` из заказа = **бронирование экипажа (500 ₽)**, НЕ депозит!
+- Реальный депозит = `cars.specs.deposit_rub` (например 20 000 ₽ у kawasaki-ex650k).
+- С iter15 веб-заказ пишет в `rentals.metadata`: `deposit_amount`/`deposit_rub` (из спецификаций), `payment_split` ({bank, cash, card_destination}), `equipment`.
+- Цепочка отображения на странице аренды: metadata.deposit_rub → depositRub → deposit_amount → artifact.deposit_rub → specs.deposit_rub.
+- Статусы трекера депозита (`app/franchize/lib/deposit-state.ts`): pending/confirmed → «не получен — внесите при выдаче»; active → «получен при выдаче»; completed → «возвращён»/«удержан».
+
+### Артефакты договоров (private schema)
+- `rental_contract_artifacts.crew_slug` — **NOT NULL**: вставка без него молча падала (у kawasaki артефакта не было вовсе). Теперь заказ пишет `crew_slug`, `renter_phone` (аренда) и `buyer_phone` (продажа).
+- Телефон на странице аренды: artifact.renter_phone → fallback `rentals.metadata.renter_phone`.
+
+### Одометр
+- Страница аренды: pickup_freeze.odometer_km → odometer_before → last_known_odometer → odometer_before_hint → **cars.specs.last_known_odometer** (новый терминальный fallback).
+- Форма «Фиксация выдачи» предзаполняет пробег из той же цепочки + подсказка «Пробег подставлен автоматически (источник)».
+
+### Ссылки в уведомлениях о заказах
+- Теперь deep-link'и Mini App: `https://t.me/<bot>/app?startapp=analytics_rentals_<YYYY-MM-DD>` (также sales/services). Роутер startapp уже понимает `analytics_{tab}[_{date}]`, `analytics_rental_<id>`, `analytics_sale_<id>`.
+
+### Детали продажи (v2 drawer + страница sales-analytics)
+- `getSalesDashboard` отдаёт `buyer_phone`, `delivery_method`, `storage_path`, `contract_key`.
+- Кнопка «Договор» в drawer'е → подписанный URL DOCX из бакета `rental-contracts` (1 час), действие `getSaleDetails` (`app/franchize/server-actions/sale-details.ts`).
+- Заметки по продаже («шлем в подарок») хранятся в `public.lead_notes` с ключом `sale:<contract_key>` — таблица переиспользована без DDL (lead_id — TEXT без FK), лиды их не видят.
+
+### Форвардинг Telegram из скриптов
+- Рабочий эндпоинт: `https://rental.vip-bike.ru/api/forward-telegram` (+ заголовок `Origin: https://nnvolt.ru`). vip-bike.ru/api/* отдаёт 404.
+
 ## 📝 ПРИОРИТЕТНЫЕ ЗАДАЧИ (TODO)
 
 1. **Email с /doc** — добавить отправку email после генерации договора

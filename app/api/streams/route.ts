@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+
+// Query-param driven GET (reads request.url) → never statically prerender.
+export const dynamic = "force-dynamic";
 import { supabaseAnon } from "@/hooks/supabase";
 
 export async function GET(request: Request) {

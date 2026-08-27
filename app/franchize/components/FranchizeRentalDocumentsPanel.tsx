@@ -17,6 +17,10 @@ interface FranchizeRentalDocumentsPanelProps {
   subrenterChatId?: string;
   status: string;
   metadata: RentalMetadata;
+  /** iter15: specs.last_known_odometer from the bike catalog — terminal
+   *  fallback for the pickup-freeze odometer prefill (rows created before
+   *  the hint was seeded, e.g. retro-fixed web orders). */
+  specsOdometerKm?: number | null;
   /** metadata.pep_signature — renter's ПЭП (ст. 5–6 ФЗ-63) status for operators */
   pepSignature?: { telegram_id?: string; username?: string | null; signed_at?: string; doc_sha256?: string } | null;
   /** metadata.doc_sha256 — the CURRENT document fingerprint (stale-signature detection) */
@@ -39,7 +43,7 @@ const freezeChecklistOptions = [
   "Клиент подписал условия",
 ];
 
-export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewSlug, subrenterChatId, status, metadata, pepSignature, currentDocSha, palette, isAuto = false }: FranchizeRentalDocumentsPanelProps) {
+export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewSlug, subrenterChatId, status, metadata, specsOdometerKm, pepSignature, currentDocSha, palette, isAuto = false }: FranchizeRentalDocumentsPanelProps) {
   const { dbUser, userCrewMemberships } = useAppContext();
 
   // All themed values — CSS vars for auto, palette values for manual themes
@@ -79,8 +83,25 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewS
     if (Number.isFinite(freezeOdo) && freezeOdo > 0) return String(freezeOdo);
     const lastKnown = Number(metadata?.last_known_odometer ?? metadata?.odometer_before_hint);
     if (Number.isFinite(lastKnown) && lastKnown > 0) return String(lastKnown);
+    // iter15: bike-specs fallback — WITHOUT this the field renders empty for
+    // retro-fixed web orders and the operator must type the odometer manually
+    // before he can save the handover (and any comment with it).
+    if (specsOdometerKm != null && Number.isFinite(Number(specsOdometerKm)) && Number(specsOdometerKm) >= 0) {
+      return String(specsOdometerKm);
+    }
     return "";
-  }, [metadata]);
+  }, [metadata, specsOdometerKm]);
+  // iter15: source label for the prefill hint (where the number came from)
+  const knownOdometerSource = useMemo((): string | null => {
+    const freezeOdo = Number((metadata?.pickup_freeze as Record<string, any> | undefined)?.odometer_km);
+    if (Number.isFinite(freezeOdo) && freezeOdo > 0) return "сохранённая фиксация выдачи";
+    const lastKnown = Number(metadata?.last_known_odometer ?? metadata?.odometer_before_hint);
+    if (Number.isFinite(lastKnown) && lastKnown > 0) return "последняя известная запись аренды";
+    if (specsOdometerKm != null && Number.isFinite(Number(specsOdometerKm)) && Number(specsOdometerKm) >= 0) {
+      return "спецификация байка (каталог)";
+    }
+    return null;
+  }, [metadata, specsOdometerKm]);
   const [odometerKm, setOdometerKm] = useState(knownOdometer);
   const [fuelLevel, setFuelLevel] = useState("4/5");
   const [freezeNotes, setFreezeNotes] = useState("");
@@ -221,6 +242,11 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewS
 
         {canFreeze && (
           <div className="mt-3 space-y-2 text-sm">
+            {knownOdometer && !pickupFreeze?.frozen_at && (
+              <p className="text-xs" style={{ color: theme.textSecondary }}>
+                💡 Пробег подставлен автоматически ({knownOdometerSource ?? "известное значение"}): {knownOdometer} км — исправьте при необходимости.
+              </p>
+            )}
             <div className="grid gap-2 sm:grid-cols-2">
               <input className="rounded-lg border px-2 py-1.5" style={{ borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.inputText }} value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} placeholder={knownOdometer ? knownOdometer : "Пробег, км"} inputMode="numeric" />
               <input className="rounded-lg border px-2 py-1.5" style={{ borderColor: theme.inputBorder, backgroundColor: theme.inputBg, color: theme.inputText }} value={fuelLevel} onChange={(e) => setFuelLevel(e.target.value)} placeholder="Топливо (например 4/5)" />

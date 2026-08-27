@@ -12,8 +12,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyCrewAccess } from "../_auth";
 import { buildRentalsCsv } from "@/lib/csv-builders/rentals-csv";
 
+// Reads request.url (searchParams) + cookies-based crew auth → must never be
+// statically prerendered (Vercel build fails with DYNAMIC_SERVER_USAGE otherwise).
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
+    // force-dynamic above makes request.url access safe at request time.
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get("slug") || "";
     const from = searchParams.get("from");

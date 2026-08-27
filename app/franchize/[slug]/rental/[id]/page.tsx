@@ -162,11 +162,15 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
   // (from /doc contract) → last_known_odometer / odometer_before_hint (seeded
   // from bike specs at web-order creation so the card shows a reference value
   // even before the handover is frozen).
+  // iter15: specsOdometer (live bike specs) is the terminal fallback — rows
+  // created before the hint was seeded (e.g. the kawasaki retrofix) showed a
+  // misleading «0 км» instead of the real 7 977 км from specs.
   const odometerBefore =
     rentalMeta?.pickup_freeze?.odometer_km
     ?? rentalMeta?.odometer_before
     ?? rentalMeta?.last_known_odometer
     ?? rentalMeta?.odometer_before_hint
+    ?? rental.specsOdometer
     ?? null;
   const odometerAfter = closureData?.odometer_after ?? rentalMeta?.odometer_after ?? null;
   const depositReturned =
@@ -175,7 +179,17 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
       : typeof rentalMeta?.deposit_returned === "boolean"
         ? rentalMeta.deposit_returned
         : null;
-  const depositRub = rentalMeta?.deposit_rub ?? rentalMeta?.depositRub ?? null;
+  // iter15: deposit chain extended — metadata.deposit_amount (web orders now
+  // store the real specs.deposit_rub) → artifact.deposit_rub → bike specs.
+  // The old chain only knew deposit_rub/depositRub from /doc metadata, so web
+  // orders with no artifact rendered NO deposit card at all.
+  const depositRub =
+    rentalMeta?.deposit_rub
+    ?? rentalMeta?.depositRub
+    ?? (typeof rentalMeta?.deposit_amount === "number" && rentalMeta.deposit_amount > 0 ? rentalMeta.deposit_amount : null)
+    ?? rental.artifactDepositRub
+    ?? rental.specsDepositRub
+    ?? null;
   const damageLevel = closureData?.damage_level ?? rentalMeta?.damage_level ?? null;
   const todosDone = Number(rentalMeta?.todos_done ?? 0);
   const todosTotal = Number(rentalMeta?.todos_total ?? 0);
@@ -567,6 +581,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               metadata={rental.metadata}
               palette={p}
               isAuto={isAuto}
+              specsOdometerKm={rental.specsOdometer}
               pepSignature={(rentalMeta?.pep_signature as { telegram_id?: string; username?: string | null; signed_at?: string; doc_sha256?: string } | null) ?? null}
               currentDocSha={(rentalMeta?.doc_sha256 as string | undefined) ?? null}
             />

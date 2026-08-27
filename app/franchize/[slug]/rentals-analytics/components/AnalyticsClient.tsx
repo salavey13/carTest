@@ -436,6 +436,7 @@ export function AnalyticsClient({
               {activeTab === "sales" && selectedSale && (
                 <SaleDetailDrawerInline
                   sale={selectedSale}
+                  crewSlug={initialSlug}
                   T={T}
                   onAction={handleRentalAction}
                   onClose={closeDrawer}
@@ -481,6 +482,7 @@ export function AnalyticsClient({
           {activeTab === "sales" && selectedSale && (
             <SaleDetailDrawer
               sale={selectedSale}
+              crewSlug={initialSlug}
               T={T}
               onAction={handleRentalAction}
               onClose={closeDrawer}
@@ -534,11 +536,13 @@ function RentalDetailDrawerInline({
 
 function SaleDetailDrawerInline({
   sale,
+  crewSlug,
   T,
   onAction,
   onClose,
 }: {
   sale: AnalyticsSaleRow;
+  crewSlug: string;
   T: ThemeTokens;
   onAction: (a: DrawerAction) => void;
   onClose: () => void;
@@ -546,6 +550,7 @@ function SaleDetailDrawerInline({
   return (
     <SaleDetailDrawer
       sale={sale}
+      crewSlug={crewSlug}
       T={T}
       onAction={onAction}
       onClose={onClose}

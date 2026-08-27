@@ -3011,18 +3011,31 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       `Доставка: ${payload.delivery}`,
       `Итого: ${formatMoney(payload.totalAmount)} ₽`,
     );
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://vip-bike.ru";
+    // ── iter15: bot web-app deep links instead of raw site URLs ──────────
+    // A raw https://vip-bike.ru/... link opens in an external browser (login
+    // friction inside Telegram). t.me/<bot>/app?startapp=... opens the Mini App
+    // directly on the right analytics day. The startapp router already
+    // understands analytics_{rentals|sales|services}_{YYYY-MM-DD}.
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot";
+    const deepLinkDate = payload.rentalStartDate || new Date(Date.now() + 3 * 3600 * 1000).toISOString().slice(0, 10);
+    const botAppUrl = (startapp: string) => `https://t.me/${botUsername}/app?startapp=${startapp}`;
     if (isServiceFlow) {
       notificationParts.push(
         ``,
-        `🔧 Сервис: ${siteUrl}/franchize/${payload.slug}/leads`,
-        `📋 Лиды: ${siteUrl}/franchize/${payload.slug}/leads`,
+        `🔧 Сервис: ${botAppUrl(`analytics_services_${deepLinkDate}`)}`,
+        `📋 Лиды: ${botAppUrl(`analytics_services_${deepLinkDate}`)}`,
+      );
+    } else if (isSaleFlow) {
+      notificationParts.push(
+        ``,
+        `🛍️ Продажа: ${botAppUrl(`analytics_sales_${deepLinkDate}`)}`,
+        `📋 Лиды: ${botAppUrl(`analytics_sales_${deepLinkDate}`)}`,
       );
     } else {
       notificationParts.push(
         ``,
-        `🔗 Аренда: ${siteUrl}/franchize/${payload.slug}/rentals`,
-        `📋 Лиды: ${siteUrl}/franchize/${payload.slug}/leads`,
+        `🔗 Аренда: ${botAppUrl(`analytics_rentals_${deepLinkDate}`)}`,
+        `📋 Лиды: ${botAppUrl(`analytics_rentals_${deepLinkDate}`)}`,
       );
     }
 
@@ -3176,7 +3189,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               resolved_bike_id: doc.bikeId,
               telegram_chat_id: payload.telegramUserId,
               telegram_message_id: null,
+              crew_slug: payload.slug || null,
               buyer_full_name: payload.recipient || null,
+              // iter15: phone was NEVER persisted — the sale detail drawer showed
+              // “—” even though the buyer typed it at checkout (falcon-gt case).
+              buyer_phone: payload.phone || null,
               buyer_passport_number: passportStr,
               buyer_passport_issued_by: payload.passportIssuedBy || rentalSecrets?.renter_passport_issued_by || null,
               buyer_passport_issue_date: payload.passportIssueDate || rentalSecrets?.renter_passport_issue_date || null,
@@ -3247,7 +3264,15 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               resolved_bike_id: doc.bikeId, // FIX: now properly resolved to actual bike ID
               telegram_chat_id: payload.telegramUserId,
               telegram_message_id: null,
+              // iter15: crew_slug is NOT NULL in the artifacts tables — the
+              // insert silently failed (PGRST204/23502 logged only) for EVERY
+              // web order, which is why kawasaki had no artifact row at all.
+              crew_slug: payload.slug || null,
               renter_full_name: payload.recipient || null,
+              // iter15: persist the phone — getFranchizeRentalCard reads the
+              // renter's phone from the artifact first; without this column the
+              // rental page showed no phone for web orders (kawasaki case).
+              renter_phone: payload.phone || null,
               renter_passport: passportStr,
               renter_passport_issued_by: payload.passportIssuedBy || rentalSecrets?.renter_passport_issued_by || null,
               renter_passport_issue_date: payload.passportIssueDate || rentalSecrets?.renter_passport_issue_date || null,
@@ -3258,7 +3283,13 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               rent_start_date: rentStartDate || null,
               rent_end_date: rentEndDate || null,
               daily_price: null,
-              deposit_rub: null,
+              // iter15: real expected deposit from bike specs (NOT the 500₽
+              // reservation hold in payload.depositAmount — different things).
+              deposit_rub: (() => {
+                const specs = ((byId.get(doc.bikeId)?.specs as Record<string, unknown> | undefined) ?? {});
+                const parsed = Number(String(specs.deposit_rub ?? specs.deposit ?? "").replace(/[^\d]/g, ""));
+                return Number.isFinite(parsed) && parsed > 0 ? String(parsed) : null;
+              })(),
               total_sum: bikePrice,
               template_version: CURRENT_RENTAL_TEMPLATE_VERSION,
               // NOTE: rental_contract_artifacts has NO metadata column — the old
@@ -3355,6 +3386,42 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           const bikeSpecs = ((byId.get(doc.bikeId)?.specs as Record<string, unknown> | undefined) ?? {});
           const lastKnownOdometer = Number(bikeSpecs.last_known_odometer ?? bikeSpecs.odometer ?? NaN);
 
+          // ── iter15: real deposit + payment split for the rental row ──────
+          // payload.depositAmount is the CREW RESERVATION HOLD (often 500₽) —
+          // NOT the security deposit. The real expected deposit lives in bike
+          // specs (specs.deposit_rub, e.g. 20 000 ₽ for kawasaki-ex650k). Store
+          // the real value in metadata so rental page / analytics never show
+          // the meaningless 500. Payment split mirrors the /doc shape
+          // ({bank, cash, card_destination}) so getPaymentSplit works for both.
+          const expectedDepositRub = (() => {
+            const parsed = Number(String(bikeSpecs.deposit_rub ?? bikeSpecs.deposit ?? "").replace(/[^\d]/g, ""));
+            return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+          })();
+          const rentalPaymentSplit = (() => {
+            const lineTotal = payload.cartLines[bikeIndex]?.lineTotal || 0;
+            const cardDestination = payload.payment === "card" ? "tbank" : null;
+            if (payload.payment === "cash") {
+              return { bank: 0, cash: lineTotal + (expectedDepositRub ?? 0), card_destination: null };
+            }
+            // card / sbp → deposit collected in cash at handover, rest via transfer
+            return { bank: lineTotal, cash: expectedDepositRub ?? 0, card_destination: cardDestination };
+          })();
+          // Equipment parsed from the cart-line perk string (parity with /doc).
+          const rentalEquipment = (() => {
+            const perkStr = String(payload.cartLines[bikeIndex]?.options?.perk || "").toLowerCase();
+            const m = perkStr.match(/шлем\s*[×x]\s*(\d+)/i);
+            return {
+              helmets: m ? Number(m[1]) : (/шлем/.test(perkStr) ? 1 : 0),
+              gloves: /перчатк/.test(perkStr) ? 1 : 0,
+              jacket: /куртк/.test(perkStr),
+              boots: /бот|сапог/.test(perkStr),
+              net: /сетк/.test(perkStr),
+              backpack: /рюкзак/.test(perkStr),
+              bag: /сумк|багажн/.test(perkStr),
+              charger: /зарядк/.test(perkStr),
+            };
+          })();
+
           try {
             const { data: rentalRow, error: rentalInsertError } = await supabaseAdmin
               .from("rentals")
@@ -3383,6 +3450,12 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                   renter_telegram_id: payload.telegramUserId,
                   flow_type: flowType,
                   bike_name: doc.bikeName,
+                  // iter15: real expected deposit from bike specs + split shape
+                  // aligned with /doc (never the 500₽ reservation hold).
+                  ...(expectedDepositRub ? { deposit_amount: expectedDepositRub } : {}),
+                  ...(expectedDepositRub ? { deposit_rub: expectedDepositRub } : {}),
+                  payment_split: rentalPaymentSplit,
+                  equipment: rentalEquipment,
                   ...(Number.isFinite(lastKnownOdometer)
                     ? { last_known_odometer: lastKnownOdometer, odometer_before_hint: lastKnownOdometer }
                     : {}),
@@ -5323,6 +5396,9 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   vehicleId: string;             // QR fix: from rentals.vehicle_id (for QR deep link)
   contractDownloadUrl: string;   // Supabase storage URL for the signed DOCX (empty if not signed)
   subrenterChatId: string;       // iter7: bike's partner owner (specs.subrenter_chat_id) — mini admin
+  specsOdometer: number | null;    // iter15: specs.last_known_odometer — freeze-form prefill fallback
+  specsDepositRub: number | null;  // iter15: specs.deposit_rub — expected-deposit display fallback
+  artifactDepositRub: number | null; // iter15: artifact.deposit_rub — deposit fallback chain
 }> {
   const safeSlug = slug.trim();
   const safeRentalId = rentalId.trim();
@@ -5357,6 +5433,9 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       vehicleId: "",
       contractDownloadUrl: "",
       subrenterChatId: "",
+      specsOdometer: null,
+      specsDepositRub: null,
+      artifactDepositRub: null,
     };
   }
 
@@ -5397,6 +5476,9 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       vehicleId: "",
       contractDownloadUrl: "",
       subrenterChatId: "",
+      specsOdometer: null,
+      specsDepositRub: null,
+      artifactDepositRub: null,
     };
   }
 
@@ -5439,10 +5521,11 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   let renterPhone = "";       // QR fix: for display on rental page
   let docSha256 = "";         // QR fix: for QR deep link generation
   let contractDownloadUrl = "";
+  let artifactDepositRub: number | null = null; // iter15: deposit fallback chain
   try {
     const { data: artefact } = await privateSchema()
       .from("rental_contract_artifacts")
-      .select("renter_full_name, telegram_chat_id, storage_path, renter_phone, original_sha256, created_by_operator_chat_id")
+      .select("renter_full_name, telegram_chat_id, storage_path, renter_phone, original_sha256, created_by_operator_chat_id, deposit_rub")
       .eq("rental_id", safeRentalId)
       .maybeSingle();
     if (artefact) {
@@ -5454,6 +5537,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       renterTelegramChatId = (rawChatId && rawChatId !== operatorChatId) ? rawChatId : "";
       // QR fix: fetch renter_phone + original_sha256 for QR code display on rental page
       renterPhone = typeof artefact.renter_phone === "string" ? artefact.renter_phone : "";
+      const parsedArtifactDeposit = Number(String(artefact.deposit_rub ?? "").replace(/[^\d]/g, ""));
+      if (Number.isFinite(parsedArtifactDeposit) && parsedArtifactDeposit > 0) artifactDepositRub = parsedArtifactDeposit;
       docSha256 = typeof artefact.original_sha256 === "string" ? artefact.original_sha256 : "";
       // If we have a storage_path, generate a signed URL (valid for 1h)
       if (artefact.storage_path) {
@@ -5469,6 +5554,28 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     // Non-fatal: artefact table may not exist or be empty; just log and continue
     console.warn("[getFranchizeRentalCard] artefact fetch failed (non-fatal):", artefactErr);
   }
+
+  // ── iter15 fallbacks for web-order rentals WITHOUT an artifact row ──────
+  // The kawasaki case: serverless died before the artifact insert, so phone /
+  // name came back empty even though rentals.metadata had everything. The
+  // rental row metadata is the primary source for web orders — use it when the
+  // artifact is missing. Also expose bike-specs values (odometer + deposit) so
+  // the page can prefill the pickup-freeze form and show the expected deposit.
+  if (!renterPhone && typeof metadata?.renter_phone === "string" && metadata.renter_phone.trim()) {
+    renterPhone = metadata.renter_phone.trim();
+  }
+  if (!renterFullName && typeof metadata?.renter_name === "string" && metadata.renter_name.trim()) {
+    renterFullName = metadata.renter_name.trim();
+  }
+  const vehicleSpecs = (vehicle?.specs ?? {}) as Record<string, unknown>;
+  const specsOdometer = (() => {
+    const parsed = Number(vehicleSpecs.last_known_odometer ?? vehicleSpecs.odometer ?? NaN);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  })();
+  const specsDepositRub = (() => {
+    const parsed = Number(String(vehicleSpecs.deposit_rub ?? "").replace(/[^\d]/g, ""));
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  })();
 
   return {
     found: true,
@@ -5505,6 +5612,9 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     docSha256,
     vehicleId: (data as any).vehicle_id || "",
     contractDownloadUrl,
+    specsOdometer,
+    specsDepositRub,
+    artifactDepositRub,
   };
 }
 

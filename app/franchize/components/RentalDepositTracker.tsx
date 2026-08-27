@@ -34,25 +34,16 @@ interface RentalDepositTrackerProps {
   borderSoft: string;
 }
 
-type DepositState = "active" | "returned" | "withheld" | "unknown";
+// iter15: pure state machine moved to lib/deposit-state.ts (testable without
+// JSX-transform infra). Icons stay here; colors/labels come from the shared config.
+import { getDepositState, DEPOSIT_STATE_CONFIG, type DepositState } from "../lib/deposit-state";
 
-function getDepositState(
-  status: string,
-  depositReturned: boolean | null | undefined,
-): DepositState {
-  if (status === "completed" || status === "cancelled") {
-    if (depositReturned === true) return "returned";
-    if (depositReturned === false) return "withheld";
-    return "unknown";
-  }
-  return "active";
-}
-
-const stateConfig: Record<DepositState, { color: string; bg: string; icon: typeof Wallet; label: string }> = {
-  active: { color: "#f59e0b", bg: "#f59e0b20", icon: Wallet, label: "получен при выдаче" },
-  returned: { color: "#22c55e", bg: "#22c55e20", icon: CheckCircle2, label: "возвращён ✓" },
-  withheld: { color: "#ef4444", bg: "#ef444420", icon: AlertTriangle, label: "удержан (уточните у оператора)" },
-  unknown: { color: "#6b7280", bg: "#6b728020", icon: ArrowDownCircle, label: "состояние неизвестно" },
+const stateIcons: Record<DepositState, typeof Wallet> = {
+  awaiting: Wallet,
+  active: Wallet,
+  returned: CheckCircle2,
+  withheld: AlertTriangle,
+  unknown: ArrowDownCircle,
 };
 
 export function RentalDepositTracker({
@@ -68,8 +59,8 @@ export function RentalDepositTracker({
   if (!depositRub || depositRub <= 0) return null;
 
   const state = getDepositState(status, depositReturned);
-  const config = stateConfig[state];
-  const Icon = config.icon;
+  const config = DEPOSIT_STATE_CONFIG[state];
+  const Icon = stateIcons[state];
 
   return (
     <div
