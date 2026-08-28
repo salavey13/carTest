@@ -3,9 +3,14 @@ import type { Metadata } from "next";
 // FIX (iter14): the checkout server action (doc generation + DB writes +
 // Telegram fan-out) regularly exceeds the default serverless timeout — the
 // live kawasaki order (order-mtbnsf97-zukmfy) died right after the doc was
-// delivered, before the rental row was written. Allow up to 5 minutes
-// (Vercel caps by plan; longer values are simply clamped).
-export const maxDuration = 300;
+// delivered, before the rental row was written.
+// FIX (hotfix follow-up): Vercel does NOT clamp maxDuration to the plan limit —
+// values above 60 hard-fail the BUILD on the Hobby plan
+// ("invalid maxDuration value ... must have a maxDuration between 1 and 60 for
+// plan hobby"). 60 is the maximum Hobby allows; if the checkout ever needs
+// longer, either upgrade to Pro (max 300) or move the heavy work to a
+// background queue.
+export const maxDuration = 60;
 
 import { getFranchizeBySlug } from "../../../actions";
 import { CrewFooter } from "../../../components/CrewFooter";
