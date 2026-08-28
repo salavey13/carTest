@@ -46,11 +46,13 @@ export function OrderSummary({ cartLines, subtotal, crew }: OrderSummaryProps) {
       <p className="text-2xl font-semibold" style={{ color: T.text }}>{cartLines.length}</p>
 
       {/* Per-line breakdown */}
+      {/* break-words: long bike titles wrap to the next line (never truncate,
+          never overflow the aside width on mobile) */}
       {rentLines.length > 0 && (
         <div className="mt-3 space-y-1.5">
           {rentLines.map((l) => (
-            <div key={l.lineId} className="flex items-baseline justify-between gap-2 text-sm">
-              <div className="min-w-0 flex-1 truncate" style={{ color: T.text }}>
+            <div key={l.lineId} className="flex items-start justify-between gap-2 text-sm">
+              <div className="min-w-0 flex-1 break-words" style={{ color: T.text }}>
                 {l.item?.title ?? "Позиция"}
                 {l.qty > 1 && <span className="ml-1 opacity-60">× {l.qty}</span>}
               </div>
@@ -73,8 +75,8 @@ export function OrderSummary({ cartLines, subtotal, crew }: OrderSummaryProps) {
       {serviceLines.length > 0 && (
         <div className="mt-3 space-y-1.5">
           {serviceLines.map((l) => (
-            <div key={l.lineId} className="flex items-baseline justify-between gap-2 text-sm">
-              <div className="min-w-0 flex-1 truncate" style={{ color: T.text }}>
+            <div key={l.lineId} className="flex items-start justify-between gap-2 text-sm">
+              <div className="min-w-0 flex-1 break-words" style={{ color: T.text }}>
                 {l.item?.title ?? "Услуга"}
                 {l.qty > 1 && <span className="ml-1 opacity-60">× {l.qty}</span>}
               </div>

@@ -67,8 +67,10 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
         {/* RIGHT: Info */}
         <div className="flex-1 min-w-0">
           {/* Title row with edit button */}
+          {/* break-words: long bike titles wrap to the next line (never truncate,
+              never overflow the card width on mobile) */}
           <div className="flex items-start justify-between gap-2 min-w-0">
-            <h2 className="text-base font-semibold truncate min-w-0 flex-1" style={{ color: T.text }}>
+            <h2 className="break-words text-base font-semibold min-w-0 flex-1" style={{ color: T.text }}>
               {line.item?.title ?? "Позиция недоступна"}
             </h2>
 

@@ -186,9 +186,10 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
     >
       <CartShimmerStyle />
       {/* Breadcrumb */}
+      {/* break-all: long crew names/urls wrap instead of pushing the page wider */}
       <nav aria-label="Breadcrumb" className="mb-2">
         <p
-          className="text-xs uppercase tracking-[0.2em]"
+          className="break-all text-xs uppercase tracking-[0.2em]"
           style={{ color: T.accent }}
         >
           / FRANCHIZE / {crew.header.brandName?.toUpperCase() ?? slug.toUpperCase()} / CART

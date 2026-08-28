@@ -1171,7 +1171,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         ["--order-progress-gradient-end" as string]: accentHover,
       }}
     >
-      <p className="text-xs uppercase tracking-[0.2em] text-[var(--order-accent)]">
+      <p className="break-all text-xs uppercase tracking-[0.2em] text-[var(--order-accent)]">
         /franchize/{slug}/order/{orderId}
       </p>
       <h1 className="mt-2 text-2xl font-semibold">Оформление заказа</h1>
@@ -1838,8 +1838,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
           </div>
 
-        <aside className="h-fit rounded-2xl border p-4" style={surface.card}>
-          <p className="text-sm" style={surface.mutedText}>Заказ #{orderId}</p>
+        <aside className="h-fit min-w-0 rounded-2xl border p-4" style={surface.card}>
+          <p className="break-all text-sm" style={surface.mutedText}>Заказ #{orderId}</p>
 
           {isCartEmpty ? (
             <div className="mt-3 rounded-xl border border-dashed p-3 text-sm" style={surface.subtleCard}>
@@ -1855,36 +1855,41 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             <>
               <ul className="mt-2 space-y-2 text-sm">
                 {cartLines.map((line) => (
-                  <li key={line.lineId} className="flex justify-between gap-2">
-                    <span>
+                  <li key={line.lineId} className="flex items-start justify-between gap-2">
+                    {/* min-w-0 + break-words: long bike titles wrap fully
+                        (no truncate, no clamping) instead of overflowing the
+                        aside → no horizontal scroll on mobile */}
+                    <span className="min-w-0 flex-1 break-words">
                       {line.item?.title ?? "Позиция недоступна"} × {line.qty}
                       {line.rentalPeriod && (
                         <span className="block text-[11px]" style={surface.mutedText}>{line.rentalPeriod}</span>
                       )}
                     </span>
-                    <span>{line.lineTotal.toLocaleString("ru-RU")} ₽</span>
+                    <span className="shrink-0 text-right">{line.lineTotal.toLocaleString("ru-RU")} ₽</span>
                   </li>
                 ))}
               </ul>
 
               <div className="mt-3 border-t border-[var(--order-border)] pt-3 text-sm">
-                <p className="mt-1 flex justify-between"><span>Оплата</span><span>{payments.find((item) => item.id === payment)?.label ?? payment}</span></p>
+                {/* flex-wrap + min-w-0: long values (dates, promo codes) wrap to
+                    the next line instead of pushing the aside wider than the screen */}
+                <p className="mt-1 flex flex-wrap justify-between gap-x-2"><span>Оплата</span><span className="min-w-0 break-words text-right">{payments.find((item) => item.id === payment)?.label ?? payment}</span></p>
                 {resolvedStartDate && resolvedEndDate && (
-                  <p className="mt-1 flex justify-between"><span>Период</span><span>{formatRuDateFromISO(resolvedStartDate)} → {formatRuDateFromISO(resolvedEndDate)}</span></p>
+                  <p className="mt-1 flex flex-wrap justify-between gap-x-2"><span>Период</span><span className="min-w-0 break-words text-right">{formatRuDateFromISO(resolvedStartDate)} → {formatRuDateFromISO(resolvedEndDate)}</span></p>
                 )}
-                <p className="mt-2 flex justify-between"><span>Подытог</span><span>{subtotal.toLocaleString("ru-RU")} ₽</span></p>
+                <p className="mt-2 flex flex-wrap justify-between gap-x-2"><span>Подытог</span><span className="min-w-0 break-words text-right">{subtotal.toLocaleString("ru-RU")} ₽</span></p>
                 {extrasTotal > 0 && (
-                  <p className="mt-1 flex justify-between"><span>Доп. опции</span><span>{extrasTotal.toLocaleString("ru-RU")} ₽</span></p>
+                  <p className="mt-1 flex flex-wrap justify-between gap-x-2"><span>Доп. опции</span><span className="min-w-0 break-words text-right">{extrasTotal.toLocaleString("ru-RU")} ₽</span></p>
                 )}
                 {appliedPromo && (
-                  <p className="mt-1 flex justify-between" style={{ color: T.isLight ? "#047857" : "#34d399" }}>
-                    <span>Промокод {appliedPromo.code}</span>
-                    <span>{promoDiscount > 0 ? `−${promoDiscount.toLocaleString("ru-RU")} ₽` : "бонус"}</span>
+                  <p className="mt-1 flex flex-wrap justify-between gap-x-2" style={{ color: T.isLight ? "#047857" : "#34d399" }}>
+                    <span className="min-w-0 break-words">Промокод {appliedPromo.code}</span>
+                    <span className="shrink-0">{promoDiscount > 0 ? `−${promoDiscount.toLocaleString("ru-RU")} ₽` : "бонус"}</span>
                   </p>
                 )}
-                <p className="mt-2 flex justify-between text-base font-bold" style={{ color: T.accent }}>
+                <p className="mt-2 flex flex-wrap justify-between gap-x-2 text-base font-bold" style={{ color: T.accent }}>
                   <span>Итого</span>
-                  <span>{totalAmount.toLocaleString("ru-RU")} ₽</span>
+                  <span className="shrink-0">{totalAmount.toLocaleString("ru-RU")} ₽</span>
                 </p>
               </div>
 
@@ -1938,8 +1943,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               <p className="mt-2 text-xs" style={surface.mutedText}>{submitHint}</p>
 
               <div className="mt-3 rounded-xl border border-[var(--order-border)] p-3 text-xs" style={surface.subtleCard}>
-                <p style={surface.mutedText}>Адрес выдачи: {pickupAddress}</p>
-                <p className="mt-1" style={surface.mutedText}>Документы: {requiredDocs.join(", ")}.</p>
+                <p className="break-words" style={surface.mutedText}>Адрес выдачи: {pickupAddress}</p>
+                <p className="mt-1 break-words" style={surface.mutedText}>Документы: {requiredDocs.join(", ")}.</p>
               </div>
             </>
           )}
