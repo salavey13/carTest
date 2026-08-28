@@ -44,3 +44,4 @@ nnvolt-static/.env*
 /download/vip-bike-rent.csv
 /download/vip-bike-rentals.csv
 /download/vip-bike-sale.csv
+backups/

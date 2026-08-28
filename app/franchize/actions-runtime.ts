@@ -3046,7 +3046,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     notificationParts.push(
       `Оплата: ${payload.payment}`,
       `Доставка: ${payload.delivery}`,
-      `Итого: ${formatMoney(payload.totalAmount)} ₽`,
+      // FIX (nbsp): formatMoney emits U+00A0 group separators — normalize to
+      // plain spaces so Telegram doesn't wrap the line one-char-per-line.
+      `Итого: ${formatMoney(payload.totalAmount).replace(/[  ]/g, " ")} ₽`,
     );
     // ── iter15: bot web-app deep links instead of raw site URLs ──────────
     // A raw https://vip-bike.ru/... link opens in an external browser (login
@@ -3055,7 +3057,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // understands analytics_{rentals|sales|services}_{YYYY-MM-DD}.
     const botUsername = process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot";
     const deepLinkDate = payload.rentalStartDate || new Date(Date.now() + 3 * 3600 * 1000).toISOString().slice(0, 10);
-    const botAppUrl = (startapp: string) => `https://t.me/${botUsername}/app?startapp=${startapp}`;
+    const botAppUrl = (startapp: string) => `<a href="https://t.me/${botUsername}/app?startapp=${startapp}">${startapp}</a>`;
     if (isServiceFlow) {
       notificationParts.push(
         ``,
@@ -3557,13 +3559,22 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // ── Notify renter + crew owner + admin with a Mini App deep link ──────
         // The renter opens /franchize/{slug}/rental/{id} in the web app to add
         // ДО/ПОСЛЕ photos; the owner/admin activate the rental from the same page.
+        //
+        // FIX (2026-08-29, "одна буква на строку"): formatMoney() uses
+        // toLocaleString("ru-RU") which inserts U+00A0 (nbsp) group separators —
+        // combined with long HTML lines, Telegram's wrapping algorithm broke the
+        // notification into one character per line on mobile. All notification
+        // text is now normalized: nbsp/narrow-nbsp → regular space.
         if (createdRentals.length > 0) {
           const botUsername = process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot";
+          // Normalize Unicode spaces that break Telegram's line wrapping
+          // (U+00A0 nbsp from toLocaleString, U+202F narrow nbsp) → plain space.
+          const tgText = (s: string) => s.replace(/[   ]/g, " ");
           const fmtRu = (iso: string) => {
             const d = new Date(iso);
             return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
           };
-          const renterLines = [
+          const renterLines = tgText([
             `🏍 <b>Аренда создана</b>`,
             ``,
             ...createdRentals.map((r) => [
@@ -3573,7 +3584,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             ].join("\n")),
             ``,
             `Откройте страницу аренды в приложении — там можно добавить фото байка ДО поездки, скачать договор и написать менеджеру.`,
-          ].join("\n");
+          ].join("\n"));
 
           const notifyTargets = new Set<string>([String(adminChatId), String(crewOwnerChatId || "")]);
           for (const target of notifyTargets) {
@@ -3582,7 +3593,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               const { sendComplexMessage } = await import("@/app/webhook-handlers/actions/sendComplexMessage");
               await sendComplexMessage(
                 target,
-                [
+                tgText([
                   `🔑 <b>Новая аренда ожидает активации</b> (#${payload.orderId})`,
                   ``,
                   ...createdRentals.map((r) => `🏍 ${r.bikeName} · ${fmtRu(r.startIso)} → ${fmtRu(r.endIso)} · ${formatMoney(r.totalRub)} ₽`).join("\n"),
@@ -3590,7 +3601,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                   `Получатель: ${payload.recipient}`,
                   `Телефон: ${payload.phone}`,
                   `Одометр подскажет страница аренды (последнее известное значение подгружено из карточки байка).`,
-                ].join("\n"),
+                  ``,
+                  `<a href="https://t.me/${botUsername}/app?startapp=rentals_analytics">📈 Аналитика аренд</a>`,
+                ].join("\n")),
                 createdRentals.length === 1
                   ? [[{ text: "🔑 Открыть аренду", url: `https://t.me/${botUsername}/app?startapp=rental_${createdRentals[0].rentalId}` }]]
                   : createdRentals.map((r) => [{ text: `🔑 ${r.bikeName}`, url: `https://t.me/${botUsername}/app?startapp=rental_${r.rentalId}` }]),
@@ -3639,14 +3652,14 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               const { sendComplexMessage } = await import("@/app/webhook-handlers/actions/sendComplexMessage");
               await sendComplexMessage(
                 subrenterChatId,
-                [
+                tgText([
                   `🔑 <b>Новая аренда вашего байка</b>`,
                   ``,
                   `🏍 ${r.bikeName} · ${fmtRu(r.startIso)} → ${fmtRu(r.endIso)} · ${formatMoney(r.totalRub)} ₽`,
                   ``,
                   `Получатель: ${payload.recipient}`,
                   `Аренда ожидает активации оператором экипажа.`,
-                ].join("\n"),
+                ].join("\n")),
                 [[{ text: "🔑 Открыть аренду", url: `https://t.me/${botUsername}/app?startapp=rental_${r.rentalId}` }]],
                 { parseMode: "HTML" },
               );

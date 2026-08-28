@@ -659,10 +659,16 @@ export function useStartParamRouter() {
             targetPath = `/franchize/${crewSlug}/rental/${parsed.rentalId}`;
             logger.info(`[ClientLayout] Routing to dedicated rental page: ${targetPath}`);
           }
-        } else if (paramToProcess.startsWith("analytics_")) {
+        } else if (paramToProcess.startsWith("analytics_") || paramToProcess === "rentals_analytics" || paramToProcess.startsWith("rentals_analytics_")) {
           // ── Analytics deep links: analytics_{tab}, analytics_{tab}_{date}, ──
           // ── analytics_rental_{id}, analytics_sale_{id} ──
-          const parsed = parseAnalyticsDeepLink(paramToProcess);
+          // ── rentals_analytics / rentals_analytics_{date} (alias used in notifications) ──
+          const analyticsParam = paramToProcess.startsWith("analytics_")
+            ? paramToProcess
+            : paramToProcess === "rentals_analytics"
+              ? "analytics_rentals"
+              : `analytics_rentals_${paramToProcess.slice("rentals_analytics_".length)}`;
+          const parsed = parseAnalyticsDeepLink(analyticsParam);
           if (parsed) {
             const crewSlug = userCrewInfo?.slug || "vip-bike";
             const params = new URLSearchParams({ ui: "v2" });
