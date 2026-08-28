@@ -779,6 +779,28 @@ node scripts/backup-supabase.mjs --schema=private
 ### Форвардинг Telegram из скриптов
 - Рабочий эндпоинт: `https://rental.vip-bike.ru/api/forward-telegram` (+ заголовок `Origin: https://nnvolt.ru`). vip-bike.ru/api/* отдаёт 404.
 
+---
+
+## 🧾 HOTFIX 2026-08-28: ЦЕНЫ СКЛАДЫВАЛИСЬ КАК СТРОКИ (веб-заказ аренды)
+
+### Корневая причина
+- У 12+ байков в `cars.specs` (JSONB) ценовые поля лежат **строками**: yamaha-r7 `dailyPrice:"10000"`, ducati-panigale-s-electro-gold, rerode-r1-plus, honda-cbr600rr-2003, aprilia-shiver, hmd-m02, motoland-breakout, nibbler-regumoto-4v, y-volt-surge-v и др. (kawasaki-ex650k — числа, поэтому у него всё сходилось).
+- `lib/rental-pricing-calculator.ts` возвращал спеки как есть → `totalRub = price + helmetRub` = `"10000" + 2000` = **"100002000"** (конкатенация!). Тот же мусор тек в модалку Item, корзину, итог заказа и priceBreakdown.
+
+### Что исправлено
+- **`lib/rental-pricing-calculator.ts`** — хелпер `num()` (coerce строки/пробелы/запятые, undefined для NaN/≤0) на КАЖДОМ чтении спеки; все выходы (`totalRub`, `basePriceRub`, `helmetRub`, `depositRub`) гарантированно числа. Интерфейс `BikePricingSpecs` расширен до `number | string`.
+- **Шлемы не считались в корзине**: модалка пишет перк как `«Шлем ×2»` (с пробелом!), а парсер корзины был `/шлем×(\d+)/` без пробела → helmetRub=0, корзина 10 000 ₽ при модалке 12 000 ₽. Теперь `/шлем\s*[×x]\s*(\d+)/i` — общий `app/franchize/lib/perk-parse.ts` (парсер корзины `parseHelmetCount` + серверный `parseHelmetCountFromPerk` с fallback «шлем»→1, как в actions-runtime equipment).
+- **`useFranchizeCartLines.ts`** — `Number()` страховка на lineTotal/priceBreakdown/subtotal.
+- **`Item.tsx`** — `grandTotal = Number(result.totalRub) + nonHelmetExtras`, `fmt()` тоже Number().
+- **`app/franchize/lib/pricing-calculator.ts`** (локальный калькулятор контрактов) — все возвраты через `validatePositiveNumber` (раньше guard валидировал, а возвращалась сырая строка); починен NaN-баг приоритета `??`/тернарника в fallbackRate; `require(date-utils)` → статический импорт (ESM/vitest).
+- **`app/lib/rental-contract-vars.ts`** — priceBreakdown.totalRub доверяем ТОЛЬКО если это настоящее число; строка → пересчёт по тарифам из спеков (zod и так срезает priceBreakdown у свежих заказов, защита для retry-пути).
+- **Серверный хил `app/franchize/lib/order-money-sanitize.ts`** (вызывается в `buildFranchizeOrderDocAndNotify` после загрузки cars): coerce всех денежных полей + **пересчёт rental-линий из спеков** (даты+время+шлемы из перка); при расхождении >1 ₽ серверное значение побеждает — лечит мусор от закэшированных старых фронтендов Telegram WebApp в окне деплоя. Нечисловый priceBreakdown отбрасывается. subtotal/extrasTotal/totalAmount пересчитываются как на странице заказа. Testdrive/sale/service/equipment-линии не пересчитываются.
+- Живая БД просканирована: мусорных сумм НЕТ (total_cost/артефакты/order-пейлоады чисты — zod срезал priceBreakdown, контракт пересчитывался на сервере; kawasaki — числовые спеки). `daily_price`/`deposit_rub` в артефактах хранятся строками с корректными значениями — это норма билдера.
+
+### Тесты
+- `tests/franchize/hotfix-string-prices.spec.ts` (34): num(), калькулятор на строковых спеках (yamaha-r7 живые значения: 12000 за день+2 шлема, а не "100002000"), перк-парсеры, sanitize-хил (мусор 100002000→12000, промо-математика, qty, testdrive/sale/service skip), контракт-билдер (строчный breakdown → пересчёт 32000, числовой → доверие).
+- Полный franchize-набор: 37 файлов, 600 passed / 8 skipped. tsc strict slice: PASS, долгов −23 (pricing-calculator.ts: 16→0 ошибок). lint:target: 0 warnings.
+
 ## 📝 ПРИОРИТЕТНЫЕ ЗАДАЧИ (TODO)
 
 1. **Email с /doc** — добавить отправку email после генерации договора

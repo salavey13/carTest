@@ -20,6 +20,7 @@ import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context
 import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
 import { CURRENT_RENTAL_TEMPLATE_VERSION } from "@/lib/rental-template-version";
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets, type RentalContractVariables } from "@/app/lib/rental-contract-vars";
+import { sanitizeFranchizeOrderMoneyFields } from "@/app/franchize/lib/order-money-sanitize";
 import { resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 import { formatRuDate } from "@/app/franchize/lib/date-utils";
@@ -2165,6 +2166,38 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     }
 
     const byId = new Map((cars || []).map((car) => [car.id, car]));
+
+    // ── HOTFIX (2026-08-28, "prices summed as strings") ────────────────────
+    // Several bikes store price fields as TEXT in specs JSONB, and the old
+    // pricing calculator returned them raw — cart/order totals concatenated
+    // ("10000" + 2000 → "100002000"). The calculator is fixed now, but users
+    // on a stale cached Telegram WebApp frontend still submit old payloads,
+    // and the retry path replays stored payloads that bypass zod. Sanitize +
+    // heal everything server-side BEFORE any doc/rental/total is derived:
+    // rental line totals are recomputed from bike specs, string-typed money
+    // fields are coerced, garbage priceBreakdowns are dropped.
+    try {
+      const sanitizeResult = sanitizeFranchizeOrderMoneyFields(
+        payload as never,
+        byId as never,
+        (message, meta) => logger.warn(message, meta),
+      );
+      if (sanitizeResult.healedLines > 0 || sanitizeResult.totalsRewritten) {
+        logger.warn("[franchize] order money fields sanitized", {
+          orderId: payload.orderId,
+          ...sanitizeResult,
+        });
+      }
+    } catch (sanitizeError) {
+      // Never let sanitation itself kill an order — coercion failures just
+      // leave the payload as delivered (zod already guarantees number types
+      // for fresh submissions).
+      logger.error("[franchize] order money sanitize failed (continuing)", {
+        orderId: payload.orderId,
+        error: sanitizeError instanceof Error ? sanitizeError.message : String(sanitizeError),
+      });
+    }
+
     const extrasRows = payload.extras.length
       ? payload.extras
           .map((extra) => `| ${extra.label} | 1 | ${formatMoney(extra.amount)} ₽ | ${formatMoney(extra.amount)} ₽ |`)

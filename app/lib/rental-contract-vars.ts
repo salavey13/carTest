@@ -678,8 +678,19 @@ export function buildRentalContractVariables(
   let tierLabel = '';
   let tierUnit = '';
   let tierPrice = 0;
-  if (options.priceBreakdown) {
-    subtotal = options.priceBreakdown.totalRub;
+  // HOTFIX (string prices): only trust a priceBreakdown whose totalRub is a
+  // REAL finite number. The web-app cart used to send totalRub as a string
+  // ("100002000" — string-spec sum) via the raw retry payload; zod strips
+  // priceBreakdown on fresh orders, but the stored-payload retry path can
+  // still carry the old string garbage. A non-number totalRub falls through
+  // to the tier-aware recompute below (which is string-safe).
+  const clientBreakdownTotal = options.priceBreakdown?.totalRub;
+  const trustedBreakdown =
+    typeof clientBreakdownTotal === "number" &&
+    Number.isFinite(clientBreakdownTotal) &&
+    clientBreakdownTotal >= 0;
+  if (options.priceBreakdown && trustedBreakdown) {
+    subtotal = clientBreakdownTotal as number;
   } else {
     // Tier-aware pricing: uses price_per_3h, price_per_6h, price_per_12h, weekday/weekend, multi-day tiers
     const specsForPricing = {

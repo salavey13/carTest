@@ -5,6 +5,7 @@ import type { FranchizeCartState } from "./useFranchizeCart";
 import type { CatalogItemVM } from "../actions";
 import { useFranchizeCart } from "./useFranchizeCart";
 import { hasServicePrice } from "../lib/catalog-utils";
+import { parseHelmetCount } from "../lib/perk-parse";
 
 const packageMultiplier: Record<string, number> = {
   base: 1,
@@ -60,13 +61,9 @@ function parseDurationDays(rawDuration: string): number {
   return days;
 }
 
-// Parse helmet count from perk string (e.g., "шлем×2" → 2, "стандарт" → 0)
-function parseHelmetCount(perk: string): number {
-  const match = perk.match(/шлем×(\d+)/i);
-  if (!match) return 0;
-  const count = Number(match[1]);
-  return Math.max(0, Math.min(2, Number.isFinite(count) ? count : 0));
-}
+// Helmet count parsing lives in lib/perk-parse.ts (pure, testable).
+// parseHelmetCount is re-exported for existing importers.
+export { parseHelmetCount };
 
 
 export type CartFlowType = "rental" | "sale" | "service";
@@ -269,19 +266,25 @@ export function useFranchizeCartLines(
               line.options.rentEndTime || "10:00",
               parseHelmetCount(line.options.perk)
             );
+            // HOTFIX (string prices): belt-and-suspenders — the calculator
+            // now coerces string specs to numbers, but a regression would
+            // silently turn `lineTotal` back into string-sum garbage
+            // ("10000" + 2000 → "100002000"). Number() here guarantees the
+            // cart subtotal can never concatenate again.
+            const resultTotal = Number(result.totalRub) || 0;
             priceBreakdown = {
-              totalRub: result.totalRub,
-              basePriceRub: result.basePriceRub,
-              helmetRub: result.helmetRub,
-              depositRub: result.depositRub,
-              savingsRub: result.savingsRub,
-              savingsPercent: result.savingsPercent,
+              totalRub: resultTotal,
+              basePriceRub: Number(result.basePriceRub) || 0,
+              helmetRub: Number(result.helmetRub) || 0,
+              depositRub: Number(result.depositRub) || 0,
+              savingsRub: Number(result.savingsRub) || 0,
+              savingsPercent: Number(result.savingsPercent) || 0,
               tier: result.tier,
             };
             // The line total now follows the pricing calculator, NOT
             // the day-rate × days formula. This is what makes a
             // 3-hour rental cost 3 000 ₽ instead of 12 000 ₽.
-            lineTotal = result.totalRub * line.qty;
+            lineTotal = resultTotal * line.qty;
             rentalPeriod = result.breakdown.period;
           } catch {
             // Fallback to day-rate total if the calculator throws —
@@ -321,7 +324,13 @@ export function useFranchizeCartLines(
       });
   }, [cart, itemById]);
 
-  const subtotal = useMemo(() => cartLines.reduce((sum, line) => sum + line.lineTotal, 0), [cartLines]);
+  // HOTFIX (string prices): Number() coercion on the reduce seed AND each
+  // lineTotal — a string lineTotal from any future regression would
+  // concatenate into the subtotal instead of adding.
+  const subtotal = useMemo(
+    () => cartLines.reduce((sum, line) => sum + (Number(line.lineTotal) || 0), 0),
+    [cartLines],
+  );
 
   return {
     cartLines,

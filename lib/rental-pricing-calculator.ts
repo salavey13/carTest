@@ -1,18 +1,36 @@
 import { differenceInHours, differenceInDays } from "date-fns";
 
 export interface BikePricingSpecs {
-  price_per_hour?: number;
-  price_per_2h?: number;
-  price_per_3h?: number;
-  price_per_6h?: number;
-  price_per_12h?: number;
-  dailyPrice?: number;
-  rent_weekday?: number;
-  rent_weekend?: number;
-  rent_2_4d?: number;
-  rent_5_10d?: number;
-  rent_11_30d?: number;
-  deposit_rub?: number;
+  price_per_hour?: number | string;
+  price_per_2h?: number | string;
+  price_per_3h?: number | string;
+  price_per_6h?: number | string;
+  price_per_12h?: number | string;
+  dailyPrice?: number | string;
+  rent_weekday?: number | string;
+  rent_weekend?: number | string;
+  rent_2_4d?: number | string;
+  rent_5_10d?: number | string;
+  rent_11_30d?: number | string;
+  deposit_rub?: number | string;
+}
+
+/**
+ * HOTFIX (2026-08-28, "prices summed as strings"): specs JSONB in Supabase
+ * stores price fields as TEXT for many bikes (e.g. yamaha-r7 has
+ * dailyPrice: "10000", not 10000). Every arithmetic read of a spec value
+ * MUST go through `num()` — a raw `specs.dailyPrice + helmetRub` on a string
+ * spec concatenates ("10000" + 2000 → "100002000") instead of adding.
+ * Returns undefined when the value is missing / not finite / <= 0 so the
+ * existing `?? fallback` chains keep working unchanged.
+ */
+export function num(value: unknown): number | undefined {
+  if (value === null || value === undefined) return undefined;
+  const raw = typeof value === "string"
+    ? Number(value.replace(/\s/g, "").replace(",", "."))
+    : Number(value);
+  if (!Number.isFinite(raw) || raw <= 0) return undefined;
+  return raw;
 }
 
 export type PricingTier =
@@ -98,36 +116,42 @@ function normalizeHourlyRental(hours: number): {
 }
 
 function getHourlyPrice(specs: BikePricingSpecs, hours: number): number {
-  // Exact tier matches
-  if (hours === 2 && specs.price_per_2h) return specs.price_per_2h;
-  if (hours === 3 && specs.price_per_3h) return specs.price_per_3h;
-  if (hours === 6 && specs.price_per_6h) return specs.price_per_6h;
-  if (hours === 12 && specs.price_per_12h) return specs.price_per_12h;
+  // Exact tier matches (num() coerces string specs — see HOTFIX note above)
+  if (hours === 2 && num(specs.price_per_2h)) return num(specs.price_per_2h)!;
+  if (hours === 3 && num(specs.price_per_3h)) return num(specs.price_per_3h)!;
+  if (hours === 6 && num(specs.price_per_6h)) return num(specs.price_per_6h)!;
+  if (hours === 12 && num(specs.price_per_12h)) return num(specs.price_per_12h)!;
 
-  const baseHourly = specs.price_per_hour ?? DEFAULT_HOURLY_PRICE;
+  const baseHourly = num(specs.price_per_hour) ?? DEFAULT_HOURLY_PRICE;
 
   // Interpolation for non-exact hours between tiers
   if (hours <= 1) return baseHourly * hours;
   if (hours < 3) {
     // Interpolate between price_per_hour and price_per_3h
-    if (specs.price_per_3h && specs.price_per_hour) {
-      return Math.round(specs.price_per_hour + (specs.price_per_3h - specs.price_per_hour) * (hours - 1) / 2);
+    const perHour = num(specs.price_per_hour);
+    const per3h = num(specs.price_per_3h);
+    if (per3h && perHour) {
+      return Math.round(perHour + (per3h - perHour) * (hours - 1) / 2);
     }
     return baseHourly * hours;
   }
   if (hours < 6) {
     // Interpolate between price_per_3h and price_per_6h
-    if (specs.price_per_3h && specs.price_per_6h) {
-      return Math.round(specs.price_per_3h + (specs.price_per_6h - specs.price_per_3h) * (hours - 3) / 3);
+    const per3h = num(specs.price_per_3h);
+    const per6h = num(specs.price_per_6h);
+    if (per3h && per6h) {
+      return Math.round(per3h + (per6h - per3h) * (hours - 3) / 3);
     }
-    return specs.price_per_6h ?? baseHourly * hours;
+    return num(specs.price_per_6h) ?? baseHourly * hours;
   }
   if (hours < 12) {
     // Interpolate between price_per_6h and price_per_12h
-    if (specs.price_per_6h && specs.price_per_12h) {
-      return Math.round(specs.price_per_6h + (specs.price_per_12h - specs.price_per_6h) * (hours - 6) / 6);
+    const per6h = num(specs.price_per_6h);
+    const per12h = num(specs.price_per_12h);
+    if (per6h && per12h) {
+      return Math.round(per6h + (per12h - per6h) * (hours - 6) / 6);
     }
-    return specs.price_per_12h ?? baseHourly * hours;
+    return num(specs.price_per_12h) ?? baseHourly * hours;
   }
 
   return baseHourly * hours;
@@ -149,26 +173,27 @@ function getDailyPrice(
     if (startDateStr) {
       const startDay = new Date(startDateStr + "T00:00:00").getDay();
       const isStartWeekend = startDay === 0 || startDay === 6;
-      if (isStartWeekend && specs.rent_weekend) {
-        return specs.rent_weekend;
+      const weekendRate = num(specs.rent_weekend);
+      if (isStartWeekend && weekendRate) {
+        return weekendRate;
       }
     }
-    return specs.dailyPrice ?? specs.rent_weekday ?? DEFAULT_DAILY_PRICE;
+    return num(specs.dailyPrice) ?? num(specs.rent_weekday) ?? DEFAULT_DAILY_PRICE;
   }
 
   if (days >= 2 && days <= 4) {
-    return (specs.rent_2_4d ?? specs.dailyPrice ?? DEFAULT_DAILY_PRICE) * days;
+    return (num(specs.rent_2_4d) ?? num(specs.dailyPrice) ?? DEFAULT_DAILY_PRICE) * days;
   }
 
   if (days >= 5 && days <= 10) {
-    return (specs.rent_5_10d ?? specs.dailyPrice ?? DEFAULT_DAILY_PRICE) * days;
+    return (num(specs.rent_5_10d) ?? num(specs.dailyPrice) ?? DEFAULT_DAILY_PRICE) * days;
   }
 
   if (days >= 11 && days <= 30) {
-    return (specs.rent_11_30d ?? specs.dailyPrice ?? DEFAULT_DAILY_PRICE) * days;
+    return (num(specs.rent_11_30d) ?? num(specs.dailyPrice) ?? DEFAULT_DAILY_PRICE) * days;
   }
 
-  return (specs.dailyPrice ?? DEFAULT_DAILY_PRICE) * days;
+  return (num(specs.dailyPrice) ?? DEFAULT_DAILY_PRICE) * days;
 }
 
 /**
@@ -221,16 +246,18 @@ function calculateBasePrice(
 
   // Multi-day: blend weekend rate for weekend days + weekday rate for weekday days
   if (days > 1 && weekendDayCount > 0 && specs.rent_weekend && specs.rent_weekday) {
+    const weekendRate = num(specs.rent_weekend)!;
+    const weekdayRate = num(specs.rent_weekday)!;
     const weekdayDayCount = days - weekendDayCount;
-    const price = weekendDayCount * specs.rent_weekend + weekdayDayCount * specs.rent_weekday;
+    const price = weekendDayCount * weekendRate + weekdayDayCount * weekdayRate;
     const tier = getPricingTier(hours, days);
-    const baseDailyRate = (weekendDayCount * specs.rent_weekend + weekdayDayCount * specs.rent_weekday) / days;
+    const baseDailyRate = (weekendDayCount * weekendRate + weekdayDayCount * weekdayRate) / days;
     return { price, tier, baseDailyRate };
   }
 
   const price = getDailyPrice(specs, days, weekendDayCount, startDateStr);
   const tier = getPricingTier(hours, days);
-  const baseDailyRate = specs.dailyPrice ?? specs.rent_weekday ?? DEFAULT_DAILY_PRICE;
+  const baseDailyRate = num(specs.dailyPrice) ?? num(specs.rent_weekday) ?? DEFAULT_DAILY_PRICE;
 
   return { price, tier, baseDailyRate };
 }
@@ -249,6 +276,11 @@ export function calculatePrice(
   const hours = differenceInHours(end, start);
   const days = differenceInDays(end, start);
 
+  // HOTFIX: helmetCount must be numeric too — a string count ("2") would
+  // make helmetRub = "2" * 1000 = 2000 via coercion today, but any future
+  // `+` usage would concatenate. Coerce once at entry.
+  const helmets = num(helmetCount) ?? 0;
+
   const normalized = normalizeHourlyRental(hours);
   const weekendDayCount = countWeekendDays(startDate, endDate);
   const { price, tier, baseDailyRate } = calculateBasePrice(
@@ -259,8 +291,12 @@ export function calculatePrice(
     startDate,
   );
 
-  const helmetRub = helmetCount * getHelmetPrice(hours);
-  const depositRub = specs.deposit_rub ?? DEFAULT_DEPOSIT_RUB;
+  const helmetRub = helmets * getHelmetPrice(hours);
+  const depositRub = num(specs.deposit_rub) ?? DEFAULT_DEPOSIT_RUB;
+  // HOTFIX: `price` and `helmetRub` are guaranteed numbers now. Previously,
+  // with string specs (dailyPrice: "10000") `price` was the raw string and
+  // this line produced "100002000" — the string-sum bug every consumer
+  // (modal, cart, order page, contract) inherited.
   const totalRub = price + helmetRub;
 
   let savingsRub = 0;
@@ -268,7 +304,7 @@ export function calculatePrice(
 
   if (hours < 24) {
     // Hourly: compare vs hourly rate
-    const baseHourly = specs.price_per_hour ?? DEFAULT_HOURLY_PRICE;
+    const baseHourly = num(specs.price_per_hour) ?? DEFAULT_HOURLY_PRICE;
     const fullPrice = baseHourly * hours;
     savingsRub = Math.max(0, fullPrice - price);
     if (fullPrice > 0) {
@@ -314,12 +350,12 @@ export function validateBikePricing(specs: BikePricingSpecs): {
   needsAdminFix?: boolean;
 } {
   const hasAnyPricing = !!(
-    specs.dailyPrice ||
-    specs.price_per_hour ||
-    specs.rent_weekday ||
-    specs.rent_2_4d ||
-    specs.rent_5_10d ||
-    specs.rent_11_30d
+    num(specs.dailyPrice) ||
+    num(specs.price_per_hour) ||
+    num(specs.rent_weekday) ||
+    num(specs.rent_2_4d) ||
+    num(specs.rent_5_10d) ||
+    num(specs.rent_11_30d)
   );
 
   if (!hasAnyPricing) {

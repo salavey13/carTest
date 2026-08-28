@@ -904,9 +904,12 @@ function PriceCard({
   // Subtract helmet cost from extrasTotal (already counted in result.helmetRub)
   const helmetFromExtras = extrasSelection ? (typeof extrasSelection.helmet === "number" ? (extrasSelection.helmet as number) * helmetUnitPrice : 0) : 0;
   const nonHelmetExtras = extrasTotal - helmetFromExtras;
-  const grandTotal = result.totalRub + nonHelmetExtras;
+  // HOTFIX (string prices): Number() — specs JSONB stores prices as strings
+  // for several bikes, and a raw `result.totalRub + extras` concatenated
+  // ("10000" + 500 → "10000500") instead of adding.
+  const grandTotal = Number(result.totalRub) + nonHelmetExtras;
 
-  const fmt = (n: number) => n.toLocaleString("ru-RU");
+  const fmt = (n: unknown) => Number(n).toLocaleString("ru-RU");
 
   return (
     <div
