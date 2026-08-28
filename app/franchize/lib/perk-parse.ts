@@ -40,3 +40,38 @@ export function parseHelmetCountFromPerk(perk: unknown): number {
   }
   return /шлем/i.test(perkStr) ? 1 : 0;
 }
+
+/**
+ * FIX (2026-08-29, "gloves not priced"): parse the NON-helmet extras from
+ * the cart line's perk string into a selection object for the pricing
+ * calculator. Label regexes mirror actions-runtime's rentalEquipment parse
+ * and the Item modal's extrasSummary() output ("Шлем ×1, Перчатки, Куртка").
+ *
+ * The perk string is the ONLY channel the extras selection travels through
+ * (modal → cart line options.perk), so this is the single parse point for
+ * both the cart hook (client) and the order-money sanitizer (server).
+ */
+export type PerkExtras = {
+  gloves: boolean;
+  jacket: boolean;
+  pants: boolean;
+  boots: boolean;
+  net: boolean;
+  backpack: boolean;
+  bag: boolean;
+  charger: boolean;
+};
+
+export function parseExtrasFromPerk(perk: unknown): PerkExtras {
+  const perkStr = String(perk ?? "").toLowerCase();
+  return {
+    gloves: /перчатк/.test(perkStr),
+    jacket: /куртк/.test(perkStr),
+    pants: /штан/.test(perkStr),
+    boots: /бот[аы]|сапог/.test(perkStr),
+    net: /сетк/.test(perkStr),
+    backpack: /рюкзак/.test(perkStr),
+    bag: /сумк|багажн/.test(perkStr),
+    charger: /зарядк/.test(perkStr),
+  };
+}

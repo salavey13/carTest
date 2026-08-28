@@ -47,6 +47,8 @@ export interface PricingResult {
   totalRub: number;
   basePriceRub: number;
   helmetRub: number;
+  /** Non-helmet extras (gloves, jacket, pants, boots, net, backpack, bag). Charger is free (0). */
+  extrasRub: number;
   depositRub: number;
   savingsRub: number;
   savingsPercent: number;
@@ -65,6 +67,44 @@ const HELMET_PRICE_HOURLY_RUB = 500;
 const DEFAULT_DEPOSIT_RUB = 20000;
 const DEFAULT_DAILY_PRICE = 10000;
 const DEFAULT_HOURLY_PRICE = 1000; // v2 formula: 10% of daily
+
+/**
+ * FIX (2026-08-29, "gloves not priced"): the calculator used to price ONLY
+ * helmets — gloves/jacket/pants/boots/net/backpack/bag were silently FREE
+ * in the cart and order (the Item modal added them locally, so modal and
+ * cart disagreed: modal 13 500 ₽, cart 13 000 ₽). Single source of truth for
+ * extra-equipment pricing — must stay in sync with the contract builder
+ * (app/lib/rental-contract-vars.ts equipmentCostTotal) and the Item modal's
+ * ADDITIONAL_ITEMS table.
+ */
+export const RENTAL_EXTRAS_PRICES_RUB: Record<RentalExtraKey, number> = {
+  gloves: 500,
+  jacket: 500,
+  pants: 500,
+  boots: 500,
+  net: 500,
+  backpack: 500,
+  bag: 500,
+  charger: 0, // free — tracked for return only
+};
+
+export type RentalExtraKey = "gloves" | "jacket" | "pants" | "boots" | "net" | "backpack" | "bag" | "charger";
+
+/** Extras selection passed to calculatePrice — booleans, mirrors the modal's toggles. */
+export type RentalExtrasSelection = Partial<Record<RentalExtraKey, boolean | number>>;
+
+/** Sum the priced extras (charger = 0). A truthy value counts as selected. */
+export function calculateExtrasRub(extras?: RentalExtrasSelection): number {
+  if (!extras) return 0;
+  let sum = 0;
+  for (const key of Object.keys(RENTAL_EXTRAS_PRICES_RUB) as RentalExtraKey[]) {
+    const val = extras[key];
+    if (val === true || (typeof val === "number" && val > 0)) {
+      sum += RENTAL_EXTRAS_PRICES_RUB[key];
+    }
+  }
+  return sum;
+}
 
 /**
  * Get helmet price based on rental tier.
@@ -268,7 +308,10 @@ export function calculatePrice(
   endDate: string,
   startTime: string,
   endTime: string,
-  helmetCount: number
+  helmetCount: number,
+  /** FIX (2026-08-29): non-helmet extras (gloves, jacket, …) — priced flat
+   *  per item, charger free. Optional so every existing caller keeps working. */
+  extras?: RentalExtrasSelection,
 ): PricingResult {
   const start = new Date(`${startDate}T${startTime}`);
   const end = new Date(`${endDate}T${endTime}`);
@@ -292,12 +335,14 @@ export function calculatePrice(
   );
 
   const helmetRub = helmets * getHelmetPrice(hours);
+  const extrasRub = calculateExtrasRub(extras);
   const depositRub = num(specs.deposit_rub) ?? DEFAULT_DEPOSIT_RUB;
   // HOTFIX: `price` and `helmetRub` are guaranteed numbers now. Previously,
   // with string specs (dailyPrice: "10000") `price` was the raw string and
   // this line produced "100002000" — the string-sum bug every consumer
   // (modal, cart, order page, contract) inherited.
-  const totalRub = price + helmetRub;
+  // FIX (2026-08-29): extrasRub joins the sum — gloves etc. are no longer free.
+  const totalRub = price + helmetRub + extrasRub;
 
   let savingsRub = 0;
   let savingsPercent = 0;
@@ -330,6 +375,7 @@ export function calculatePrice(
     totalRub,
     basePriceRub: price,
     helmetRub,
+    extrasRub,
     depositRub,
     savingsRub,
     savingsPercent,

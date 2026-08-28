@@ -155,9 +155,29 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   // Telegram's initData (HMAC-signed by Telegram) with the order — the
   // server verifies it and embeds the ПЭП line into the contract (п. 12.3).
   const [pepInitData, setPepInitData] = useState<string | null>(null);
+  const [pepUserOptedOut, setPepUserOptedOut] = useState(false);
+  // FIX (2026-08-29, "docs sent without ПЭП"): ПЭП is now DEFAULT-ON. The
+  // toggle used to be opt-in and renters never tapped it — every web order
+  // went out with a blank handwritten-signature line (only the renter's
+  // name), which the owner read as "ПЭП is broken". Submitting the order
+  // already implies contract acceptance (signatureAccepted: true is sent
+  // unconditionally), so signing with the verified Telegram identity is the
+  // honest default; the card below still lets the renter opt OUT.
+  useEffect(() => {
+    if (pepInitData || pepUserOptedOut) return;
+    try {
+      const initData = (window as any).Telegram?.WebApp?.initData;
+      if (typeof initData === "string" && initData.length >= 32) {
+        setPepInitData(initData);
+      }
+    } catch {
+      // no Telegram context — stays opt-in via the card
+    }
+  }, [isInTelegramContext, pepInitData, pepUserOptedOut]);
   const handlePepSignToggle = () => {
     if (pepInitData) {
       setPepInitData(null);
+      setPepUserOptedOut(true);
       return;
     }
     try {

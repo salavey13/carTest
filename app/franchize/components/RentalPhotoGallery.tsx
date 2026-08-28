@@ -61,6 +61,12 @@ export function RentalPhotoGallery({
   const [startPhotos, setStartPhotos] = useState<Photo[]>([]);
   const [endPhotos, setEndPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
+  // FIX (2026-08-29, "photos don't appear"): the old fetch path swallowed
+  // EVERY failure silently (401 expired session, network error, non-JSON
+  // response) — the gallery just looked empty forever while the upload toast
+  // had already said "Фото ДО добавлено". Now a failed fetch shows an explicit
+  // error row with a retry button instead of a phantom-empty gallery.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [uploadingType, setUploadingType] = useState<"start" | "end" | null>(null);
   const [lightboxPhoto, setLightboxPhoto] = useState<Photo | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -68,6 +74,7 @@ export function RentalPhotoGallery({
 
   const loadPhotos = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const resp = await fetch(
         `/api/franchize/rental-photos?rentalId=${rentalId}`,
@@ -79,14 +86,17 @@ export function RentalPhotoGallery({
           const photos: Photo[] = (data.photos || []).filter((p: Photo) => p.signedUrl);
           setStartPhotos(photos.filter((p) => p.photoType === "start"));
           setEndPhotos(photos.filter((p) => p.photoType === "end"));
+        } else {
+          setLoadError(String(data.error || "Не удалось загрузить фото."));
         }
       } else if (resp.status === 401) {
-        // CR fix: show session-expired message instead of silent empty gallery
-        setStartPhotos([]);
-        setEndPhotos([]);
+        // Session expired — tell the user instead of a silent empty gallery
+        setLoadError("Сессия истекла — откройте приложение заново, чтобы увидеть фото.");
+      } else {
+        setLoadError(`Не удалось загрузить фото (код ${resp.status}).`);
       }
     } catch {
-      // network error — gallery is non-critical
+      setLoadError("Сеть недоступна — фото не загрузились.");
     } finally {
       setLoading(false);
     }
@@ -238,6 +248,27 @@ export function RentalPhotoGallery({
 
   return (
     <div className="space-y-3">
+      {/* FIX (2026-08-29): explicit fetch-failure state with retry — a silent
+          empty gallery right after a successful upload toast was reported as
+          "photos don't appear". */}
+      {loadError && (
+        <div
+          className="flex items-center justify-between gap-2 rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-xs"
+          role="alert"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0 text-rose-400" />
+            <span className="min-w-0 truncate" style={{ color: "var(--franchize-text-secondary, #ccc)" }}>{loadError}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => void loadPhotos()}
+            className="shrink-0 rounded-md border border-rose-400/40 px-2 py-1 text-[11px] font-semibold text-rose-200 transition hover:bg-rose-500/10"
+          >
+            Повторить
+          </button>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         {/* ДО column */}
         <PhotoColumn
@@ -245,6 +276,9 @@ export function RentalPhotoGallery({
           icon="📸"
           photoType="start"
           photos={startPhotos}
+          // FIX (2026-08-29): server-side counter (rentals.start_photo_count)
+          // keeps the badge honest while the client list is loading or failed.
+          fallbackCount={initialStartCount}
           canUpload={canUpload}
           uploading={uploadingType === "start"}
           onUpload={(files) => handleBatchUpload("start", files)}
@@ -261,6 +295,7 @@ export function RentalPhotoGallery({
           icon="📷"
           photoType="end"
           photos={endPhotos}
+          fallbackCount={initialEndCount}
           canUpload={canUpload}
           uploading={uploadingType === "end"}
           onUpload={(files) => handleBatchUpload("end", files)}
@@ -273,8 +308,9 @@ export function RentalPhotoGallery({
       </div>
 
       {/* Soft warning when both are empty (v1: non-blocking).
-          I3 hotfix (M4): hidden in compact mode — analytics drawer can't act on it. */}
-      {!compact && startPhotos.length === 0 && endPhotos.length === 0 && (
+          I3 hotfix (M4): hidden in compact mode — analytics drawer can't act on it.
+          FIX (2026-08-29): also hidden while a fetch error is shown above. */}
+      {!compact && !loadError && startPhotos.length === 0 && endPhotos.length === 0 && (
         <div
           className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs"
           style={{ color: "var(--franchize-text-secondary, #999)" }}
@@ -372,6 +408,9 @@ interface PhotoColumnProps {
   icon: string;
   photoType: "start" | "end";
   photos: Photo[];
+  /** Server-side counter (rentals.start/end_photo_count) shown while the
+   * signed list hasn't loaded — keeps the badge honest during load/fail. */
+  fallbackCount?: number;
   canUpload: boolean;
   uploading: boolean;
   // I4 enhancement: batch upload — onUpload now receives an array of files
@@ -388,6 +427,7 @@ function PhotoColumn({
   label,
   icon,
   photos,
+  fallbackCount = 0,
   canUpload,
   uploading,
   onUpload,
@@ -415,20 +455,26 @@ function PhotoColumn({
           className="rounded-full px-2 py-0.5 text-[10px] font-medium"
           style={{
             backgroundColor:
-              photos.length === 0
+              photos.length === 0 && fallbackCount === 0
                 ? "rgba(245, 158, 11, 0.15)"
                 : "rgba(34, 197, 94, 0.15)",
-            color: photos.length === 0 ? "#f59e0b" : "#22c55e",
+            color: photos.length === 0 && fallbackCount === 0 ? "#f59e0b" : "#22c55e",
           }}
         >
-          {photos.length}
+          {photos.length > 0 ? photos.length : fallbackCount}
         </span>
       </div>
 
       {photos.length === 0 ? (
-        <p className="mt-2 text-[10px]" style={{ color: "var(--franchize-text-secondary, #999)" }}>
-          Нет фото
-        </p>
+        fallbackCount > 0 ? (
+          <p className="mt-2 text-[10px]" style={{ color: "var(--franchize-text-secondary, #999)" }}>
+            {fallbackCount} фото — обновите, чтобы показать
+          </p>
+        ) : (
+          <p className="mt-2 text-[10px]" style={{ color: "var(--franchize-text-secondary, #999)" }}>
+            Нет фото
+          </p>
+        )
       ) : (
         <div className={`mt-2 grid ${compact ? "grid-cols-2" : "grid-cols-3"} gap-1.5`}>
           {photos.map((photo) => (

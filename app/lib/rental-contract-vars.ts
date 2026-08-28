@@ -203,6 +203,11 @@ export type PepSignatureMeta = {
   username?: string;
   /** ISO timestamp of the signature act */
   signedAt: string;
+  /** SHA-256 of the signed initData string (the cryptographic signature
+   * material). Rendered into the doc's ПЭП block so the printed contract
+   * carries an verifiable fingerprint — the audit trail (doc_sha256 +
+   * init_data_sha256) lives in metadata.pep_signature. */
+  initDataSha256?: string;
 };
 
 /**
@@ -952,11 +957,19 @@ export function buildRentalContractVariables(
         const pad = (n: number) => String(n).padStart(2, "0");
         const mskStamp = `${pad(mskDate.getUTCDate())}.${pad(mskDate.getUTCMonth() + 1)}.${mskDate.getUTCFullYear()} ${pad(mskDate.getUTCHours())}:${pad(mskDate.getUTCMinutes())} (МСК)`;
         const who = `Telegram ID ${meta.pep.telegramId}${meta.pep.username ? ` (@${meta.pep.username})` : ""}`;
+        // FIX (2026-08-29, "no sha in the doc"): fingerprint now embeds the
+        // SHA-256 of the signed initData (first 16 hex chars) — the doc's
+        // ПЭП block renders it under the signature line. The doc's own
+        // SHA-256 can't be embedded in itself (chicken-and-egg); the initData
+        // sha fingerprints the cryptographic signature act instead, and the
+        // full doc hash is bound in metadata.pep_signature.doc_sha256.
+        const initSha = String(meta.pep.initDataSha256 || "").replace(/[^a-f0-9]/gi, "").slice(0, 16);
+        const fingerprint = `pep:tg:${meta.pep.telegramId}${initSha ? `:${initSha}` : ""}`;
         return {
           pep_signed: "1",
           renter_signature: who,
           signature_timestamp: mskStamp,
-          signature_fingerprint: meta.signatureFingerprint || `pep:tg:${meta.pep.telegramId}`,
+          signature_fingerprint: meta.signatureFingerprint || fingerprint,
         };
       }
       return {

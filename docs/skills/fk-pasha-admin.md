@@ -801,6 +801,31 @@ node scripts/backup-supabase.mjs --schema=private
 - `tests/franchize/hotfix-string-prices.spec.ts` (34): num(), калькулятор на строковых спеках (yamaha-r7 живые значения: 12000 за день+2 шлема, а не "100002000"), перк-парсеры, sanitize-хил (мусор 100002000→12000, промо-математика, qty, testdrive/sale/service skip), контракт-билдер (строчный breakdown → пересчёт 32000, числовой → доверие).
 - Полный franchize-набор: 37 файлов, 600 passed / 8 skipped. tsc strict slice: PASS, долгов −23 (pricing-calculator.ts: 16→0 ошибок). lint:target: 0 warnings.
 
+## 🧾 iter16 2026-08-29: ПЭП ПО УМОЛЧАНИЮ + ЭКИПИРОВКА В ЦЕНЕ + ФОТО-ГАЛЕРЕЯ
+
+### 1. ПЭП: договоры уходили БЕЗ подписи (chat_id/sha отсутствовали)
+- **Корень**: карта ПЭП на чекауте была opt-in — арендаторы её не нажимали, `pepInitData` никогда не уходил (проверено по живым `franchize_order_notifications.payload` — ни одного `pepInitData` во ВСЕХ заказах). Договор печатался с классической пустой строкой «____ / ФИО» — владелец читал это как «ПЭП сломан».
+- **Фикс**: `OrderPageClient` — ПЭП теперь **включён по умолчанию** (useEffect захватывает `Telegram.WebApp.initData`, если он валиден); карта осталась для отказа (`pepUserOptedOut` — автозахват не включит обратно после явного отказа). Отправка заказа и так шлёт `signatureAccepted: true`.
+- **sha в документе**: `PepSignatureMeta.initDataSha256` → fingerprint `pep:tg:<id>:<sha16>` рендерится в блоке ПЭП всех 4 шаблонов («Отпечаток подписи (SHA-256 initData)»). SHA самого DOCX внутрь файла вложить нельзя (курица-яйцо) — он остаётся в `metadata.pep_signature.doc_sha256`.
+
+### 2. Экипировка не считалась в цене (перчатки бесплатны!)
+- **Корень**: `calculatePrice` ценил ТОЛЬКО шлемы. Перчатки/куртка/штаны/боты/сетка/рюкзак/сумка ехали в перке, но нигде не прайсились. Модалка Item прибавляла их вручную (13 500), а корзина/заказ — нет (13 000). Живой случай: aprilia «Шлем ×1, Перчатки» = 13 000 вместо 13 500.
+- **Фикс**: `RENTAL_EXTRAS_PRICES_RUB` (gloves/jacket/pants/boots/net/backpack/bag = 500, charger = 0) + `calculateExtrasRub()` в `lib/rental-pricing-calculator.ts`; `calculatePrice` получил опциональный `extras`-параметр, результат — `extrasRub`. Модалка теперь передаёт выбор В калькулятор (ручное сложение убрано — иначе double-count). Корзина парсит перк через `parseExtrasFromPerk` (label-regex зеркалит серверный equipment-парс). Серверный хил `order-money-sanitize` тоже пересчитывает с extras (клиент 13 000 → хил 13 500).
+- Контракт-билдер (`rental-contract-vars` equipmentCostTotal) уже считал всё правильно — теперь source of truth один.
+
+### 3. Фото «ДО»: тост success, галерея пустая
+- **Пайплайн проверен end-to-end живьём** (Playwright + валидная сессия владельца): загрузка → 8 строк в `rental_photos` + стор, листинг API → подписанные URL, галерея рендерит 8 фото. Сервер ОК.
+- **Реальные дыры, закрытые фиксами**: (а) `getFranchizeRentalCard` НЕ выбирал `start_photo_count/end_photo_count` → `initialStartCount` ВСЕГДА 0; (б) галерея глотала ВСЕ ошибки листинга молча (401 истёкшей сессии/сеть) → вечная «пустая» галерея после успешного тоста загрузки. Теперь: счётчики из БД (fallback-бейдж «8 фото»), явная строка ошибки + кнопка «Повторить», янтарный банер «Фото не добавлены» скрыт при ошибке.
+
+### Живые данные (retrofix scripts/iter16-retrofix.mjs + iter16-retrofix2.mjs)
+- **Ducati Panigale S Electro Black Aero** (38d0af71, Нектарий): total 10 000 → **8 000**, депозит 20 000 → **15 000** (deposit_amount, md.deposit_amount, md.deposit_rub, payment_split, artifact total_sum/deposit_rub) + manual_correction note.
+- **Aprilia Shiver 750** (c01cb3b3, Лобанов): total 13 000 → **11 000** (байк 10 000 по договорённости + шлем 1 000, перчатки в подарок), payment_split, artifact; note «Перчатки — в подарок».
+- Проверено браузером: страницы показывают «Итого: 8 000 ₽ / ДЕПОЗИТ: 15 000 ₽» и «Итого: 11 000 ₽ / ДЕПОЗИТ: 20 000 ₽».
+
+### Тесты
+- `tests/franchize/iter16-suite.spec.ts` (23): extras-цены (aprilia 13 500, все позиции, hourly), `parseExtrasFromPerk`, sanitize-хил перчаток (13 000→13 500 + без ложного хила), ПЭП default-on (source guards), fingerprint `pep:tg:<id>:<sha16>`, шаблоны, счётчики фото + error state галереи.
+- Полный franchize-набор: 39 файлов, 645 passed / 8 skipped (+1 с живыми кредами). tsc strict slice: PASS. lint:target: 0.
+
 ## 📝 ПРИОРИТЕТНЫЕ ЗАДАЧИ (TODO)
 
 1. **Email с /doc** — добавить отправку email после генерации договора

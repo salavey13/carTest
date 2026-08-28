@@ -886,13 +886,18 @@ function PriceCard({
 
   // Dynamic import of calculatePrice (client-side only)
   const { calculatePrice, getHelmetPrice } = require("@/lib/rental-pricing-calculator");
+  // FIX (2026-08-29, "gloves not priced"): extras are now passed INTO the
+  // shared calculator — the cart, the modal and the server recompute all
+  // price gloves/jacket/pants/boots/net/backpack/bag identically. The manual
+  // `+ nonHelmetExtras` addition below is gone (it would double-count now).
   const result = calculatePrice(
     specs as any,
     startDate,
     endDate,
     startTime || "10:00",
     endTime || "10:00",
-    helmetCount
+    helmetCount,
+    extrasSelection as Record<string, boolean | number> | undefined,
   );
 
   // Calculate rental hours for dynamic helmet pricing
@@ -907,7 +912,8 @@ function PriceCard({
   })();
   const helmetUnitPrice = getHelmetPrice(rentalHours);
 
-  // Add non-helmet extras to the total
+  // Extras breakdown for the expanded price details — the calculator already
+  // priced them into result.totalRub / result.extrasRub.
   const extrasTotal = extrasSelection ? calcExtrasTotal(extrasSelection, rentalHours) : 0;
   // Subtract helmet cost from extrasTotal (already counted in result.helmetRub)
   const helmetFromExtras = extrasSelection ? (typeof extrasSelection.helmet === "number" ? (extrasSelection.helmet as number) * helmetUnitPrice : 0) : 0;
@@ -915,7 +921,7 @@ function PriceCard({
   // HOTFIX (string prices): Number() — specs JSONB stores prices as strings
   // for several bikes, and a raw `result.totalRub + extras` concatenated
   // ("10000" + 500 → "10000500") instead of adding.
-  const grandTotal = Number(result.totalRub) + nonHelmetExtras;
+  const grandTotal = Number(result.totalRub);
 
   const fmt = (n: unknown) => Number(n).toLocaleString("ru-RU");
 

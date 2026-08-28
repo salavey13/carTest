@@ -26,9 +26,9 @@
  */
 
 import { calculatePrice } from "@/lib/rental-pricing-calculator";
-import { parseHelmetCountFromPerk } from "@/app/franchize/lib/perk-parse";
+import { parseHelmetCountFromPerk, parseExtrasFromPerk } from "@/app/franchize/lib/perk-parse";
 
-export { parseHelmetCountFromPerk };
+export { parseHelmetCountFromPerk, parseExtrasFromPerk };
 
 /**
  * Coerce anything into a finite number (fallback when not possible).
@@ -125,9 +125,9 @@ function hasBikePricing(specs: Record<string, unknown>): boolean {
 
 /**
  * Recompute a RENTAL line total from bike specs + picked dates + helmet
- * count — exactly what the fixed frontend calculator produces. Returns null
- * when the line is not a recomputable rental (sale/testdrive/service, no
- * dates, non-bike item).
+ * count + extras — exactly what the fixed frontend calculator produces.
+ * Returns null when the line is not a recomputable rental (sale/testdrive/
+ * service, no dates, non-bike item).
  */
 function recomputeRentalLineTotal(
   line: SanitizeCartLine,
@@ -148,6 +148,10 @@ function recomputeRentalLineTotal(
       o.rentStartTime || "10:00",
       o.rentEndTime || "10:00",
       parseHelmetCountFromPerk(o.perk),
+      // FIX (2026-08-29, "gloves not priced"): same perk string carries the
+      // non-helmet extras — recompute them too, or stale frontends that
+      // undercharged (gloves free) would keep the wrong total.
+      parseExtrasFromPerk(o.perk),
     );
     const qty = Math.max(1, Math.round(toFiniteNumber(line.qty, 1)));
     const total = Math.round(toFiniteNumber(result.totalRub, 0)) * qty;

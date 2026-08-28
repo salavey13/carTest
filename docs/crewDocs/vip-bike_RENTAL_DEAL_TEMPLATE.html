@@ -253,7 +253,8 @@
 <td style="border: none; width: 50%; text-align: center;">_________________ / {{issuer_representative}}</td>
 {{#if pep_signed}}<td style="border: none; width: 50%; text-align: left;"><b>Подписано ПЭП:</b><br>
 {{renter_signature}}<br>
-Дата и время: {{signature_timestamp}}</td>{{else}}<td style="border: none; width: 50%; text-align: center;">_________________ / {{renter_full_name}}</td>{{/if}}
+Дата и время: {{signature_timestamp}}<br>
+Отпечаток подписи (SHA-256 initData): {{signature_fingerprint}}</td>{{else}}<td style="border: none; width: 50%; text-align: center;">_________________ / {{renter_full_name}}</td>{{/if}}
 </tr>
 <tr>
 <td style="border: none; width: 50%; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О.)</td>

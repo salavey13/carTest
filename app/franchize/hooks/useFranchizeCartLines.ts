@@ -5,7 +5,7 @@ import type { FranchizeCartState } from "./useFranchizeCart";
 import type { CatalogItemVM } from "../actions";
 import { useFranchizeCart } from "./useFranchizeCart";
 import { hasServicePrice } from "../lib/catalog-utils";
-import { parseHelmetCount } from "../lib/perk-parse";
+import { parseHelmetCount, parseExtrasFromPerk } from "../lib/perk-parse";
 
 const packageMultiplier: Record<string, number> = {
   base: 1,
@@ -88,6 +88,7 @@ export type FranchizeCartLineVM = {
     totalRub: number;
     basePriceRub: number;
     helmetRub: number;
+    extrasRub: number;
     depositRub: number;
     savingsRub: number;
     savingsPercent: number;
@@ -264,7 +265,13 @@ export function useFranchizeCartLines(
               line.options.rentEndDate,
               line.options.rentStartTime || "10:00",
               line.options.rentEndTime || "10:00",
-              parseHelmetCount(line.options.perk)
+              parseHelmetCount(line.options.perk),
+              // FIX (2026-08-29, "gloves not priced"): non-helmet extras are
+              // parsed from the SAME perk string and priced by the calculator
+              // — previously only helmets were priced, so gloves/jacket/etc.
+              // were silently free in the cart while the Item modal showed
+              // them (+500 ₽ each).
+              parseExtrasFromPerk(line.options.perk),
             );
             // HOTFIX (string prices): belt-and-suspenders — the calculator
             // now coerces string specs to numbers, but a regression would
@@ -276,6 +283,7 @@ export function useFranchizeCartLines(
               totalRub: resultTotal,
               basePriceRub: Number(result.basePriceRub) || 0,
               helmetRub: Number(result.helmetRub) || 0,
+              extrasRub: Number(result.extrasRub) || 0,
               depositRub: Number(result.depositRub) || 0,
               savingsRub: Number(result.savingsRub) || 0,
               savingsPercent: Number(result.savingsPercent) || 0,

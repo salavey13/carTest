@@ -2414,7 +2414,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // telegramUserId. If the renter explicitly signed but verification fails,
     // we REFUSE the order — generating an unsigned doc while the renter
     // believes he signed would be legally worse than a retry.
-    let pepMeta: { telegramId: string; username?: string; signedAt: string } | null = null;
+    let pepMeta: { telegramId: string; username?: string; signedAt: string; initDataSha256?: string } | null = null;
     let pepAudit: Record<string, unknown> | null = null;
     if (payload.pepInitData) {
       const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -2443,10 +2443,14 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       }
       const signedAt = new Date().toISOString();
       const { createHash } = await import("crypto");
+      const initDataSha256 = createHash("sha256").update(payload.pepInitData).digest("hex");
       pepMeta = {
         telegramId: String(tgUser.id),
         username: tgUser.username || undefined,
         signedAt,
+        // FIX (2026-08-29): carried into the doc's ПЭП block as the printed
+        // fingerprint (pep:tg:<id>:<sha16>) — see rental-contract-vars.ts.
+        initDataSha256,
       };
       pepAudit = {
         method: "order_checkout",
@@ -2454,7 +2458,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         username: pepMeta.username ?? null,
         signed_at: signedAt,
         auth_date: pepParams.get("auth_date") || null,
-        init_data_sha256: createHash("sha256").update(payload.pepInitData).digest("hex"),
+        init_data_sha256: initDataSha256,
       };
       logger.info("[franchize] ПЭП signature verified", { orderId: payload.orderId, telegramId: pepMeta.telegramId });
     }
@@ -5432,6 +5436,12 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   specsOdometer: number | null;    // iter15: specs.last_known_odometer — freeze-form prefill fallback
   specsDepositRub: number | null;  // iter15: specs.deposit_rub — expected-deposit display fallback
   artifactDepositRub: number | null; // iter15: artifact.deposit_rub — deposit fallback chain
+  // FIX (2026-08-29, "photos don't appear"): photo counters for the gallery's
+  // initial render — previously never selected, so initialStartCount was
+  // ALWAYS 0 and the gallery looked empty until the client fetch finished
+  // (or forever, when the fetch failed silently).
+  startPhotoCount: number | null;
+  endPhotoCount: number | null;
 }> {
   const safeSlug = slug.trim();
   const safeRentalId = rentalId.trim();
@@ -5469,12 +5479,14 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       specsOdometer: null,
       specsDepositRub: null,
       artifactDepositRub: null,
+      startPhotoCount: null,
+      endPhotoCount: null,
     };
   }
 
   const { data, error } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, vehicle_id, agreed_start_date, agreed_end_date, requested_end_date, metadata, vehicle:cars(make, model, image_url, specs), crew:crews!rentals_crew_id_fkey(id, slug)")
+    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, vehicle_id, agreed_start_date, agreed_end_date, requested_end_date, metadata, start_photo_count, end_photo_count, vehicle:cars(make, model, image_url, specs), crew:crews!rentals_crew_id_fkey(id, slug)")
     .eq("rental_id", safeRentalId)
     .maybeSingle();
 
@@ -5648,6 +5660,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     specsOdometer,
     specsDepositRub,
     artifactDepositRub,
+    startPhotoCount: typeof (data as any).start_photo_count === "number" ? (data as any).start_photo_count : null,
+    endPhotoCount: typeof (data as any).end_photo_count === "number" ? (data as any).end_photo_count : null,
   };
 }
 
