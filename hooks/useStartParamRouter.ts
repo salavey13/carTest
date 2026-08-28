@@ -337,7 +337,7 @@ export function useStartParamRouter() {
 
   const resolveFranchizeVehicleLink = useCallback(
     async (rawParam: string, flow: "rent" | "buy", docSha256?: string | null) => {
-      const vehicleId = rawParam.replace(/^(?:rent|buy)_/i, '').trim().toLowerCase();
+      const vehicleId = rawParam.replace(/^(?:rent|buy|sale)_/i, '').trim().toLowerCase();
       if (!vehicleId) return null;
       try {
         const qs = new URLSearchParams({ vehicle: vehicleId, flow });
@@ -549,7 +549,10 @@ export function useStartParamRouter() {
           } else {
             logger.warn('[ClientLayout] failed to decode cart_ state', { paramPreview: paramToProcess.slice(0, 50) });
           }
-        } else if (paramToProcess.startsWith("buy_")) {
+        } else if (paramToProcess.startsWith("buy_") || paramToProcess.startsWith("sale_")) {
+          // ── Sale deep-link: buy_{bikeId} (legacy, CSV exports) or
+          //    sale_{bikeId} (share button in the catalog bike modal) ──
+          // Both route to the sale landing page.
           targetPath = await resolveFranchizeVehicleLink(paramToProcess, "buy") ?? undefined;
         } else if (paramToProcess.startsWith("rent_")) {
           // ── QR deep-link: rent_{bikeId} or rent_{bikeId}_{docSha256} ──

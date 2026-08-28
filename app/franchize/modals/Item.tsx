@@ -12,6 +12,7 @@ import {
   Info,
   Package,
   Phone,
+  Share2,
   Star,
   Swords,
   X,
@@ -38,6 +39,13 @@ import { readableTextOnColor, withAlpha } from "../lib/theme";
 import { FRANCHIZE_MODAL_CLOSE_SAFE_AREA_STYLE } from "../lib/route-cta-policy";
 import { encodeStartappState, type StartappState } from "@/lib/startapp-state";
 import { getTelegramWebAppAdaptiveHref } from "@/app/franchize/lib/telegram-links";
+import {
+  buildItemDeepLinks,
+  buildItemShareText,
+  buildTelegramShareHref,
+  resolveItemShareFlows,
+  type ItemShareFlow,
+} from "../lib/item-share";
 import { upsertFranchizeLead } from "@/app/franchize/lib/leads";
 import { useCrewTokens, type CrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import { addDaysISO, formatRuDateFromISO, todayISO, durationDaysFromDateTime } from "@/app/franchize/lib/date-utils";
@@ -1284,6 +1292,12 @@ export function ItemModal({
   // a bot deep-link. Consumed from sessionStorage (set by CatalogClient).
   const [startappBanner, setStartappBanner] = useState<string | null>(null);
   const [vsBike, setVsBike] = useState<CatalogItemVM | null>(null);
+  // ── Share (Поделиться) ──
+  // Dual-flow bikes (rent + sale) reveal a compact choice row instead of
+  // sharing immediately; single-flow bikes share in one tap.
+  const [shareChoiceOpen, setShareChoiceOpen] = useState(false);
+  const [shareNote, setShareNote] = useState<string | null>(null);
+  const shareNoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // New state for dynamic pricing
   const [helmetCount, setHelmetCount] = useState(0);
@@ -1377,6 +1391,12 @@ export function ItemModal({
     setActiveMediaIndex(0);
     setVsBike(null);
     setStartappBanner(null);
+    setShareChoiceOpen(false);
+    setShareNote(null);
+    if (shareNoteTimerRef.current) {
+      clearTimeout(shareNoteTimerRef.current);
+      shareNoteTimerRef.current = null;
+    }
     // Detect deep-link from bot (set by CatalogClient) and show a banner.
     if (typeof window !== "undefined") {
       try {
@@ -1660,6 +1680,98 @@ export function ItemModal({
     },
     [item, options.rentStartDate, options.rentEndDate, options.package, options.perk, rentStartTime, rentEndTime, helmetCount, extrasSelection, botUsername],
   );
+
+  // ── Share (Поделиться) — deep-links for rent_ / sale_ startapp formats ──
+  // Flows are availability-based (not mode-based): a dual bike opened in the
+  // rent tab still offers both links, so the recipient sees every option.
+  const shareFlows = useMemo<ItemShareFlow[]>(() => {
+    if (!item) return [];
+    return resolveItemShareFlows({
+      rentAvailable: hasRentPrice(item),
+      saleAvailable: hasSalePrice(item),
+    });
+  }, [item]);
+
+  const showShareButton = shareFlows.length > 0 && !isServiceItem && !isEquipment;
+
+  const handleShareItem = useCallback(
+    (flow: ItemShareFlow) => {
+      if (!item) return;
+      const links = buildItemDeepLinks(item.id, botUsername);
+      const url = flow === "rent" ? links.rent : links.sale;
+      const text = buildItemShareText({
+        title: item.title,
+        flow,
+        rentPriceLabel: item.rentPriceLabel,
+        salePrice: item.salePrice,
+      });
+      const shareHref = buildTelegramShareHref(url, text);
+
+      const tg = (window as any).Telegram?.WebApp;
+      tg?.HapticFeedback?.impactOccurred?.("light");
+      setShareChoiceOpen(false);
+
+      const showNote = (message: string) => {
+        setShareNote(message);
+        if (shareNoteTimerRef.current) clearTimeout(shareNoteTimerRef.current);
+        shareNoteTimerRef.current = setTimeout(() => setShareNote(null), 5000);
+      };
+
+      // 1) Inside Telegram: native share dialog (chat picker) via t.me/share/url
+      try {
+        if (tg?.openTelegramLink) {
+          tg.openTelegramLink(shareHref);
+          return;
+        }
+      } catch { /* fall through */ }
+
+      // 2) Telegram in-app browser
+      try {
+        if (tg?.openLink) {
+          tg.openLink(shareHref);
+          return;
+        }
+      } catch { /* fall through */ }
+
+      // 3) Regular browser: open the t.me share page in a new tab
+      if (typeof window !== "undefined" && typeof window.open === "function") {
+        window.open(shareHref, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      // 4) Web Share API (mobile browsers without window.open)
+      void (async () => {
+        try {
+          if (typeof navigator !== "undefined" && navigator.share) {
+            await navigator.share({ title: item.title, text, url });
+            return;
+          }
+        } catch { /* user cancelled or unsupported — fall through */ }
+
+        // 5) Last resort: clipboard + hint
+        try {
+          if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(`${text}\n${url}`);
+            showNote("Ссылка скопирована — вставьте её в чат.");
+            return;
+          }
+        } catch { /* ignore */ }
+        showNote("Не удалось открыть отправку. Попробуйте ещё раз.");
+      })();
+    },
+    [item, botUsername],
+  );
+
+  const handleShareButtonClick = useCallback(() => {
+    // Single flow → share immediately; dual → reveal the choice row.
+    if (shareFlows.length === 1) {
+      handleShareItem(shareFlows[0]);
+      return;
+    }
+    const tg = (window as any).Telegram?.WebApp;
+    tg?.HapticFeedback?.impactOccurred?.("light");
+    setShareChoiceOpen((open) => !open);
+  }, [shareFlows, handleShareItem]);
 
   // ── handleCallbackSubmit — MUST be before early return (it's a hook) ──
   const handleCallbackSubmit = useCallback(
@@ -1969,7 +2081,60 @@ export function ItemModal({
                     С возвращением!
                   </span>
                 )}
+
+                {/* Share button — sends a t.me/app deep-link (rent_ / sale_) */}
+                {showShareButton && (
+                  <button
+                    type="button"
+                    onClick={handleShareButtonClick}
+                    aria-expanded={shareFlows.length > 1 ? shareChoiceOpen : undefined}
+                    aria-label={
+                      shareFlows.length === 1
+                        ? `Поделиться ссылкой — ${shareFlows[0] === "rent" ? "аренда" : "покупка"}`
+                        : "Поделиться ссылкой на карточку"
+                    }
+                    className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold transition hover:opacity-80 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                    style={{ backgroundColor: T.accentSoft, color: T.accent, borderColor: T.accent }}
+                  >
+                    <Share2 className="h-3.5 w-3.5" aria-hidden />
+                    Поделиться
+                  </button>
+                )}
               </div>
+
+              {/* Share choice row — dual-flow bikes (rent + sale): pick which
+                  link to send. Each shared message carries exactly one link. */}
+              {showShareButton && shareChoiceOpen && shareFlows.length > 1 && (
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  {shareFlows.map((flow) => (
+                    <button
+                      key={`share-${flow}`}
+                      type="button"
+                      onClick={() => handleShareItem(flow)}
+                      className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-semibold transition hover:opacity-80 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                      style={{ backgroundColor: "color-mix(in srgb, var(--item-accent) 10%, transparent)", color: "var(--item-accent)", borderColor: "color-mix(in srgb, var(--item-accent) 45%, transparent)" }}
+                    >
+                      <Share2 className="h-3.5 w-3.5" aria-hidden />
+                      {flow === "rent" ? "Ссылка на аренду" : "Ссылка на покупку"}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Share status note (clipboard fallback feedback) */}
+              {shareNote && (
+                <p
+                  className="mt-2 rounded-xl border px-3 py-2 text-xs"
+                  style={{
+                    borderColor: "color-mix(in srgb, var(--item-accent) 25%, transparent)",
+                    backgroundColor: "color-mix(in srgb, var(--item-accent) 8%, transparent)",
+                    color: "var(--item-accent)",
+                  }}
+                  role="status"
+                >
+                  {shareNote}
+                </p>
+              )}
             </div>
 
             {/* Rental strip — only for rental flow */}
