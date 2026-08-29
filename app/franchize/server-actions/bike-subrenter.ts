@@ -16,6 +16,15 @@
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
+import {
+  buildSubrenterUserLabel,
+  buildUserSearchOrExpression,
+  normalizeSubrenterUserQuery,
+  rankSubrenterUserCandidate,
+  SUBRENTER_USER_SEARCH_LIMIT,
+  SUBRENTER_USER_SEARCH_MIN_LENGTH,
+  type SubrenterUserCandidate,
+} from "@/app/franchize/lib/subrenter-user-search";
 /**
  * Unified permission check for subrenter management.
  *
@@ -147,7 +156,14 @@ export async function setBikeSubrenterAction(input: {
   actorUserId: string;
   bikeId: string;
   subrenterChatId: string | null;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{
+  success: boolean;
+  error?: string;
+  /** iter19: resolved partner label («Александр Корнилов · @K0r_Al · 425137783») for the toast. */
+  subrenterLabel?: string;
+  /** iter19: false when the assigned id is NOT in the users table yet (never opened the app). */
+  subrenterKnownUser?: boolean;
+}> {
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) {
     return { success: false, error: "Некорректный запрос." };
@@ -201,9 +217,14 @@ export async function setBikeSubrenterAction(input: {
       delete specs.subrenter_set_by;
     }
 
+    // NOTE (iter19 bugfix): cars has NO updated_at column — sending one made
+    // PostgREST reject the whole PATCH with PGRST204 ("Could not find the
+    // 'updated_at' column of 'cars'"), so every «Сохранить» in this panel
+    // failed with a cryptic error while the bot /subrent flow (specs-only)
+    // kept working. Only real columns may be sent.
     const { error: updateError } = await supabaseAdmin
       .from("cars")
-      .update({ specs, updated_at: new Date().toISOString() })
+      .update({ specs })
       .eq("id", bikeId);
 
     if (updateError) return { success: false, error: updateError.message };
@@ -233,7 +254,26 @@ export async function setBikeSubrenterAction(input: {
 
     // POLISH: tell the partner he now has mini-admin access — otherwise he
     // never learns the crew exists. Best-effort (non-fatal on failures).
+    let subrenterLabel = normalized;
+    let subrenterKnownUser = false;
     if (normalized.length > 0) {
+      try {
+        const { data: partnerUser } = await supabaseAdmin
+          .from("users")
+          .select("user_id, username, full_name")
+          .eq("user_id", normalized)
+          .maybeSingle();
+        if (partnerUser) {
+          subrenterKnownUser = true;
+          subrenterLabel = buildSubrenterUserLabel({
+            userId: String(partnerUser.user_id),
+            username: partnerUser.username,
+            fullName: partnerUser.full_name,
+          });
+        }
+      } catch (lookupErr) {
+        logger.warn("[setBikeSubrenterAction] partner lookup failed (non-fatal)", lookupErr);
+      }
       try {
         const { sendComplexMessage } = await import("@/app/webhook-handlers/actions/sendComplexMessage");
         const { data: crewRow } = await supabaseAdmin
@@ -263,9 +303,71 @@ export async function setBikeSubrenterAction(input: {
     }
 
     logger.info("[setBikeSubrenterAction] updated", { slug, bikeId, subrenterChatId: normalized || "(cleared)" });
-    return { success: true };
+    return { success: true, subrenterLabel, subrenterKnownUser };
   } catch (error) {
     logger.error("[setBikeSubrenterAction] failed:", error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * iter19 — user-picker search for the «Субарендаторы» panel.
+ *
+ * The admin types @username / full name / numeric id and gets up to 10
+ * matching app users to tap — no more copy-pasting raw chat ids from
+ * @userinfobot. Gated by the SAME canManageSubrenters permission as the
+ * assignment itself (a user-directory search must not leak to regular
+ * members), and it only exposes fields the admin panels already show
+ * (user_id, username, full_name).
+ */
+export async function searchUsersForSubrenterAction(input: {
+  slug: string;
+  actorUserId: string;
+  query: string;
+}): Promise<{ success: boolean; data?: SubrenterUserCandidate[]; error?: string }> {
+  const parsed = z.object({
+    slug: z.string().trim().min(1),
+    actorUserId: z.string().trim().min(1),
+    query: z.string().max(120),
+  }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректный запрос." };
+  const { slug, actorUserId } = parsed.data;
+
+  try {
+    const query = normalizeSubrenterUserQuery(parsed.data.query);
+    if (query.length < SUBRENTER_USER_SEARCH_MIN_LENGTH) {
+      return { success: false, error: `Введите минимум ${SUBRENTER_USER_SEARCH_MIN_LENGTH} символа поиска.` };
+    }
+
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id")
+      .eq("slug", slug.trim())
+      .maybeSingle();
+    if (!crew) return { success: false, error: "Экипаж не найден." };
+
+    const allowed = await canManageSubrenters(crew.id, crew.owner_id, actorUserId);
+    if (!allowed) return { success: false, error: "Недостаточно прав." };
+
+    const { data: users, error: usersError } = await supabaseAdmin
+      .from("users")
+      .select("user_id, username, full_name")
+      .or(buildUserSearchOrExpression(query))
+      .order("username", { ascending: true, nullsFirst: false })
+      .limit(SUBRENTER_USER_SEARCH_LIMIT);
+    if (usersError) return { success: false, error: usersError.message };
+
+    const data: SubrenterUserCandidate[] = (users ?? [])
+      .map((u: { user_id: string | number; username?: string | null; full_name?: string | null }) => ({
+        userId: String(u.user_id),
+        username: u.username ? String(u.username) : null,
+        fullName: u.full_name ? String(u.full_name) : null,
+      }))
+      .sort((a, b) => rankSubrenterUserCandidate(a, query) - rankSubrenterUserCandidate(b, query));
+
+    return { success: true, data };
+  } catch (error) {
+    logger.error("[searchUsersForSubrenterAction] failed:", error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
@@ -276,7 +378,13 @@ export async function getCrewBikesSubrenterInfoAction(input: {
   actorUserId: string;
 }): Promise<{
   success: boolean;
-  data?: Array<{ bikeId: string; label: string; subrenterChatId: string | null; subrenterUsername?: string | null }>;
+  data?: Array<{
+    bikeId: string;
+    label: string;
+    subrenterChatId: string | null;
+    subrenterUsername?: string | null;
+    subrenterFullName?: string | null;
+  }>;
   error?: string;
 }> {
   const parsed = z.object({
@@ -323,18 +431,21 @@ export async function getCrewBikesSubrenterInfoAction(input: {
       new Set(data.map((b) => b.subrenterChatId).filter((id): id is string => Boolean(id))),
     );
     const usernameById = new Map<string, string>();
+    const fullNameById = new Map<string, string>();
     if (assignedIds.length > 0) {
       const { data: subrenterUsers } = await supabaseAdmin
         .from("users")
-        .select("user_id, username")
+        .select("user_id, username, full_name")
         .in("user_id", assignedIds);
       for (const u of subrenterUsers ?? []) {
         if (u.username) usernameById.set(String(u.user_id), String(u.username));
+        if (u.full_name) fullNameById.set(String(u.user_id), String(u.full_name));
       }
     }
     const dataWithUsernames = data.map((b) => ({
       ...b,
       subrenterUsername: b.subrenterChatId ? usernameById.get(b.subrenterChatId) ?? null : null,
+      subrenterFullName: b.subrenterChatId ? fullNameById.get(b.subrenterChatId) ?? null : null,
     }));
     return { success: true, data: dataWithUsernames };
   } catch (error) {

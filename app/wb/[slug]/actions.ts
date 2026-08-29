@@ -182,7 +182,9 @@ export async function updateCrewItemLocationQty(
 
     const { error: updateError } = await supabaseAdmin
       .from("cars")
-      .update({ specs, updated_at: new Date().toISOString() })
+      // NOTE (iter19): cars has NO updated_at column — sending it makes the
+      // whole PATCH fail with PGRST204. specs-only, like the other cars writers.
+      .update({ specs })
       .eq("id", itemId)
       .eq("crew_id", crewId);
 
@@ -329,11 +331,11 @@ export async function uploadCrewWarehouseCsv(parsedRows: any[], slug: string, us
           if (exists) {
             const { error: updateErr } = await supabaseAdmin
               .from("cars")
+              // NOTE (iter19): cars has NO updated_at column (PGRST204) — real columns only
               .update({
                 make,
                 model,
                 specs,
-                updated_at: new Date().toISOString(),
               })
               .eq("id", id)
               .eq("crew_id", crewId);
@@ -516,7 +518,8 @@ export async function resetCrewCheckpoint(slug: string, memberId: string) {
         specs.warehouse_locations = normalizedLocations;
         const { error } = await supabaseAdmin
           .from("cars")
-          .update({ specs, updated_at: new Date().toISOString() })
+          // NOTE (iter19): cars has NO updated_at column (PGRST204) — specs-only
+          .update({ specs })
           .eq("id", row.id)
           .eq("crew_id", crew.id);
         if (error) failures.push({ id: row.id, error: error.message });

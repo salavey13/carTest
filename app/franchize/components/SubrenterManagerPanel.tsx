@@ -7,15 +7,20 @@
 // The subrenter then sees rentals of his bike (mini admin) and gets
 // exploration achievements. No DB migration — pure specs JSONB data.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { FileDown, RefreshCw, Send } from "lucide-react";
+import { FileDown, RefreshCw, Search, Send, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   getCrewBikesSubrenterInfoAction,
+  searchUsersForSubrenterAction,
   setBikeSubrenterAction,
 } from "@/app/franchize/server-actions/bike-subrenter";
+import {
+  buildSubrenterUserLabel,
+  type SubrenterUserCandidate,
+} from "@/app/franchize/lib/subrenter-user-search";
 import {
   generateSubrenterWeeklyReportAction,
   type SubrentWeeklyReportResult,
@@ -27,6 +32,7 @@ interface BikeSubrenterRow {
   label: string;
   subrenterChatId: string | null;
   subrenterUsername?: string | null;
+  subrenterFullName?: string | null;
 }
 
 export function SubrenterManagerPanel({
@@ -47,6 +53,18 @@ export function SubrenterManagerPanel({
   const [search, setSearch] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
+
+  // ── iter19: user picker (assign by @username / name / id, not raw chat id) ──
+  // One picker open at a time; results come from searchUsersForSubrenterAction.
+  const [pickerBikeId, setPickerBikeId] = useState<string | null>(null);
+  const [pickerQuery, setPickerQuery] = useState("");
+  const [pickerResults, setPickerResults] = useState<SubrenterUserCandidate[]>([]);
+  const [pickerSearching, setPickerSearching] = useState(false);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+  // Confirmation hint under the input once a user was picked (or a typed id
+  // matches a picker result) — disappears the moment the id is edited.
+  const [pickedUser, setPickedUser] = useState<SubrenterUserCandidate | null>(null);
+  const pickerSeq = useRef(0);
 
   // ── Weekly owner report (§5.5 / Приложение № 3) ──
   // Default period: the CURRENT week Mon–Sun in the MSK calendar.
@@ -185,6 +203,71 @@ export function SubrenterManagerPanel({
     if (expanded && canManage) void load();
   }, [expanded, canManage, load]);
 
+  // Debounced picker search — fires 350ms after the admin stops typing, only
+  // while a picker is open and the query is long enough to be meaningful.
+  useEffect(() => {
+    if (!pickerBikeId) return;
+    const q = pickerQuery.trim();
+    if (q.length < 2) {
+      setPickerResults([]);
+      setPickerError(null);
+      setPickerSearching(false);
+      return;
+    }
+    const seq = ++pickerSeq.current;
+    const timer = setTimeout(async () => {
+      setPickerSearching(true);
+      try {
+        const userId = await waitForUserId();
+        if (!userId) {
+          if (seq !== pickerSeq.current) return;
+          setPickerError("Пользователь ещё авторизуется — попробуйте ещё раз.");
+          setPickerResults([]);
+          return;
+        }
+        const res = await searchUsersForSubrenterAction({ slug, actorUserId: userId, query: q });
+        if (seq !== pickerSeq.current) return; // stale response — a newer search won
+        if (res.success && res.data) {
+          setPickerResults(res.data);
+          setPickerError(
+            res.data.length === 0
+              ? "Ничего не найдено. Попробуйте другой запрос или введите Telegram id вручную (узнать id: @userinfobot)."
+              : null,
+          );
+        } else {
+          setPickerResults([]);
+          setPickerError(res.error ?? "Поиск не удался.");
+        }
+      } catch (err) {
+        if (seq !== pickerSeq.current) return;
+        setPickerResults([]);
+        setPickerError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (seq === pickerSeq.current) setPickerSearching(false);
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickerQuery, pickerBikeId, slug]);
+
+  const openPicker = (bikeId: string) => {
+    setPickerBikeId((prev) => (prev === bikeId ? null : bikeId));
+    setPickerQuery("");
+    setPickerResults([]);
+    setPickerError(null);
+    setPickerSearching(false);
+  };
+
+  const pickUser = (user: SubrenterUserCandidate) => {
+    if (!pickerBikeId) return;
+    setDrafts((prev) => ({ ...prev, [pickerBikeId]: user.userId }));
+    setPickedUser(user);
+    setPickerBikeId(null);
+    setPickerQuery("");
+    setPickerResults([]);
+    setPickerError(null);
+  };
+
   const save = async (bikeId: string) => {
     const userId = dbUser?.user_id;
     if (!userId) {
@@ -201,8 +284,25 @@ export function SubrenterManagerPanel({
         subrenterChatId: value || null,
       });
       if (result.success) {
-        toast.success(value ? "Субарендатор назначен — отправили ему уведомление в Telegram" : "Субарендатор снят");
-        setBikes((prev) => prev.map((b) => (b.bikeId === bikeId ? { ...b, subrenterChatId: value || null } : b)));
+        toast.success(
+          value
+            ? result.subrenterKnownUser && result.subrenterLabel
+              ? `Субарендатор назначен: ${result.subrenterLabel}. Уведомление отправлено в Telegram.`
+              : `Назначен id ${value} (не найден в базе приложения — уведомление отправлено в Telegram).`
+            : "Субарендатор снят",
+        );
+        setBikes((prev) =>
+          prev.map((b) =>
+            b.bikeId === bikeId
+              ? {
+                  ...b,
+                  subrenterChatId: value || null,
+                  subrenterUsername: pickedUser?.userId === value ? pickedUser.username : value ? null : b.subrenterUsername,
+                  subrenterFullName: pickedUser?.userId === value ? pickedUser.fullName : value ? null : b.subrenterFullName,
+                }
+              : b,
+          ),
+        );
       } else {
         toast.error(`Не удалось сохранить — ${result.error ?? "неизвестная ошибка"}`);
       }
@@ -223,8 +323,9 @@ export function SubrenterManagerPanel({
             Субарендаторы (мини-админы)
           </p>
           <p className="mt-1 text-xs leading-relaxed text-[var(--fr-admin-muted)]">
-            Telegram chat id партнёра-владельца байка. Субарендатор видит аренды
-            своего байка на странице «Аренды» и может открыть страницу аренды.
+            Партнёр-владелец байка. Ищите по имени / @username / id (кнопка
+            «Найти») или введите Telegram id вручную. Субарендатор видит аренды
+            своего байка на странице «Аренды» и получает уведомления.
           </p>
         </div>
         <Button
@@ -353,7 +454,7 @@ export function SubrenterManagerPanel({
           {visibleBikes.map((bike) => (
             <div
               key={bike.bikeId}
-              className="flex flex-col gap-2 rounded-xl border p-3 sm:flex-row sm:items-center"
+              className="flex flex-col gap-2 rounded-xl border p-3"
               style={{ borderColor: "var(--fr-admin-border)" }}
             >
               <div className="min-w-0 flex-1">
@@ -362,28 +463,91 @@ export function SubrenterManagerPanel({
                 </p>
                 <p className="mt-0.5 text-xs text-[var(--fr-admin-muted)]">
                   {bike.subrenterChatId
-                    ? `Субарендатор: ${bike.subrenterUsername ? `@${bike.subrenterUsername} · ` : ""}${bike.subrenterChatId}`
+                    ? `Субарендатор: ${[
+                        bike.subrenterUsername ? `@${bike.subrenterUsername}` : null,
+                        bike.subrenterFullName,
+                        bike.subrenterChatId,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}`
                     : "Субарендатор не назначен"}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <input
                   value={drafts[bike.bikeId] ?? ""}
-                  onChange={(e) => setDrafts((prev) => ({ ...prev, [bike.bikeId]: e.target.value.replace(/[^\d]/g, "") }))}
-                  placeholder="chat id, напр. 123456789"
+                  onChange={(e) => {
+                    setDrafts((prev) => ({ ...prev, [bike.bikeId]: e.target.value.replace(/[^\d]/g, "") }));
+                    setPickedUser(null);
+                  }}
+                  placeholder="Telegram id, напр. 123456789"
                   inputMode="numeric"
-                  className="h-9 w-40 rounded-lg border bg-transparent px-3 text-xs text-[var(--fr-admin-text)] outline-none focus:border-[var(--fr-admin-accent)]"
+                  className="h-9 min-w-0 flex-1 rounded-lg border bg-transparent px-3 text-xs text-[var(--fr-admin-text)] outline-none focus:border-[var(--fr-admin-accent)] sm:w-40 sm:flex-none"
                   style={{ borderColor: "var(--fr-admin-border)" }}
                 />
                 <Button
                   type="button"
-                  className="h-9 text-xs font-semibold"
+                  variant="outline"
+                  className="h-9 shrink-0 text-xs"
+                  aria-expanded={pickerBikeId === bike.bikeId}
+                  onClick={() => openPicker(bike.bikeId)}
+                >
+                  <Search className="mr-1 h-3 w-3" />
+                  {pickerBikeId === bike.bikeId ? "Закрыть" : "Найти"}
+                </Button>
+                <Button
+                  type="button"
+                  className="h-9 shrink-0 text-xs font-semibold"
                   disabled={savingId === bike.bikeId || (drafts[bike.bikeId] ?? "") === (bike.subrenterChatId ?? "")}
                   onClick={() => void save(bike.bikeId)}
                 >
                   {savingId === bike.bikeId ? "Сохраняю…" : "Сохранить"}
                 </Button>
               </div>
+              {pickedUser && (drafts[bike.bikeId] ?? "") === pickedUser.userId && (
+                <p className="flex items-center gap-1 text-xs text-emerald-400">
+                  <UserRound className="h-3 w-3 shrink-0" />
+                  {buildSubrenterUserLabel(pickedUser)}
+                </p>
+              )}
+              {pickerBikeId === bike.bikeId && (
+                <div
+                  className="rounded-lg border p-2"
+                  style={{ borderColor: "var(--fr-admin-border)" }}
+                >
+                  <input
+                    autoFocus
+                    value={pickerQuery}
+                    onChange={(e) => setPickerQuery(e.target.value)}
+                    placeholder="Имя, @username или id: Александр, K0r_Al, 425137783…"
+                    className="h-9 w-full rounded-lg border bg-transparent px-3 text-xs text-[var(--fr-admin-text)] outline-none focus:border-[var(--fr-admin-accent)]"
+                    style={{ borderColor: "var(--fr-admin-border)" }}
+                  />
+                  {pickerSearching && (
+                    <p className="mt-2 text-xs text-[var(--fr-admin-muted)]">Поиск…</p>
+                  )}
+                  {!pickerSearching && pickerError && (
+                    <p className="mt-2 text-xs text-amber-300">{pickerError}</p>
+                  )}
+                  {!pickerSearching && !pickerError && pickerResults.length === 0 && (
+                    <p className="mt-2 text-xs text-[var(--fr-admin-muted)]">
+                      Введите минимум 2 символа — поиск идёт по имени, @username и id.
+                    </p>
+                  )}
+                  <div className="mt-2 flex flex-col gap-1">
+                    {pickerResults.map((user) => (
+                      <button
+                        key={user.userId}
+                        type="button"
+                        onClick={() => pickUser(user)}
+                        className="rounded-lg px-2 py-2 text-left text-xs text-[var(--fr-admin-text)] transition-colors hover:bg-[var(--fr-admin-accent)]/10"
+                      >
+                        {buildSubrenterUserLabel(user)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -242,6 +242,13 @@ swap.log
 - Профиль владельца экипажа: панель «Субарендаторы» — список партнёров с их байками и статистикой аренд (`getFranchizeSubrentersOverviewAction`)
 - Админ-панель: `SubrenterManagerPanel` — назначение/снятие subrenter_chat_id + уведомление партнёру в TG
 
+**Назначение субарендатора на байк (iter19) — 3 способа:**
+1. **Web-панель (user picker):** админ-панель → «Субарендаторы (мини-админы)» → у байка кнопка «Найти» → поиск по имени / @username / Telegram id (`searchUsersForSubrenterAction`, gate = canManageSubrenters) → тап по результату → «Сохранить». Ручной ввод числового id по-прежнему работает (для партнёров, не открывавших приложение). Чистые хелперы: `app/franchize/lib/subrenter-user-search.ts`.
+2. **CLI-скилл:** `node scripts/assign-subrenter-skill.mjs --user 425137783 --bike kawasaki-ex650k` (dry-run) → `--apply` для записи; `--user "@K0r_Al"` / `--user "Александр Корнилов"` — fuzzy-поиск; `--bike ex650` — подстрока; `--clear` — снять; `--list` — текущие назначения; `--no-notify` — без TG-уведомления. Пишет specs.subrenter_chat_id + синкает users.metadata.subrenterOf (новому И предыдущему партнёру) + TG через forwarding API.
+3. **Бот `/subrent`** (шаг 8, iter14): Telegram ID собственника в конце флоу договора — байк помечается субарендным автоматически (после генерации DOCX).
+
+Синхронизация флага `users.metadata.subrenterOf = {crewId:[bikeIds]}` поддерживается всеми тремя путями и само-исцеляется при чтении профиля (`getSubrenterOwnedBikesAction`).
+
 **⚠️ ВАЖНО:** Субаренда = парк берёт байк СОБСТВЕННИКА для сдачи клиентам. Это НЕ аренда байка клиентом. Web-версия: `/franchize/[slug]/partners` (заявка на субаренду от пользователя).
 
 ---
