@@ -827,7 +827,19 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     const endDate = submitPayload.rentalEndDate || submitPayload.rentalStartDate;
     if (!carIds.length || !startDate || !endDate) return true;
 
-    const result = await checkFranchizeCarsAvailability({ carIds, rentalStartDate: startDate, rentalEndDate: endDate, slug });
+    // FIX (2026-08-29): send the cart's pickup/return TIMES too. Without them
+    // the server blows the window up to whole calendar days and a rental that
+    // ended at 11:30 blocks a new order starting at 12:00 the same day. The
+    // times mirror exactly what createFranchizeOrderCheckout persists
+    // (first cart line's rentStartTime/rentEndTime, Moscow local).
+    const result = await checkFranchizeCarsAvailability({
+      carIds,
+      rentalStartDate: startDate,
+      rentalEndDate: endDate,
+      rentalStartTime: resolvedStartTime,
+      rentalEndTime: resolvedEndTime,
+      slug,
+    });
     if (!result.success) {
       toast.error(result.error ?? "Не удалось проверить доступность байка.");
       return false;

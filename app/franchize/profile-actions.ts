@@ -4,6 +4,7 @@ import { createHash } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { privateSchema } from "@/lib/private-secrets";
 import { isCrewMember, getUserRentalSecretsByPhone } from "@/app/lib/user-rental-secrets";
+import { isSchemaCacheMiss, stripOptionalLicenseColumns } from "@/app/lib/user-rental-secrets-columns";
 import { logger } from "@/lib/logger";
 
 export type FranchizeAchievementDefinition = {
@@ -1128,24 +1129,44 @@ export async function saveRentalDocsPrefillAction(params: {
         updated_at: new Date().toISOString(),
       };
 
-      const { error: updateError } = await privateSchema()
+      // FIX (2026-08-29): the live DB lacks license_categories/license_expiry_date
+      // until migration 20260708000000 is applied in the Supabase SQL editor —
+      // this update failed with PGRST204 for EVERY save. Retry without the
+      // optional columns so the profile prefill persists either way.
+      let { error: updateError } = await privateSchema()
         .from("user_rental_secrets")
         .update(merged)
         .eq("chat_id", chatId)
         .eq("crew_slug", params.slug)
         .eq("source_doc_key", "profile_prefill");
+      if (isSchemaCacheMiss(updateError)) {
+        ({ error: updateError } = await privateSchema()
+          .from("user_rental_secrets")
+          .update(stripOptionalLicenseColumns(merged))
+          .eq("chat_id", chatId)
+          .eq("crew_slug", params.slug)
+          .eq("source_doc_key", "profile_prefill"));
+      }
 
       if (updateError) {
         return { success: false, error: updateError.message };
       }
     } else {
       // INSERT new prefill row
-      const { error: insertError } = await privateSchema()
+      let { error: insertError } = await privateSchema()
         .from("user_rental_secrets")
         .insert({
           ...upsertData,
           updated_at: new Date().toISOString(),
         });
+      if (isSchemaCacheMiss(insertError)) {
+        ({ error: insertError } = await privateSchema()
+          .from("user_rental_secrets")
+          .insert({
+            ...stripOptionalLicenseColumns(upsertData),
+            updated_at: new Date().toISOString(),
+          }));
+      }
 
       if (insertError) {
         return { success: false, error: insertError.message };
@@ -1276,13 +1297,24 @@ export async function tryVerifyUserRentalDocs(chatId: string, crewSlug: string):
       if (artifact.license_expiry_date) updateData.license_expiry_date = artifact.license_expiry_date;
     }
 
-    const { error: updateError } = await privateSchema()
+    // FIX (2026-08-29): PGRST204 fallback — license_categories/license_expiry_date
+    // may be missing on the live DB until migration 20260708000000 is applied.
+    let { error: updateError } = await privateSchema()
       .from("user_rental_secrets")
       .update(updateData)
       .eq("chat_id", chatId)
       .eq("crew_slug", crewSlug)
       .eq("source_doc_key", "profile_prefill")
       .eq("verification_status", "pending"); // only upgrade pending → verified
+    if (isSchemaCacheMiss(updateError)) {
+      ({ error: updateError } = await privateSchema()
+        .from("user_rental_secrets")
+        .update(stripOptionalLicenseColumns(updateData))
+        .eq("chat_id", chatId)
+        .eq("crew_slug", crewSlug)
+        .eq("source_doc_key", "profile_prefill")
+        .eq("verification_status", "pending"));
+    }
 
     if (updateError) {
       console.error("[tryVerifyUserRentalDocs] update failed:", updateError);

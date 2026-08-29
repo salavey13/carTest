@@ -5,6 +5,8 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { normalizePhoneDigits } from "@/app/franchize/lib/phone-utils";
+import { createHash } from "node:crypto";
+import { isSchemaCacheMiss, stripOptionalLicenseColumns } from "@/app/lib/user-rental-secrets-columns";
 
 export interface UserRentalSecret {
   id: string;
@@ -67,6 +69,12 @@ function logUserRentalSecretsError(operation: string, error: unknown) {
           : String(error),
   });
 }
+
+/**
+ * Shared helpers for optional license columns live in
+ * @/app/lib/user-rental-secrets-columns (plain lib — sync helpers can't be
+ * exported from this "use server" file). See there for the PGRST204 story.
+ */
 
 // ─── Result type for claimRentalSecretsByDocSha ──────────────────────────────
 
@@ -339,6 +347,161 @@ export async function saveUserRentalSecrets(
   } catch (error) {
     logUserRentalSecretsError("saveUserRentalSecrets", error);
     return null;
+  }
+}
+
+export interface WebOrderRenterSecretInput {
+  chatId: string;
+  crewSlug: string;
+  fullName?: string | null;
+  phone?: string | null;
+  birthDate?: string | null;
+  /** Combined "series number" string. */
+  passport?: string | null;
+  passportIssuedBy?: string | null;
+  passportIssueDate?: string | null;
+  registration?: string | null;
+  /** Combined "series number" string. */
+  driverLicense?: string | null;
+  licenseCategories?: string | null;
+  licenseExpiryDate?: string | null;
+  sourceRentalId?: string | null;
+}
+
+/**
+ * WEB CHECKOUT prefill write (2026-08-29, "личные данные не подставились при
+ * следующей аренде").
+ *
+ * The /doc bot flow creates a user_rental_secrets row at contract generation
+ * and links it to the renter when he scans the QR code. The WEB checkout knows
+ * the renter's chat_id up front (Telegram initData) — so it can persist the
+ * same personal data immediately, minus the QR dance. Without this write the
+ * order-page prefill chain (getRentalDocsPrefillAction →
+ * getLatestRentalDataWithSource) found NOTHING for returning web renters and
+ * they had to re-type their passport every single time.
+ *
+ * Row identity mirrors the profile-page flow exactly:
+ *   chat_id = renter's telegram id, crew_slug, source_doc_key = "profile_prefill",
+ *   doc_sha256 = sha256("profile_prefill_<chatId>_<crewSlug>")
+ * so every existing read path picks the row up with zero changes.
+ *
+ * Merge semantics: non-empty incoming values overwrite, empty values keep the
+ * stored ones (a returning renter who skips an optional field must not erase
+ * what he entered last time).
+ *
+ * verification_status is set to "verified" — the data comes from a contract
+ * the renter himself signed at checkout (signatureAccepted / ПЭП audit),
+ * which is more authoritative than self-entered profile data.
+ *
+ * The CALLER must guard against crew members (operator placing an order under
+ * his own session must not store the renter's data under his own chat_id).
+ */
+export async function upsertWebOrderRenterSecret(
+  input: WebOrderRenterSecretInput,
+): Promise<boolean> {
+  const chatId = typeof input.chatId === "string" ? input.chatId.trim() : "";
+  const crewSlug = typeof input.crewSlug === "string" ? input.crewSlug.trim() : "";
+  if (!chatId || !crewSlug) return false;
+
+  const docSha256 = createHash("sha256")
+    .update(`profile_prefill_${chatId}_${crewSlug}`)
+    .digest("hex");
+
+  const nonEmpty = (value: string | null | undefined): string | null =>
+    typeof value === "string" && value.trim() ? value.trim() : null;
+
+  const incoming = {
+    renter_full_name: nonEmpty(input.fullName),
+    renter_phone: nonEmpty(input.phone),
+    renter_birth_date: nonEmpty(input.birthDate),
+    renter_passport: nonEmpty(input.passport),
+    renter_passport_issued_by: nonEmpty(input.passportIssuedBy),
+    renter_passport_issue_date: nonEmpty(input.passportIssueDate),
+    renter_registration: nonEmpty(input.registration),
+    renter_driver_license: nonEmpty(input.driverLicense),
+    license_categories: nonEmpty(input.licenseCategories),
+    license_expiry_date: nonEmpty(input.licenseExpiryDate),
+  };
+
+  try {
+    const { data: existing, error: findError } = await privateSchema()
+      .from("user_rental_secrets")
+      .select("*")
+      .eq("chat_id", chatId)
+      .eq("crew_slug", crewSlug)
+      .eq("source_doc_key", "profile_prefill")
+      .maybeSingle();
+
+    if (findError) {
+      logUserRentalSecretsError("upsertWebOrderRenterSecret.find", findError);
+      return false;
+    }
+
+    if (existing) {
+      // Merge: incoming non-empty values win, otherwise keep stored values.
+      const merged: Record<string, string | null> = {};
+      for (const [key, value] of Object.entries(incoming)) {
+        merged[key] = value ?? (existing as Record<string, string | null>)[key] ?? null;
+      }
+      const updatePayload = {
+        ...merged,
+        verification_status: "verified",
+        ...(input.sourceRentalId ? { source_rental_id: input.sourceRentalId } : {}),
+        updated_at: new Date().toISOString(),
+      };
+      let { error: updateError } = await privateSchema()
+        .from("user_rental_secrets")
+        .update(updatePayload)
+        .eq("chat_id", chatId)
+        .eq("crew_slug", crewSlug)
+        .eq("source_doc_key", "profile_prefill");
+      if (isSchemaCacheMiss(updateError)) {
+        // Live DB without migration 20260708000000 (license columns) — retry
+        // without the optional columns so the prefill still persists.
+        ({ error: updateError } = await privateSchema()
+          .from("user_rental_secrets")
+          .update(stripOptionalLicenseColumns(updatePayload))
+          .eq("chat_id", chatId)
+          .eq("crew_slug", crewSlug)
+          .eq("source_doc_key", "profile_prefill"));
+      }
+      if (updateError) {
+        logUserRentalSecretsError("upsertWebOrderRenterSecret.update", updateError);
+        return false;
+      }
+      return true;
+    }
+
+    const hasAnyData = Object.values(incoming).some((value) => value !== null);
+    if (!hasAnyData) return false;
+
+    const insertPayload = {
+      chat_id: chatId,
+      crew_slug: crewSlug,
+      doc_sha256: docSha256,
+      ...incoming,
+      source_doc_key: "profile_prefill",
+      source_rental_id: input.sourceRentalId ?? null,
+      verification_status: "verified",
+      template_version: 1,
+      updated_at: new Date().toISOString(),
+    };
+    let { error: insertError } = await privateSchema()
+      .from("user_rental_secrets")
+      .insert(insertPayload);
+    if (isSchemaCacheMiss(insertError)) {
+      ({ error: insertError } = await privateSchema()
+        .from("user_rental_secrets")
+        .insert(stripOptionalLicenseColumns(insertPayload)));
+    }
+    if (insertError) {
+      logUserRentalSecretsError("upsertWebOrderRenterSecret.insert", insertError);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    logUserRentalSecretsError("upsertWebOrderRenterSecret", error);
+    return false;
   }
 }
 

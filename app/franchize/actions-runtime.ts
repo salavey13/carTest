@@ -24,6 +24,7 @@ import { sanitizeFranchizeOrderMoneyFields } from "@/app/franchize/lib/order-mon
 import { resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 import { formatRuDate } from "@/app/franchize/lib/date-utils";
+import { buildRequestedWindowMs, rentalRowBlocksWindow, type RentalOverlapRow } from "@/app/franchize/lib/rental-overlap";
 // v3 polish: centralized notification template builders (HTML-escaped, with inline buttons)
 import { buildCartCheckoutRenterMessage } from "@/app/franchize/lib/notification-templates";
 import {
@@ -3556,6 +3557,66 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           }
         }
 
+    // ── FIX (2026-08-29, "личные данные не подставились при следующей
+    // аренде"): persist the renter's personal data to
+    // private.user_rental_secrets keyed by HIS chat_id.
+    //
+    // The /doc bot flow stores these secrets at contract generation and links
+    // them to the renter via the QR claim step. The web checkout already knows
+    // the renter's telegram id from initData — no QR needed — but it never
+    // wrote the row, so the order-page prefill chain
+    // (getRentalDocsPrefillAction → getLatestRentalDataWithSource) came up
+    // empty for returning web renters and they re-typed their passport every
+    // time. Non-fatal on failure: the order itself is already complete.
+    if (payload.telegramUserId && payload.slug) {
+      try {
+        const { isCrewMember: isCrewMemberOfSlug, upsertWebOrderRenterSecret } = await import("@/app/lib/user-rental-secrets");
+        // Guard: an operator placing an order under his own session must not
+        // store the renter's data under his own chat_id (it would pollute his
+        // own prefill). Those renters are served by the phone-based fallback.
+        const operatorSession = await isCrewMemberOfSlug(String(payload.telegramUserId), payload.slug);
+        if (!operatorSession) {
+          const webPassport = [payload.passportSeries, payload.passportNumber].filter(Boolean).join(" ").trim() || null;
+          const webLicense = payload.hasLicense === false
+            ? null
+            : [payload.licenseSeries, payload.licenseNumber].filter(Boolean).join(" ").trim() || null;
+          const hasAnyPersonalData = Boolean(
+            payload.recipient || payload.phone || webPassport || webLicense || payload.birthDate,
+          );
+          if (hasAnyPersonalData) {
+            const saved = await upsertWebOrderRenterSecret({
+              chatId: String(payload.telegramUserId),
+              crewSlug: payload.slug,
+              fullName: payload.recipient || null,
+              phone: payload.phone || null,
+              birthDate: payload.birthDate || null,
+              passport: webPassport,
+              passportIssuedBy: payload.passportIssuedBy || null,
+              passportIssueDate: payload.passportIssueDate || null,
+              registration: payload.registrationAddress || null,
+              driverLicense: webLicense,
+              licenseCategories: payload.licenseCategories || null,
+              licenseExpiryDate: payload.licenseExpiryDate || null,
+              sourceRentalId: createdRentals[0]?.rentalId ?? null,
+            });
+            if (saved) {
+              logger.info("[franchize] web-order renter secret saved for next-rent prefill", {
+                orderId: payload.orderId,
+                crewSlug: payload.slug,
+              });
+            } else {
+              logger.warn("[franchize] web-order renter secret upsert failed (non-fatal)", {
+                orderId: payload.orderId,
+                crewSlug: payload.slug,
+              });
+            }
+          }
+        }
+      } catch (secretErr) {
+        logger.warn("[franchize] web-order renter secret upsert threw (non-fatal):", secretErr);
+      }
+    }
+
     // ── Notify renter + crew owner + admin with a Mini App deep link ──────
         // The renter opens /franchize/{slug}/rental/{id} in the web app to add
         // ДО/ПОСЛЕ photos; the owner/admin activate the rental from the same page.
@@ -5360,6 +5421,10 @@ const checkFranchizeAvailabilitySchema = z.object({
   carIds: z.array(z.string().trim().min(1)).min(1),
   rentalStartDate: z.string().trim().min(1),
   rentalEndDate: z.string().trim().min(1),
+  // Hour-precise window (HH:MM, Moscow local time — the same convention the
+  // checkout uses when persisting requested_start_date/requested_end_date).
+  rentalStartTime: z.string().trim().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+  rentalEndTime: z.string().trim().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   slug: z.string().trim().min(1).optional(),
 });
 
@@ -5369,7 +5434,7 @@ export async function checkFranchizeCarsAvailability(input: unknown): Promise<{ 
     return { success: false, error: parsed.error.issues[0]?.message ?? "Некорректный запрос проверки доступности." };
   }
 
-  const { carIds, rentalStartDate, rentalEndDate, slug } = parsed.data;
+  const { carIds, rentalStartDate, rentalEndDate, rentalStartTime, rentalEndTime, slug } = parsed.data;
 
   // If slug is provided, validate that all carIds belong to this crew
   if (slug) {
@@ -5390,29 +5455,48 @@ export async function checkFranchizeCarsAvailability(input: unknown): Promise<{ 
       return { success: false, error: "Некоторые байки не принадлежат вашему экипажу." };
     }
   }
-  const startAt = new Date(`${rentalStartDate}T00:00:00.000Z`);
-  const endAt = new Date(`${rentalEndDate}T23:59:59.999Z`);
-  if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || endAt < startAt) {
+
+  // ── FIX (2026-08-29, "байк занят весь день"): hour-precise window ──────
+  // The old check blew the requested range up to whole calendar days
+  // (start 00:00:00Z → end 23:59:59Z) and matched with SQL date filters, so
+  // a rental that ended at 11:30 blocked a new order starting at 12:00 the
+  // SAME day. Now the client sends the cart's rentStartTime/rentEndTime and
+  // we compare real intervals (Moscow local, exactly like the checkout
+  // persists them). Date-only callers (sale test-drive landing) keep the
+  // day-window fallback, but even they benefit from rule 3 below.
+  const window = buildRequestedWindowMs({ rentalStartDate, rentalEndDate, rentalStartTime, rentalEndTime });
+  if (!window) {
     return { success: false, error: "Проверьте диапазон дат аренды." };
   }
-  const startIso = startAt.toISOString();
-  const endIso = endAt.toISOString();
 
   const blockingStatuses = ["pending", "pending_confirmation", "confirmed", "active"] as const;
 
+  // Fetch the open rentals and evaluate overlap in code: requested_* dates
+  // are authoritative (what the web flow writes), agreed_* as fallback, and
+  // rentals whose end (+30 min late-return grace) is already in the past
+  // never block — a stale `pending_confirmation` duplicate or a forgotten
+  // `active` row must not keep the bike "busy" for the rest of the day.
   const { data, error } = await supabaseAdmin
     .from("rentals")
-    .select("vehicle_id")
+    .select("vehicle_id, status, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date")
     .in("vehicle_id", carIds)
-    .in("status", blockingStatuses)
-    .filter("requested_start_date", "lt", endIso)
-    .filter("requested_end_date", "gt", startIso);
+    .in("status", blockingStatuses);
 
   if (error) {
     return { success: false, error: `Не удалось проверить пересечения аренды: ${error.message}` };
   }
 
-  const unavailableCarIds = Array.from(new Set((data ?? []).map((row) => row.vehicle_id).filter((id): id is string => typeof id === "string")));
+  const nowTs = Date.now();
+  const unavailable = new Set<string>();
+  for (const row of (data ?? []) as RentalOverlapRow[]) {
+    const vehicleId = typeof row.vehicle_id === "string" ? row.vehicle_id : "";
+    if (!vehicleId || unavailable.has(vehicleId)) continue;
+    if (rentalRowBlocksWindow(row, window, nowTs)) {
+      unavailable.add(vehicleId);
+    }
+  }
+
+  const unavailableCarIds = Array.from(unavailable);
   return { success: true, unavailableCarIds };
 }
 
