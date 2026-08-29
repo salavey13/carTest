@@ -174,7 +174,7 @@ Logs go to `/var/log/vip-bike-ops.log` — rotate with logrotate or truncate man
 Аренд сегодня: 5
 Выручка: 85000 ₽
 Активных: 22
-Завершено: 3
+Возвратов: 3
 
 💰 Продажи
 Продаж сегодня: 2
@@ -193,7 +193,7 @@ Logs go to `/var/log/vip-bike-ops.log` — rotate with logrotate or truncate man
 ```
 
 **Queries** (3 parallel):
-1. Rentals for today (created OR period-overlapping) — KPIs: total / revenue (active+completed) / active / completed
+1. Rentals for today — **start-day semantics, mirrors the web dashboard (F7 + iter14)**: a rental belongs to the Moscow calendar day it STARTS (`requested_start_date ?? agreed_start_date`); the fetch window is the exact MSK day in UTC and jq does the precise MSK split. Multi-day rentals are NOT recounted while active, rentals merely returning today do NOT inflate today's revenue, cancelled rows are excluded. KPIs: total (started today) / revenue (started today, real statuses) / active / returns (end date = today)
 2. Sales for today (created today) — KPIs: total / revenue (`total_sum ?? sale_price`)
 3. Service rentals for today (vehicle_id IN cars.type='service') — KPIs: total / revenue / active / completed
 

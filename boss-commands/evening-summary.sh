@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# /home/z/my-project/boss-commands/evening-summary.sh
+# /home/z/my-project/analytics/boss-commands/evening-summary.sh
 #
 # Boss command: evening-summary
-# Sends an end-of-day KPI digest with equipment extraction, service detail,
-# salary, хозрасходы, deposits, and shift status.
+# Sends an end-of-day KPI digest: rentals/sales/services + shifts/equipment.
+# Designed to run at 21:00 Moscow daily.
 #
-# Per-bike rental breakdown IS included. Each rental shows the bike name
-# and amount. Special conditions (free, contest, barter) are noted.
-#
-# Cron schedule: every day at 22:00 Moscow = 19:00 UTC = "0 19 * * *"
+# Output: Telegram message to ADMIN_CHAT_ID
+# Cron schedule: every day at 21:00 Moscow = 18:00 UTC = "0 18 * * *"
 #
 # Usage:
 #   ./evening-summary.sh                 # sends Telegram notification
@@ -23,341 +21,276 @@ NOW_DISPLAY=$(TZ=Europe/Moscow date +"%H:%M")
 
 log "Running evening-summary for $TODAY"
 
-# MSK timezone boundaries (Russia = UTC+3, no DST since 2014)
-START_UTC="${TODAY}T00:00:00+03:00"
-END_UTC="${TODAY}T23:59:59+03:00"
-START_ENC="${START_UTC//+/%2B}"
-END_ENC="${END_UTC//+/%2B}"
+# ─── Rentals KPIs ────────────────────────────────────────────────────────────
+# Mirrors the web dashboard (rentals-analytics v2, F7 + iter14):
+# a rental belongs to the day it STARTS (Moscow calendar date). Multi-day
+# rentals are NOT recounted on every day they stay active, and rentals merely
+# RETURNING today no longer inflate today's revenue — they were counted on
+# their start day. The old query (created_at OR period-overlapping) produced
+# inflated numbers: e.g. 2026-08-29 showed 12/92553₽ instead of 7/53553₽.
+#
+# Fetch window = exact MSK day in UTC (via date -d, see CLAUDE.md): rows whose
+# start OR end falls inside it (4 branches: requested/agreed start, agreed/
+# requested end — legacy rows may have either pair null). The precise
+# MSK-calendar split (started-today vs returns-today) happens in jq below.
+# Equipment rows are excluded implicitly: they carry crew_id=NULL in rentals
+# (migration 20260815000001) while this query filters crew_id=eq.
+START_UTC="$(moscow_today_start_utc)"
+END_UTC="$(moscow_today_end_utc)"
 
-# ─── Rentals (per-bike breakdown) ────────────────────────────────────────────────
 RENTALS_DATA=$(supabase_query "rentals" \
-  "select=rental_id,status,total_cost,metadata,vehicle_id,created_at&crew_id=eq.${CREW_ID}&or=(and(created_at.gte.${START_ENC},created_at.lte.${END_ENC}),and(agreed_start_date.lte.${END_ENC},agreed_end_date.gte.${START_ENC}))&vehicle_id=not.like.vip-bike-svc-*")
+  "select=rental_id,status,total_cost,agreed_start_date,agreed_end_date,requested_start_date,requested_end_date,vehicle_id&crew_id=eq.${CREW_ID}&or=(and(requested_start_date.gte.${START_UTC},requested_start_date.lte.${END_UTC}),and(requested_start_date.is.null,agreed_start_date.gte.${START_UTC},agreed_start_date.lte.${END_UTC}),and(agreed_end_date.gte.${START_UTC},agreed_end_date.lte.${END_UTC}),and(agreed_end_date.is.null,requested_end_date.gte.${START_UTC},requested_end_date.lte.${END_UTC})))&vehicle_id=not.like.vip-bike-svc-*")
 
-# Fetch cars for bike names
-CARS_DATA=$(supabase_query "cars" "select=id,make,model&crew_id=eq.${CREW_ID}")
+# MSK calendar date of an ISO timestamp (UTC + 3h, no DST — same math as the
+# web client's localDateOnly() in analytics-utils.ts).
+RENTAL_KPIS=$(echo "$RENTALS_DATA" | jq -r --arg today "$TODAY" '
+  def mskd:
+    if . == null or . == "" then ""
+    else
+      sub("\\.[0-9]+"; "") | sub("Z$"; "") | sub("\\+00:00$"; "")
+      | strptime("%Y-%m-%dT%H:%M:%S") | mktime + 10800 | strftime("%Y-%m-%d")
+    end;
+  def sd: (.requested_start_date // .agreed_start_date // "") | mskd;
+  def ed: (.agreed_end_date // .requested_end_date // "") | mskd;
+  (map(select(.status != "cancelled"))) as $rows
+  | ($rows | map(select(sd == $today))) as $started
+  | {
+      total: ($started | length),
+      active: ([$rows[] | select(.status == "active")] | length),
+      returns: ([$rows[] | select(ed == $today)] | length),
+      revenue: ([$started[]
+        | select(.status == "active" or .status == "completed" or .status == "confirmed" or .status == "pending_confirmation")
+        | (.total_cost // 0)] | add // 0)
+    } | . as $x |
+  (if $x.returns == 0 then " — день открыт" else "" end) as $suffix |
+  "Аренд сегодня: \($x.total)\nВыручка: \($x.revenue) ₽\nАктивных: \($x.active)\nВозвратов: \($x.returns)\($suffix)"
+')
 
-# Count: new rentals created today vs multi-day rentals still active
-RENTAL_NEW=$(echo "$RENTALS_DATA" | jq '[.[] | select(.status == "active" or .status == "completed") | select(.created_at >= "${START_ENC}")] | length' 2>/dev/null || echo 0)
-RENTAL_MULTIDAY=$(echo "$RENTALS_DATA" | jq '[.[] | select(.status == "active" or .status == "completed") | select(.created_at < "${START_ENC}")] | length' 2>/dev/null || echo 0)
-RENTAL_COUNT=$((RENTAL_NEW + RENTAL_MULTIDAY))
-RENTAL_REVENUE=$(echo "$RENTALS_DATA" | jq '[.[] | select(.status == "active" or .status == "completed") | (.total_cost // 0)] | add // 0' 2>/dev/null || echo 0)
-RENTAL_ACTIVE=$(echo "$RENTALS_DATA" | jq '[.[] | select(.status == "active")] | length' 2>/dev/null || echo 0)
+# Started-today billable rows only — this is what feeds TOTAL_REVENUE, so the
+# day total uses the same start-day semantics as the web dashboard.
+RENTALS_TODAY=$(echo "$RENTALS_DATA" | jq -c --arg today "$TODAY" '
+  def mskd:
+    if . == null or . == "" then ""
+    else
+      sub("\\.[0-9]+"; "") | sub("Z$"; "") | sub("\\+00:00$"; "")
+      | strptime("%Y-%m-%dT%H:%M:%S") | mktime + 10800 | strftime("%Y-%m-%d")
+    end;
+  [.[] | select(.status != "cancelled")
+    | select(((.requested_start_date // .agreed_start_date // "") | mskd) == $today)
+    | select(.status == "active" or .status == "completed" or .status == "confirmed" or .status == "pending_confirmation")]
+')
 
-# Build count label with new vs multi-day breakdown
-RENTAL_COUNT_LABEL="${RENTAL_NEW} новых"
-if [[ ${RENTAL_MULTIDAY} -gt 0 ]]; then
-  RENTAL_COUNT_LABEL="${RENTAL_COUNT_LABEL} + ${RENTAL_MULTIDAY} переходящ. = ${RENTAL_COUNT}"
-fi
-
-# ─── Build per-bike rental breakdown ─────────────────────────────────────────
-RENTAL_BREAKDOWN=$(jq -rn --argjson rentals "$RENTALS_DATA" --argjson cars "$CARS_DATA" --arg start "${START_ENC}" '
-  ($cars | map({(.id): ("\(.make) \(.model)")}) | add // {}) as $bike_names |
-  [ $rentals[] |
-    select(.status == "active" or .status == "completed") |
-    select(.created_at >= $start) |
-    {
-      id: .rental_id[0:8],
-      bike: ($bike_names[.vehicle_id] // .vehicle_id // "—"),
-      cost: (.total_cost // 0),
-      status: (if .total_cost == 0 then "[бесплатно]" elif .metadata.free_rental_reason then "[конкурс]" else "" end)
-    }
-  ] |
-  if length == 0 then "  (нет аренд)"
-  else map("• \(.bike) — \(.cost) ₽ \(.status)") | join("\n") end
-' 2>/dev/null || echo "  (ошибка)")
-
-# ─── Equipment extraction from rental metadata ───────────────────────────────
-# Equipment is stored in rentals.metadata.equipment as:
-#   { helmets: N, gloves: N, jacket: bool, pants: bool, boots: bool,
-#     net: bool, backpack: bool, bag: bool, charger: bool }
-# Prices: helmet = 1000₽/day (or 500₽ for <24h, but we use 1000 for simplicity
-# in the digest — the exact per-rental calculation is in the dashboard).
-# All other items = 500₽ flat.
-#
-# NOTE: the /doc flow stores equipment as COUNTS (helmets: 2, gloves: 1) and
-# BOOLEANS (jacket: true). The digest sums all rentals' equipment into totals.
-#
-# KNOWN LIMITATION: specific jacket/pants items (e.g. "Ducati Racing Jacket"
-# vs "KTM Textile Jacket") are NOT tracked per-rental — only the count/boolean.
-# The cars table has 30 equipment items (type='equipment') with individual
-# IDs, but rentals.metadata.equipment doesn't reference specific item IDs.
-# Per-item tracking would require a new equipment_rental table (deferred).
-EQUIPMENT_SECTION=$(echo "$RENTALS_DATA" | jq -r '
-  [ .[] | select(.status == "active" or .status == "completed") | .metadata.equipment // empty ] as $all_eq |
-  ($all_eq | map(.helmets // 0) | add // 0) as $h |
-  ($all_eq | map(.gloves // 0) | add // 0) as $g |
-  ($all_eq | map(if .jacket then 1 else 0 end) | add // 0) as $j |
-  ($all_eq | map(if .pants then 1 else 0 end) | add // 0) as $p |
-  ($all_eq | map(if .boots then 1 else 0 end) | add // 0) as $b |
-  ($all_eq | map(if .net then 1 else 0 end) | add // 0) as $n |
-  ($all_eq | map(if .backpack then 1 else 0 end) | add // 0) as $bp |
-  ($all_eq | map(if .bag then 1 else 0 end) | add // 0) as $bg |
-  ($h * 1000 + $g * 500 + $j * 500 + $p * 500 + $b * 500 + $n * 500 + $bp * 500 + $bg * 500) as $total |
-  if $total > 0 then
-    "🛡️ ЭКИПИРОВКА (из договоров):\n" +
-    (if $h > 0 then "• Шлемы: \($h) шт — \($h * 1000) ₽\n" else "" end) +
-    (if $g > 0 then "• Перчатки: \($g) шт — \($g * 500) ₽\n" else "" end) +
-    (if $j > 0 then "• Куртки: \($j) шт — \($j * 500) ₽\n" else "" end) +
-    (if $p > 0 then "• Штаны: \($p) шт — \($p * 500) ₽\n" else "" end) +
-    (if $b > 0 then "• Боты: \($b) шт — \($b * 500) ₽\n" else "" end) +
-    (if $n > 0 then "• Сетки: \($n) шт — \($n * 500) ₽\n" else "" end) +
-    (if $bp > 0 then "• Рюкзаки: \($bp) шт — \($bp * 500) ₽\n" else "" end) +
-    "── Итого: \($total) ₽"
-  else "" end
-' 2>/dev/null || echo "")
-
-# ─── Sales ───────────────────────────────────────────────────────────────────
+# ─── Sales KPIs ──────────────────────────────────────────────────────────────
 SALES_DATA=$(supabase_query "sale_contract_artifacts" \
-  "select=id,total_sum,sale_price&crew_id=eq.${CREW_ID}&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}" \
+  "select=id,total_sum,sale_price,created_at&crew_slug=eq.${CREW_SLUG}&created_at=gte.${START_UTC}&created_at=lte.${END_UTC}" \
   "private")
 
-SALE_COUNT=$(echo "$SALES_DATA" | jq 'length' 2>/dev/null || echo 0)
-SALE_REVENUE=$(echo "$SALES_DATA" | jq -r '
-  def to_num: if type == "number" then . elif type == "string" then (gsub(" "; "") | tonumber? // 0) else 0 end;
-  ([.[] | (.total_sum // (.sale_price | to_num) // 0)] | add // 0)
-' 2>/dev/null || echo 0)
+SALE_KPIS=$(echo "$SALES_DATA" | jq -r '
+  # Defensive number coercion: sale_price can be a string with spaces ("420 000"),
+  # a clean number string ("390000"), or null. total_sum is a proper number.
+  def to_num:
+    if type == "number" then .
+    elif type == "string" then (gsub(" "; "") | tonumber? // 0)
+    else 0 end;
+  {
+    total: length,
+    revenue: ([.[] | (.total_sum // (.sale_price | to_num) // 0)] | add // 0)
+  } |
+  "Продаж сегодня: \(.total)\nВыручка: \(.revenue) ₽"
+')
 
-# ─── Service (with detail + 50/50 split display) ─────────────────────────────
-# Service work is stored as rentals with vehicle_id pointing to cars.type='service'.
-# Each service rental has metadata:
-#   { bike: "ducati-black", service_name: "Замена подножки", source: "service_work",
-#     created_by: "service-work-text", performed_at: ISO, client: "..." }
-# The service_name comes from the cars table (cars.model = service description).
-# There is NO mechanic_id field — the operator who ran the skill is in
-# rentals.created_by_operator_chat_id (but for service-work-text skill entries,
-# this field is typically null because the skill INSERTs directly via REST).
-#
-# 50/50 split: currently NOT auto-calculated. The digest shows the split
-# as a display-only calculation (total_cost / 2). Auto-creating an
-# expense_salary cash_transaction row would require knowing WHO the mechanic is —
-# currently service work entries don't have a mechanic_id field.
-SVC_IDS=$(supabase_query "cars" "select=id&crew_id=eq.${CREW_ID}&type=eq.service" | jq -r '[.[].id] | join(",")' 2>/dev/null || echo "")
+# ─── Service KPIs ────────────────────────────────────────────────────────────
+SVC_IDS=$(supabase_query "cars" "select=id&crew_id=eq.${CREW_ID}&type=eq.service" | jq -r '[.[].id] | join(",")')
 
-SERVICE_DETAIL=""
-SERVICE_REVENUE=0
-
-if [[ -n "$SVC_IDS" ]]; then
+# Guard: if no service vehicles, skip the services query
+if [[ -z "$SVC_IDS" ]]; then
+  log "No service vehicles found — skipping services KPI"
+  SERVICES_DATA='[]'
+else
   SERVICES_DATA=$(supabase_query "rentals" \
-    "select=rental_id,status,total_cost,vehicle_id,metadata&crew_id=eq.${CREW_ID}&vehicle_id=in.(${SVC_IDS})&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}")
-
-  SERVICE_REVENUE=$(echo "$SERVICES_DATA" | jq '[.[] | select(.status == "active" or .status == "completed") | (.total_cost // 0)] | add // 0' 2>/dev/null || echo 0)
-
-  # Build per-service detail with 50/50 split display
-  # Uses metadata.bike (which bike was serviced) + metadata.service_name (what was done)
-  SERVICE_DETAIL=$(echo "$SERVICES_DATA" | jq -r '
-    [ .[] | select(.status == "active" or .status == "completed") ] |
-    if length == 0 then ""
-    else
-      map(
-        .total_cost as $cost |
-        (.metadata.bike // "—") as $bike |
-        (.metadata.service_name // .vehicle_id // "сервис") as $svc |
-        ($cost / 2 | floor) as $half |
-        "• \($bike): \($svc) — \($cost) ₽\n  ├── 50% мастеру: \($half) ₽\n  └── 50% компания: \($half) ₽"
-      ) | join("\n")
-    end
-  ' 2>/dev/null || echo "")
+    "select=rental_id,status,total_cost,metadata,created_at&crew_id=eq.${CREW_ID}&vehicle_id=in.(${SVC_IDS})&created_at=gte.${START_UTC}&created_at=lte.${END_UTC}")
 fi
 
-# ─── Testdrives ──────────────────────────────────────────────────────────────
-TESTDRIVE_COUNT=$(supabase_query "testdrive_contract_artifacts" \
-  "select=id&crew_id=eq.${CREW_ID}&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}" \
-  "private" | jq 'length' 2>/dev/null || echo 0)
+# Service sign rule (see skills/service-work-text):
+#   metadata.client present  → client service (+ revenue, counts in day total)
+#   metadata.client absent   → crew / internal work (− expense = mechanic salary,
+#                              shown separately, NOT added to day total)
+SERVICE_KPIS=$(echo "$SERVICES_DATA" | jq -r '
+  def is_client: (((.metadata // {}).client // "") | length > 0);
+  def billable: (.status == "active" or .status == "completed");
+  {
+    total: length,
+    active: ([.[] | select(.status == "active")] | length),
+    completed: ([.[] | select(.status == "completed")] | length),
+    client_count: ([.[] | select(is_client)] | length),
+    client_revenue: ([.[] | select(is_client and billable) | (.total_cost // 0)] | add // 0),
+    crew_count: ([.[] | select(is_client | not)] | length),
+    crew_expense: ([.[] | select((is_client | not) and billable) | (.total_cost // 0)] | add // 0)
+  } | . as $x |
+  (if $x.completed == 0 then " — день открыт" else "" end) as $suffix |
+  "Сервисов сегодня: \($x.total)\nВыручка (клиентам): \($x.client_revenue) ₽ (\($x.client_count) ↗)\nВнутр. работы (зарплата): \($x.crew_expense) ₽ (\($x.crew_count) ↘)\nЗавершено: \($x.completed)\($suffix)"
+')
 
-# ─── Prepayments (booking fees, separate from revenue) ───────────────────────
-# Prepayments are stored as cash_transactions with transaction_type='income_prepayment'
-# They are NOT included in TOTAL_REVENUE — they're like deposits, held in reserve
-# until the rental is completed.
-PREPAYMENTS_DATA=$(supabase_query "cash_transactions" \
-  "select=amount,description,rental_id&crew_id=eq.${CREW_ID}&transaction_type=eq.income_prepayment&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}")
-
-PREPAYMENT_COUNT=$(echo "$PREPAYMENTS_DATA" | jq 'length' 2>/dev/null || echo 0)
-PREPAYMENT_TOTAL=$(echo "$PREPAYMENTS_DATA" | jq '[.[].amount // 0] | add // 0' 2>/dev/null || echo 0)
-
-# Build prepayment section with bike names (look up rental.vehicle_id → cars)
-PREPAYMENT_SECTION=""
-if [[ ${PREPAYMENT_COUNT} -gt 0 ]]; then
-  # Get rental_ids from prepayments
-  PREPAYMENT_RENTAL_IDS=$(echo "$PREPAYMENTS_DATA" | jq -r '[.[].rental_id // empty] | unique | join(",")' 2>/dev/null)
-
-  PREPAYMENT_DETAIL=$(jq -rn --argjson preps "$PREPAYMENTS_DATA" --argjson cars "$CARS_DATA" '
-    ($cars | map({(.id): ("\(.make) \(.model)")}) | add // {}) as $bike_names |
-    [ $preps[] |
-      {
-        bike: ($bike_names[.rental_id] // .rental_id // "—"),
-        amount: (.amount // 0),
-        desc: (.description // "Предоплата")
-      }
-    ] |
-    map("• \(.bike): \(.desc) — \(.amount) ₽") | join("\n")
-  ' 2>/dev/null || echo "  (ошибка)")
-
-  PREPAYMENT_SECTION="<b>💳 ПРЕДОПЛАТЫ (не в выручке):</b>
-${PREPAYMENT_DETAIL}
-── Итого предоплат: ${PREPAYMENT_TOTAL} ₽
-
-"
-fi
-
-# ─── Deposits (excluded from revenue) ────────────────────────────────────────
-DEPOSIT_DATA=$(supabase_query "deposit_entries" \
-  "select=destination,entry_type,amount&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}")
-
-DEPOSIT_KPIS=$(echo "$DEPOSIT_DATA" | jq -r '
-  group_by(.destination) | map({
-    dest: .[0].destination,
-    collected: ([.[] | select(.entry_type == "deposit_collected")] | map(.amount) | add // 0),
-    returned: ([.[] | select(.entry_type == "deposit_returned")] | map(.amount) | add // 0)
-  }) | .[] |
-  "  " + (if .dest == "cash" then "💵" elif .dest == "tbank" then "💳Т" else "💳С" end) +
-  ": +" + (.collected | tostring) + " / -" + (.returned | tostring)
-' 2>/dev/null || echo "  (нет данных)")
-
-# ─── Salary (ФОТ) ────────────────────────────────────────────────────────────
-SALARY_DATA=$(supabase_query "cash_transactions" \
-  "select=amount,description&crew_id=eq.${CREW_ID}&transaction_type=eq.expense_salary&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}")
-
-SALARY_SECTION=$(echo "$SALARY_DATA" | jq -r '
-  if length == 0 then "  (нет выплат)"
-  else [ .[] | "• \(.description // "выплата") — \(.amount) ₽" ] | join("\n") end
-' 2>/dev/null || echo "  (ошибка)")
-
-# ─── Household expenses (хозрасходы, лимит 10 000 ₽/мес) ────────────────────
-HOUSEHOLD_DATA=$(supabase_query "cash_transactions" \
-  "select=amount,description&crew_id=eq.${CREW_ID}&transaction_type=eq.expense_other&created_at=gte.${START_ENC}&created_at=lte.${END_ENC}")
-
-MONTH_START=$(TZ=Europe/Moscow date +"%Y-%m-01T00:00:00+03:00" | sed 's/+/%2B/g')
-HOUSEHOLD_MONTH=$(supabase_query "cash_transactions" \
-  "select=amount&crew_id=eq.${CREW_ID}&transaction_type=eq.expense_other&created_at=gte.${MONTH_START}" | jq '[.[].amount] | add // 0' 2>/dev/null || echo 0)
-
-HOUSEHOLD_REMAINING=$((10000 - HOUSEHOLD_MONTH))
-
-HOUSEHOLD_SECTION=$(echo "$HOUSEHOLD_DATA" | jq -r --argjson m "$HOUSEHOLD_MONTH" --argjson r "$HOUSEHOLD_REMAINING" '
-  if length == 0 then "  (нет закупок)"
-  else
-    [ .[] | "• \(.description // "закупка") — \(.amount) ₽" ] | join("\n") +
-    "\n  ── За месяц: \($m) ₽ | Остаток: \($r) ₽"
-  end
-' 2>/dev/null || echo "  (ошибка)")
-
-# ─── Shift status ────────────────────────────────────────────────────────────
+# ─── Shifts KPIs (crew_member_shifts, see skills/shift-tracker-text) ─────────
+# Completed today + currently open. Salary = stored salary_amount, else
+# hours × hourly_rate (default 169₽). Open shifts started before today are
+# flagged as forgotten (⚠ unclosed from previous days).
 SHIFTS_DATA=$(supabase_query "crew_member_shifts" \
-  "select=member_id,clock_in_time,clock_out_time,duration_minutes&crew_id=eq.${CREW_ID}&clock_in_time=gte.${START_ENC}&clock_in_time=lte.${END_ENC}")
+  "select=clock_in_time,clock_out_time,hourly_rate,duration_minutes,salary_amount,users(username,full_name)&crew_id=eq.${CREW_ID}&order=clock_in_time.asc&limit=500")
 
-SHIFT_USER_IDS=$(echo "$SHIFTS_DATA" | jq -r '[.[].member_id] | unique | join(",")' 2>/dev/null)
-if [[ -n "$SHIFT_USER_IDS" && "$SHIFT_USER_IDS" != "null" ]]; then
-  SHIFT_OR_FILTER=$(echo "$SHIFT_USER_IDS" | sed 's/,/,user_id.eq./g; s/^/user_id.eq./')
-  USERS_DATA=$(supabase_query "users" "select=user_id,full_name&or=(${SHIFT_OR_FILTER})")
-fi
-
-# Combine shifts + users into a single JSON for jq processing
-SHIFT_SECTION=$(jq -rn --argjson shifts "$SHIFTS_DATA" --argjson users "$USERS_DATA" '
-  ($users | map({(.user_id): (.full_name // .user_id)}) | add // {}) as $names |
-  def fmt_time(ts):
-    if ts == null then "open"
+SHIFT_KPIS=$(echo "$SHIFTS_DATA" | jq -r --arg today "$TODAY" '
+  def ts: sub("\\.[0-9]+";"") | sub("\\+00:00$";"Z") | fromdateiso8601;
+  def h: ((if .clock_out_time then (.clock_out_time|ts) else now end) - (.clock_in_time|ts)) / 3600;
+  def sal: (.salary_amount // (h * (.hourly_rate // 169)));
+  def r1: ((.*10)|round)/10;
+  def who: (.users.username // .users.full_name // "?");
+  (map(select(.clock_out_time != null and ((.clock_in_time // "")|startswith($today))))) as $done
+  | (map(select(.clock_out_time == null and ((.clock_in_time // "")|startswith($today))))) as $open
+  | (map(select(.clock_out_time == null and (((.clock_in_time // "")|startswith($today))|not)))) as $stale
+  | ($done + $open) as $day
+  | if ($day|length) == 0 and ($stale|length) == 0 then
+      "Сегодня смен не было"
     else
-      ts[11:16] as $hhmm |
-      ($hhmm[0:2] | tonumber) as $h |
-      $hhmm[2:] as $m |
-      (($h + 3) % 24) as $msk |
-      (if $msk < 10 then "0" else "" end) + ($msk | tostring) + $m
-    end;
-  def fmt_h(mins):
-    if mins == null then "open"
-    else ((mins / 10 | floor) / 10 | tostring) + " ч"
-    end;
-  if ($shifts | length) == 0 then "  (нет смен)"
-  else
-    [ $shifts[] |
-      ($names[.member_id] // .member_id) as $n |
-      "• \($n): \(fmt_time(.clock_in_time)) → \(fmt_time(.clock_out_time)) (\(fmt_h(.duration_minutes)))"
-    ] | join("\n")
-  end
-' 2>/dev/null || echo "  (ошибка загрузки смен)")
+      [
+        (if ($day|length) == 0 then "" else
+          "Завершено смен: \($done|length) (\([$done[]|h]|add//0|r1) ч)\nОткрытых смен: \($open|length) (\([$open[]|h]|add//0|r1) ч)\nНа смене: \(if ($open|length)==0 then "—" else [$open[]|"\(who) с \((.clock_in_time|ts) + 10800 | strftime("%H:%M")) МСК"]|join(", ") end)\nЗарплата за день: \([$day[]|sal]|add//0|round) ₽"
+        end),
+        (if ($stale|length)>0 then "⚠️ Незакрытые с прошлых дней: \($stale|length) (\([$stale[]|"\(who) с \(.clock_in_time[0:10])"]|join(", ")))" else "" end)
+      ] | map(select(length > 0)) | join("\n")
+    end
+')
 
-# ─── Active rentals with deep links (keep — this is actionable) ──────────────
-ACTIVE_LIST=$(echo "$RENTALS_DATA" | jq -r '
+# ─── Equipment KPIs (unified rentals, see skills/equipment-tracker-text) ─────
+# Equipment rentals live in `rentals` with crew_id in metadata (the rentals
+# column is NULL for equipment rows — migration 20260815000001). The bike query
+# above excludes them via or=(metadata->>item_type...) so they are NOT double
+# counted; their revenue is added to TOTAL_REVENUE below.
+EQUIP_DATA=$(supabase_query "rentals" \
+  "select=rental_id,status,total_cost,created_at,agreed_end_date,metadata&metadata->>item_type=eq.equipment&metadata->>crew_id=eq.${CREW_ID}&order=created_at.desc&limit=500")
+
+EQUIP_STOCK=$(supabase_query "cars" "select=id&crew_id=eq.${CREW_ID}&type=eq.equipment" | jq 'length')
+
+EQUIP_KPIS=$(echo "$EQUIP_DATA" | jq -r --arg today "$TODAY" --arg start "$START_UTC" --arg end "$END_UTC" --arg stock "$EQUIP_STOCK" '
+  def cond: (.metadata.equipment_condition // "");
+  (map(select((.created_at // "")|startswith($today)))) as $issued
+  | (map(select(.status == "active"))) as $active
+  | (map(select(.status == "active" and ((.agreed_end_date // "") >= $start) and ((.agreed_end_date // "") <= $end)))) as $due
+  | (map(select(.status == "active" and ((.agreed_end_date // "") < $start)))) as $overdue
+  | (map(select(
+      .status == "disputed"
+      or ((cond|length) > 0 and (cond != "Норм") and (cond != "Выдан"))
+      or (((.metadata.damage_reports // [])|length) > 0)
+    ))) as $problems
+  | (($issued + $active) | unique_by(.rental_id) | map(select(.status == "active" or .status == "completed"))) as $rev
+  | if (($issued + $active)|length) == 0 then
+      "Выдач сегодня не было (склад: \($stock) предметов)"
+    else
+      "Выдач сегодня: \($issued|length) · активных: \($active|length)\nК возврату сегодня: \($due|length) · просрочено: \($overdue|length)\nВыручка: \([$rev[]|(.total_cost//0)]|add//0|round) ₽\(if ($problems|length)>0 then "\n⚠️ Проблемы (состояние/повреждения): \($problems|length)" else "" end)"
+    end
+')
+
+# ─── Total revenue ───────────────────────────────────────────────────────────
+# Day total = rentals (started-today, see RENTALS_TODAY) + sales + CLIENT
+# services + equipment. Internal/crew services (no metadata.client) are a
+# mechanic-salary expense, NOT revenue — they are reported separately in
+# SERVICE_KPIS and excluded from TOTAL_REVENUE.
+TOTAL_REVENUE=$(jq -s -r '
+  def to_num:
+    if type == "number" then .
+    elif type == "string" then (gsub(" "; "") | tonumber? // 0)
+    else 0 end;
+  def revenue_of:
+    if has("total_cost") then (.total_cost // 0)
+    elif has("total_sum") then (.total_sum // (.sale_price | to_num) // 0)
+    else 0 end;
+  def is_client_service: (((.metadata // {}).client // "") | length > 0);
+  ([.[0][] | {total_cost: revenue_of, status: "active"}]
+    + [.[1][] | {total_cost: revenue_of, status: "active"}]
+    + [.[2][] | select(is_client_service)]
+    + [.[3][] | select(.status == "active" or .status == "completed")]
+  ) |
+  ([.[] | select(.status == "active" or .status == "completed") | revenue_of] | add // 0)
+' <<EOF
+${RENTALS_TODAY}
+${SALES_DATA}
+${SERVICES_DATA}
+${EQUIP_DATA}
+EOF
+)
+
+# ─── Compose message ─────────────────────────────────────────────────────────
+DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
+
+# ─── Per-rental deep links for active rentals (BUG E fix) ────────────────────
+# Build a "📋 Активные аренды" section so operators can tap straight into each
+# open rental's detail page (where the closure UI lives). Without this, the
+# digest only shows "Активных: N" with no way to drill into a specific rental.
+# NOTE: this lists ALL currently active rentals (a multi-day rental started
+# days ago is not in RENTALS_DATA's day window but still needs a drill-in
+# link), so it uses its own status=active query. Times shown in Moscow
+# time (CLAUDE.md: digests always report MSK).
+ACTIVE_DATA=$(supabase_query "rentals" \
+  "select=rental_id,status,total_cost,agreed_end_date&crew_id=eq.${CREW_ID}&status=eq.active&vehicle_id=not.like.vip-bike-svc-*&order=agreed_end_date.asc&limit=50")
+
+ACTIVE_RENTALS_LIST=""
+ACTIVE_RENTALS_LIST=$(echo "$ACTIVE_DATA" | jq -r '
   [.[] | select(.status == "active")] | .[0:5] |
-  map("RENTAL_ROW|\(.rental_id[0:8])|\(.agreed_end_date)|\(.total_cost // 0)") | join("\n")
+  map("RENTAL_ROW|\(.rental_id[0:8])|\(.agreed_end_date // "")|\(.total_cost // 0)") | join("\n")
 ' | while IFS='|' read -r prefix rid_short end_iso cost; do
   [[ "$prefix" != "RENTAL_ROW" ]] && continue
   end_msk=$(moscow_hhmm "$end_iso")
-  printf '• #%s — до %s МСК — %s ₽' "$rid_short" "$end_msk" "$cost"
-done | paste -sd'\n' -)
-
-ACTIVE_SECTION=""
-if [[ -n "$ACTIVE_LIST" ]]; then
-  ACTIVE_LINKS=$(echo "$RENTALS_DATA" | jq -r '[.[] | select(.status == "active")] | .[0:5] | .[] | .rental_id' | while read -r rid; do
+  printf '• Аренда #%s — до %s МСК — %s ₽\n' "$rid_short" "$end_msk" "$cost"
+done)
+ACTIVE_RENTALS_LINKS=""
+if [[ -n "$ACTIVE_RENTALS_LIST" ]]; then
+  # Build per-rental "📋 Открыть" links using rental_link() from _lib.sh.
+  # rental_link emits tg_deep_link "rental_<id>" which useStartParamRouter
+  # routes to /franchize/<slug>/rental/<id> (the dedicated rental page
+  # with closure UI).
+  ACTIVE_RENTALS_LINKS=$(echo "$ACTIVE_DATA" | jq -r '
+    [.[] | select(.status == "active")] | .[0:5] | .[] | .rental_id
+  ' | while read -r rid; do
     rlink=$(rental_link "$rid")
     printf '  📋 <a href="%s">Открыть %s</a>\n' "$rlink" "${rid:0:8}"
   done)
-  ACTIVE_SECTION="<b>📋 Активные аренды:</b>
-${ACTIVE_LIST}
+fi
 
-${ACTIVE_LINKS}
+ACTIVE_SECTION=""
+if [[ -n "$ACTIVE_RENTALS_LIST" ]]; then
+  ACTIVE_SECTION="<b>📋 Активные аренды (до 5):</b>
+${ACTIVE_RENTALS_LIST}
+
+${ACTIVE_RENTALS_LINKS}
 
 ━━━━━━━━━━━━━━━━━━
 "
 fi
 
-# ─── Total revenue (rentals + sales + services, NO deposits) ─────────────────
-TOTAL_REVENUE=$(( RENTAL_REVENUE + SALE_REVENUE + SERVICE_REVENUE ))
+RENTALS_LINK="$(analytics_link "rentals" "$TODAY")"
+SALES_LINK="$(analytics_link "sales" "$TODAY")"
+SERVICES_LINK="$(analytics_link "services" "$TODAY")"
 
-# ─── Links ────────────────────────────────────────────────────────────────────
-DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
+MESSAGE="📊 <b>Итоги дня</b> — ${TODAY}, ${NOW_DISPLAY} МСК
 
-# ─── Compose message ─────────────────────────────────────────────────────────
-MESSAGE="📊 <b>ЕЖЕДНЕВНЫЙ ВЕЧЕРНИЙ ДАЙДЖЕСТ</b> — ${TODAY}, ${NOW_DISPLAY} МСК
+<b>🏍 <a href=\"${RENTALS_LINK}\">Аренды</a></b>
+${RENTAL_KPIS}
 
-<b>🔑 АРЕНДЫ ТЕХНИКИ:</b> ${RENTAL_COUNT_LABEL} (активных: ${RENTAL_ACTIVE})
+<b>💰 <a href=\"${SALES_LINK}\">Продажи</a></b>
+${SALE_KPIS}
 
-if [[ -n "$EQUIPMENT_SECTION" ]]; then
-  MESSAGE="${MESSAGE}
+<b>🔧 <a href=\"${SERVICES_LINK}\">Сервис</a></b>
+${SERVICE_KPIS}
 
-<b>${EQUIPMENT_SECTION}</b>"
-fi
+<b>🕒 Смены</b>
+${SHIFT_KPIS}
 
-MESSAGE="${MESSAGE}
-<b>💰 Продажи:</b> ${SALE_COUNT} — ${SALE_REVENUE} ₽"
-
-if [[ -n "$SERVICE_DETAIL" ]]; then
-  MESSAGE="${MESSAGE}
-
-<b>🛠️ СЕРВИС:</b>
-${SERVICE_DETAIL}
-── Итого сервис: ${SERVICE_REVENUE} ₽"
-else
-  MESSAGE="${MESSAGE}
-
-<b>🛠️ Сервис:</b> (нет работ)"
-fi
-
-MESSAGE="${MESSAGE}
-<b>🛵 Тест-драйвы:</b> ${TESTDRIVE_COUNT}
-"
-
-if [[ -n "$PREPAYMENT_SECTION" ]]; then
-  MESSAGE="${MESSAGE}
-${PREPAYMENT_SECTION}"
-fi
-
-MESSAGE="${MESSAGE}
-<b>🛒 ХОЗРАСХОДЫ (лимит 10 000 ₽/мес):</b>
-${HOUSEHOLD_SECTION}
-
-<b>💸 ЗАРПЛАТЫ (ФОТ):</b>
-${SALARY_SECTION}
-
-<b>🔒 ЗАЛОГИ (не в выручке):</b>
-${DEPOSIT_KPIS}
-
-<b>⏱️ СМЕНЫ:</b>
-${SHIFT_SECTION}
+<b>🧥 Экипировка</b> — на складе ${EQUIP_STOCK}
+${EQUIP_KPIS}
 
 ━━━━━━━━━━━━━━━━━━
-${ACTIVE_SECTION}<b>Итого выручка: ${TOTAL_REVENUE} ₽</b>
+${ACTIVE_SECTION}<b>Итого выручка за день: ${TOTAL_REVENUE} ₽</b>
 
-📊 <a href=\"${DASHBOARD_LINK}\">Дашборд</a>"
+📊 Дашборд: <a href=\"${DASHBOARD_LINK}\">Открыть</a>"
 
 # ─── Send ────────────────────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
