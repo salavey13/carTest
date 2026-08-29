@@ -13,23 +13,36 @@
 //      stacked — leaving a gap big enough to fit a keyboard ("huge bottom
 //      padding").
 //
-// Fix:
-//   - Use `h-[90vh]` (fixed) instead of `max-h-[90vh]` so the sheet is always
-//     full-height regardless of content length. The drag handle still lets
-//     the user swipe down to dismiss.
-//   - Move the scroll container to start at the TOP, anchor with `pt-2` only
-//     and trim `pb-4`. The safe-area inset is applied to the OUTER container
-//     only (no double padding).
-//   - Reset scroll to top on open — without this, when a user opens the same
-//     rental modal again after closing, the scroll position is preserved at
-//     whatever they last scrolled to, which feels like the top is hidden.
-//   - Stretch the drag handle across the full width (so dragging anywhere on
-//     the top bar starts the gesture, not just the small pill).
+// FIX (iter18 — "sheet stucks at half size, footer unreachable"): two roots.
+//   A. `h-[90vh]` measured the LAYOUT viewport, which in the Telegram WebView
+//      can be TALLER than the visible area (TG header / browser toolbar /
+//      fullscreen insets) — the sheet's bottom (sticky footer «Открыть
+//      аренду») went offscreen, and only rotating the phone (forcing a vh
+//      recalculation) fixed it. Now the height comes from
+//      useViewportHeightPx() (tg.viewportStableHeight → window.innerHeight)
+//      so the sheet ALWAYS fits the visible viewport, whatever the browser
+//      does with vh. Live updates on viewportChanged/resize/rotation.
+//   B. When the user started a swipe while the entry spring was still
+//      running, framer-motion recorded the interrupted (half-way) position as
+//      the drag origin — after a non-dismissing drag the sheet sprang back to
+//      that HALF position and stayed there ("stuck at half size, draggable
+//      only in the reduction direction"). Now onDragEnd always re-animates to
+//      the FULL open position via animation controls — the sheet can never
+//      rest at half size, and dragging up snaps it back to full.
+//
+// The drag handle remains a dismiss gesture only (swipe down to close);
+// the sheet is not user-resizable — it is always the full intended size.
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { motion, AnimatePresence, useDragControls } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  useAnimationControls,
+  useDragControls,
+} from "framer-motion";
 import { X } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
+import { useViewportHeightPx } from "../hooks/useViewportHeightPx";
 
 interface AnalyticsMobileSheetProps {
   open: boolean;
@@ -39,6 +52,11 @@ interface AnalyticsMobileSheetProps {
   children: ReactNode;
 }
 
+/** Fraction of the visible viewport the sheet occupies when open. */
+const SHEET_VIEWPORT_FRACTION = 0.92;
+
+const OPEN_SPRING = { type: "spring", damping: 30, stiffness: 280 } as const;
+
 export function AnalyticsMobileSheet({
   open,
   onClose,
@@ -46,8 +64,19 @@ export function AnalyticsMobileSheet({
   T,
   children,
 }: AnalyticsMobileSheetProps) {
+  // dragControls: the handle bar starts the swipe gesture (dragListener off).
   const dragControls = useDragControls();
+  // controls: the sheet's y-position animation — re-fired after every
+  // non-dismissing drag so it ALWAYS returns to the full open position.
+  const controls = useAnimationControls();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const viewportHeight = useViewportHeightPx();
+
+  // Pixel height derived from the VISIBLE viewport (see hook docblock).
+  // Before mount (viewportHeight === 0) we fall back to the CSS class
+  // (90dvh — dynamic viewport height, still better than the old vh).
+  const sheetHeightPx =
+    viewportHeight > 0 ? Math.round(viewportHeight * SHEET_VIEWPORT_FRACTION) : 0;
 
   // Esc to close
   useEffect(() => {
@@ -78,6 +107,18 @@ export function AnalyticsMobileSheet({
     }
   }, [open]);
 
+  // FIX (iter18-B): the entry animation runs through the animation controls
+  // so it can be re-fired after a non-dismissing drag (restore to FULL
+  // size). sheetHeightPx is intentionally NOT a dependency: a viewport
+  // change while open must not replay the slide-up — the inline style height
+  // already re-seats the sheet correctly.
+  useEffect(() => {
+    if (open) {
+      void controls.start({ y: 0, transition: OPEN_SPRING });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, controls]);
+
   return (
     <AnimatePresence>
       {open && (
@@ -102,21 +143,34 @@ export function AnalyticsMobileSheet({
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.4 }}
             onDragEnd={(_, info) => {
-              if (info.offset.y > 120 || info.velocity.y > 600) onClose();
+              if (info.offset.y > 120 || info.velocity.y > 600) {
+                // Dismiss — the AnimatePresence exit slides the sheet away.
+                onClose();
+                return;
+              }
+              // FIX (iter18-B): not dismissed → ALWAYS restore the FULL open
+              // position. Previously the sheet could rest at the half-way
+              // point where an interrupted drag started (the "stuck at half
+              // size" bug) and no upward drag could recover it.
+              void controls.start({ y: 0, transition: OPEN_SPRING });
             }}
             initial={{ y: "100%" }}
-            animate={{ y: 0 }}
+            animate={controls}
             exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 280 }}
+            transition={OPEN_SPRING}
             onClick={(e) => e.stopPropagation()}
-            // FIX (F14): fixed height instead of max-h — guarantees full-screen
-            // sheet regardless of content length. Safe-area inset on the OUTER
-            // container only (no double-padding).
-            className="relative flex h-[90vh] w-full flex-col rounded-t-3xl"
+            // FIX (iter18-A): pixel height from the VISIBLE viewport (TG-aware)
+            // with a 90dvh CSS fallback for the pre-mount frame. The sheet can
+            // never be taller than what the user actually sees, so the sticky
+            // footer stays onscreen.
+            className={`relative flex w-full flex-col rounded-t-3xl ${
+              sheetHeightPx > 0 ? "" : "h-[90dvh]"
+            }`}
             style={{
               backgroundColor: T.bg,
               borderTop: `1px solid ${T.border}`,
               boxShadow: "0 -10px 40px rgba(0,0,0,0.4)",
+              ...(sheetHeightPx > 0 ? { height: `${sheetHeightPx}px` } : {}),
               paddingBottom: "env(safe-area-inset-bottom, 0px)",
             }}
           >

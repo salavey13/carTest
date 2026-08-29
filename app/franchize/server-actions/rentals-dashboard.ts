@@ -2170,9 +2170,11 @@ export async function updateRentalStatus(input: {
     // S5 fix: include vehicle.id in SELECT — needed for the bike-specs odometer save below.
     // Was: vehicle:cars(make, model) only → vehicle.id was always undefined → save never fired.
     // 2026-08-22: also include crew_id — needed for sendReviewNudge() to resolve crew.reviewsLink.
+    // iter18: also specs + total_cost + dates — needed for the subrenter activation
+    // notification (partner-owner + his 50% cut) when status flips to "active".
     const { data: rental } = await supabaseAdmin
       .from("rentals")
-      .select("rental_id, status as old_status, metadata, user_id, crew_id, vehicle:cars(id, make, model)")
+      .select("rental_id, status as old_status, total_cost, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date, metadata, user_id, crew_id, vehicle:cars(id, make, model, specs)")
       .eq("rental_id", rentalId)
       .maybeSingle();
 
@@ -2269,6 +2271,36 @@ export async function updateRentalStatus(input: {
         } catch (nudgeErr) {
           console.warn("[update-rental-status] Review nudge failed (non-fatal):", nudgeErr);
         }
+      }
+    }
+
+    // ── iter18: subrenter activation notification ──
+    // A manual flip to "active" (e.g. from the drawer's «Активировать»)
+    // means the bike was handed to the renter — the partner-owner must get
+    // his «bike in rent + your cut» message, same as the 2-step activation.
+    if (status === "active" && rental && rental.old_status !== "active") {
+      try {
+        const { notifySubrenterOfRentalActivation } = await import(
+          "@/app/franchize/lib/subrenter-notify"
+        );
+        const subRental = rental as {
+          total_cost?: number | null;
+          metadata?: Record<string, unknown> | null;
+          agreed_start_date?: string | null;
+          agreed_end_date?: string | null;
+          vehicle?: { id: string | number; make?: string | null; model?: string | null; specs?: Record<string, unknown> | null } | null;
+        };
+        await notifySubrenterOfRentalActivation({
+          rentalId,
+          vehicle: subRental.vehicle ?? null,
+          totalCost: subRental.total_cost ?? null,
+          metadata: subRental.metadata ?? null,
+          startDate: subRental.agreed_start_date ?? null,
+          endDate: subRental.agreed_end_date ?? null,
+          crewName: (crew.metadata as { name?: string } | null)?.name || slug || null,
+        });
+      } catch (subrentErr) {
+        console.warn("[update-rental-status] Subrenter notify failed (non-fatal):", subrentErr);
       }
     }
 
@@ -2640,6 +2672,28 @@ export async function activateRental(input: {
     // Send to admin (salavey13) — always include QR. Use operational variant.
     const adminChatId = "413553377";
     await sendToChat(adminChatId, { messageText: congratTextOperator });
+
+    // ── iter18: subrenter immediate-satisfaction notification ──
+    // If the bike is subrented (specs.subrenter_chat_id), the partner-owner
+    // learns his bike is out + his 50% cut of the bike part (equipment
+    // excluded — it is crew money). Fire-and-forget, never fatal.
+    try {
+      const { notifySubrenterOfRentalActivation } = await import(
+        "@/app/franchize/lib/subrenter-notify"
+      );
+      await notifySubrenterOfRentalActivation({
+        rentalId,
+        vehicle: { id: vehicle.id, make: vehicle.make, model: vehicle.model, specs: vehicle.specs },
+        totalCost: rental.total_cost,
+        metadata: (rental.metadata || {}) as Record<string, unknown>,
+        renterName: renterName || null,
+        startDate: rentStartDate || null,
+        endDate: rentEndDate || null,
+        crewName: crew.slug || null,
+      });
+    } catch (subrentErr) {
+      console.warn("[activate-rental] Subrenter notify failed (non-fatal):", subrentErr);
+    }
 
     // ── 7. Send via email ──
     try {

@@ -195,6 +195,21 @@ export async function activateRentalIfReady(
           error: err,
         });
       });
+
+      // iter18: subrenter immediate-satisfaction notification — if the bike is
+      // subrented (cars.specs.subrenter_chat_id), tell the partner-owner his
+      // bike is in rent + his 50% cut of the bike part (equipment excluded).
+      // Fetches the rental row itself — no extra data needed here.
+      import("@/app/franchize/lib/subrenter-notify")
+        .then(({ notifySubrenterOfRentalActivation }) =>
+          notifySubrenterOfRentalActivation({ rentalId }),
+        )
+        .catch((err) => {
+          logger.warn("[activateRentalIfReady] Subrenter notify failed (non-fatal)", {
+            rentalId,
+            error: err,
+          });
+        });
     });
 
     logger.info("[activateRentalIfReady] Rental activated successfully", { rentalId });

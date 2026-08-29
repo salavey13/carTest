@@ -16,7 +16,13 @@
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
-import { canManageSubrenters } from "./bike-subrenter";
+import { canManageSubrenters, syncUserSubrenterFlag } from "./bike-subrenter";
+import {
+  normalizeMonthKey,
+  currentMskMonthKey,
+  summarizeSubrenterMonth,
+  type SubrenterMonthSummary,
+} from "@/app/franchize/lib/subrenter-economics";
 
 export interface SubrenterOwnedBike {
   bikeId: string;
@@ -87,8 +93,18 @@ export async function getSubrenterOwnedBikesAction(input: {
       .eq("specs->>subrenter_chat_id", userId);
 
     if (!bikes || bikes.length === 0) {
+      // iter18 self-heal: the flag must not claim bikes the user no longer owns.
+      await syncUserSubrenterFlag(userId, crew.id, []);
       return { success: true, data: { bikes: [], rentals: [] } };
     }
+
+    // iter18 self-heal: backfill / refresh the backwards ownership flag
+    // (users.metadata.subrenterOf) from the freshly-queried bike list.
+    await syncUserSubrenterFlag(
+      userId,
+      crew.id,
+      bikes.map((b: { id: string | number }) => String(b.id)),
+    );
 
     const bikeIds = bikes.map((b: { id: string | number }) => String(b.id));
     const labelOf = (b: { make?: string | null; model?: string | null; id: string | number }) =>
@@ -300,6 +316,348 @@ export async function getFranchizeSubrentersOverviewAction(input: {
     return { success: true, data: out };
   } catch (error) {
     logger.warn("[getFranchizeSubrentersOverviewAction] failed:", error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Monthly earnings / payouts (iter18).
+//
+// Scope rule (mirrors the analytics day page + weekly report): a rental
+// belongs to the month in which it STARTS (MSK calendar). The money math
+// (equipment part vs bike part vs 50% cut) lives in subrenter-economics.ts —
+// the same helpers that drive the analytics quick counters.
+// ─────────────────────────────────────────────────────────────────────────
+
+function mskLocalMonth(iso: string | null | undefined): string {
+  if (!iso) return "";
+  try {
+    // en-CA + year/month emits "YYYY-MM" directly.
+    return new Date(iso).toLocaleDateString("en-CA", {
+      timeZone: "Europe/Moscow",
+      year: "numeric",
+      month: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
+
+/** Month boundaries in ISO (MSK) — rentals are queried by created_at window
+ *  and then precisely scoped by their MSK START month in JS. */
+function monthWindowIso(month: string): { fromIso: string; toIso: string } {
+  const [y, m] = month.split("-").map(Number);
+  // start of the month minus a 60-day advance-booking buffer
+  const from = new Date(Date.UTC(y, m - 1, 1, 0, 0, 0) - 60 * 86400000);
+  // end of the month plus a small tail
+  const to = new Date(Date.UTC(y, m, 0, 23, 59, 59) + 86400000);
+  return { fromIso: from.toISOString(), toIso: to.toISOString() };
+}
+
+/**
+ * SUBRENTER's own monthly earnings: rentals of HIS bikes that started in the
+ * requested month (default: current MSK month), each with the money split
+ * (total / equipment / bike part / his 50% cut) + month totals.
+ *
+ * This is the «how much did I earn» panel for actual paybacks; the activation
+ * notification is the immediate-satisfaction counterpart.
+ */
+export async function getSubrenterMonthlyEarningsAction(input: {
+  slug: string;
+  userId: string;
+  month?: string;
+}): Promise<{ success: boolean; data?: SubrenterMonthSummary; error?: string }> {
+  const parsed = z
+    .object({
+      slug: z.string().trim().min(1),
+      userId: z.string().trim().min(1),
+      month: z.string().trim().optional(),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректный запрос." };
+  const { slug, userId } = parsed.data;
+  const month = normalizeMonthKey(parsed.data.month) || currentMskMonthKey();
+
+  try {
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id")
+      .eq("slug", slug.trim())
+      .maybeSingle();
+    if (!crew) return { success: false, error: "Экипаж не найден." };
+
+    const { data: bikes } = await supabaseAdmin
+      .from("cars")
+      .select("id, make, model")
+      .eq("crew_id", crew.id)
+      .eq("specs->>subrenter_chat_id", userId);
+    if (!bikes || bikes.length === 0) {
+      return { success: true, data: summarizeSubrenterMonth(month, [], { docLinkBase: `/franchize/${slug}/rental` }) };
+    }
+
+    const bikeLabel = new Map(
+      bikes.map((b: { id: string | number; make?: string | null; model?: string | null }) => [
+        String(b.id),
+        `${b.make ?? ""} ${b.model ?? ""}`.trim() || String(b.id),
+      ]),
+    );
+
+    const { fromIso, toIso } = monthWindowIso(month);
+    const { data: rentals } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id,vehicle_id,status,total_cost,agreed_start_date,agreed_end_date,requested_start_date,metadata,created_at")
+      .in("vehicle_id", Array.from(bikeLabel.keys()))
+      .gte("created_at", fromIso)
+      .lte("created_at", toIso)
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(1000);
+
+    // Precise MSK-month scoping by START date (agreed first, requested fallback).
+    const scoped = (rentals ?? []).filter((r: {
+      agreed_start_date?: string | null;
+      requested_start_date?: string | null;
+    }) => {
+      const start = r.agreed_start_date || r.requested_start_date;
+      return mskLocalMonth(start) === month;
+    });
+
+    const rows = scoped.map((r: {
+      rental_id: string;
+      vehicle_id?: string | null;
+      status?: string | null;
+      total_cost?: number | string | null;
+      agreed_start_date?: string | null;
+      agreed_end_date?: string | null;
+      requested_start_date?: string | null;
+      metadata?: Record<string, unknown> | null;
+    }) => ({
+      rentalId: String(r.rental_id),
+      bikeId: String(r.vehicle_id ?? ""),
+      bikeLabel: bikeLabel.get(String(r.vehicle_id ?? "")) ?? "Байк",
+      status: r.status || "unknown",
+      totalCost: r.total_cost ?? 0,
+      agreedStartDate: r.agreed_start_date || null,
+      agreedEndDate: r.agreed_end_date || null,
+      requestedStartDate: r.requested_start_date || null,
+      metadata: r.metadata ?? null,
+    }));
+
+    return {
+      success: true,
+      data: summarizeSubrenterMonth(month, rows, {
+        docLinkBase: `/franchize/${slug}/rental`,
+      }),
+    };
+  } catch (error) {
+    logger.warn("[getSubrenterMonthlyEarningsAction] failed:", error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export interface SubrenterPayoutRow {
+  chatId: string;
+  username: string | null;
+  name: string | null;
+  bikeLabels: string[];
+  rentalCount: number;
+  totalRub: number;
+  bikePartRub: number;
+  payoutRub: number;
+  summary: SubrenterMonthSummary;
+}
+
+export interface SubrentersMonthlyPayoutsData {
+  month: string;
+  rows: SubrenterPayoutRow[];
+  totalPayoutRub: number;
+}
+
+/**
+ * CREW OWNER's / admin's monthly payout sheet: one row per partner with his
+ * rentals of subrented bikes started in the month, the money split and the
+ * amount the crew owes him (50% of the bike part; equipment is crew money).
+ * Plus the grand total — «how much to pay subrenters this month».
+ */
+export async function getSubrentersMonthlyPayoutsAction(input: {
+  slug: string;
+  actorUserId: string;
+  month?: string;
+}): Promise<{ success: boolean; data?: SubrentersMonthlyPayoutsData; error?: string }> {
+  const parsed = z
+    .object({
+      slug: z.string().trim().min(1),
+      actorUserId: z.string().trim().min(1),
+      month: z.string().trim().optional(),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректный запрос." };
+  const { slug, actorUserId } = parsed.data;
+  const month = normalizeMonthKey(parsed.data.month) || currentMskMonthKey();
+
+  try {
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id")
+      .eq("slug", slug.trim())
+      .maybeSingle();
+    if (!crew) return { success: false, error: "Экипаж не найден." };
+
+    const allowed = await canManageSubrenters(crew.id, crew.owner_id, actorUserId);
+    if (!allowed) return { success: false, error: "Недостаточно прав." };
+
+    const { data: bikes } = await supabaseAdmin
+      .from("cars")
+      .select("id, make, model, specs")
+      .eq("crew_id", crew.id)
+      .not("specs->>subrenter_chat_id", "is", null);
+    const partnerBikes = (bikes ?? []).map((b: {
+      id: string | number;
+      make?: string | null;
+      model?: string | null;
+      specs?: Record<string, unknown> | null;
+    }) => ({
+      bikeId: String(b.id),
+      label: `${b.make ?? ""} ${b.model ?? ""}`.trim() || String(b.id),
+      chatId: typeof b.specs?.subrenter_chat_id === "string" ? b.specs.subrenter_chat_id : "",
+    })).filter((b: { chatId: string }) => b.chatId.length > 0);
+    if (partnerBikes.length === 0) {
+      return { success: true, data: { month, rows: [], totalPayoutRub: 0 } };
+    }
+
+    const bikeByChat = new Map<string, { bikeId: string; label: string }[]>();
+    for (const b of partnerBikes) {
+      const list = bikeByChat.get(b.chatId) ?? [];
+      list.push({ bikeId: b.bikeId, label: b.label });
+      bikeByChat.set(b.chatId, list);
+    }
+    const bikeLabelById = new Map(partnerBikes.map((b: { bikeId: string; label: string }) => [b.bikeId, b.label]));
+
+    const { fromIso, toIso } = monthWindowIso(month);
+    const { data: rentals } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id,vehicle_id,status,total_cost,agreed_start_date,agreed_end_date,requested_start_date,metadata,created_at")
+      .in("vehicle_id", partnerBikes.map((b: { bikeId: string }) => b.bikeId))
+      .gte("created_at", fromIso)
+      .lte("created_at", toIso)
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(2000);
+
+    const scoped = (rentals ?? []).filter((r: {
+      agreed_start_date?: string | null;
+      requested_start_date?: string | null;
+    }) => {
+      const start = r.agreed_start_date || r.requested_start_date;
+      return mskLocalMonth(start) === month;
+    });
+
+    // Group rentals per partner (a bike has exactly one partner).
+    const rentalsByChat = new Map<string, Array<{
+      rentalId: string;
+      bikeId: string;
+      bikeLabel: string;
+      status: string;
+      totalCost: number | string | null;
+      agreedStartDate: string | null;
+      agreedEndDate: string | null;
+      requestedStartDate: string | null;
+      metadata: Record<string, unknown> | null;
+    }>>();
+    for (const r of scoped as Array<{
+      rental_id: string;
+      vehicle_id?: string | null;
+      status?: string | null;
+      total_cost?: number | string | null;
+      agreed_start_date?: string | null;
+      agreed_end_date?: string | null;
+      requested_start_date?: string | null;
+      metadata?: Record<string, unknown> | null;
+    }>) {
+      const bikeId = String(r.vehicle_id ?? "");
+      const partner = partnerBikes.find((b: { bikeId: string }) => b.bikeId === bikeId);
+      if (!partner) continue;
+      const list = rentalsByChat.get(partner.chatId) ?? [];
+      list.push({
+        rentalId: String(r.rental_id),
+        bikeId,
+        bikeLabel: bikeLabelById.get(bikeId) ?? "Байк",
+        status: r.status || "unknown",
+        totalCost: r.total_cost ?? 0,
+        agreedStartDate: r.agreed_start_date || null,
+        agreedEndDate: r.agreed_end_date || null,
+        requestedStartDate: r.requested_start_date || null,
+        metadata: r.metadata ?? null,
+      });
+      rentalsByChat.set(partner.chatId, list);
+    }
+
+    // Partner identities
+    const chatIds = Array.from(bikeByChat.keys());
+    const userByChatId = new Map<string, { username: string | null; name: string | null }>();
+    if (chatIds.length > 0) {
+      const { data: users } = await supabaseAdmin
+        .from("users")
+        .select("user_id, username, full_name")
+        .in("user_id", chatIds);
+      for (const u of (users ?? []) as Array<{ user_id: string | number; username?: string | null; full_name?: string | null }>) {
+        userByChatId.set(String(u.user_id), {
+          username: u.username ? String(u.username) : null,
+          name: u.full_name ? String(u.full_name) : null,
+        });
+      }
+    }
+
+    const rows: SubrenterPayoutRow[] = [];
+    for (const [chatId, list] of rentalsByChat) {
+      const user = userByChatId.get(chatId);
+      const summary = summarizeSubrenterMonth(month, list, {
+        docLinkBase: `/franchize/${slug}/rental`,
+      });
+      rows.push({
+        chatId,
+        username: user?.username ?? null,
+        name: user?.name ?? null,
+        bikeLabels: (bikeByChat.get(chatId) ?? []).map((b) => b.label),
+        rentalCount: summary.rentalCount,
+        totalRub: summary.totalRub,
+        bikePartRub: summary.bikePartRub,
+        payoutRub: summary.cutRub,
+        summary,
+      });
+    }
+
+    // Partners with bikes but zero rentals this month still appear — the owner
+    // wants the full payback list, not only the busy ones.
+    for (const chatId of bikeByChat.keys()) {
+      if (rentalsByChat.has(chatId)) continue;
+      const user = userByChatId.get(chatId);
+      rows.push({
+        chatId,
+        username: user?.username ?? null,
+        name: user?.name ?? null,
+        bikeLabels: (bikeByChat.get(chatId) ?? []).map((b) => b.label),
+        rentalCount: 0,
+        totalRub: 0,
+        bikePartRub: 0,
+        payoutRub: 0,
+        summary: summarizeSubrenterMonth(month, [], {
+          docLinkBase: `/franchize/${slug}/rental`,
+        }),
+      });
+    }
+
+    rows.sort((a, b) => b.payoutRub - a.payoutRub || a.chatId.localeCompare(b.chatId));
+    return {
+      success: true,
+      data: {
+        month,
+        rows,
+        totalPayoutRub: rows.reduce((s, r) => s + r.payoutRub, 0),
+      },
+    };
+  } catch (error) {
+    logger.warn("[getSubrentersMonthlyPayoutsAction] failed:", error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }

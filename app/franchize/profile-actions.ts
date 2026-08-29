@@ -367,6 +367,94 @@ export async function getFranchizeProfileBySlugAction(params: {
   return { success: true, data, catalog: getCatalogBySlug(slug) };
 }
 
+/**
+ * iter18 (bonus): TG notifications on achievement unlocks.
+ *
+ * Called fire-and-forget from grantFranchizeAchievementAction on EVERY newly
+ * unlocked badge (exploration, rental, shift, onboarding — they all funnel
+ * through that action). Notifies:
+ *   • the achiever himself («Достижение получено!»)
+ *   • the crew owner + crew admins («Новое достижение в экипаже»)
+ * Never throws — a failed notification must not break the grant.
+ */
+async function notifyAchievementUnlocked(params: {
+  slug: string;
+  userId: string;
+  achievementId: string;
+}): Promise<void> {
+  try {
+    const catalog = getCatalogBySlug(params.slug);
+    const badge = catalog.find((a) => a.id === params.achievementId);
+    if (!badge) return;
+
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id, name")
+      .eq("slug", params.slug)
+      .maybeSingle();
+    if (!crew) return;
+
+    const { data: achiever } = await supabaseAdmin
+      .from("users")
+      .select("user_id, username, full_name")
+      .eq("user_id", params.userId)
+      .maybeSingle();
+    if (!achiever) return;
+
+    const { buildAchievementNotificationMessage } = await import(
+      "@/app/franchize/lib/subrenter-economics"
+    );
+    const { sendComplexMessage } = await import(
+      "@/app/webhook-handlers/actions/sendComplexMessage"
+    );
+
+    const base = {
+      crewName: (crew.name as string) || params.slug,
+      achieverName: (achiever.full_name as string) || "",
+      achieverUsername: (achiever.username as string) || null,
+      achievementTitle: badge.title,
+      achievementDescription: badge.description,
+    };
+
+    // 1. The achiever
+    await sendComplexMessage(
+      params.userId,
+      buildAchievementNotificationMessage({ ...base, recipientRole: "achiever" }),
+      [],
+      { parseMode: "HTML" },
+    );
+
+    // 2. Crew owner + crew admins (dedup: owner might also be an admin/member)
+    const recipients = new Set<string>();
+    if (crew.owner_id) recipients.add(String(crew.owner_id));
+    const { data: admins } = await supabaseAdmin
+      .from("crew_members")
+      .select("user_id")
+      .eq("crew_id", crew.id)
+      .in("role", ["owner", "admin", "co_owner"])
+      .eq("membership_status", "active");
+    for (const a of (admins ?? []) as Array<{ user_id: string | number }>) {
+      recipients.add(String(a.user_id));
+    }
+    recipients.delete(String(params.userId)); // don't double-message the achiever
+
+    const ownerText = buildAchievementNotificationMessage({
+      ...base,
+      recipientRole: "owner",
+    });
+    for (const chatId of recipients) {
+      await sendComplexMessage(chatId, ownerText, [], { parseMode: "HTML" });
+    }
+  } catch (error) {
+    logger.warn("[notifyAchievementUnlocked] non-fatal failure", {
+      slug: params.slug,
+      userId: params.userId,
+      achievementId: params.achievementId,
+      error,
+    });
+  }
+}
+
 export async function grantFranchizeAchievementAction(params: {
   slug: string;
   userId: string;
@@ -432,6 +520,19 @@ export async function grantFranchizeAchievementAction(params: {
     .eq("user_id", params.userId);
 
   if (updateError) return { success: false, error: updateError.message };
+
+  // iter18 (bonus): celebrate NEW unlocks in Telegram — the achiever + the
+  // crew owner + crew admins get a message right away (fire-and-forget).
+  if (!alreadyUnlocked) {
+    setImmediate(() => {
+      void notifyAchievementUnlocked({
+        slug,
+        userId: params.userId,
+        achievementId: params.achievementId,
+      });
+    });
+  }
+
   return { success: true, alreadyUnlocked };
 }
 

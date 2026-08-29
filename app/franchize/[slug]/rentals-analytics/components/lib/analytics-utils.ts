@@ -22,6 +22,13 @@ import type {
   Tone,
 } from "../types";
 
+// Shared subrenter money math — ONE source of truth for the analytics counters,
+// the profile monthly panels and the activation notification.
+import {
+  getEquipmentCostPart,
+  getSubrenterCut,
+} from "../../../../../franchize/lib/subrenter-economics";
+
 // ── Status metadata ──────────────────────────────────────────────────────────
 
 interface StatusMeta {
@@ -536,6 +543,10 @@ export interface KpiRentalRow {
   agreed_start_date?: string | null;
   agreed_end_date?: string | null;
   requested_end_date?: string | null;
+  /** Equipment included in the rent — drives the equipment-part KPI. */
+  metadata?: Record<string, unknown> | null;
+  /** Partner-owner chat id (cars.specs.subrenter_chat_id) when subrented. */
+  subrenterChatId?: string | null;
 }
 
 export interface AnalyticsKpiValues {
@@ -543,14 +554,20 @@ export interface AnalyticsKpiValues {
   revenueToday: number;
   activeCount: number;
   returnsDue: number;
+  equipmentPartToday: number;
+  owedToSubrentersToday: number;
 }
+
+// Shared subrenter money math — see the import at the top of this file.
 
 /**
  * Day-scoped KPIs over the day's page rows (started OR returned on the day):
- *   Аренд сегодня — rentals STARTED on the selected MSK day (non-cancelled)
- *   Выручка       — revenue of the day's STARTED rentals (real statuses only)
- *   Активных      — day-page rows currently active
- *   Возвратов     — rentals whose END falls on the selected MSK day
+ *   Аренд сегодня   — rentals STARTED on the selected MSK day (non-cancelled)
+ *   Выручка         — revenue of the day's STARTED rentals (real statuses only)
+ *   Активных        — day-page rows currently active
+ *   Возвратов       — rentals whose END falls on the selected MSK day
+ *   Экипировка      — equipment part of the day's STARTED revenue (100% crew)
+ *   Субарендаторам  — 50% of the bike part for SUBRENTED bikes (owed to partners)
  */
 export function computeAnalyticsKpis(
   rows: KpiRentalRow[],
@@ -560,14 +577,25 @@ export function computeAnalyticsKpis(
   const localEnd = (r: KpiRentalRow) => localDateOnly(r.agreed_end_date || r.requested_end_date);
   const startedToday = rows.filter((r) => localStart(r) === date);
   const returnsToday = rows.filter((r) => localEnd(r) === date);
-  const revenueToday = startedToday
-    .filter((r) => ["active", "completed", "confirmed", "pending_confirmation"].includes(String(r.status ?? "")))
+  const revenueRows = startedToday
+    .filter((r) => ["active", "completed", "confirmed", "pending_confirmation"].includes(String(r.status ?? "")));
+  const revenueToday = revenueRows
     .reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0);
+  // Equipment part of the day's real revenue (gift items excluded — they
+  // were not charged, so they are not crew money either).
+  const equipmentPartToday = revenueRows
+    .reduce((sum, r) => sum + getEquipmentCostPart(r.metadata), 0);
+  // Subrenter cut: 50% of the BIKE part (total − equipment) of subrented bikes.
+  const owedToSubrentersToday = revenueRows
+    .filter((r) => typeof r.subrenterChatId === "string" && r.subrenterChatId)
+    .reduce((sum, r) => sum + getSubrenterCut(r.total_cost, getEquipmentCostPart(r.metadata)), 0);
   return {
     totalToday: startedToday.length,
     revenueToday,
     activeCount: rows.filter((r) => r.status === "active").length,
     returnsDue: returnsToday.length,
+    equipmentPartToday,
+    owedToSubrentersToday,
   };
 }
 

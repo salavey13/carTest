@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, Camera, CheckCircle2, Pencil, PenLine, RotateCcw, Trash2 } from "lucide-react";
+import { Calendar, Camera, CheckCircle2, Pencil, PenLine, RotateCcw, Trash2, X } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -194,6 +195,17 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   };
   const [isPromoValidating, setIsPromoValidating] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
+
+  // iter18 (bonus-bonus): prominent post-submit success dialog. A renter
+  // created THREE rentals in a row because the only confirmation was a
+  // quickly-fading toast — she never noticed the contract was already in her
+  // chat. The dialog is intentionally modal and has NO auto-dismiss: the
+  // renter must tap the big ✕ to continue, so the success state is
+  // impossible to miss and double-submitting is much less likely.
+  const [successDialog, setSuccessDialog] = useState<{
+    flowType: string;
+    pepSigned: boolean;
+  } | null>(null);
   const [promoMessage, setPromoMessage] = useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
   const [isReturningUser, setIsReturningUser] = useState(false);
   const [returningUserLastRental, setReturningUserLastRental] = useState<string | null>(null);
@@ -960,10 +972,13 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
       // ПЭП-aware success message: the renter sees that the contract was
       // actually SIGNED (not just submitted) when they used the ПЭП toggle.
-      const rentalSuccessMsg = pepInitData
-        ? "Заявка на аренду отправлена — договор подписан вашей ПЭП (п. 12.3)."
-        : "Заявка на аренду отправлена вместе с DOC-файлом.";
-      toast.success(submitPayload.flowType === "rental" ? rentalSuccessMsg : submitPayload.flowType === "service" ? "Сервисная заявка отправлена." : submitPayload.flowType === "mixed" ? (pepInitData ? "Заявка отправлена — договоры аренды подписаны вашей ПЭП (п. 12.3)." : "Заявка отправлена вместе с DOC-файлами.") : "Заявка на покупку отправлена вместе с DOC-файлом.");
+      // iter18: the fade-away toast was TOO easy to miss (a renter submitted
+      // the same order 3 times) — the confirmation is now a half-screen
+      // "✓ RENTAL CREATED!" dialog with an explicit ✕ close button.
+      setSuccessDialog({
+        flowType: submitPayload.flowType,
+        pepSigned: Boolean(pepInitData),
+      });
 
       // Clear cart after successful order
       clearCart();
@@ -1962,6 +1977,106 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           )}
         </aside>
       </form>
+
+      {/* iter18: prominent "ORDER CREATED" dialog — half-screen, explicit ✕ */}
+      <AnimatePresence>
+        {successDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+            style={{ background: "color-mix(in srgb, #000000 70%, transparent)" }}
+            role="dialog"
+            aria-modal="true"
+            aria-live="assertive"
+            aria-label="Заказ отправлен"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 24 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 12 }}
+              transition={{ type: "spring", damping: 26, stiffness: 300 }}
+              className="relative w-full max-w-md overflow-hidden rounded-3xl border p-6 text-center"
+              style={{
+                backgroundColor: T.bg,
+                borderColor: T.border,
+                boxShadow: "0 24px 80px rgba(0,0,0,0.55)",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setSuccessDialog(null)}
+                aria-label="Закрыть"
+                className="absolute right-3 top-3 rounded-xl p-2.5 transition hover:opacity-80 focus:outline-none focus-visible:ring-2"
+                style={{ color: T.textMuted, minHeight: "44px", minWidth: "44px" }}
+              >
+                <X className="h-6 w-6" />
+              </button>
+
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", damping: 12, stiffness: 220, delay: 0.1 }}
+                className="mx-auto grid h-20 w-20 place-items-center rounded-full"
+                style={{ backgroundColor: "rgba(34,197,94,0.15)" }}
+                aria-hidden
+              >
+                <CheckCircle2 className="h-11 w-11" style={{ color: "#22c55e" }} />
+              </motion.div>
+
+              <h2 className="mt-4 text-xl font-extrabold uppercase tracking-wide" style={{ color: T.text }}>
+                {successDialog.flowType === "rental"
+                  ? "Аренда создана!"
+                  : successDialog.flowType === "service"
+                    ? "Заявка на сервис создана!"
+                    : successDialog.flowType === "mixed"
+                      ? "Заказ создан!"
+                      : "Заказ на покупку создан!"}
+              </h2>
+
+              <p className="mt-3 text-sm leading-relaxed" style={{ color: T.textMuted }}>
+                {successDialog.flowType === "rental" || successDialog.flowType === "mixed" ? (
+                  <>
+                    Договор аренды <b style={{ color: T.text }}>уже отправлен вам в Telegram</b>{" "}
+                    — откройте чат с ботом и проверьте сообщения.
+                    {successDialog.pepSigned
+                      ? " Договор подписан вашей ПЭП (п. 12.3)."
+                      : ""}
+                    <br />
+                    <span style={{ color: "#22c55e" }}>
+                      Повторная отправка не нужна — заказ уже в работе.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    Документы <b style={{ color: T.text }}>уже отправлены вам в Telegram</b> —
+                    откройте чат с ботом и проверьте сообщения.
+                  </>
+                )}
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setSuccessDialog(null)}
+                autoFocus
+                className="mt-6 w-full rounded-xl px-4 py-3.5 text-base font-bold transition hover:brightness-105 active:scale-[0.99]"
+                style={{
+                  backgroundColor: "var(--order-accent, #22c55e)",
+                  color: "var(--order-accent-contrast, #16130A)",
+                  minHeight: "52px",
+                }}
+              >
+                Закрыть
+              </button>
+              <p className="mt-2.5 text-[11px]" style={{ color: T.textMuted }}>
+                Нажмите «Закрыть» или ✗, чтобы продолжить
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

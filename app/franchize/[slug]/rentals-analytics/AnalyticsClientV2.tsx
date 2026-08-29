@@ -78,6 +78,17 @@ interface AnalyticsClientV2Props {
 // metadata JSONB so the v2 RentalDetailDrawer's handoff section can read
 // them via the same `metadata.handoff_at / odometer_before / odometer_after`
 // contract used by the v2 web tree.
+// Extract the partner-owner chat id from bike specs (cars.specs.subrenter_chat_id).
+// Drives the «Субарендаторам» KPI — rentals of subrented bikes split 50/50.
+function subrenterChatIdFromSpecs(
+  specs: Record<string, unknown> | null | undefined,
+): string | null {
+  const raw = specs?.["subrenter_chat_id"];
+  if (typeof raw === "string" && raw.trim().length > 0) return raw.trim();
+  if (typeof raw === "number" && Number.isFinite(raw)) return String(raw);
+  return null;
+}
+
 function toAnalyticsRental(item: RentalDashboardItem): AnalyticsRentalRow {
   const md = (item.metadata || {}) as Record<string, unknown>;
   // Bridge v1 handoff fields into the v2 metadata shape. The v2 drawer
@@ -125,6 +136,9 @@ function toAnalyticsRental(item: RentalDashboardItem): AnalyticsRentalRow {
       (md.drivers_licence_frontal_photo as string | null) || null,
     crew_id: item.vehicle?.crew_id || null,
     created_by_operator_chat_id: item.created_by_operator_chat_id,
+    subrenterChatId: subrenterChatIdFromSpecs(
+      (item.vehicle?.specs ?? null) as Record<string, unknown> | null,
+    ),
     vehicle: item.vehicle
       ? { make: item.vehicle.make, model: item.vehicle.model }
       : null,

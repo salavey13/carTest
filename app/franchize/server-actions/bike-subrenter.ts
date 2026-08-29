@@ -78,6 +78,70 @@ const inputSchema = z.object({
   subrenterChatId: z.string().trim().max(24).nullable(),
 });
 
+/**
+ * iter18 — backwards ownership link on the USER row.
+ *
+ * A bike knows its partner via specs.subrenter_chat_id; the user gets the
+ * mirror flag `metadata.subrenterOf = { [crewId]: [bikeId, ...] }` so profile
+ * pages (and any future gate) can answer "does this user own bikes in the
+ * park?" without scanning the cars table.
+ *
+ * SELF-HEALING: getSubrenterOwnedBikesAction calls this on every read with
+ * the freshly-queried bike list, so legacy assignments (made before this
+ * flag existed) are backfilled automatically and cleared bikes disappear
+ * from the flag on the next profile visit.
+ *
+ * Returns true when the flag actually changed (for logging).
+ */
+export async function syncUserSubrenterFlag(
+  userId: string,
+  crewId: string,
+  bikeIds: string[],
+): Promise<boolean> {
+  if (!userId || !crewId) return false;
+  try {
+    const { data: user, error } = await supabaseAdmin
+      .from("users")
+      .select("metadata")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error || !user) return false;
+
+    const metadata = ((user.metadata ?? {}) as Record<string, unknown>) || {};
+    const prev = ((metadata.subrenterOf ?? {}) as Record<string, unknown>) || {};
+    const nextBikes = Array.from(new Set(bikeIds.map((id) => String(id)))).sort();
+
+    const next = { ...prev };
+    if (nextBikes.length > 0) next[crewId] = nextBikes;
+    else delete next[crewId];
+
+    const prevBikes = Array.isArray(prev[crewId])
+      ? (prev[crewId] as unknown[]).map((v) => String(v)).sort()
+      : [];
+    const unchanged =
+      nextBikes.length === prevBikes.length &&
+      nextBikes.every((v, i) => v === prevBikes[i]) &&
+      Object.keys(next).length === Object.keys(prev).length;
+    if (unchanged) return false;
+
+    const { error: updateError } = await supabaseAdmin
+      .from("users")
+      .update({
+        metadata: { ...metadata, subrenterOf: next },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+    if (updateError) {
+      logger.warn("[syncUserSubrenterFlag] update failed", { userId, crewId, error: updateError });
+      return false;
+    }
+    return true;
+  } catch (error) {
+    logger.warn("[syncUserSubrenterFlag] non-fatal failure", { userId, crewId, error });
+    return false;
+  }
+}
+
 export async function setBikeSubrenterAction(input: {
   slug: string;
   actorUserId: string;
@@ -122,6 +186,10 @@ export async function setBikeSubrenterAction(input: {
     const specs = (bike.specs && typeof bike.specs === "object" && !Array.isArray(bike.specs)
       ? { ...(bike.specs as Record<string, unknown>) }
       : {}) as Record<string, unknown>;
+    // iter18: remember the PREVIOUS partner — when clearing/reassigning, the
+    // backwards ownership flag of the OLD subrenter must be refreshed too.
+    const previousSubrenterChatId =
+      typeof specs.subrenter_chat_id === "string" ? specs.subrenter_chat_id : "";
 
     if (normalized.length > 0) {
       specs.subrenter_chat_id = normalized;
@@ -139,6 +207,29 @@ export async function setBikeSubrenterAction(input: {
       .eq("id", bikeId);
 
     if (updateError) return { success: false, error: updateError.message };
+
+    // iter18: keep the backwards ownership flag (users.metadata.subrenterOf)
+    // in sync with the bike specs — query the partner's CURRENT bikes so a
+    // reassignment or clear reflects the true state. Best-effort.
+    try {
+      const affectedPartners = new Set(
+        [normalized, previousSubrenterChatId].filter((id) => id.length >= 5),
+      );
+      for (const partnerId of affectedPartners) {
+        const { data: partnerBikes } = await supabaseAdmin
+          .from("cars")
+          .select("id")
+          .eq("crew_id", crew.id)
+          .eq("specs->>subrenter_chat_id", partnerId);
+        await syncUserSubrenterFlag(
+          partnerId,
+          crew.id,
+          (partnerBikes ?? []).map((b: { id: string | number }) => String(b.id)),
+        );
+      }
+    } catch (flagErr) {
+      logger.warn("[setBikeSubrenterAction] subrenterOf flag sync failed (non-fatal)", flagErr);
+    }
 
     // POLISH: tell the partner he now has mini-admin access — otherwise he
     // never learns the crew exists. Best-effort (non-fatal on failures).

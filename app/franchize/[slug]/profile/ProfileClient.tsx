@@ -48,9 +48,17 @@ import { getMyWorkTodayAction } from "../../server-actions/my-work";
 import {
   getSubrenterOwnedBikesAction,
   getFranchizeSubrentersOverviewAction,
+  getSubrenterMonthlyEarningsAction,
+  getSubrentersMonthlyPayoutsAction,
   type SubrenterOwnedBikesData,
   type SubrenterOverviewRow,
+  type SubrenterMonthSummary,
+  type SubrentersMonthlyPayoutsData,
 } from "../../server-actions/subrenter-monitoring";
+import {
+  currentMskMonthKey,
+  shiftMonthKey,
+} from "../../lib/subrenter-economics";
 
 // 2026-08-19 review: use the shared fallbackCrew constant from
 // lib/fallback-crew.ts — was duplicated inline here, which meant it
@@ -191,6 +199,16 @@ export function FranchizeProfileClient({
   const [subrenterOwned, setSubrenterOwned] = useState<SubrenterOwnedBikesData | null>(null);
   const [subrentersOverview, setSubrentersOverview] = useState<SubrenterOverviewRow[] | null>(null);
 
+  // iter18: monthly money panels. Subrenter sees HIS monthly earnings
+  // (his 50% cut of the bike part); the crew owner sees how much he owes
+  // every partner this month. Month is switchable (payback bookkeeping).
+  const [subrenterMonth, setSubrenterMonth] = useState(() => currentMskMonthKey());
+  const [subrenterEarnings, setSubrenterEarnings] = useState<SubrenterMonthSummary | null>(null);
+  const [subrenterEarningsLoading, setSubrenterEarningsLoading] = useState(false);
+  const [payoutsMonth, setPayoutsMonth] = useState(() => currentMskMonthKey());
+  const [subrenterPayouts, setSubrenterPayouts] = useState<SubrentersMonthlyPayoutsData | null>(null);
+  const [payoutsLoading, setPayoutsLoading] = useState(false);
+
   // Earnings and work state
   const [earnings, setEarnings] = useState<{
     currentPlan: { accrued: number; balanceDue: number; nextPayoutDate: string | null };
@@ -321,6 +339,61 @@ export function FranchizeProfileClient({
     };
     void run();
   }, [dbUser?.user_id, slug]);
+
+  // iter18: subrenter monthly earnings loader — runs when the partner panel
+  // is visible (user owns bikes in the park) and whenever he switches the
+  // month. Failures are silent (the panel keeps the previous data).
+  useEffect(() => {
+    if (!dbUser?.user_id) return;
+    if (!subrenterOwned || subrenterOwned.bikes.length === 0) return;
+    let cancelled = false;
+    setSubrenterEarningsLoading(true);
+    getSubrenterMonthlyEarningsAction({ slug, userId: dbUser.user_id, month: subrenterMonth })
+      .then((res) => {
+        if (!cancelled && res.success && res.data) setSubrenterEarnings(res.data);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setSubrenterEarningsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dbUser?.user_id, slug, subrenterOwned, subrenterMonth]);
+
+  // iter18: owner's monthly payout loader — runs when the subrenters overview
+  // panel is visible (owner/admin) and whenever the month changes.
+  useEffect(() => {
+    if (!dbUser?.user_id) return;
+    if (!subrentersOverview || subrentersOverview.length === 0) return;
+    let cancelled = false;
+    setPayoutsLoading(true);
+    getSubrentersMonthlyPayoutsAction({ slug, actorUserId: dbUser.user_id, month: payoutsMonth })
+      .then((res) => {
+        if (!cancelled && res.success && res.data) setSubrenterPayouts(res.data);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setPayoutsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dbUser?.user_id, slug, subrentersOverview, payoutsMonth]);
+
+  /** "август 2026" label for a YYYY-MM key. */
+  const monthLabel = (monthKey: string) => {
+    try {
+      const [y, m] = monthKey.split("-").map(Number);
+      const label = new Date(y, m - 1, 1).toLocaleDateString("ru-RU", {
+        month: "long",
+        year: "numeric",
+      });
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    } catch {
+      return monthKey;
+    }
+  };
 
   // Currency formatter helper (reused across component)
   const formatCurrency = (amount: number) =>
@@ -717,6 +790,101 @@ export function FranchizeProfileClient({
               ))}
             </div>
 
+            {/* iter18: monthly earnings with month switcher — the partner's
+                payback bookkeeping (his 50% cut of the bike part; equipment
+                is crew money and never split). */}
+            <div className="mt-4 rounded-xl border p-3" style={T.styles.card}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: T.textMuted }}>
+                  <Wallet className="h-3.5 w-3.5" /> Заработок за месяц
+                </p>
+                {/* Month switcher: ‹ Август 2026 › */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="Предыдущий месяц"
+                    onClick={() => setSubrenterMonth((m) => shiftMonthKey(m, -1))}
+                    className="rounded-lg border px-2.5 py-1 text-sm transition hover:opacity-80"
+                    style={{ borderColor: T.borderSoft, color: T.text, minHeight: "36px" }}
+                  >
+                    ‹
+                  </button>
+                  <span className="min-w-[110px] text-center text-xs font-semibold" style={{ color: T.text }}>
+                    {monthLabel(subrenterMonth)}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Следующий месяц"
+                    onClick={() => setSubrenterMonth((m) => shiftMonthKey(m, 1))}
+                    className="rounded-lg border px-2.5 py-1 text-sm transition hover:opacity-80"
+                    style={{ borderColor: T.borderSoft, color: T.text, minHeight: "36px" }}
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+
+              {subrenterEarningsLoading ? (
+                <p className="mt-3 animate-pulse text-sm" style={{ color: T.textMuted }}>
+                  Считаем…
+                </p>
+              ) : subrenterEarnings ? (
+                <>
+                  <div className="mt-3 flex flex-wrap items-end gap-x-4 gap-y-1">
+                    <span className="text-2xl font-bold tabular-nums" style={{ color: T.accent }}>
+                      {formatCurrency(subrenterEarnings.cutRub)}
+                    </span>
+                    <span className="text-[11px]" style={{ color: T.textMuted }}>
+                      ваша доля · 50% от аренды байков {formatCurrency(subrenterEarnings.bikePartRub)}
+                      {subrenterEarnings.equipmentRub > 0 && (
+                        <> · экипировка {formatCurrency(subrenterEarnings.equipmentRub)} (не делится)</>
+                      )}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px]" style={{ color: T.textMuted }}>
+                    Аренд за месяц: {subrenterEarnings.rentalCount} · Суммарно оплачено:{" "}
+                    {formatCurrency(subrenterEarnings.totalRub)} · Экипировка целиком остаётся экипажу.
+                  </p>
+                  {subrenterEarnings.rentals.length > 0 && (
+                    <div className="mt-3 space-y-1.5">
+                      {subrenterEarnings.rentals.slice(0, 6).map((r) => (
+                        <div
+                          key={r.rentalId}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => navigateSpa(r.docLink || `/franchize/${slug}/rental/${r.rentalId}`)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              navigateSpa(r.docLink || `/franchize/${slug}/rental/${r.rentalId}`);
+                            }
+                          }}
+                          className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border p-2 text-xs transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                          style={T.styles.card}
+                        >
+                          <span className="min-w-0 truncate font-medium" style={{ color: T.text }}>
+                            {r.bikeLabel}
+                            {r.startedAt && (
+                              <span className="ml-1.5 font-normal" style={{ color: T.textMuted }}>
+                                {new Date(r.startedAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                              </span>
+                            )}
+                          </span>
+                          <span className="whitespace-nowrap font-bold tabular-nums" style={{ color: T.accent }}>
+                            +{formatCurrency(r.cutRub)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="mt-3 text-sm" style={{ color: T.textMuted }}>
+                  Нет данных за этот месяц.
+                </p>
+              )}
+            </div>
+
             {subrenterOwned.rentals.length > 0 && (
               <div className="mt-4">
                 <p className="mb-2 text-xs font-semibold" style={{ color: T.textMuted }}>
@@ -792,6 +960,82 @@ export function FranchizeProfileClient({
               <FranchizeOperatorLinkButton href={`/franchize/${slug}/admin`}>
                 Управлять
               </FranchizeOperatorLinkButton>
+            </div>
+
+            {/* iter18: monthly payout sheet — how much the crew owes every
+                partner this month (50% of the bike part; equipment is not
+                split). Month switcher for payback bookkeeping. */}
+            <div className="mt-4 rounded-xl border p-3" style={T.styles.card}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: T.textMuted }}>
+                  <Wallet className="h-3.5 w-3.5" /> Выплаты субарендаторам
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="Предыдущий месяц"
+                    onClick={() => setPayoutsMonth((m) => shiftMonthKey(m, -1))}
+                    className="rounded-lg border px-2.5 py-1 text-sm transition hover:opacity-80"
+                    style={{ borderColor: T.borderSoft, color: T.text, minHeight: "36px" }}
+                  >
+                    ‹
+                  </button>
+                  <span className="min-w-[110px] text-center text-xs font-semibold" style={{ color: T.text }}>
+                    {monthLabel(payoutsMonth)}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Следующий месяц"
+                    onClick={() => setPayoutsMonth((m) => shiftMonthKey(m, 1))}
+                    className="rounded-lg border px-2.5 py-1 text-sm transition hover:opacity-80"
+                    style={{ borderColor: T.borderSoft, color: T.text, minHeight: "36px" }}
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+
+              {payoutsLoading ? (
+                <p className="mt-3 animate-pulse text-sm" style={{ color: T.textMuted }}>
+                  Считаем…
+                </p>
+              ) : subrenterPayouts ? (
+                <>
+                  <div className="mt-3 flex flex-wrap items-end gap-x-4 gap-y-1">
+                    <span className="text-2xl font-bold tabular-nums" style={{ color: "#f59e0b" }}>
+                      {formatCurrency(subrenterPayouts.totalPayoutRub)}
+                    </span>
+                    <span className="text-[11px]" style={{ color: T.textMuted }}>
+                      к выплате партнёрам за {monthLabel(subrenterPayouts.month).toLowerCase()} · 50% аренды байков (экипировка не делится)
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-1.5">
+                    {subrenterPayouts.rows.map((row) => (
+                      <div
+                        key={row.chatId}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2 text-xs"
+                        style={T.styles.card}
+                      >
+                        <div className="min-w-0">
+                          <span className="font-semibold" style={{ color: T.text }}>
+                            {row.name || (row.username ? `@${row.username}` : `id ${row.chatId}`)}
+                          </span>
+                          <span className="ml-1.5 font-normal" style={{ color: T.textMuted }}>
+                            {row.rentalCount} аренд{row.rentalCount > 0 && row.totalRub > 0 ? ` · оборот ${formatCurrency(row.totalRub)}` : ""}
+                          </span>
+                        </div>
+                        <span className="whitespace-nowrap font-bold tabular-nums" style={{ color: "#f59e0b" }}>
+                          {row.payoutRub > 0 ? `→ ${formatCurrency(row.payoutRub)}` : "—"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="mt-3 text-sm" style={{ color: T.textMuted }}>
+                  Нет данных за этот месяц.
+                </p>
+              )}
             </div>
 
             <div className="mt-3 space-y-2">

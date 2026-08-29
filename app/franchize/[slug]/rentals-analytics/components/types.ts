@@ -41,6 +41,9 @@ export interface AnalyticsRentalRow {
   drivers_licence_frontal_photo: string | null;
   crew_id: string | null;
   created_by_operator_chat_id: string | null;
+  /** Telegram chat id of the partner-owner when this bike is subrented
+   *  (cars.specs.subrenter_chat_id) — drives the «owed to subrenters» KPI. */
+  subrenterChatId?: string | null;
   vehicle?: AnalyticsVehicle | null;
   user?: AnalyticsUser | null;
   /** Contract artifact data (private.rental_contract_artifacts) — the REAL
@@ -81,6 +84,11 @@ export interface AnalyticsKpis {
   revenueToday: number;
   activeCount: number;
   returnsDue: number;
+  /** Equipment revenue part of the day's started rentals (100% crew money). */
+  equipmentPartToday: number;
+  /** 50% of the bike-part revenue from SUBRENTED bikes — what the crew owes
+   *  to partner-owners for the day. */
+  owedToSubrentersToday: number;
 }
 
 // ── Drawer-only types (Phase 2) ──────────────────────────────────────────────
