@@ -9,15 +9,53 @@
 # Cron schedule: every day at 21:00 Moscow = 18:00 UTC = "0 18 * * *"
 #
 # Usage:
-#   ./evening-summary.sh                 # sends Telegram notification
-#   ./evening-summary.sh --dry-run       # prints to stdout instead
+#   ./evening-summary.sh                          # sends Telegram notification
+#   ./evening-summary.sh --dry-run                # prints to stdout instead
+#   ./evening-summary.sh --date YYYY-MM-DD [--dry-run]
+#                                                  # backfill: rebuild the digest
+#                                                  # for a past MSK day (KPIs,
+#                                                  # revenue and the active-
+#                                                  # rentals section become
+#                                                  # as-of that day)
 
 set -euo pipefail
 source "$(dirname "$0")/_lib.sh"
 
-DRY_RUN="${1:-}"
-TODAY=$(moscow_today)
+DRY_RUN=""
+DATE_OVERRIDE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN="--dry-run"; shift ;;
+    --date)    DATE_OVERRIDE="${2:-}"; shift 2 ;;
+    *)         log "Unknown arg: $1 (skipping)"; shift ;;
+  esac
+done
+
+BACKFILL=0
+if [[ -n "$DATE_OVERRIDE" ]]; then
+  if ! [[ "$DATE_OVERRIDE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+    log "ERROR: --date must be YYYY-MM-DD, got '$DATE_OVERRIDE'" >&2
+    exit 1
+  fi
+  if [[ "$DATE_OVERRIDE" > "$(moscow_today)" ]]; then
+    log "ERROR: --date is in the future ($DATE_OVERRIDE)" >&2
+    exit 1
+  fi
+  BACKFILL=1
+  TODAY="$DATE_OVERRIDE"
+  # Same MSK-day → UTC-window math as _lib.sh, just for an arbitrary date
+  # (CLAUDE.md: convert only via date -d, never in your head).
+  START_UTC=$(date -u -d "${TODAY}T00:00:00+03:00" +"%Y-%m-%dT%H:%M:%SZ")
+  END_UTC=$(date -u -d "${TODAY}T23:59:59+03:00" +"%Y-%m-%dT%H:%M:%SZ")
+else
+  TODAY=$(moscow_today)
+  START_UTC="$(moscow_today_start_utc)"
+  END_UTC="$(moscow_today_end_utc)"
+fi
 NOW_DISPLAY=$(TZ=Europe/Moscow date +"%H:%M")
+if [[ "$BACKFILL" -eq 1 ]]; then
+  NOW_DISPLAY="${NOW_DISPLAY}, пересборка"
+fi
 
 log "Running evening-summary for $TODAY"
 
@@ -35,15 +73,14 @@ log "Running evening-summary for $TODAY"
 # MSK-calendar split (started-today vs returns-today) happens in jq below.
 # Equipment rows are excluded implicitly: they carry crew_id=NULL in rentals
 # (migration 20260815000001) while this query filters crew_id=eq.
-START_UTC="$(moscow_today_start_utc)"
-END_UTC="$(moscow_today_end_utc)"
-
+# (START_UTC/END_UTC are computed once in the header block — for today, or for
+# the --date backfill day — and reused by every section below.)
 RENTALS_DATA=$(supabase_query "rentals" \
   "select=rental_id,status,total_cost,agreed_start_date,agreed_end_date,requested_start_date,requested_end_date,vehicle_id&crew_id=eq.${CREW_ID}&or=(and(requested_start_date.gte.${START_UTC},requested_start_date.lte.${END_UTC}),and(requested_start_date.is.null,agreed_start_date.gte.${START_UTC},agreed_start_date.lte.${END_UTC}),and(agreed_end_date.gte.${START_UTC},agreed_end_date.lte.${END_UTC}),and(agreed_end_date.is.null,requested_end_date.gte.${START_UTC},requested_end_date.lte.${END_UTC})))&vehicle_id=not.like.vip-bike-svc-*")
 
 # MSK calendar date of an ISO timestamp (UTC + 3h, no DST — same math as the
 # web client's localDateOnly() in analytics-utils.ts).
-RENTAL_KPIS=$(echo "$RENTALS_DATA" | jq -r --arg today "$TODAY" '
+RENTAL_KPIS=$(echo "$RENTALS_DATA" | jq -r --arg today "$TODAY" --arg bf "$BACKFILL" '
   def mskd:
     if . == null or . == "" then ""
     else
@@ -62,7 +99,7 @@ RENTAL_KPIS=$(echo "$RENTALS_DATA" | jq -r --arg today "$TODAY" '
         | select(.status == "active" or .status == "completed" or .status == "confirmed" or .status == "pending_confirmation")
         | (.total_cost // 0)] | add // 0)
     } | . as $x |
-  (if $x.returns == 0 then " — день открыт" else "" end) as $suffix |
+  (if $x.returns == 0 and ($bf != "1") then " — день открыт" else "" end) as $suffix |
   "Аренд сегодня: \($x.total)\nВыручка: \($x.revenue) ₽\nАктивных: \($x.active)\nВозвратов: \($x.returns)\($suffix)"
 ')
 
@@ -115,7 +152,7 @@ fi
 #   metadata.client present  → client service (+ revenue, counts in day total)
 #   metadata.client absent   → crew / internal work (− expense = mechanic salary,
 #                              shown separately, NOT added to day total)
-SERVICE_KPIS=$(echo "$SERVICES_DATA" | jq -r '
+SERVICE_KPIS=$(echo "$SERVICES_DATA" | jq -r --arg bf "$BACKFILL" '
   def is_client: (((.metadata // {}).client // "") | length > 0);
   def billable: (.status == "active" or .status == "completed");
   {
@@ -127,7 +164,7 @@ SERVICE_KPIS=$(echo "$SERVICES_DATA" | jq -r '
     crew_count: ([.[] | select(is_client | not)] | length),
     crew_expense: ([.[] | select((is_client | not) and billable) | (.total_cost // 0)] | add // 0)
   } | . as $x |
-  (if $x.completed == 0 then " — день открыт" else "" end) as $suffix |
+  (if $x.completed == 0 and ($bf != "1") then " — день открыт" else "" end) as $suffix |
   "Сервисов сегодня: \($x.total)\nВыручка (клиентам): \($x.client_revenue) ₽ (\($x.client_count) ↗)\nВнутр. работы (зарплата): \($x.crew_expense) ₽ (\($x.crew_count) ↘)\nЗавершено: \($x.completed)\($suffix)"
 ')
 
@@ -170,10 +207,11 @@ EQUIP_DATA=$(supabase_query "rentals" \
 
 EQUIP_STOCK=$(supabase_query "cars" "select=id&crew_id=eq.${CREW_ID}&type=eq.equipment" | jq 'length')
 
-EQUIP_KPIS=$(echo "$EQUIP_DATA" | jq -r --arg today "$TODAY" --arg start "$START_UTC" --arg end "$END_UTC" --arg stock "$EQUIP_STOCK" '
+EQUIP_KPIS=$(echo "$EQUIP_DATA" | jq -r --arg today "$TODAY" --arg start "$START_UTC" --arg end "$END_UTC" --arg stock "$EQUIP_STOCK" --arg bf "$BACKFILL" '
   def cond: (.metadata.equipment_condition // "");
+  def issued_before_end: ((.created_at // "") | sub("\\.[0-9]+";"") | .[0:19]) <= ($end | .[0:19]);
   (map(select((.created_at // "")|startswith($today)))) as $issued
-  | (map(select(.status == "active"))) as $active
+  | (map(select(.status == "active" and (($bf != "1") or issued_before_end)))) as $active
   | (map(select(.status == "active" and ((.agreed_end_date // "") >= $start) and ((.agreed_end_date // "") <= $end)))) as $due
   | (map(select(.status == "active" and ((.agreed_end_date // "") < $start)))) as $overdue
   | (map(select(
@@ -191,10 +229,14 @@ EQUIP_KPIS=$(echo "$EQUIP_DATA" | jq -r --arg today "$TODAY" --arg start "$START
 
 # ─── Total revenue ───────────────────────────────────────────────────────────
 # Day total = rentals (started-today, see RENTALS_TODAY) + sales + CLIENT
-# services + equipment. Internal/crew services (no metadata.client) are a
-# mechanic-salary expense, NOT revenue — they are reported separately in
-# SERVICE_KPIS and excluded from TOTAL_REVENUE.
-TOTAL_REVENUE=$(jq -s -r '
+# services + equipment ISSUED TODAY. Internal/crew services (no
+# metadata.client) are a mechanic-salary expense, NOT revenue — they are
+# reported separately in SERVICE_KPIS and excluded from TOTAL_REVENUE.
+# Equipment MUST be date-scoped too: EQUIP_DATA carries up to 500 historical
+# rows, and without the issued-today filter every old completed equipment
+# rental leaks into each day's total (e.g. a 500₽ helmet from Aug 22 inflated
+# every digest after it).
+TOTAL_REVENUE=$(jq -s -r --arg today "$TODAY" '
   def to_num:
     if type == "number" then .
     elif type == "string" then (gsub(" "; "") | tonumber? // 0)
@@ -207,7 +249,8 @@ TOTAL_REVENUE=$(jq -s -r '
   ([.[0][] | {total_cost: revenue_of, status: "active"}]
     + [.[1][] | {total_cost: revenue_of, status: "active"}]
     + [.[2][] | select(is_client_service)]
-    + [.[3][] | select(.status == "active" or .status == "completed")]
+    + [.[3][] | select(((.created_at // "") | startswith($today)))
+             | select(.status == "active" or .status == "completed")]
   ) |
   ([.[] | select(.status == "active" or .status == "completed") | revenue_of] | add // 0)
 ' <<EOF
@@ -229,8 +272,32 @@ DASHBOARD_LINK="$(analytics_link "rentals" "$TODAY")"
 # days ago is not in RENTALS_DATA's day window but still needs a drill-in
 # link), so it uses its own status=active query. Times shown in Moscow
 # time (CLAUDE.md: digests always report MSK).
-ACTIVE_DATA=$(supabase_query "rentals" \
-  "select=rental_id,status,total_cost,agreed_end_date&crew_id=eq.${CREW_ID}&status=eq.active&vehicle_id=not.like.vip-bike-svc-*&order=agreed_end_date.asc&limit=50")
+if [[ "$BACKFILL" -eq 1 ]]; then
+  # Backfill: active AS OF the end of that MSK day — started before/at day end
+  # and either still active now or planned to end after day end. Rentals that
+  # started LATER (e.g. today's) must not leak into a past day's digest.
+  END_EPOCH=$(date -u -d "$END_UTC" +%s)
+  ACTIVE_DATA=$(supabase_query "rentals" \
+    "select=rental_id,status,total_cost,agreed_end_date,requested_end_date&crew_id=eq.${CREW_ID}&status=in.(active,completed,confirmed,pending_confirmation)&vehicle_id=not.like.vip-bike-svc-*&or=(requested_start_date.lte.${END_UTC},and(requested_start_date.is.null,agreed_start_date.lte.${END_UTC}))&order=created_at.desc&limit=200")
+  # Normalize to the same shape as the live query: only as-of-active rows,
+  # status forced to "active", sorted by end asc. Epoch math mirrors
+  # RENTAL_KPIS (strptime/mktime = UTC, no DST).
+  ACTIVE_DATA=$(echo "$ACTIVE_DATA" | jq -c --argjson end_ep "$END_EPOCH" '
+    def ep:
+      if . == null or . == "" then 0
+      else sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | sub("Z$"; "")
+        | strptime("%Y-%m-%dT%H:%M:%S") | mktime
+      end;
+    [.[] | select(
+        (.status == "active")
+        or (((.agreed_end_date // .requested_end_date // "") | ep) > $end_ep)
+      )]
+    | sort_by(((.agreed_end_date // .requested_end_date // "9999") | ep))
+    | map({rental_id, status: "active", total_cost, agreed_end_date})')
+else
+  ACTIVE_DATA=$(supabase_query "rentals" \
+    "select=rental_id,status,total_cost,agreed_end_date&crew_id=eq.${CREW_ID}&status=eq.active&vehicle_id=not.like.vip-bike-svc-*&order=agreed_end_date.asc&limit=50")
+fi
 
 ACTIVE_RENTALS_LIST=""
 ACTIVE_RENTALS_LIST=$(echo "$ACTIVE_DATA" | jq -r '
