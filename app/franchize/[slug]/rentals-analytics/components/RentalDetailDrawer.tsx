@@ -217,14 +217,18 @@ export function RentalDetailDrawer({
       : { label: "Экипировка",     value: "не включена" },
     // FIX (F3 + F13): deposit amount + destination card (T-Банк / Сбер / нал)
     // + return status. Prefer deposit_entries data; fall back to metadata.
-    {
-      label: "Депозит",
+    { label: "Депозит",
       value:
         deposit.amount != null && deposit.amount > 0
           ? `${formatRubles(deposit.amount)}${depositDestinationLabel ? ` · ${depositDestinationLabel}` : ""}${depositReturnedFromEntries === true ? " · возвращен" : depositReturnedFromEntries === false ? " · у держателя" : ""}`
           : "не записан",
     },
     { label: "Оператор",        value: rental.operatorName || "—" },
+    // iter20: partner-owner tile for subrented bikes (50/50 revenue split) —
+    // resolved server-side from cars.specs.subrenter_chat_id.
+    ...(rental.subrenterLabel
+      ? [{ label: "Субарендатор", value: rental.subrenterLabel }]
+      : []),
     { label: "Создана",         value: formatDateTime(rental.created_at) },
   ];
 

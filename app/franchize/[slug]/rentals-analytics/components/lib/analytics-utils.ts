@@ -227,6 +227,10 @@ export interface DepositInfo {
   method: string | null;
   methodLabel: string | null;
   returned: boolean | null;
+  /** Where the amount came from — drives the sheet's provenance line:
+   *  "по данным заказа" (metadata, web orders) vs "из данных договора"
+   *  (contract artifact, /doc flow). */
+  source: "metadata" | "artifact" | null;
 }
 
 const DEPOSIT_METHOD_LABELS: Record<string, string> = {
@@ -238,29 +242,91 @@ const DEPOSIT_METHOD_LABELS: Record<string, string> = {
 };
 
 /** Deposit from metadata.deposit_amount/deposit_method/deposit_returned with
- *  artifact deposit_rub as fallback (private.rental_contract_artifacts). */
+ *  artifact deposit_rub as fallback (private.rental_contract_artifacts).
+ *
+ *  iter20: when the web order did not record deposit_method (all rentals
+ *  created before iter20), derive the EXPECTED method from payment_split —
+ *  the split always routes the deposit into its cash part (cash payment =
+ *  everything in cash; card/sbp = rent by transfer + deposit in cash at
+ *  handout), so `cash >= amount` ⇒ "наличные". This backfills the display for
+ *  existing rentals without a data migration. */
 export function getDepositInfo(rental: AnalyticsRentalRow): DepositInfo {
   const md = (rental.metadata || {}) as Record<string, unknown>;
   let amount: number | null = null;
+  let source: "metadata" | "artifact" | null = null;
   const mdAmount = md["deposit_amount"];
   if (typeof mdAmount === "number") amount = mdAmount;
   else if (typeof mdAmount === "string" && mdAmount.trim().length > 0) {
     const parsed = Number(mdAmount.replace(/[^\d.]/g, ""));
     if (!Number.isNaN(parsed)) amount = parsed;
   }
+  if (amount != null) {
+    source = "metadata";
+  } else if (typeof md["deposit_rub"] === "number" && (md["deposit_rub"] as number) > 0) {
+    amount = md["deposit_rub"] as number;
+    source = "metadata";
+  }
   if (amount == null && rental.contract?.deposit_rub) {
     const parsed = Number(String(rental.contract.deposit_rub).replace(/[^\d.]/g, ""));
-    if (!Number.isNaN(parsed)) amount = parsed;
+    if (!Number.isNaN(parsed)) {
+      amount = parsed;
+      source = "artifact";
+    }
   }
-  const method =
+  let method =
     (typeof md["deposit_method"] === "string" ? (md["deposit_method"] as string) : null) || null;
+  // iter20: backfill the expected method from the stored payment split.
+  if (!method && amount != null) {
+    const ps = md["payment_split"];
+    if (ps && typeof ps === "object") {
+      const split = ps as Record<string, unknown>;
+      const cash = typeof split["cash"] === "number" ? (split["cash"] as number) : 0;
+      if (cash >= amount) method = "cash";
+      else if (typeof split["card_destination"] === "string" && (split["card_destination"] as string).length > 0) {
+        method = split["card_destination"] as string;
+      }
+    }
+  }
   const returned = typeof md["deposit_returned"] === "boolean" ? (md["deposit_returned"] as boolean) : null;
   return {
     amount,
     method,
     methodLabel: method ? DEPOSIT_METHOD_LABELS[method.toLowerCase()] || method : null,
     returned,
+    source,
   };
+}
+
+// ── Deposit badge state (iter20) ──────────────────────────────────────────────
+
+export interface DepositBadgeState {
+  label: string;
+  color: string;
+}
+
+/** Status-aware deposit badge for the analytics item sheet.
+ *
+ *  Fixes the old bug where `deposit_returned === null` (every web order before
+ *  the closure modal runs) rendered the blue «возвращён» badge on an ACTIVE
+ *  rental whose deposit is actually still held. Mirrors the rental page's
+ *  deposit-state machine (lib/deposit-state.ts):
+ *    returned === true                → «возвращён» (blue)
+ *    returned === false               → «у держателя» (amber)
+ *    null + pending/confirmed          → «не получен» (amber)
+ *    null + active                    → «у держателя» (amber — collected at handout)
+ *    null + completed/cancelled/other → «состояние неизвестно» (gray)
+ */
+export function resolveDepositBadge(
+  rentalStatus: string,
+  returned: boolean | null,
+): DepositBadgeState {
+  if (returned === true) return { label: "возвращён", color: "#3b82f6" };
+  if (returned === false) return { label: "у держателя", color: "#f59e0b" };
+  if (rentalStatus === "pending_confirmation" || rentalStatus === "confirmed") {
+    return { label: "не получен", color: "#f59e0b" };
+  }
+  if (rentalStatus === "active") return { label: "у держателя", color: "#f59e0b" };
+  return { label: "состояние неизвестно", color: "#64748b" };
 }
 
 // ── Equipment included in the rent (F4) ───────────────────────────────────────

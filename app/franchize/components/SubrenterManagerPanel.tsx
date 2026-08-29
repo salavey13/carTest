@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { FileDown, RefreshCw, Search, Send, UserRound } from "lucide-react";
+import { RefreshCw, Search, Send, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
 import {
@@ -19,6 +19,7 @@ import {
 } from "@/app/franchize/server-actions/bike-subrenter";
 import {
   buildSubrenterUserLabel,
+  findExactSubrenterUserCandidate,
   type SubrenterUserCandidate,
 } from "@/app/franchize/lib/subrenter-user-search";
 import {
@@ -66,13 +67,22 @@ export function SubrenterManagerPanel({
   const [pickedUser, setPickedUser] = useState<SubrenterUserCandidate | null>(null);
   const pickerSeq = useRef(0);
 
+  // ── iter20: inline suggestions on the MAIN assignment field ──
+  // The field used to strip every non-digit (username search was impossible).
+  // Now it accepts free text: typing "@K0r_Al" / "Корнилов" shows tappable
+  // suggestions right under the row; save() resolves exact matches.
+  const [inlineSearch, setInlineSearch] = useState<{ bikeId: string; query: string } | null>(null);
+  const [inlineResults, setInlineResults] = useState<SubrenterUserCandidate[]>([]);
+  const [inlineSearching, setInlineSearching] = useState(false);
+  const inlineSeq = useRef(0);
+
   // ── Weekly owner report (§5.5 / Приложение № 3) ──
   // Default period: the CURRENT week Mon–Sun in the MSK calendar.
   const [reportFrom, setReportFrom] = useState("");
   const [reportTo, setReportTo] = useState("");
   const [reportChatId, setReportChatId] = useState("");
   const [reportPct, setReportPct] = useState("");
-  const [reportBusy, setReportBusy] = useState<"download" | "send" | null>(null);
+  const [reportBusy, setReportBusy] = useState<"self" | "send" | null>(null);
 
   useEffect(() => {
     // MSK current week boundaries (Mon..Sun)
@@ -101,7 +111,7 @@ export function SubrenterManagerPanel({
     if (!reportChatId && partners.length > 0) setReportChatId(partners[0].chatId);
   }, [partners, reportChatId]);
 
-  const runWeeklyReport = async (mode: "download" | "send") => {
+  const runWeeklyReport = async (mode: "self" | "send") => {
     const userId = dbUser?.user_id;
     if (!userId) {
       toast.error("Пользователь ещё авторизуется — попробуйте ещё раз.");
@@ -120,7 +130,12 @@ export function SubrenterManagerPanel({
         from: reportFrom,
         to: reportTo,
         ...(reportPct.trim() ? { ownerPercentage: Number(reportPct) } : {}),
+        // iter20: «Послать себе в ТГ» replaced «Скачать отчёт» — the browser
+        // blob download is silently blocked inside the TG WebApp iframe on
+        // iOS/Android, while the bot delivery lands in the admin's chat
+        // reliably. The docx still comes back as base64 (unused fallback).
         sendToPartner: mode === "send",
+        sendToSelf: mode === "self",
       });
       if (!result.success || !result.docBase64) {
         toast.error(`Отчёт не сформирован — ${result.error ?? "неизвестная ошибка"}`);
@@ -128,17 +143,15 @@ export function SubrenterManagerPanel({
       }
       const s = result.summary;
       const summaryText = s ? `${s.rentalCount} аренд · ${s.totalPaymentsRub.toLocaleString("ru-RU")} ₽ · доля партнёра ${s.ownerPayoutRub.toLocaleString("ru-RU")} ₽ (${s.ownerPercentage}%)` : "";
-      if (mode === "download") {
-        const binary = Uint8Array.from(atob(result.docBase64), (c) => c.charCodeAt(0));
-        const url = URL.createObjectURL(new Blob([binary], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = result.fileName ?? `subrent-weekly-report-${reportFrom}.docx`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success(`Отчёт сформирован${summaryText ? `: ${summaryText}` : ""}`);
+      if (mode === "self") {
+        toast.success(
+          result.sentToSelf
+            ? `Отчёт отправлен вам в Telegram${summaryText ? ` — ${summaryText}` : ""}`
+            : `Отчёт сформирован, но отправка в ваш Telegram не удалась${summaryText ? ` — ${summaryText}` : ""}`,
+          { duration: 6000 },
+        );
       } else {
-        toast.success(result.sentToPartner ? `Отчёт отправлен партнёру в Telegram${summaryText ? ` — ${summaryText}` : ""}` : "Отчёт сформирован, но отправка партнёру не удалась (проверьте chat id).") ;
+        toast.success(result.sentToPartner ? `Отчёт отправлен партнёру в Telegram${summaryText ? ` — ${summaryText}` : ""}` : "Отчёт сформирован, но отправка партнёру не удалась (проверьте chat id).", { duration: 6000 }) ;
       }
     } catch (err) {
       toast.error(`Отчёт не сформирован — ${err instanceof Error ? err.message : String(err)}`);
@@ -258,6 +271,48 @@ export function SubrenterManagerPanel({
     setPickerSearching(false);
   };
 
+  // ── iter20: debounced inline search for the MAIN assignment field ──
+  // Fires while the admin types a NON-NUMERIC value (username / name) —
+  // numeric ids need no resolution. Stale responses are dropped via a seq.
+  useEffect(() => {
+    if (!inlineSearch) {
+      setInlineResults([]);
+      setInlineSearching(false);
+      return;
+    }
+    const { bikeId, query } = inlineSearch;
+    if (query.trim().length < 2) {
+      setInlineResults([]);
+      setInlineSearching(false);
+      return;
+    }
+    const seq = ++inlineSeq.current;
+    const timer = setTimeout(async () => {
+      setInlineSearching(true);
+      try {
+        const userId = await waitForUserId();
+        if (!userId || seq !== inlineSeq.current) return;
+        const res = await searchUsersForSubrenterAction({ slug, actorUserId: userId, query: query.trim() });
+        if (seq !== inlineSeq.current) return;
+        setInlineResults(res.success && res.data ? res.data : []);
+      } catch {
+        if (seq === inlineSeq.current) setInlineResults([]);
+      } finally {
+        if (seq === inlineSeq.current) setInlineSearching(false);
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inlineSearch, slug]);
+
+  const pickInlineUser = (user: SubrenterUserCandidate) => {
+    if (!inlineSearch) return;
+    setDrafts((prev) => ({ ...prev, [inlineSearch.bikeId]: user.userId }));
+    setPickedUser(user);
+    setInlineSearch(null);
+    setInlineResults([]);
+  };
+
   const pickUser = (user: SubrenterUserCandidate) => {
     if (!pickerBikeId) return;
     setDrafts((prev) => ({ ...prev, [pickerBikeId]: user.userId }));
@@ -274,8 +329,38 @@ export function SubrenterManagerPanel({
       toast.error("Пользователь ещё авторизуется — попробуйте ещё раз через пару секунд.");
       return;
     }
-    const value = (drafts[bikeId] ?? "").trim();
+    const rawValue = (drafts[bikeId] ?? "").trim();
     setSavingId(bikeId);
+    // iter20: free-text resolution — "@K0r_Al" / "Александр Корнилов" is
+    // resolved to the numeric Telegram id through the users search (exact
+    // username / full-name match). Numeric ids pass through untouched so
+    // partners who never opened the app still work.
+    let value = rawValue;
+    let resolvedUser: SubrenterUserCandidate | null = null;
+    if (rawValue && !/^\d+$/.test(rawValue)) {
+      try {
+        const res = await searchUsersForSubrenterAction({ slug, actorUserId: userId, query: rawValue });
+        const candidates = res.success && res.data ? res.data : [];
+        resolvedUser = findExactSubrenterUserCandidate(candidates, rawValue);
+        if (!resolvedUser) {
+          setSavingId(null);
+          toast.error(
+            candidates.length > 0
+              ? "Уточните кандидата — нажмите на подходящего в списке под полем или кнопкой «Найти»."
+              : `Не удалось однозначно определить пользователя «${rawValue}» — введите Telegram id или воспользуйтесь кнопкой «Найти».`,
+            { duration: 6000 },
+          );
+          if (candidates.length > 0) setInlineSearch({ bikeId, query: rawValue });
+          return;
+        }
+        value = resolvedUser.userId;
+        setDrafts((prev) => ({ ...prev, [bikeId]: value }));
+      } catch (err) {
+        setSavingId(null);
+        toast.error(`Поиск пользователя не удался — ${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
+    }
     try {
       const result = await setBikeSubrenterAction({
         slug,
@@ -291,18 +376,21 @@ export function SubrenterManagerPanel({
               : `Назначен id ${value} (не найден в базе приложения — уведомление отправлено в Telegram).`
             : "Субарендатор снят",
         );
+        setInlineSearch(null);
+        setInlineResults([]);
         setBikes((prev) =>
           prev.map((b) =>
             b.bikeId === bikeId
               ? {
                   ...b,
                   subrenterChatId: value || null,
-                  subrenterUsername: pickedUser?.userId === value ? pickedUser.username : value ? null : b.subrenterUsername,
-                  subrenterFullName: pickedUser?.userId === value ? pickedUser.fullName : value ? null : b.subrenterFullName,
+                  subrenterUsername: (resolvedUser ?? pickedUser)?.userId === value ? (resolvedUser ?? pickedUser)!.username : value ? null : b.subrenterUsername,
+                  subrenterFullName: (resolvedUser ?? pickedUser)?.userId === value ? (resolvedUser ?? pickedUser)!.fullName : value ? null : b.subrenterFullName,
                 }
               : b,
           ),
         );
+        if (resolvedUser) setPickedUser(resolvedUser);
       } else {
         toast.error(`Не удалось сохранить — ${result.error ?? "неизвестная ошибка"}`);
       }
@@ -404,10 +492,10 @@ export function SubrenterManagerPanel({
                   variant="outline"
                   className="h-9 text-xs"
                   disabled={reportBusy !== null}
-                  onClick={() => void runWeeklyReport("download")}
+                  onClick={() => void runWeeklyReport("self")}
                 >
-                  <FileDown className="mr-1 h-3 w-3" />
-                  {reportBusy === "download" ? "Формирую…" : "Скачать отчёт"}
+                  <Send className="mr-1 h-3 w-3" />
+                  {reportBusy === "self" ? "Отправляю…" : "Послать себе в ТГ"}
                 </Button>
                 <Button
                   type="button"
@@ -477,12 +565,22 @@ export function SubrenterManagerPanel({
                 <input
                   value={drafts[bike.bikeId] ?? ""}
                   onChange={(e) => {
-                    setDrafts((prev) => ({ ...prev, [bike.bikeId]: e.target.value.replace(/[^\d]/g, "") }));
+                    const next = e.target.value;
+                    setDrafts((prev) => ({ ...prev, [bike.bikeId]: next }));
                     setPickedUser(null);
+                    // iter20: free-text input — non-numeric values (username /
+                    // name) trigger the inline suggestion search below; numeric
+                    // ids need no resolution.
+                    const trimmed = next.trim();
+                    if (trimmed.length >= 2 && !/^\d+$/.test(trimmed)) {
+                      setInlineSearch({ bikeId: bike.bikeId, query: trimmed });
+                    } else {
+                      setInlineSearch(null);
+                      setInlineResults([]);
+                    }
                   }}
-                  placeholder="Telegram id, напр. 123456789"
-                  inputMode="numeric"
-                  className="h-9 min-w-0 flex-1 rounded-lg border bg-transparent px-3 text-xs text-[var(--fr-admin-text)] outline-none focus:border-[var(--fr-admin-accent)] sm:w-40 sm:flex-none"
+                  placeholder="Telegram id или @username"
+                  className="h-9 min-w-0 flex-1 rounded-lg border bg-transparent px-3 text-xs text-[var(--fr-admin-text)] outline-none focus:border-[var(--fr-admin-accent)] sm:w-52 sm:flex-none"
                   style={{ borderColor: "var(--fr-admin-border)" }}
                 />
                 <Button
@@ -509,6 +607,40 @@ export function SubrenterManagerPanel({
                   <UserRound className="h-3 w-3 shrink-0" />
                   {buildSubrenterUserLabel(pickedUser)}
                 </p>
+              )}
+              {/* iter20: inline suggestions under the MAIN field — tappable
+                  search results while typing a username / name. */}
+              {inlineSearch?.bikeId === bike.bikeId && (
+                <div
+                  className="rounded-lg border p-2"
+                  style={{ borderColor: "var(--fr-admin-accent)" }}
+                >
+                  {inlineSearching && (
+                    <p className="text-xs text-[var(--fr-admin-muted)]">Поиск «{inlineSearch.query}»…</p>
+                  )}
+                  {!inlineSearching && inlineResults.length === 0 && (
+                    <p className="text-xs text-[var(--fr-admin-muted)]">
+                      Ничего не найдено — проверьте написание или введите Telegram id (узнать id: @userinfobot).
+                    </p>
+                  )}
+                  {!inlineSearching && inlineResults.length > 0 && (
+                    <p className="mb-1 text-[10px] uppercase tracking-wide text-[var(--fr-admin-muted)]">
+                      Найдено — нажмите на кандидата:
+                    </p>
+                  )}
+                  <div className="flex flex-col gap-1">
+                    {inlineResults.map((user) => (
+                      <button
+                        key={user.userId}
+                        type="button"
+                        onClick={() => pickInlineUser(user)}
+                        className="rounded-lg px-2 py-2 text-left text-xs text-[var(--fr-admin-text)] transition-colors hover:bg-[var(--fr-admin-accent)]/10"
+                      >
+                        {buildSubrenterUserLabel(user)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
               {pickerBikeId === bike.bikeId && (
                 <div

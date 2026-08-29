@@ -76,6 +76,9 @@ export interface RentalDashboardItem {
   } | null;
   // Resolved operator display name (username/full_name from public.users)
   operatorName?: string | null;
+  // iter20: resolved partner-owner label ("@username · Full Name") for
+  // subrented bikes — drives the «Субарендатор» tile in the analytics sheet.
+  subrenterLabel?: string | null;
 }
 
 export interface RentalDashboardSummary {
@@ -612,6 +615,38 @@ export async function getRentalsDashboard(input: {
           operatorNameById.get(item.created_by_operator_chat_id || "") ??
           null,
       }));
+
+      // ── iter20: resolve subrenter (partner-owner) display names ────────────
+      // cars.specs.subrenter_chat_id marks a subrented bike; the raw id means
+      // nothing to a human, so resolve "@username · Full Name" like the
+      // operator names above. One batched users query for all bikes.
+      const subrenterIds = new Set<string>();
+      for (const item of items) {
+        const raw = (item.vehicle?.specs as Record<string, unknown> | null | undefined)?.["subrenter_chat_id"];
+        const id = typeof raw === "string" ? raw.trim() : typeof raw === "number" ? String(raw) : "";
+        if (id) subrenterIds.add(id);
+      }
+      const subrenterLabelById = new Map<string, string>();
+      if (subrenterIds.size > 0) {
+        const { data: subrenterUsers } = await supabaseAdmin
+          .from("users")
+          .select("user_id, full_name, username")
+          .in("user_id", Array.from(subrenterIds));
+        for (const u of (subrenterUsers || []) as any[]) {
+          const label = u.username
+            ? `@${u.username}${u.full_name ? ` · ${u.full_name}` : ""}`
+            : u.full_name || u.user_id;
+          subrenterLabelById.set(u.user_id, label);
+        }
+      }
+      items = items.map(item => {
+        const raw = (item.vehicle?.specs as Record<string, unknown> | null | undefined)?.["subrenter_chat_id"];
+        const id = typeof raw === "string" ? raw.trim() : typeof raw === "number" ? String(raw) : "";
+        return {
+          ...item,
+          subrenterLabel: id ? subrenterLabelById.get(id) ?? id : null,
+        };
+      });
     }
 
     // Calculate summary statistics.

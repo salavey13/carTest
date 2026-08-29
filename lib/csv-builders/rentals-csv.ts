@@ -12,10 +12,14 @@
 // Coefficients are configurable at /franchize/[slug]/salary-coefficients;
 // defaults come from the official bonus document (lib/salary-coefficients.ts).
 //
-// Columns (17 total):
+// Columns (21 total — iter20 added 4 at the end):
 //   Дата, ЗП Аренда, Партнеру, Цена, Экип, Залог, Марка, (spacer),
 //   Пробег до, Пробег после, Время, Комментарий,
-//   дата, ЗП Продажа, Наименование, Цена, Комментарий
+//   дата, ЗП Продажа, Наименование, Цена, Комментарий,
+//   Заметки, Субарендатор, Фото, ID (hidden in the web table view)
+// The 4 new columns are appended AFTER the established 17-col finance-sheet
+// layout so existing consumers (boss's sheet import, TG send) keep every
+// original column index stable.
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import {
@@ -29,6 +33,12 @@ import {
   standardRentalPrice,
   type RentalEquipment,
 } from "@/lib/salary-coefficients";
+import {
+  rentalNotesSummary,
+  rentalPhotoCountsLabel,
+  subrenterChatIdFromSpecs,
+  subrenterCsvLabel,
+} from "@/lib/csv-builders/rental-csv-columns";
 
 type SupabaseSchemaClient = {
   schema: (schema: string) => {
@@ -76,7 +86,7 @@ export async function buildRentalsCsv(
     .select(`
       rental_id, status, total_cost, payment_status,
       requested_start_date, requested_end_date, agreed_start_date, agreed_end_date,
-      metadata, created_at,
+      metadata, created_at, start_photo_count, end_photo_count,
       vehicle:cars!inner(id, make, model, crew_id, specs, daily_price)
     `)
     .eq("vehicle.crew_id", crew.id)
@@ -109,8 +119,31 @@ export async function buildRentalsCsv(
     "Дата", "ЗП Аренда", "Партнеру", "Цена", "Экип", "Залог",
     "Марка", "", "Пробег до", "Пробег после", "Время", "Комментарий",
     "дата", "ЗП Продажа", "Наименование", "Цена", "Комментарий",
+    "Заметки", "Субарендатор", "Фото", "ID",
   ];
   const rows: string[] = [headers.join(",")];
+
+  // iter20: resolve subrenter labels for every subrented bike in one batched
+  // users query (specs.subrenter_chat_id → "@username · Full Name").
+  const subrenterIds = new Set<string>();
+  for (const r of (rentals || []) as any[]) {
+    const id = subrenterChatIdFromSpecs(r.vehicle?.specs);
+    if (id) subrenterIds.add(id);
+  }
+  const subrenterUserById = new Map<string, { user_id: string; full_name: string | null; username: string | null }>();
+  if (subrenterIds.size > 0) {
+    const { data: subrenterUsers } = await supabaseAdmin
+      .from("users")
+      .select("user_id, full_name, username")
+      .in("user_id", Array.from(subrenterIds));
+    for (const u of (subrenterUsers || []) as any[]) {
+      subrenterUserById.set(u.user_id, {
+        user_id: u.user_id,
+        full_name: u.full_name ?? null,
+        username: u.username ?? null,
+      });
+    }
+  }
 
   let totalRevenue = 0;
   let totalSalary = 0;
@@ -166,10 +199,22 @@ export async function buildRentalsCsv(
     const equipStr = equipParts.length > 0 ? `${equipParts.join("+")} (${equipCost})` : "";
 
     const depositAmount = Number(meta.deposit_amount || 0);
+    // iter20: deposit method — direct metadata, else derived from the payment
+    // split (the split always routes the deposit into its cash part), same
+    // backfill rule the analytics sheet uses in getDepositInfo().
+    const split = (meta.payment_split || {}) as { cash?: number; card_destination?: string | null };
+    const depositMethodRaw =
+      meta.deposit_method === "cash" || meta.deposit_method === "tbank" || meta.deposit_method === "sber"
+        ? meta.deposit_method
+        : depositAmount > 0 && Number(split.cash ?? 0) >= depositAmount
+          ? "cash"
+          : depositAmount > 0 && typeof split.card_destination === "string" && split.card_destination
+            ? split.card_destination
+            : null;
     const depositMethod =
-      meta.deposit_method === "cash" ? " нал"
-      : meta.deposit_method === "tbank" ? " ТБанк"
-      : meta.deposit_method === "sber" ? " Сбербанк"
+      depositMethodRaw === "cash" ? " нал"
+      : depositMethodRaw === "tbank" ? " ТБанк"
+      : depositMethodRaw === "sber" ? " Сбербанк"
       : "";
     const depositStr = depositAmount > 0 ? `${depositAmount}${depositMethod}` : "";
 
@@ -194,10 +239,19 @@ export async function buildRentalsCsv(
     const freeReason = meta.free_rental_reason || "";
     const comment = [renterName, renterPhone, paymentMethod, freeReason].filter(Boolean).join(" ");
 
+    // iter20: the 4 new columns — notes / subrenter / photos / rental id.
+    const notesStr = rentalNotesSummary(meta);
+    const subrenterId = subrenterChatIdFromSpecs(r.vehicle?.specs);
+    const subrenterStr = subrenterId
+      ? subrenterCsvLabel(subrenterUserById.get(subrenterId) ?? { user_id: subrenterId, full_name: null, username: null })
+      : "";
+    const photosStr = rentalPhotoCountsLabel(r.start_photo_count, r.end_photo_count);
+
     rows.push(rowOf([
       dateStr, salaryStr, "", price, equipStr, depositStr,
       bikeName, "", odoBefore, odoAfter, timeStr, comment,
       "", "", "", "", "",
+      notesStr, subrenterStr, photosStr, r.rental_id || "",
     ]));
   }
 
@@ -222,6 +276,7 @@ export async function buildRentalsCsv(
       "", "", "", "", "", "",
       "", "", "", "", "", "",
       dateStr, String(saleSalary.total), bikeName, price, comment,
+      "", "", "", "",
     ]));
   }
   totalSalary += totalSalesSalary;
@@ -237,6 +292,7 @@ export async function buildRentalsCsv(
     "", totalSalary, "", totalRevenue, totalEquip, totalDeposit,
     "", "", "", "", "", "",
     "", "", "", totalSales, "",
+    "", "", "", "",
   ]));
 
   const csv = "\uFEFF" + rows.join("\n");

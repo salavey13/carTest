@@ -84,3 +84,33 @@ export function buildSubrenterUserLabel(user: {
   if (user.userId) parts.push(user.userId);
   return parts.join(" · ");
 }
+
+/**
+ * iter20: exact-match resolution for free-text assignment input.
+ *
+ * The MAIN assignment field now accepts @username / full name / id (it used
+ * to strip every non-digit — username search was impossible). On save, a
+ * non-numeric value is resolved through the search results: an EXACT
+ * username match (case-insensitive, @-stripped) or an exact full-name match
+ * resolves unambiguously; anything else stays unresolved so the UI can ask
+ * the admin to pick from the suggestion list.
+ *
+ * Returns the resolved candidate or null.
+ */
+export function findExactSubrenterUserCandidate(
+  candidates: SubrenterUserCandidate[],
+  rawQuery: string,
+): SubrenterUserCandidate | null {
+  const q = normalizeSubrenterUserQuery(rawQuery).toLowerCase();
+  if (!q) return null;
+  const byUsername = candidates.filter(
+    (c) => (c.username ?? "").trim().replace(/^@+/, "").toLowerCase() === q,
+  );
+  if (byUsername.length === 1) return byUsername[0];
+  if (byUsername.length > 1) return null; // ambiguous — impossible for usernames, but be safe
+  const byFullName = candidates.filter(
+    (c) => (c.fullName ?? "").trim().replace(/\s+/g, " ").toLowerCase() === q,
+  );
+  if (byFullName.length === 1) return byFullName[0];
+  return null;
+}

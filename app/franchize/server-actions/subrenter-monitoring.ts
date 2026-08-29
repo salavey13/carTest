@@ -684,6 +684,10 @@ export interface SubrentWeeklyReportInput {
   ownerPercentage?: number;
   /** Send the rendered DOCX to the partner via the bot (default true). */
   sendToPartner?: boolean;
+  /** iter20: send the rendered DOCX to the ADMIN's own Telegram chat instead
+   *  of the partner's (the blob-download button is dead in the TG WebApp
+   *  iframe sandbox on iOS — «Послать себе в ТГ» replaces «Скачать отчёт»). */
+  sendToSelf?: boolean;
 }
 
 export interface SubrentWeeklyReportResult {
@@ -693,6 +697,8 @@ export interface SubrentWeeklyReportResult {
   /** base64 DOCX so the operator can also download it in the web app */
   docBase64?: string;
   sentToPartner?: boolean;
+  /** iter20: true when the report was delivered to the admin's own chat. */
+  sentToSelf?: boolean;
   summary?: {
     rentalCount: number;
     totalPaymentsRub: number;
@@ -726,12 +732,13 @@ export async function generateSubrenterWeeklyReportAction(
       to: z.string().trim().regex(DATE_RE),
       ownerPercentage: z.coerce.number().min(1).max(99).optional(),
       sendToPartner: z.boolean().optional(),
+      sendToSelf: z.boolean().optional(),
     })
     .safeParse(input);
   if (!parsed.success) {
     return { success: false, error: "Некорректные параметры отчёта." };
   }
-  const { slug, actorUserId, chatId, from, to, ownerPercentage, sendToPartner = true } = parsed.data;
+  const { slug, actorUserId, chatId, from, to, ownerPercentage, sendToPartner = true, sendToSelf = false } = parsed.data;
   if (from > to) return { success: false, error: "Дата начала позже даты окончания." };
 
   try {
@@ -906,7 +913,9 @@ export async function generateSubrenterWeeklyReportAction(
       templateMode: "html",
     });
 
-    // Deliver to the partner (best-effort, never fails the report itself)
+    // Deliver to the partner (best-effort, never fails the report itself).
+    // iter20: sendToSelf routes the SAME docx to the admin's own chat — the
+    // admin wants the report in TG, not as a browser download.
     let sentToPartner = false;
     if (sendToPartner) {
       try {
@@ -920,12 +929,26 @@ export async function generateSubrenterWeeklyReportAction(
         logger.warn("[subrent-weekly-report] partner delivery threw (non-fatal)", sendErr);
       }
     }
+    let sentToSelf = false;
+    if (sendToSelf) {
+      try {
+        const { sendTelegramDocument } = await import("@/app/actions");
+        const selfResult = await sendTelegramDocument(actorUserId, new Blob([doc.bytes]), fileName);
+        sentToSelf = Boolean(selfResult?.success);
+        if (!sentToSelf) {
+          logger.warn("[subrent-weekly-report] self delivery failed", { actorUserId, error: selfResult?.error });
+        }
+      } catch (sendErr) {
+        logger.warn("[subrent-weekly-report] self delivery threw (non-fatal)", sendErr);
+      }
+    }
 
     return {
       success: true,
       fileName,
       docBase64: Buffer.from(doc.bytes).toString("base64"),
       sentToPartner,
+      sentToSelf,
       summary: {
         rentalCount: rows.length,
         totalPaymentsRub: totalPayments,

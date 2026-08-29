@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Wallet, AlertTriangle, RefreshCw } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
 import { DrawerSection, DrawerEmptyHint } from "./DrawerPrimitives";
+import { resolveDepositBadge, type DepositInfo } from "./lib/analytics-utils";
 
 interface DepositEntry {
   id: string;
@@ -35,12 +36,7 @@ interface DepositSectionProps {
   /** FIX (F3): deposit info resolved from rental metadata / contract artifact
    *  (metadata.deposit_amount + deposit_method + deposit_returned). Used when
    *  there are no deposit_entries rows (typical for /doc-flow rentals). */
-  metadataDeposit?: {
-    amount: number | null;
-    method: string | null;
-    methodLabel: string | null;
-    returned: boolean | null;
-  } | null;
+  metadataDeposit?: DepositInfo | null;
   /** FIX (F13): if the parent (RentalDetailDrawer) already fetched the
    *  deposit summary, accept it as the initial value to avoid a second
    *  network request. The component still owns the live refetch logic. */
@@ -169,10 +165,17 @@ export function DepositSection({ rentalId, rentalStatus, T, expanded, onToggle, 
             Возвращён
           </span>
         ) : metadataDeposit && metadataDeposit.amount != null && metadataDeposit.amount > 0 ? (
-          <span className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                style={{ backgroundColor: metadataDeposit.returned === false ? "#f59e0b15" : "#3b82f615", color: metadataDeposit.returned === false ? "#f59e0b" : "#3b82f6" }}>
-            {metadataDeposit.returned === false ? "у держателя" : "возвращён"}
-          </span>
+          // iter20: status-aware badge (was: "возвращён" whenever
+          // deposit_returned was null — a lie for every active web order).
+          (() => {
+            const badge = resolveDepositBadge(rentalStatus, metadataDeposit.returned);
+            return (
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    style={{ backgroundColor: `${badge.color}15`, color: badge.color }}>
+                {badge.label}
+              </span>
+            );
+          })()
         ) : null
       }
     >
@@ -183,8 +186,8 @@ export function DepositSection({ rentalId, rentalStatus, T, expanded, onToggle, 
         </div>
       ) : !summary || summary.totalCollected === 0 ? (
         metadataDeposit && metadataDeposit.amount != null && metadataDeposit.amount > 0 ? (
-          // FIX (F3): no deposit_entries rows, but the /doc flow recorded the
-          // deposit in rental metadata / contract artifact — show it instead
+          // FIX (F3): no deposit_entries rows, but the rental recorded the
+          // deposit in metadata / contract artifact — show it instead
           // of the misleading "Депозит не записан".
           <div className="rounded-xl border p-2.5" style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}>
             <div className="flex items-center justify-between">
@@ -195,8 +198,13 @@ export function DepositSection({ rentalId, rentalStatus, T, expanded, onToggle, 
             </div>
             <div className="mt-1 flex items-center justify-between text-[10px]" style={{ color: T.textFaint }}>
               <span>
+                {/* iter20: provenance + expected method — "наличные · по данным
+                    заказа" for web orders (method captured / derived from the
+                    payment split), "способ не указан · из данных договора" for
+                    /doc rentals falling back to the contract artifact. */}
                 {metadataDeposit.methodLabel || metadataDeposit.method || "способ не указан"}
-                {" · из данных договора"}
+                {" · "}
+                {metadataDeposit.source === "artifact" ? "из данных договора" : "по данным заказа"}
               </span>
               <span style={{ color: metadataDeposit.returned === false ? "#f59e0b" : "#3b82f6" }}>
                 {metadataDeposit.returned === false ? "у держателя" : metadataDeposit.returned === true ? "возвращён" : ""}

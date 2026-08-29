@@ -3446,6 +3446,16 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             // card / sbp → deposit collected in cash at handover, rest via transfer
             return { bank: lineTotal, cash: expectedDepositRub ?? 0, card_destination: cardDestination };
           })();
+          // iter20: deposit METHOD — derived from the same split shape so the
+          // analytics item sheet shows «наличные» instead of «способ не указан».
+          // The split always routes the deposit into its cash part (cash payment
+          // = everything in cash; card/sbp = rent by transfer + deposit in cash
+          // at handout), so the expected collection method is cash. Mirrored
+          // into the rentals table columns as well (deposit_amount was always 0
+          // for web orders — the cron CSV reads the TABLE columns).
+          const expectedDepositMethod = expectedDepositRub
+            ? (rentalPaymentSplit.cash >= expectedDepositRub ? "cash" : rentalPaymentSplit.card_destination)
+            : null;
           // Equipment parsed from the cart-line perk string (parity with /doc).
           const rentalEquipment = (() => {
             const perkStr = String(payload.cartLines[bikeIndex]?.options?.perk || "").toLowerCase();
@@ -3480,6 +3490,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                 status: "pending_confirmation", // 2-step: operator activates via LEADS page → active
                 payment_status: payload.payment === "telegram_xtr" ? "interest_paid" : "pending",
                 total_cost: Math.round(docTotal || payload.totalAmount),
+                // iter20: real table-column mirror of the expected deposit so
+                // the cron CSV (which reads rentals.deposit_amount / .deposit_method)
+                // stops showing 0 / empty for web orders.
+                ...(expectedDepositRub ? { deposit_amount: expectedDepositRub } : {}),
+                ...(expectedDepositMethod ? { deposit_method: expectedDepositMethod } : {}),
                 metadata: {
                   source: "franchize_web_order",
                   order_id: payload.orderId,
@@ -3492,8 +3507,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                   bike_name: doc.bikeName,
                   // iter15: real expected deposit from bike specs + split shape
                   // aligned with /doc (never the 500₽ reservation hold).
+                  // iter20: + deposit_method so the analytics sheet shows the
+                  // expected collection method, not «способ не указан».
                   ...(expectedDepositRub ? { deposit_amount: expectedDepositRub } : {}),
                   ...(expectedDepositRub ? { deposit_rub: expectedDepositRub } : {}),
+                  ...(expectedDepositMethod ? { deposit_method: expectedDepositMethod } : {}),
                   payment_split: rentalPaymentSplit,
                   equipment: rentalEquipment,
                   ...(Number.isFinite(lastKnownOdometer)

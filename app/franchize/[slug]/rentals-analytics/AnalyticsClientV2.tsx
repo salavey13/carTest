@@ -139,6 +139,7 @@ function toAnalyticsRental(item: RentalDashboardItem): AnalyticsRentalRow {
     subrenterChatId: subrenterChatIdFromSpecs(
       (item.vehicle?.specs ?? null) as Record<string, unknown> | null,
     ),
+    subrenterLabel: item.subrenterLabel ?? null,
     vehicle: item.vehicle
       ? { make: item.vehicle.make, model: item.vehicle.model }
       : null,

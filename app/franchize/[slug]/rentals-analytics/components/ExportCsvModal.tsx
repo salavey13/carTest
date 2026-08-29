@@ -28,7 +28,8 @@
 //    a no-op (live filter).
 
 import { useCallback, useEffect, useState } from "react";
-import { X, Download, Loader2, Send, Search, Table2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { X, Download, Loader2, Send, Search, Table2, Camera } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
 import { formatDateRu } from "@/app/franchize/components/DateInputRu";
 
@@ -42,8 +43,10 @@ interface ExportCsvModalProps {
   /** Send the same data as a TG document to the operator's chat. */
   onSendTelegram?: (from: string, to: string) => Promise<void>;
   T: ThemeTokens;
-  /** Column set: "rentals" (17 cols) or "sales" (5 cols). */
+  /** Column set: "rentals" (21 cols incl. hidden ID) or "sales" (5 cols). */
   variant?: "rentals" | "sales";
+  /** iter20: crew slug — used for the row tap-through to the rental page. */
+  slug?: string;
 }
 
 function firstDayOfMonthIso(): string {
@@ -125,9 +128,14 @@ function parseCsv(text: string): string[][] {
 
 // Column-kind heuristic — drives alignment + parsing for the totals card.
 // Index 7 in rentals variant is the empty spacer column.
+// iter20: index 20 is the rental UUID (hidden — powers the row tap-through).
 const RENTALS_NUMERIC_COLS = new Set([1, 3, 4, 5, 8, 9, 15]); // ЗП, Цена, Экип, Залог, odo, odo, Цена продажи
 const RENTALS_DATE_COLS = new Set([0, 12]); // Дата (rental), дата (sale)
-const RENTALS_HIDE_COLS = new Set([7]); // empty spacer
+const RENTALS_HIDE_COLS = new Set([7, 20]); // empty spacer + hidden rental id
+const RENTALS_NOTES_COL = 17;   // «Заметки» — wider, wrapped
+const RENTALS_SUBRENTER_COL = 18; // «Субарендатор» — amber-tinted
+const RENTALS_PHOTOS_COL = 19; // «Фото» — camera icon + green when present
+const RENTALS_ID_COL = 20;     // hidden rental uuid
 const SALES_NUMERIC_COLS = new Set([3]); // Цена
 const SALES_DATE_COLS = new Set([0]); // Дата
 
@@ -152,7 +160,9 @@ export function ExportCsvModal({
   onSendTelegram,
   T,
   variant = "rentals",
+  slug,
 }: ExportCsvModalProps) {
+  const router = useRouter();
   const [from, setFrom] = useState(firstDayOfMonthIso());
   const [to, setTo] = useState(todayIso());
   const [rows, setRows] = useState<string[][]>([]);
@@ -269,6 +279,19 @@ export function ExportCsvModal({
   const dateCols = variant === "rentals" ? RENTALS_DATE_COLS : SALES_DATE_COLS;
   const hideCols = variant === "rentals" ? RENTALS_HIDE_COLS : new Set<number>();
 
+  // iter20: visible column count for the header badge (21 cols − 2 hidden).
+  const visibleColCount = Math.max(headerRow.length - hideCols.size, 0);
+
+  // iter20: row tap-through — rental rows carry the rental uuid in the hidden
+  // last column; tapping a row opens the rental page (photos gallery, deposit
+  // tracking, handoff flow) exactly like the item sheet's «Открыть аренду».
+  const openRentalForRow = (row: string[]) => {
+    if (variant !== "rentals" || !slug) return;
+    const rentalId = (row[RENTALS_ID_COL] || "").trim();
+    if (!rentalId) return;
+    router.push(`/franchize/${slug}/rental/${rentalId}`);
+  };
+
   // Totals card — sum of price column (col 3 for rentals, col 3 for sales)
   // and salary column (col 1 for rentals).
   const priceCol = 3;
@@ -322,7 +345,7 @@ export function ExportCsvModal({
                   color: T.accent,
                 }}
               >
-                {variant === "sales" ? "5 столбцов" : "17 столбцов"}
+                {variant === "sales" ? "5 столбцов" : `${visibleColCount} столбцов`}
               </span>
             </div>
             <button
@@ -556,13 +579,23 @@ export function ExportCsvModal({
               <tbody>
                 {dataRows.map((r, ri) => {
                   const isAlt = ri % 2 === 1;
+                  // iter20: rental rows (hidden uuid present) are tappable —
+                  // opens the rental page like the item sheet's «Открыть аренду».
+                  const rowRentalId =
+                    variant === "rentals" ? (r[RENTALS_ID_COL] || "").trim() : "";
+                  const rowClickable = !!rowRentalId && !!slug;
                   return (
                     <tr
                       key={ri}
                       className="transition-colors hover:brightness-95"
                       style={{
                         backgroundColor: isAlt ? T.bgElevated : T.bgCard,
+                        ...(rowClickable
+                          ? { cursor: "pointer" }
+                          : {}),
                       }}
+                      onClick={rowClickable ? () => openRentalForRow(r) : undefined}
+                      title={rowClickable ? "Открыть аренду" : undefined}
                     >
                       {headerRow.map((_, ci) => {
                         const cell = r[ci] ?? "";
@@ -587,15 +620,35 @@ export function ExportCsvModal({
                           <td
                             key={ci}
                             className="border-b border-r px-2.5 py-1.5"
-                            title={cell}
+                            title={
+                              variant === "rentals" && ci === RENTALS_PHOTOS_COL && cell
+                                ? `${cell.split("+")[0]} фото при выдаче + ${cell.split("+")[1] ?? 0} при возврате`
+                                : cell
+                            }
                             style={{
                               borderColor: T.border,
                               textAlign: isNum ? "right" : isDate ? "center" : "left",
-                              whiteSpace: "nowrap",
+                              // iter20: «Заметки» wraps (long operator notes) and
+                              // «Субарендатор» gets a soft amber tint; «Фото» shows
+                              // a camera glyph — green when photos exist.
+                              whiteSpace:
+                                variant === "rentals" && ci === RENTALS_NOTES_COL
+                                  ? "normal"
+                                  : "nowrap",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
-                              maxWidth: isDate ? "8rem" : undefined,
+                              maxWidth:
+                                isDate ? "8rem"
+                                : variant === "rentals" && ci === RENTALS_NOTES_COL ? "16rem"
+                                : variant === "rentals" && (ci === RENTALS_SUBRENTER_COL || ci === RENTALS_PHOTOS_COL) ? "10rem"
+                                : undefined,
                               fontVariantNumeric: isNum ? "tabular-nums" : undefined,
+                              ...(variant === "rentals" && ci === RENTALS_SUBRENTER_COL && cell
+                                ? { color: "#f59e0b" }
+                                : {}),
+                              ...(variant === "rentals" && ci === RENTALS_PHOTOS_COL && cell
+                                ? { color: "#22c55e", fontWeight: 600 }
+                                : {}),
                               // Sticky first column — same bg as row, with shadow
                               ...(ci === 0
                                 ? {
@@ -608,7 +661,14 @@ export function ExportCsvModal({
                                 : {}),
                             }}
                           >
-                            {cell || "\u00A0"}
+                            {variant === "rentals" && ci === RENTALS_PHOTOS_COL && cell ? (
+                              <span className="inline-flex items-center gap-1">
+                                <Camera className="h-3 w-3" aria-hidden />
+                                {cell}
+                              </span>
+                            ) : (
+                              cell || "\u00A0"
+                            )}
                           </td>
                         );
                       })}
@@ -671,6 +731,12 @@ export function ExportCsvModal({
               {dataRows.length}
               {totalsRow ? " + итоги" : ""} строк
             </span>
+            {/* iter20: tap-through affordance — rental rows open the rental page */}
+            {variant === "rentals" && slug && dataRows.length > 0 && (
+              <span className="text-[10px] opacity-80">
+                Нажмите на строку — откроется страница аренды (фото, депозит, передача)
+              </span>
+            )}
             <span className="tabular-nums">
               {formatDateRu(from)} — {formatDateRu(to)}
             </span>

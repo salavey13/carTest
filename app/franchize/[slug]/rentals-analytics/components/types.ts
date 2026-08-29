@@ -44,6 +44,9 @@ export interface AnalyticsRentalRow {
   /** Telegram chat id of the partner-owner when this bike is subrented
    *  (cars.specs.subrenter_chat_id) — drives the «owed to subrenters» KPI. */
   subrenterChatId?: string | null;
+  /** iter20: resolved partner label ("@username · Full Name") for subrented
+   *  bikes — shown in the analytics item sheet «Субарендатор» tile. */
+  subrenterLabel?: string | null;
   vehicle?: AnalyticsVehicle | null;
   user?: AnalyticsUser | null;
   /** Contract artifact data (private.rental_contract_artifacts) — the REAL

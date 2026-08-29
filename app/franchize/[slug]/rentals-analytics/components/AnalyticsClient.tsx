@@ -325,6 +325,7 @@ export function AnalyticsClient({
           onSendTelegram={onSendCsvToTelegram}
           fetchCsvText={onFetchCsvText}
           variant="rentals"
+          slug={initialSlug}
           T={T}
         />
       )}
