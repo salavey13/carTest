@@ -104,6 +104,61 @@ const SCROLL_SNAP_CSS = `
 /* ══ Cinematic duo section background (shared between Partners + Final CTA) ══ */
 const DUO_SECTION_BG = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2026/image_1.jpg";
 
+/* ══ CATALOG CARD GALLERIES — animated card backgrounds, split by propulsion type.
+   Image folders verified against Supabase storage; bike/type split follows
+   docs/autoreply/vip-bike-rent.csv (public.cars export: 12 Electric + 9 ICE). ══ */
+const CARPIX = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix";
+const img = (folder: string, n = 1) => `${CARPIX}/${folder}/image_${n}.jpg`;
+
+const ELECTRIC_BIKE_IMAGES = [
+  img("falcon-gt-2026", 1), img("falcon-gt-2026", 3),
+  img("falcon-pro", 1), img("falcon-pro", 2),
+  img("y-volt-surge-v", 1), img("y-volt-surge-v", 3),
+  img("sequence-zero", 1), img("sequence-zero", 2),
+  img("livewire-one", 1), img("livewire-one", 4),
+  img("rerode-r1-plus", 1),
+  img("hmd-m02", 1),
+  img("wenbox-u2-pro", 1), img("wenbox-u2-pro", 3),
+];
+
+const PETROL_BIKE_IMAGES = [
+  img("kawasaki-ex650k", 1), img("kawasaki-ex650k", 2),
+  img("yamaha-r7", 1), img("yamaha-r7", 2),
+  img("suzuki-gsx-s1000f", 1),
+  img("bmw-f800r", 1),
+  img("aprilia-shiver", 1),
+  img("nibbler-regumoto-4v", 1),
+  img("motoland-breakout", 1),
+  img("kayo-tsd110", 1),
+  img("jilang-max-pro", 1),
+];
+
+/* Card 3 (Подбор) — the head-turners from both camps, alternating electro/ICE */
+const SHOWSTOPPER_BIKE_IMAGES = [
+  img("sequence-zero", 1),
+  img("ducati-panigale-s-electro-gold", 1),
+  img("y-volt-surge-v", 1),
+  img("livewire-one", 2),
+  img("yamaha-r7", 1),
+  img("kawasaki-ex650k", 2),
+  img("suzuki-gsx-s1000f", 1),
+  img("falcon-gt-2026", 2),
+];
+
+/* ══ Bike name lists per card (same verified split as galleries above) ══ */
+const ELECTRIC_BIKE_NAMES = [
+  "Falcon GT 2026", "Falcon PRO", "Y-VOLT Surge V", "Sequence Zero", "LiveWire One",
+  "Rerode R1+", "HMD M02", "Wenbox U2 Pro", "Ducati Panigale S Electro",
+];
+const PETROL_BIKE_NAMES = [
+  "Kawasaki Ninja 650", "Yamaha R7", "Suzuki GSX-S1000F", "BMW F800R", "Aprilia Shiver 750",
+  "Regulmoto Nibbler 300", "Motoland Breakout 300", "Kayo TSD 110", "Jilang Max Pro",
+];
+const SHOWSTOPPER_BIKE_NAMES = [
+  "Sequence Zero", "Panigale S Electro Gold", "Y-VOLT Surge V", "LiveWire One",
+  "Yamaha R7", "Kawasaki Ninja 650", "Suzuki GSX-S1000F", "Falcon GT 2026",
+];
+
 const SOCIAL_LINKS: SocialLink[] = [
   {
     id: "instagram", label: "Instagram", href: INSTAGRAM_HREF, color: "#E4405F",
@@ -300,18 +355,18 @@ function MouseFollowGlow() {
   return <motion.div aria-hidden className="pointer-events-none fixed inset-0 z-[5] hidden md:block" style={{ background }} />;
 }
 
-/* ══ HERO IMAGE CAROUSEL — crossfade between 4 images every 5s ══ */
-function HeroImageCarousel({ images, alt }: { images: string[]; alt: string }) {
+/* ══ HERO IMAGE CAROUSEL — crossfade between images (hero + catalog cards) ══ */
+function HeroImageCarousel({ images, alt, loading = "eager", intervalMs = 5000 }: { images: string[]; alt: string; loading?: "eager" | "lazy"; intervalMs?: number }) {
   const [index, setIndex] = useState(0);
   useEffect(() => {
     if (images.length <= 1) return;
-    const interval = setInterval(() => setIndex((prev) => (prev + 1) % images.length), 5000);
+    const interval = setInterval(() => setIndex((prev) => (prev + 1) % images.length), intervalMs);
     return () => clearInterval(interval);
-  }, [images.length]);
+  }, [images.length, intervalMs]);
   return (
     <div className="absolute inset-0 overflow-hidden">
       <AnimatePresence initial={false}>
-        <motion.img key={index} src={images[index]} alt={alt} initial={{ opacity: 0, scale: 1.03 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.3, ease: "easeInOut" }} className="absolute inset-0 w-full h-full object-cover" loading="eager" />
+        <motion.img key={index} src={images[index]} alt={alt} initial={{ opacity: 0, scale: 1.03 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.3, ease: "easeInOut" }} className="absolute inset-0 w-full h-full object-cover" loading={loading} />
       </AnimatePresence>
       {images.length > 1 && (
         <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10 flex">
@@ -632,11 +687,11 @@ function CinematicHero() {
                 transition={{ duration: 0.4, delay: 1.2 + idx * 0.08 }}
                 whileHover={{ scale: 1.15, y: -3 }}
                 whileTap={{ scale: 0.92 }}
-                className="group relative flex items-center justify-center"
+                className={`group relative flex items-center justify-center ${social.id === "website" ? "w-full md:w-auto" : ""}`}
                 aria-label={social.label}
               >
                 <div
-                  className="relative w-11 h-11 md:w-12 md:h-12 rounded-2xl flex items-center justify-center transition-all duration-300 overflow-hidden"
+                  className={`relative rounded-2xl flex items-center justify-center transition-all duration-300 overflow-hidden ${social.id === "website" ? "w-full h-12 md:w-12 md:h-12" : "w-11 h-11 md:w-12 md:h-12"}`}
                   style={{
                     backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 30%, transparent)",
                     border: `1.5px solid color-mix(in srgb, ${social.color} 40%, transparent)`,
@@ -658,8 +713,13 @@ function CinematicHero() {
                       <span className="pointer-events-none absolute inset-1 rounded-2xl" style={{ background: "radial-gradient(circle, rgba(34,211,238,0.3), transparent 70%)", animation: "vip-electric-spark 5s ease-in-out infinite" }} />
                     </>
                   )}
-                  <div className="relative transition-all duration-300 group-hover:scale-110" style={{ color: social.color }}>
+                  <div className="relative transition-all duration-300 group-hover:scale-110 flex items-center gap-2" style={{ color: social.color }}>
                     {social.icon}
+                    {social.id === "website" && (
+                      <span className="md:hidden text-sm font-bold whitespace-nowrap" style={{ color: social.color }}>
+                        {social.label} — vip-bike.ru
+                      </span>
+                    )}
                   </div>
                 </div>
                 {/* Tooltip label on hover */}
@@ -818,7 +878,7 @@ export default function Home() {
                 <AnimatedSection delay={0}>
                   <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "color-mix(in srgb, #22C55E 40%, var(--vip-border-soft))" }}>
                     <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
-                      <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-gt-2026/image_1.jpg" alt="Электро-эндуро 79BIKE Falcon" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
+                      <HeroImageCarousel images={ELECTRIC_BIKE_IMAGES} alt="Электромотоциклы VIP Bike" loading="lazy" intervalMs={5000} />
                       <div className="absolute inset-0 pointer-events-none z-10" style={{ background: "linear-gradient(to bottom, transparent 30%, var(--vip-bg-card) 85%)" }} />
                     </div>
                     <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-20" style={{ backgroundColor: "rgba(34, 197, 94, 0.2)", color: "#22c55e", border: "1px solid rgba(34, 197, 94, 0.3)", backdropFilter: "blur(8px)" }}>от 5 000 ₽/сутки</div>
@@ -832,7 +892,7 @@ export default function Home() {
                         <span>Менеджер проверит документы и доступность до брони</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5 mb-4">
-                        {["Falcon GT", "Falcon PRO", "Falcon LYNX", "HMD M02", "Sotion EM01", "Y-VOLT Surge V"].map(b => (
+                        {ELECTRIC_BIKE_NAMES.map(b => (
                           <span key={b} className="px-2.5 py-1 rounded-lg text-xs" style={{ backgroundColor: "rgba(34, 197, 94, 0.08)", color: "#22c55e" }}>{b}</span>
                         ))}
                       </div>
@@ -845,7 +905,7 @@ export default function Home() {
                 <AnimatedSection delay={0.15}>
                   <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "color-mix(in srgb, #F59E0B 40%, var(--vip-border-soft))" }}>
                     <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
-                      <motion.img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/kawasaki-ex650k/image_1.jpg" alt="Бензиновый мотоцикл Kawasaki Ninja 650" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
+                      <HeroImageCarousel images={PETROL_BIKE_IMAGES} alt="Бензиновые мотоциклы VIP Bike" loading="lazy" intervalMs={5400} />
                       <div className="absolute inset-0 pointer-events-none z-10" style={{ background: "linear-gradient(to bottom, transparent 30%, var(--vip-bg-card) 85%)" }} />
                     </div>
                     <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-20" style={{ backgroundColor: "rgba(245, 158, 11, 0.2)", color: "#f59e0b", border: "1px solid rgba(245, 158, 11, 0.3)", backdropFilter: "blur(8px)" }}>от 4 000 ₽/сутки</div>
@@ -859,7 +919,7 @@ export default function Home() {
                         <span>Паспорт, водительское удостоверение и категория А</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5 mb-4">
-                        {["Kawasaki Ninja 650", "Yamaha R7", "BMW F800R", "Suzuki GSX-S1000F", "Motoland Breakout 300", "Kayo TSD 110"].map(b => (
+                        {PETROL_BIKE_NAMES.map(b => (
                           <span key={b} className="px-2.5 py-1 rounded-lg text-xs" style={{ backgroundColor: "rgba(245, 158, 11, 0.08)", color: "#f59e0b" }}>{b}</span>
                         ))}
                       </div>
@@ -872,7 +932,7 @@ export default function Home() {
                 <AnimatedSection delay={0.3}>
                   <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "color-mix(in srgb, #EF4444 40%, var(--vip-border-soft))" }}>
                     <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
-                      <motion.img src={DUO_SECTION_BG} alt="Помощь с подбором мотоцикла" className="absolute top-0 left-0 w-full h-full object-cover" whileHover={{ scale: 1.08 }} transition={{ duration: 0.6 }} />
+                      <HeroImageCarousel images={SHOWSTOPPER_BIKE_IMAGES} alt="Самые эффектные мотоциклы VIP Bike" loading="lazy" intervalMs={5800} />
                       <div className="absolute inset-0 pointer-events-none z-10" style={{ background: "linear-gradient(to bottom, transparent 30%, var(--vip-bg-card) 85%)" }} />
                     </div>
                     <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-20" style={{ backgroundColor: "rgba(239, 68, 68, 0.2)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.3)", backdropFilter: "blur(8px)" }}>Помощь менеджера</div>
@@ -886,7 +946,7 @@ export default function Home() {
                         <span>Все условия подтвердим до бронирования</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5 mb-4">
-                        {["Опыт", "Маршрут", "Даты", "Тип техники", "Доступность"].map(b => (
+                        {SHOWSTOPPER_BIKE_NAMES.map(b => (
                           <span key={b} className="px-2.5 py-1 rounded-lg text-xs" style={{ backgroundColor: "rgba(239, 68, 68, 0.08)", color: "#ef4444" }}>{b}</span>
                         ))}
                       </div>
@@ -1148,7 +1208,7 @@ export default function Home() {
                 <h5 className="font-bold mb-4 uppercase text-xs tracking-widest" style={{ color: "var(--vip-text-secondary)" }}>Мы в соцсетях</h5>
                 <div className="flex flex-wrap gap-2 md:gap-3 md:flex-nowrap justify-center md:justify-start">
                   {SOCIAL_LINKS.map((social) => (
-                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="group relative w-11 h-11 md:w-12 md:h-12 md:rounded-full rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0" style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${social.color} 30%, transparent)`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 5s linear infinite" } : {}) }}>
+                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className={`group relative ${social.id === "website" ? "w-full h-12 md:w-12 md:h-12" : "w-11 h-11"} md:rounded-full rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0`} style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${social.color} 30%, transparent)`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 5s linear infinite" } : {}) }}>
                       {social.featured === "gold" && (
                         <span className="pointer-events-none absolute inset-0 overflow-hidden md:rounded-full rounded-xl">
                           <span className="absolute top-0 left-0 w-1/2 h-full" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.85) 50%, transparent)", animation: "vip-gold-blic 2s ease-in-out infinite" }} />
@@ -1160,8 +1220,13 @@ export default function Home() {
                           <span className="pointer-events-none absolute inset-1 md:rounded-full rounded-xl" style={{ background: "radial-gradient(circle, rgba(34,211,238,0.3), transparent 70%)", animation: "vip-electric-spark 5s ease-in-out infinite" }} />
                         </>
                       )}
-                      <div className="relative transition-colors duration-300" style={{ color: social.color }}>
+                      <div className="relative transition-colors duration-300 flex items-center gap-2" style={{ color: social.color }}>
                         <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 md:w-4 md:h-4">{social.icon.props.children}</svg>
+                        {social.id === "website" && (
+                          <span className="md:hidden text-sm font-bold whitespace-nowrap" style={{ color: social.color }}>
+                            {social.label} — vip-bike.ru
+                          </span>
+                        )}
                       </div>
                     </a>
                   ))}
