@@ -186,12 +186,15 @@ describe("ПЭП template rendering (RENTAL_DEAL_TEMPLATE + vip-bike crew templa
       // the renter's name. No fully-blank 17-underscore pair remains in
       // section 13.
       expect(out.match(/_________________ \/ _______________/g)?.length ?? 0).toBe(0);
-      // iter23: in ПЭП mode the ISSUER's blank placeholder is gone too —
-      // replaced by the п. 12.3 ПЭП Арендодателя formulation (the doc file
-      // itself, formed by the lessor's system and sent to the renter).
+      // iter23: in ПЭП mode the ISSUER's blank placeholder is gone — his
+      // line is the BARE representative name («Воробьев Р.В.» instead of
+      // «_____ / Воробьев Р.В.»); the п. 12.3 ПЭП Арендодателя explanation
+      // stays in the small-print caption under the name.
       expect(out).not.toContain("_________________ / " + (vars.issuer_representative ?? ""));
-      expect(out).toContain("ПЭП Арендодателя — файл Договора");
-      expect(out).toContain(String(vars.issuer_representative ?? ""));
+      expect(out.split(`>${vars.issuer_representative ?? ""}</td>`).length - 1).toBe(2);
+      expect(out).toContain("(ПЭП Арендодателя — файл Договора, п. 12.3)");
+      expect(out).not.toContain("ПЭП Арендодателя — файл Договора, сформированный");
+      expect(out).not.toContain("ПЭП Арендодателя — файл Договора, направленный");
       // template keeps the HTML entity — htmlToDocx converts &emsp; later
       expect(out).not.toContain("(подпись)&emsp;(Ф.И.О. Арендатора)");
     });
@@ -257,6 +260,18 @@ describe("ПЭП template rendering (EQUIPMENT_RENTAL templates)", () => {
       // iter14: signed → renter's line becomes the ПЭП block, issuer's line
       // prefills his name; the appendix act lines prefill both names.
       expect(out.match(/_________________ \/ _______________/g)?.length ?? 0).toBe(0);
+      // iter23-fix: ПЭП now fills ALL FOUR renter places (main full audit +
+      // акт + прайс-приложение + согласие, compact form) and the OWNER line
+      // is the bare representative name in both his places (main + акт) —
+      // same «Воробьев Р.В.» instead of «_____ / Воробьев Р.В.» rule as the
+      // rental doc, because mixed carts ПЭП-sign equipment docs too.
+      expect(out.split("Подписано ПЭП").length - 1).toBe(4);
+      expect(out.split(`>${vars.issuer_representative ?? ""}</td>`).length - 1).toBe(2);
+      expect(out).toContain("(ПЭП Арендодателя — файл Договора, п. 12.3)");
+      expect(out).not.toContain(`_________________ / ${vars.issuer_representative ?? ""}`);
+      expect(out).not.toContain(`_____________________ / ${vars.issuer_representative ?? ""} /`);
+      expect(out).not.toContain("{{#if");
+      expect(out).not.toContain("{{/if}}");
     });
 
     it(`[${label}] unsigned → classic blank signature lines for both parties`, () => {
@@ -266,6 +281,9 @@ describe("ПЭП template rendering (EQUIPMENT_RENTAL templates)", () => {
       expect(out).not.toContain("Подписано ПЭП");
       // iter14: unsigned keeps both section-13 lines with pre-printed names.
       expect(out.match(/_________________ \/ _______________/g)?.length ?? 0).toBe(0);
+      // Owner blanks are back in manual mode (main + akt).
+      expect(out).toContain(`_________________ / ${vars.issuer_representative ?? ""}`);
+      expect(out).toContain(`_____________________ / ${vars.issuer_representative ?? ""} /`);
       expect(out).toContain("_________________ / " + (vars.renter_full_name ?? ""));
       expect(out).toContain("(подпись)&emsp;(Ф.И.О. Арендатора)");
     });

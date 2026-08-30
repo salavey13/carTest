@@ -6,8 +6,10 @@
 //      (main contract, Акт приёма-передачи, Инструкция, Тарифы, Согласие
 //      на обработку ПД) — previously only the main block had the branch.
 //   2. In ПЭП mode the OWNER side drops the «_____» handwritten placeholder
-//      and renders the п. 12.3 ПЭП Арендодателя formulation (the doc file
-//      itself, formed by the lessor's system and sent to the renter).
+//      and renders the BARE representative name — «Воробьев Р.В.» instead of
+//      «_____ / Воробьев Р.В.» (user clarification after the first iter23 cut;
+//      the п. 12.3 ПЭП Арендодателя explanation lives on in the small-print
+//      caption under the name).
 //   3. Rental ACTIVATION re-render (rentals-dashboard.ts) carries the ПЭП
 //      meta from rentals.metadata.pep_signature — previously the activated
 //      DOCX silently lost the electronic signature.
@@ -64,9 +66,14 @@ describe("iter23 · rental template renders ПЭП in ALL signature places", () 
         expect(count(rendered, "30.08.2026 12:34 (МСК)")).toBeGreaterThanOrEqual(4);
       });
 
-      it("owner side: no «_____» placeholder left in ПЭП mode — ПЭП Арендодателя line instead", () => {
-        // Owner signature places: main contract + акт.
-        expect(count(rendered, "ПЭП Арендодателя — файл Договора")).toBeGreaterThanOrEqual(2);
+      it("owner side: ПЭП mode renders the BARE name — «Воробьев Р.В.» instead of «_____ / Воробьев Р.В.»", () => {
+        // iter23-fix (user): the owner signature line is just the name; the
+        // verbose «ПЭП Арендодателя — файл Договора…» line is GONE, the
+        // п. 12.3 reference stays in the small-print caption only.
+        expect(count(rendered, `>Воробьев Р.В.</td>`)).toBe(2);
+        expect(rendered).not.toContain("ПЭП Арендодателя — файл Договора, сформированный");
+        expect(rendered).not.toContain("ПЭП Арендодателя — файл Договора, направленный");
+        expect(count(rendered, "(ПЭП Арендодателя — файл Договора, п. 12.3)")).toBe(2);
         // The owner blank lines are GONE (name-bearing owner lines).
         expect(rendered).not.toContain("_________________ / Воробьев Р.В.");
         expect(rendered).not.toContain("_____________________ / Воробьев Р.В. /");
@@ -99,9 +106,10 @@ describe("iter23 · manual-signature rendering keeps the classic look", () => {
     it(`${tplPath}: blanks and captions intact, zero ПЭП text`, () => {
       const rendered = applyTemplateVariables(read(tplPath), MANUAL_VARS);
       expect(rendered).not.toContain("Подписано ПЭП");
-      // п. 12.3 clause text legitimately mentions ПЭП Арендодателя — only
-      // the SIGNATURE-BLOCK variant must be absent in manual mode.
-      expect(rendered).not.toContain("ПЭП Арендодателя — файл Договора");
+      // The ПЭП wording (owner line OR caption) must be absent in manual
+      // mode — clause 12.3 body text legitimately mentions «ПЭП Арендодателя»,
+      // so we assert on the signature-block variants only.
+      expect(rendered).not.toContain("(ПЭП Арендодателя — файл Договора, п. 12.3)");
       // Owner blanks (main + акт).
       expect(rendered).toContain("_________________ / Воробьев Р.В.");
       expect(rendered).toContain("_____________________ / Воробьев Р.В. /");
@@ -137,7 +145,7 @@ describe("iter23 · ПЭП + СТС collateral render together cleanly", () => {
     expect(rendered).not.toContain("{{#if");
     expect(rendered).not.toContain("{{sts_");
     expect(count(rendered, "Подписано ПЭП")).toBe(5);
-    expect(rendered).toContain("ПЭП Арендодателя — файл Договора");
+    expect(rendered).toContain("(ПЭП Арендодателя — файл Договора, п. 12.3)");
     // СТС return receipt (a future-event field) intentionally keeps its
     // fill-in line even in ПЭП mode — documented decision.
     expect(rendered).toContain("СТС возвращён Арендатору: ____________");

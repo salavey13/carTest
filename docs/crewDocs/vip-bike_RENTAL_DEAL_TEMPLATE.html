@@ -250,7 +250,7 @@
 
 <table style="width: 100%; border: none; margin-top: 6pt;">
 <tr>
-{{#if pep_signed}}<td style="border: none; width: 50%; text-align: center;">ПЭП Арендодателя — файл Договора, сформированный системой Арендодателя и направленный Арендатору (п. 12.3):<br>{{issuer_representative}}</td>{{else}}<td style="border: none; width: 50%; text-align: center;">_________________ / {{issuer_representative}}</td>{{/if}}
+{{#if pep_signed}}<td style="border: none; width: 50%; text-align: center;">{{issuer_representative}}</td>{{else}}<td style="border: none; width: 50%; text-align: center;">_________________ / {{issuer_representative}}</td>{{/if}}
 {{#if pep_signed}}<td style="border: none; width: 50%; text-align: left;"><b>Подписано ПЭП:</b><br>
 {{renter_signature}}<br>
 Дата и время: {{signature_timestamp}}<br>
@@ -319,7 +319,7 @@
 <td style="border: none; width: 50%; text-align: center;">АРЕНДАТОР</td>
 </tr>
 <tr>
-{{#if pep_signed}}<td style="border: none; width: 50%;">ПЭП Арендодателя — файл Договора, направленный Арендатору (п. 12.3): {{issuer_representative}}</td>{{else}}<td style="border: none; width: 50%;">_____________________ / {{issuer_representative}} /</td>{{/if}}
+{{#if pep_signed}}<td style="border: none; width: 50%;">{{issuer_representative}}</td>{{else}}<td style="border: none; width: 50%;">_____________________ / {{issuer_representative}} /</td>{{/if}}
 {{#if pep_signed}}<td style="border: none; width: 50%; text-align: left;"><b>Подписано ПЭП:</b> {{renter_signature}}<br>Дата и время: {{signature_timestamp}} (п. 12.3 Договора)</td>{{else}}<td style="border: none; width: 50%;">_____________________ / {{renter_full_name}} /</td>{{/if}}
 </tr>
 <tr>
