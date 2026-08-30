@@ -185,6 +185,45 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
       category: "operations",
       triggerSources: ["telegram:/shift"],
     },
+    // iter24: time-of-day / day-of-week shift badges. Evaluated by the pure
+    // helpers in app/franchize/lib/shift-crew-status.ts (MSK rules):
+    //   evaluateClockInAchievements  → early_bird / dawn_patrol / weekend_warrior
+    //   evaluateClockOutAchievements → marathon / night_owl
+    {
+      id: "shift_early_bird",
+      title: "Ранняя пташка 🌅",
+      description: "Начал смену раньше 10:00 утра (МСК). Кто рано встаёт — тот и зарабатывает!",
+      category: "operations",
+      triggerSources: ["telegram:/shift"],
+    },
+    {
+      id: "shift_dawn_patrol",
+      title: "Рассветный патруль 🌄",
+      description: "Начал смену раньше 07:00 утра (МСК). Город ещё спит, а ты уже в седле!",
+      category: "operations",
+      triggerSources: ["telegram:/shift"],
+    },
+    {
+      id: "shift_weekend_warrior",
+      title: "Боец выходного 🎯",
+      description: "Вышел на смену в выходной. На тебя всегда можно положиться!",
+      category: "operations",
+      triggerSources: ["telegram:/shift"],
+    },
+    {
+      id: "shift_marathon",
+      title: "Марафонец 🏁",
+      description: "Провёл на одной смене 8+ часов. Железная выдержка!",
+      category: "operations",
+      triggerSources: ["telegram:/shift"],
+    },
+    {
+      id: "shift_night_owl",
+      title: "Ночная сова 🦉",
+      description: "Завершил смену позже 23:00 (МСК). Ночная вахта под надёжным присмотром!",
+      category: "operations",
+      triggerSources: ["telegram:/shift"],
+    },
   ];
 
   // FIX (iter4): Rental achievements — mirror the shift streak/badge pattern
