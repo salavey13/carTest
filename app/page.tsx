@@ -86,7 +86,7 @@ const GOLD_BLIC_KEYFRAMES = `
 }
 `;
 
-/* ══ Scroll-snap CSS for Tesla-style duo section ══ */
+/* ══ Scroll-snap CSS for Tesla-style duo section + JS-independent hero entrance ══ */
 const SCROLL_SNAP_CSS = `
 .vip-snap-container {
   scroll-snap-type: y proximity;
@@ -95,9 +95,22 @@ const SCROLL_SNAP_CSS = `
   scroll-snap-align: start;
   scroll-snap-stop: normal;
 }
+/* Hero entrance: pure CSS so text is NEVER hidden pre-hydration (fixes
+   "only hero visible / only background visible" on slow or broken JS). */
+@keyframes vip-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.vip-fade-up { animation: vip-fade-up 0.6s ease-out backwards; }
+@keyframes vip-word-in {
+  from { opacity: 0; transform: translateY(50px) rotateX(-90deg); }
+  to   { opacity: 1; transform: translateY(0) rotateX(0deg); }
+}
+.vip-word-in { animation: vip-word-in 0.6s cubic-bezier(0.215, 0.61, 0.355, 1) backwards; }
 @media (prefers-reduced-motion: reduce) {
   .vip-snap-container { scroll-snap-type: none; }
   .vip-snap-section { scroll-snap-align: none; }
+  .vip-fade-up, .vip-word-in { animation: none; }
 }
 `;
 
@@ -283,12 +296,59 @@ function GradientText({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* ══ SAFE SCROLL-REVEAL HOOK ══
+   Reveal-by-default semantics: SSR renders content fully visible (no opacity:0
+   in the server HTML). After hydration, an element is hidden ONLY if it sits
+   below the viewport AND IntersectionObserver exists AND the user hasn't asked
+   for reduced motion — then it reveals once on scroll. This fixes "page shows
+   only the hero" reports: previously every section below the hero shipped as
+   opacity:0 and stayed invisible whenever hydration was slow (weak mobile
+   networks) or IntersectionObserver never fired (old Telegram WebViews).
+   Returns `shown` (animate to visible?) and `everHidden` (an animation is
+   actually running — callers use it to pick instant vs animated transitions). */
+function useSafeReveal<T extends HTMLElement>(rootMargin = "-50px") {
+  const ref = useRef<T>(null);
+  const [hidden, setHidden] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const el = ref.current;
+    if (!el) return;
+    // Only arm elements fully BELOW the viewport. Anything already on screen
+    // (or scrolled past before hydration) stays visible — hiding sections the
+    // user already passed would recreate the "missing sections" bug when they
+    // scroll back up.
+    if (el.getBoundingClientRect().top < window.innerHeight) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setRevealed(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin },
+    );
+    setHidden(true);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [rootMargin]);
+
+  return { ref, shown: !hidden || revealed, everHidden: hidden };
+}
+
 /* ══ ANIMATED SECTION WRAPPER ══ */
 function AnimatedSection({ children, className, delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-80px" });
+  const { ref, shown, everHidden } = useSafeReveal<HTMLDivElement>("-80px");
   return (
-    <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: 0.7, delay, ease: "easeOut" }} className={className}>
+    <motion.div
+      ref={ref}
+      initial={false}
+      animate={shown ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
+      transition={{ duration: everHidden && shown ? 0.7 : 0, delay: shown ? delay : 0, ease: "easeOut" }}
+      className={className}
+    >
       {children}
     </motion.div>
   );
@@ -494,10 +554,9 @@ function VipBikeThemeStyles() {
 /* ══ FAQ ACCORDION ITEM ══ */
 function FaqItem({ item, index }: { item: (typeof FAQ_ITEMS)[0]; index: number }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const { ref, shown, everHidden } = useSafeReveal<HTMLDivElement>();
   return (
-    <motion.div ref={ref} initial={{ opacity: 0, y: 20 }} animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }} transition={{ duration: 0.5, delay: index * 0.05 }} className="rounded-2xl border overflow-hidden transition-colors duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: open ? "var(--vip-accent-main)" : "var(--vip-border-soft)" }}>
+    <motion.div ref={ref} initial={false} animate={shown ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }} transition={{ duration: everHidden && shown ? 0.5 : 0, delay: shown ? index * 0.05 : 0 }} className="rounded-2xl border overflow-hidden transition-colors duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: open ? "var(--vip-accent-main)" : "var(--vip-border-soft)" }}>
       <button onClick={() => setOpen(!open)} className="w-full text-left p-5 md:p-6 flex items-start justify-between gap-4 cursor-pointer">
         <span className="text-base md:text-lg font-bold pr-2 leading-snug" style={{ color: "var(--vip-text-primary)" }}>{item.q}</span>
         <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.3 }} className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: open ? "var(--vip-accent-main)" : "color-mix(in srgb, var(--vip-accent-main) 10%, transparent)", color: open ? "var(--vip-bg-base)" : "var(--vip-accent-main)" }}>
@@ -536,10 +595,9 @@ function InfoIcon({ className = "w-4 h-4" }: { className?: string }) {
 
 /* ══ PRICING CARD ══ */
 function PricingCard({ tier, index }: { tier: (typeof PRICING_TIERS)[0]; index: number }) {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const { ref, shown, everHidden } = useSafeReveal<HTMLDivElement>();
   return (
-    <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: 0.6, delay: index * 0.15, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative z-10 flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-colors duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: tier.highlighted ? "var(--vip-accent-main)" : "var(--vip-border-soft)", boxShadow: tier.highlighted ? `0 20px 60px color-mix(in srgb, var(--vip-accent-main) 20%, transparent)` : "0 4px 16px rgba(0,0,0,0.15)" }}>
+    <motion.div ref={ref} initial={false} animate={shown ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: everHidden && shown ? 0.6 : 0, delay: shown ? index * 0.15 : 0, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative z-10 flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-colors duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: tier.highlighted ? "var(--vip-accent-main)" : "var(--vip-border-soft)", boxShadow: tier.highlighted ? `0 20px 60px color-mix(in srgb, var(--vip-accent-main) 20%, transparent)` : "0 4px 16px rgba(0,0,0,0.15)" }}>
       {tier.highlighted && <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wide" style={{ background: "var(--vip-accent-main)", color: "var(--vip-bg-base)" }}>Хит</div>}
       <div className="text-center mb-6">
         <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-full border text-sm font-black" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)" }}>{tier.marker}</div>
@@ -568,10 +626,9 @@ function PricingCard({ tier, index }: { tier: (typeof PRICING_TIERS)[0]; index: 
 
 /* ══ BIKE TIER CARD — one of the 3 experience levels ══ */
 function BikeTierCard({ tier, index }: { tier: (typeof BIKE_TIERS)[0]; index: number }) {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const { ref, shown, everHidden } = useSafeReveal<HTMLDivElement>();
   return (
-    <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: 0.6, delay: index * 0.15, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative z-10 flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-all duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: `color-mix(in srgb, ${tier.accentColor} 40%, var(--vip-border-soft))`, boxShadow: `0 10px 40px color-mix(in srgb, ${tier.accentColor} 10%, transparent)` }}>
+    <motion.div ref={ref} initial={false} animate={shown ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: everHidden && shown ? 0.6 : 0, delay: shown ? index * 0.15 : 0, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative z-10 flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-all duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: `color-mix(in srgb, ${tier.accentColor} 40%, var(--vip-border-soft))`, boxShadow: `0 10px 40px color-mix(in srgb, ${tier.accentColor} 10%, transparent)` }}>
       <div className="flex items-center gap-4 mb-5">
         <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-sm font-black leading-none flex-shrink-0" style={{ background: `linear-gradient(135deg, ${tier.accentColor}33, ${tier.accentColor}11)`, border: `1px solid ${tier.accentColor}55`, color: tier.accentColor }}>{tier.marker}</div>
         <div>
@@ -619,8 +676,6 @@ function CinematicHero() {
   // Stats fade very late — visible for most of the hero scroll
   const contentOpacity = useTransform(scrollYProgress, [0.7, 0.98], [1, 0]);
   const headlineWords = ["VIP", "BIKE", "RENTAL"];
-  const headlineRef = useRef(null);
-  const headlineInView = useInView(headlineRef, { once: true, margin: "-100px" });
 
   return (
     <section ref={ref} className="relative min-h-screen flex items-center overflow-hidden pt-16 md:pt-20">
@@ -640,38 +695,38 @@ function CinematicHero() {
       <motion.div style={{ y: contentY, opacity: contentOpacity }} className="relative z-10 max-w-5xl mx-auto px-4 text-center w-full py-8">
 
         {/* Badge */}
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-5">
+        <div className="vip-fade-up mb-5">
           <Badge variant="outline" className="px-3 py-1.5 text-xs md:text-sm" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)", backgroundColor: "var(--vip-badge-bg)", backdropFilter: "blur(8px)" }}>
             Электро и ДВС мотоциклы в аренду
           </Badge>
-        </motion.div>
+        </div>
 
-        {/* Headline */}
-        <h2 ref={headlineRef} className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black mb-4 leading-[0.95] tracking-tighter" style={{ color: "var(--vip-text-primary)" }}>
+        {/* Headline — CSS entrance (works without JS, see SCROLL_SNAP_CSS keyframes) */}
+        <h2 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black mb-4 leading-[0.95] tracking-tighter" style={{ color: "var(--vip-text-primary)" }}>
           {headlineWords.map((word, i) => (
-            <motion.span key={i} initial={{ opacity: 0, y: 50, rotateX: -90 }} animate={headlineInView ? { opacity: 1, y: 0, rotateX: 0 } : {}} transition={{ duration: 0.6, delay: 0.15 + i * 0.12, ease: [0.215, 0.61, 0.355, 1] }} className="inline-block mr-3 md:mr-4 last:mr-0" style={{ backgroundImage: i === 2 ? "linear-gradient(135deg, var(--vip-accent-main), var(--vip-accent-main-hover))" : "none", WebkitBackgroundClip: i === 2 ? "text" : "unset", WebkitTextFillColor: i === 2 ? "transparent" : "var(--vip-text-primary)", backgroundClip: "text", transformOrigin: "bottom" }}>{word}</motion.span>
+            <span key={i} className="vip-word-in inline-block mr-3 md:mr-4 last:mr-0" style={{ animationDelay: `${0.15 + i * 0.12}s`, backgroundImage: i === 2 ? "linear-gradient(135deg, var(--vip-accent-main), var(--vip-accent-main-hover))" : "none", WebkitBackgroundClip: i === 2 ? "text" : "unset", WebkitTextFillColor: i === 2 ? "transparent" : "var(--vip-text-primary)", backgroundClip: "text", transformOrigin: "bottom" }}>{word}</span>
           ))}
         </h2>
 
         {/* Subtitle */}
-        <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.6 }} className="text-base md:text-xl max-w-xl mx-auto mb-3 leading-relaxed font-medium" style={{ color: "var(--vip-text-primary)" }}>
+        <p className="vip-fade-up text-base md:text-xl max-w-xl mx-auto mb-3 leading-relaxed font-medium" style={{ animationDelay: "0.6s", color: "var(--vip-text-primary)" }}>
           Аренда мотоциклов без заморочек
-        </motion.p>
-        <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.75 }} className="text-sm md:text-base max-w-lg mx-auto mb-6" style={{ color: "var(--vip-text-secondary)" }}>
+        </p>
+        <p className="vip-fade-up text-sm md:text-base max-w-lg mx-auto mb-6" style={{ animationDelay: "0.75s", color: "var(--vip-text-secondary)" }}>
           Выбирай электрическую или бензиновую модель. Даты, доступность и дополнительные условия менеджер подтвердит до бронирования.
-        </motion.p>
+        </p>
 
         {/* CTA Buttons */}
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.9 }} className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-8">
+        <div className="vip-fade-up flex flex-col sm:flex-row gap-3 justify-center items-center mb-8" style={{ animationDelay: "0.9s" }}>
           <MagneticButton href={CATALOG_HREF} primary>Выбрать байк<ArrowRight /></MagneticButton>
           <MagneticButton href={BOT_HREF}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="mr-2 inline"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" /></svg>
             Бронь в боте
           </MagneticButton>
-        </motion.div>
+        </div>
 
         {/* ══ SOCIAL LINKS — MAIN FEATURE, INSIDE HERO ══ */}
-        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 1.1 }} className="mb-8">
+        <div className="vip-fade-up mb-8" style={{ animationDelay: "1.1s" }}>
           <p className="text-xs uppercase tracking-[0.2em] mb-4 font-semibold" style={{ color: "var(--vip-text-secondary)" }}>
             Мы в соцсетях — подписывайся
           </p>
@@ -682,12 +737,12 @@ function CinematicHero() {
                 href={social.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                initial={{ opacity: 0, scale: 0.7 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4, delay: 1.2 + idx * 0.08 }}
+                /* hover:z-10 — raise hovered icon above later flex-wrap rows so
+                   its tooltip balloon is not overlapped by the next line of icons */
                 whileHover={{ scale: 1.15, y: -3 }}
                 whileTap={{ scale: 0.92 }}
-                className={`group relative flex items-center justify-center ${social.id === "website" ? "w-full md:w-auto" : ""}`}
+                className={`vip-fade-up hover:z-10 group relative flex items-center justify-center ${social.id === "website" ? "w-full md:w-auto" : ""}`}
+                style={{ animationDelay: `${1.2 + idx * 0.08}s` }}
                 aria-label={social.label}
               >
                 <div
@@ -732,18 +787,18 @@ function CinematicHero() {
               </motion.a>
             ))}
           </div>
-        </motion.div>
+        </div>
 
 
       </motion.div>
 
       {/* Scroll indicator */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.2, duration: 0.8 }} className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 hidden md:flex flex-col items-center gap-1" style={{ color: "var(--vip-text-secondary)" }}>
+      <div className="vip-fade-up absolute bottom-4 left-1/2 -translate-x-1/2 z-10 hidden md:flex flex-col items-center gap-1" style={{ animationDelay: "2.2s", color: "var(--vip-text-secondary)" }}>
         <span className="text-[10px] uppercase tracking-widest opacity-60">Листай</span>
         <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
         </motion.div>
-      </motion.div>
+      </div>
     </section>
   );
 }
