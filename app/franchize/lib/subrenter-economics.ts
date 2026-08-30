@@ -219,6 +219,21 @@ export function shiftMonthKey(month: string, delta: number): string {
 }
 
 /**
+ * "2026-08" → "Август 2026" — locale-independent (no Intl/Date needed), used
+ * by the shared MonthPickerBar (iter21). Invalid keys → "Месяц".
+ */
+export function monthKeyToLabelRu(monthKey: string | null | undefined): string {
+  const norm = normalizeMonthKey(monthKey);
+  if (!norm) return "Месяц";
+  const [y, m] = norm.split("-").map(Number);
+  const full = [
+    "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+    "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+  ][m - 1];
+  return `${full} ${y}`;
+}
+
+/**
  * Aggregate a set of rental rows into a month summary. Rows are expected to
  * be ALREADY scoped to the partner's bikes and the requested month (query
  * filters); this function only does the money math and the totals.

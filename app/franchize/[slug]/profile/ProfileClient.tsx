@@ -57,8 +57,8 @@ import {
 } from "../../server-actions/subrenter-monitoring";
 import {
   currentMskMonthKey,
-  shiftMonthKey,
 } from "../../lib/subrenter-economics";
+import { MonthPickerBar } from "../../components/FranchizeMonthPicker";
 
 // 2026-08-19 review: use the shared fallbackCrew constant from
 // lib/fallback-crew.ts — was duplicated inline here, which meant it
@@ -798,30 +798,20 @@ export function FranchizeProfileClient({
                 <p className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: T.textMuted }}>
                   <Wallet className="h-3.5 w-3.5" /> Заработок за месяц
                 </p>
-                {/* Month switcher: ‹ Август 2026 › */}
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    aria-label="Предыдущий месяц"
-                    onClick={() => setSubrenterMonth((m) => shiftMonthKey(m, -1))}
-                    className="rounded-lg border px-2.5 py-1 text-sm transition hover:opacity-80"
-                    style={{ borderColor: T.borderSoft, color: T.text, minHeight: "36px" }}
-                  >
-                    ‹
-                  </button>
-                  <span className="min-w-[110px] text-center text-xs font-semibold" style={{ color: T.text }}>
-                    {monthLabel(subrenterMonth)}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Следующий месяц"
-                    onClick={() => setSubrenterMonth((m) => shiftMonthKey(m, 1))}
-                    className="rounded-lg border px-2.5 py-1 text-sm transition hover:opacity-80"
-                    style={{ borderColor: T.borderSoft, color: T.text, minHeight: "36px" }}
-                  >
-                    ›
-                  </button>
-                </div>
+                {/* iter21: month picker bar — iterate ‹ › AND jump to any
+                    month directly (previously ‹ › only, so reaching e.g.
+                    March meant tapping 5+ times). */}
+                <MonthPickerBar
+                  value={subrenterMonth}
+                  onChange={setSubrenterMonth}
+                  accent={T.accent}
+                  accentContrast={T.accentContrast}
+                  bgCard={T.bgCard}
+                  bgElevated={T.bgElevated}
+                  border={T.borderSoft}
+                  text={T.text}
+                  textMuted={T.textMuted}
+                />
               </div>
 
               {subrenterEarningsLoading ? (
@@ -970,29 +960,17 @@ export function FranchizeProfileClient({
                 <p className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: T.textMuted }}>
                   <Wallet className="h-3.5 w-3.5" /> Выплаты субарендаторам
                 </p>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    aria-label="Предыдущий месяц"
-                    onClick={() => setPayoutsMonth((m) => shiftMonthKey(m, -1))}
-                    className="rounded-lg border px-2.5 py-1 text-sm transition hover:opacity-80"
-                    style={{ borderColor: T.borderSoft, color: T.text, minHeight: "36px" }}
-                  >
-                    ‹
-                  </button>
-                  <span className="min-w-[110px] text-center text-xs font-semibold" style={{ color: T.text }}>
-                    {monthLabel(payoutsMonth)}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Следующий месяц"
-                    onClick={() => setPayoutsMonth((m) => shiftMonthKey(m, 1))}
-                    className="rounded-lg border px-2.5 py-1 text-sm transition hover:opacity-80"
-                    style={{ borderColor: T.borderSoft, color: T.text, minHeight: "36px" }}
-                  >
-                    ›
-                  </button>
-                </div>
+                <MonthPickerBar
+                  value={payoutsMonth}
+                  onChange={setPayoutsMonth}
+                  accent={T.accent}
+                  accentContrast={T.accentContrast}
+                  bgCard={T.bgCard}
+                  bgElevated={T.bgElevated}
+                  border={T.borderSoft}
+                  text={T.text}
+                  textMuted={T.textMuted}
+                />
               </div>
 
               {payoutsLoading ? (

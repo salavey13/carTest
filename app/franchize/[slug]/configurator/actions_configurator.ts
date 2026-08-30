@@ -464,13 +464,20 @@ async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
       },
       // CR-006: Distinguish "no recipients at all" from "all failed" from "some sent".
       // Was: 0 recipients → 0===0 false → "sent" (misleading — DOCX generated but delivered to nobody).
-      send_status: recipientSet.size === 0
-        ? "no_recipients"
-        : failures.length === sendResults.length
-          ? "failed"
-          : "sent",
+      // iter21 fix: 'no_recipients' is NOT in the table's CHECK constraint
+      // (pending|sent|failed — verified live: insert dies with 23514), so those
+      // rows were silently DROPPED by the catch below. Log them as 'failed'
+      // with an explicit last_error instead — they then show up (correctly) in
+      // the admin panel's «Сбои отправки» list with a Retry button.
+      send_status: failures.length === sendResults.length ? "failed" : "sent",
       attempts: 1,
       doc_file_name: docFileName,
+      last_error:
+        recipientSet.size === 0
+          ? "Получатели не настроены — документ не доставлен никому (no recipients)"
+          : failures.length === sendResults.length
+            ? failures.map((f) => `${f.id}: ${f.error ?? "send failed"}`).join("; ").slice(0, 500)
+            : null,
     });
   } catch (e) {
     logger.warn("[configurator] log insert failed", e);

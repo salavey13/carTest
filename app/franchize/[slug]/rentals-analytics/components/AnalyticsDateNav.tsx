@@ -4,7 +4,20 @@
 //
 // Horizontal date navigator: ← date → | Сегодня
 // Mobile-first: 44px touch targets, ARIA labels, focus rings.
+//
+// iter21: the date chip is now a PICKER, not just a label — tapping it opens
+// the system date sheet (native <input type="date"> + showPicker()). The ‹ ›
+// iterator and «Сегодня» stay for one-tap stepping. Requested by the owner:
+// "use such date picker/iterator in analytics pages instead of current date
+// iterator" — same pick+iterate pattern as the profile's MonthPickerBar.
+//
+// Why the hidden-native-input trick instead of a custom calendar popover:
+//   - type="date" works on Android WebView AND iOS WKWebView (Telegram WebApp
+//     on both platforms) and gives the familiar system calendar sheet.
+//   - type="month" would NOT work on iOS, which is why the profile's month
+//     switcher (FranchizeMonthPicker) uses a hand-rolled grid instead.
 
+import { useRef } from "react";
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
 import { formatDateLong, shiftDateIso, todayLocalIso } from "./lib/analytics-utils";
@@ -17,6 +30,8 @@ interface AnalyticsDateNavProps {
 }
 
 export function AnalyticsDateNav({ date, onChange, T, isToday }: AnalyticsDateNavProps) {
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
   const btnBase: React.CSSProperties = {
     borderColor: T.border,
     backgroundColor: T.bgCard,
@@ -26,6 +41,24 @@ export function AnalyticsDateNav({ date, onChange, T, isToday }: AnalyticsDateNa
     minWidth: "44px",
     borderRadius: "12px",
     border: `1px solid ${T.border}`,
+  };
+
+  // Open the system date sheet. Called directly from the click handler so the
+  // user-gesture activation is still warm (showPicker requires it).
+  const openPicker = () => {
+    const input = dateInputRef.current;
+    if (!input) return;
+    try {
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+        return;
+      }
+    } catch {
+      // showPicker can throw when transient activation expired — fall through
+      // to focus; on mobile webviews focus alone opens the native sheet.
+    }
+    input.focus();
+    input.click();
   };
 
   return (
@@ -44,13 +77,16 @@ export function AnalyticsDateNav({ date, onChange, T, isToday }: AnalyticsDateNa
         <ChevronLeft className="h-5 w-5" aria-hidden />
       </button>
 
-      <div
-        className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2.5"
+      {/* Date chip = label for the hidden native input: the whole chip is
+          tappable and opens the system date picker. */}
+      <label
+        className="flex min-w-0 flex-1 cursor-pointer select-none items-center justify-center gap-2 rounded-xl border px-3 py-2.5 transition focus-within:outline focus-within:outline-2"
         style={{
           borderColor: T.border,
           backgroundColor: T.bgCard,
           minHeight: "44px",
         }}
+        title="Выбрать дату"
       >
         <Calendar className="h-4 w-4 shrink-0" aria-hidden style={{ color: T.textMuted }} />
         <span
@@ -59,7 +95,23 @@ export function AnalyticsDateNav({ date, onChange, T, isToday }: AnalyticsDateNa
         >
           {formatDateLong(date)}
         </span>
-      </div>
+        <input
+          ref={dateInputRef}
+          type="date"
+          value={date}
+          onChange={(e) => {
+            // Native inputs emit "" while the user is mid-edit in the field;
+            // only commit complete YYYY-MM-DD values.
+            if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) {
+              onChange(e.target.value);
+            }
+          }}
+          onClick={openPicker}
+          aria-label="Выбор даты аналитики"
+          className="sr-only"
+          tabIndex={-1}
+        />
+      </label>
 
       <button
         type="button"

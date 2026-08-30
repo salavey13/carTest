@@ -440,7 +440,9 @@ describe("iter18 · source guards (wiring)", () => {
     const src = read("app/franchize/[slug]/profile/ProfileClient.tsx");
     expect(src).toContain("getSubrenterMonthlyEarningsAction");
     expect(src).toContain("getSubrentersMonthlyPayoutsAction");
-    expect(src).toContain("shiftMonthKey");
+    // iter21: the ‹ › switchers moved into the shared MonthPickerBar
+    // (pickable month grid); ProfileClient wires both counters to it.
+    expect(src).toContain("MonthPickerBar");
     expect(src).toContain("Заработок за месяц");
     expect(src).toContain("Выплаты субарендаторам");
   });

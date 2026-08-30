@@ -27,6 +27,7 @@ import { formatRuDate } from "@/app/franchize/lib/date-utils";
 import { buildRequestedWindowMs, rentalRowBlocksWindow, type RentalOverlapRow } from "@/app/franchize/lib/rental-overlap";
 // v3 polish: centralized notification template builders (HTML-escaped, with inline buttons)
 import { buildCartCheckoutRenterMessage } from "@/app/franchize/lib/notification-templates";
+import { deriveNotificationSendTo } from "@/app/franchize/lib/notification-log";
 import {
   DEFAULT_AD_CARDS_TEXT,
   DEFAULT_CATEGORY_ORDER,
@@ -4603,9 +4604,15 @@ export async function getFranchizeOrderNotificationFailures(input: unknown): Pro
   const canRead = await resolveFranchizeEditorAccess(actorUserId, crew);
   if (!canRead) return { success: false, error: "Недостаточно прав для просмотра логов." };
 
+  // iter21 fix: the table has NO `send_to` column — the old select died with
+  // `column franchize_order_notifications.send_to does not exist` and the
+  // admin panel showed the «Не удалось загрузить уведомления» toast. The
+  // recipient identity lives in the payload JSONB instead (order flow writes
+  // telegramUserId + recipient; configurator writes sentTo[]). We select the
+  // payload and derive the label with the pure, unit-tested helper.
   const { data, error } = await supabaseAdmin
     .from("franchize_order_notifications")
-    .select("order_id, send_to, last_error, created_at")
+    .select("order_id, payload, last_error, created_at")
     .eq("slug", slug)
     .eq("send_status", "failed")
     .order("created_at", { ascending: false })
@@ -4613,7 +4620,7 @@ export async function getFranchizeOrderNotificationFailures(input: unknown): Pro
   if (error) return { success: false, error: error.message };
   return {
     success: true,
-    items: (data ?? []).map((row) => ({ orderId: row.order_id, sendTo: row.send_to ?? "", lastError: row.last_error ?? "", createdAt: row.created_at ?? "" })),
+    items: (data ?? []).map((row) => ({ orderId: row.order_id, sendTo: deriveNotificationSendTo(row.payload), lastError: row.last_error ?? "", createdAt: row.created_at ?? "" })),
   };
 }
 
