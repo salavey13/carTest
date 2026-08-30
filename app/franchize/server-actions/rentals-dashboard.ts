@@ -2473,6 +2473,30 @@ export async function activateRental(input: {
 
     const secretData = secrets as any || {};
 
+    // iter23: crew legal identity for the doc — issuer_representative feeds
+    // the owner signature line (and the ПЭП Арендодателя formulation),
+    // organization_short/ogrnip feed the Акт preamble. Previously these
+    // rendered EMPTY in activation docs. Same shared resolver + fallbacks
+    // as the /doc flow (webhook-handlers/lib/crew-access.ts).
+    const { loadCrewSecrets: loadCrewSecretsShared } = await import("@/app/webhook-handlers/lib/crew-access");
+    const CREW_FALLBACKS: Record<string, string> = {
+      organizationName: "Мотосалон ВипБайкЭлектро",
+      organizationShort: "ИП Воробьев Р.В.",
+      organizationRepresentative: "ИП Воробьев Р.В.",
+      issuerRepresentative: "Сидоров Илья Олегович",
+      ogrnip: "326527500025145",
+      inn: "525813643035",
+      email: "vip_bike@mail.ru",
+      legalAddress: "г. Нижний Новгород, пл. Комсомольская 2",
+      issuerName: "Воробьев Р.В.",
+    };
+    const crewSecrets = await loadCrewSecretsShared(slug.trim(), CREW_FALLBACKS);
+    const issuerRepresentative =
+      crewSecrets.issuerRepresentative ||
+      crewSecrets.organizationRepresentative ||
+      crewSecrets.issuerName ||
+      "Представитель экипажа";
+
     // ── 4. Generate DOCX with odometer ──
     const { buildFranchizeDocxFromTemplate } = await import("@/app/franchize/lib/docx-capability");
     const { createHash } = await import("crypto");
@@ -2517,7 +2541,39 @@ export async function activateRental(input: {
       bike_vehicle_type_label: vehicle.type === "ebike" ? "ЭЛЕКТРОМОТОЦИКЛА" : "МОТОЦИКЛА",
       signature_timestamp: now.toLocaleString("ru-RU"),
       renter_signature: "активировано при выдаче",
+      // iter23: crew legal identity (was missing → owner line rendered empty).
+      issuer_representative: issuerRepresentative,
+      issuer_name: crewSecrets.issuerName || "",
+      organization_name: crewSecrets.organizationName || "",
+      organization_short: crewSecrets.organizationShort || "",
+      ogrnip: crewSecrets.ogrnip || "",
+      inn: crewSecrets.inn || "",
+      legal_address: crewSecrets.legalAddress || "",
+      lessor_address: crewSecrets.legalAddress || "",
+      email: crewSecrets.email || "",
     };
+
+    // ПЭП (iter23): if the renter signed the contract at checkout, the
+    // activation re-render MUST keep the ПЭП signature line — previously this
+    // flow rebuilt the doc without pep vars, so the activated DOCX silently
+    // dropped the electronic signature and showed blank handwritten lines.
+    // Shape mirrors metadata.pep_signature written by app/rentals/actions.ts:
+    // { telegram_id, username, signed_at, init_data_sha256, doc_sha256 }.
+    const rentalMeta = (rental.metadata || {}) as Record<string, unknown>;
+    const pepMeta = rentalMeta.pep_signature as
+      | { telegram_id?: string; username?: string | null; signed_at?: string; init_data_sha256?: string }
+      | null
+      | undefined;
+    if (pepMeta?.telegram_id && pepMeta.signed_at) {
+      const signedMs = new Date(pepMeta.signed_at).getTime();
+      const mskDate = new Date((Number.isFinite(signedMs) ? signedMs : Date.now()) + 3 * 3600 * 1000);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      vars.pep_signed = "1";
+      vars.renter_signature = `Telegram ID ${pepMeta.telegram_id}${pepMeta.username ? ` (@${pepMeta.username})` : ""}`;
+      vars.signature_timestamp = `${pad(mskDate.getUTCDate())}.${pad(mskDate.getUTCMonth() + 1)}.${mskDate.getUTCFullYear()} ${pad(mskDate.getUTCHours())}:${pad(mskDate.getUTCMinutes())} (МСК)`;
+      const initSha = String(pepMeta.init_data_sha256 || "").replace(/[^a-f0-9]/gi, "").slice(0, 16);
+      vars.signature_fingerprint = `pep:tg:${pepMeta.telegram_id}${initSha ? `:${initSha}` : ""}`;
+    }
 
     // Include extra shared-builder fields if available
     const { buildRentalContractVariables } = await import("@/app/lib/rental-contract-vars").catch(() => ({ buildRentalContractVariables: null }));

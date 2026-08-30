@@ -182,12 +182,16 @@ describe("ПЭП template rendering (RENTAL_DEAL_TEMPLATE + vip-bike crew templa
       expect(out).toContain("27.08.2026 19:42 (МСК)");
       expect(out).toContain("(ПЭП Арендатора — акцепт в Telegram, п. 12.3 Договора)");
       // iter14: name-prefilled signature lines. Signed → the renter's ПЭП
-      // block replaces his line; the issuer's line prefills his name; the
-      // personal-data consent line prefills the renter's name. No fully-blank
-      // 17-underscore pair remains in section 13.
+      // block replaces his line; the personal-data consent line prefills
+      // the renter's name. No fully-blank 17-underscore pair remains in
+      // section 13.
       expect(out.match(/_________________ \/ _______________/g)?.length ?? 0).toBe(0);
-      // issuer + consent lines carry pre-printed names now
-      expect(out).toContain("_________________ / " + (vars.issuer_representative ?? ""));
+      // iter23: in ПЭП mode the ISSUER's blank placeholder is gone too —
+      // replaced by the п. 12.3 ПЭП Арендодателя formulation (the doc file
+      // itself, formed by the lessor's system and sent to the renter).
+      expect(out).not.toContain("_________________ / " + (vars.issuer_representative ?? ""));
+      expect(out).toContain("ПЭП Арендодателя — файл Договора");
+      expect(out).toContain(String(vars.issuer_representative ?? ""));
       // template keeps the HTML entity — htmlToDocx converts &emsp; later
       expect(out).not.toContain("(подпись)&emsp;(Ф.И.О. Арендатора)");
     });

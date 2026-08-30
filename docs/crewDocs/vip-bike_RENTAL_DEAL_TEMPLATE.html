@@ -250,14 +250,14 @@
 
 <table style="width: 100%; border: none; margin-top: 6pt;">
 <tr>
-<td style="border: none; width: 50%; text-align: center;">_________________ / {{issuer_representative}}</td>
+{{#if pep_signed}}<td style="border: none; width: 50%; text-align: center;">ПЭП Арендодателя — файл Договора, сформированный системой Арендодателя и направленный Арендатору (п. 12.3):<br>{{issuer_representative}}</td>{{else}}<td style="border: none; width: 50%; text-align: center;">_________________ / {{issuer_representative}}</td>{{/if}}
 {{#if pep_signed}}<td style="border: none; width: 50%; text-align: left;"><b>Подписано ПЭП:</b><br>
 {{renter_signature}}<br>
 Дата и время: {{signature_timestamp}}<br>
 Отпечаток подписи (SHA-256 initData): {{signature_fingerprint}}</td>{{else}}<td style="border: none; width: 50%; text-align: center;">_________________ / {{renter_full_name}}</td>{{/if}}
 </tr>
 <tr>
-<td style="border: none; width: 50%; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О.)</td>
+{{#if pep_signed}}<td style="border: none; width: 50%; text-align: center; font-size: 10pt;">(ПЭП Арендодателя — файл Договора, п. 12.3)</td>{{else}}<td style="border: none; width: 50%; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О.)</td>{{/if}}
 {{#if pep_signed}}<td style="border: none; width: 50%; text-align: left; font-size: 10pt;">(ПЭП Арендатора — акцепт в Telegram, п. 12.3 Договора)</td>{{else}}<td style="border: none; width: 50%; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О. Арендатора)</td>{{/if}}
 </tr>
 </table>
@@ -319,12 +319,12 @@
 <td style="border: none; width: 50%; text-align: center;">АРЕНДАТОР</td>
 </tr>
 <tr>
-<td style="border: none; width: 50%;">_____________________ / {{issuer_representative}} /</td>
-<td style="border: none; width: 50%;">_____________________ / {{renter_full_name}} /</td>
+{{#if pep_signed}}<td style="border: none; width: 50%;">ПЭП Арендодателя — файл Договора, направленный Арендатору (п. 12.3): {{issuer_representative}}</td>{{else}}<td style="border: none; width: 50%;">_____________________ / {{issuer_representative}} /</td>{{/if}}
+{{#if pep_signed}}<td style="border: none; width: 50%; text-align: left;"><b>Подписано ПЭП:</b> {{renter_signature}}<br>Дата и время: {{signature_timestamp}} (п. 12.3 Договора)</td>{{else}}<td style="border: none; width: 50%;">_____________________ / {{renter_full_name}} /</td>{{/if}}
 </tr>
 <tr>
-<td style="border: none; width: 50%;">(подпись)&emsp;(ФИО)</td>
-<td style="border: none; width: 50%;">(подпись)&emsp;(ФИО)</td>
+{{#if pep_signed}}<td style="border: none; width: 50%;">(ПЭП Арендодателя — файл Договора, п. 12.3)</td>{{else}}<td style="border: none; width: 50%;">(подпись)&emsp;(ФИО)</td>{{/if}}
+{{#if pep_signed}}<td style="border: none; width: 50%;">(ПЭП Арендатора — акцепт в Telegram, п. 12.3 Договора)</td>{{else}}<td style="border: none; width: 50%;">(подпись)&emsp;(ФИО)</td>{{/if}}
 </tr>
 </table>
 
@@ -348,8 +348,8 @@
 <p style="text-align: justify;">С настоящей инструкцией ознакомлен</p>
 <table style="width: 100%; border: none; margin-top: 6pt;">
 <tr>
-<td style="border: none; width: 50%; text-align: right; padding-right: 12pt;">_____________/ {{renter_full_name}}&emsp;</td>
-<td style="border: none; width: 50%;">(подпись)&emsp;(ФИО)</td>
+{{#if pep_signed}}<td style="border: none; width: 50%; text-align: right; padding-right: 12pt;"><b>Подписано ПЭП:</b> {{renter_signature}}<br>{{signature_timestamp}}&emsp;</td>{{else}}<td style="border: none; width: 50%; text-align: right; padding-right: 12pt;">_____________/ {{renter_full_name}}&emsp;</td>{{/if}}
+{{#if pep_signed}}<td style="border: none; width: 50%;">(ПЭП Арендатора — п. 12.3 Договора)</td>{{else}}<td style="border: none; width: 50%;">(подпись)&emsp;(ФИО)</td>{{/if}}
 </tr>
 </table>
 
@@ -386,8 +386,8 @@
 <p style="text-align: justify;">С настоящим приложением ознакомлен</p>
 <table style="width: 100%; border: none; margin-top: 6pt;">
 <tr>
-<td style="border: none; width: 50%; text-align: right; padding-right: 12pt;">_____________/ {{renter_full_name}}&emsp;</td>
-<td style="border: none; width: 50%;">(подпись)&emsp;(ФИО)</td>
+{{#if pep_signed}}<td style="border: none; width: 50%; text-align: right; padding-right: 12pt;"><b>Подписано ПЭП:</b> {{renter_signature}}<br>{{signature_timestamp}}&emsp;</td>{{else}}<td style="border: none; width: 50%; text-align: right; padding-right: 12pt;">_____________/ {{renter_full_name}}&emsp;</td>{{/if}}
+{{#if pep_signed}}<td style="border: none; width: 50%;">(ПЭП Арендатора — п. 12.3 Договора)</td>{{else}}<td style="border: none; width: 50%;">(подпись)&emsp;(ФИО)</td>{{/if}}
 </tr>
 </table>
 
@@ -437,8 +437,8 @@
 
 <table style="width: 100%; border: none; margin-top: 12pt; margin-left: auto; margin-right: auto; max-width: 500px;">
 <tr>
-<td style="border: none; width: 50%; text-align: right; padding-right: 12pt;">___________________________ / {{renter_full_name}}&emsp;</td>
-<td style="border: none; width: 50%; text-align: left;">(подпись)&emsp;(ФИО)</td>
+{{#if pep_signed}}<td style="border: none; width: 50%; text-align: right; padding-right: 12pt;"><b>Подписано ПЭП:</b> {{renter_signature}}<br>{{signature_timestamp}}&emsp;</td>{{else}}<td style="border: none; width: 50%; text-align: right; padding-right: 12pt;">___________________________ / {{renter_full_name}}&emsp;</td>{{/if}}
+{{#if pep_signed}}<td style="border: none; width: 50%; text-align: left;">(ПЭП Арендатора — п. 12.3 Договора)</td>{{else}}<td style="border: none; width: 50%; text-align: left;">(подпись)&emsp;(ФИО)</td>{{/if}}
 </tr>
 </table>
 
