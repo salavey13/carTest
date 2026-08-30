@@ -32,6 +32,8 @@ import { useRouter } from "next/navigation";
 import { X, Download, Loader2, Send, Search, Table2, Camera } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
 import { formatDateRu } from "@/app/franchize/components/DateInputRu";
+// iter26: money-cell parser for the totals row (Σ Цена / Σ ЗП / Σ Партнёрам / Σ Экип+Залог).
+import { toNumber } from "./lib/csv-money";
 
 interface ExportCsvModalProps {
   isOpen: boolean;
@@ -143,13 +145,6 @@ function isNumericLike(s: string): boolean {
   if (!s) return false;
   const t = s.trim().replace(/\s+/g, "").replace(",", ".").replace(/[₽$€]/g, "");
   return t !== "" && !Number.isNaN(Number(t));
-}
-
-function toNumber(s: string): number {
-  if (!s) return 0;
-  const t = s.trim().replace(/\s+/g, "").replace(",", ".").replace(/[₽$€]/g, "");
-  const n = Number(t);
-  return Number.isFinite(n) ? n : 0;
 }
 
 export function ExportCsvModal({
@@ -296,6 +291,7 @@ export function ExportCsvModal({
   // and salary column (col 1 for rentals).
   const priceCol = 3;
   const salaryCol = variant === "rentals" ? 1 : -1;
+  const partnerCol = variant === "rentals" ? 2 : -1;
   const equipCol = variant === "rentals" ? 4 : -1;
   const depositCol = variant === "rentals" ? 5 : -1;
 
@@ -304,6 +300,7 @@ export function ExportCsvModal({
 
   const sumPrice = sumOf(priceCol, dataRows);
   const sumSalary = sumOf(salaryCol, dataRows);
+  const sumPartner = sumOf(partnerCol, dataRows);
   const sumEquip = sumOf(equipCol, dataRows);
   const sumDeposit = sumOf(depositCol, dataRows);
 
@@ -461,7 +458,7 @@ export function ExportCsvModal({
         {/* ── Totals card — row count + sum of money columns ─────────────────── */}
         {!loading && !error && headerRow.length > 0 && (
           <div
-            className="grid grid-cols-2 gap-px border-b sm:grid-cols-4"
+            className={variant === "rentals" ? "grid grid-cols-2 gap-px border-b sm:grid-cols-5" : "grid grid-cols-2 gap-px border-b sm:grid-cols-4"}
             style={{
               borderColor: T.border,
               backgroundColor: T.border,
@@ -482,6 +479,16 @@ export function ExportCsvModal({
               <TotalsTile
                 label="Σ ЗП Аренда"
                 value={`${formatMoney(sumSalary)} ₽`}
+                T={T}
+              />
+            )}
+            {/* iter26: partner payouts total — mirrors the admin panel's
+                «Партнёрам» KPI (same 50%-of-bike-part math) so the owner can
+                cross-check the sheet against the owner/admin page. */}
+            {variant === "rentals" && (
+              <TotalsTile
+                label="Σ Партнёрам"
+                value={`${formatMoney(sumPartner)} ₽`}
                 T={T}
               />
             )}

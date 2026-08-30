@@ -69,7 +69,7 @@ import {
   getRentalStatusMeta,
 } from "./lib/analytics-utils";
 // iter25: shared moto/gear + company/partner split (pure, client-safe)
-import { computePartnerSplit } from "../../../../../franchize/lib/rental-price-split";
+import { computePartnerSplit } from "@/app/franchize/lib/rental-price-split";
 import { DepositSection } from "./DepositSection";
 
 interface RentalDetailDrawerProps {

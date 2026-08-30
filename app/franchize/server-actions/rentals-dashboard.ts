@@ -2147,6 +2147,10 @@ export async function updateRentalStatus(input: {
   odometerBefore?: number;        // For activation — starting odometer
   odometerAfter?: number;         // For completion — final odometer
   isPasswordAuth?: boolean;
+  /** iter26: skip the renter TG notification — for data-correction cancels
+   *  (e.g. aborting an already-completed rental where the deal actually fell
+   *  through; the renter already knows, no need to spam him). */
+  silent?: boolean;
 }): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
     const parsed = z.object({
@@ -2158,13 +2162,14 @@ export async function updateRentalStatus(input: {
       odometerBefore: z.number().int().min(0).max(999999).optional(),
       odometerAfter: z.number().int().min(0).max(999999).optional(),
       isPasswordAuth: z.boolean().optional(),
+      silent: z.boolean().optional(),
     }).safeParse(input);
 
     if (!parsed.success) {
       return { success: false, error: "Некорректный запрос." };
     }
 
-    const { slug, actorUserId, rentalId, status, operatorMessage, odometerBefore, odometerAfter, isPasswordAuth = false } = parsed.data;
+    const { slug, actorUserId, rentalId, status, operatorMessage, odometerBefore, odometerAfter, isPasswordAuth = false, silent = false } = parsed.data;
 
     // Get crew and verify access
     const { data: crew, error: crewError } = await supabaseAdmin
@@ -2257,7 +2262,10 @@ export async function updateRentalStatus(input: {
     // CRITICAL FIX: previously, if operator flipped status without typing a message,
     // the renter had NO IDEA their rental was marked completed/cancelled.
     // Now we always send a notification, using a warm default if no message provided.
-    if (rental?.user_id) {
+    // iter26: `silent` opts out — data-correction cancels from the analytics
+    // drawer (e.g. aborting a rental that was completed by mistake) don't
+    // need to notify a renter who already got his deposit back.
+    if (rental?.user_id && !silent) {
       const renterChatId = rental.user_id;
       const vehicle = rental?.vehicle as { make?: string; model?: string } | null;
       const bikeName = vehicle ? `${vehicle.make || ""} ${vehicle.model || ""}`.trim() : "байк";
@@ -2364,7 +2372,8 @@ export async function updateRentalStatus(input: {
 
     const msgParts: string[] = [];
     msgParts.push(`Статус изменён на «${status}»`);
-    if (operatorMessage) msgParts.push("уведомление отправлено арендатору");
+    if (operatorMessage && !silent) msgParts.push("уведомление отправлено арендатору");
+    if (silent) msgParts.push("без уведомления арендатору");
     if (odometerBefore != null) msgParts.push(`одометр: ${odometerBefore} км`);
     if (odometerAfter != null) msgParts.push(`финальный одометр: ${odometerAfter} км`);
 

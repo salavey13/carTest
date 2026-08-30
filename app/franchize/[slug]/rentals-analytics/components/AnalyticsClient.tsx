@@ -13,6 +13,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { updateRentalStatus } from "@/app/franchize/server-actions/rentals-dashboard";
 import type { ThemeTokens } from "../hooks/useTheme";
 import type {
   AnalyticsTab,
@@ -48,6 +50,9 @@ interface AnalyticsClientProps {
   loading?: boolean;
   todos?: RentalTodo[];
   mechanicMap?: Record<string, string | null>;
+  /** iter26: cookie/TG actor id — needed for the drawer's status actions
+   *  (Отменить / Активировать / Завершить → updateRentalStatus). */
+  actorUserId?: string | null;
   date?: string;
   onDateChange?: (next: string) => void;
   /** Deep-link params from URL (Phase 2 of startParamRouter PRD) */
@@ -72,6 +77,7 @@ export function AnalyticsClient({
   loading = false,
   todos = [],
   mechanicMap = {},
+  actorUserId = null,
   date: controlledDate,
   onDateChange,
   initialTab,
@@ -98,6 +104,8 @@ export function AnalyticsClient({
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(initialSaleId ?? null);
   // FIX (F9): CSV export modal state
   const [csvModalOpen, setCsvModalOpen] = useState(false);
+  // iter26: drawer status-action in flight (Отменить) — disables re-entry.
+  const [actionPending, setActionPending] = useState(false);
 
   // Switch tab — reset selection SYNCHRONOUSLY (not via useEffect, which
   // would let the wrong drawer render for one frame).
@@ -279,7 +287,69 @@ export function AnalyticsClient({
       router.push(`/franchize/${initialSlug}/sales-analytics`);
       return;
     }
-    // Other actions: future server-action wiring
+
+    // iter26: real status actions. Previously «Отменить» / «Активировать» /
+    // «Завершить» fell through here and did NOTHING (dead buttons) — the
+    // client could not abort an already-completed rental from the sheet.
+    // Cancel runs directly (confirm + updateRentalStatus); activate/complete
+    // need the odometer + photo flows, so they deep-link to the rental page
+    // where the proper handoff flow lives.
+    if (action === "cancel" || action === "activate" || action === "complete") {
+      const rental = selectedRental ?? selectedServiceRental;
+      if (!selectedRentalId || !rental) return;
+
+      if (action === "cancel") {
+        void cancelSelectedRental(rental);
+        return;
+      }
+      // activate / complete — full flow (odometer, photos, contract docs) is
+      // on the rental page; a bare status flip here would corrupt handoff data.
+      router.push(`/franchize/${initialSlug}/rental/${selectedRentalId}`);
+      return;
+    }
+  };
+
+  // iter26: «Отменить» from the drawer/sheet — works in ANY state (pending,
+  // active, completed…). Cancelling an already-completed/active rental is a
+  // data correction (deal fell through, money returned) → silent (no TG spam
+  // to the renter); cancelling a pending/confirmed request is a real decline
+  // → the renter gets a notification.
+  const cancelSelectedRental = async (rental: AnalyticsRentalRow) => {
+    if (!selectedRentalId || actionPending) return;
+    if (!actorUserId) {
+      toast.error("Не удалось определить пользователя — обновите страницу и попробуйте снова.");
+      return;
+    }
+    const bikeTitle = rental.vehicle ? `${rental.vehicle.make || ""} ${rental.vehicle.model || ""}`.trim() : "аренда";
+    const dataCorrection = rental.status === "completed" || rental.status === "active";
+    const ok = window.confirm(
+      dataCorrection
+        ? `Отменить аренду «${bikeTitle}»?\n\nАренда уже в статусе «${rental.status === "completed" ? "завершена" : "активна"}» — она будет помечена отменённой и исчезнет из выручки/ЗП (запись сохранится для аудита). Арендатор не будет уведомлён.`
+        : `Отменить аренду «${bikeTitle}»?\n\nАрендатор получит уведомление в Telegram.`
+    );
+    if (!ok) return;
+
+    setActionPending(true);
+    try {
+      const result = await updateRentalStatus({
+        slug: initialSlug,
+        actorUserId,
+        rentalId: selectedRentalId,
+        status: "cancelled",
+        silent: dataCorrection,
+      });
+      if (result.success) {
+        toast.success(result.message || "Аренда отменена");
+        setSelectedRentalId(null);
+        router.refresh();
+      } else {
+        toast.error(result.error || "Не удалось отменить аренду");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Ошибка сети");
+    } finally {
+      setActionPending(false);
+    }
   };
 
   // ── Render ──────────────────────────────────────────────────────────────

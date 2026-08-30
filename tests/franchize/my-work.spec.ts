@@ -3,6 +3,11 @@
 // 2026-08-19 review: specs for my-work.ts — lock in the IDOR fix (cookie-derived
 // secureUserId) and the clock_in_time column fix (was previously querying the
 // non-existent shift_start column).
+//
+// iter26: reworked for getMyWorkDayAction — the «Аренды» card now counts REAL
+// rentals attributed to the operator (same computeRentalSalary math as the
+// analytics CSV «ЗП Аренда»), shifts live in their own card, a date picker
+// scopes the day. These specs lock that contract.
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
@@ -24,7 +29,7 @@ vi.mock("@/lib/supabase-server", () => ({
   supabaseAdmin: { from: (table: string) => mockHolder.from(table) },
 }));
 
-import { getMyWorkTodayAction } from "@/app/franchize/server-actions/my-work";
+import { getMyWorkDayAction, getMyWorkTodayAction } from "@/app/franchize/server-actions/my-work";
 
 function setMockImpl(fn: (table: string) => any) {
   mockHolder.from = fn;
@@ -40,6 +45,7 @@ function buildChain(result: { data?: any; error?: any } = {}) {
     lte: vi.fn(() => chain),
     lt: vi.fn(() => chain),
     gt: vi.fn(() => chain),
+    neq: vi.fn(() => chain),
     order: vi.fn(() => chain),
     limit: vi.fn(() => chain),
     maybeSingle: vi.fn(() => ({ data: result.data ?? null, error: result.error ?? null })),
@@ -56,7 +62,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("getMyWorkTodayAction", () => {
+describe("getMyWorkDayAction", () => {
   it("ignores client-supplied userId and uses cookie-derived secureUserId (IDOR fix)", async () => {
     // Track every .eq("member_id", ...) call to assert it uses
     // "mock-user-id" (cookie-derived), NOT "attacker-supplied-id".
@@ -67,7 +73,7 @@ describe("getMyWorkTodayAction", () => {
         : table === "crews" ? { id: CREW_ID, owner_id: "someone-else" }
         : table === "crew_members" ? { role: "member", membership_status: "active" }
         : table === "crew_member_shifts" ? []
-        : []; // cash_transactions
+        : []; // cash_transactions / rentals / cars
       const chain = buildChain({ data });
       const origEq = chain.eq;
       chain.eq = vi.fn((column: string, value: any) => {
@@ -77,7 +83,7 @@ describe("getMyWorkTodayAction", () => {
       return chain;
     });
     // Pass an "attacker-supplied" userId — should be ignored.
-    const res = await getMyWorkTodayAction({
+    const res = await getMyWorkDayAction({
       slug: "vip-bike",
       userId: "attacker-supplied-id",
     });
@@ -112,7 +118,7 @@ describe("getMyWorkTodayAction", () => {
       chain.lte = vi.fn((col: string) => { filterCalls.push({ column: col, op: "lte" }); return chain; });
       return chain;
     });
-    const res = await getMyWorkTodayAction({ slug: "vip-bike", userId: "mock-user-id" });
+    const res = await getMyWorkDayAction({ slug: "vip-bike", userId: "mock-user-id" });
     expect(res.success).toBe(true);
     // Assert clock_in_time is the filter column (NOT shift_start).
     const clockInFilters = filterCalls.filter(f => f.column === "clock_in_time");
@@ -121,7 +127,7 @@ describe("getMyWorkTodayAction", () => {
     expect(shiftStartFilters.length).toBe(0);
   });
 
-  it("computes rentals total from salary_amount when present", async () => {
+  it("counts SHIFTS in the shifts card (not mislabeled as rentals anymore)", async () => {
     setMockImpl((table: string) => {
       const data =
         table === "users" ? { metadata: null }
@@ -136,15 +142,19 @@ describe("getMyWorkTodayAction", () => {
         : [];
       return buildChain({ data });
     });
-    const res = await getMyWorkTodayAction({ slug: "vip-bike", userId: "mock-user-id" });
+    const res = await getMyWorkDayAction({ slug: "vip-bike", userId: "mock-user-id" });
     expect(res.success).toBe(true);
     if (res.success && res.data) {
-      expect(res.data.rentals.count).toBe(1);
-      expect(res.data.rentals.total).toBe(676);
+      expect(res.data.shifts.count).toBe(1);
+      expect(res.data.shifts.total).toBe(676);
+      // The rental card must NOT count the shift anymore.
+      expect(res.data.rentals.count).toBe(0);
+      expect(res.data.rentals.salary).toBe(0);
+      expect(res.data.totalDay).toBe(676);
     }
   });
 
-  it("computes rentals total from duration × hourly_rate when salary_amount is null (active shift)", async () => {
+  it("computes shift income from duration × hourly_rate when salary_amount is null (active shift)", async () => {
     setMockImpl((table: string) => {
       const data =
         table === "users" ? { metadata: null }
@@ -159,12 +169,131 @@ describe("getMyWorkTodayAction", () => {
         : [];
       return buildChain({ data });
     });
-    const res = await getMyWorkTodayAction({ slug: "vip-bike", userId: "mock-user-id" });
+    const res = await getMyWorkDayAction({ slug: "vip-bike", userId: "mock-user-id" });
+    expect(res.success).toBe(true);
+    if (res.success && res.data) {
+      expect(res.data.shifts.count).toBe(1);
+      // 4h × 169 = 676, allow some leeway for test runtime.
+      expect(res.data.shifts.total).toBeGreaterThanOrEqual(676);
+    }
+  });
+
+  it("counts rentals attributed to me via created_by_operator_chat_id and pays the SAME salary as the analytics CSV", async () => {
+    // One rental created by the cookie user (op chat id = mock-user-id),
+    // regular category (default fallback), no equipment, no markup.
+    // computeRentalSalary → base 1000 + 0 + 0 = 1000.
+    setMockImpl((table: string) => {
+      const data =
+        table === "users" ? { metadata: null }
+        : table === "crews" ? { id: CREW_ID, owner_id: "someone-else" }
+        : table === "crew_members" ? { role: "member", membership_status: "active" }
+        : table === "crew_member_shifts" ? []
+        : table === "rentals" ? [{
+            rental_id: "11111111-1111-4111-8111-111111111111",
+            status: "completed",
+            total_cost: 12000,
+            metadata: {},
+            created_at: "2026-08-30T10:00:00.000Z",
+            created_by_operator_chat_id: "mock-user-id",
+            requested_start_date: null,
+            requested_end_date: null,
+            agreed_start_date: null,
+            agreed_end_date: null,
+            vehicle: { id: "bike-1", make: "Yamaha", model: "R7", crew_id: CREW_ID, specs: {}, daily_price: null },
+          }]
+        : [];
+      return buildChain({ data });
+    });
+    const res = await getMyWorkDayAction({ slug: "vip-bike", userId: "mock-user-id" });
     expect(res.success).toBe(true);
     if (res.success && res.data) {
       expect(res.data.rentals.count).toBe(1);
-      // 4h × 169 = 676, allow some leeway for test runtime.
-      expect(res.data.rentals.total).toBeGreaterThanOrEqual(676);
+      expect(res.data.rentals.revenue).toBe(12000);
+      expect(res.data.rentals.salary).toBe(1000);
+      expect(res.data.rentalDetails).toHaveLength(1);
+      expect(res.data.rentalDetails[0].bikeLabel).toBe("Yamaha R7");
+      expect(res.data.rentalDetails[0].sourceLabel).toBe("/doc");
+      expect(res.data.totalDay).toBe(1000);
     }
+  });
+
+  it("does NOT count rentals attributed to another operator", async () => {
+    setMockImpl((table: string) => {
+      const data =
+        table === "users" ? { metadata: null }
+        : table === "crews" ? { id: CREW_ID, owner_id: "someone-else" }
+        : table === "crew_members" ? { role: "member", membership_status: "active" }
+        : table === "crew_member_shifts" ? []
+        : table === "rentals" ? [{
+            rental_id: "22222222-2222-4222-8222-222222222222",
+            status: "completed",
+            total_cost: 8000,
+            metadata: {},
+            created_at: "2026-08-30T10:00:00.000Z",
+            created_by_operator_chat_id: "356282674", // someone else
+            requested_start_date: null,
+            requested_end_date: null,
+            agreed_start_date: null,
+            agreed_end_date: null,
+            vehicle: { id: "bike-2", make: "Ducati", model: "Panigale", crew_id: CREW_ID, specs: {}, daily_price: null },
+          }]
+        : [];
+      return buildChain({ data });
+    });
+    const res = await getMyWorkDayAction({ slug: "vip-bike", userId: "mock-user-id" });
+    expect(res.success).toBe(true);
+    if (res.success && res.data) {
+      expect(res.data.rentals.count).toBe(0);
+      expect(res.data.rentals.salary).toBe(0);
+    }
+  });
+
+  it("scopes the day window to the requested date (MSK) and reports it back", async () => {
+    const gteCalls: Array<{ column: string; value: any }> = [];
+    setMockImpl((table: string) => {
+      const data =
+        table === "users" ? { metadata: null }
+        : table === "crews" ? { id: CREW_ID, owner_id: "someone-else" }
+        : table === "crew_members" ? { role: "member", membership_status: "active" }
+        : [];
+      const chain = buildChain({ data });
+      chain.gte = vi.fn((col: string, value: any) => {
+        if (table === "rentals") gteCalls.push({ column: col, value });
+        return chain;
+      });
+      return chain;
+    });
+    const res = await getMyWorkDayAction({ slug: "vip-bike", date: "2026-08-29" });
+    expect(res.success).toBe(true);
+    if (res.success && res.data) {
+      expect(res.data.date).toBe("2026-08-29");
+      expect(res.data.isToday).toBe(false);
+    }
+    // Rentals are scoped by requested_start_date within the MSK day window
+    // (2026-08-29 00:00 MSK = 2026-08-28T21:00:00Z).
+    const startFilter = gteCalls.find(c => c.column === "requested_start_date");
+    expect(startFilter).toBeTruthy();
+    expect(startFilter!.value).toBe("2026-08-28T21:00:00.000Z");
+  });
+
+  it("falls back to today for garbage dates", async () => {
+    setMockImpl((table: string) => {
+      const data =
+        table === "users" ? { metadata: null }
+        : table === "crews" ? { id: CREW_ID, owner_id: "someone-else" }
+        : table === "crew_members" ? { role: "member", membership_status: "active" }
+        : [];
+      return buildChain({ data });
+    });
+    const res = await getMyWorkDayAction({ slug: "vip-bike", date: "2026-02-31" });
+    expect(res.success).toBe(true);
+    if (res.success && res.data) {
+      expect(res.data.isToday).toBe(true);
+    }
+  });
+
+  it("getMyWorkTodayAction remains exported as a compatible alias", async () => {
+    expect(typeof getMyWorkTodayAction).toBe("function");
+    expect(getMyWorkTodayAction).toBe(getMyWorkDayAction);
   });
 });

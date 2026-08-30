@@ -573,6 +573,7 @@ export function AnalyticsClientV2({
       todos={todos}
       loading={loading}
       mechanicMap={buildMechanicMap(rentals, todos)}
+      actorUserId={dbUser?.user_id ?? passwordAuthOwnerId ?? null}
       date={date}
       onDateChange={setDate}
       initialTab={initialTab}

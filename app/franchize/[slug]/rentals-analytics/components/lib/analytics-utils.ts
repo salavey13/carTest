@@ -29,8 +29,8 @@ import {
   getSubrenterCut,
   SUBRENTER_EQUIPMENT_UNIT_PRICES as UNIT_PRICES,
   SUBRENTER_EQUIPMENT_PRICE_FALLBACK as UNIT_PRICE_FALLBACK,
-} from "../../../../../franchize/lib/subrenter-economics";
-import { getStoredEquipmentPrice } from "../../../../../franchize/lib/rental-price-split";
+} from "@/app/franchize/lib/subrenter-economics";
+import { getStoredEquipmentPrice } from "@/app/franchize/lib/rental-price-split";
 
 // ── Status metadata ──────────────────────────────────────────────────────────
 
