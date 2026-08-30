@@ -16,7 +16,13 @@
     "components/map-riders/RiderFAB.tsx",
     "components/map-riders/StatusOverlay.tsx",
     "components/map-riders/RiderMarkerLayer.tsx",
-    "components/map-riders/RidersDrawer.tsx"
+    "components/map-riders/RidersDrawer.tsx",
+    "app/franchize/lib/bike-wall.ts",
+    "app/franchize/server-actions/bike-wall.ts",
+    "app/franchize/[slug]/bikes/page.tsx",
+    "app/franchize/[slug]/bikes/BikesWallClient.tsx",
+    "app/franchize/[slug]/bikes/[bikeId]/page.tsx",
+    "app/franchize/[slug]/bikes/[bikeId]/BikeStoryClient.tsx"
   ],
   "exclude": ["node_modules", ".next"]
 }
