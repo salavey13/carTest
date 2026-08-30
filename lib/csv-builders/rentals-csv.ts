@@ -39,6 +39,12 @@ import {
   subrenterChatIdFromSpecs,
   subrenterCsvLabel,
 } from "@/lib/csv-builders/rental-csv-columns";
+// iter25: shared money split — stored moto/gear amounts first, unit-price
+// estimate fallback; getSubrenterCut = partner share of the BIKE part.
+import {
+  getEquipmentCostPart,
+  getSubrenterCut,
+} from "@/app/franchize/lib/subrenter-economics";
 
 type SupabaseSchemaClient = {
   schema: (schema: string) => {
@@ -147,6 +153,10 @@ export async function buildRentalsCsv(
 
   let totalRevenue = 0;
   let totalSalary = 0;
+  // iter25: Σ partner payouts for the period — mirrors the client's own
+  // finance sheet, where «Партнеру» is ~50% of the deal for partner bikes.
+  let totalPartnerPayouts = 0;
+  let totalEquipment = 0;
 
   // ── Rental rows (cols 1-12) ──
   for (const r of (rentals || []) as any[]) {
@@ -162,6 +172,24 @@ export async function buildRentalsCsv(
 
     const price = r.total_cost || 0;
     totalRevenue += price;
+
+    // iter25: moto/gear split of THIS rental — stored amounts (exact) when the
+    // row carries them (iter25+ writers), unit-price estimate for legacy rows.
+    const equipmentPartRub = getEquipmentCostPart(meta);
+    totalEquipment += equipmentPartRub;
+
+    // iter25: partner payout — subrented bikes only. The metadata snapshot
+    // (deal-time truth) wins over the current bike specs, so historical rows
+    // stay correct after a bike is re-assigned to another partner.
+    const subrenterIdSnapshot =
+      typeof meta.subrenter_chat_id === "string" && meta.subrenter_chat_id.trim()
+        ? meta.subrenter_chat_id.trim()
+        : typeof meta.subrenter_chat_id === "number"
+          ? String(meta.subrenter_chat_id)
+          : null;
+    const subrenterId = subrenterIdSnapshot ?? subrenterChatIdFromSpecs(r.vehicle?.specs);
+    const partnerPayout = subrenterId ? getSubrenterCut(price, equipmentPartRub) : 0;
+    if (partnerPayout > 0) totalPartnerPayouts += partnerPayout;
 
     // ── ЗП Аренда: категория техники + экип + оверпрайс ──
     const categories = resolveBikeCategories(vehicle?.id || "", bikeOverrides);
@@ -185,8 +213,11 @@ export async function buildRentalsCsv(
     const salaryStr = String(salary.total);
     totalSalary += salary.total;
 
-    // Equipment (FIX F2-iter2): charger is free
-    const equipCost = equipmentStandardCost(eq);
+    // Equipment (FIX F2-iter2): charger is free. iter25: the charged amount
+    // (stored split) is the source of truth; the estimate (~) only for legacy
+    // rows. The "~" marker matches the analytics drawer convention.
+    const equipCost = equipmentPartRub;
+    const equipExact = Number(meta.equipment_price) >= 0 && meta.equipment_price != null;
     const equipParts: string[] = [];
     if (Number(eq.helmets) > 0) equipParts.push(`${eq.helmets}шл`);
     if (Number(eq.gloves) > 0) equipParts.push(`${eq.gloves}перч`);
@@ -196,7 +227,7 @@ export async function buildRentalsCsv(
     if (eq.net) equipParts.push("сет");
     if (eq.backpack) equipParts.push("рюк");
     if (eq.charger) equipParts.push("заряд↔");
-    const equipStr = equipParts.length > 0 ? `${equipParts.join("+")} (${equipCost})` : "";
+    const equipStr = equipParts.length > 0 ? `${equipParts.join("+")} (${equipCost}${equipExact ? "" : "~"})` : "";
 
     const depositAmount = Number(meta.deposit_amount || 0);
     // iter20: deposit method — direct metadata, else derived from the payment
@@ -241,14 +272,13 @@ export async function buildRentalsCsv(
 
     // iter20: the 4 new columns — notes / subrenter / photos / rental id.
     const notesStr = rentalNotesSummary(meta);
-    const subrenterId = subrenterChatIdFromSpecs(r.vehicle?.specs);
     const subrenterStr = subrenterId
       ? subrenterCsvLabel(subrenterUserById.get(subrenterId) ?? { user_id: subrenterId, full_name: null, username: null })
       : "";
     const photosStr = rentalPhotoCountsLabel(r.start_photo_count, r.end_photo_count);
 
     rows.push(rowOf([
-      dateStr, salaryStr, "", price, equipStr, depositStr,
+      dateStr, salaryStr, partnerPayout > 0 ? String(partnerPayout) : "", price, equipStr, depositStr,
       bikeName, "", odoBefore, odoAfter, timeStr, comment,
       "", "", "", "", "",
       notesStr, subrenterStr, photosStr, r.rental_id || "",
@@ -283,13 +313,10 @@ export async function buildRentalsCsv(
 
   // Totals row
   rows.push("");
-  const totalEquip = (rentals || []).reduce((sum: number, r: any) => {
-    return sum + equipmentStandardCost((r.metadata?.equipment) || {});
-  }, 0);
   const totalDeposit = (rentals || []).reduce((sum: number, r: any) => sum + Number(r.metadata?.deposit_amount || 0), 0);
   const totalSales = (sales || []).reduce((sum: number, s: any) => sum + (Number(s.sale_price) || 0), 0);
   rows.push(rowOf([
-    "", totalSalary, "", totalRevenue, totalEquip, totalDeposit,
+    "", totalSalary, totalPartnerPayouts > 0 ? totalPartnerPayouts : "", totalRevenue, totalEquipment, totalDeposit,
     "", "", "", "", "", "",
     "", "", "", totalSales, "",
     "", "", "", "",
@@ -306,6 +333,9 @@ export async function buildRentalsCsv(
       sales: (sales || []).length,
       totalRevenue,
       totalSalary,
+      // iter25: partner payouts of the period (Σ «Партнеру» column)
+      totalPartnerPayouts,
+      totalEquipment,
     },
   };
 }

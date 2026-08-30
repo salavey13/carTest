@@ -21,6 +21,8 @@ import {
   normalizeMonthKey,
   currentMskMonthKey,
   summarizeSubrenterMonth,
+  getEquipmentCostPart,
+  getBikeRevenuePart,
   type SubrenterMonthSummary,
 } from "@/app/franchize/lib/subrenter-economics";
 
@@ -702,6 +704,10 @@ export interface SubrentWeeklyReportResult {
   summary?: {
     rentalCount: number;
     totalPaymentsRub: number;
+    /** iter25: bike part of the payments — the payout base (gear excluded). */
+    bikePartRub: number;
+    /** iter25: gear part of the payments — never split with the partner. */
+    equipmentPartRub: number;
     ownerPercentage: number;
     ownerPayoutRub: number;
     periodFrom: string;
@@ -791,16 +797,31 @@ export async function generateSubrenterWeeklyReportAction(
       metadata?: Record<string, unknown> | null;
     }) => {
       const statusLabel = r.status === "completed" ? "Завершена" : r.status === "active" ? "Активна" : r.status === "confirmed" ? "Подтверждена" : "Ожидает";
+      // iter25: moto / gear split per rental — the client's wish
+      // («стоимость мота и экипа отдельно»). Stored amounts (exact) when the
+      // rental carries them, unit-price estimate for legacy rows.
+      const equipmentRub = getEquipmentCostPart(r.metadata);
+      const rub = Math.round(Number(r.total_cost) || 0);
+      const bikeRub = getBikeRevenuePart(rub, equipmentRub);
       return {
         bike: bikeLabel.get(String(r.vehicle_id ?? "")) ?? String(r.vehicle_id ?? ""),
         client: String((r.metadata as Record<string, unknown> | null)?.renter_name ?? "—"),
         period: `${fmtRuDate(r.agreed_start_date)} – ${fmtRuDate(r.agreed_end_date)}`,
-        rub: Math.round(Number(r.total_cost) || 0),
+        rub,
+        bikeRub,
+        equipmentRub,
         statusLabel,
       };
     });
 
     const totalPayments = rows.reduce((acc: number, r: { rub: number }) => acc + r.rub, 0);
+    // iter25: split the period totals into bike vs gear parts — the payout
+    // base is the BIKE part only (gear belongs to the crew and is never
+    // split). Previously the weekly report paid pct × TOTAL including gear,
+    // which disagreed with the monthly payout sheet and overpaid partners
+    // whenever gear was rented along with the bike.
+    const totalEquipment = rows.reduce((acc: number, r: { equipmentRub: number }) => acc + r.equipmentRub, 0);
+    const totalBikePart = rows.reduce((acc: number, r: { bikeRub: number }) => acc + r.bikeRub, 0);
 
     // Owner share: explicit override → latest contract artifact → 50%
     let pct = ownerPercentage ?? SUBRENT_REPORT_DEFAULT_PCT;
@@ -816,7 +837,7 @@ export async function generateSubrenterWeeklyReportAction(
       const stored = Number((artifact as { owner_percentage?: string | null } | null)?.owner_percentage);
       if (Number.isFinite(stored) && stored >= 1 && stored <= 99) pct = Math.round(stored);
     }
-    const payout = Math.round((totalPayments * pct) / 100);
+    const payout = Math.round((totalBikePart * pct) / 100);
 
     // Crew requisites for the header block
     let orgVars: Record<string, string> = {
@@ -864,15 +885,17 @@ export async function generateSubrenterWeeklyReportAction(
     const partnerPhone = (partnerUser?.metadata as Record<string, unknown> | null)?.phone;
     if (typeof partnerPhone === "string" && partnerPhone.length > 4) ownerPhone = partnerPhone;
 
-    // Render Appendix № 3 rows
+    // Render Appendix № 3 rows — iter25: moto and gear costs in SEPARATE
+    // columns (client wish: «стоимость мота и экипа отдельно»)
     const rowsHtml = rows
-      .map((r: { bike: string; client: string; period: string; rub: number; statusLabel: string }, idx: number) =>
+      .map((r: { bike: string; client: string; period: string; rub: number; bikeRub: number; equipmentRub: number; statusLabel: string }, idx: number) =>
         `<tr>` +
         `<td style="border: 1px solid #000; padding: 4pt 6pt; text-align: center;">${idx + 1}</td>` +
         `<td style="border: 1px solid #000; padding: 4pt 6pt; text-align: center;">${r.period}</td>` +
         `<td style="border: 1px solid #000; padding: 4pt 6pt;">${r.bike}</td>` +
         `<td style="border: 1px solid #000; padding: 4pt 6pt;">${r.client}</td>` +
-        `<td style="border: 1px solid #000; padding: 4pt 6pt; text-align: right;">${r.rub.toLocaleString("ru-RU")}</td>` +
+        `<td style="border: 1px solid #000; padding: 4pt 6pt; text-align: right;">${r.bikeRub.toLocaleString("ru-RU")}</td>` +
+        `<td style="border: 1px solid #000; padding: 4pt 6pt; text-align: right;">${r.equipmentRub > 0 ? r.equipmentRub.toLocaleString("ru-RU") : "—"}</td>` +
         `<td style="border: 1px solid #000; padding: 4pt 6pt; text-align: center;">${r.statusLabel}</td>` +
         `</tr>`,
       )
@@ -892,6 +915,8 @@ export async function generateSubrenterWeeklyReportAction(
       zero_report: rows.length === 0 ? "1" : "",
       rental_count: String(rows.length),
       total_payments_rub: totalPayments.toLocaleString("ru-RU"),
+      bike_part_rub: totalBikePart.toLocaleString("ru-RU"),
+      equipment_part_rub: totalEquipment.toLocaleString("ru-RU"),
       owner_percentage: String(pct),
       owner_payout_rub: payout.toLocaleString("ru-RU"),
       generated_at: generatedAt,
@@ -952,6 +977,8 @@ export async function generateSubrenterWeeklyReportAction(
       summary: {
         rentalCount: rows.length,
         totalPaymentsRub: totalPayments,
+        bikePartRub: totalBikePart,
+        equipmentPartRub: totalEquipment,
         ownerPercentage: pct,
         ownerPayoutRub: payout,
         periodFrom: from,

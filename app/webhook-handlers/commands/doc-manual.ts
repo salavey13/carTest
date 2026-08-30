@@ -1630,6 +1630,26 @@ async function createRentalFromDocContract(
         price_override_amount: context.priceOverridden
           ? (context.cashAmount || 0) + (context.bankAmount || 0)
           : null,
+        // iter25: persist the MOTO vs GEAR price split so analytics, the CSV
+        // finance sheet and partner payouts stop RE-ESTIMATING the gear part
+        // from quantities (the estimate can drift from what was actually
+        // charged — e.g. the /doc helmet price is duration-aware). When the
+        // operator overrode the price, the standard equipment charge is the
+        // best known gear part and the bike part is the remainder.
+        bike_price: Math.round(
+          context.priceOverridden
+            ? Math.max(0, totalCost - equipmentCostTotal)
+            : baseRentalCost,
+        ),
+        equipment_price: Math.round(equipmentCostTotal),
+        // iter25: snapshot the partner-owner at deal time — rentals of partner
+        // bikes are split ~50/50, and the snapshot survives a later bike
+        // re-assignment (specs change, historical payouts must not).
+        ...(typeof bike.specs?.subrenter_chat_id === "string" && bike.specs.subrenter_chat_id.trim()
+          ? { subrenter_chat_id: bike.specs.subrenter_chat_id.trim() }
+          : typeof bike.specs?.subrenter_chat_id === "number"
+            ? { subrenter_chat_id: String(bike.specs.subrenter_chat_id) }
+            : {}),
         // Fix: store odometer_before so RentalOdometerDelta can display it
         odometer_before: context.odometerBefore || null,
         // Fix: store payment split so closure modal can show "было получено"

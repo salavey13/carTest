@@ -32,7 +32,7 @@ export const franchizeOrderHandler: WebhookHandler = {
 
     const { data: vehicle, error: vehicleError } = await supabase
       .from("cars")
-      .select("id, owner_id, make, model, image_url")
+      .select("id, owner_id, make, model, image_url, specs")
       .eq("id", firstItemId)
       .maybeSingle();
 
@@ -53,6 +53,36 @@ export const franchizeOrderHandler: WebhookHandler = {
 
     const totalRub = Number(metadata.totalAmount || metadata.subtotal || 0);
     const interestStars = Number(metadata.amountXtr || totalAmount || 0);
+
+    // iter25: derive the MOTO vs GEAR price split from the cart lines' price
+    // breakdown (helmet + extras per line) and persist it on the rental row —
+    // analytics, the CSV finance sheet and partner payouts then read the
+    // EXACT charged amounts instead of re-estimating from quantities.
+    const splitFromCart = (() => {
+      const lines = Array.isArray(metadata.cartLines) ? metadata.cartLines : [];
+      let gearRub = 0;
+      let known = false;
+      for (const line of lines) {
+        const pb = line?.priceBreakdown;
+        if (pb && (pb.helmetRub != null || pb.extrasRub != null)) {
+          gearRub += Number(pb.helmetRub || 0) + Number(pb.extrasRub || 0);
+          known = true;
+        }
+      }
+      if (!known) return {};
+      const equipmentPrice = Math.max(0, Math.round(gearRub));
+      const bikePrice = Math.max(0, Math.round(totalRub - equipmentPrice));
+      return { equipment_price: equipmentPrice, bike_price: bikePrice };
+    })();
+
+    // iter25: snapshot the partner-owner at deal time (partner bikes split
+    // ~50/50; the snapshot survives later bike re-assignment).
+    const subrenterSnapshot = (() => {
+      const raw = (vehicle?.specs as Record<string, unknown> | null | undefined)?.["subrenter_chat_id"];
+      if (typeof raw === "string" && raw.trim()) return { subrenter_chat_id: raw.trim() };
+      if (typeof raw === "number" && Number.isFinite(raw)) return { subrenter_chat_id: String(raw) };
+      return {};
+    })();
 
     await upsertFranchizeIntent({
       slug,
@@ -98,6 +128,8 @@ export const franchizeOrderHandler: WebhookHandler = {
         requested_end_date: metadata?.rentalEndDate || new Date(Date.now() + 7 * 86400000).toISOString(),
         metadata: {
           ...(metadata || {}),
+          ...splitFromCart,
+          ...subrenterSnapshot,
           source: "franchize_order",
           franchise_slug: slug,
           hot_client: true,

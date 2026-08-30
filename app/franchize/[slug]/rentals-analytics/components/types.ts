@@ -92,6 +92,9 @@ export interface AnalyticsKpis {
   /** 50% of the bike-part revenue from SUBRENTED bikes — what the crew owes
    *  to partner-owners for the day. */
   owedToSubrentersToday: number;
+  /** iter25: revenue minus partner cuts — what the CREW keeps for the day
+   *  (own bikes 100% + gear always + company share of partner bikes). */
+  companyPartToday: number;
 }
 
 // ── Drawer-only types (Phase 2) ──────────────────────────────────────────────

@@ -78,11 +78,18 @@ interface AnalyticsClientV2Props {
 // metadata JSONB so the v2 RentalDetailDrawer's handoff section can read
 // them via the same `metadata.handoff_at / odometer_before / odometer_after`
 // contract used by the v2 web tree.
-// Extract the partner-owner chat id from bike specs (cars.specs.subrenter_chat_id).
-// Drives the «Субарендаторам» KPI — rentals of subrented bikes split 50/50.
+// Extract the partner-owner chat id for a rental. iter25: the metadata
+// SNAPSHOT (written at deal time by /doc and web checkout) wins — historical
+// payouts stay correct even if the bike is later re-assigned to another
+// partner; current specs remain the fallback for legacy rows.
+// Drives the «Партнёрам» / «Компании» KPIs — rentals of subrented bikes split 50/50.
 function subrenterChatIdFromSpecs(
   specs: Record<string, unknown> | null | undefined,
+  metadata?: Record<string, unknown> | null,
 ): string | null {
+  const snapRaw = metadata?.["subrenter_chat_id"];
+  if (typeof snapRaw === "string" && snapRaw.trim().length > 0) return snapRaw.trim();
+  if (typeof snapRaw === "number" && Number.isFinite(snapRaw)) return String(snapRaw);
   const raw = specs?.["subrenter_chat_id"];
   if (typeof raw === "string" && raw.trim().length > 0) return raw.trim();
   if (typeof raw === "number" && Number.isFinite(raw)) return String(raw);
@@ -138,6 +145,7 @@ function toAnalyticsRental(item: RentalDashboardItem): AnalyticsRentalRow {
     created_by_operator_chat_id: item.created_by_operator_chat_id,
     subrenterChatId: subrenterChatIdFromSpecs(
       (item.vehicle?.specs ?? null) as Record<string, unknown> | null,
+      md,
     ),
     subrenterLabel: item.subrenterLabel ?? null,
     vehicle: item.vehicle

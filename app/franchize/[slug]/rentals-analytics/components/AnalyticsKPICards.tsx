@@ -2,16 +2,17 @@
 
 // /analytics/components/AnalyticsKPICards.tsx
 //
-// 6-card KPI row (iter18): Аренд сегодня | Выручка | Активных | Возвратов
-//                          | Экипировка | Субарендаторам
-// Mobile: 2x3 grid. Desktop: 1x6 horizontal.
+// 7-card KPI row (iter25): Аренд сегодня | Выручка | Компании | Партнёрам
+//                          | Экипировка | Активных | Возвратов
+// Mobile: 2-col grid. Desktop: 1x7 horizontal.
 // Semantic status colors allowed (PRD §0.6); everything else from T.*.
 //
-// iter18 — the two NEW money counters split the day's «Выручка»:
-//   Экипировка     — equipment part of the day's revenue (100% crew money)
-//   Субарендаторам — 50% of the bike part for SUBRENTED bikes: money the crew
-//                    owes to partner-owners (amber — outgoing cash)
-// The «Выручка» super-total card is UNCHANGED (no regression on the headline).
+// iter25 — the money cards now answer the owner's question
+// («была видна прибыль компании и партнёра»):
+//   Выручка    — the day's headline total (unchanged super-total)
+//   Компании   — revenue MINUS partner cuts: what the crew keeps
+//   Партнёрам  — owner cuts for subrented bikes (gear excluded — outgoing)
+//   Экипировка — gear part of the revenue (100% crew money)
 
 import { motion } from "framer-motion";
 import type { ThemeTokens } from "../hooks/useTheme";
@@ -33,12 +34,18 @@ interface KpiCard {
 export function AnalyticsKPICards({ kpis, T }: AnalyticsKPICardsProps) {
   const cards: KpiCard[] = [
     { label: "Аренд сегодня", value: kpis.totalToday,                  color: T.text },
-    { label: "Выручка",       value: `${kpis.revenueToday.toLocaleString("ru-RU")} ₽`, color: "#22c55e" },
-    { label: "Активных",      value: kpis.activeCount,                  color: "#22c55e" },
+    { label: "Выручка",       value: `${kpis.revenueToday.toLocaleString("ru-RU")} ₽`, color: "#22c55e", hint: "все аренды, начатые в этот день" },
     {
-      label: "Возвратов",
-      value: kpis.returnsDue,
-      color: kpis.returnsDue > 0 ? "#ef4444" : T.textMuted,
+      label: "Компании",
+      value: `${kpis.companyPartToday.toLocaleString("ru-RU")} ₽`,
+      color: "#22c55e",
+      hint: "выручка минус доли партнёров — остаётся нам",
+    },
+    {
+      label: "Партнёрам",
+      value: `${kpis.owedToSubrentersToday.toLocaleString("ru-RU")} ₽`,
+      color: "#f59e0b",
+      hint: "доли владельцев субарендованных байков (экип не делится)",
     },
     {
       label: "Экипировка",
@@ -46,17 +53,17 @@ export function AnalyticsKPICards({ kpis, T }: AnalyticsKPICardsProps) {
       color: "#8b5cf6",
       hint: "часть выручки за экипировку — целиком наша",
     },
+    { label: "Активных",      value: kpis.activeCount,                  color: "#22c55e" },
     {
-      label: "Субарендаторам",
-      value: `${kpis.owedToSubrentersToday.toLocaleString("ru-RU")} ₽`,
-      color: "#f59e0b",
-      hint: "50% аренды субарендованных байков — долг партнёрам",
+      label: "Возвратов",
+      value: kpis.returnsDue,
+      color: kpis.returnsDue > 0 ? "#ef4444" : T.textMuted,
     },
   ];
 
   return (
     <div
-      className="grid min-w-0 grid-cols-2 gap-2 lg:grid-cols-6 lg:gap-3"
+      className="grid min-w-0 grid-cols-2 gap-2 lg:grid-cols-7 lg:gap-3"
       role="region"
       aria-label="Ключевые показатели"
     >

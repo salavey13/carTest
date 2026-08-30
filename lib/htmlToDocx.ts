@@ -1,6 +1,13 @@
 /**
  * htmlToDocx.ts — Proper HTML → docx element converter
  *
+ * ⚠️ SHADOWED TWIN: lib/htmlToDocx.mjs is the file that actually loads at
+ * runtime — Next.js (webpack) and Vitest (Vite) both resolve ".mjs" before
+ * ".ts" for extensionless imports. This .ts is the typed twin used by
+ * `tsc` typecheck only. ANY behavior change here MUST be mirrored in
+ * lib/htmlToDocx.mjs (and vice versa). tests/franchize/iter25-testdrive-fixes.spec.ts
+ * imports the module the same way the app does, so it gates the live .mjs.
+ *
  * Parses HTML with cheerio and produces an array of docx construct objects
  * (Paragraph, Table) that preserve formatting: bold, centering, indentation,
  * tables with borders, horizontal rules, line breaks, etc.
@@ -68,6 +75,28 @@ function mapAlign(style: Record<string, string>): (typeof AlignmentType)[keyof t
   if (s === 'justify') return AlignmentType.JUSTIFIED;
   if (s === 'left') return AlignmentType.LEFT;
   return undefined;
+}
+
+/**
+ * Map text-align for a table cell whose raw content is a single implicit
+ * paragraph with <br> soft line breaks (signature/requisites blocks).
+ *
+ * OOXML gotcha: a JUSTIFIED paragraph stretches EVERY line that ends with a
+ * manual line break (w:br) to the full column width — only the paragraph's
+ * final line is spared. Signature blocks like
+ *   «Мотосалон: <br> ООО … <br> ____ /Имя/ (подпись)»
+ * render with huge gaps between short fragments and look "spread".
+ * Guard: multi-`<br>` cell content never justifies — fall back to LEFT.
+ */
+function mapCellBreakAlign(
+  style: Record<string, string>,
+  cellHasLineBreaks: boolean,
+): (typeof AlignmentType)[keyof typeof AlignmentType] | undefined {
+  const align = mapAlign(style);
+  if (align === AlignmentType.JUSTIFIED && cellHasLineBreaks) {
+    return AlignmentType.LEFT;
+  }
+  return align;
 }
 
 /** Decode common HTML entities */
@@ -241,8 +270,9 @@ export function buildTable($table: ReturnType<CheerioAPI>, $: CheerioAPI): Table
         if (isHeader) cellCtx.bold = true;
 
         const runs = collectRuns($cell, $, cellCtx);
+        const cellHasLineBreaks = $cell.find('br').length > 0;
         cellParagraphs.push(new Paragraph({
-          alignment: mapAlign(cellStyle),
+          alignment: mapCellBreakAlign(cellStyle, cellHasLineBreaks),
           children: runs.length ? runs : [new TextRun({ text: '', font: DEFAULT_FONT })],
         }));
       }

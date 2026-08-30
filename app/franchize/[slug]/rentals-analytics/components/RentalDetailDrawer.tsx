@@ -68,6 +68,8 @@ import {
   getRenterPhone,
   getRentalStatusMeta,
 } from "./lib/analytics-utils";
+// iter25: shared moto/gear + company/partner split (pure, client-safe)
+import { computePartnerSplit } from "../../../../../franchize/lib/rental-price-split";
 import { DepositSection } from "./DepositSection";
 
 interface RentalDetailDrawerProps {
@@ -157,6 +159,13 @@ export function RentalDetailDrawer({
   const deposit = getDepositInfo(rental);
   // FIX (F4): equipment included in this rent
   const equipment = getEquipmentSummary(rental);
+  // iter25: moto-vs-gear split + company-vs-partner split of this rental.
+  // Stored amounts (exact) when the rental carries them; estimate fallback.
+  const moneySplit = computePartnerSplit({
+    totalCost: rental.total_cost,
+    metadata: md,
+    subrenterChatId: rental.subrenterChatId ?? null,
+  });
   // Payment split (bank/cash/card destination)
   const paymentSplit = getPaymentSplit(rental);
   const handoff = rental.handoff;
@@ -211,9 +220,22 @@ export function RentalDetailDrawer({
     { label: "Начало",          value: formatDateTime(rental.agreed_start_date || rental.requested_start_date) },
     { label: "Конец",           value: formatDateTime(rental.agreed_end_date || rental.requested_end_date) },
     { label: "Стоимость",       value: formatRubles(cost) },
+    // iter25: moto / gear split of the total (exact when persisted at
+    // creation, "~" marks the unit-price estimate for legacy rows)
+    {
+      label: "Мот / Экип",
+      value: `${formatRubles(moneySplit.bikePartRub)} / ${formatRubles(moneySplit.equipmentPartRub)}${moneySplit.source === "estimated" ? " ~" : ""}`,
+    },
+    // iter25: company vs partner profit — only meaningful for subrented bikes
+    ...(moneySplit.isPartnerBike
+      ? [{
+          label: "Нам / Партнёру",
+          value: `${formatRubles(moneySplit.companyRub)} / ${formatRubles(moneySplit.partnerRub)} (50%)`,
+        }]
+      : []),
     // FIX (F4): equipment part of the total as a separate field
     equipment.text
-      ? { label: "Экипировка",     value: equipment.cost > 0 ? `${equipment.text} (${formatRubles(equipment.cost)})` : equipment.text }
+      ? { label: "Экипировка",     value: equipment.cost > 0 ? `${equipment.text} (${formatRubles(equipment.cost)}${equipment.exact ? "" : " ~"})` : equipment.text }
       : { label: "Экипировка",     value: "не включена" },
     // FIX (F3 + F13): deposit amount + destination card (T-Банк / Сбер / нал)
     // + return status. Prefer deposit_entries data; fall back to metadata.

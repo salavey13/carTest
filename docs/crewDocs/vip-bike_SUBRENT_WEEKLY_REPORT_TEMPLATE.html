@@ -28,11 +28,12 @@
 {{else}}
 <table style="border: 1px solid #000; margin-top: 6pt;">
 <tr>
-  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 6%;">№</th>
-  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 17%;">Период аренды</th>
-  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 24%;">Мотоцикл</th>
-  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 27%;">Клиент</th>
-  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 13%;">Сумма, руб.</th>
+  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 5%;">№</th>
+  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 15%;">Период аренды</th>
+  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 21%;">Мотоцикл</th>
+  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 23%;">Клиент</th>
+  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 12%;">Мот, руб.</th>
+  <th style="border: 1px solid #000; padding: 4pt 6pt; width: 11%;">Экип, руб.</th>
   <th style="border: 1px solid #000; padding: 4pt 6pt; width: 13%;">Статус</th>
 </tr>
 {{rental_rows}}
@@ -50,7 +51,15 @@
   <td style="border: 1px solid #000; padding: 4pt 8pt; text-align: right;">{{total_payments_rub}}</td>
 </tr>
 <tr>
-  <td style="border: 1px solid #000; padding: 4pt 8pt;">Вознаграждение Арендодателя ({{owner_percentage}}% по п. 5.1 Договора), руб.</td>
+  <td style="border: 1px solid #000; padding: 4pt 8pt;">в т.ч. аренда мотоцикла(ов), руб.</td>
+  <td style="border: 1px solid #000; padding: 4pt 8pt; text-align: right;">{{bike_part_rub}}</td>
+</tr>
+<tr>
+  <td style="border: 1px solid #000; padding: 4pt 8pt;">в т.ч. экипировка (собственность экипажа, вознаграждением не облагается), руб.</td>
+  <td style="border: 1px solid #000; padding: 4pt 8pt; text-align: right;">{{equipment_part_rub}}</td>
+</tr>
+<tr>
+  <td style="border: 1px solid #000; padding: 4pt 8pt;">Вознаграждение Арендодателя ({{owner_percentage}}% от аренды мотоцикла(ов), п. 5.1 Договора), руб.</td>
   <td style="border: 1px solid #000; padding: 4pt 8pt; text-align: right; font-weight: bold;">{{owner_payout_rub}}</td>
 </tr>
 </table>

@@ -8,32 +8,34 @@
 // is NOT split: helmets/gloves/etc. belong to the crew, so the partner's cut
 // is 50% of (total − equipment part).
 //
+// iter25: the equipment part now prefers the PERSISTED split
+// (metadata.equipment_price — the amount actually charged at creation) and
+// falls back to the unit-price estimate for legacy rows. The unit-price
+// table lives in rental-price-split.ts — ONE table for analytics, CSV, salary
+// and partner payouts.
+//
 // Zero dependencies — safe to import from client components AND server actions
 // (the analytics KPI cards, the profile monthly panels and the activation
 // notification all read the SAME math from here).
+
+import {
+  EQUIPMENT_UNIT_PRICES_RUB,
+  EQUIPMENT_UNIT_PRICE_FALLBACK_RUB,
+  getRentalEquipmentPart,
+} from "./rental-price-split";
 
 /** Default owner share of the bike part (subrent contract §5.5). */
 export const SUBRENTER_SHARE_PCT = 50;
 
 /**
- * Operator equipment price list (₽ per unit) — mirrors the analytics
- * UNIT_PRICES table and the CSV export pricing rule. Charger is a freebie
- * bundled with the bike.
+ * Operator equipment price list (₽ per unit) — re-exported from the single
+ * source of truth (rental-price-split.ts). Charger is a freebie bundled
+ * with the bike.
  */
-export const SUBRENTER_EQUIPMENT_UNIT_PRICES: Record<string, number> = {
-  helmets: 1000,
-  gloves: 500,
-  jacket: 500,
-  pants: 500,
-  boots: 500,
-  net: 500,
-  bag: 500,
-  backpack: 500,
-  charger: 0,
-};
+export const SUBRENTER_EQUIPMENT_UNIT_PRICES: Record<string, number> = EQUIPMENT_UNIT_PRICES_RUB;
 
 /** Fallback unit price for unknown equipment keys (new gear types). */
-export const SUBRENTER_EQUIPMENT_PRICE_FALLBACK = 500;
+export const SUBRENTER_EQUIPMENT_PRICE_FALLBACK = EQUIPMENT_UNIT_PRICE_FALLBACK_RUB;
 
 function toFiniteNumber(value: unknown): number {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -45,7 +47,9 @@ function toFiniteNumber(value: unknown): number {
 }
 
 /**
- * Equipment revenue part of a rental (₽), read from metadata.equipment.
+ * Equipment revenue part of a rental (₽). PERSISTED split first
+ * (metadata.equipment_price — the actually charged amount, iter25+),
+ * gift-aware unit-price estimate for legacy rows.
  *
  * Values are quantities (helmets: 2) or booleans (gloves: true).
  * GIFT AWARENESS: an item flagged as a gift (`${key}_gift: true` inside the
@@ -56,20 +60,7 @@ function toFiniteNumber(value: unknown): number {
 export function getEquipmentCostPart(
   metadata: Record<string, unknown> | null | undefined,
 ): number {
-  const eq = metadata?.["equipment"];
-  if (!eq || typeof eq !== "object" || Array.isArray(eq)) return 0;
-  let total = 0;
-  for (const [key, value] of Object.entries(eq as Record<string, unknown>)) {
-    if (key.endsWith("_gift")) continue;
-    const gifted = (eq as Record<string, unknown>)[`${key}_gift`] === true;
-    if (gifted) continue;
-    const unitPrice = SUBRENTER_EQUIPMENT_UNIT_PRICES[key] ?? SUBRENTER_EQUIPMENT_PRICE_FALLBACK;
-    let qty = 0;
-    if (typeof value === "number" && value > 0) qty = value;
-    else if (value === true) qty = 1;
-    total += unitPrice * qty;
-  }
-  return total;
+  return getRentalEquipmentPart(metadata);
 }
 
 /** Bike-only revenue part: total minus the equipment part, floored at 0. */

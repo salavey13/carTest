@@ -27,7 +27,10 @@ import type {
 import {
   getEquipmentCostPart,
   getSubrenterCut,
+  SUBRENTER_EQUIPMENT_UNIT_PRICES as UNIT_PRICES,
+  SUBRENTER_EQUIPMENT_PRICE_FALLBACK as UNIT_PRICE_FALLBACK,
 } from "../../../../../franchize/lib/subrenter-economics";
+import { getStoredEquipmentPrice } from "../../../../../franchize/lib/rental-price-split";
 
 // ── Status metadata ──────────────────────────────────────────────────────────
 
@@ -359,31 +362,34 @@ export interface EquipmentItem {
   free: boolean;
 }
 
-// Operator price list (mirrors the CSV export pricing rule).
+// Operator price list — ONE table for the whole app (rental-price-split.ts).
 // FIX (F2-iter2): charger is a freebie — bundled with the bike, never
 // itemised in the equipment cost. Helmet 1000₽, soft gear 500₽ each.
-const UNIT_PRICES: Record<string, number> = {
-  helmets: 1000, gloves: 500, jacket: 500, pants: 500,
-  boots: 500, net: 500, bag: 500, backpack: 500, charger: 0,
-};
+// (Re-exported from subrenter-economics for import-path stability.)
 
 export interface EquipmentSummary {
   /** Human-readable list, e.g. "2 шлема, перчатки" */
   text: string;
-  /** Estimated equipment cost part of the total (₽), using operator prices. */
+  /** Equipment cost part of the total (₽): the PERSISTED charged amount when
+   *  present (exact), else the unit-price estimate (~). */
   cost: number;
+  /** True when `cost` is the exact amount charged at creation (iter25),
+   *  false for the unit-price estimate (legacy rows). */
+  exact: boolean;
   items: EquipmentItem[];
 }
 
 /** Parse metadata.equipment into a readable list with quantities.
- *  Numeric values are quantities (helmets: 2 → "2 шлема"), booleans are on/off. */
+ *  Numeric values are quantities (helmets: 2 → "2 шлема"), booleans are on/off.
+ *  iter25: `cost` prefers the PERSISTED charged amount (metadata.equipment_price)
+ *  — exact; the unit-price estimate remains the fallback for legacy rows. */
 export function getEquipmentSummary(rental: AnalyticsRentalRow): EquipmentSummary {
   const md = (rental.metadata || {}) as Record<string, unknown>;
   const eq = md["equipment"];
   const items: EquipmentItem[] = [];
   if (eq && typeof eq === "object") {
     for (const [key, value] of Object.entries(eq as Record<string, unknown>)) {
-      const unitPrice = UNIT_PRICES[key] ?? 500;
+      const unitPrice = UNIT_PRICES[key] ?? UNIT_PRICE_FALLBACK;
       const free = unitPrice === 0;
       if (typeof value === "number" && value > 0) {
         items.push({ key, label: EQUIPMENT_LABELS[key] || key, qty: value, unitPrice, free });
@@ -392,7 +398,11 @@ export function getEquipmentSummary(rental: AnalyticsRentalRow): EquipmentSummar
       }
     }
   }
-  const cost = items.reduce((sum, it) => sum + it.unitPrice * it.qty, 0);
+  const stored = getStoredEquipmentPrice(md);
+  const exact = stored != null;
+  const cost = exact
+    ? stored!
+    : items.reduce((sum, it) => sum + it.unitPrice * it.qty, 0);
 
   const parts = items.map((it) => {
     if (it.qty > 1) {
@@ -403,7 +413,7 @@ export function getEquipmentSummary(rental: AnalyticsRentalRow): EquipmentSummar
     }
     return it.label;
   });
-  return { text: parts.join(", "), cost, items };
+  return { text: parts.join(", "), cost, exact, items };
 }
 
 // ── Payment split ────────────────────────────────────────────────────────────
@@ -628,6 +638,10 @@ export interface AnalyticsKpiValues {
   returnsDue: number;
   equipmentPartToday: number;
   owedToSubrentersToday: number;
+  /** iter25: money the CREW keeps from the day's revenue — total minus the
+   *  partner cuts (own bikes 100% + gear always + company share of partner
+   *  bikes). Complement of owedToSubrentersToday. */
+  companyPartToday: number;
 }
 
 // Shared subrenter money math — see the import at the top of this file.
@@ -639,7 +653,8 @@ export interface AnalyticsKpiValues {
  *   Активных        — day-page rows currently active
  *   Возвратов       — rentals whose END falls on the selected MSK day
  *   Экипировка      — equipment part of the day's STARTED revenue (100% crew)
- *   Субарендаторам  — 50% of the bike part for SUBRENTED bikes (owed to partners)
+ *   Партнёрам       — 50% of the bike part for SUBRENTED bikes (owed to partners)
+ *   Компании        — revenue minus partner cuts (what the crew keeps)
  */
 export function computeAnalyticsKpis(
   rows: KpiRentalRow[],
@@ -668,6 +683,7 @@ export function computeAnalyticsKpis(
     returnsDue: returnsToday.length,
     equipmentPartToday,
     owedToSubrentersToday,
+    companyPartToday: Math.max(0, revenueToday - owedToSubrentersToday),
   };
 }
 

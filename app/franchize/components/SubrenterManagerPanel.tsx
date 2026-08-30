@@ -142,7 +142,13 @@ export function SubrenterManagerPanel({
         return;
       }
       const s = result.summary;
-      const summaryText = s ? `${s.rentalCount} аренд · ${s.totalPaymentsRub.toLocaleString("ru-RU")} ₽ · доля партнёра ${s.ownerPayoutRub.toLocaleString("ru-RU")} ₽ (${s.ownerPercentage}%)` : "";
+      // iter25: payout base is the BIKE part — gear is crew property and is
+      // never split, so the summary shows the split explicitly.
+      const summaryText = s
+        ? `${s.rentalCount} аренд · ${s.totalPaymentsRub.toLocaleString("ru-RU")} ₽ ` +
+          `(мот ${s.bikePartRub.toLocaleString("ru-RU")} + экип ${s.equipmentPartRub.toLocaleString("ru-RU")}) · ` +
+          `доля партнёра ${s.ownerPayoutRub.toLocaleString("ru-RU")} ₽ (${s.ownerPercentage}% от аренды мотоциклов)`
+        : "";
       if (mode === "self") {
         toast.success(
           result.sentToSelf

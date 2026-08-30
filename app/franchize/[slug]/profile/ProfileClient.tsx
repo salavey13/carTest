@@ -1000,6 +1000,7 @@ export function FranchizeProfileClient({
                           </span>
                           <span className="ml-1.5 font-normal" style={{ color: T.textMuted }}>
                             {row.rentalCount} аренд{row.rentalCount > 0 && row.totalRub > 0 ? ` · оборот ${formatCurrency(row.totalRub)}` : ""}
+                            {row.rentalCount > 0 && row.totalRub > 0 ? ` · нам ${formatCurrency(Math.max(0, row.totalRub - row.payoutRub))}` : ""}
                           </span>
                         </div>
                         <span className="whitespace-nowrap font-bold tabular-nums" style={{ color: "#f59e0b" }}>

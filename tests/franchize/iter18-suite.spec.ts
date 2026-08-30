@@ -381,13 +381,18 @@ describe("iter18 · source guards (wiring)", () => {
     expect(src).toContain("innerHeight");
   });
 
-  // T2 — KPI cards
-  it("AnalyticsKPICards renders 6 counters, super total card untouched", () => {
+  // T2 — KPI cards (iter25: 7 counters — added «Компании», «Субарендаторам»
+  // renamed to «Партнёрам», the money row now answers the owner's question
+  // «была видна прибыль компании и партнёра»)
+  it("AnalyticsKPICards renders 7 counters (money split), super total card untouched", () => {
     const src = read("app/franchize/[slug]/rentals-analytics/components/AnalyticsKPICards.tsx");
     expect(src).toContain("equipmentPartToday");
     expect(src).toContain("owedToSubrentersToday");
+    expect(src).toContain("companyPartToday");
     expect(src).toContain("Экипировка");
-    expect(src).toContain("Субарендаторам");
+    expect(src).toContain("Партнёрам");
+    expect(src).toContain("Компании");
+    expect(src).toContain("lg:grid-cols-7");
     // the headline revenue card keeps its label + green color
     expect(src).toMatch(/label: "Выручка"[\s\S]*?kpis\.revenueToday\.toLocaleString/);
     expect(src).toContain("#22c55e");

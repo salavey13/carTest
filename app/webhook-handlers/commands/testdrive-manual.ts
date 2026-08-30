@@ -512,6 +512,87 @@ async function gotoConfirm(chatId: number, userId: string, context: TestDriveCon
 
 // ── Contract generation ──────────────────────────────────────────────────────
 
+/**
+ * Email the generated testdrive DOCX to the crew mailbox (attachment).
+ * Resolves — never rejects: email is a non-critical backup channel, the DOCX
+ * is already delivered via Telegram and saved to Supabase Storage.
+ *
+ * ⚠️ TIMING CONTRACT: call this EARLY (immediately after docxBuf exists),
+ * never as the last step of the flow. This webhook route runs under a hard
+ * Vercel maxDuration cap. When the send was started last (old code), the
+ * SMTP connection was still handshaking when the handler returned → the
+ * lambda froze → the crew email silently never arrived. Started early, the
+ * remaining awaited steps (storage upload, Telegram sends, DB saves, lead
+ * pipeline) keep the lambda warm while the message uploads in parallel —
+ * the exact pattern that makes /doc email delivery reliable.
+ */
+function sendTestDriveDocxEmail(params: {
+  bike: { make?: string; model?: string };
+  context: TestDriveContext;
+  documentKey: string;
+  docFileName: string;
+  docxBuf: Buffer;
+  crewEmail?: string;
+}): Promise<void> {
+  try {
+    const smtpHost = process.env.SMTP_HOST || process.env.SMTP_YANDEX_HOST;
+    const smtpPort = Number(process.env.SMTP_PORT || process.env.SMTP_YANDEX_PORT || 465);
+    const smtpUser = process.env.SMTP_USER || process.env.SMTP_YANDEX_USER;
+    const smtpPass = process.env.SMTP_PASS || process.env.SMTP_YANDEX_PASS;
+    const emailFrom = process.env.EMAIL_FROM || smtpUser;
+    const emailTo = process.env.EMAIL_DEFAULT_TO || params.crewEmail || "vip_bike@mail.ru";
+
+    if (!(smtpHost && smtpUser && smtpPass)) {
+      logger.warn("[/testdrive] SMTP env not configured — crew email skipped");
+      return Promise.resolve();
+    }
+
+    const docList: string[] = [];
+    if (params.context.needPassport && params.context.customerSeries) docList.push("🪪 паспорт");
+    if (params.context.needLicense && params.context.licenseSeries) docList.push("🚗 В/У");
+    const docStr = docList.length > 0 ? docList.join(" + ") : "без документов";
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: { user: smtpUser, pass: smtpPass },
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 8000,
+    });
+
+    return transporter.sendMail({
+      from: emailFrom,
+      to: emailTo,
+      subject: `Договор тест-драйва — ${params.bike.make} ${params.bike.model}`,
+      text: [
+        `Договор тест-драйва №${params.documentKey}`,
+        ``,
+        `Байк: ${params.bike.make} ${params.bike.model}`,
+        `Клиент: ${params.context.customerFullName || "—"}`,
+        `Телефон: ${params.context.customerPhone || "—"}`,
+        `Документы: ${docStr}`,
+        ``,
+        `Договор сгенерирован в Telegram-боте.`,
+        `Документ во вложении.`,
+      ].join("\n"),
+      attachments: [{
+        filename: params.docFileName,
+        content: params.docxBuf,
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      }],
+    }).then(() => {
+      logger.info(`[/testdrive] Email with DOCX sent to ${emailTo}`);
+    }).catch((emailErr: unknown) => {
+      logger.warn("[/testdrive] Email send failed (non-fatal):", emailErr);
+    });
+  } catch (emailSetupErr) {
+    logger.warn("[/testdrive] Email setup failed (non-fatal):", emailSetupErr);
+    return Promise.resolve();
+  }
+}
+
 async function generateContract(chatId: number, userId: string, context: TestDriveContext, crewSlug: string): Promise<boolean> {
   try {
     const bike = await resolveBikeById(context.bikeId);
@@ -612,6 +693,19 @@ async function generateContract(chatId: number, userId: string, context: TestDri
 
     const docxBuf = Buffer.from(docResult.bytes);
     const docSha256 = docResult.sha256;
+
+    // ── Crew email: START NOW, run in parallel with everything below ──────────
+    // Started early so storage upload + Telegram sends + DB saves keep the
+    // lambda warm while SMTP uploads the message (see timing contract on
+    // sendTestDriveDocxEmail). A bounded final grace await happens at the end.
+    const crewEmailPromise = sendTestDriveDocxEmail({
+      bike,
+      context,
+      documentKey: vars.document_key,
+      docFileName,
+      docxBuf,
+      crewEmail: crewSecrets.email,
+    });
 
     // Upload to storage (non-fatal)
     let docStoragePath: string | null = null;
@@ -876,57 +970,18 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       logger.warn("[/testdrive] Failed to create lead:", leadErr);
     }
 
-    // Send email notification — fire-and-forget (no await) to avoid Vercel timeout
-    // Matches the /doc command pattern: connectionTimeout 5s, greetingTimeout 5s,
-    // socketTimeout 8s. The promise resolves/rejects in the background.
+    // ── Crew email: final bounded grace ─────────────────────────────────────
+    // The send was started right after the DOCX was built and has been running
+    // in parallel with the steps above. Give it a short, capped extra window
+    // (1.5s) so a slightly slow SMTP can still finish before the handler
+    // returns — but never let email block the user-facing reply.
     try {
-      const smtpHost = process.env.SMTP_HOST || process.env.SMTP_YANDEX_HOST;
-      const smtpPort = Number(process.env.SMTP_PORT || process.env.SMTP_YANDEX_PORT || 465);
-      const smtpUser = process.env.SMTP_USER || process.env.SMTP_YANDEX_USER;
-      const smtpPass = process.env.SMTP_PASS || process.env.SMTP_YANDEX_PASS;
-      const emailFrom = process.env.EMAIL_FROM || smtpUser;
-      const emailTo = process.env.EMAIL_DEFAULT_TO || crewSecrets.email || "vip_bike@mail.ru";
-
-      if (smtpHost && smtpUser && smtpPass) {
-        const transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: smtpPort,
-          secure: smtpPort === 465,
-          auth: { user: smtpUser, pass: smtpPass },
-          connectionTimeout: 5000,
-          greetingTimeout: 5000,
-          socketTimeout: 8000,
-        });
-
-        // Fire-and-forget — don't block the command on email
-        transporter.sendMail({
-          from: emailFrom,
-          to: emailTo,
-          subject: `Договор тест-драйва — ${bike.make} ${bike.model}`,
-          text: [
-            `Договор тест-драйва №${vars.document_key}`,
-            ``,
-            `Байк: ${bike.make} ${bike.model}`,
-            `Клиент: ${context.customerFullName || "—"}`,
-            `Телефон: ${context.customerPhone || "—"}`,
-            `Документы: ${docStr}`,
-            ``,
-            `Договор сгенерирован в Telegram-боте.`,
-            `Документ во вложении.`,
-          ].join("\n"),
-          attachments: [{
-            filename: docFileName,
-            content: docxBuf,
-            contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          }],
-        }).then(() => {
-          logger.info(`[/testdrive] Email with DOCX sent to ${emailTo}`);
-        }).catch((emailErr: unknown) => {
-          logger.warn("[/testdrive] Email send failed (non-fatal):", emailErr);
-        });
-      }
-    } catch (emailErr) {
-      logger.warn("[/testdrive] Email setup failed (non-fatal):", emailErr);
+      await Promise.race([
+        crewEmailPromise,
+        new Promise((resolve) => setTimeout(resolve, 1500)),
+      ]);
+    } catch {
+      // sendTestDriveDocxEmail never rejects; this is purely defensive.
     }
 
     return true;
