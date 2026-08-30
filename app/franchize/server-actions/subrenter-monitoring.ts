@@ -144,7 +144,10 @@ export async function getSubrenterOwnedBikesAction(input: {
 
     const bikesOut: SubrenterOwnedBike[] = bikes.map((b: { id: string | number; make?: string | null; model?: string | null; image_url?: string | null }) => {
       const bikeId = String(b.id);
-      const mine = (rentals ?? []).filter((r: { vehicle_id?: string | null }) => String(r.vehicle_id ?? "") === bikeId);
+      // iter27: cancelled rentals don't count toward «всего» — same rule as the
+      // analytics quick counters (they never physically happened).
+      const mine = (rentals ?? []).filter((r: { vehicle_id?: string | null; status?: string | null }) =>
+        String(r.vehicle_id ?? "") === bikeId && String(r.status ?? "") !== "cancelled");
       const activeCount = mine.filter((r: { status?: string | null; agreed_end_date?: string | null }) =>
         isRentalEffectivelyActive({ status: r.status, agreed_end_date: r.agreed_end_date, now }),
       ).length;
@@ -253,6 +256,10 @@ export async function getFranchizeSubrentersOverviewAction(input: {
     }>) {
       const vid = String(r.vehicle_id ?? "");
       if (!vid) continue;
+      // iter27: cancelled rentals never physically happened — they must not
+      // inflate a partner's «всего аренд» counter (mirrors the analytics KPIs,
+      // CSV and salary rules).
+      if (String(r.status ?? "") === "cancelled") continue;
       const s = statsByBike.get(vid) ?? { active: 0, total: 0 };
       s.total += 1;
       if (isRentalEffectivelyActive({ status: r.status, agreed_end_date: r.agreed_end_date, now })) s.active += 1;

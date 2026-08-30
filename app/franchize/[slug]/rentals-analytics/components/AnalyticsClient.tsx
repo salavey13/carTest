@@ -65,6 +65,12 @@ interface AnalyticsClientProps {
   onFetchCsvText?: (from: string, to: string) => Promise<string>;
   /** FIX (iter4): send the CSV to the operator's Telegram chat via the bot. */
   onSendCsvToTelegram?: (from: string, to: string) => Promise<void>;
+  /** iter27: ask the data owner (AnalyticsClientV2) to REFETCH the dashboard
+   *  after a mutation that changes money/status (Отменить…). `router.refresh()`
+   *  alone does NOT re-run the client-side server-action loaders, so the KPI
+   *  cards kept showing the cancelled rental in the day's counters until a
+   *  full app reopen. */
+  onDataRefresh?: () => void;
 }
 
 export function AnalyticsClient({
@@ -86,6 +92,7 @@ export function AnalyticsClient({
   onExportCsv,
   onFetchCsvText,
   onSendCsvToTelegram,
+  onDataRefresh,
 }: AnalyticsClientProps) {
   const router = useRouter();
   // Date state: controlled (when parent passes `date` + `onDateChange`) or
@@ -342,6 +349,12 @@ export function AnalyticsClient({
         toast.success(result.message || "Аренда отменена");
         setSelectedRentalId(null);
         router.refresh();
+        // iter27: router.refresh() only re-renders the server components — the
+        // rentals/sales are loaded CLIENT-side (loadRentals/loadSales in
+        // AnalyticsClientV2), so without an explicit reload the KPI cards and
+        // the list keep the pre-cancel values (the cancelled rental stayed in
+        // «Аренд сегодня» / «Выручка» until a full reopen).
+        onDataRefresh?.();
       } else {
         toast.error(result.error || "Не удалось отменить аренду");
       }

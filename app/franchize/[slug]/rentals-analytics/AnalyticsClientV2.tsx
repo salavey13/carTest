@@ -269,6 +269,15 @@ export function AnalyticsClientV2({
   // changes when the user taps ← / → / Сегодня in AnalyticsDateNav.
   const [date, setDate] = useState(initialDate);
 
+  // iter27: mutation-driven reload token. «Отменить» (and any future status
+  // action from the analytics drawer) changes money/status in the DB, but the
+  // dashboard data lives in client state loaded by the effect below — its deps
+  // ([actor, date, loaders]) don't change on a mutation, and `router.refresh()`
+  // from the child only re-renders server components. Bumping this token
+  // re-runs loadRentals/loadSales so the KPI cards drop the cancelled rental
+  // immediately (was: stale counters until a full app reopen).
+  const [reloadToken, setReloadToken] = useState(0);
+
   const themeArgs = useMemo(() => resolveThemeTokens(crew.theme), [crew.theme]);
   const T: ThemeTokens = useTheme(themeArgs);
 
@@ -529,7 +538,8 @@ export function AnalyticsClientV2({
 
   // Initial load + refetch on date change. v1 has the same pattern
   // (lines 807-827): useEffect on [selectedDate] triggers loadRentals +
-  // loadSales. We mirror that here.
+  // loadSales. We mirror that here. iter27: reloadToken re-runs the loaders
+  // after in-page mutations (cancel from the drawer) — see its useState above.
   useEffect(() => {
     if (!getActorUserId()) return;
     void loadRentals(date);
@@ -539,7 +549,7 @@ export function AnalyticsClientV2({
       void loadTodos();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getActorUserId, date, loadRentals, loadSales]);
+  }, [getActorUserId, date, loadRentals, loadSales, reloadToken]);
 
   // ─── Loading / password gate ───────────────────────────────────────────────
 
@@ -582,6 +592,7 @@ export function AnalyticsClientV2({
       onExportCsv={exportCsv}
       onFetchCsvText={fetchCsvText}
       onSendCsvToTelegram={sendCsvToTelegram}
+      onDataRefresh={() => setReloadToken((t) => t + 1)}
     />
   );
 }

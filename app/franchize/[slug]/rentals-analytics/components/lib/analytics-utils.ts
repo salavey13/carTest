@@ -655,15 +655,23 @@ export interface AnalyticsKpiValues {
  *   Экипировка      — equipment part of the day's STARTED revenue (100% crew)
  *   Партнёрам       — 50% of the bike part for SUBRENTED bikes (owed to partners)
  *   Компании        — revenue minus partner cuts (what the crew keeps)
+ *
+ * iter27 HARDENING: cancelled rows are dropped HERE as well, not only by the
+ * caller (displayRentals). Previously `totalToday` / `returnsDue` counted
+ * EVERY row they were handed — the function trusted its caller to pre-filter,
+ * so any future call path that forgets would silently re-inflate the quick
+ * counters with rentals that never physically happened. Defence in depth:
+ * both layers now filter.
  */
 export function computeAnalyticsKpis(
   rows: KpiRentalRow[],
   date: string,
 ): AnalyticsKpiValues {
+  const realRows = rows.filter((r) => String(r.status ?? "") !== "cancelled");
   const localStart = (r: KpiRentalRow) => localDateOnly(r.requested_start_date || r.agreed_start_date);
   const localEnd = (r: KpiRentalRow) => localDateOnly(r.agreed_end_date || r.requested_end_date);
-  const startedToday = rows.filter((r) => localStart(r) === date);
-  const returnsToday = rows.filter((r) => localEnd(r) === date);
+  const startedToday = realRows.filter((r) => localStart(r) === date);
+  const returnsToday = realRows.filter((r) => localEnd(r) === date);
   const revenueRows = startedToday
     .filter((r) => ["active", "completed", "confirmed", "pending_confirmation"].includes(String(r.status ?? "")));
   const revenueToday = revenueRows
@@ -679,7 +687,7 @@ export function computeAnalyticsKpis(
   return {
     totalToday: startedToday.length,
     revenueToday,
-    activeCount: rows.filter((r) => r.status === "active").length,
+    activeCount: realRows.filter((r) => r.status === "active").length,
     returnsDue: returnsToday.length,
     equipmentPartToday,
     owedToSubrentersToday,
