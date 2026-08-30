@@ -459,6 +459,9 @@ async function buildConfiguratorDocAndNotify(input: ConfiguratorLeadInput) {
       payload: {
         ...input,
         configId,
+        // iter22: kind marker so the admin failures list can tell these rows
+        // apart from order rows (legacy rows are detected via sentTo[]).
+        kind: "configurator",
         sentTo: sendResults.map((r) => ({ tgId: r.id, ok: r.ok })),
         persistedAt: now.toISOString(),
       },

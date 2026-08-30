@@ -56,7 +56,22 @@ export function MonthPickerBar({
   const [gridYear, setGridYear] = useState(() => Number(normalizeMonthKey(value)?.slice(0, 4)) || new Date().getFullYear());
   const rootRef = useRef<HTMLDivElement>(null);
 
+  // iter22 rapid-tap fix: parents store the emitted key in React state, so two
+  // taps inside one render batch would both compute from the SAME `value` and
+  // one step would be lost. Track the last key we emitted in a ref so ‹ ›
+  // always steps from the newest value, even before the parent re-renders.
+  const lastEmittedRef = useRef<string>(normalizeMonthKey(value) || currentMskMonthKey());
+
   const norm = normalizeMonthKey(value) || currentMskMonthKey();
+  useEffect(() => {
+    lastEmittedRef.current = norm;
+  }, [norm]);
+  const iterate = (delta: number) => {
+    const next = shiftMonthKey(lastEmittedRef.current, delta);
+    lastEmittedRef.current = next;
+    onChange(next);
+  };
+
   const currentMonthNum = Number(norm.slice(5, 7));
   const currentYear = Number(norm.slice(0, 4));
 
@@ -106,7 +121,7 @@ export function MonthPickerBar({
       <button
         type="button"
         aria-label="Предыдущий месяц"
-        onClick={() => onChange(shiftMonthKey(norm, -1))}
+        onClick={() => iterate(-1)}
         className="rounded-lg border px-2.5 py-1 text-sm transition hover:opacity-80"
         style={chipBase}
       >
@@ -129,7 +144,7 @@ export function MonthPickerBar({
       <button
         type="button"
         aria-label="Следующий месяц"
-        onClick={() => onChange(shiftMonthKey(norm, 1))}
+        onClick={() => iterate(1)}
         className="rounded-lg border px-2.5 py-1 text-sm transition hover:opacity-80"
         style={chipBase}
       >

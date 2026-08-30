@@ -87,11 +87,17 @@ export function formatDateTime(iso: string | null | undefined): string {
 
 export function formatDateLong(iso: string): string {
   try {
-    const s = new Date(iso).toLocaleDateString("ru-RU", {
+    // iter22 tz fix: date-only ISO strings parse as UTC midnight, but
+    // toLocaleDateString used the DEVICE timezone — west-of-UTC devices
+    // displayed the PREVIOUS day (data is scoped to Europe/Moscow days by
+    // the server). Anchor the parse to UTC midnight and render in MSK so
+    // the label is the same calendar date on every device.
+    const s = new Date(`${iso}T00:00:00Z`).toLocaleDateString("ru-RU", {
       day: "numeric",
       month: "long",
       year: "numeric",
       weekday: "long",
+      timeZone: "Europe/Moscow",
     });
     // Capitalize only the first letter (Russian months/weekdays are lowercase by default).
     return s.charAt(0).toUpperCase() + s.slice(1);

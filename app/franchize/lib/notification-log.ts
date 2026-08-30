@@ -21,6 +21,27 @@
 // so the failure list can show WHO was supposed to receive the doc.
 
 /**
+ * Which producer wrote this log row?
+ *   - "configurator" — configurator lead flow (payload has sentTo[] and, from
+ *     iter22 on, an explicit kind marker)
+ *   - "order" — the rental order flow (default)
+ *
+ * Needed by the admin «Сбои отправки» list: configurator rows must NOT offer
+ * the order-flow Retry button — retryFranchizeOrderNotification resubmits an
+ * ORDER payload schema, and a configurator payload would die in zod with a
+ * confusing «Некорректный payload для retry» toast.
+ */
+export function deriveNotificationKind(payload: unknown): "order" | "configurator" {
+  if (!payload || typeof payload !== "object") return "order";
+  const p = payload as Record<string, unknown>;
+  if (p.kind === "configurator") return "configurator";
+  // Legacy rows (written before the kind marker existed) are identified by
+  // the configurator-only sentTo[] array.
+  if (Array.isArray(p.sentTo)) return "configurator";
+  return "order";
+}
+
+/**
  * Derive a human-readable recipient label from a notification-log payload.
  * Returns "" when nothing recognizable is present.
  *

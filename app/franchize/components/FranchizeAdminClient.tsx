@@ -140,6 +140,8 @@ export function FranchizeAdminClient({
   const [failedNotifications, setFailedNotifications] = useState<
     Array<{
       orderId: string;
+      /** iter22: configurator leads share the log table — their rows can't use the order-flow Retry. */
+      kind: "order" | "configurator";
       sendTo: string;
       lastError: string;
       createdAt: string;
@@ -990,30 +992,41 @@ export function FranchizeAdminClient({
           </p>
         ) : (
           <div className="mt-3 space-y-2">
-            {failedNotifications.map((item) => (
-              <div
-                key={`${item.orderId}-${item.sendTo}-${item.createdAt}`}
-                className="rounded-xl border p-2"
-                style={{ borderColor: "var(--fr-admin-border)" }}
-              >
-                <p className="text-xs text-[var(--fr-admin-text)]">
-                  Заказ #{item.orderId} → {item.sendTo || "не указан"}
-                </p>
-                <p className="mt-1 text-xs text-rose-300">
-                  {item.lastError || "ошибка не указана"}
-                </p>
-                <Button
-                  type="button"
-                  className="mt-2 h-8 text-xs"
-                  onClick={() => handleRetryNotification(item.orderId)}
-                  disabled={retryingOrderId === item.orderId}
+            {failedNotifications.map((item) => {
+              const isConfigurator = item.kind === "configurator";
+              return (
+                <div
+                  key={`${item.kind}-${item.orderId}-${item.sendTo}-${item.createdAt}`}
+                  className="rounded-xl border p-2"
+                  style={{ borderColor: "var(--fr-admin-border)" }}
                 >
-                  {retryingOrderId === item.orderId
-                    ? "Повторяем..."
-                    : "Повторить отправку"}
-                </Button>
-              </div>
-            ))}
+                  <p className="text-xs text-[var(--fr-admin-text)]">
+                    {isConfigurator ? `Конфигурация #${item.orderId}` : `Заказ #${item.orderId}`} → {item.sendTo || "не указан"}
+                  </p>
+                  <p className="mt-1 text-xs text-rose-300">
+                    {item.lastError || "ошибка не указана"}
+                  </p>
+                  {isConfigurator ? (
+                    // iter22: configurator rows can't be retried through the
+                    // order flow — the payload won't pass the order schema.
+                    <p className="mt-2 text-[11px] text-[var(--fr-admin-muted)]">
+                      Документ из конфигуратора — повторная отправка заказа недоступна, пересоберите конфигурацию.
+                    </p>
+                  ) : (
+                    <Button
+                      type="button"
+                      className="mt-2 h-8 text-xs"
+                      onClick={() => handleRetryNotification(item.orderId)}
+                      disabled={retryingOrderId === item.orderId}
+                    >
+                      {retryingOrderId === item.orderId
+                        ? "Повторяем..."
+                        : "Повторить отправку"}
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </FranchizeOperatorPanel>

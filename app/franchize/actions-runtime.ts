@@ -27,7 +27,7 @@ import { formatRuDate } from "@/app/franchize/lib/date-utils";
 import { buildRequestedWindowMs, rentalRowBlocksWindow, type RentalOverlapRow } from "@/app/franchize/lib/rental-overlap";
 // v3 polish: centralized notification template builders (HTML-escaped, with inline buttons)
 import { buildCartCheckoutRenterMessage } from "@/app/franchize/lib/notification-templates";
-import { deriveNotificationSendTo } from "@/app/franchize/lib/notification-log";
+import { deriveNotificationKind, deriveNotificationSendTo } from "@/app/franchize/lib/notification-log";
 import {
   DEFAULT_AD_CARDS_TEXT,
   DEFAULT_CATEGORY_ORDER,
@@ -4503,6 +4503,18 @@ export async function retryFranchizeOrderNotification(input: unknown): Promise<{
     return { success: false, error: "Snapshot заказа не найден для retry." };
   }
 
+  // iter22 guard: configurator rows share this table but their payload does
+  // NOT match the order schema — resubmitting would die in zod with an
+  // opaque «Некорректный payload для retry» toast. Fail with a clear message
+  // instead (the admin UI hides the Retry button for these rows anyway —
+  // this is defense in depth for stale clients).
+  if (deriveNotificationKind(logRow.payload) === "configurator") {
+    return {
+      success: false,
+      error: "Это конфигурация из конфигуратора, а не заказ — повторная отправка заказа недоступна. Документ можно пересобрать в конфигураторе.",
+    };
+  }
+
   return submitFranchizeOrderNotification(logRow.payload);
 }
 
@@ -4595,7 +4607,7 @@ export async function getFranchizeSuccessfulRentals(input: unknown): Promise<{ s
   };
 }
 
-export async function getFranchizeOrderNotificationFailures(input: unknown): Promise<{ success: boolean; items?: Array<{ orderId: string; sendTo: string; lastError: string; createdAt: string }>; error?: string }> {
+export async function getFranchizeOrderNotificationFailures(input: unknown): Promise<{ success: boolean; items?: Array<{ orderId: string; kind: "order" | "configurator"; sendTo: string; lastError: string; createdAt: string }>; error?: string }> {
   const parsed = z.object({ slug: z.string().trim().min(1), actorUserId: z.string().trim().min(1) }).safeParse(input);
   if (!parsed.success) return { success: false, error: "Некорректный запрос." };
   const { slug, actorUserId } = parsed.data;
@@ -4620,7 +4632,16 @@ export async function getFranchizeOrderNotificationFailures(input: unknown): Pro
   if (error) return { success: false, error: error.message };
   return {
     success: true,
-    items: (data ?? []).map((row) => ({ orderId: row.order_id, sendTo: deriveNotificationSendTo(row.payload), lastError: row.last_error ?? "", createdAt: row.created_at ?? "" })),
+    // iter22: kind tells the admin UI which rows are configurator leads —
+    // those must not offer the order-flow Retry button (it would fail zod
+    // validation with a confusing payload error).
+    items: (data ?? []).map((row) => ({
+      orderId: row.order_id,
+      kind: deriveNotificationKind(row.payload),
+      sendTo: deriveNotificationSendTo(row.payload),
+      lastError: row.last_error ?? "",
+      createdAt: row.created_at ?? "",
+    })),
   };
 }
 

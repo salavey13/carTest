@@ -132,9 +132,10 @@ describe("iter21 · source guards", () => {
 
   it("MonthPickerBar: iterate + year stepper + 12-month grid + current-month jump", () => {
     const src = read("app/franchize/components/FranchizeMonthPicker.tsx");
-    // iterate
-    expect(src).toContain("shiftMonthKey(norm, -1)");
-    expect(src).toContain("shiftMonthKey(norm, 1)");
+    // iterate (iter22: goes through lastEmittedRef so rapid taps can't lose steps)
+    expect(src).toContain("iterate(-1)");
+    expect(src).toContain("iterate(1)");
+    expect(src).toContain("lastEmittedRef.current");
     // label comes from the shared lib (single source of truth)
     expect(src).toContain("monthKeyToLabelRu(norm)");
     // direct pick

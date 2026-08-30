@@ -107,9 +107,16 @@ export function AnalyticsDateNav({ date, onChange, T, isToday }: AnalyticsDateNa
             }
           }}
           onClick={openPicker}
+          onKeyDown={(e) => {
+            // iter22 a11y: keyboard users Tab into the hidden input — Enter
+            // and Space should open the picker, same as a tap on the chip.
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openPicker();
+            }
+          }}
           aria-label="Выбор даты аналитики"
           className="sr-only"
-          tabIndex={-1}
         />
       </label>
 
