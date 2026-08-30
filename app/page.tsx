@@ -108,41 +108,41 @@ const DUO_SECTION_BG = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/obje
    Image folders verified against Supabase storage; bike/type split follows
    docs/autoreply/vip-bike-rent.csv (public.cars export: 12 Electric + 9 ICE). ══ */
 const CARPIX = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix";
-const img = (folder: string, n = 1) => `${CARPIX}/${folder}/image_${n}.jpg`;
+const img = (folder: string) => `${CARPIX}/${folder}/image_1.jpg`;
 
 const ELECTRIC_BIKE_IMAGES = [
-  img("falcon-gt-2026", 1), img("falcon-gt-2026", 3),
-  img("falcon-pro", 1), img("falcon-pro", 2),
-  img("y-volt-surge-v", 1), img("y-volt-surge-v", 3),
-  img("sequence-zero", 1), img("sequence-zero", 2),
-  img("livewire-one", 1), img("livewire-one", 4),
-  img("rerode-r1-plus", 1),
-  img("hmd-m02", 1),
-  img("wenbox-u2-pro", 1), img("wenbox-u2-pro", 3),
+  img("falcon-gt-2026"),
+  img("falcon-pro"),
+  img("y-volt-surge-v"),
+  img("sequence-zero"),
+  img("livewire-one"),
+  img("rerode-r1-plus"),
+  img("hmd-m02"),
+  img("wenbox-u2-pro"),
 ];
 
 const PETROL_BIKE_IMAGES = [
-  img("kawasaki-ex650k", 1), img("kawasaki-ex650k", 2),
-  img("yamaha-r7", 1), img("yamaha-r7", 2),
-  img("suzuki-gsx-s1000f", 1),
-  img("bmw-f800r", 1),
-  img("aprilia-shiver", 1),
-  img("nibbler-regumoto-4v", 1),
-  img("motoland-breakout", 1),
-  img("kayo-tsd110", 1),
-  img("jilang-max-pro", 1),
+  img("kawasaki-ex650k"),
+  img("yamaha-r7"),
+  img("suzuki-gsx-s1000f"),
+  img("bmw-f800r"),
+  img("aprilia-shiver"),
+  img("nibbler-regumoto-4v"),
+  img("motoland-breakout"),
+  img("kayo-tsd110"),
+  img("jilang-max-pro"),
 ];
 
 /* Card 3 (Подбор) — the head-turners from both camps, alternating electro/ICE */
 const SHOWSTOPPER_BIKE_IMAGES = [
-  img("sequence-zero", 1),
-  img("ducati-panigale-s-electro-gold", 1),
-  img("y-volt-surge-v", 1),
-  img("livewire-one", 2),
-  img("yamaha-r7", 1),
-  img("kawasaki-ex650k", 2),
-  img("suzuki-gsx-s1000f", 1),
-  img("falcon-gt-2026", 2),
+  img("sequence-zero"),
+  img("ducati-panigale-s-electro-gold"),
+  img("y-volt-surge-v"),
+  img("livewire-one"),
+  img("yamaha-r7"),
+  img("kawasaki-ex650k"),
+  img("suzuki-gsx-s1000f"),
+  img("falcon-gt-2026"),
 ];
 
 /* ══ Bike name lists per card (same verified split as galleries above) ══ */
