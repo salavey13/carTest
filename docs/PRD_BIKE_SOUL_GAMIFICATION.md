@@ -1,24 +1,26 @@
 # PRD: «BikeSoul» — Bikes as Pets 🏍️💗
 
-## Turning the VIP Bike fleet into a social network where bikes are the stars
+## A gamification layer for the bike wall: levels, moods, duels, seasons, work digests
 
 | | |
 |---|---|
 | **Codename** | BikeSoul (Души мото) |
-| **Status** | Draft v1 — for review |
-| **Date** | 2026-08-31 |
+| **Status** | Draft v1.1 — polished for review |
+| **Date** | 2026-09-01 |
 | **Iteration** | 29 (vision) → rollout iters 30–36 |
 | **Builds on** | iter28 «Мотопарк» wall (shipped, commit `86705f55c`), iter27 money discipline, iter25 money split engine |
-| **Author** | Product (with the crew owner's tamagotchi/Pokémon fever) |
+| **Author** | Product, from the owner's tamagotchi / Pokémon / «на Луну» idea |
 | **Related** | `docs/FRANCHIZE_METADATA_CONTRACT.md`, `docs/analytics_redesign_PRD.md`, `app/franchize/lib/bike-wall.ts` |
 
 ---
 
 ## 0. TL;DR
 
-We already shipped a **VK-style wall for bikes** (iter28): every rental and service job is a feed post with real photos, money, kilometres and odometer story. The crew loved it — because it accidentally did something no fleet dashboard does: **it gave each bike a biography**.
+> **Origin note.** This started as banter — tamagotchi, Pokémon battles, «пусть самые крутые летят на Луну». We are building it anyway, with full engineering discipline, because the joke pointed at something real: the cheapest known lever for daily engagement, pointed at idle motorcycles. The discipline exists so the joke can be dropped cheaply: display-only, metric-gated, one money engine, no permanent deletes. If the numbers don't move after iter32, we stop.
 
-This PRD turns that biography into a **life**. Every bike becomes a pet / character:
+We already shipped a **VK-style wall for bikes** (iter28): every rental and service job is a feed post with real photos, money, kilometres and odometer story. It did something no fleet dashboard does: **gave each bike a biography**.
+
+This PRD adds a **character layer** on top of that biography. Every bike becomes a pet / character:
 
 - It **grows** — XP and levels from rentals, revenue, kilometres, perfect returns; evolution stages from «Пони» to «Легенда Гаража».
 - It **feels** — a tamagotchi mood layer driven by service freshness, idle days and utilization («скучает», «спит», «на больничном»).
@@ -29,7 +31,7 @@ This PRD turns that biography into a **life**. Every bike becomes a pet / charac
 
 **The one rule that governs everything: gamification is display-only. It never touches real money math.** Earnings, splits, deposits and salary stay computed by the exact same engines as today (`computePartnerSplit`, iter27 rules). Souls, XP and moods are a *lens* on that truth, never a second source of it.
 
-**Why we believe it works:** the fleet's #1 business lever is **utilization** (idle bikes = dead capital), and the #1 human lever is **subrenter attachment** (partners who *love* their bike don't pull it from the fleet). Tamagotchi mechanics are the cheapest known way to make humans check on something daily. We are pointing that psychology at idle motorcycles.
+**Why we believe it works:** the fleet's #1 business lever is **utilization** (idle bikes = dead capital), and the #1 human lever is **subrenter attachment** (partners who *love* their bike don't pull it from the fleet). Pet-game mechanics are a proven way to make humans check on something daily. We are pointing that psychology at idle motorcycles — and measuring whether it moves the needle (§3), so this is a hypothesis with a kill date, not a faith.
 
 ---
 
@@ -108,9 +110,9 @@ Every mechanic in this PRD is an **event on top of the wall**, and the wall alre
 
 ### 5.1 Soul
 
-A **Soul** is a per-bike record: level, XP (season + all-time), stage, mood, rarity, title, skin, achievement set, streaks. One soul per `cars.id` where `type='bike'`. Souls are crew-scoped (RLS mirrors `crew_members`). A bike that leaves the fleet keeps its soul **parked** (soft state), not deleted — partners would riot.
+A **Soul** is a per-bike record: level, XP (season + all-time), stage, mood, rarity, title, skin, achievement set, streaks. One soul per `cars.id` where `type='bike'`. Souls are crew-scoped (RLS mirrors `crew_members`). A bike that leaves the fleet keeps its soul **parked** (soft state), not deleted — deleting a bike's accumulated history would break the emotional contract this whole layer depends on.
 
-### 5.2 XP — the grind IS the business
+### 5.2 XP — the grind is the business
 
 XP is computed **only from verified ledger events** (see §9 data model). v1 formula:
 
@@ -248,7 +250,7 @@ Each pillar: story → mechanics → UX → data → metrics → risks. Priority
 
 ### P4. Bike Battles 🥊 *(iter33)*
 
-**Story.** The user asked «what's next beyond leaderboard — bike battles?» Yes: weekly 1v1 duels, crew votes, zero money, maximum memes.
+**Story.** Beyond the leaderboard: weekly 1v1 duels with crew voting. Zero money, deliberately silly — crowns, memes, emoji.
 
 **Mechanics.**
 - Opt-in per bike (subrenter/owner toggles «Участвует в битвах»).
@@ -289,7 +291,7 @@ Each pillar: story → mechanics → UX → data → metrics → risks. Priority
 
 ### P6. Work-to-Earn — «байки идут на работу» 💼 *(iter34)*
 
-**Story.** The user's joke is the feature: bikes «go to work» and bring wages home. The subrenter gets a daily digest like a pet-trainer report, and a monthly salary sheet per bike.
+**Story.** «Байки идут на работу»: bikes go to work and bring wages home. The subrenter gets a daily digest (like a pet-trainer report) and a monthly salary sheet per bike — passive income framing for a real revenue share he already receives today, made visible and predictable.
 
 **Mechanics.**
 - Daily digest 09:00 MSK from `@oneBikePlsBot` per subrenter: per bike — yesterday's earnings, days-in-work streak, mood, one nudge if 😐/😴/🤒.
@@ -332,7 +334,7 @@ Each pillar: story → mechanics → UX → data → metrics → risks. Priority
 
 ### P9. Moon Program 🚀 *(annual, first ceremony Dec 2026)*
 
-**Story.** «Let the coolest go to the moon!» The annual Bike of the Year. Not the richest — the **coolest**: a weighted score of revenue (40 %), utilization (25 %), condition/care (15 %), crew love (10 %), tenure (10 %).
+**Story.** «Пусть самые крутые летят на Луну» — the annual Bike of the Year. Not the richest — the **coolest**: a weighted score of revenue (40 %), utilization (25 %), condition/care (15 %), crew love (10 %), tenure (10 %).
 
 **Mechanics.**
 - Winner announced 31 Dec, MSK, with a full-year wall retrospective Moment.
@@ -570,3 +572,8 @@ Snapshot 2026-08-30, vip-bike crew, from the wall engine (iter28):
 | Зарплата мото | Bike salary | monthly per-bike earnings sheet |
 | ГОДНОТА | Bike of the Year | Moon Program winner plate |
 | Тихий режим | Quiet mode | notification opt-out |
+
+## Changelog
+
+- **v1** (2026-08-31) — initial draft: full concept, XP/level/mood model, 10 pillars, data model, 7-iteration rollout.
+- **v1.1** (2026-09-01) — polish pass, no scope change: grounded the tone (the concept started as a joke and the doc now says so, with the discipline that makes it safe to try), removed meta references to "the user asked", tightened TL;DR, restored the «Мотопарк» menu link to the vip-bike hydration SQL (lost in an environment reset before commit — live crew was already patched directly, so no production action was needed).
