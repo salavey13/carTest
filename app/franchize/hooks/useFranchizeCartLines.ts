@@ -6,6 +6,7 @@ import type { CatalogItemVM } from "../actions";
 import { useFranchizeCart } from "./useFranchizeCart";
 import { hasServicePrice } from "../lib/catalog-utils";
 import { parseHelmetCount, parseExtrasFromPerk } from "../lib/perk-parse";
+import { resolveSalePriceFromSpecs } from "../lib/sale-price";
 
 const packageMultiplier: Record<string, number> = {
   base: 1,
@@ -34,12 +35,13 @@ const perkSurcharge: Record<string, number> = {
 
 function resolveSalePrice(item: CatalogItemVM | null): number {
   if (!item) return 0;
-  const specs = item.rawSpecs ?? {};
-  const raw = Number(
-    specs.price_rub ?? specs.sale_price ?? specs.purchase_price ?? specs.total_price ?? specs.price ?? 0,
-  );
-  if (!Number.isFinite(raw) || raw <= 0) return 0;
-  return Math.round(raw);
+  // iter29: sale_price now wins over price_rub — see lib/sale-price.ts.
+  // The quick price editor writes specs.sale_price; previously the cart
+  // preferred price_rub (the mirrored book value) and kept charging the
+  // STALE price after an editor fix. Catalog cards + buy PDF already
+  // preferred sale_price; this aligns the cart and the web-order sale
+  // contract (which takes its price from the cart line total).
+  return resolveSalePriceFromSpecs(item.rawSpecs ?? {});
 }
 
 function isBuyFlow(options: { package: string; duration: string; perk: string; auction: string; action?: string; buyConfigId?: string; buyPriceDelta?: number }): boolean {

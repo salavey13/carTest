@@ -210,6 +210,20 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
       setSavingId(vehicle.id);
       try {
         const currentSpecs = ((vehicle.specs || {}) as Record<string, unknown>) || {};
+
+        // iter29 sale-price mirror-sync: most legacy sale bikes carry
+        // price_rub === sale_price (book value mirrors the sale price).
+        // When the pair was mirrored before this edit, keep it mirrored —
+        // update price_rub too, so legacy price_rub consumers (daily
+        // insights cron etc.) don't charge/show a stale value. Intentional
+        // divergence (totalled > sale price) is preserved untouched.
+        const saleFlagOn = isSaleEnabled(currentSpecs);
+        const prevSale = Number(currentSpecs.sale_price ?? 0) || 0;
+        const prevRub = Number(currentSpecs.price_rub ?? 0) || 0;
+        const nextSale = Number(draft.salePrice) || 0;
+        const wasMirrored = saleFlagOn && prevSale > 0 && prevRub === prevSale;
+        const nextRub = wasMirrored ? nextSale : Number(draft.priceRub) || 0;
+
         const response = await fetch("/api/cars", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -233,8 +247,8 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
               "rent_5-10d": Number(draft.rent5_10d) || 0,
               "rent_11_30d": Number(draft.rent11_30d) || 0,
               // Sale & Totalled
-              sale_price: Number(draft.salePrice) || 0,
-              price_rub: Number(draft.priceRub) || 0,
+              sale_price: nextSale,
+              price_rub: nextRub,
               // Existing
               hidden: draft.hidden,
             },
@@ -246,7 +260,11 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
           return;
         }
 
-        toast.success("Цены сохранены");
+        toast.success(
+          wasMirrored && nextRub !== prevRub
+            ? "Цены сохранены (sale + price_rub синхронизированы)"
+            : "Цены сохранены",
+        );
         await loadFleet();
       } catch (error) {
         toast.error(
@@ -370,6 +388,19 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-[var(--fr-admin-text)]">
                       {vehicle.type === "bike" ? "🏍️" : "🚗"} {vehicle.make} {vehicle.model}
+                      {saleFlag && (
+                        <span
+                          className="ml-2 inline-flex items-baseline gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold"
+                          style={{
+                            backgroundColor: withAlpha(palette.accentMain, 0.14),
+                            color: "var(--fr-admin-accent)",
+                          }}
+                          title={draft.salePrice ? "Цена продажи (specs.sale_price)" : "sale=1, цена не задана"}
+                        >
+                          💰 Sale
+                          {draft.salePrice ? ` · ${Number(draft.salePrice).toLocaleString("ru-RU")} ₽` : " · без цены"}
+                        </span>
+                      )}
                     </p>
                     <p className="text-xs text-[var(--fr-admin-muted)]">{vehicle.id}</p>
                   </div>

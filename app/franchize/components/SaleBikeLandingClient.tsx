@@ -54,6 +54,7 @@ import { getTelegramWebAppFallbackHref } from "@/app/franchize/lib/telegram-link
 import { useFranchizeCart } from "@/app/franchize/hooks/useFranchizeCart";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useResolvedPalette } from "@/app/franchize/lib/useResolvedPalette";
+import { resolveSalePriceFromSpecs } from "@/app/franchize/lib/sale-price";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   CATALOG_VS_SPECS,
@@ -161,7 +162,11 @@ export function SaleBikeLandingClient({
   const heroImage =
     gallery[0] ?? "https://placehold.co/1200x900/0b0f13/e6edf3?text=No+image";
   const specs = useMemo(() => item.rawSpecs || {}, [item.rawSpecs]);
-  const basePrice = Number(specs.price_rub || specs.sale_price || 0);
+  // iter29 sale-price fix: prefer sale_price over price_rub via the shared
+  // lib (lib/sale-price.ts) — matches the catalog card and the cart. The
+  // quick price editor writes specs.sale_price; price_rub is the legacy
+  // book/totalled value most bikes mirror (usually equal, sometimes stale).
+  const basePrice = resolveSalePriceFromSpecs(specs);
 
   const configOptions = useMemo(() => resolveBuyConfigOptions(specs), [specs]);
   const colorOptions = useMemo(() => resolveBuyColorOptions(specs), [specs]);
