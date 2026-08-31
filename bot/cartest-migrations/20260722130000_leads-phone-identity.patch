@@ -1,0 +1,416 @@
+From 3d38c93c73ba1d9ea37995cd2cd11c400258e8d1 Mon Sep 17 00:00:00 2001
+From: Assistant VIP BIKE <assistant@vip-bike.local>
+Date: Wed, 22 Jul 2026 14:12:32 +0000
+Subject: [PATCH] fix(leads): stop operator rentals collapsing + collect client
+ phone
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Root cause of 45/57 rental_contract_artifacts having renter_phone = NULL:
+/doc-manual's client_phone step is optional and the operator skipped it every
+time, so the phone is genuinely absent from the DB (not lost mid-flow). Worse,
+that keyed the lead by the operator's telegram id, collapsing ALL of one
+operator's renters into a single franchize_intents row — only one renter was
+ever visible on the leads page.
+
+Changes:
+- leads.ts: add nameIdentityKey() (normalized). Operator-created artifacts and
+  rentals with no phone now key by normalized renter name instead of the
+  operator/owner chat id, so each renter is a distinct, visible lead. Rentals
+  merge into the matching artifact lead by name. Fixes the raw-name fallback
+  that produced duplicates ("...Кириллович." vs "...Кириллович").
+- leads-query.mjs: mirror leads.ts identity resolution exactly (skill now shows
+  the same leads as the web page). Also fixes a pre-existing broken template
+  literal (lines ~1156-1169) that embedded a fetch() inside a console.log(``)
+  and made the entire skill fail to parse.
+- doc-manual.ts: auto-suggest recent web callback (contact_click) phones in the
+  client_phone step so the operator links the contract in one tap instead of
+  skipping — the main cause of NULL phones going forward.
+- vip-bike-ops/SKILL.md: document the lead identity resolution order.
+
+Backfill migration (recover the few phones that exist in users) ships separately
+as 20260722130000_backfill_renter_phone_from_users.sql. Most NULL phones cannot
+be recovered — they were never collected.
+
+Co-Authored-By: Assistant VIP BIKE <assistant@vip-bike.local>
+---
+ app/franchize/server-actions/leads.ts       | 57 +++++++++++--
+ app/webhook-handlers/commands/doc-manual.ts | 89 ++++++++++++++++++---
+ skills/leads-crm-text/leads-query.mjs       | 46 +++++++++--
+ skills/vip-bike-ops/SKILL.md                | 24 ++++++
+ 4 files changed, 194 insertions(+), 22 deletions(-)
+
+diff --git a/app/franchize/server-actions/leads.ts b/app/franchize/server-actions/leads.ts
+index 1b7a6b1..dbe2bdf 100644
+--- a/app/franchize/server-actions/leads.ts
++++ b/app/franchize/server-actions/leads.ts
+@@ -159,6 +159,31 @@ function isPhoneString(id: string | null | undefined): boolean {
+   return /^(\+7|8|7)\d{10}$/.test(id.replace(/[\s\-\(\)]/g, ""));
+ }
+ 
++/**
++ * Build a stable per-renter identity key from a full name, e.g.
++ * "Рудометов Михаил Сергеевич." → "name:рудометов михаил сергеевич".
++ *
++ * WHY: when an operator creates a contract via /doc-manual and SKIPS the optional
++ * client phone, the lead used to be keyed by the operator's telegram_chat_id.
++ * That collapsed ALL of one operator's renters into a single franchize_intents /
++ * lead row (last write wins on name), so only ONE renter was ever visible on the
++ * leads page and the other 44+ were invisible. Keying by normalized name instead
++ * gives every renter a distinct, stable lead identity even without a phone.
++ *
++ * Normalization is intentionally minimal (lowercase, strip trailing dots/punct,
++ * collapse whitespace) and MUST stay identical here and in leads-query.mjs so the
++ * web page and the text skill surface the same identities. Returns "" for empty.
++ */
++function nameIdentityKey(fullName: string | null | undefined): string {
++  const n = (fullName || "")
++    .trim()
++    .toLowerCase()
++    .replace(/[.\s]+/g, " ")
++    .replace(/[.]/g, "")
++    .trim();
++  return n ? `name:${n}` : "";
++}
++
+ /**
+  * Normalize a phone number to canonical E.164-ish form (+7XXXXXXXXXX for RU).
+  * Accepts +7/7/8 prefix, spaces, dashes, parentheses.
+@@ -247,6 +272,11 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
+     // Cache: rental_id → artifact renter_phone (built from step 2 for step 4 lookups).
+     // Stores NORMALIZED phones so rentals step can match against operator-placeholder rentals.
+     const artifactPhoneByRentalId = new Map<string, string | null>();
++    // renter_full_name by rental_id — lets the rentals step fall back to a NAME
++    // identity key (nameIdentityKey) for operator-placeholder rentals that have no
++    // phone, so they merge with the matching artifact lead instead of collapsing
++    // under the crew-owner placeholder user_id.
++    const artifactNameByRentalId = new Map<string, string | null>();
+     // Cache: renter_phone (normalized) → set of rental_ids — helps with old artifacts
+     // that don't have rental_id backfilled (audit §4).
+     const rentalIdsByNormalizedPhone = new Map<string, Set<string>>();
+@@ -460,6 +490,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
+         // Cache phone by rental_id for rental-step lookups (use the normalized form).
+         if (a.rental_id) {
+           artifactPhoneByRentalId.set(a.rental_id, normalizedArtifactPhone);
++          artifactNameByRentalId.set(a.rental_id, a.renter_full_name || null);
+           // Also index by normalized phone → rental_ids (helps old artifacts without rental_id).
+           if (normalizedArtifactPhone) {
+             const set = rentalIdsByNormalizedPhone.get(normalizedArtifactPhone) ?? new Set<string>();
+@@ -488,10 +519,13 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
+         const isOperatorFromCrew = isOperatorPlaceholder(a.telegram_chat_id);
+         const preferPhone =
+           (isPreClaimByOperatorColumn || isOperatorFromCrew) && !!normalizedArtifactPhone;
+-        // When operator placeholder + no phone, use renter_full_name as fallback
+-        // identity key so the lead doesn't disappear under the operator's ID.
++        // When operator placeholder + no phone, use the NORMALIZED renter name as
++        // the identity key so each renter is a distinct lead (not collapsed under
++        // the operator's chat id). Normalization matters: "…Кириллович." (trailing
++        // dot) and "…Кириллович" must resolve to the SAME key, otherwise the same
++        // person shows up twice. See nameIdentityKey().
+         const fallbackName = (!preferPhone && !normalizedArtifactPhone && a.renter_full_name)
+-          ? `name:${a.renter_full_name}`
++          ? nameIdentityKey(a.renter_full_name)
+           : null;
+         const id = preferPhone
+           ? normalizedArtifactPhone!
+@@ -599,12 +633,23 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
+           ? normalizePhone((r.metadata as Record<string, unknown>).renter_phone as string | undefined)
+           : null;
+         const effectivePhone = artifactPhone || metaRenterPhone || null;
+-        const effectiveId = (prefersPhone && effectivePhone) ? effectivePhone : r.user_id;
++        // Identity for this rental: phone if we have one; otherwise, for operator-
++        // placeholder (pre-claim) rentals, fall back to the renter NAME (looked up
++        // via the artifact for this rental_id) so the rental merges with the
++        // matching artifact lead instead of collapsing under the crew-owner
++        // placeholder user_id (which hid 22 operator-created rentals behind one id).
++        const rentalName = (r.rental_id && artifactNameByRentalId.get(r.rental_id)) || null;
++        const rentalNameKey = prefersPhone ? nameIdentityKey(rentalName) : "";
++        const effectiveId = (prefersPhone && effectivePhone)
++          ? effectivePhone
++          : (rentalNameKey || r.user_id);
+ 
+         const existing = leadMap.get(effectiveId) ||
+           // Fallback: try matching by renter_phone from metadata (handles existing rentals
+           // whose user_id is telegramUserId while the lead key is phone)
+-          (metaRenterPhone ? leadMap.get(metaRenterPhone) || null : null);
++          (metaRenterPhone ? leadMap.get(metaRenterPhone) || null : null) ||
++          // Fallback: try matching by name key (rental merged to artifact by name)
++          (rentalNameKey ? leadMap.get(rentalNameKey) || null : null);
+         const vehicle = r.vehicle as { make?: string; model?: string } | null;
+         const bikeTitle = `${vehicle?.make || ""} ${vehicle?.model || ""}`.trim() || null;
+         // rentals.created_by_operator_chat_id preserves who originally created the rental
+@@ -627,7 +672,7 @@ export async function getFranchizeLeads(slug: string): Promise<GetFranchizeLeads
+         if (!existing) {
+           leadMap.set(effectiveId, {
+             user_id: effectiveId,
+-            full_name: null,
++            full_name: rentalName || null,
+             username: null,
+             phone: effectivePhone,
+             source: "rental",
+diff --git a/app/webhook-handlers/commands/doc-manual.ts b/app/webhook-handlers/commands/doc-manual.ts
+index 89ae4d9..01f2378 100644
+--- a/app/webhook-handlers/commands/doc-manual.ts
++++ b/app/webhook-handlers/commands/doc-manual.ts
+@@ -87,6 +87,47 @@ async function getDocCrewSlug(userId: string): Promise<string> {
+   }
+ }
+ 
++/**
++ * Fetch recent callback leads (web "перезвоните" CTA) that carry a phone, for a
++ * crew. Used in the client_phone step to auto-suggest the client phone so the
++ * operator can link the contract to the web lead in ONE tap instead of skipping.
++ *
++ * Skipping was the root cause of 45/57 rental_contract_artifacts having
++ * renter_phone = NULL: the phone step is optional and operators routinely hit
++ * "Пропустить", which keys the lead by the operator's TG id (collapsing all of
++ * one operator's clients into a single franchize_intents row) and leaves the
++ * phone empty everywhere. Surfacing existing callback phones makes collection
++ * 1-tap when the client actually came from the site.
++ */
++async function getRecentCallbackPhones(slug: string): Promise<Array<{ phone: string; name: string | null }>> {
++  try {
++    const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
++    const { data, error } = await supabaseAdmin
++      .from("franchize_intents")
++      .select("phone, metadata, last_seen_at")
++      .eq("slug", slug)
++      .eq("intent_type", "contact_click")
++      .not("phone", "is", null)
++      .gte("last_seen_at", since)
++      .order("last_seen_at", { ascending: false })
++      .limit(8);
++    if (error || !data) return [];
++    const seen = new Set<string>();
++    const out: Array<{ phone: string; name: string | null }> = [];
++    for (const row of data) {
++      const phone = (row.phone || "").trim();
++      if (!phone || seen.has(phone)) continue;
++      seen.add(phone);
++      const meta = (row.metadata as Record<string, unknown> | null) || {};
++      out.push({ phone, name: (meta.name as string) || null });
++    }
++    return out;
++  } catch (e) {
++    logger.warn("[/doc] getRecentCallbackPhones failed:", e);
++    return [];
++  }
++}
++
+ // ── Constants (minimal inline keyboards) ─────────────────────────────────────
+ // Simplified: we only care about A, B (M included), or no license. C/C1 ignored.
+ 
+@@ -3283,19 +3324,26 @@ export async function handleDocCallback(
+   }
+ 
+   if (callbackData === "ok") {
+-    // Before generating: ask for optional client phone (for callback leads)
+-    // This links the contract to the web lead (phone = user_id in users table)
++    // Before generating: ask for client phone (links contract to web callback lead).
++    // Auto-suggest recent "перезвоните" leads from the site so the operator can
++    // pick the client in one tap. This prevents the recurring NULL-phone case
++    // (operator used to skip the optional step → renter_phone NULL everywhere).
+     if (!context.clientPhoneResolved) {
+       await setState(userId, "client_phone", context);
+-      await sendComplexMessage(
+-        chatId,
+-        "📞 *Телефон клиента*\n\nЕсли клиент пришёл с сайта (заявка на звонок), введите его номер — договор привяжется к заявке.\n\nИли нажмите «Пропустить».",
+-        [
+-          [{ text: "⏭ Пропустить", callback_data: "ph_skip" }],
+-          [{ text: "❌ Отменить", callback_data: "cancel" }],
+-        ],
+-        { keyboardType: "inline", parseMode: "Markdown" },
+-      );
++      const suggestSlug = await getDocCrewSlug(userId);
++      const suggestions = await getRecentCallbackPhones(suggestSlug);
++      const rows: KeyboardButton[][] = [];
++      if (suggestions.length) {
++        for (const s of suggestions.slice(0, 6)) {
++          rows.push([{ text: `👤 ${s.name || "Клиент с сайта"} · ${s.phone}`, callback_data: `ph_pick:${s.phone}` }]);
++        }
++      }
++      rows.push([{ text: "⏭ Пропустить (без телефона)", callback_data: "ph_skip" }]);
++      rows.push([{ text: "❌ Отменить", callback_data: "cancel" }]);
++      const header = suggestions.length
++        ? "📞 *Телефон клиента*\n\nЗаявки с сайта (перезвон) за 14 дней. Выберите клиента — договор привяжется к заявке:\n\nЛибо введите номер вручную, либо пропустите."
++        : "📞 *Телефон клиента*\n\nВведите номер клиента — договор привяжется к заявке с сайта (если была).\n\nИли нажмите «Пропустить».";
++      await sendComplexMessage(chatId, header, rows, { keyboardType: "inline", parseMode: "Markdown" });
+       return true;
+     }
+     const docCrewSlug = await getDocCrewSlug(userId);
+@@ -3319,6 +3367,25 @@ export async function handleDocCallback(
+     return true;
+   }
+ 
++  // Operator picked a suggested callback-lead phone → link contract to that lead.
++  if (callbackData.startsWith("ph_pick:")) {
++    const phone = callbackData.slice("ph_pick:".length).trim();
++    if (!/^[\d+]{10,16}$/.test(phone)) {
++      await sendComplexMessage(chatId, "❌ Некорректный номер. Введите вручную или пропустите.", [], { removeKeyboard: true });
++      return true;
++    }
++    context.clientPhone = phone;
++    context.clientPhoneResolved = true;
++    await setState(userId, "confirm", context);
++    await sendComplexMessage(chatId, `✅ Телефон клиента: ${phone}\n\n⏳ Генерирую...`, [], { removeKeyboard: true });
++    const crewSlug = await getDocCrewSlug(userId);
++    const success = await generateContract(chatId, userId, context, crewSlug);
++    if (success) {
++      await clearState(userId);
++    }
++    return true;
++  }
++
+   logger.warn("[/doc] Unknown callback", { callbackData, state });
+   return false;
+ }
+diff --git a/skills/leads-crm-text/leads-query.mjs b/skills/leads-crm-text/leads-query.mjs
+index fac3292..8bc42ac 100644
+--- a/skills/leads-crm-text/leads-query.mjs
++++ b/skills/leads-crm-text/leads-query.mjs
+@@ -124,6 +124,23 @@ function isPhoneString(id) {
+   return /^(\+7|8|7)\d{10}$/.test(id.replace(/[\s\-()]/g, ""));
+ }
+ 
++/**
++ * Stable per-renter identity key from a full name ("Рудометов Михаил Сергеевич."
++ * → "name:рудометов михаил сергеевич"). Used so operator-created contracts with
++ * NO phone don't all collapse under the operator's chat id (which hid everyone
++ * except one renter on the leads list). MUST mirror leads.ts nameIdentityKey()
++ * exactly so the text skill and the web page surface the same identities.
++ */
++function nameIdentityKey(fullName) {
++  const n = String(fullName || "")
++    .trim()
++    .toLowerCase()
++    .replace(/[.\s]+/g, " ")
++    .replace(/[.]/g, "")
++    .trim();
++  return n ? `name:${n}` : "";
++}
++
+ // ─── Supabase REST client (uses fetch, no supabase-js dep) ────────────────────
+ 
+ let _supaUrl = null;
+@@ -290,6 +307,7 @@ function addOrMerge(leadMap, row) {
+ 
+ async function buildLeadMap() {
+   const artifactPhoneByRentalId = new Map();
++  const artifactNameByRentalId = new Map();
+   const rentalIdsByNormalizedPhone = new Map();
+   const bikeTitleMap = new Map();
+   const leadMap = new Map();
+@@ -404,6 +422,7 @@ async function buildLeadMap() {
+     const normalizedArtifactPhone = normalizePhone(a.renter_phone);
+     if (a.rental_id) {
+       artifactPhoneByRentalId.set(a.rental_id, normalizedArtifactPhone);
++      artifactNameByRentalId.set(a.rental_id, a.renter_full_name || null);
+       if (normalizedArtifactPhone) {
+         const set = rentalIdsByNormalizedPhone.get(normalizedArtifactPhone) ?? new Set();
+         set.add(a.rental_id);
+@@ -416,7 +435,13 @@ async function buildLeadMap() {
+       a.telegram_chat_id === a.created_by_operator_chat_id;
+     const isOperatorFromCrew = a.telegram_chat_id && CREW_OPERATOR_IDS.has(a.telegram_chat_id);
+     const preferPhone = (isPreClaimByOperatorColumn || isOperatorFromCrew) && !!normalizedArtifactPhone;
+-    const id = preferPhone ? normalizedArtifactPhone : (a.telegram_chat_id || normalizedArtifactPhone || "");
++    // Operator-created + no phone → key by NORMALIZED renter name so each renter
++    // is a distinct lead (mirrors leads.ts nameIdentityKey). Without this, all of
++    // one operator's renters collapsed under the operator's chat id and only one
++    // was ever visible.
++    const isOperatorOrigin = isPreClaimByOperatorColumn || isOperatorFromCrew;
++    const nameKey = isOperatorOrigin ? nameIdentityKey(a.renter_full_name) : "";
++    const id = preferPhone ? normalizedArtifactPhone : (nameKey || a.telegram_chat_id || normalizedArtifactPhone || "");
+     if (!id) continue;
+     const bikeId = a.resolved_bike_id || a.requested_bike_id;
+     const bikeTitle = (bikeId && bikeTitleMap.get(bikeId)) || null;
+@@ -489,12 +514,23 @@ async function buildLeadMap() {
+       ? normalizePhone(r.metadata.renter_phone)
+       : null;
+     const effectivePhone = artifactPhone || metaRenterPhone || null;
+-    const effectiveId = (prefersPhone && effectivePhone) ? effectivePhone : r.user_id;
++    // Operator-placeholder (pre-claim) + no phone → key by NORMALIZED renter name
++    // (looked up via the artifact for this rental_id) so the rental merges with
++    // the matching artifact lead instead of collapsing under the crew-owner
++    // placeholder user_id. Mirrors leads.ts.
++    const rentalName = (r.rental_id && artifactNameByRentalId.get(r.rental_id)) || null;
++    const rentalNameKey = prefersPhone ? nameIdentityKey(rentalName) : "";
++    const effectiveId = (prefersPhone && effectivePhone)
++      ? effectivePhone
++      : (rentalNameKey || r.user_id);
+ 
+     let existing = leadMap.get(effectiveId);
+     if (!existing && metaRenterPhone) {
+       existing = leadMap.get(metaRenterPhone) || null;
+     }
++    if (!existing && rentalNameKey) {
++      existing = leadMap.get(rentalNameKey) || null;
++    }
+     // Resolve bike title: try bike_id from metadata → bikeTitleMap; else fall back to null.
+     const meta = (r.metadata && typeof r.metadata === "object") ? r.metadata : null;
+     const bikeId = meta?.bike_id || meta?.requested_bike_id;
+@@ -516,7 +552,7 @@ async function buildLeadMap() {
+     if (!existing) {
+       leadMap.set(effectiveId, {
+         user_id: effectiveId,
+-        full_name: null,
++        full_name: rentalName || null,
+         username: null,
+         phone: effectivePhone,
+         source: "rental",
+@@ -1117,7 +1153,7 @@ async function cmdLeadDetail(leadId, opts) {
+   console.log("=== Pipeline ===");
+   console.log(`Стадия:          ${STAGE_LABELS[lead.stageKey] || lead.stageKey}`);
+   console.log(`QR status:       ${lead.qrStatus}`);
+-  console.log(`
++
+   // Fetch lead notes
+   const notesResp = await fetch(`${SUPABASE_URL}/rest/v1/lead_notes?select=id,text,created_by,created_at&lead_id=eq.${encodeURIComponent(leadId)}&order=created_at.desc&limit=20`, {
+     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+@@ -1130,7 +1166,7 @@ async function cmdLeadDetail(leadId, opts) {
+     }
+   }
+ 
+-  // Следующее действие: ${STAGE_NEXT_ACTION[lead.stageKey] || "—"}`);
++  console.log(`Следующее действие: ${STAGE_NEXT_ACTION[lead.stageKey] || "—"}`);
+   console.log(`Assignee:        ${formatAssignee(lead.assignee)}`);
+   console.log("");
+ 
+diff --git a/skills/vip-bike-ops/SKILL.md b/skills/vip-bike-ops/SKILL.md
+index 7a3fbd4..1628204 100644
+--- a/skills/vip-bike-ops/SKILL.md
++++ b/skills/vip-bike-ops/SKILL.md
+@@ -188,6 +188,30 @@ This skill does not query Supabase directly. For schema details, refer to the re
+ - `rental_contract_artifacts` — PII. Rental contract metadata, STS pledge, storage_path.
+ - `sale_contract_artifacts` — PII. Sale contract metadata, buyer info, warranty.
+ 
++### Lead identity resolution (important)
++
++When surfacing leads (web page `app/franchize/server-actions/leads.ts` and this
++skill's `leads-query.mjs`), the identity key is resolved in this priority:
++
++1. **Phone** (normalized `+7XXXXXXXXXX`) — when the artifact/rental has one.
++2. **Normalized renter name** — `name:<lowercased, dot-collapsed full name>` —
++   used as a fallback for operator-created contracts where the operator SKIPPED
++   the optional client phone step in `/doc-manual`. Without this fallback all of
++   one operator's renters collapsed into a single lead keyed by the operator's
++   `telegram_chat_id`, hiding everyone except one. The normalization MUST match
++   exactly between `leads.ts` (`nameIdentityKey`) and `leads-query.mjs`
++   (`nameIdentityKey`) or the web page and the text skill diverge.
++3. `telegram_chat_id` / `user_id` — last resort (operator placeholder).
++
++`rentals.user_id` for operator-created rentals is a placeholder = crew owner
++until the renter scans the QR. `created_by_operator_chat_id` on
++`rental_contract_artifacts` preserves the REAL operator; on `rentals` it is the
++crew-owner placeholder (known inconsistency, do not rely on it for "who issued").
++
++`/doc-manual` now auto-suggests recent web callback (`contact_click`) phones in
++the client_phone step so the operator links the contract in one tap instead of
++skipping — the main cause of `renter_phone = NULL`.
++
+ ## Web Links
+ 
+ | Command         | Web page                                                                              |
+-- 
+2.43.0
+

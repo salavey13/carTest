@@ -1,0 +1,47 @@
+{
+  "name": "vip-bot",
+  "version": "0.1.0",
+  "description": "VIP BIKE ELECTRO — Telegram-бот на рантайме KLOD-BOX (форк). Агент договоров аренды (recognize → docx → SQLite) + штатные lean-скиллы.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "contract": "tsx modules/contract/cli.ts",
+    "contract:recognize-sample": "RECOGNIZE_MOCK=1 tsx modules/contract/scripts/recognize-sample.ts",
+    "contract:gen-sample": "tsx modules/contract/scripts/gen-contract-sample.ts",
+    "avito:image": "tsx modules/avito/kie-image.ts",
+    "avito:image-sample": "KIE_MOCK=1 tsx modules/avito/scripts/gen-image-sample.ts",
+    "lead-watcher": "tsx modules/lead-watcher/watcher.ts",
+    "cert:generate": "tsx modules/certificate/kie-certificate.ts",
+    "cert:generate-sample": "KIE_MOCK=1 tsx modules/certificate/kie-certificate.ts gen-certificate --recipient \"Тест Тестова\" --donor \"ООО «Тест»\" --occasion \"С праздником!\" --amount \"1 000 руб.\""
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.120",
+    "@grammyjs/runner": "^2.0.3",
+    "@supabase/supabase-js": "^2.109.0",
+    "better-sqlite3": "^11.5.0",
+    "better-sqlite3-multiple-ciphers": "^11.5.0",
+    "cron-parser": "^4.9.0",
+    "docxtemplater": "^3.68.7",
+    "grammy": "^1.31.0",
+    "pino": "^9.5.0",
+    "pino-pretty": "^13.0.0",
+    "pizzip": "^3.2.0",
+    "sharp": "^0.33.5",
+    "tesseract.js": "^5.1.1",
+    "undici": "^6.26.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

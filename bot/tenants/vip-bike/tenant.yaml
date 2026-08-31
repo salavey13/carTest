@@ -1,0 +1,59 @@
+slug: vip-bike
+display_name: Бот VIP BIKE
+created_at: 2026-06-09
+vps:
+  ssh_target: root@212.67.11.25
+  ip: 212.67.11.25
+  provider: "{{уточнить}}"
+  ssh_key: ~/.ssh/clients_vps
+  os: Ubuntu 24.04
+  ram_gb: 3.9
+  domain: vip-bike.ru
+  # ⛔ На сервере уже: Docker-контейнер vip_bike → 127.0.0.1:3005 (Next-сайт) + nginx 80/443.
+  #    Бот ставится РЯДОМ (systemd/Node), порты НЕ пересекать. Доступ/пароль — tenants/vip-bike/vps-access.md (gitignored).
+deployment:
+  version: 0.1.0
+  install_path: /opt/claudeclaw/vip-bike
+  install_user: claudeclaw
+  service_name: claudeclaw-vip-bike
+  source: KLOD-BOX v0.9.5 fork (vip-bot)
+  notes: |
+    Форк рантайма KLOD-BOX. Главный навык — contract-agent (договоры аренды).
+    БД договоров — локальный SQLite (зашифрован, CONTRACTS_DB_KEY), отдельно от памяти бота.
+bot:
+  name: Ассистент VIP BIKE
+  assistant_display: Ассистент VIP BIKE
+client:
+  name: VIP BIKE ELECTRO
+  role: прокат электромотоциклов/электробайков (Нижний Новгород)
+  operators:
+    - "{{уточнить: Рустам — telegram_id}}"
+    - "{{уточнить: Илья — telegram_id}}"
+  description: |
+    Прокат электробайков в НН. Бот помогает операторам оформлять договоры аренды
+    прямо в Telegram: фото паспорта+ВУ клиента → распознавание → готовый .docx.
+  telegram_owner_id: "{{уточнить}}"
+auth:
+  method: z.ai
+support:
+  telegram_owner_id: "{{уточнить}}"
+  escalation_channel: TBD
+mcp_servers:
+  - zai-vision
+workspace:
+  notes_dir: workspace
+  rsync_excludes:
+    - .DS_Store
+    - store          # SQLite договоров (ПДн) — не синкать с локалью
+    - uploads        # фото документов (ПДн)
+contracts:
+  db_path: /opt/claudeclaw/vip-bike/workspace/store/contracts.db
+  encrypted: true    # SQLCipher, ключ в .env (CONTRACTS_DB_KEY)
+  uploads_dir: /opt/claudeclaw/vip-bike/workspace/uploads
+needed_from_client:
+  - CONTRACTS_DB_KEY (сгенерировать: openssl rand -hex 32)
+  - Z_AI_API_KEY + Z_AI_VISION_MODEL (боевой OCR)
+  - реквизиты lessor (ОГРНИП/ИНН/адрес/подписант) — или из Supabase
+  - per-unit bike_units (VIN/год/цвет) — или из Supabase
+  - telegram_id операторов (ALLOWED_CHAT_ID)
+  - юр-основа трансграничной передачи фото в Z.AI (152-ФЗ) ИЛИ РФ-OCR

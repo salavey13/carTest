@@ -1,0 +1,20 @@
+[Unit]
+Description=vip-bike lead-watcher (Supabase Realtime → Telegram)
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=claudeclaw
+WorkingDirectory=/opt/claudeclaw/vip-bike
+ExecStart=/usr/bin/npx tsx modules/lead-watcher/watcher.ts
+EnvironmentFile=/opt/claudeclaw/vip-bike/.env
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vip-bike-lead-watcher
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,14 @@
+{
+  "_comment_mcp": "z.ai окно контекста = 200k. Каждый MCP грузит схемы тулзов в стартовый промпт — держим минимум. VIP-боту нужен только zai-vision (фолбэк-анализ фото документов; основной OCR договоров идёт напрямую через recognize.ts по Z_AI_API_KEY, не через MCP). kie-ai (генерация картинок), zai-search (веб-поиск), playwright (браузер) убраны — боту проката не нужны.",
+  "mcpServers": {
+    "zai-vision": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@z_ai/mcp-server"],
+      "env": {
+        "Z_AI_API_KEY": "${Z_AI_API_KEY}",
+        "Z_AI_MODE": "ZAI"
+      }
+    }
+  }
+}

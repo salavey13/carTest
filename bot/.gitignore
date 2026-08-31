@@ -1,0 +1,24 @@
+# deps / build
+node_modules/
+dist/
+
+# secrets & access (НИКОГДА не коммитить)
+.env
+.env.*
+tenants/*/.env
+tenants/*/vps-access.md
+tenants/*/contract-data-form.md
+*.key
+*.pem
+
+# runtime data (SQLite договоров + загрузки ПДн + temp)
+workspace/store/*.db
+workspace/store/*.db-*
+workspace/store/*.docx
+workspace/uploads/
+_tmp/
+
+# misc
+.DS_Store
+*.tsbuildinfo
+npm-debug.log*
