@@ -1,346 +1,114 @@
-# carTest
+# 🏍️ VIP Bike — Telegram Mini App для аренды мото (франшиза)
 
-`carTest` — Telegram-first продуктовая студия на **Next.js + Supabase**.
+**VIP Bike** — это Telegram-first платформа аренды мотоциклов: мини-приложение
+(`@oneBikePlsBot`), CRM для экипажа (crews), полный пайплайн аренд с документами,
+аналитика с разделением денег партнёр/компания, и «Мотопарк» — стена историй
+каждого мото как в VK. Плюс Telegram-бот, который закрывает операционку:
+смены, документы, отчёты, `/testdrive`, `/salary` и другое.
 
-Цель простая: быстро собрать идею, дать ИИ контекст, получить правки в код и довести это до PR.
-
----
-
-## Ключевые маршруты
-- `/` — вход и навигация по платформе.
-- `/nexus` — хаб по инфраструктуре и инструментам.
-- `/repo-xml` — рабочая зона: контекст репозитория, AI-правки, PR-флоу.
-
-Логика продукта: **вход → рамка платформы → выполнение**.
+> Репо выросло из песочницы экспериментов — весь легаси (VPR-тесты, sauna,
+> strikeball, arbitrage и т.п.) остался в коде как «debug oldschool mode»,
+> но вынесен из критического пути миграций. Продукт — франшиза VIP Bike.
 
 ---
 
-## Что нужно, чтобы запустить свой fork
+## Что внутри (продуктовая поверхность)
+
+| Модуль | Где | Что делает |
+|---|---|---|
+| Лендинг + каталог | `/` | Витрина байков, конфигуратор, заявки |
+| Франшиза (экипаж) | `/franchize/{slug}` | Кабинет crews: аренды, лиды, деньги, документы |
+| Аренды | `/franchize/{slug}/rentals` | Пайплайн: заявка → подтверждение → активная → закрытие (фото ДО/ПОСЛЕ, одометр, депозит, экип) |
+| Аналитика | `/franchize/{slug}/rentals-analytics` | KPI, разделение партнёр/компания, парольной вход с TTL |
+| **Мотопарк** | `/franchize/{slug}/bikes` | Стена историй мото: фото аренд, деньги, сервис, одометр |
+| Зарплаты | `/franchize/{slug}/salary` | Планы, комиссии, расчёты |
+| Telegram-бот | `app/webhook-handlers` | Смены, документы (docx), отчёты, команды |
+| Документы | `app/franchize/*doc*` | DOCX-генерация: аренда/продажа/тестдрайв/субаренда/КП |
+
+**Дисциплина денег:** один движок расчёта (`computePartnerSplit` +
+`computeBikeStats`), отменённые аренды никогда не считаются в доход (iter27),
+весь геймификационный слой поверх — только отображение (PRD BikeSoul, iter29).
+
+---
+
+## Клон → деплой → ребрендинг
 
 ### 1) Fork и деплой
-1. Сделай **Fork** репозитория в свой GitHub.
-2. Подключи fork к своему Codex-потоку (ChatGPT Codex / local Codex).
-3. Импортируй fork в **Vercel**.
-4. Подключи Supabase.
+1. **Fork** репозитория.
+2. Импортируй fork в **Vercel** (framework Next.js, `npm run build`).
+3. Создай проект в **Supabase** (free tier хватает для старта).
+4. Создай бота в **@BotFather**, включи Mini App (Menu Button → Web App),
+   поставь webhook на `https://<твой-domain>/api/telegramWebhook`.
 
 ### 2) База данных
-Минимум для старта:
-- `supabase/migrations/20240101000000_init.sql`
-- `supabase/migrations/20260304_private_scheme.sql` — приватные `user_secrets`/`crew_secrets` для документов аренды.
-- `supabase/migrations/20260508090000_repair_private_crew_secrets.sql` — idempotent repair/grants guard для окружений, где `private.crew_secrets` отсутствовал.
+```bash
+supabase link --project-ref <ref>
+supabase db push          # применит ~160 чистых миграций из supabase/migrations/
+```
+Применяется всё: users, crews/members, cars (bike/equipment/service), rentals
++ rental_photos, franchize_intents, leads, salary, cash, deposits, артефакты
+документов, RPC для бота. Легаси-эксперименты вынесены в
+`supabase/legacy-migrations/` (см. README там — включая ⚠️ токен на ротацию).
 
-Дальше — накатывай остальные миграции по модулям, которые реально используешь.
+Минимум для старта, если хочешь шаг за шагом:
+- `20240101000000_init.sql` (base, включая исправленный Paul:-баг)
+- `20260304_private_scheme.sql` + `20260508090000_repair_private_crew_secrets.sql` (приватные секреты для документов)
+- далее по порядку — полный список в `supabase/migrations/README.md`.
 
-### 3) Переменные окружения (минимум)
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `TELEGRAM_BOT_TOKEN`
-- `ADMIN_CHAT_ID`
-- `GITHUB_TOKEN`
-- `GEMINI_API_KEY`
-- `ZAI_BASE_URL` *(default: https://internal-api.z.ai/v1)*
-- `ZAI_API_KEY`
-- `ZAI_CHAT_ID`	*(опционально, для functions.invoke контекста)*
-- `ZAI_USER_ID`	*(опционально, для user-scoped вызовов)*
-- `ZAI_TOKEN`	*(опционально, JWT токен)*
+### 3) Переменные окружения
+
+**Обязательные:**
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- `TELEGRAM_BOT_TOKEN`, `ADMIN_CHAT_ID`
 - `NEXT_PUBLIC_SITE_URL`
-- `SLACK_BOT_TOKEN` *(для `/codex` -> Slack)*
-- `SLACK_CODEX_CHANNEL_ID` *(ID канала, куда слать Codex-задачи; нужно для `chat.postMessage` mode)*
-- `SLACK_CODEX_MENTION` *(опционально, по умолчанию `@codex`)*
-- `SLACK_INCOMING_WEBHOOK_URL` *(опционально, альтернатива token+channel; канал берётся из webhook)*
-- `SLACK_CLIENT_ID` *(опционально, если используешь OAuth token rotation)*
-- `SLACK_CLIENT_SECRET` *(опционально, если используешь OAuth token rotation)*
-- `SLACK_REFRESH_TOKEN` *(опционально, если используешь OAuth token rotation)*
-- `CODEX_BRIDGE_CALLBACK_SECRET` *(опционально, для защищенного callback API)*
-- `VERCEL_PROJECT_NAME` *(опционально, по умолчанию `v0-car-test`)*
-- `VERCEL_PREVIEW_DOMAIN_SUFFIX` *(опционально, для автогенерации preview ссылок)*
-- `RENTAL_DOC_TEMPLATE_MODE=html` *(опционально, режим шаблона: md по умолчанию, html — с форматированием)*
 
-> Реальные секреты в Git не коммитим.
+**Опциональные:** `GITHUB_TOKEN`, `GEMINI_API_KEY`, `ZAI_*` (AI-функции),
+`SLACK_*` (мост `/codex` → Slack), `RENTAL_DOC_TEMPLATE_MODE=html`,
+`VERCEL_PROJECT_NAME`, `VERCEL_PREVIEW_DOMAIN_SUFFIX` — полный список в
+`.env.example`.
 
----
+> Секреты в Git не коммитим. Никогда. Даже в SQL-миграциях (см. историю — и урок в `supabase/legacy-migrations/README.md`).
 
-## Локальный запуск (опционально)
+### 4) Ребрендинг
+- Название/палитра crews: `docs/sql/update-vip-bike-*-palette.sql` как образец; метаданные crews (`metadata.franchize.*`) правятся SQL-хидрацией (`docs/sql/*-hydration.sql`).
+- Шаблоны документов: `docs/*_DEAL_TEMPLATE.html` + генератор в `app/franchize/`.
+- Бот: имя/аватар в BotFather, команды — в `app/webhook-handlers/commands/`.
+
+### 5) Локальный запуск
 ```bash
-git clone https://github.com/<YOUR_USERNAME>/carTest.git
-cd carTest
-cp .env.example .env.local
-npm install
-npm run dev
+cp .env.example .env.local   # заполни секреты
+npm install && npm run dev
 ```
 
 ---
 
-## Как держать fork в актуальном состоянии
-
-### Вариант A: через терминал
-```bash
-git remote add upstream https://github.com/<UPSTREAM_OWNER>/carTest.git
-git checkout main
-git fetch upstream
-git merge upstream/main
-# или: git rebase upstream/main
-git push origin main
-```
-
-### Вариант B: только браузер (без локального Git)
-1. Открой свой fork на GitHub.
-2. Нажми **Sync fork** → **Update branch** для `main`.
-3. Если возникли конфликты — реши их через GitHub conflict editor
-   или открой PR из upstream в свой fork.
-
----
-
-## Как контрибьютить без боли
-1. Делай изменения в своей ветке в форке.
-2. Открывай PR.
-3. После мержа в upstream остальные форки подтягивают апдейты тем же способом.
-
-Коротко: **fork it → ship it → sync it**.
-
----
-
-## Технологии
-- Next.js (App Router), React, TypeScript
-- Tailwind + shadcn/ui
-- Supabase (Postgres, Auth, Storage)
-- Telegram Bot / WebApp
-- GitHub API (автоматизация branch/PR)
-
----
-
-## Полезные документы
-- Короткая версия: `docs/README_TLDR.md`
-- Правила для агентных правок: `AGENTS.md`
-- Операционный опыт/память агента: `docs/AGENT_DIARY.md`
-- Каноничный рантайм-контракт: `docs/CYBERTUTOR_RUNTIME_CONTRACT_V1.md`
-- Контрибьют: `CONTRIBUTING.md`
-
-
----
-
-## Telegram → Slack (`/codex`) bridge
-
-Добавлен бесплатный мост вместо внешних форвардеров: команда в Telegram уходит в Slack как запрос к Codex.
-
-Пример:
-```
-/codex add /codex command that posts to slack
-```
-
-Что происходит:
-1. Пользователь пишет `/codex ...` в Telegram-бота.
-2. В `app/api/telegramWebhook` это проходит через общий `command-handler`.
-3. Новый handler отправляет сообщение в Slack через `chat.postMessage` в канал `SLACK_CODEX_CHANNEL_ID`.
-4. Текст трансформируется в формат `@codex ...` (или другой mention через `SLACK_CODEX_MENTION`).
-
-Важно для тебя (что нужно настроить в Vercel secrets):
-
-Вариант A — `chat.postMessage` mode:
-- `SLACK_BOT_TOKEN` (Bot User OAuth Token, обычно `xoxb-...`)
-- `SLACK_CODEX_CHANNEL_ID` (например `C08...`, не имя `#general`)
-- опционально `SLACK_CODEX_MENTION` (если нужен не `@codex`; для гарантированного пинга указывай Slack ID в формате `<@U...>`)
-
-Вариант B — Incoming Webhook mode (без channel id):
-- `SLACK_INCOMING_WEBHOOK_URL`
-- опционально `SLACK_CODEX_MENTION`
-
-Чтобы token mode работал, Slack app должен иметь минимум scope `chat:write` и быть добавлен в целевой канал.
-
-Рекомендация по хранению токенов:
-- Если `xoxb` долгоживущий в твоей конфигурации — храни `SLACK_BOT_TOKEN` в Vercel env.
-- Если у тебя rotation и токен часто истекает — храни `SLACK_CLIENT_ID`/`SLACK_CLIENT_SECRET`/`SLACK_REFRESH_TOKEN`, а access token получай динамически (уже реализовано серверно).
-- Если хочешь самый простой fixed-channel вариант — используй `SLACK_INCOMING_WEBHOOK_URL` и не задавай `SLACK_CODEX_CHANNEL_ID`.
-
-
-## Codex callback API (Telegram/Slack replies + preview link)
-
-Добавлен server-side endpoint: `POST /api/codex-bridge/callback`
-
-Для чего: после выполнения задачи можно отправить результат обратно в Telegram и/или в Slack, плюс автоматически собрать preview URL по branch name.
-
-Авторизация:
-- header `x-codex-bridge-secret: <CODEX_BRIDGE_CALLBACK_SECRET>`
-
-
-Зачем нужен `CODEX_BRIDGE_CALLBACK_SECRET`:
-- это shared secret для защиты `POST /api/codex-bridge/callback` от чужих запросов
-- endpoint принимает callback только если header `x-codex-bridge-secret` совпадает с env
-- без этого любой, кто знает URL, мог бы спамить сообщения в Telegram/Slack от имени системы
-
-Пример payload:
-```json
-{
-  "status": "done",
-  "summary": "Implemented /codex flow",
-  "branch": "feat-ai-1770909184796",
-  "taskPath": "/wblanding",
-  "prUrl": "https://github.com/.../pull/123",
-  "telegramChatId": "123456789",
-  "slackChannelId": "C0123456789",
-  "slackThreadTs": "1730000000.12345"
-}
-```
-
-Preview link строится как:
-`https://<VERCEL_PROJECT_NAME>-git-<branch-with-slashes-replaced><VERCEL_PREVIEW_DOMAIN_SUFFIX>/<taskPath>`
-
-Пример: `feat/ai-177` -> `feat-ai-177`.
-
-Suffix может быть в формате `-team.vercel.app` (рекомендуемо) или `.team.vercel.app`; код поддерживает оба варианта.
-
-
-### Bridge workflow contract (ветка -> PR -> callback)
-1. Работай в короткой ветке вида `fix/...` или `chore/...` (lowercase, `a-z0-9/-`, без `_`, лучше <= 24 символов в slug).
-2. После коммита открой PR.
-3. Сразу после PR отправь callback (в тот же Slack thread / Telegram chat): `status`, `summary`, `branch`, `taskPath`, `prUrl`, `slackThreadTs`.
-4. Preview строится только из **реального** имени ветки (`/` -> `-`), без плейсхолдеров вроде `work`.
-5. Если runner переименовал/префиксовал ветку (например `fix/...` -> `codex/fix-...`), source of truth = `head.ref` из созданного PR.
-6. Preview и callback должны использовать именно финальное имя ветки из PR metadata.
-
-
-### SupaPlan-first execution (for Codex/agents)
-- Start from `AGENT_ENTRY.md`: default flow is `inspect-migrations` -> `pick-task` -> execute task `todo_path` -> `ready_for_pr`.
-- `node scripts/supaplan-skill.mjs inspect-migrations` is now the capability-discovery check: it reads live `supaplan_tasks` rows from Supabase (JS client first, REST fallback second), so the capability list comes from current DB state rather than seed migration files.
-- Pick `--capability` only from the real capability names shown there. Never guess or hallucinate a capability.
-- Then use CLI helper: `node scripts/supaplan-skill.mjs pick-task --capability <real_capability_from_inspect> --agentId <agent_id>`.
-- If `inspect-migrations` shows zero real capabilities or zero claimable tasks, report exactly: `No claimable tasks for any real capability right now. Waiting for operator or new tasks.`
-- Prefer repo skills/scripts before manual improvisation; this includes SupaPlan helpers, `scripts/codex-notify.mjs`, Supabase access helpers, and screenshot/browser helpers when visual proof would help.
-- If the change is visual or easier to validate with an image, capture a screenshot proactively instead of waiting for a special trigger.
-- If task is claimed, keep statuses updated (`running`, then `ready_for_pr`) and log progress via `log-event`.
-- Task-bound PRs must include the token in both places: title contains `supaplan_task:<task_id>`, and description contains a standalone line `supaplan_task: <task_id>`.
-- When notification context exists, do not forget delivery: use `scripts/codex-notify.mjs`; if context is missing, report that explicitly instead of silently skipping it.
-- Treat ad-hoc coding as fallback only when SupaPlan has no claimable open task for any real capability returned by `inspect-migrations` or SupaPlan infra is temporarily unavailable.
-
-### Bridge automation roadmap
-- See `docs/AUTOMATION_EXPANSION_PLAN.md` for phased expansion from manual callbacks to agent-executed callbacks, lifecycle notifications, and data/deploy observability.
-
-
-### Built-in notification skill (agent/operator)
-Use local helper script:
-```bash
-node scripts/codex-notify.mjs callback --status completed --summary "Done" --telegramChatId <chat_id> --telegramUserId <originator_user_id>
-```
-Notes:
-- script resolves branch as `PR_HEAD_REF` -> current git branch -> `--branch`
-- pass both `telegramChatId` and `telegramUserId` to notify chat + originator
-- `node scripts/codex-notify.mjs telegram --text "..."` now supports heartbeat fan-out to `ADMIN_CHAT_ID`, `NEXT_PUBLIC_MOCK_USER_ID` (if set), and always mirrors to super-admin `417553377`; use `--dryRun true` to verify recipients without sending.
-
-### Operator copy-paste callback template
-After Codex task completion, send callback to (fallback mode when agent cannot send it automatically):
-- `https://v0-car-test.vercel.app/api/codex-bridge/callback`
+## Разработка и гейты
 
 ```bash
-curl -X POST "https://v0-car-test.vercel.app/api/codex-bridge/callback" \
-  -H "Content-Type: application/json" \
-  -H "x-codex-bridge-secret: $CODEX_BRIDGE_CALLBACK_SECRET" \
-  -d '{
-    "status": "done",
-    "summary": "Implemented requested change",
-    "branch": "feat/ai-1770909184796",
-    "taskPath": "/wblanding",
-    "prUrl": "https://github.com/<owner>/<repo>/pull/<id>",
-    "telegramChatId": "<chat_id>",
-    "slackChannelId": "<channel_id>",
-    "slackThreadTs": "<thread_ts_optional>"
-  }'
+npx vitest run tests/franchize/   # тесты франшизы (~930, есть live-спеки — нужны креды)
+npm run typecheck:franchize       # строгий TS-слайс продукта
+npm run lint:target               # eslint по app/franchize
+npm run gen:db-types              # перегенерация types/database.types.ts из живой БД
 ```
 
+Правила для агентов и контрибьюторов: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`.
+Опыт итераций: `docs/AGENT_DIARY.md`, корневой `worklog.md`.
 
+## Карта документации
 
----
+- Продуктовые PRD: `docs/PRD_*.md` (зарплаты, аналитика, лиды, фото аренд, …)
+- **BikeSoul** — геймификация «байки как питомцы»: `docs/PRD_BIKE_SOUL_GAMIFICATION.md`
+- Плейсхолдеры и планы: `docs/superpowers/plans/`
+- Легаси-архив (vibe-эпоха): `docs/legacy/`
 
-## Appendix A — Как получить `TELEGRAM_BOT_TOKEN` и `ADMIN_CHAT_ID` (первый раз)
+## Sync форка
 
-### A1) Создать бота через BotFather
-1. В Telegram открой `@BotFather`.
-2. Отправь `/newbot`.
-3. Задай имя бота (любое, например `oneSitePls Helper`).
-4. Задай username бота (должен заканчиваться на `bot`, например `oneSitePlsBot`).
-5. BotFather вернет токен вида `123456789:AA...` — это и есть `TELEGRAM_BOT_TOKEN`.
-
-### A2) Включить WebApp-кнопку (опционально, но полезно)
-1. В `@BotFather` отправь `/setmenubutton`.
-2. Выбери своего бота.
-3. Выбери `Configure menu button`.
-4. Укажи URL вашего приложения (например Vercel production URL).
-
-### A3) Узнать `ADMIN_CHAT_ID`
-Самый простой путь:
-1. Напиши любое сообщение своему боту.
-2. Открой в браузере:
-   `https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getUpdates`
-3. Найди поле `message.chat.id` (или `from.id`) — это твой `ADMIN_CHAT_ID`.
-
-> Для групп/каналов chat id может быть отрицательным (например `-100...`).
-
----
-
-## Appendix B — Как получить Slack токены для `/codex` bridge
-
-### B1) Создать Slack App
-1. Открой [api.slack.com/apps](https://api.slack.com/apps).
-2. Нажми **Create New App** → **From scratch**.
-3. Укажи имя (например `carTest Codex Bridge`) и workspace (`oneSitePls.slack.com`).
-
-### B2) Выдать права (OAuth Scopes)
-1. В приложении открой **OAuth & Permissions**.
-2. В **Bot Token Scopes** добавь минимум:
-   - `chat:write`
-3. Нажми **Install to Workspace** (или **Reinstall** после изменения scopes).
-
-### B3) Получить `SLACK_BOT_TOKEN`
-1. В **OAuth & Permissions** скопируй **Bot User OAuth Token** (`xoxb-...`).
-2. Сохрани как `SLACK_BOT_TOKEN` в Vercel env.
-
-### B3b) Если включена token rotation (short-lived access token)
-Если в Slack включен rotation и access token короткоживущий, в env лучше хранить не сам access token, а связку:
-- `SLACK_CLIENT_ID`
-- `SLACK_CLIENT_SECRET`
-- `SLACK_REFRESH_TOKEN`
-
-В этом проекте мост умеет автоматически получать свежий access token через `oauth.v2.access` (grant type: `refresh_token`).
-Тогда `SLACK_BOT_TOKEN` можно не задавать.
-
-### B4b) Incoming webhook без channel id
-Если используешь incoming webhook URL, `SLACK_CODEX_CHANNEL_ID` не нужен: канал уже "зашит" в webhook.
-
-### B4) Получить `SLACK_CODEX_CHANNEL_ID`
-Вариант через Slack UI:
-1. Открой нужный канал (например `#general`).
-2. Кликни по названию канала → **View channel details**.
-3. Найди/скопируй Channel ID (формат обычно `C...`).
-
-Вариант через URL канала:
-- часто ID виден в URL вида `.../client/T.../C...`.
-
-### B5) Добавить бота в канал
-В канале Slack выполни:
-- `/invite @<имя_твоего_slack_app_бота>`
-
-Без этого `chat.postMessage` может возвращать `not_in_channel`.
-
-### B6) Проверка (минимальная)
-После деплоя отправь в Telegram:
+```bash
+git remote add upstream https://github.com/salavey13/cartest.git
+git fetch upstream && git rebase upstream/main && git push origin main
 ```
-/codex test slack bridge
-```
-Ожидаемо: сообщение появится в Slack в формате `@codex ...`.
+Или кнопкой **Sync fork** на GitHub.
 
+## Лицензия
 
-### CyberTutor homework-photo strict mode
-- For `/codex` tasks with homework photo, agent must solve concrete numbered tasks (not just provide a plan).
-- In `Что дано`, include extracted task statements from source PDFs (not only exercise numbers).
-- Must persist solved output to Supabase and verify read-after-write before claiming success.
-- Completion callback should include production homework URL (`https://v0-car-test.vercel.app/homework/solution/<jobId>`), and screenshot must be uploaded to public storage and sent as `imageUrl`.
-- Include Telegram WebApp deeplink too: `https://t.me/oneBikePlsBot/app?startapp=homework/solution/<jobId>`.
-- Screenshot fallback order: Chromium -> Firefox -> WebKit -> thum.io (`scripts/page-screenshot-skill.mjs`).
-- `scripts/page-screenshot-skill.mjs` is **public URL fallback only** (not local/private smoke testing) and its binary outputs should generally **not be committed in PRs**.
-- For deterministic local/CI captures use: `node scripts/capture-screenshot.mjs --url http://127.0.0.1:3000 --out artifacts/home.png` (same fallback chain + `networkidle` wait + animations disabled).
-- For ИЗО tasks, generate a "photo-of-sketchbook" image prompt + manual redraw steps + materials list.
-- If Slack lacks file-upload scopes (`missing_scope`), bridge should send photo links fallback instead of silently dropping images.
-
-
-### Client naming note
-- `vip-bike`, `vip bike`, `franchize`, and `FRANCHEEZEPLAN` refer to the same client/teammate stream in this repo unless an operator explicitly says otherwise.
+Apache License 2.0 (`LICENSE.md`). Vibe-лицензия эпохи песочницы — в `docs/legacy/`.
