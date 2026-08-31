@@ -460,6 +460,34 @@ if (!isPasswordAuth) {
 
 ---
 
+## 🟡 AVITO → ЛИДЫ: webhook-интеграция (v1, 2026-08-31)
+
+Входящие сообщения Авито сохраняются как **холодные лиды** в CRM
+(`/franchize/vip-bike/leads`, сегмент «Заявки», колонка «Новые»).
+
+**Поток:** покупатель пишет в чат Авито → Avito шлёт Messenger v3 webhook →
+`POST /api/webhooks/avito` → INSERT/UPDATE `public.franchize_intents`
+(`intent_type=callback_request`, `stage=lead_captured`, `contact_channel=avito`,
+metadata: `avitoChatId`, `avitoUserId`, `bikeTitle`, текст, счётчик сообщений)
+→ TG-уведомление владельцу экипажа через `/api/forward-telegram`
+(на VPS Telegram заблокирован — только прокси).
+
+**Правила обработки:**
+- Первое сообщение чата = новый лид; повторные от покупателя = UPDATE metadata + `last_seen_at` (без спама)
+- Наши ответы (`author_id != buyer_id`) = только touch `last_seen_at`
+- Дедуп по `metadata->>avitoChatId`, идемпотентность повторов по `metadata->>lastEventId`
+- Ответ ВСЕГДА `200` (Avito ретраит не-200; таймаут 2 сек) — даже при ошибке Supabase
+- Секрет: env `AVITO_WEBHOOK_SECRET` (передаётся в `?secret=` URL или header `x-avito-secret`); если env не задан — принимается с warning
+
+**Env / инфраструктура:**
+- `AVITO_WEBHOOK_SECRET` — задан в VPS `.env.local` (2026-08-31); в Vercel env пока НЕ задан
+- ⚠️ **Подписка на стороне Авито НЕ активирована** — нужны `AVITO_CLIENT_ID/SECRET` со scope `messenger:read` (приложение на developers.avito.ru). До регистрации лиды из Авито НЕ приходят
+- Регистрация: `node scripts/avito-webhook-setup.mjs register "https://rental.vip-bike.ru/api/webhooks/avito?secret=..."`
+
+**Доки:** `docs/AVITO_WEBHOOK.md` (setup + smoke-тесты) · PRD развития лидов и РНП: `docs/PRD_LEADS_RNP.md`
+
+**Не путать:** таблица `leads` + страница `/leads` — легаси скрапер-тула, к этой CRM отношения не имеет; `crm_leads` — мёртвый фундамент (кодом не используется). Канонический лиджер — `franchize_intents`.
+
 ## 🗄️ SUPABASE SCHEMA
 
 ### Public Schema
