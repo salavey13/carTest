@@ -133,11 +133,15 @@ set
           'logoHref', '/',
           -- NOTE: header.menuLinks (the hamburger menu) is intentionally a
           -- rich list — Каталог, Карта, Каталог-electro, Конфигуратор, О нас,
-          -- Контакты, Корзина, Мои аренды, Сообщество, Партнёрам, Продажи.
+          -- Контакты, Корзина, Мои аренды, Мотопарк, Сообщество, Партнёрам,
+          -- Продажи + I5 service ops (Касса, Комиссии, Зарплата, Экипировка).
           -- A prior cleanup (027d72dc) trimmed this down to 5 entries together
           -- with the footer, but the hamburger menu needs the full navigation.
           -- Only the FOOTER columns were meant to be slimmed. Do not trim this.
           -- "Мои аренды" uses ?my=true to show only the current user's rentals.
+          -- iter28: «Мотопарк» → /franchize/{slug}/bikes (bike story wall).
+          -- Live vip-bike already carries this link (12 links, patched 2026-08-30);
+          -- it MUST also live here so re-hydration never wipes the button.
           'menuLinks', jsonb_build_array(
             jsonb_build_object('label', 'Каталог', 'href', '/franchize/{slug}'),
             jsonb_build_object('label', 'Карта', 'href', '/franchize/{slug}/map-riders'),
@@ -147,6 +151,7 @@ set
             jsonb_build_object('label', 'Контакты', 'href', '/franchize/{slug}/contacts'),
             jsonb_build_object('label', 'Корзина', 'href', '/franchize/{slug}/cart'),
             jsonb_build_object('label', 'Мои аренды', 'href', '/franchize/{slug}/profile'),
+            jsonb_build_object('label', 'Мотопарк', 'href', '/franchize/{slug}/bikes', 'icon', 'Bike'),
             jsonb_build_object('label', 'Сообщество', 'href', '/franchize/{slug}/community'),
             jsonb_build_object('label', 'Партнёрам', 'href', '/franchize/{slug}/onboarding'),
             jsonb_build_object('label', 'Продажи', 'href', '/franchize/{slug}/sales'),
