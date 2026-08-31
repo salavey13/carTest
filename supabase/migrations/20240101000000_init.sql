@@ -86,9 +86,6 @@ CREATE INDEX ON users USING gin (username gin_trgm_ops);
 ALTER TABLE cars ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read" ON cars FOR SELECT USING (true);
 
-
-Paul:
-
 -- Enable Row-Level Security (RLS) for all tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
