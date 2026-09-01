@@ -481,8 +481,10 @@ metadata: `avitoChatId`, `avitoUserId`, `bikeTitle`, текст, счётчик 
 
 **Env / инфраструктура:**
 - `AVITO_WEBHOOK_SECRET` — задан в VPS `.env.local` (2026-08-31); в Vercel env пока НЕ задан
-- ⚠️ **Подписка на стороне Авито НЕ активирована** — нужны `AVITO_CLIENT_ID/SECRET` со scope `messenger:read` (приложение на developers.avito.ru). До регистрации лиды из Авито НЕ приходят
-- Регистрация: `node scripts/avito-webhook-setup.mjs register "https://rental.vip-bike.ru/api/webhooks/avito?secret=..."`
+- **Автоматический источник (2026-09-01):** фабричный cron `*/10min` → `/opt/vip-bike-avito/scripts/avito_monitor.py` (2 аккаунта Авито: аренда+продажа, ключи там же) дублирует каждое новое входящее в этот вебхук с enrichment `client{name,url,profile,category}` — реальные имена покупателей и GLM-категория в metadata. Дедуп по реальному chat_id
+- Fallback: ассистент-бот пересылает ручные форварды операторов конвертом `bot_forward` (см. ниже)
+- ⚠️ **Официальная подписка Авито НЕ активирована** — при активации отключить CRM-дублирование монитора (TG-аналитику оставить), чтобы не дублировать TG-уведомления
+- Регистрация: `node scripts/avito-webhook-setup.mjs register "https://rental.vip-bike.ru/api/webhooks/avito?secret=..."` (ключи уже есть: `/opt/vip-bike-avito/secrets.env` на фабрике)
 
 **Доки:** `docs/AVITO_WEBHOOK.md` (setup + smoke-тесты) · PRD развития лидов и РНП: `docs/PRD_LEADS_RNP.md`
 
