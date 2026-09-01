@@ -320,6 +320,14 @@ export async function getFranchizeLeads(
    * by itself.
    */
   initData?: string,
+  /**
+   * Analytics password (browser password-auth path). 2026-09-01 fix: the leads
+   * page's password gate stored the password but never forwarded it here, so
+   * password users always got «Не авторизован» after passing the gate.
+   * Verified server-side against the analytics_passwords RPC — never trusted
+   * by itself.
+   */
+  authPassword?: string,
 ): Promise<GetFranchizeLeadsResult> {
   noStore();
   const safeSlug = slug.trim();
@@ -345,6 +353,20 @@ export async function getFranchizeLeads(
           return { success: false, error: ownerAccess.error || "Недостаточно прав." };
         }
         // Password auth OK — proceed with actorUserId
+      } else if (authPassword && authPassword.trim().length > 0) {
+        // 2026-09-01: browser password-auth path — verify the password against
+        // analytics_passwords (RPC checks expiry) and require this crew's slug.
+        const rpc = await supabaseAdmin.rpc("validate_analytics_password", {
+          p_password: authPassword.trim(),
+        });
+        if (rpc.error) {
+          return { success: false, error: "Ошибка проверки пароля." };
+        }
+        const row = Array.isArray(rpc.data) ? rpc.data[0] : null;
+        if (!row || !row.is_valid || (row.slug && row.slug !== safeSlug)) {
+          return { success: false, error: "Не авторизован (пароль)." };
+        }
+        // Password OK — proceed (owner identity not needed for the read path)
       } else {
         return { success: false, error: access.error || "Не авторизован." };
       }

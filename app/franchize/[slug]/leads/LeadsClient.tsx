@@ -150,6 +150,7 @@ export function LeadsClient({
     passwordAuthed,
     storedPassword,
     handlePasswordSubmit,
+    passwordAuthOwnerId,
   } = usePasswordGate(slug, isInTelegram, dbUser?.user_id);
 
   // Auth check: user is authed via Telegram WebApp OR password
@@ -192,9 +193,12 @@ export function LeadsClient({
         // in leads.ts, so the module-level imports are clean for the client RPC stub.
         const result = await getFranchizeLeads(
           slug,
-          dbUser?.user_id || "",
+          dbUser?.user_id || passwordAuthOwnerId || "",
           false, // isPasswordAuth=false — server tries cookie auth first
           initData,
+          // 2026-09-01: forward the analytics password so browser password-auth
+          // users can actually load leads (server verifies it via RPC).
+          storedPassword || undefined,
         );
         if (isCancelled()) return false;
         if (result.success) {
@@ -218,7 +222,7 @@ export function LeadsClient({
     }
     setLeadsLoadError(lastError);
     return false;
-  }, [slug, dbUser?.user_id]);
+  }, [slug, dbUser?.user_id, passwordAuthOwnerId, storedPassword]);
 
   useEffect(() => {
     if (!isAuthed || shouldShowPassword) return;
@@ -397,7 +401,12 @@ export function LeadsClient({
     setNotesState([]);
     (async () => {
       try {
-        const res = await getLeadNotes(selectedId, crewId, dbUser?.user_id || undefined, passwordAuthed);
+        const res = await getLeadNotes(
+          selectedId,
+          crewId,
+          dbUser?.user_id || passwordAuthOwnerId || undefined,
+          passwordAuthed,
+        );
         if (!cancelled && res.success && res.data) {
           setNotesState(res.data.map((n) => ({
             id: n.id, text: n.text, created_at: n.created_at, created_by: n.created_by,
@@ -414,7 +423,7 @@ export function LeadsClient({
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, isAuthed, crewId]);
+  }, [selectedId, isAuthed, crewId, passwordAuthOwnerId]);
 
   // ── Sheet action handler (call / telegram / notify / resend_qr) ──
   const handleSheetAction = useCallback(async (action: string) => {

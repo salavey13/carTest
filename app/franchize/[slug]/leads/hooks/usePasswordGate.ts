@@ -10,6 +10,9 @@ export function usePasswordGate(slug: string, isInTelegram: boolean, dbUserId?: 
   const [isPasswordValidating, setIsPasswordValidating] = useState(false);
   const [passwordAuthed, setPasswordAuthed] = useState(false);
   const [storedPassword, setStoredPassword] = useState<string | null>(null);
+  // 2026-09-01: keep the crew owner id resolved by the password so consumers
+  // (notes server action etc.) can pass a real actorUserId instead of nothing.
+  const [passwordAuthOwnerId, setPasswordAuthOwnerId] = useState<string | null>(null);
 
   // Skip password gate entirely if user is already authenticated via Telegram
   const isAlreadyAuthed = !!dbUserId;
@@ -27,6 +30,7 @@ export function usePasswordGate(slug: string, isInTelegram: boolean, dbUserId?: 
       if (!result.success) { setPasswordError(result.error || "Неверный пароль"); return; }
       if (result.slug && result.slug !== slug.trim()) { setPasswordError("Пароль для другого экипажа"); return; }
       setStoredPassword(passwordInput.trim());
+      if (result.ownerId) setPasswordAuthOwnerId(String(result.ownerId));
       setPasswordAuthed(true);
       setShowPasswordEntry(false);
       setPasswordInput("");
@@ -43,6 +47,7 @@ export function usePasswordGate(slug: string, isInTelegram: boolean, dbUserId?: 
     isPasswordValidating,
     passwordAuthed,
     storedPassword,
+    passwordAuthOwnerId,
     handlePasswordSubmit,
   };
 }
