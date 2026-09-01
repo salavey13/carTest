@@ -273,6 +273,10 @@ async function handleBotForward(body: BotForwardBody): Promise<NextResponse> {
     created: now,
   };
   const extra: Record<string, unknown> = {
+    // Spread last in createLead metadata → overrides v3 defaults.
+    name: body.name || null,
+    phone: body.phone || null,
+    capturedVia: "bot_forward",
     forwardManager: body.manager || null,
     sourceUrl: body.url || null,
   };
