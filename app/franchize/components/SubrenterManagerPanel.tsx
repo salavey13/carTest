@@ -9,7 +9,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { RefreshCw, Search, Send, UserRound } from "lucide-react";
+import { RefreshCw, Search, Send, UserRound, History } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
 import {
@@ -552,9 +553,20 @@ export function SubrenterManagerPanel({
               style={{ borderColor: "var(--fr-admin-border)" }}
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-[var(--fr-admin-text)]">
-                  {bike.label}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-sm font-medium text-[var(--fr-admin-text)]">
+                    {bike.label}
+                  </p>
+                  {/* quick jump to the bike story wall (rentals + service history) */}
+                  <Link
+                    href={`/franchize/${slug}/bikes/${bike.bikeId}`}
+                    className="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition hover:bg-white/5 active:opacity-70"
+                    style={{ borderColor: "var(--fr-admin-border)", color: "var(--fr-admin-muted)" }}
+                  >
+                    <History className="h-3 w-3" />
+                    История
+                  </Link>
+                </div>
                 <p className="mt-0.5 text-xs text-[var(--fr-admin-muted)]">
                   {bike.subrenterChatId
                     ? `Субарендатор: ${[

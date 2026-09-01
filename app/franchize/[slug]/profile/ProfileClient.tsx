@@ -809,14 +809,24 @@ export function FranchizeProfileClient({
             </h2>
             <p className="mt-1 text-xs" style={{ color: T.textMuted }}>
               Аренды байков, которые вы передали экипажу — вы видите их статус
-              в реальном времени.
+              в реальном времени. Нажмите на байк, чтобы открыть его историю:
+              аренды, сервис, пробег.
             </p>
 
             <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
               {subrenterOwned.bikes.map((bike) => (
                 <div
                   key={bike.bikeId}
-                  className="flex items-center gap-3 rounded-xl border p-3"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigateSpa(`/franchize/${slug}/bikes/${bike.bikeId}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigateSpa(`/franchize/${slug}/bikes/${bike.bikeId}`);
+                    }
+                  }}
+                  className="flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={T.styles.card}
                 >
                   {bike.imageUrl && (
@@ -840,6 +850,7 @@ export function FranchizeProfileClient({
                       )}
                     </span>
                   </div>
+                  <ChevronRight className="h-4 w-4 flex-shrink-0" style={{ color: T.textMuted }} />
                 </div>
               ))}
             </div>
@@ -1097,13 +1108,19 @@ export function FranchizeProfileClient({
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {s.bikes.map((b) => (
-                      <span
+                      <button
                         key={b.bikeId}
-                        className="rounded-full border px-2 py-0.5 text-[11px]"
-                        style={{ borderColor: T.borderSoft, color: T.textMuted }}
+                        type="button"
+                        onClick={() => navigateSpa(`/franchize/${slug}/bikes/${b.bikeId}`)}
+                        title="Открыть историю байка"
+                        className="cursor-pointer rounded-full border px-2 py-0.5 text-[11px] transition hover:opacity-80 active:scale-[0.98]"
+                        style={{
+                          borderColor: b.activeRentals > 0 ? T.accent : T.borderSoft,
+                          color: b.activeRentals > 0 ? T.accent : T.textMuted,
+                        }}
                       >
                         {b.label} · {b.totalRentals} аренд{b.activeRentals > 0 ? ` · ${b.activeRentals} активна` : ""}
-                      </span>
+                      </button>
                     ))}
                   </div>
                 </div>

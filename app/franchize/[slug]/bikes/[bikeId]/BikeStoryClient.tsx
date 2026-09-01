@@ -487,6 +487,7 @@ function RentalCard({
 
 function ServiceCard({
   item,
+  slug,
   T,
 }: {
   item: WallFeedItem;
@@ -496,8 +497,8 @@ function ServiceCard({
   const svc = item.service;
   if (!svc) return null;
   return (
-    <article className="rounded-2xl border px-3.5 py-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
-      <div className="flex items-start gap-3">
+    <article className="overflow-hidden rounded-2xl border" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
+      <div className="flex items-start gap-3 px-3.5 py-3">
         <span
           className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
           style={{ backgroundColor: `color-mix(in srgb, ${T.accent} 12%, transparent)`, color: T.accent }}
@@ -516,6 +517,15 @@ function ServiceCard({
           </p>
         </div>
       </div>
+      {/* service work lives on a rental row → jump to the rental details */}
+      <Link
+        href={`/franchize/${slug}/rental/${item.rentalId}`}
+        className="flex items-center justify-between border-t px-3.5 py-2.5 text-xs font-medium transition active:opacity-70"
+        style={{ borderColor: T.borderSoft, color: T.accent }}
+      >
+        <span>Открыть аренду · детали и фото</span>
+        <ArrowRight className="h-3.5 w-3.5" />
+      </Link>
     </article>
   );
 }
