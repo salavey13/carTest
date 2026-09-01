@@ -38,6 +38,9 @@ import {
   equipmentChips,
   odometerDelta,
   compareWallItems,
+  mskMonthKey,
+  normalizeMonthParam,
+  availableMonthKeys,
   type BikeWallSummary,
   type StatsInputRow,
   type WallFeedItem,
@@ -149,7 +152,7 @@ function galleryOf(specs: Record<string, unknown> | null, image_url: string | nu
 }
 
 const EMPTY_STATS = {
-  earnedTotal: 0, earnedThisMonth: 0, completedCount: 0, activeCount: 0, cancelledCount: 0,
+  earnedTotal: 0, earnedThisMonth: 0, monthRentals: 0, completedCount: 0, activeCount: 0, cancelledCount: 0,
   totalCount: 0, daysInRent: 0, avgCheck: 0, odometerLatest: null, distanceTotal: 0,
   lastRentalAt: null, serviceCount: 0, serviceTotal: 0, lastServiceAt: null,
 } as const;
@@ -242,12 +245,18 @@ export async function getBikesWallAction(params: {
   slug: string;
   actorUserId?: string;
   isPasswordAuth?: boolean;
+  /** "YYYY-MM" (MSK) — scope the per-bike month tile + fleet month total. */
+  month?: string | null;
 }): Promise<{
   success: boolean;
   data?: {
     bikes: BikeWallSummary[];
     viewerIsSubrenter: boolean;
     fleetEarnedTotal: number;
+    /** Effective month scope actually applied (null = all-time defaults). */
+    month: string | null;
+    /** Month keys with any activity (newest-first) — bounds the selector. */
+    availableMonths: string[];
   };
   error?: string;
 }> {
@@ -255,6 +264,7 @@ export async function getBikesWallAction(params: {
     const gate = await resolveBikeWallAccess(params);
     if (!gate.ok) return { success: false, error: gate.error };
     const { crewId, subrenterVehicleIds } = gate;
+    const monthKey = normalizeMonthParam(params.month) ?? undefined;
 
     // BIKE rows only — equipment / service price-list / wb_item entries are
     // not part of the fleet wall.
@@ -300,6 +310,14 @@ export async function getBikesWallAction(params: {
     }
 
     const now = Date.now();
+    // Months with any rental/service activity across the (visible) fleet —
+    // collected BEFORE stats so the selector knows where history begins.
+    const fleetMonths = availableMonthKeys(
+      Array.from(rentalsByVehicle.values())
+        .flat()
+        .map((r) => r.agreed_start_date || r.created_at),
+      now,
+    );
     const bikes: BikeWallSummary[] = (cars ?? []).map((car: CarRow) => {
       const rows = rentalsByVehicle.get(String(car.id)) ?? [];
       const svcRows = serviceByVehicle.get(String(car.id)) ?? [];
@@ -307,6 +325,7 @@ export async function getBikesWallAction(params: {
         rows.map(toStatsRow),
         now,
         svcRows.map(parseServiceEvent).filter(Boolean) as never[],
+        monthKey,
       );
       const onRentNow = rows.some(
         (r) =>
@@ -321,7 +340,13 @@ export async function getBikesWallAction(params: {
       data: {
         bikes,
         viewerIsSubrenter: subrenterVehicleIds.length > 0,
-        fleetEarnedTotal: bikes.reduce((acc, b) => acc + b.stats.earnedTotal, 0),
+        // Month scope: sum the month slice when a month is selected.
+        fleetEarnedTotal: bikes.reduce(
+          (acc, b) => acc + (monthKey ? b.stats.earnedThisMonth : b.stats.earnedTotal),
+          0,
+        ),
+        month: monthKey ?? null,
+        availableMonths: fleetMonths,
       },
     };
   } catch (error) {
@@ -337,11 +362,20 @@ export async function getBikeStoryAction(params: {
   bikeId: string;
   actorUserId?: string;
   isPasswordAuth?: boolean;
+  /**
+   * "YYYY-MM" (MSK) — when set, the wall shows only that month's events and
+   * the month KPI is scoped to it (2026-09-01: month selector request).
+   */
+  month?: string | null;
 }): Promise<{
   success: boolean;
   data?: {
     bike: BikeWallSummary;
     feed: WallFeedItem[];
+    /** Effective month scope (null = whole history). */
+    month: string | null;
+    /** Month keys with any activity for this bike (newest-first). */
+    availableMonths: string[];
   };
   error?: string;
 }> {
@@ -349,6 +383,7 @@ export async function getBikeStoryAction(params: {
     const gate = await resolveBikeWallAccess(params);
     if (!gate.ok) return { success: false, error: gate.error };
     const { crewId, subrenterVehicleIds } = gate;
+    const monthKey = normalizeMonthParam(params.month) ?? undefined;
 
     const { data: car } = await supabaseAdmin
       .from("cars")
@@ -392,6 +427,7 @@ export async function getBikeStoryAction(params: {
       bikeRentals.map(toStatsRow),
       now,
       serviceRentals.map(parseServiceEvent).filter(Boolean) as never[],
+      monthKey,
     );
     const onRentNow = bikeRentals.some(
       (r) =>
@@ -565,9 +601,26 @@ export async function getBikeStoryAction(params: {
     }
 
     feed.sort(compareWallItems);
-    const capped = feed.slice(0, WALL_EVENTS_CAP);
 
-    return { success: true, data: { bike, feed: capped } };
+    // Month scope: keep only events whose (start || createdAt) falls in the
+    // selected MSK month; the KPI band is already scoped via computeBikeStats.
+    const inMonth = (item: WallFeedItem): boolean =>
+      mskMonthKey(item.start || item.createdAt, now) === monthKey;
+    const scoped = monthKey ? feed.filter(inMonth) : feed;
+    const capped = scoped.slice(0, WALL_EVENTS_CAP);
+
+    // Months with any activity for THIS bike (before scoping) — selector bounds.
+    const bikeMonths = availableMonthKeys(
+      [...bikeRentals, ...serviceRentals].map(
+        (r) => r.agreed_start_date || r.created_at,
+      ),
+      now,
+    );
+
+    return {
+      success: true,
+      data: { bike, feed: capped, month: monthKey ?? null, availableMonths: bikeMonths },
+    };
   } catch (error) {
     logger.error("[getBikeStoryAction]", error);
     return { success: false, error: error instanceof Error ? error.message : "Внутренняя ошибка" };

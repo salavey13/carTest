@@ -378,6 +378,33 @@ export async function getFranchizeLeads(
     // Cache: bike_id → bike title — populated from artifacts & sales after main fetch.
     const bikeTitleMap = new Map<string, string>();
 
+    /**
+     * Avito channel block from an intent's metadata — only meaningful when the
+     * intent came from the Avito webhook or assistant-bot forward. Fields are
+     * written by /api/webhooks/avito (sourceUrl, avitoChatId, avitoItemId,
+     * avitoProfile, lastMessage).
+     */
+    const avitoBlockFromMeta = (
+      meta: Record<string, unknown> | null | undefined,
+    ): LeadRow["avito"] => {
+      if (!meta) return null;
+      const str = (key: string): string | null => {
+        const v = meta[key];
+        return typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+      };
+      const chatId = str("avitoChatId");
+      const itemUrl = str("sourceUrl");
+      const profileUrl = str("avitoProfile");
+      const itemIdRaw = meta["avitoItemId"];
+      const itemId =
+        (typeof itemIdRaw === "number" && Number.isFinite(itemIdRaw)) ? String(itemIdRaw)
+          : typeof itemIdRaw === "string" && itemIdRaw.trim() ? itemIdRaw.trim()
+            : null;
+      const lastMessage = str("lastMessage");
+      if (!chatId && !itemUrl && !profileUrl && !itemId && !lastMessage) return null;
+      return { chatId, itemUrl, profileUrl, itemId, lastMessage };
+    };
+
     const addOrMerge = (row: MutableLead) => {
       const existing = leadMap.get(row.user_id);
       if (!existing) {
@@ -400,6 +427,9 @@ export async function getFranchizeLeads(
       if (row.telegramChatId && !existing.telegramChatId) existing.telegramChatId = row.telegramChatId;
       if (row.sourceRoute && !existing.sourceRoute) existing.sourceRoute = row.sourceRoute;
       if (row.contactChannel && !existing.contactChannel) existing.contactChannel = row.contactChannel;
+      // Avito deep-link metadata — keep the first non-empty block (the webhook
+      // enriches it on repeat messages, so any captured copy is the good one).
+      if (row.avito && !existing.avito) existing.avito = row.avito;
       // Preserve operator origin across merges — keep the first non-null value we see.
       if (row.originalOperatorChatId && !existing.originalOperatorChatId) {
         existing.originalOperatorChatId = row.originalOperatorChatId;
@@ -581,6 +611,7 @@ export async function getFranchizeLeads(
           telegramChatId: i.telegram_user_id || null,
           sourceRoute: i.source_route,
           contactChannel: i.contact_channel,
+          avito: avitoBlockFromMeta(meta),
           originalOperatorChatId: originalOp,
           rentals: [],
           sales: [],

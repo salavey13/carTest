@@ -270,6 +270,31 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
             >
               {SOURCE_META[lead.source]?.label || lead.source}
             </span>
+            {/* Avito channel badge + deep link into the buyer chat/listing.
+                Cold Avito leads (segment «Заявки») have no phone and no TG —
+                the ONLY way to answer them is this link. */}
+            {lead.contactChannel === "avito" && (
+              lead.avito?.itemUrl ? (
+                <a
+                  href={lead.avito.itemUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition hover:brightness-110"
+                  style={{ background: "#0af1331f", color: "#0a8f2a" }}
+                  aria-label="Открыть чат Авито"
+                >
+                  Avito · чат ↗
+                </a>
+              ) : (
+                <span
+                  className="rounded-full px-2.5 py-1 text-[10px] font-semibold"
+                  style={{ background: "#0af1331f", color: "#0a8f2a" }}
+                >
+                  Avito
+                </span>
+              )
+            )}
             {topSignal && (
               <span
                 className="rounded-full px-2.5 py-1 text-[10px] font-medium"

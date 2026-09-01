@@ -3,8 +3,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { Lock, X, Bike } from "lucide-react";
+import { Lock } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import type {LeadRow, LeadTodoRow} from "./leads-types";
 import { getFranchizeLeads } from "@/app/franchize/server-actions/leads";
@@ -15,12 +14,12 @@ import { LeadsToolbar } from "./components/LeadsToolbar";
 import { LeadList } from "./components/LeadList";
 import { LeadBoard } from "./components/LeadBoard";
 import { LeadTableView } from "./components/LeadTableView";
-import { MobileLeadSheet } from "./components/MobileLeadSheet";
+import { LeadDetailSheet } from "./components/LeadDetailSheet";
+import type { LeadDrawerNote } from "./components/LeadDetailDrawer";
+import { getLeadNotes, createLeadNote } from "@/app/franchize/server-actions/lead-notes";
+import { notifyLeadViaTelegram } from "@/app/franchize/server-actions/lead-notify";
 import { EmptyState } from "./components/EmptyState";
 import { LeadDetailContent } from "./components/LeadDetailContent";
-import { Avatar } from "./components/Avatar";
-import { SourceBadge } from "./components/SourceBadge";
-import { IdentityBadge } from "./components/IdentityBadge";
 import { DismissLeadDialog, type DismissReason } from "./components/DismissLeadDialog";
 
 // Import constants
@@ -30,7 +29,6 @@ import {
   type SortMode,
   type FilterFlags,
 } from "./leads-constants";
-import { relativeTime } from "./leads-utils";
 
 // Import hooks
 import { useTodosMapping, useFilteredSortedLeads } from "./hooks/useLeadsData";
@@ -102,6 +100,22 @@ export function LeadsClient({
   const [leadsState, setLeadsState] = useState(leads);
   const [todosState, setTodosState] = useState(todos);
   const leadsFetchedRef = useRef(false);
+
+  // ── Lead detail sheet state (2026-09-01 sheet overhaul) ──
+  // Notes are fetched lazily for the SELECTED lead (they live in a separate
+  // table and would bloat the initial leads payload if fetched for everyone).
+  const [notesState, setNotesState] = useState<LeadDrawerNote[]>([]);
+  const [notesLeadId, setNotesLeadId] = useState<string | null>(null);
+  const [notesLoading, setNotesLoading] = useState(false);
+  // Lightweight toast for action feedback (copy/notify errors etc.) —
+  // z-[70]: above the sheet (z-[60]) and the header (z-50).
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = useCallback((msg: string, ms = 2600) => {
+    setToastMsg(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), ms);
+  }, []);
 
   // Debounce search query
   useEffect(() => {
@@ -370,6 +384,189 @@ export function LeadsClient({
     }
   };
 
+  // ── Fetch notes for the selected lead (lazy, per-lead) ──
+  useEffect(() => {
+    if (!selectedId || !isAuthed) {
+      setNotesState([]);
+      setNotesLeadId(null);
+      return;
+    }
+    if (notesLeadId === selectedId) return;
+    let cancelled = false;
+    setNotesLoading(true);
+    setNotesState([]);
+    (async () => {
+      try {
+        const res = await getLeadNotes(selectedId, crewId, dbUser?.user_id || undefined, passwordAuthed);
+        if (!cancelled && res.success && res.data) {
+          setNotesState(res.data.map((n) => ({
+            id: n.id, text: n.text, created_at: n.created_at, created_by: n.created_by,
+          })));
+        }
+        // Notes are optional enrichment — silent on failure.
+      } catch { /* silent */ }
+      finally {
+        if (!cancelled) {
+          setNotesLeadId(selectedId);
+          setNotesLoading(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, isAuthed, crewId]);
+
+  // ── Sheet action handler (call / telegram / notify / resend_qr) ──
+  const handleSheetAction = useCallback(async (action: string) => {
+    const lead = selectedId ? leadsState.find((l) => l.user_id === selectedId) : null;
+    if (!lead) return;
+    switch (action) {
+      case "call": {
+        if (lead.phone) {
+          window.location.href = `tel:${lead.phone.replace(/[^+\d]/g, "")}`;
+        } else {
+          showToast("У лида нет телефона");
+        }
+        break;
+      }
+      case "telegram": {
+        if (lead.username) {
+          window.open(`https://t.me/${lead.username}`, "_blank", "noopener");
+        } else if (lead.telegramChatId) {
+          try {
+            await navigator.clipboard.writeText(lead.telegramChatId);
+            showToast(`TG ID ${lead.telegramChatId} скопирован`);
+          } catch {
+            showToast(`TG ID: ${lead.telegramChatId}`);
+          }
+        } else {
+          showToast("У лида нет Telegram");
+        }
+        break;
+      }
+      case "notify": {
+        if (!lead.telegramChatId) {
+          showToast("У лида нет Telegram — уведомить нельзя");
+          break;
+        }
+        showToast("Отправляем уведомление…", 1200);
+        const res = await notifyLeadViaTelegram({ slug, chatId: lead.telegramChatId });
+        showToast(res.success ? "Уведомление отправлено" : (res.error || "Ошибка отправки"));
+        break;
+      }
+      case "resend_qr": {
+        const rentalId = lead.rentals?.[0]?.rentalId;
+        if (rentalId) {
+          router.push(`/franchize/${slug}/rental/${encodeURIComponent(rentalId)}`);
+        } else {
+          showToast("QR доступен на странице аренды");
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }, [selectedId, leadsState, showToast, slug, router]);
+
+  // ── Sheet todo handlers (REST API — same route the dismiss flow uses) ──
+  const authHeaders = useMemo<Record<string, string>>(() => {
+    const h: Record<string, string> = { "Content-Type": "application/json" };
+    if (dbUser?.user_id) h["x-telegram-user-id"] = dbUser.user_id;
+    else if (storedPassword) h["x-auth-password"] = storedPassword;
+    return h;
+  }, [dbUser?.user_id, storedPassword]);
+
+  const handleCreateTodo = useCallback(async (title: string) => {
+    const lead = selectedId ? leadsState.find((l) => l.user_id === selectedId) : null;
+    if (!lead || !title.trim()) return;
+    try {
+      const resp = await fetch("/api/franchize/lead-todo", {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ crewId, slug, leadId: lead.user_id, leadName: lead.full_name || "", title: title.trim() }),
+      });
+      const body = await resp.json().catch(() => null);
+      if (!resp.ok || !body?.success) {
+        showToast(body?.error || `Не удалось создать задачу (HTTP ${resp.status})`);
+        return;
+      }
+      // Optimistic local append (the API returns the full todo row).
+      const todo = body.todo as LeadTodoRow;
+      setTodosState((prev) => [todo, ...prev]);
+    } catch {
+      showToast("Ошибка сети при создании задачи");
+    }
+  }, [selectedId, leadsState, crewId, slug, authHeaders, showToast]);
+
+  const handleToggleTodo = useCallback(async (todoId: string) => {
+    const current = todosState.find((t) => t.id === todoId);
+    if (!current) return;
+    const nextStatus = current.status === "done" ? "pending" : "done";
+    // Optimistic flip first, revert on failure.
+    setTodosState((prev) => prev.map((t) => (t.id === todoId ? { ...t, status: nextStatus } : t)));
+    try {
+      const resp = await fetch("/api/franchize/lead-todo", {
+        method: "PATCH",
+        headers: authHeaders,
+        body: JSON.stringify({ todoId, status: nextStatus, crewId }),
+      });
+      const body = await resp.json().catch(() => null);
+      if (!resp.ok || !body?.success) {
+        setTodosState((prev) => prev.map((t) => (t.id === todoId ? { ...t, status: current.status } : t)));
+        showToast(body?.error || "Не удалось обновить задачу");
+      }
+    } catch {
+      setTodosState((prev) => prev.map((t) => (t.id === todoId ? { ...t, status: current.status } : t)));
+      showToast("Ошибка сети");
+    }
+  }, [todosState, crewId, authHeaders, showToast]);
+
+  const handleDeleteTodo = useCallback(async (todoId: string) => {
+    // Optimistic remove, revert on failure.
+    const snapshot = todosState;
+    setTodosState((prev) => prev.filter((t) => t.id !== todoId));
+    try {
+      const resp = await fetch("/api/franchize/lead-todo", {
+        method: "DELETE",
+        headers: authHeaders,
+        body: JSON.stringify({ todoId, crewId }),
+      });
+      const body = await resp.json().catch(() => null);
+      if (!resp.ok || !body?.success) {
+        setTodosState(snapshot);
+        showToast(body?.error || "Не удалось удалить задачу");
+      }
+    } catch {
+      setTodosState(snapshot);
+      showToast("Ошибка сети");
+    }
+  }, [todosState, crewId, authHeaders, showToast]);
+
+  // ── Sheet notes handler (server action, cookie-auth) ──
+  const handleAddNote = useCallback(async (text: string) => {
+    const lead = selectedId ? leadsState.find((l) => l.user_id === selectedId) : null;
+    if (!lead || !text.trim()) return;
+    try {
+      const res = await createLeadNote({
+        leadId: lead.user_id,
+        crewId,
+        text: text.trim(),
+        actorUserId: dbUser?.user_id || undefined,
+        isPasswordAuth: passwordAuthed,
+      });
+      if (res.success && res.data) {
+        const note: LeadDrawerNote = {
+          id: res.data.id, text: res.data.text, created_at: res.data.created_at, created_by: res.data.created_by,
+        };
+        setNotesState((prev) => [note, ...prev]);
+      } else {
+        showToast(res.error || "Не удалось сохранить заметку");
+      }
+    } catch {
+      showToast("Ошибка сети при сохранении заметки");
+    }
+  }, [selectedId, leadsState, crewId, dbUser?.user_id, passwordAuthed, showToast]);
+
   // Password gate render — only show if NOT in Telegram AND no dbUser AND not password-authed
   if (shouldShowPassword && !passwordAuthed) {
     return (
@@ -407,70 +604,6 @@ export function LeadsClient({
       </div>
     );
   }
-
-  // ── Desktop detail panel (shared by list + table views) ──────────────────
-  // Extracted (iter6) so the new table view gets the same detail panel as the
-  // card list — click a table row on desktop → panel slides in on the right.
-  const desktopDetailPanel = (
-    <AnimatePresence mode="wait">
-      {(() => {
-        const selectedLead = selectedId ? sortedLeads.find(l => l.user_id === selectedId) : null;
-        if (!selectedLead) {
-          return (
-            <motion.div
-              key="empty-placeholder"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="sticky top-24 flex h-[calc(100vh-200px)] items-center justify-center rounded-2xl border border-dashed"
-              style={{ borderColor: T.border }}
-            >
-              <p className="text-sm" style={{ color: T.textFaint }}>Выберите лида для просмотра деталей</p>
-            </motion.div>
-          );
-        }
-        return (
-          <motion.div
-            key={selectedLead.user_id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ type: "spring", damping: 24, stiffness: 260, mass: 0.6 }}
-            className="sticky top-24 max-h-[calc(100vh-140px)] overflow-y-auto rounded-2xl border p-4"
-            style={{ borderColor: T.border, backgroundColor: T.bgCard, boxShadow: T.shadow }}
-          >
-            <div className="mb-4 flex items-start gap-3">
-              <Avatar name={selectedLead.full_name} source={selectedLead.source} size={56} />
-              <div className="min-w-0 flex-1">
-                <h3 className="truncate text-lg font-bold" style={{ color: T.text }}>{selectedLead.full_name || "Без имени"}</h3>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: T.textMuted }}>
-                  {selectedLead.phone && <span>{selectedLead.phone}</span>}
-                  {selectedLead.username && <span>@{selectedLead.username}</span>}
-                  <span>{relativeTime(selectedLead.lastSeenAt || selectedLead.createdAt)}</span>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <SourceBadge source={selectedLead.source} size="md" />
-                  {selectedLead.identityState && selectedLead.identityState !== 'claimed_user' && (
-                    <IdentityBadge state={selectedLead.identityState} />
-                  )}
-                  {selectedLead.bikeTitle && (
-                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ backgroundColor: T.borderSoft, color: T.text }}>
-                      <Bike className="h-3 w-3" /> {selectedLead.bikeTitle}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <button onClick={() => setSelectedId(null)} aria-label="Закрыть детали" className="rounded p-1 transition hover:bg-black/5" style={{ color: T.textFaint }}>
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} onTodoUpdate={handleTodoUpdate} />
-          </motion.div>
-        );
-      })()}
-    </AnimatePresence>
-  );
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -547,55 +680,75 @@ export function LeadsClient({
         sortedLeads.length === 0 ? (
           <EmptyState hasFilters={hasFilters} searchQuery={debouncedSearchQuery} T={T} />
         ) : (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-            <div className={`transition-all duration-200 ${selectedId ? "lg:col-span-7" : "lg:col-span-12"}`}>
-              <LeadTableView
-                leads={sortedLeads}
-                selectedId={selectedId}
-                onSelect={(id) => setSelectedId(id)}
-                getTodosForLead={getTodosForLead}
-                sortMode={sortMode}
-                onSortChange={setSortMode}
-                T={T}
-              />
-            </div>
-            {/* Desktop detail panel — shared with the list view */}
-            <div className="hidden lg:block lg:col-span-5">{desktopDetailPanel}</div>
-          </div>
+          <LeadTableView
+            leads={sortedLeads}
+            selectedId={selectedId}
+            onSelect={(id) => setSelectedId(id)}
+            getTodosForLead={getTodosForLead}
+            sortMode={sortMode}
+            onSortChange={setSortMode}
+            T={T}
+          />
         )
       ) : sortedLeads.length === 0 ? (
         <EmptyState hasFilters={hasFilters} searchQuery={debouncedSearchQuery} T={T} />
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          {/* List column — shrinks on desktop when lead selected */}
-          <div className={`space-y-3 transition-all duration-200 ${selectedId ? "lg:col-span-5" : "lg:col-span-12"}`}>
-            <LeadList
-              leads={sortedLeads}
-              selectedId={selectedId}
-              setSelectedId={setSelectedId}
-              onDismiss={handleDismissLead}
-              getTodosForLead={getTodosForLead}
-              T={T}
-              crewId={crewId}
-              slug={slug}
-            />
-          </div>
-
-          {/* Desktop detail panel — always rendered; shows empty state or details */}
-          <div className="hidden lg:block lg:col-span-7">{desktopDetailPanel}</div>
-        </div>
+        <LeadList
+          leads={sortedLeads}
+          selectedId={selectedId}
+          setSelectedId={setSelectedId}
+          onDismiss={handleDismissLead}
+          getTodosForLead={getTodosForLead}
+          T={T}
+          crewId={crewId}
+          slug={slug}
+        />
       )}
 
-      {/* Mobile bottom sheet — slides up on lead selection */}
+      {/* Adaptive lead-detail sheet — bottom sheet on phones/narrow windows,
+          right-side drawer on ≥lg. Replaces BOTH the old mobile-only sheet
+          (whose inner drawer used to take over the whole screen) and the old
+          inline desktop panel (whose close button hid under the CrewHeader). */}
       {selectedId && (() => {
         const selectedLead = sortedLeads.find(l => l.user_id === selectedId);
         if (!selectedLead) return null;
         return (
-          <MobileLeadSheet open={true} onClose={() => setSelectedId(null)} title={selectedLead.full_name || selectedLead.phone || undefined} T={T}>
-            <LeadDetailContent lead={selectedLead} todos={getTodosForLead(selectedLead)} crewId={crewId} slug={slug} T={T} onTodoUpdate={handleTodoUpdate} />
-          </MobileLeadSheet>
+          <LeadDetailSheet
+            open={true}
+            onClose={() => setSelectedId(null)}
+            title={selectedLead.full_name || selectedLead.phone || "Лид"}
+            T={T}
+          >
+            <LeadDetailContent
+              lead={selectedLead}
+              todos={getTodosForLead(selectedLead)}
+              notes={notesLeadId === selectedId ? notesState : []}
+              slug={slug}
+              T={T}
+              onClose={() => setSelectedId(null)}
+              onAction={handleSheetAction}
+              onCreateTodo={handleCreateTodo}
+              onToggleTodo={handleToggleTodo}
+              onDeleteTodo={handleDeleteTodo}
+              onAddNote={handleAddNote}
+              onDismissLead={() => handleDismissLead(selectedLead.user_id)}
+              asSheetChild
+            />
+          </LeadDetailSheet>
         );
       })()}
+
+      {/* Toast — action feedback (copy/notify/todo errors). z-[70] sits above
+          the sheet (z-[60]) and the CrewHeader (z-50). */}
+      {toastMsg && (
+        <div
+          className="fixed inset-x-0 bottom-6 z-[70] mx-auto w-fit max-w-[92vw] rounded-full border px-4 py-2.5 text-sm font-medium shadow-lg"
+          style={{ backgroundColor: T.bgCard, borderColor: T.border, color: T.text }}
+          role="status"
+        >
+          {toastMsg}
+        </div>
+      )}
 
       {/* Dismiss confirmation dialog — opened from LeadCard ⋮ menu "Закрыть лид".
           Shows reason dropdown + optional note + analytics-impact preview.

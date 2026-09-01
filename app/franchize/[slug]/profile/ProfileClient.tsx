@@ -44,7 +44,7 @@ import {
   franchizeOperatorInputStyle,
 } from "../../components/FranchizeOperatorSurface";
 import { getMyEarnings } from "../../server-actions/salary-calculations";
-import { getMyWorkDayAction, type MyWorkRentalDetail } from "../../server-actions/my-work";
+import { getMyWorkDayAction, type MyWorkRentalDetail, type MyWorkSaleDetail } from "../../server-actions/my-work";
 import {
   getSubrenterOwnedBikesAction,
   getFranchizeSubrentersOverviewAction,
@@ -237,10 +237,11 @@ export function FranchizeProfileClient({
     isToday: boolean;
     shifts: { count: number; total: number };
     rentals: { count: number; revenue: number; salary: number };
-    sales: { count: number; total: number };
+    sales: { count: number; total: number; revenue: number };
     serviceReturns: { count: number; total: number };
     totalDay: number;
     rentalDetails: MyWorkRentalDetail[];
+    saleDetails: MyWorkSaleDetail[];
   } | null>(null);
   const [earningsLoading, setEarningsLoading] = useState(true);
   const [workLoading, setWorkLoading] = useState(true);
@@ -1449,13 +1450,18 @@ export function FranchizeProfileClient({
                     {formatCurrency(myWork.shifts.total)}
                   </p>
                 </div>
+                {/* Продажи — actual attributed sales (created via /doc by me, or
+                    my shift covered the sale). ЗП matches the salary model 1:1. */}
                 <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
-                  <p className="text-xs" style={{ color: T.textMuted }}>Продажи</p>
+                  <p className="text-xs" style={{ color: T.textMuted }}>Продажи (ЗП)</p>
                   <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
                     {myWork.sales.count}
                   </p>
-                  <p className="text-xs" style={{ color: T.textMuted }}>
+                  <p className="text-xs font-semibold" style={{ color: T.accent }}>
                     {formatCurrency(myWork.sales.total)}
+                  </p>
+                  <p className="text-[10px]" style={{ color: T.textMuted }}>
+                    оборот {formatCurrency(myWork.sales.revenue ?? 0)}
                   </p>
                 </div>
                 <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
@@ -1481,6 +1487,32 @@ export function FranchizeProfileClient({
                   {formatCurrency(myWork.totalDay)}
                 </span>
               </div>
+
+              {/* Детализация: мои продажи за день — bike, цена, ЗП, зачтено. */}
+              {myWork.saleDetails?.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold" style={{ color: T.textMuted }}>
+                    Мои продажи за день
+                  </p>
+                  {myWork.saleDetails.map((s) => (
+                    <div
+                      key={s.saleId}
+                      className="flex items-center justify-between rounded px-2 py-1.5 text-xs"
+                      style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate" style={{ color: T.text }}>{s.bikeLabel}</p>
+                        <p className="text-[10px]" style={{ color: T.textMuted }}>
+                          цена {formatCurrency(s.salePrice)} · зачтено: {s.sourceLabel}
+                        </p>
+                      </div>
+                      <span className="ml-2 font-mono font-semibold" style={{ color: T.accent }}>
+                        +{formatCurrency(s.salary)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Детализация: мои аренды за день — bike, revenue, ЗП. */}
               {myWork.rentalDetails.length > 0 && (

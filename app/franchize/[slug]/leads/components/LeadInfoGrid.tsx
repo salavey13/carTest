@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, ExternalLink } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
 
 export interface InfoTile {
@@ -9,6 +9,8 @@ export interface InfoTile {
   value: string;
   tone?: "default" | "accent" | "warning" | "danger" | "good";
   copyable?: boolean;
+  /** When set, the tile value renders as an external link (new tab). */
+  href?: string;
 }
 
 interface Props {
@@ -101,7 +103,20 @@ function Tile({ item, T }: { item: InfoTile; T: ThemeTokens }) {
         style={{ color: valueColor }}
         title={item.value}
       >
-        {item.value}
+        {item.href ? (
+          <a
+            href={item.href}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex min-w-0 items-center gap-1.5 underline decoration-dotted underline-offset-2 transition hover:opacity-80"
+            style={{ color: valueColor }}
+          >
+            <span className="truncate">{item.value}</span>
+            <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          </a>
+        ) : (
+          item.value
+        )}
       </div>
     </div>
   );

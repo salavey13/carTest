@@ -7,11 +7,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Bike, ChevronRight, HandCoins, RefreshCw, Wrench } from "lucide-react";
+import { Bike, ChevronLeft, ChevronRight, HandCoins, RefreshCw, Wrench } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { getBikesWallAction } from "@/app/franchize/server-actions/bike-wall";
 import type { BikeWallSummary } from "@/app/franchize/lib/bike-wall";
-import { formatMoney } from "@/app/franchize/lib/bike-wall";
+import { formatMoney, monthLabelRu, monthLabelShort } from "@/app/franchize/lib/bike-wall";
 import { AnalyticsPasswordEntry } from "@/app/franchize/[slug]/rentals-analytics/analytics-components/AnalyticsPasswordEntry";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
@@ -37,6 +37,10 @@ export function BikesWallClient({ initialSlug, crew }: BikesWallClientProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("earned");
+  // Month selector (2026-09-01): null = all-time tiles; a "YYYY-MM" key scopes
+  // each card's money/rental tiles + the fleet header total to that month.
+  const [month, setMonth] = useState<string | null>(null);
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
 
   useFranchizeTheme(crew?.theme || { mode: "auto", isAuto: true });
   const T = useCrewTokens(crew?.theme || { mode: "auto", isAuto: true });
@@ -62,11 +66,13 @@ export function BikesWallClient({ initialSlug, crew }: BikesWallClientProps) {
         slug,
         actorUserId: getActorUserId() || undefined,
         isPasswordAuth: !!passwordAuthOwnerId,
+        month,
       });
       if (result.success && result.data) {
         setBikes(result.data.bikes);
         setViewerIsSubrenter(result.data.viewerIsSubrenter);
         setFleetEarnedTotal(result.data.fleetEarnedTotal);
+        setAvailableMonths(result.data.availableMonths ?? []);
       } else {
         setError(result.error || "Не удалось загрузить мотопарк.");
       }
@@ -75,7 +81,7 @@ export function BikesWallClient({ initialSlug, crew }: BikesWallClientProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [slug, getActorUserId, passwordAuthOwnerId]);
+  }, [slug, getActorUserId, passwordAuthOwnerId, month]);
 
   useEffect(() => {
     if (!isAuthed || authLoading) return;
@@ -146,10 +152,53 @@ export function BikesWallClient({ initialSlug, crew }: BikesWallClientProps) {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[11px] uppercase tracking-wide" style={{ color: T.textMuted }}>Заработал парк</p>
+            <p className="text-[11px] uppercase tracking-wide" style={{ color: T.textMuted }}>
+              {month ? `Заработал парк · ${monthLabelRu(month)}` : "Заработал парк"}
+            </p>
             <p className="text-xl font-bold sm:text-2xl" style={{ color: T.accent }}>{formatMoney(fleetEarnedTotal)}</p>
           </div>
         </div>
+
+        {/* month selector — [Всё время] ↔ [текущий] ↔ [прошлые месяцы] */}
+        {(() => {
+          const timeline: Array<string | null> = [null, ...availableMonths];
+          const index = month == null ? 0 : 1 + availableMonths.indexOf(month);
+          const canBack = index < timeline.length - 1;
+          const canForward = index > 0;
+          const step = (delta: 1 | -1) => setMonth(timeline[Math.min(Math.max(index + delta, 0), timeline.length - 1)]);
+          return (
+            <div className="mt-3 flex items-center justify-between gap-1.5 rounded-xl border px-2 py-1.5" style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}>
+              <button
+                type="button"
+                onClick={() => step(1)}
+                disabled={!canBack}
+                aria-label="Предыдущий месяц"
+                className="flex h-11 w-11 items-center justify-center rounded-xl transition active:scale-95 disabled:opacity-30"
+                style={{ backgroundColor: T.bgCard, color: T.text }}
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <div className="min-w-0 flex-1 text-center">
+                <p className="truncate text-sm font-semibold" style={{ color: month ? T.accent : T.text }}>
+                  {month ? monthLabelRu(month) : "Всё время"}
+                </p>
+                <p className="mt-0.5 truncate text-[10px]" style={{ color: T.textFaint }}>
+                  {month ? "выручка и аренды за месяц" : "выручка за всё время"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => step(-1)}
+                disabled={!canForward}
+                aria-label="Следующий месяц или всё время"
+                className="flex h-11 w-11 items-center justify-center rounded-xl transition active:scale-95 disabled:opacity-30"
+                style={{ backgroundColor: T.bgCard, color: T.text }}
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          );
+        })()}
 
         {/* sort pills */}
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
@@ -185,7 +234,7 @@ export function BikesWallClient({ initialSlug, crew }: BikesWallClientProps) {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {sortedBikes.map((bike) => (
-            <BikeCard key={bike.bikeId} bike={bike} slug={slug} T={T} />
+            <BikeCard key={bike.bikeId} bike={bike} slug={slug} T={T} month={month} />
           ))}
         </div>
       )}
@@ -197,10 +246,13 @@ function BikeCard({
   bike,
   slug,
   T,
+  month,
 }: {
   bike: BikeWallSummary;
   slug: string;
   T: ReturnType<typeof useCrewTokens>;
+  /** null = all-time; "YYYY-MM" = month-scoped money/rental tiles. */
+  month: string | null;
 }) {
   const s = bike.stats;
   return (
@@ -257,15 +309,19 @@ function BikeCard({
           <ChevronRight className="mt-1 h-4 w-4 shrink-0" style={{ color: T.textFaint }} />
         </div>
 
-        {/* stats strip */}
+        {/* stats strip — month-scoped when a month is selected */}
         <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
           <div className="rounded-xl px-1 py-2" style={{ backgroundColor: T.bgElevated }}>
-            <p className="text-[13px] font-bold leading-none" style={{ color: T.accent }}>{formatMoney(s.earnedTotal)}</p>
-            <p className="mt-1 text-[10px] uppercase tracking-wide" style={{ color: T.textMuted }}>выручка</p>
+            <p className="text-[13px] font-bold leading-none" style={{ color: T.accent }}>
+              {formatMoney(month ? s.earnedThisMonth : s.earnedTotal)}
+            </p>
+            <p className="mt-1 text-[10px] uppercase tracking-wide" style={{ color: T.textMuted }}>
+              {month ? `за ${monthLabelShort(month)}` : "выручка"}
+            </p>
           </div>
           <div className="rounded-xl px-1 py-2" style={{ backgroundColor: T.bgElevated }}>
-            <p className="text-[13px] font-bold leading-none" style={{ color: T.text }}>{s.totalCount - s.cancelledCount}</p>
-            <p className="mt-1 text-[10px] uppercase tracking-wide" style={{ color: T.textMuted }}>аренд</p>
+            <p className="text-[13px] font-bold leading-none" style={{ color: T.text }}>{month ? s.monthRentals : s.totalCount - s.cancelledCount}</p>
+            <p className="mt-1 text-[10px] uppercase tracking-wide" style={{ color: T.textMuted }}>{month ? "аренд · мес" : "аренд"}</p>
           </div>
           <div className="rounded-xl px-1 py-2" style={{ backgroundColor: T.bgElevated }}>
             <p className="text-[13px] font-bold leading-none" style={{ color: s.serviceCount > 0 ? T.text : T.textFaint }}>

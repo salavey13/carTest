@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Phone,
@@ -11,12 +12,15 @@ import {
   CheckCircle2,
   Flame,
   ChevronDown,
+  ChevronRight,
   Briefcase,
   StickyNote,
   Plus,
+  ExternalLink,
+  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
-import type {LeadRow, LeadTodoRow} from "../leads-types";
+import type { LeadRow, LeadTodoRow } from "../leads-types";
 import type {
   LeadSignal,
   LeadHistoryEvent,
@@ -34,6 +38,13 @@ import {
   fmtMoney,
   formatDate,
 } from "../leads-utils";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { LeadSLAOverview } from "./LeadSLAOverview";
 import { LeadInfoGrid, type InfoTile } from "./LeadInfoGrid";
 import {
@@ -64,6 +75,8 @@ interface Props {
   signals: LeadSignal[];
   history: LeadHistoryEvent[];
   docs: DocumentItem[];
+  /** Crew slug — used to build SPA links to rental details. */
+  slug: string;
   T: ThemeTokens;
   onClose: () => void;
   onAction: (action: string) => void;
@@ -73,20 +86,25 @@ interface Props {
   onAddNote: (text: string) => void;
   onDismissLead: () => void;
   /** When true, render as the inner content of a parent sheet/drawer (no
-   *  backdrop, no right-side panel chrome, no z-index). Used by MobileLeadSheet
-   *  so the sheet provides the backdrop + animation and this component only
-   *  renders the content sections. */
+   *  backdrop, no right-side panel chrome, no z-index). Used by the adaptive
+   *  LeadDetailSheet so the sheet provides the backdrop + animation and this
+   *  component only renders the content sections. */
   asSheetChild?: boolean;
 }
 
 type TodoFilter = "all" | "mine" | "overdue";
 
 /**
- * Full lead detail drawer (right side panel).
- * Sections (in order):
- *   1. Header  2. Primary actions  3. SLA overview  4. Info grid
- *   5. Deals (collapsible)  6. Documents (collapsible)  7. Tasks (collapsible + sub-filters)
- *   8. Notes (collapsible)  9. History (collapsible, timeline)  10. Sticky footer
+ * Lead detail content — sections 1-9 + action footer.
+ *
+ * 2026-09-01 REWORK (sheet overhaul):
+ *   • ONE body for both modes — previously the sheet-child mode silently
+ *     dropped sections 6-9 (documents/tasks/notes/history), so the mobile
+ *     sheet showed far less than the desktop drawer.
+ *   • Deal rows are now SPA links to the rental details page
+ *     (/franchize/[slug]/rental/[rentalId]) — mirrors the bike wall.
+ *   • Avito leads get a deep-link button (chat/listing URL from the webhook
+ *     metadata) + an info tile with the captured chat id and last message.
  */
 export function LeadDetailDrawer(props: Props) {
   const {
@@ -96,6 +114,7 @@ export function LeadDetailDrawer(props: Props) {
     signals,
     history,
     docs,
+    slug,
     T,
     onClose,
     onAction,
@@ -121,6 +140,7 @@ export function LeadDetailDrawer(props: Props) {
   const rel = relativeTime(lead?.lastSeenAt || lead?.createdAt);
   const isHot = signals.some((s) => s.tone === "danger");
   const assignee = lead?.assigneeName || lead?.assigneeId || "—";
+  const avito = lead?.avito ?? null;
 
   const [todoFilter, setTodoFilter] = useState<TodoFilter>("all");
   const [newTodo, setNewTodo] = useState("");
@@ -146,7 +166,7 @@ export function LeadDetailDrawer(props: Props) {
             ? "warning"
             : "default",
     },
-    { label: "Источник", value: SOURCE_META[lead?.source]?.label || lead?.source },
+    { label: "Источник", value: SOURCE_META[lead?.source]?.label || lead?.source || "—" },
     { label: "Канал", value: lead?.contactChannel || "—" },
     { label: "Маршрут", value: lead?.sourceRoute || "—", copyable: !!lead?.sourceRoute },
     { label: "Первый контакт", value: lead?.createdAt ? formatDate(lead?.createdAt) : "—" },
@@ -154,6 +174,17 @@ export function LeadDetailDrawer(props: Props) {
     { label: "Ответственный", value: assignee },
     { label: "Следующее действие", value: STAGE_NEXT_ACTION[stageKey] || "—" },
   ];
+  if (avito?.chatId) {
+    infoItems.push({
+      label: "Avito чат",
+      value: `ID ${avito.chatId}`,
+      copyable: true,
+      href: avito.itemUrl || avito.profileUrl || undefined,
+    });
+  }
+  if (avito?.itemId) {
+    infoItems.push({ label: "Avito объявление", value: String(avito.itemId) });
+  }
 
   const filteredTodos = todos.filter((t) => {
     if (todoFilter === "overdue")
@@ -191,8 +222,9 @@ export function LeadDetailDrawer(props: Props) {
     label: string;
     action: string;
     color: string;
+    disabled?: boolean;
   }> = [
-    { icon: Phone, label: "Позвонить", action: "call", color: "#22c55e" },
+    { icon: Phone, label: "Позвонить", action: "call", color: "#22c55e", disabled: !lead?.phone },
     { icon: Send, label: "Написать в TG", action: "telegram", color: "#3b82f6" },
     { icon: Bell, label: "Уведомить", action: "notify", color: "#eab308" },
     { icon: MoreHorizontal, label: "Ещё", action: "more", color: "#64748b" },
@@ -205,186 +237,550 @@ export function LeadDetailDrawer(props: Props) {
     return null;
   }
 
-  // ── Sheet-child mode: render content only, no backdrop/aside wrapper ──
-  // When rendered inside MobileLeadSheet, the sheet provides the backdrop +
-  // animation. We render just the content sections + sticky footer, wrapped
-  // in a simple div (no fixed positioning, no z-index, no AnimatePresence).
+  const copyText = async (value: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      /* clipboard unavailable — best effort */
+    }
+  };
+
+  // "Действия" dropdown — local, zero-latency actions that don't need the
+  // parent's server wiring (clipboard + external links). Destructive
+  // "Закрыть лид" stays a separate explicit button.
+  const actionsMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="min-h-[44px] flex-1 cursor-pointer rounded-2xl border px-4 py-3 text-sm font-medium transition"
+          style={{ borderColor: T.border, color: T.text }}
+        >
+          Действия
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side="top" className="w-56">
+        <DropdownMenuItem
+          disabled={!lead.phone}
+          onSelect={() => void copyText(lead.phone || "", "phone")}
+        >
+          📞 Скопировать телефон
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void copyText(lead.user_id, "tg id")}>
+          🆔 Скопировать TG ID
+        </DropdownMenuItem>
+        {avito?.itemUrl ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <a href={avito.itemUrl} target="_blank" rel="noreferrer noopener">
+                🟢 Открыть чат Авито
+              </a>
+            </DropdownMenuItem>
+          </>
+        ) : null}
+        {avito?.lastMessage ? (
+          <DropdownMenuItem onSelect={() => void copyText(avito.lastMessage || "", "msg")}>
+            💬 Скопировать последнее сообщение
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onClose}>↩ Закрыть панель</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // ONE shared body — sections 1-9. Both the sheet-child mode (inside the
+  // adaptive LeadDetailSheet) and the desktop right-drawer mode render the
+  // SAME content; only the wrapper (backdrop/aside chrome + footer anchoring)
+  // differs. Previously the sheet mode silently dropped sections 6-9.
+  // ─────────────────────────────────────────────────────────────────────────
+  const body: ReactNode = (
+    <>
+      {/* 1. Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 gap-4">
+          <div
+            className="grid h-12 w-12 shrink-0 place-items-center rounded-full text-lg font-bold md:h-14 md:w-14"
+            style={{ background: `${stageColor}26`, color: stageColor }}
+            aria-hidden
+          >
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2
+                className="truncate text-lg font-semibold tracking-tight md:text-xl"
+                style={{ color: T.text }}
+              >
+                {displayName}
+              </h2>
+              {lead?.verified && (
+                <CheckCircle2
+                  className="h-5 w-5"
+                  style={{ color: "#22c55e" }}
+                  aria-label="Подтверждён"
+                />
+              )}
+              {isHot && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+                  style={{ background: "#ef444426", color: "#ef4444" }}
+                >
+                  <Flame className="h-3 w-3" aria-hidden /> Горячий
+                </span>
+              )}
+            </div>
+            <div className="mt-1 text-sm" style={{ color: T.textMuted }}>
+              {lead?.phone || "—"} • {rel}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span
+                className="rounded-full px-3 py-1 text-[11px]"
+                style={{ background: `${stageColor}1a`, color: stageColor }}
+              >
+                {stageLabel}
+              </span>
+              {lead?.username && (
+                <span
+                  className="rounded-full px-3 py-1 text-[11px]"
+                  style={{ background: T.bgCard, color: T.textMuted }}
+                >
+                  @{lead.username}
+                </span>
+              )}
+              {lead?.contactChannel === "avito" && (
+                <span
+                  className="rounded-full px-3 py-1 text-[11px] font-medium"
+                  style={{ background: "#0af133", color: "#0b2b13" }}
+                >
+                  Avito
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        {/* In sheet-child mode the sheet itself provides the close button —
+            hide the duplicate to avoid two Xs stacked on mobile. */}
+        {!asSheetChild && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer rounded-lg p-2 transition"
+            style={{ color: T.textMuted }}
+            aria-label="Закрыть панель"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = T.bgCardHover;
+              e.currentTarget.style.color = T.text;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = T.textMuted;
+            }}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
+      </div>
+
+      {/* 1b. Avito deep link — opens the captured chat/listing URL */}
+      {avito?.itemUrl && (
+        <a
+          href={avito.itemUrl}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="mt-4 flex min-h-[48px] items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm font-semibold transition active:scale-[0.99]"
+          style={{ borderColor: "#22c55e55", background: "#22c55e12", color: "#16a34a" }}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
+            <span className="truncate">Открыть чат Авито</span>
+          </span>
+          <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
+        </a>
+      )}
+
+      {/* 2. Primary actions — 2x2 grid on mobile, 4-col on desktop */}
+      <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+        {primaryActions.map((b) => {
+          const Icon = b.icon;
+          return (
+            <motion.button
+              key={b.action}
+              whileTap={{ scale: 0.96 }}
+              whileHover={{ y: b.disabled ? 0 : -1 }}
+              transition={{ type: "spring", damping: 22, stiffness: 320 }}
+              onClick={() => onAction(b.action)}
+              disabled={b.disabled}
+              className="flex min-h-[88px] cursor-pointer flex-col items-start justify-between rounded-2xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-40 md:min-h-[100px] md:p-4"
+              style={{
+                borderColor: `${b.color}33`,
+                background: `${b.color}14`,
+                color: b.color,
+              }}
+            >
+              <Icon className="h-6 w-6" aria-hidden />
+              <div className="mt-2 text-sm font-medium">{b.label}</div>
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* 3. SLA overview */}
+      <div className="mt-5">
+        <LeadSLAOverview signals={signals} T={T} />
+      </div>
+
+      {/* 4. Info grid */}
+      <div className="mt-5">
+        <LeadInfoGrid items={infoItems} T={T} />
+      </div>
+
+      {/* 5. Deals — rows are SPA links to the rental details page */}
+      <div className="mt-5">
+        <Section
+          title="Сделки"
+          icon={Briefcase}
+          count={(lead?.rentals?.length ?? 0) + (lead?.sales?.length ?? 0)}
+          expanded={openDeals}
+          onToggle={() => setOpenDeals(!openDeals)}
+          T={T}
+        >
+          <div className="space-y-2">
+            {(!lead?.rentals || lead.rentals.length === 0) && (!lead?.sales || lead.sales.length === 0) && (
+              <p className="text-sm" style={{ color: T.textMuted }}>
+                Сделок нет
+              </p>
+            )}
+            {lead?.rentals?.map((r) => (
+              <Link
+                key={r.rentalId}
+                href={`/franchize/${slug}/rental/${encodeURIComponent(r.rentalId)}`}
+                className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3 transition hover:bg-black/[0.03]"
+                style={{
+                  borderColor: T.border,
+                  background: T.bgCard,
+                }}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium" style={{ color: T.text }}>
+                    {r.bikeTitle || "Аренда"}
+                  </p>
+                  <p className="text-[11px]" style={{ color: T.textFaint }}>
+                    {r.startDate ? formatDate(r.startDate) : "—"} → {r.endDate ? formatDate(r.endDate) : "—"}
+                  </p>
+                </div>
+                <span className="flex shrink-0 items-center gap-2">
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    style={{
+                      backgroundColor: `${RENTAL_STATUS_META[r.status]?.color || "#64748b"}15`,
+                      color: RENTAL_STATUS_META[r.status]?.color || "#64748b",
+                    }}
+                  >
+                    {RENTAL_STATUS_META[r.status]?.label || r.status}
+                  </span>
+                  <ChevronRight className="h-4 w-4" style={{ color: T.textFaint }} aria-hidden />
+                </span>
+              </Link>
+            ))}
+            {lead?.sales?.map((s) => (
+              <div
+                key={s.saleId}
+                className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3"
+                style={{
+                  borderColor: T.border,
+                  background: T.bgCard,
+                }}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium" style={{ color: T.text }}>
+                    {s.bikeTitle || "Продажа"}
+                  </p>
+                  <p className="text-[11px]" style={{ color: T.textFaint }}>
+                    {formatDate(s.createdAt)}
+                  </p>
+                </div>
+                <span
+                  className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  style={{
+                    backgroundColor: "#f59e0b15",
+                    color: "#f59e0b",
+                  }}
+                >
+                  {fmtMoney(s.salePrice)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      </div>
+
+      {/* 6. Documents */}
+      <div className="mt-5">
+        <LeadDocumentsSection
+          documents={docs}
+          qrStatus={qrStatus}
+          expanded={openDocs}
+          onToggle={() => setOpenDocs(!openDocs)}
+          onRequestResendQr={() => onAction("resend_qr")}
+          T={T}
+        />
+      </div>
+
+      {/* 7. Tasks */}
+      <div className="mt-5">
+        <Section
+          title="Задачи"
+          icon={CheckCircle2}
+          count={todos.filter((t) => t.status !== "done").length}
+          expanded={openTasks}
+          onToggle={() => setOpenTasks(!openTasks)}
+          T={T}
+        >
+          <div className="mb-3 flex flex-wrap gap-2">
+            {([
+              { v: "all", label: `Все (${todos.length})`, color: "#eab308" },
+              { v: "mine", label: "Мои", color: "#3b82f6" },
+              { v: "overdue", label: "Просроченные", color: "#ef4444" },
+            ] as const).map((f) => (
+              <button
+                key={f.v}
+                type="button"
+                onClick={() => setTodoFilter(f.v)}
+                aria-pressed={todoFilter === f.v}
+                className="min-h-[36px] cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition"
+                style={
+                  todoFilter === f.v
+                    ? {
+                        borderColor: `${f.color}4d`,
+                        background: `${f.color}1a`,
+                        color: f.color,
+                      }
+                    : {
+                        borderColor: T.border,
+                        background: T.bgCard,
+                        color: T.textMuted,
+                      }
+                }
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mb-3 flex gap-2">
+            <input
+              value={newTodo}
+              onChange={(e) => setNewTodo(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newTodo.trim()) {
+                  onCreateTodo(newTodo.trim());
+                  setNewTodo("");
+                }
+              }}
+              placeholder="Новая задача..."
+              aria-label="Новая задача"
+              className="min-h-[44px] flex-1 rounded-xl border px-3 py-2 text-sm outline-none"
+              style={{
+                background: T.inputBg,
+                borderColor: T.inputBorder,
+                color: T.text,
+              }}
+            />
+            <button
+              type="button"
+              disabled={!newTodo.trim()}
+              onClick={() => {
+                if (newTodo.trim()) {
+                  onCreateTodo(newTodo.trim());
+                  setNewTodo("");
+                }
+              }}
+              className="inline-flex min-h-[44px] cursor-pointer items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ background: T.accent, color: T.accentContrast }}
+            >
+              <Plus className="h-4 w-4" aria-hidden /> Добавить
+            </button>
+          </div>
+
+          <div className="max-h-72 space-y-2 overflow-y-auto">
+            {filteredTodos.length === 0 ? (
+              <p className="text-sm" style={{ color: T.textMuted }}>
+                Нет задач
+              </p>
+            ) : (
+              filteredTodos.map((t) => {
+                const isDone = t.status === "done";
+                const isOverdue =
+                  !!t.due_date &&
+                  new Date(t.due_date).getTime() < Date.now() &&
+                  !isDone;
+                return (
+                  <div
+                    key={t.id}
+                    className="flex min-h-[44px] items-start gap-3 rounded-2xl border p-3"
+                    style={{
+                      borderColor: isOverdue
+                        ? "#ef444433"
+                        : T.border,
+                      background: isOverdue
+                        ? "#ef44440d"
+                        : T.bgCard,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onToggleTodo(t.id)}
+                      className="mt-0.5 grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded-md border transition"
+                      style={{
+                        borderColor: isDone ? "#22c55e" : T.border,
+                        background: isDone ? "#22c55e" : "transparent",
+                      }}
+                      aria-label={isDone ? "Снять отметку" : "Отметить выполненной"}
+                    >
+                      {isDone && <CheckCircle2 className="h-3 w-3" style={{ color: T.accentContrast }} />}
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <div
+                        className={`text-sm ${isDone ? "line-through" : ""}`}
+                        style={{ color: isDone ? T.textFaint : T.text }}
+                      >
+                        {t.title}
+                      </div>
+                      <div
+                        className="mt-0.5 text-xs"
+                        style={{ color: isOverdue ? "#ef4444" : T.textMuted }}
+                      >
+                        {t.assigned_to || "—"}
+                        {t.due_date && ` • ${formatDate(t.due_date)}`}
+                        {isOverdue && " • просрочено"}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteTodo(t.id)}
+                      className="cursor-pointer text-xs transition"
+                      style={{ color: T.textFaint }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = "#ef4444";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = T.textFaint;
+                      }}
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </Section>
+      </div>
+
+      {/* 8. Notes */}
+      <div className="mt-5">
+        <Section
+          title="Заметки"
+          icon={StickyNote}
+          count={notes.length}
+          expanded={openNotes}
+          onToggle={() => setOpenNotes(!openNotes)}
+          T={T}
+        >
+          <div className="mb-3 flex gap-2">
+            <input
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newNote.trim()) {
+                  onAddNote(newNote.trim());
+                  setNewNote("");
+                }
+              }}
+              placeholder="Добавить заметку..."
+              aria-label="Новая заметка"
+              className="min-h-[44px] flex-1 rounded-xl border px-3 py-2 text-sm outline-none"
+              style={{
+                background: T.inputBg,
+                borderColor: T.inputBorder,
+                color: T.text,
+              }}
+            />
+            <button
+              type="button"
+              disabled={!newNote.trim()}
+              onClick={() => {
+                if (newNote.trim()) {
+                  onAddNote(newNote.trim());
+                  setNewNote("");
+                }
+              }}
+              className="min-h-[44px] cursor-pointer rounded-xl border px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40"
+              style={{
+                borderColor: T.border,
+                color: T.text,
+              }}
+            >
+              Добавить
+            </button>
+          </div>
+          <div className="max-h-72 space-y-2 overflow-y-auto">
+            {notes.length === 0 ? (
+              <p className="text-sm" style={{ color: T.textMuted }}>
+                Заметок нет
+              </p>
+            ) : (
+              notes.map((n) => (
+                <div
+                  key={n.id}
+                  className="rounded-2xl border p-3"
+                  style={{
+                    borderColor: T.border,
+                    background: T.bgCard,
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-xs font-medium" style={{ color: T.text }}>
+                      {n.created_by || "Аноним"}
+                    </span>
+                    <span className="shrink-0 text-xs" style={{ color: T.textFaint }}>
+                      {relativeTime(n.created_at)}
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-sm" style={{ color: T.textMuted }}>
+                    {n.text}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </Section>
+      </div>
+
+      {/* 9. History */}
+      <div className="mt-5">
+        <LeadHistorySection
+          events={history}
+          expanded={openHistory}
+          onToggle={() => setOpenHistory(!openHistory)}
+          T={T}
+        />
+      </div>
+    </>
+  );
+
+  // ── Sheet-child mode: content only, no backdrop/aside wrapper ──
+  // Rendered inside the adaptive LeadDetailSheet, which provides the
+  // backdrop, the slide animation, the close affordances and the drag handle.
   if (asSheetChild) {
     return (
       <div className="relative flex w-full flex-col">
-        <div className="flex-1 overflow-y-auto pb-24 pt-1">
-          {/* 1. Header */}
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex min-w-0 gap-4">
-              <div
-                className="grid h-12 w-12 shrink-0 place-items-center rounded-full text-lg font-bold md:h-14 md:w-14"
-                style={{ background: `${stageColor}26`, color: stageColor }}
-                aria-hidden
-              >
-                {initials}
-              </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2
-                    className="truncate text-lg font-semibold tracking-tight md:text-xl"
-                    style={{ color: T.text }}
-                  >
-                    {displayName}
-                  </h2>
-                  {lead?.verified && (
-                    <CheckCircle2
-                      className="h-5 w-5"
-                      style={{ color: "#22c55e" }}
-                      aria-label="Подтверждён"
-                    />
-                  )}
-                  {isHot && (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                      style={{ background: "#ef444426", color: "#ef4444" }}
-                    >
-                      <Flame className="h-3 w-3" aria-hidden /> Горячий
-                    </span>
-                  )}
-                </div>
-                <div className="mt-1 text-sm" style={{ color: T.textMuted }}>
-                  {lead?.phone || "—"} • {rel}
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span
-                    className="rounded-full px-3 py-1 text-[11px]"
-                    style={{ background: `${stageColor}1a`, color: stageColor }}
-                  >
-                    {stageLabel}
-                  </span>
-                  {lead?.username && (
-                    <span
-                      className="rounded-full px-3 py-1 text-[11px]"
-                      style={{ background: T.bgCard, color: T.textMuted }}
-                    >
-                      @{lead.username}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Primary actions — 2x2 grid on mobile, 4-col on desktop */}
-          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-            {primaryActions.map((b) => {
-              const Icon = b.icon;
-              return (
-                <motion.button
-                  key={b.action}
-                  whileTap={{ scale: 0.96 }}
-                  whileHover={{ y: -1 }}
-                  transition={{ type: "spring", damping: 22, stiffness: 320 }}
-                  onClick={() => onAction(b.action)}
-                  className="flex min-h-[88px] cursor-pointer flex-col items-start justify-between rounded-2xl border p-3 text-left transition md:min-h-[100px] md:p-4"
-                  style={{
-                    borderColor: `${b.color}33`,
-                    background: `${b.color}14`,
-                    color: b.color,
-                  }}
-                >
-                  <Icon className="h-6 w-6" aria-hidden />
-                  <div className="mt-2 text-sm font-medium">{b.label}</div>
-                </motion.button>
-              );
-            })}
-          </div>
-
-          {/* 3. SLA overview */}
-          <div className="mt-5">
-            <LeadSLAOverview signals={signals} T={T} />
-          </div>
-
-          {/* 4. Info grid */}
-          <div className="mt-5">
-            <LeadInfoGrid items={infoItems} T={T} />
-          </div>
-
-          {/* 5. Deals */}
-          <div className="mt-5">
-            <Section
-              title="Сделки"
-              icon={Briefcase}
-              count={lead?.rentals?.length + lead?.sales?.length}
-              expanded={openDeals}
-              onToggle={() => setOpenDeals(!openDeals)}
-              T={T}
-            >
-              <div className="space-y-2">
-                {(!lead?.rentals || lead.rentals.length === 0) && (!lead?.sales || lead.sales.length === 0) && (
-                  <p className="text-sm" style={{ color: T.textMuted }}>
-                    Сделок нет
-                  </p>
-                )}
-                {lead?.rentals?.map((r) => (
-                  <div
-                    key={r.rentalId}
-                    className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3"
-                    style={{
-                      borderColor: T.border,
-                      background: T.bgCard,
-                    }}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium" style={{ color: T.text }}>
-                        {r.bikeTitle || "Аренда"}
-                      </p>
-                      <p className="text-[11px]" style={{ color: T.textFaint }}>
-                        {r.startDate ? formatDate(r.startDate) : "—"} → {r.endDate ? formatDate(r.endDate) : "—"}
-                      </p>
-                    </div>
-                    <span
-                      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
-                      style={{
-                        backgroundColor: `${RENTAL_STATUS_META[r.status]?.color || "#64748b"}15`,
-                        color: RENTAL_STATUS_META[r.status]?.color || "#64748b",
-                      }}
-                    >
-                      {RENTAL_STATUS_META[r.status]?.label || r.status}
-                    </span>
-                  </div>
-                ))}
-                {lead?.sales?.map((s) => (
-                  <div
-                    key={s.saleId}
-                    className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3"
-                    style={{
-                      borderColor: T.border,
-                      background: T.bgCard,
-                    }}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium" style={{ color: T.text }}>
-                        {s.bikeTitle || "Продажа"}
-                      </p>
-                      <p className="text-[11px]" style={{ color: T.textFaint }}>
-                        {formatDate(s.createdAt)}
-                      </p>
-                    </div>
-                    <span
-                      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
-                      style={{
-                        backgroundColor: "#f59e0b15",
-                        color: "#f59e0b",
-                      }}
-                    >
-                      {fmtMoney(s.salePrice)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Section>
-          </div>
-
-          {/* 6-9: Documents, Tasks, Notes, History — reuse same Section pattern */}
-          {/* For brevity in sheet mode, we render them in the same order as desktop */}
-
-          {/* 10. Sticky footer — action buttons */}
+        <div className="flex-1 overflow-y-auto pb-2 pt-1">
+          {body}
+          {/* Sticky footer — action buttons (anchored to the sheet body) */}
           <div
             className="sticky bottom-0 left-0 right-0 mt-5 flex items-center gap-3 border-t p-3"
             style={{
@@ -392,14 +788,7 @@ export function LeadDetailDrawer(props: Props) {
               background: T.bg,
             }}
           >
-            <button
-              type="button"
-              onClick={() => onAction("more")}
-              className="min-h-[44px] flex-1 cursor-pointer rounded-2xl border px-4 py-3 text-sm font-medium transition"
-              style={{ borderColor: T.border, color: T.text }}
-            >
-              Действия
-            </button>
+            {actionsMenu}
             <button
               type="button"
               onClick={onDismissLead}
@@ -422,11 +811,9 @@ export function LeadDetailDrawer(props: Props) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        // z-[55]: ABOVE the sticky CrewHeader (z-50) — the header must never
-        // overlap the drawer content — but below the dialogs (z-[60]) and
-        // toasts (z-[70]). Previously z-40 let the (now taller) sticky header
-        // cover the drawer's title row + close button.
-        className="fixed inset-0 z-[55] flex justify-end"
+        // z-[60]: above the sticky CrewHeader (z-50) so the header can never
+        // cover the drawer's title row or close button, below toasts (z-[70]).
+        className="fixed inset-0 z-[60] flex justify-end"
         style={{ background: "color-mix(in srgb, #000000 60%, transparent)" }}
         onClick={onClose}
       >
@@ -436,7 +823,7 @@ export function LeadDetailDrawer(props: Props) {
           exit={{ x: "100%" }}
           transition={{ type: "spring", damping: 30, stiffness: 280 }}
           onClick={(e) => e.stopPropagation()}
-          // Mobile: full-width. Desktop: max-w-[640px] right-side drawer.
+          // Mobile fallback: full-width. Desktop: max-w-[640px] right-side drawer.
           // `relative` so the absolutely-positioned sticky footer (bottom-0)
           // anchors to this aside and not the full-viewport backdrop.
           className="relative flex h-full w-full flex-col lg:max-w-[640px]"
@@ -447,413 +834,10 @@ export function LeadDetailDrawer(props: Props) {
           }}
         >
           <div className="flex-1 overflow-y-auto px-4 pb-32 pt-5 sm:px-5">
-            {/* 1. Header */}
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex min-w-0 gap-4">
-                <div
-                  className="grid h-12 w-12 shrink-0 place-items-center rounded-full text-lg font-bold md:h-14 md:w-14 md:text-lg"
-                  style={{ background: `${stageColor}26`, color: stageColor }}
-                  aria-hidden
-                >
-                  {initials}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2
-                      className="truncate text-lg md:text-base md:text-lg font-semibold tracking-tight"
-                      style={{ color: T.text }}
-                    >
-                      {displayName}
-                    </h2>
-                    {lead?.verified && (
-                      <CheckCircle2
-                        className="h-5 w-5"
-                        style={{ color: "#22c55e" }}
-                        aria-label="Подтверждён"
-                      />
-                    )}
-                    {isHot && (
-                      <span
-                        className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                        style={{ background: "#ef444426", color: "#ef4444" }}
-                      >
-                        <Flame className="h-3 w-3" aria-hidden /> Горячий
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1 text-sm" style={{ color: T.textMuted }}>
-                    {lead?.phone || "—"} • {rel}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span
-                      className="rounded-full px-3 py-1 text-[11px]"
-                      style={{ background: `${stageColor}1a`, color: stageColor }}
-                    >
-                      {stageLabel}
-                    </span>
-                    {lead?.username && (
-                      <span
-                        className="rounded-full px-3 py-1 text-[11px]"
-                        style={{ background: T.bgCard, color: T.textMuted }}
-                      >
-                        @{lead?.username}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="cursor-pointer rounded-lg p-2 transition"
-                style={{ color: T.textMuted }}
-                aria-label="Закрыть панель"
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = T.bgCardHover;
-                  e.currentTarget.style.color = T.text;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.color = T.textMuted;
-                }}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* 2. Primary actions — 2x2 grid on mobile, 4-col on desktop */}
-            <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-              {primaryActions.map((b) => {
-                const Icon = b.icon;
-                return (
-                  <motion.button
-                    key={b.action}
-                    whileTap={{ scale: 0.96 }}
-                    whileHover={{ y: -1 }}
-                    transition={{ type: "spring", damping: 22, stiffness: 320 }}
-                    onClick={() => onAction(b.action)}
-                    className="flex min-h-[88px] cursor-pointer flex-col items-start justify-between rounded-2xl border p-3 text-left transition md:min-h-[100px] md:p-4"
-                    style={{
-                      borderColor: `${b.color}33`,
-                      background: `${b.color}14`,
-                      color: b.color,
-                    }}
-                  >
-                    <Icon className="h-6 w-6" aria-hidden />
-                    <div className="mt-2 text-sm font-medium">{b.label}</div>
-                  </motion.button>
-                );
-              })}
-            </div>
-
-            {/* 3. SLA overview */}
-            <div className="mt-5">
-              <LeadSLAOverview signals={signals} T={T} />
-            </div>
-
-            {/* 4. Info grid */}
-            <div className="mt-5">
-              <LeadInfoGrid items={infoItems} T={T} />
-            </div>
-
-            {/* 5. Deals */}
-            <div className="mt-5">
-              <Section
-                title="Сделки"
-                icon={Briefcase}
-                count={lead?.rentals.length + lead?.sales.length}
-                expanded={openDeals}
-                onToggle={() => setOpenDeals(!openDeals)}
-                T={T}
-              >
-                <div className="space-y-2">
-                  {lead?.rentals.length === 0 && lead?.sales.length === 0 && (
-                    <p className="text-sm" style={{ color: T.textMuted }}>
-                      Сделок нет
-                    </p>
-                  )}
-                  {lead?.rentals.map((r) => (
-                    <div
-                      key={r.rentalId}
-                      className="flex min-h-[44px] items-center justify-between rounded-2xl border p-3"
-                      style={{
-                        borderColor: T.border,
-                        background: T.bgCard,
-                      }}
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium" style={{ color: T.text }}>
-                          {r.bikeTitle || "Байк"}
-                        </div>
-                        <div className="text-xs" style={{ color: T.textMuted }}>
-                          {r.startDate ? formatDate(r.startDate) : "—"} →{" "}
-                          {r.endDate ? formatDate(r.endDate) : "—"}
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-sm font-semibold" style={{ color: T.text }}>
-                        {fmtMoney(r.totalCost)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Section>
-            </div>
-
-            {/* 6. Documents */}
-            <div className="mt-5">
-              <LeadDocumentsSection
-                documents={docs}
-                qrStatus={qrStatus}
-                expanded={openDocs}
-                onToggle={() => setOpenDocs(!openDocs)}
-                onRequestResendQr={() => onAction("resend_qr")}
-                T={T}
-              />
-            </div>
-
-            {/* 7. Tasks */}
-            <div className="mt-5">
-              <Section
-                title="Задачи"
-                icon={CheckCircle2}
-                count={todos.filter((t) => t.status !== "done").length}
-                expanded={openTasks}
-                onToggle={() => setOpenTasks(!openTasks)}
-                T={T}
-              >
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {([
-                    { v: "all", label: `Все (${todos.length})`, color: "#eab308" },
-                    { v: "mine", label: "Мои", color: "#3b82f6" },
-                    { v: "overdue", label: "Просроченные", color: "#ef4444" },
-                  ] as const).map((f) => (
-                    <button
-                      key={f.v}
-                      type="button"
-                      onClick={() => setTodoFilter(f.v)}
-                      aria-pressed={todoFilter === f.v}
-                      className="min-h-[36px] cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition"
-                      style={
-                        todoFilter === f.v
-                          ? {
-                              borderColor: `${f.color}4d`,
-                              background: `${f.color}1a`,
-                              color: f.color,
-                            }
-                          : {
-                              borderColor: T.border,
-                              background: T.bgCard,
-                              color: T.textMuted,
-                            }
-                      }
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mb-3 flex gap-2">
-                  <input
-                    value={newTodo}
-                    onChange={(e) => setNewTodo(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && newTodo.trim()) {
-                        onCreateTodo(newTodo.trim());
-                        setNewTodo("");
-                      }
-                    }}
-                    placeholder="Новая задача..."
-                    aria-label="Новая задача"
-                    className="min-h-[44px] flex-1 rounded-xl border px-3 py-2 text-sm outline-none"
-                    style={{
-                      background: T.inputBg,
-                      borderColor: T.inputBorder,
-                      color: T.text,
-                    }}
-                  />
-                  <button
-                    type="button"
-                    disabled={!newTodo.trim()}
-                    onClick={() => {
-                      if (newTodo.trim()) {
-                        onCreateTodo(newTodo.trim());
-                        setNewTodo("");
-                      }
-                    }}
-                    className="inline-flex min-h-[44px] cursor-pointer items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40"
-                    style={{ background: T.accent, color: T.accentContrast }}
-                  >
-                    <Plus className="h-4 w-4" aria-hidden /> Добавить
-                  </button>
-                </div>
-
-                <div className="max-h-72 space-y-2 overflow-y-auto">
-                  {filteredTodos.length === 0 ? (
-                    <p className="text-sm" style={{ color: T.textMuted }}>
-                      Нет задач
-                    </p>
-                  ) : (
-                    filteredTodos.map((t) => {
-                      const isDone = t.status === "done";
-                      const isOverdue =
-                        !!t.due_date &&
-                        new Date(t.due_date).getTime() < Date.now() &&
-                        !isDone;
-                      return (
-                        <div
-                          key={t.id}
-                          className="flex min-h-[44px] items-start gap-3 rounded-2xl border p-3"
-                          style={{
-                            borderColor: isOverdue
-                              ? "#ef444433"
-                              : T.border,
-                            background: isOverdue
-                              ? "#ef44440d"
-                              : T.bgCard,
-                          }}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => onToggleTodo(t.id)}
-                            className="mt-0.5 grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded-md border transition"
-                            style={{
-                              borderColor: isDone ? "#22c55e" : T.border,
-                              background: isDone ? "#22c55e" : "transparent",
-                            }}
-                            aria-label={isDone ? "Снять отметку" : "Отметить выполненной"}
-                          >
-                            {isDone && <CheckCircle2 className="h-3 w-3" style={{ color: T.accentContrast }} />}
-                          </button>
-                          <div className="min-w-0 flex-1">
-                            <div
-                              className={`text-sm ${isDone ? "line-through" : ""}`}
-                              style={{ color: isDone ? T.textFaint : T.text }}
-                            >
-                              {t.title}
-                            </div>
-                            <div
-                              className="mt-0.5 text-xs"
-                              style={{ color: isOverdue ? "#ef4444" : T.textMuted }}
-                            >
-                              {t.assigned_to || "—"}
-                              {t.due_date && ` • ${formatDate(t.due_date)}`}
-                              {isOverdue && " • просрочено"}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => onDeleteTodo(t.id)}
-                            className="cursor-pointer text-xs transition"
-                            style={{ color: T.textFaint }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = "#ef4444";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = T.textFaint;
-                            }}
-                          >
-                            Удалить
-                          </button>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </Section>
-            </div>
-
-            {/* 8. Notes */}
-            <div className="mt-5">
-              <Section
-                title="Заметки"
-                icon={StickyNote}
-                count={notes.length}
-                expanded={openNotes}
-                onToggle={() => setOpenNotes(!openNotes)}
-                T={T}
-              >
-                <div className="mb-3 flex gap-2">
-                  <input
-                    value={newNote}
-                    onChange={(e) => setNewNote(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && newNote.trim()) {
-                        onAddNote(newNote.trim());
-                        setNewNote("");
-                      }
-                    }}
-                    placeholder="Добавить заметку..."
-                    aria-label="Новая заметка"
-                    className="min-h-[44px] flex-1 rounded-xl border px-3 py-2 text-sm outline-none"
-                    style={{
-                      background: T.inputBg,
-                      borderColor: T.inputBorder,
-                      color: T.text,
-                    }}
-                  />
-                  <button
-                    type="button"
-                    disabled={!newNote.trim()}
-                    onClick={() => {
-                      if (newNote.trim()) {
-                        onAddNote(newNote.trim());
-                        setNewNote("");
-                      }
-                    }}
-                    className="min-h-[44px] cursor-pointer rounded-xl border px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40"
-                    style={{
-                      borderColor: T.border,
-                      color: T.text,
-                    }}
-                  >
-                    Добавить
-                  </button>
-                </div>
-                <div className="max-h-72 space-y-2 overflow-y-auto">
-                  {notes.length === 0 ? (
-                    <p className="text-sm" style={{ color: T.textMuted }}>
-                      Заметок нет
-                    </p>
-                  ) : (
-                    notes.map((n) => (
-                      <div
-                        key={n.id}
-                        className="rounded-2xl border p-3"
-                        style={{
-                          borderColor: T.border,
-                          background: T.bgCard,
-                        }}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="truncate text-xs font-medium" style={{ color: T.text }}>
-                            {n.created_by || "Аноним"}
-                          </span>
-                          <span className="shrink-0 text-xs" style={{ color: T.textFaint }}>
-                            {relativeTime(n.created_at)}
-                          </span>
-                        </div>
-                        <p className="mt-1.5 text-sm" style={{ color: T.textMuted }}>
-                          {n.text}
-                        </p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </Section>
-            </div>
-
-            {/* 9. History */}
-            <div className="mt-5">
-              <LeadHistorySection
-                events={history}
-                expanded={openHistory}
-                onToggle={() => setOpenHistory(!openHistory)}
-                T={T}
-              />
-            </div>
+            {body}
           </div>
 
-          {/* 10. Sticky footer — action buttons are full-width on mobile */}
+          {/* 10. Sticky footer — action buttons */}
           <div
             className="absolute bottom-0 left-0 right-0 flex items-center gap-3 border-t p-4"
             style={{
@@ -862,20 +846,7 @@ export function LeadDetailDrawer(props: Props) {
               backdropFilter: "blur(12px)",
             }}
           >
-            <button
-              type="button"
-              onClick={() => onAction("more")}
-              className="min-h-[44px] flex-1 cursor-pointer rounded-2xl border px-4 py-3 text-sm font-medium transition"
-              style={{ borderColor: T.border, color: T.text }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = T.bgCardHover;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-              }}
-            >
-              Действия
-            </button>
+            {actionsMenu}
             <button
               type="button"
               onClick={onDismissLead}

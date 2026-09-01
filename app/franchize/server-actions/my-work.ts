@@ -19,10 +19,12 @@ import {
 } from "@/lib/salary-coefficients";
 import {
   resolveRentalOperator,
+  resolveSaleOperator,
   ATTRIBUTION_SOURCE_LABELS,
   type AttributionSource,
   type ShiftLike,
 } from "@/app/franchize/lib/operator-attribution";
+import { computeSaleSalary } from "@/lib/salary-coefficients-shared";
 
 /**
  * I5 — My Work server actions for profile sections.
@@ -60,6 +62,17 @@ export interface MyWorkRentalDetail {
   sourceLabel: string;
 }
 
+export interface MyWorkSaleDetail {
+  saleId: string;
+  bikeLabel: string;
+  /** Sale price of the bike, ₽. */
+  salePrice: number;
+  /** Operator salary for this sale (computeSaleSalary), ₽. */
+  salary: number;
+  /** How the sale was credited to the operator («/doc» or «смена»). */
+  sourceLabel: string;
+}
+
 export async function getMyWorkDayAction(params: {
   slug: string;
   /** Kept for backward compat — ignored (cookie identity used instead). */
@@ -73,11 +86,13 @@ export async function getMyWorkDayAction(params: {
     isToday: boolean;
     shifts: { count: number; total: number };
     rentals: { count: number; revenue: number; salary: number };
-    sales: { count: number; total: number };
+    /** Actual attributed sales (sale_contract_artifacts) — see below. */
+    sales: { count: number; total: number; revenue: number };
     serviceReturns: { count: number; total: number };
-    /** Итого за день: смены + ЗП аренд + продажи + сервис/возвраты. */
+    /** Итого за день: смены + ЗП аренд + ЗП продаж + сервис/возвраты. */
     totalDay: number;
     rentalDetails: MyWorkRentalDetail[];
+    saleDetails: MyWorkSaleDetail[];
   };
   error?: string;
 }> {
@@ -228,22 +243,84 @@ export async function getMyWorkDayAction(params: {
       });
     }
 
-    // ── Sales commissions (cash_transactions, «продажа») ──
-    const { data: salesCommissions, error: salesError } = await supabaseAdmin
-      .from("cash_transactions")
-      .select("id, amount, description")
-      .eq("crew_id", access.crewId)
-      .eq("to_user_id", secureUserId)
-      .eq("transaction_type", "expense_commission")
-      .gte("transaction_date", startOfDay)
-      .lte("transaction_date", endOfDay)
-      .like("description", "%продажа%");
+    // ── Sales: ACTUAL sale contracts attributed to me ──
+    // iter30: previously this card counted only manually recorded commission
+    // transactions (cash_transactions LIKE '%продажа%'), so a sale created via
+    // /doc by the operator himself showed «Продажи: 0» on the very same day.
+    // Now we mirror the salary model (computeCategoryBonuses in
+    // salary-calculations.ts) 1:1:
+    //   1. telegram_chat_id ∈ crew roster — the member whose bot session
+    //      created the sale doc (/doc creator);
+    //   2. fallback — the crew member whose shift covers created_at.
+    // Bonus = computeSaleSalary (same coefficients as the salary page/CSV).
+    const [{ data: crewMembersForSales }] = await Promise.all([
+      supabaseAdmin
+        .from("crew_members")
+        .select("user_id")
+        .eq("crew_id", access.crewId),
+    ]);
+    const memberIds = new Set<string>(
+      ((crewMembersForSales || []) as Array<{ user_id: string }>).map((m) => String(m.user_id)),
+    );
 
-    if (salesError) {
-      logger.warn("[getMyWorkDayAction] Sales commissions query failed:", salesError);
+    const { data: crewBikes } = await supabaseAdmin
+      .from("cars")
+      .select("id, make, model")
+      .eq("crew_id", access.crewId);
+    const crewBikeIds = ((crewBikes || []) as Array<{ id: string }>).map((b) => String(b.id));
+    const bikeLabelById = new Map<string, string>();
+    for (const b of (crewBikes || []) as Array<{ id: string; make: string | null; model: string | null }>) {
+      bikeLabelById.set(String(b.id), `${b.make || ""} ${b.model || ""}`.trim() || String(b.id));
     }
 
-    const salesTotal = (salesCommissions || []).reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
+    const saleDetails: MyWorkSaleDetail[] = [];
+    let salesRevenue = 0;
+    let salesSalary = 0;
+    if (crewBikeIds.length > 0) {
+      const { data: daySales, error: daySalesError } = await (supabaseAdmin as unknown as {
+        schema: (s: string) => { from: (t: string) => any };
+      })
+        .schema("private")
+        .from("sale_contract_artifacts")
+        .select("id, sale_price, resolved_bike_id, created_at, telegram_chat_id")
+        .in("resolved_bike_id", crewBikeIds)
+        .gte("created_at", startOfDay)
+        .lte("created_at", endOfDay);
+
+      if (daySalesError) {
+        logger.warn("[getMyWorkDayAction] Sales query failed:", daySalesError);
+      }
+
+      for (const s of ((daySales || []) as Array<{
+        id: string;
+        sale_price: string | number | null;
+        resolved_bike_id: string | null;
+        created_at: string | null;
+        telegram_chat_id: string | null;
+      }>)) {
+        const attribution = resolveSaleOperator(s, memberIds, allShifts);
+        if (attribution.operatorId !== secureUserId) continue;
+
+        const bikeId = String(s.resolved_bike_id || "");
+        const categories = resolveBikeCategories(bikeId, bikeOverrides);
+        const price = Math.round(Number(s.sale_price) || 0);
+        const salary = computeSaleSalary({
+          config: salaryConfig,
+          saleCategory: categories.sale,
+          salePrice: price,
+        });
+
+        salesRevenue += price;
+        salesSalary += salary.total;
+        saleDetails.push({
+          saleId: String(s.id),
+          bikeLabel: bikeLabelById.get(bikeId) || "Байк",
+          salePrice: price,
+          salary: salary.total,
+          sourceLabel: ATTRIBUTION_SOURCE_LABELS[attribution.source as AttributionSource] || "—",
+        });
+      }
+    }
 
     // ── Service / returns commissions ──
     const { data: serviceCommissions, error: serviceError } = await supabaseAdmin
@@ -263,7 +340,7 @@ export async function getMyWorkDayAction(params: {
     const serviceTotal = (serviceCommissions || []).reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
 
     const totalDay =
-      Math.round(shiftsTotal) + rentalsSalary + salesTotal + serviceTotal;
+      Math.round(shiftsTotal) + rentalsSalary + salesSalary + serviceTotal;
 
     return {
       success: true,
@@ -280,8 +357,9 @@ export async function getMyWorkDayAction(params: {
           salary: rentalsSalary,
         },
         sales: {
-          count: salesCommissions?.length || 0,
-          total: salesTotal,
+          count: saleDetails.length,
+          total: Math.round(salesSalary),
+          revenue: salesRevenue,
         },
         serviceReturns: {
           count: serviceCommissions?.length || 0,
@@ -289,6 +367,7 @@ export async function getMyWorkDayAction(params: {
         },
         totalDay,
         rentalDetails,
+        saleDetails,
       },
     };
   } catch (err) {

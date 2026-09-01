@@ -57,6 +57,23 @@ export interface LeadRow {
   sales: LeadSaleRow[];
   sourceRoute?: string | null;
   contactChannel?: string | null;
+  /**
+   * Avito channel metadata (present when the lead came from the Avito
+   * webhook / assistant-bot forward). Lets the UI deep-link the operator
+   * straight into the Avito chat/listing instead of hunting for it.
+   */
+  avito?: {
+    /** Avito chat id (v3 chat_id or synthetic fwd-… key). */
+    chatId: string | null;
+    /** Listing/chat URL captured from the forward or monitor enrichment. */
+    itemUrl: string | null;
+    /** Buyer profile URL (monitor enrichment). */
+    profileUrl: string | null;
+    /** Avito item id, when known. */
+    itemId: string | null;
+    /** Last buyer message excerpt (truncated server-side). */
+    lastMessage: string | null;
+  } | null;
   identityState?: 'claimed_user' | 'phone_only' | 'operator_placeholder' | 'merged';
   sourceCount?: number;
   originalOperatorChatId?: string | null;

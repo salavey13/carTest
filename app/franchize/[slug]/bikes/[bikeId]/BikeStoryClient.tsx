@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  ArrowLeft, ArrowRight, Bike, CalendarDays, Camera, ChevronLeft,
+  ArrowLeft, ArrowRight, Bike, CalendarDays, Camera, ChevronLeft, ChevronRight,
   Gauge, HandCoins, RefreshCw, Wrench, X,
 } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
@@ -25,6 +25,7 @@ import {
   formatMoney,
   formatMskShort,
   formatRangeLabel,
+  monthLabelRu,
   photoGridRecipe,
   statusMeta,
   type BikeWallSummary,
@@ -55,6 +56,11 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ photos: WallPhoto[]; index: number } | null>(null);
+  // Month selector (2026-09-01): null = «Вся история» (wall shows everything,
+  // month KPI shows the current month); a "YYYY-MM" key scopes BOTH the month
+  // KPI and the wall feed to that month.
+  const [month, setMonth] = useState<string | null>(null);
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
 
   useFranchizeTheme(crew?.theme || { mode: "auto", isAuto: true });
   const T = useCrewTokens(crew?.theme || { mode: "auto", isAuto: true });
@@ -81,10 +87,12 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
         bikeId,
         actorUserId: getActorUserId() || undefined,
         isPasswordAuth: !!passwordAuthOwnerId,
+        month,
       });
       if (result.success && result.data) {
         setBike(result.data.bike);
         setFeed(result.data.feed);
+        setAvailableMonths(result.data.availableMonths ?? []);
       } else {
         setError(result.error || "Не удалось загрузить историю мото.");
       }
@@ -93,7 +101,7 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
     } finally {
       setIsLoading(false);
     }
-  }, [slug, bikeId, getActorUserId, passwordAuthOwnerId]);
+  }, [slug, bikeId, getActorUserId, passwordAuthOwnerId, month]);
 
   useEffect(() => {
     if (!isAuthed || authLoading) return;
@@ -169,9 +177,13 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
 
   const s = bike.stats;
   const rentalCount = s.totalCount - s.cancelledCount;
-  const kpis: Array<{ label: string; value: string; accent?: boolean }> = [
+  const kpis: Array<{ label: string; value: string; accent?: boolean; sub?: string }> = [
     { label: "Заработал", value: formatMoney(s.earnedTotal), accent: true },
-    { label: "Этот месяц", value: formatMoney(s.earnedThisMonth) },
+    {
+      label: month ? monthLabelRu(month) : "Этот месяц",
+      value: formatMoney(s.earnedThisMonth),
+      sub: month ? `${s.monthRentals} аренд за месяц` : undefined,
+    },
     { label: "Аренд", value: String(rentalCount) },
     { label: "Ср. чек", value: formatMoney(s.avgCheck) },
     { label: "Дней в аренде", value: String(s.daysInRent) },
@@ -233,12 +245,62 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
         </div>
       </div>
 
+      {/* ── MONTH SELECTOR ────────────────────────────────────── */}
+      {/* Timeline: [Вся история] ↔ [текущий месяц] ↔ [прошлые месяцы].
+          ‹ steps back in time, › steps forward; the rightmost position is
+          «Вся история» (full wall). Bounds come from availableMonths. */}
+      {(() => {
+        const timeline: Array<string | null> = [null, ...availableMonths];
+        const index = month == null ? 0 : 1 + availableMonths.indexOf(month);
+        const canBack = index < timeline.length - 1;
+        const canForward = index > 0;
+        const step = (delta: 1 | -1) => setMonth(timeline[Math.min(Math.max(index + delta, 0), timeline.length - 1)]);
+        return (
+          <div
+            className="flex items-center justify-between gap-1.5 rounded-2xl border px-2 py-1.5"
+            style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}
+          >
+            <button
+              type="button"
+              onClick={() => step(1)}
+              disabled={!canBack}
+              aria-label="Предыдущий месяц"
+              className="flex h-11 w-11 items-center justify-center rounded-xl transition active:scale-95 disabled:opacity-30"
+              style={{ backgroundColor: T.bgElevated, color: T.text }}
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <div className="min-w-0 flex-1 text-center">
+              <p className="truncate text-sm font-semibold" style={{ color: month ? T.accent : T.text }}>
+                {month ? monthLabelRu(month) : "Вся история"}
+              </p>
+              <p className="mt-0.5 truncate text-[10px]" style={{ color: T.textFaint }}>
+                {month ? "стена и KPI месяца" : "вся стена · KPI месяца: текущий"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => step(-1)}
+              disabled={!canForward}
+              aria-label="Следующий месяц или вся история"
+              className="flex h-11 w-11 items-center justify-center rounded-xl transition active:scale-95 disabled:opacity-30"
+              style={{ backgroundColor: T.bgElevated, color: T.text }}
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+        );
+      })()}
+
       {/* ── KPI BAND (horizontal scroll on mobile) ────────────── */}
       <div className="-mx-1 overflow-x-auto px-1 pb-1" style={{ scrollbarWidth: "none" }}>
         <div className="flex gap-2" style={{ minWidth: "max-content" }}>
           {kpis.map((kpi) => (
             <div key={kpi.label} className="rounded-2xl border px-3.5 py-2.5" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard, minWidth: 108 }}>
               <p className="text-[15px] font-bold leading-tight" style={{ color: kpi.accent ? T.accent : T.text }}>{kpi.value}</p>
+              {kpi.sub ? (
+                <p className="mt-0.5 text-[10px]" style={{ color: T.accent }}>{kpi.sub}</p>
+              ) : null}
               <p className="mt-0.5 text-[10px] uppercase tracking-wide" style={{ color: T.textMuted }}>{kpi.label}</p>
             </div>
           ))}

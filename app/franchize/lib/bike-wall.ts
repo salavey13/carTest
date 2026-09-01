@@ -87,8 +87,11 @@ export interface WallFeedItem {
 export interface BikeWallStats {
   /** completed + active + confirmed + pending (cancelled excluded) */
   earnedTotal: number;
-  /** MSK-calendar-month slice of earnedTotal */
+  /** Month slice of earnedTotal — the CURRENT month by default, or the month
+   *  passed to computeBikeStats as `monthKey` (the month selector on the wall). */
   earnedThisMonth: number;
+  /** Earning rentals counted into earnedThisMonth (same month scope). */
+  monthRentals: number;
   completedCount: number;
   activeCount: number;
   cancelledCount: number;
@@ -251,6 +254,83 @@ export function mskMonthKey(iso: string | null | undefined, nowMs: number = Date
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+// ── Month-selector helpers (2026-09-01: "Заработал 0 ₽ этот месяц" on the 1st
+//    of a month made owners want to page back through previous months) ────────
+
+const MONTHS_RU_NOM = [
+  "январь", "февраль", "март", "апрель", "май", "июнь",
+  "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь",
+];
+
+/** "2026-08" → "Август 2026" (nominal case for selectors/titles). */
+export function monthLabelRu(key: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(key || "").trim());
+  if (!m) return String(key || "");
+  const mo = Number(m[2]) - 1;
+  if (mo < 0 || mo > 11) return String(key || "");
+  const label = MONTHS_RU_NOM[mo];
+  const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+  return `${labelCap} ${Number(m[1])}`;
+}
+
+/** Short variant for cramped tiles: "2026-08" → "авг". */
+const MONTHS_RU_SHORT = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+export function monthLabelShort(key: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(key || "").trim());
+  if (!m) return String(key || "");
+  const mo = Number(m[2]) - 1;
+  if (mo < 0 || mo > 11) return String(key || "");
+  return MONTHS_RU_SHORT[mo];
+}
+
+/** Step a "YYYY-MM" key by ±delta months (handles year rollover). */
+export function shiftMonthKey(key: string, delta: number): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(key || "").trim());
+  if (!m) return String(key || "");
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Validate a client-supplied month param ("YYYY-MM", MSK calendar).
+ * Returns the normalized key, or null when absent/invalid/future.
+ * Future months are rejected — you cannot earn in a month that hasn't begun.
+ */
+export function normalizeMonthParam(
+  raw: string | null | undefined,
+  nowMs: number = Date.now(),
+): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  const m = /^(\d{4})-(\d{2})$/.exec(s);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  if (mo < 1 || mo > 12 || y < 2015 || y > 2200) return null;
+  const key = `${y}-${String(mo).padStart(2, "0")}`;
+  if (key > mskMonthKey(null, nowMs)) return null;
+  return key;
+}
+
+/**
+ * Distinct month keys covered by the given dates (plus the current month),
+ * newest-first. Used to bound the month selector's back arrow so the user
+ * never pages into an empty void.
+ */
+export function availableMonthKeys(
+  dates: Array<string | null | undefined>,
+  nowMs: number = Date.now(),
+): string[] {
+  const current = mskMonthKey(null, nowMs);
+  const set = new Set<string>([current]);
+  for (const d of dates) {
+    if (!d) continue;
+    const key = mskMonthKey(d, nowMs);
+    if (key <= current) set.add(key);
+  }
+  return Array.from(set).sort().reverse();
+}
+
 export interface StatsInputRow {
   status: RentalWallStatus;
   totalCost: number | null | undefined;
@@ -271,10 +351,13 @@ export function computeBikeStats(
   rows: StatsInputRow[],
   nowMs: number = Date.now(),
   serviceRows: ServiceStatsInputRow[] = [],
+  /** Month scope for earnedThisMonth/monthRentals — defaults to the current month. */
+  monthKey?: string,
 ): BikeWallStats {
   const stats: BikeWallStats = {
     earnedTotal: 0,
     earnedThisMonth: 0,
+    monthRentals: 0,
     completedCount: 0,
     activeCount: 0,
     cancelledCount: 0,
@@ -289,7 +372,7 @@ export function computeBikeStats(
     lastServiceAt: null,
   };
 
-  const currentMonth = mskMonthKey(null, nowMs);
+  const currentMonth = monthKey ?? mskMonthKey(null, nowMs);
   let earnedCount = 0;
   let latestOdo: number | null = null;
 
@@ -308,6 +391,7 @@ export function computeBikeStats(
       earnedCount++;
       if (mskMonthKey(r.start || r.createdAt, nowMs) === currentMonth) {
         stats.earnedThisMonth += cost;
+        stats.monthRentals++;
       }
     }
     stats.daysInRent += rentalDays(r.start, r.end);
