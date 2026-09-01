@@ -1,18 +1,33 @@
 "use client";
 
+// ProfileClient.tsx (franchize profile, iter31)
+// ──────────────────────────────────────────────────────────────────────────
+// The page was split into per-domain panel components under ./components/ —
+// the file had grown past 2.5k lines and every new feature touched it.
+// This file now owns ONLY: identity/theme, the master data load, the
+// owner-cash store (shared between the wallet panel and the payout
+// actions), and the composition of panels.
+//
+// Panels (each self-contained unless noted):
+//   ProfileHeaderPanel        — hero + stat cards
+//   RentalsPurchasesPanel     — my rentals + buy orders (digest)
+//   SubrenterMyBikesPanel     — partner's bikes + monthly cut (own fetch)
+//   SubrentersOverviewPanel   — owner/admin partner list + payout sheet
+//                               (own fetch; writes via owner cash)
+//   OwnerCashWalletPanel      — «Кошелёк владельца» (data owned here)
+//   MyEarningsPanel           — pay-period + monthly earnings (own fetch)
+//   MyWorkPanel               — per-day work stats (own fetch)
+//   CrewOperationsPanel       — quick links
+//   DocumentPhotosPanel /
+//   RentalDocsPanel /
+//   FormPrefillsPanel         — document & form prefills
+//   AchievementsPanel         — gamification grid
+
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Trophy, MapPin, ShoppingCart, Lock, CheckCircle, Wallet, Briefcase, Calendar, Users, RotateCw, Bike, Handshake, ChevronLeft, ChevronRight, Plus, Trash2, Landmark } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import VibeContentRenderer from "@/components/VibeContentRenderer";
-import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
-import { getCurrentPayPeriod } from "@/lib/salary-period";
-import { formatDateRu } from "@/app/franchize/components/DateInputRu";
 import {
   getFranchizeProfileBySlugAction,
   grantFranchizeAchievementAction,
@@ -32,40 +47,21 @@ import {
   getFranchizeOperatorDashboardAccess,
   type FranchizeCrewVM,
 } from "@/app/franchize/actions";
-import { readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
-import { RentalDocsForm } from "../../components/RentalDocsForm";
-import { PhotoUploadButton } from "../../components/PhotoUploadButton";
-import {
-  FranchizeOperatorLinkButton,
-  FranchizeOperatorPanel,
-  FranchizeOperatorStatCard,
-  franchizeOperatorInputClassName,
-  franchizeOperatorInputStyle,
-} from "../../components/FranchizeOperatorSurface";
-import { getMyEarnings } from "../../server-actions/salary-calculations";
-import { getMyWorkDayAction, type MyWorkRentalDetail, type MyWorkSaleDetail } from "../../server-actions/my-work";
 import {
   getSubrenterOwnedBikesAction,
   getFranchizeSubrentersOverviewAction,
-  getSubrenterMonthlyEarningsAction,
-  getSubrentersMonthlyPayoutsAction,
   type SubrenterOwnedBikesData,
   type SubrenterOverviewRow,
-  type SubrenterMonthSummary,
-  type SubrentersMonthlyPayoutsData,
-} from "../../server-actions/subrenter-monitoring";
+} from "@/app/franchize/server-actions/subrenter-monitoring";
 import {
   addOwnerCashEntryAction,
   deleteOwnerCashEntryAction,
   getOwnerCashMonthAction,
   type OwnerCashMonthData,
-} from "../../server-actions/owner-cash";
-import {
-  currentMskMonthKey,
-} from "../../lib/subrenter-economics";
-import { MonthPickerBar } from "../../components/FranchizeMonthPicker";
+} from "@/app/franchize/server-actions/owner-cash";
+import { currentMskMonthKey } from "@/app/franchize/lib/subrenter-economics";
 
 // 2026-08-19 review: use the shared fallbackCrew constant from
 // lib/fallback-crew.ts — was duplicated inline here, which meant it
@@ -73,87 +69,33 @@ import { MonthPickerBar } from "../../components/FranchizeMonthPicker";
 // contentBlocks, cta fields after the type was extended).
 import { fallbackCrew } from "@/app/franchize/lib/fallback-crew";
 
+import {
+  containerVariants,
+  ProfileSkeleton,
+  type ProfileDocsStatusState,
+  type RentalSecretsState,
+  type OwnerCashFormValues,
+} from "./components/profile-shared";
+import { ProfileHeaderPanel } from "./components/ProfileHeaderPanel";
+import { RentalsPurchasesPanel } from "./components/RentalsPurchasesPanel";
+import { SubrenterMyBikesPanel } from "./components/SubrenterMyBikesPanel";
+import { SubrentersOverviewPanel } from "./components/SubrentersOverviewPanel";
+import { OwnerCashWalletPanel } from "./components/OwnerCashWalletPanel";
+import { MyEarningsPanel } from "./components/MyEarningsPanel";
+import { MyWorkPanel } from "./components/MyWorkPanel";
+import { CrewOperationsPanel } from "./components/CrewOperationsPanel";
+import {
+  DocumentPhotosPanel,
+  RentalDocsPanel,
+  FormPrefillsPanel,
+  type RentalDocsPrefillState,
+} from "./components/ProfileDocumentsPanels";
+import { AchievementsPanel } from "./components/AchievementsPanel";
+
 type FranchizeProfileClientProps = {
   initialCrew?: FranchizeCrewVM;
   initialSlug?: string;
 };
-
-// iter26: today's date as "YYYY-MM-DD" in Europe/Moscow (server runs UTC).
-function todayMskIso(): string {
-  return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
-
-// iter26: shift a "YYYY-MM-DD" day key by ±N days (MSK-safe, no DST in MSK).
-function shiftDateKey(key: string, deltaDays: number): string {
-  const [y, m, d] = key.split("-").map(Number);
-  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return todayMskIso();
-  return new Date(Date.UTC(y, m - 1, d + deltaDays)).toISOString().slice(0, 10);
-}
-
-// Loading skeleton component
-function ProfileSkeleton() {
-  return (
-    <div className="space-y-4">
-      {[1, 2, 3, 4].map((i) => (
-        <div
-          key={i}
-          className="h-32 animate-pulse rounded-2xl border"
-          style={{
-            borderColor: "var(--franchize-shell-border)",
-            backgroundColor: "color-mix(in srgb, var(--franchize-shell-card) 50%, transparent)",
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-// Empty state component
-function EmptyState({
-  icon,
-  title,
-  description,
-  actionLabel,
-  actionHref,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  actionLabel?: string;
-  actionHref?: string;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed p-8 text-center">
-      <div
-        className="mb-4 flex h-16 w-16 items-center justify-center rounded-full"
-        style={{
-          backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 12%, transparent)",
-          color: "var(--franchize-shell-accent)",
-        }}
-      >
-        {icon}
-      </div>
-      <p className="font-semibold" style={{ color: "var(--franchize-shell-text)" }}>
-        {title}
-      </p>
-      <p className="mt-1 text-sm" style={{ color: "var(--franchize-shell-muted)" }}>
-        {description}
-      </p>
-      {actionLabel && actionHref && (
-        <Link
-          href={actionHref}
-          className="mt-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition hover:opacity-90"
-          style={{
-            backgroundColor: "var(--franchize-shell-accent)",
-            color: "var(--franchize-shell-primary-contrast)",
-          }}
-        >
-          {actionLabel}
-        </Link>
-      )}
-    </div>
-  );
-}
 
 export function FranchizeProfileClient({
   initialCrew,
@@ -188,19 +130,7 @@ export function FranchizeProfileClient({
   const [error, setError] = useState<string | null>(null);
   const [digest, setDigest] = useState<FranchizeActivityDigest | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [rentalSecrets, setRentalSecrets] = useState<{
-    hasPreviousRentals: boolean;
-    lastRentalDate?: string;
-    savedData?: {
-      fullName: string;
-      phone: string;
-      passport: string;
-      driverLicense: string;
-      birthDate: string;
-      licenseExpiryDate: string;
-      licenseCategories: string;
-    };
-  } | null>(null);
+  const [rentalSecrets, setRentalSecrets] = useState<RentalSecretsState | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [prefill, setPrefill] = useState<FranchizeFormPrefill>({
@@ -214,17 +144,12 @@ export function FranchizeProfileClient({
 
   // Subrent partner monitoring (iter12): the user's OWN partner bikes
   // (specs.subrenter_chat_id = his chat id) and, for crew owner/admins,
-  // the dedicated subrenters list.
+  // the dedicated subrenters list. Owned here (not in the panels) because
+  // both drive cross-panel behavior: the overview gate doubles as the
+  // owner-cash permission check, and payout writes reload the wallet.
   const [subrenterOwned, setSubrenterOwned] = useState<SubrenterOwnedBikesData | null>(null);
   const [subrentersOverview, setSubrentersOverview] = useState<SubrenterOverviewRow[] | null>(null);
-
-  // iter18: monthly money panels. Subrenter sees HIS monthly earnings
-  // (his 50% cut of the bike part); the crew owner sees how much he owes
-  // every partner this month. Month is switchable (payback bookkeeping).
   const [subrenterMonth, setSubrenterMonth] = useState(() => currentMskMonthKey());
-  const [subrenterEarnings, setSubrenterEarnings] = useState<SubrenterMonthSummary | null>(null);
-  const [subrenterEarningsLoading, setSubrenterEarningsLoading] = useState(false);
-  const [payoutsMonth, setPayoutsMonth] = useState(() => currentMskMonthKey());
 
   // Owner cash wallet («Кошелёк владельца») — personal money movements +
   // subrenter payouts, owner/admin only. null = нет прав / не загружено.
@@ -232,89 +157,12 @@ export function FranchizeProfileClient({
   const [ownerCashHidden, setOwnerCashHidden] = useState(false);
   const [ownerCashMonth, setOwnerCashMonth] = useState(() => currentMskMonthKey());
   const [ownerCashLoading, setOwnerCashLoading] = useState(false);
-  const [ownerCashForm, setOwnerCashForm] = useState({
-    direction: "out" as "in" | "out",
-    kind: "personal" as "personal" | "subrenter_payout" | "other",
-    amount: "",
-    title: "",
-    person: "",
-  });
   const [ownerCashBusy, setOwnerCashBusy] = useState(false);
-  const [payoutRecordBusy, setPayoutRecordBusy] = useState<string | null>(null);
-  const [subrenterPayouts, setSubrenterPayouts] = useState<SubrentersMonthlyPayoutsData | null>(null);
-  const [payoutsLoading, setPayoutsLoading] = useState(false);
 
-  // Earnings and work state
-  const [earnings, setEarnings] = useState<{
-    currentPlan: { accrued: number; balanceDue: number; nextPayoutDate: string | null };
-    recentCommissions: Array<{ amount: number; date: string; description: string }>;
-  } | null>(null);
-  // iter26: My Work — per-day (date picker), real rentals + shifts + commissions.
-  const [workDate, setWorkDate] = useState<string>(() => {
-    // Today in MSK (server runs UTC).
-    const msk = new Date(Date.now() + 3 * 60 * 60 * 1000);
-    return msk.toISOString().slice(0, 10);
-  });
-  const [myWork, setMyWork] = useState<{
-    date: string;
-    isToday: boolean;
-    shifts: { count: number; total: number };
-    rentals: { count: number; revenue: number; salary: number };
-    sales: { count: number; total: number; revenue: number };
-    serviceReturns: { count: number; total: number };
-    totalDay: number;
-    rentalDetails: MyWorkRentalDetail[];
-    saleDetails: MyWorkSaleDetail[];
-  } | null>(null);
-  const [earningsLoading, setEarningsLoading] = useState(true);
-  const [workLoading, setWorkLoading] = useState(true);
-
-  // Period earnings state.
-  // 2026-08-19 review: default to the CURRENT PAY PERIOD (10th → 25th, or
-  // 25th → next 10th) instead of "first of month → today". Matches the
-  // owner's actual payout cycle so the totals match what gets paid out.
-  // Helper lives in lib/salary-period.ts and is shared with SalaryClient.
-  const [earningsPeriod, setEarningsPeriod] = useState(() => {
-    // Inline the import-time compute so we don't recompute every render.
-    const period = getCurrentPayPeriod();
-    return period;
-  });
-  const [periodEarnings, setPeriodEarnings] = useState<{
-    shifts: number;
-    shiftIncome: number;
-    commissionIncome: number;
-    total: number;
-    breakdown: Array<{ date: string; description: string; amount: number }>;
-  } | null>(null);
-  const [periodEarningsLoading, setPeriodEarningsLoading] = useState(false);
-  const [periodEarningsError, setPeriodEarningsError] = useState<string | null>(null);
-
-  // Team earnings modal state (for owners)
-  const [showTeamEarningsModal, setShowTeamEarningsModal] = useState(false);
-  const [teamEarnings, setTeamEarnings] = useState<Array<{
-    memberId: string;
-    memberName: string;
-    shifts: number;
-    shiftIncome: number;
-    commissionIncome: number;
-    total: number;
-  }>>([]);
-  const [teamEarningsLoading, setTeamEarningsLoading] = useState(false);
-  const [teamEarningsError, setTeamEarningsError] = useState<string | null>(null);
   // Pre-entered rental docs (passport/license) from private.user_rental_secrets
-  const [docsPrefill, setDocsPrefill] = useState<{
-    fullName?: string; phone?: string; birthDate?: string;
-    passportSeries?: string; passportNumber?: string; passportIssuedBy?: string;
-    passportIssueDate?: string; registrationAddress?: string;
-    licenseSeries?: string; licenseNumber?: string; licenseCategories?: string;
-    licenseExpiryDate?: string; verificationStatus?: string; hasVerifiedData?: boolean;
-  } | null>(null);
+  const [docsPrefill, setDocsPrefill] = useState<RentalDocsPrefillState | null>(null);
   // Profile document photos status (uploaded/verified)
-  const [profileDocsStatus, setProfileDocsStatus] = useState<{
-    passportMainpage: { uploaded: boolean; verified: boolean };
-    passportRegistration: { uploaded: boolean; verified: boolean };
-    driversLicence: { uploaded: boolean; verified: boolean };
-  } | null>(null);
+  const [profileDocsStatus, setProfileDocsStatus] = useState<ProfileDocsStatusState | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -363,101 +211,10 @@ export function FranchizeProfileClient({
         incrementCounters: { profileOpenCount: 1 },
       });
       setIsLoading(false);
-
-      // Load earnings and work data
-      setEarningsLoading(true);
-      setWorkLoading(true);
-
-      const [earningsRes, workRes] = await Promise.all([
-        getMyEarnings({ slug, actorUserId: dbUser.user_id }),
-        getMyWorkDayAction({ slug, date: workDate }),
-      ]);
-
-      if (earningsRes.success && earningsRes.data) {
-        setEarnings(earningsRes.data);
-      }
-      setEarningsLoading(false);
-
-      if (workRes.success && workRes.data) {
-        setMyWork(workRes.data);
-      }
-      setWorkLoading(false);
     };
     void run();
-    // workDate is intentionally NOT a dep here — the dedicated effect below
-    // refetches only the work section when the user picks another day.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dbUser?.user_id, slug]);
-
-  // iter26: date picker — refetch the My Work section when the picked day
-  // changes (the initial fetch happens in the loader above). Skips the very
-  // first run (already fetched there) and ignores garbage dates (the action
-  // would fall back to "today" and mismatch the picker forever).
-  const shiftWorkDate = (deltaDays: number) => {
-    const next = shiftDateKey(workDate, deltaDays);
-    const cap = todayMskIso();
-    setWorkDate(next > cap ? cap : next);
-  };
-
-  useEffect(() => {
-    if (!dbUser?.user_id) return;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(workDate)) return;
-    if (workDate === myWork?.date) return;
-    let cancelled = false;
-    setWorkLoading(true);
-    getMyWorkDayAction({ slug, date: workDate })
-      .then((res) => {
-        if (!cancelled && res.success && res.data) setMyWork(res.data);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!cancelled) setWorkLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [workDate, dbUser?.user_id, slug, myWork?.date]);
-
-  // iter18: subrenter monthly earnings loader — runs when the partner panel
-  // is visible (user owns bikes in the park) and whenever he switches the
-  // month. Failures are silent (the panel keeps the previous data).
-  useEffect(() => {
-    if (!dbUser?.user_id) return;
-    if (!subrenterOwned || subrenterOwned.bikes.length === 0) return;
-    let cancelled = false;
-    setSubrenterEarningsLoading(true);
-    getSubrenterMonthlyEarningsAction({ slug, userId: dbUser.user_id, month: subrenterMonth })
-      .then((res) => {
-        if (!cancelled && res.success && res.data) setSubrenterEarnings(res.data);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!cancelled) setSubrenterEarningsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [dbUser?.user_id, slug, subrenterOwned, subrenterMonth]);
-
-  // iter18: owner's monthly payout loader — runs when the subrenters overview
-  // panel is visible (owner/admin) and whenever the month changes.
-  useEffect(() => {
-    if (!dbUser?.user_id) return;
-    if (!subrentersOverview || subrentersOverview.length === 0) return;
-    let cancelled = false;
-    setPayoutsLoading(true);
-    getSubrentersMonthlyPayoutsAction({ slug, actorUserId: dbUser.user_id, month: payoutsMonth })
-      .then((res) => {
-        if (!cancelled && res.success && res.data) setSubrenterPayouts(res.data);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!cancelled) setPayoutsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [dbUser?.user_id, slug, subrentersOverview, payoutsMonth]);
 
   // ── Owner cash wallet loader: runs when user proven to be owner/admin
   // (subrentersOverview loaded non-empty ⇒ canManageSubrenters passed).
@@ -489,41 +246,35 @@ export function FranchizeProfileClient({
     return cleanup;
   }, [reloadOwnerCash]);
 
-  const submitOwnerCash = async () => {
-    if (!dbUser?.user_id) return;
-    const amount = Number(String(ownerCashForm.amount || "").replace(/[^\d.]/g, ""));
+  const submitOwnerCash = async (form: OwnerCashFormValues): Promise<boolean> => {
+    if (!dbUser?.user_id) return false;
+    const amount = Number(String(form.amount || "").replace(/[^\d.]/g, ""));
     if (!amount || amount <= 0) {
       toast.error("Укажите сумму");
-      return;
+      return false;
     }
-    if (!ownerCashForm.title.trim()) {
+    if (!form.title.trim()) {
       toast.error("Укажите, за что / от кого");
-      return;
+      return false;
     }
     setOwnerCashBusy(true);
     try {
       const res = await addOwnerCashEntryAction({
         slug,
         actorUserId: dbUser.user_id,
-        direction: ownerCashForm.direction,
-        kind: ownerCashForm.kind,
+        direction: form.direction,
+        kind: form.kind,
         amount,
-        title: ownerCashForm.title.trim(),
-        person: ownerCashForm.person.trim() || undefined,
+        title: form.title.trim(),
+        person: form.person.trim() || undefined,
       });
       if (res.success) {
         toast.success("Записано в кошелёк владельца");
-        setOwnerCashForm({
-          direction: ownerCashForm.direction,
-          kind: ownerCashForm.kind,
-          amount: "",
-          title: "",
-          person: "",
-        });
         reloadOwnerCash();
-      } else {
-        toast.error(res.error || "Не удалось записать");
+        return true;
       }
+      toast.error(res.error || "Не удалось записать");
+      return false;
     } finally {
       setOwnerCashBusy(false);
     }
@@ -539,139 +290,6 @@ export function FranchizeProfileClient({
       toast.error(res.error || "Не удалось удалить");
     }
   };
-
-  /** Быстрая запись выплаты субарендатору из панели выплат (kind=subrenter_payout). */
-  const recordSubrenterPayout = async (chatId: string, name: string, amountRub: number) => {
-    if (!dbUser?.user_id) return;
-    if (!amountRub || amountRub <= 0) {
-      toast.error("Нечего записывать — сумма 0");
-      return;
-    }
-    setPayoutRecordBusy(chatId);
-    try {
-      const res = await addOwnerCashEntryAction({
-        slug,
-        actorUserId: dbUser.user_id,
-        direction: "out",
-        kind: "subrenter_payout",
-        amount: amountRub,
-        title: "Выплата субарендатору",
-        person: name,
-      });
-      if (res.success) {
-        toast.success(`Выплата ${name} записана в кошелёк`);
-        reloadOwnerCash();
-      } else {
-        toast.error(res.error || "Не удалось записать выплату");
-      }
-    } finally {
-      setPayoutRecordBusy(null);
-    }
-  };
-
-  /** "август 2026" label for a YYYY-MM key. */
-  const monthLabel = (monthKey: string) => {
-    try {
-      const [y, m] = monthKey.split("-").map(Number);
-      const label = new Date(y, m - 1, 1).toLocaleDateString("ru-RU", {
-        month: "long",
-        year: "numeric",
-      });
-      return label.charAt(0).toUpperCase() + label.slice(1);
-    } catch {
-      return monthKey;
-    }
-  };
-
-  // Currency formatter helper (reused across component)
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("ru-RU", {
-      style: "currency",
-      currency: "RUB",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-
-  // Fetch earnings helper (shared between self and team)
-  const fetchEarnings = async (scope: "self" | "team") => {
-    if (!dbUser?.user_id) return { success: false, error: "Не авторизован" };
-
-    // Validate date range
-    const fromDate = new Date(earningsPeriod.from);
-    const toDate = new Date(earningsPeriod.to);
-    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
-      return { success: false, error: "Некорректный формат даты" };
-    }
-    if (fromDate > toDate) {
-      return { success: false, error: "Дата начала не может быть позже даты окончания" };
-    }
-
-    // Clone date to avoid mutation
-    const to = new Date(toDate);
-    to.setHours(23, 59, 59, 999);
-
-    const params = new URLSearchParams({
-      from: fromDate.toISOString(),
-      to: to.toISOString(),
-      scope,
-      actorUserId: dbUser.user_id,
-    });
-
-    try {
-      const res = await fetch(`/api/franchize/${slug}/earnings?${params}`);
-      return await res.json();
-    } catch (err) {
-      console.error(`Failed to fetch ${scope} earnings:`, err);
-      return { success: false, error: `Ошибка при загрузке ${scope === "team" ? "зарплат команды" : "дохода за период"}` };
-    }
-  };
-
-  // Fetch period earnings for self
-  const fetchPeriodEarnings = async () => {
-    setPeriodEarningsLoading(true);
-    setPeriodEarningsError(null);
-    const result = await fetchEarnings("self");
-    if (result.success && result.data) {
-      setPeriodEarnings(result.data);
-    } else {
-      setPeriodEarningsError(result.error || "Не удалось загрузить доход за период");
-    }
-    setPeriodEarningsLoading(false);
-  };
-
-  // Fetch team earnings for owners
-  const fetchTeamEarnings = async () => {
-    setTeamEarningsLoading(true);
-    setTeamEarningsError(null);
-    const result = await fetchEarnings("team");
-    if (result.success && result.data) {
-      setTeamEarnings(result.data);
-      setShowTeamEarningsModal(true);
-    } else {
-      setTeamEarningsError(result.error || "Не удалось загрузить зарплаты команды");
-    }
-    setTeamEarningsLoading(false);
-  };
-
-  // Auto-load period earnings on mount with default period.
-  // FIX (iter14): earnings are CREW-ONLY — ordinary renters must not see
-  // salary data (and we skip the API call for them entirely).
-  useEffect(() => {
-    if (dbUser?.user_id && canOpenCloserDashboard && !periodEarnings) {
-      void fetchPeriodEarnings();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dbUser?.user_id, canOpenCloserDashboard]);
-
-  const unlockedSet = useMemo(
-    () => new Set(Object.keys(profile?.achievements || {})),
-    [profile?.achievements],
-  );
-  const unlockedCount = catalog.filter((item) =>
-    unlockedSet.has(item.id),
-  ).length;
-  const accentOn = T.accentContrast;
-  const isAuto = T.isAuto;
 
   const handlePrefillSave = async () => {
     if (!dbUser?.user_id) return;
@@ -691,24 +309,17 @@ export function FranchizeProfileClient({
     setIsSaving(false);
   };
 
+  const unlockedSet = useMemo(
+    () => new Set(Object.keys(profile?.achievements || {})),
+    [profile?.achievements],
+  );
+  const unlockedCount = catalog.filter((item) =>
+    unlockedSet.has(item.id),
+  ).length;
+
   if (isLoading) {
     return <ProfileSkeleton />;
   }
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 },
-  };
 
   return (
     <motion.div
@@ -729,1816 +340,123 @@ export function FranchizeProfileClient({
       }}
     >
       {/* Header Panel */}
-      <motion.div variants={itemVariants}>
-        <FranchizeOperatorPanel muted={false}>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex-1">
-              <p className="flex items-center gap-2 text-xs font-medium tracking-wide " style={{ color: T.accent }}>
-                <VibeContentRenderer content="::FaIdBadge::" /> Профиль райдера
-              </p>
-              <h1 className="mt-2 break-words text-2xl font-semibold " style={{ color: T.text }}>
-                {profile?.crewName || crew.header.brandName || slug}
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-relaxed " style={{ color: T.textMuted }}>
-                Персональная страница достижений, сохранённых данных и быстрых
-                возвратов в аренды экипажа.
-              </p>
-            </div>
-            <FranchizeOperatorLinkButton href={`/franchize/${slug}`}>
-              В каталог
-            </FranchizeOperatorLinkButton>
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-            <FranchizeOperatorStatCard
-              label="Достижения"
-              value={`${unlockedCount}/${catalog.length}`}
-              icon={<Trophy className="h-4 w-4" style={{ color: T.accent }} />}
-            />
-            <FranchizeOperatorStatCard
-              label="Смен завершено"
-              value={profile?.counters?.shiftsCompleted || 0}
-              icon={<Briefcase className="h-4 w-4" style={{ color: T.accent }} />}
-            />
-            <FranchizeOperatorStatCard
-              label="Часов работы"
-              value={profile?.counters?.totalHoursWorked
-                ? Math.round(profile.counters.totalHoursWorked)
-                : 0}
-              icon={<Calendar className="h-4 w-4" style={{ color: T.accent }} />}
-            />
-          </div>
-        </FranchizeOperatorPanel>
-      </motion.div>
-
-      {/* Achievements Panel moved to end of page */}
+      <ProfileHeaderPanel
+        crewName={profile?.crewName || crew.header.brandName || slug}
+        slug={slug}
+        unlockedCount={unlockedCount}
+        achievementsTotal={catalog.length}
+        shiftsCompleted={profile?.counters?.shiftsCompleted || 0}
+        totalHoursWorked={profile?.counters?.totalHoursWorked || 0}
+        T={T}
+      />
 
       {/* Rentals and Purchases Panel */}
-      <motion.div variants={itemVariants}>
-        <FranchizeOperatorPanel>
-          <h2 className="flex items-center gap-2 text-base font-semibold " style={{ color: T.text }}>
-            <ShoppingCart className="h-4 w-4" /> Аренды и покупки
-          </h2>
-          <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
-            {/* Rentals section */}
-            <div>
-              <p className="mb-2 text-xs font-semibold " style={{ color: T.textMuted }}>
-                Мои аренды
-              </p>
-              {digest?.rentals && digest.rentals.length > 0 ? (
-                <div className="space-y-2">
-                  {digest.rentals.slice(0, 5).map((r) => (
-                    <div
-                      key={r.rentalId}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => navigateSpa(r.docLink)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          navigateSpa(r.docLink);
-                        }
-                      }}
-                      className="block rounded-xl border p-3 text-sm transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                      style={T.styles.card}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-3">
-                          {r.vehicleImage && (
-                            <img
-                              src={r.vehicleImage}
-                              alt={r.vehicleLabel}
-                              className="h-12 w-12 flex-shrink-0 rounded-lg object-cover"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                            />
-                          )}
-                          <div>
-                            <span className="font-semibold" style={{ color: T.text }}>
-                              {r.vehicleLabel}
-                            </span>
-                            {r.agreedStartDate && r.agreedEndDate && (
-                              <p style={{ color: T.textMuted }} className="mt-0.5 text-[11px]">
-                                {new Date(r.agreedStartDate).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
-                                {" → "}
-                                {new Date(r.agreedEndDate).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        {r.isTestRide ? (
-                          <span style={T.styles.accentBadge} className="rounded-full px-2 py-0.5 text-[10px] whitespace-nowrap">
-                            Тест-драйв
-                          </span>
-                        ) : (
-                          <span
-                            className="rounded-full px-2 py-0.5 text-[10px] whitespace-nowrap"
-                            style={{
-                              ...T.styles.accentPill,
-                              opacity: r.status === "active" ? 1 : 0.6,
-                            }}
-                          >
-                            {(() => {
-                              const STATUS_LABELS: Record<string, string> = {
-                                active: "Активна",
-                                completed: "Завершена",
-                                cancelled: "Отменена",
-                                disputed: "Спорная",
-                                confirmed: "Подтверждена",
-                                pending_confirmation: "Ждёт подтверждения",
-                              };
-                              return STATUS_LABELS[r.status] || r.status;
-                            })()}
-                          </span>
-                        )}
-                      </div>
-                      {r.status === "active" && (
-                        <div className="mt-2 flex items-center justify-end gap-2 border-t pt-2"
-                          style={{ borderColor: T.borderSoft }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigateSpa(`/franchize/${slug}?vehicle=${r.vehicleId}`);
-                            }}
-                            className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold transition hover:opacity-85"
-                            style={T.styles.ctaPrimary}
-                          >
-                            Продлить
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  icon={<MapPin className="h-6 w-6" />}
-                  title="Нет активных аренд"
-                  description="Начните аренду, чтобы она появилась здесь"
-                  actionLabel="Каталог байков"
-                  actionHref={`/franchize/${slug}`}
-                />
-              )}
-            </div>
+      <RentalsPurchasesPanel
+        digest={digest}
+        slug={slug}
+        T={T}
+        navigateSpa={navigateSpa}
+      />
 
-            {/* Orders section */}
-            <div>
-              <p className="mb-2 text-xs font-semibold " style={{ color: T.textMuted }}>
-                Планируемые покупки
-              </p>
-              {digest?.buyOrders && digest.buyOrders.length > 0 ? (
-                <div className="space-y-2">
-                  {digest.buyOrders.slice(0, 3).map((o) => (
-                    <div
-                      key={o.orderId}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => navigateSpa(o.docLink)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          navigateSpa(o.docLink);
-                        }
-                      }}
-                      className="block cursor-pointer rounded-xl border p-3 text-sm transition hover:opacity-90 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                      style={{ borderColor: T.borderSoft }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs " style={{ color: T.accent }}>
-                          #{o.orderId}
-                        </span>
-                        <ShoppingCart className="h-3 w-3 "  style={{ color: T.textMuted }} />
-                      </div>
-                      <div className="mt-1 text-xs " style={{ color: T.text }}>
-                        {o.status} · {o.vehicleIds.slice(0, 2).join(", ")}
-                        {o.vehicleIds.length > 2 && ` +${o.vehicleIds.length - 2}`}
-                      </div>
-                      {o.docFileName && (
-                        <div className="mt-1 text-xs " style={{ color: T.textMuted }}>
-                          📄 {o.docFileName}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  icon={<ShoppingCart className="h-6 w-6" />}
-                  title="Нет заказов"
-                  description="Оформите покупку, чтобы она появилась здесь"
-                  actionLabel="Каталог"
-                  actionHref={`/franchize/${slug}`}
-                />
-              )}
-            </div>
-          </div>
-        </FranchizeOperatorPanel>
-      </motion.div>
-
-      {/* Subrenter panel: rentals of MY bikes in the park (partner monitoring) */}
+      {/* Subrenter panel: rentals of MY bikes in the park (partner monitoring).
+          The panel fetches its own monthly earnings when the month changes. */}
       {subrenterOwned && subrenterOwned.bikes.length > 0 && (
-        <motion.div variants={itemVariants}>
-          <FranchizeOperatorPanel>
-            <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
-              <Bike className="h-4 w-4" /> Мои байки в парке
-            </h2>
-            <p className="mt-1 text-xs" style={{ color: T.textMuted }}>
-              Аренды байков, которые вы передали экипажу — вы видите их статус
-              в реальном времени. Нажмите на байк, чтобы открыть его историю:
-              аренды, сервис, пробег.
-            </p>
-
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-              {subrenterOwned.bikes.map((bike) => (
-                <div
-                  key={bike.bikeId}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => navigateSpa(`/franchize/${slug}/bikes/${bike.bikeId}`)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      navigateSpa(`/franchize/${slug}/bikes/${bike.bikeId}`);
-                    }
-                  }}
-                  className="flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                  style={T.styles.card}
-                >
-                  {bike.imageUrl && (
-                    <img
-                      src={bike.imageUrl}
-                      alt={bike.label}
-                      className="h-12 w-12 flex-shrink-0 rounded-lg object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold" style={{ color: T.text }}>
-                      {bike.label}
-                    </span>
-                    <span className="mt-0.5 block text-[11px]" style={{ color: T.textMuted }}>
-                      Аренд всего: {bike.totalRentals}
-                      {bike.activeRentals > 0 && (
-                        <span className="ml-1 font-semibold" style={{ color: T.accent }}>
-                          · сейчас в аренде: {bike.activeRentals}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <ChevronRight className="h-4 w-4 flex-shrink-0" style={{ color: T.textMuted }} />
-                </div>
-              ))}
-            </div>
-
-            {/* iter18: monthly earnings with month switcher — the partner's
-                payback bookkeeping (his 50% cut of the bike part; equipment
-                is crew money and never split). */}
-            <div className="mt-4 rounded-xl border p-3" style={T.styles.card}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: T.textMuted }}>
-                  <Wallet className="h-3.5 w-3.5" /> Заработок за месяц
-                </p>
-                {/* iter21: month picker bar — iterate ‹ › AND jump to any
-                    month directly (previously ‹ › only, so reaching e.g.
-                    March meant tapping 5+ times). */}
-                <MonthPickerBar
-                  value={subrenterMonth}
-                  onChange={setSubrenterMonth}
-                  accent={T.accent}
-                  accentContrast={T.accentContrast}
-                  bgCard={T.bgCard}
-                  bgElevated={T.bgElevated}
-                  border={T.borderSoft}
-                  text={T.text}
-                  textMuted={T.textMuted}
-                />
-              </div>
-
-              {subrenterEarningsLoading ? (
-                <p className="mt-3 animate-pulse text-sm" style={{ color: T.textMuted }}>
-                  Считаем…
-                </p>
-              ) : subrenterEarnings ? (
-                <>
-                  <div className="mt-3 flex flex-wrap items-end gap-x-4 gap-y-1">
-                    <span className="text-2xl font-bold tabular-nums" style={{ color: T.accent }}>
-                      {formatCurrency(subrenterEarnings.cutRub)}
-                    </span>
-                    <span className="text-[11px]" style={{ color: T.textMuted }}>
-                      ваша доля · 50% от аренды байков {formatCurrency(subrenterEarnings.bikePartRub)}
-                      {subrenterEarnings.equipmentRub > 0 && (
-                        <> · экипировка {formatCurrency(subrenterEarnings.equipmentRub)} (не делится)</>
-                      )}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px]" style={{ color: T.textMuted }}>
-                    Аренд за месяц: {subrenterEarnings.rentalCount} · Суммарно оплачено:{" "}
-                    {formatCurrency(subrenterEarnings.totalRub)} · Экипировка целиком остаётся экипажу.
-                  </p>
-                  {subrenterEarnings.rentals.length > 0 && (
-                    <div className="mt-3 space-y-1.5">
-                      {subrenterEarnings.rentals.slice(0, 6).map((r) => (
-                        <div
-                          key={r.rentalId}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => navigateSpa(r.docLink || `/franchize/${slug}/rental/${r.rentalId}`)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              navigateSpa(r.docLink || `/franchize/${slug}/rental/${r.rentalId}`);
-                            }
-                          }}
-                          className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border p-2 text-xs transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                          style={T.styles.card}
-                        >
-                          <span className="min-w-0 truncate font-medium" style={{ color: T.text }}>
-                            {r.bikeLabel}
-                            {r.startedAt && (
-                              <span className="ml-1.5 font-normal" style={{ color: T.textMuted }}>
-                                {new Date(r.startedAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
-                              </span>
-                            )}
-                          </span>
-                          <span className="whitespace-nowrap font-bold tabular-nums" style={{ color: T.accent }}>
-                            +{formatCurrency(r.cutRub)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="mt-3 text-sm" style={{ color: T.textMuted }}>
-                  Нет данных за этот месяц.
-                </p>
-              )}
-            </div>
-
-            {subrenterOwned.rentals.length > 0 && (
-              <div className="mt-4">
-                <p className="mb-2 text-xs font-semibold" style={{ color: T.textMuted }}>
-                  Последние аренды моих байков
-                </p>
-                <div className="space-y-2">
-                  {subrenterOwned.rentals.slice(0, 5).map((r) => (
-                    <div
-                      key={r.rentalId}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => navigateSpa(r.docLink)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          navigateSpa(r.docLink);
-                        }
-                      }}
-                      className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border p-3 text-sm transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                      style={T.styles.card}
-                    >
-                      <div className="min-w-0">
-                        <span className="font-semibold" style={{ color: T.text }}>
-                          {r.bikeLabel}
-                        </span>
-                        {r.agreedStartDate && r.agreedEndDate && (
-                          <p className="mt-0.5 text-[11px]" style={{ color: T.textMuted }}>
-                            {new Date(r.agreedStartDate).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
-                            {" → "}
-                            {new Date(r.agreedEndDate).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
-                          </p>
-                        )}
-                      </div>
-                      <span
-                        className="rounded-full px-2 py-0.5 text-[10px] whitespace-nowrap"
-                        style={{ ...T.styles.accentPill, opacity: r.status === "active" ? 1 : 0.6 }}
-                      >
-                        {(() => {
-                          const STATUS_LABELS: Record<string, string> = {
-                            active: "Активна",
-                            completed: "Завершена",
-                            cancelled: "Отменена",
-                            disputed: "Спорная",
-                            confirmed: "Подтверждена",
-                            pending_confirmation: "Ждёт подтверждения",
-                          };
-                          return STATUS_LABELS[r.status] || r.status;
-                        })()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </FranchizeOperatorPanel>
-        </motion.div>
+        <SubrenterMyBikesPanel
+          owned={subrenterOwned}
+          month={subrenterMonth}
+          onMonthChange={setSubrenterMonth}
+          slug={slug}
+          userId={dbUser?.user_id || ""}
+          T={T}
+          navigateSpa={navigateSpa}
+        />
       )}
 
-      {/* Crew owner/admin panel: dedicated subrenters list */}
+      {/* Crew owner/admin panel: dedicated subrenters list + payout sheet */}
       {subrentersOverview && subrentersOverview.length > 0 && (
-        <motion.div variants={itemVariants}>
-          <FranchizeOperatorPanel>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
-                  <Handshake className="h-4 w-4" /> Субарендаторы
-                </h2>
-                <p className="mt-1 text-xs" style={{ color: T.textMuted }}>
-                  Партнёры, передавшие свои байки в парк экипажа. Назначить или
-                  снять субарендатора можно в админ-панели.
-                </p>
-              </div>
-              <FranchizeOperatorLinkButton href={`/franchize/${slug}/admin`}>
-                Управлять
-              </FranchizeOperatorLinkButton>
-            </div>
-
-            {/* iter18: monthly payout sheet — how much the crew owes every
-                partner this month (50% of the bike part; equipment is not
-                split). Month switcher for payback bookkeeping. */}
-            <div className="mt-4 rounded-xl border p-3" style={T.styles.card}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: T.textMuted }}>
-                  <Wallet className="h-3.5 w-3.5" /> Выплаты субарендаторам
-                </p>
-                <MonthPickerBar
-                  value={payoutsMonth}
-                  onChange={setPayoutsMonth}
-                  accent={T.accent}
-                  accentContrast={T.accentContrast}
-                  bgCard={T.bgCard}
-                  bgElevated={T.bgElevated}
-                  border={T.borderSoft}
-                  text={T.text}
-                  textMuted={T.textMuted}
-                />
-              </div>
-
-              {payoutsLoading ? (
-                <p className="mt-3 animate-pulse text-sm" style={{ color: T.textMuted }}>
-                  Считаем…
-                </p>
-              ) : subrenterPayouts ? (
-                <>
-                  <div className="mt-3 flex flex-wrap items-end gap-x-4 gap-y-1">
-                    <span className="text-2xl font-bold tabular-nums" style={{ color: "#f59e0b" }}>
-                      {formatCurrency(subrenterPayouts.totalPayoutRub)}
-                    </span>
-                    <span className="text-[11px]" style={{ color: T.textMuted }}>
-                      к выплате партнёрам за {monthLabel(subrenterPayouts.month).toLowerCase()} · 50% аренды байков (экипировка не делится)
-                    </span>
-                  </div>
-                  <div className="mt-3 space-y-1.5">
-                    {subrenterPayouts.rows.map((row) => (
-                      <div
-                        key={row.chatId}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2 text-xs"
-                        style={T.styles.card}
-                      >
-                        <div className="min-w-0">
-                          <span className="font-semibold" style={{ color: T.text }}>
-                            {row.name || (row.username ? `@${row.username}` : `id ${row.chatId}`)}
-                          </span>
-                          <span className="ml-1.5 font-normal" style={{ color: T.textMuted }}>
-                            {row.rentalCount} аренд{row.rentalCount > 0 && row.totalRub > 0 ? ` · оборот ${formatCurrency(row.totalRub)}` : ""}
-                            {row.rentalCount > 0 && row.totalRub > 0 ? ` · нам ${formatCurrency(Math.max(0, row.totalRub - row.payoutRub))}` : ""}
-                          </span>
-                        </div>
-                        <span className="whitespace-nowrap font-bold tabular-nums" style={{ color: "#f59e0b" }}>
-                          {row.payoutRub > 0 ? `→ ${formatCurrency(row.payoutRub)}` : "—"}
-                        </span>
-                        {row.payoutRub > 0 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-7 shrink-0 text-[11px]"
-                            disabled={payoutRecordBusy === row.chatId}
-                            onClick={() =>
-                              void recordSubrenterPayout(
-                                row.chatId,
-                                row.name || (row.username ? `@${row.username}` : `id ${row.chatId}`),
-                                row.payoutRub,
-                              )
-                            }
-                          >
-                            {payoutRecordBusy === row.chatId ? "…" : "Записать выплату"}
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <p className="mt-3 text-sm" style={{ color: T.textMuted }}>
-                  Нет данных за этот месяц.
-                </p>
-              )}
-            </div>
-
-            <div className="mt-3 space-y-2">
-              {subrentersOverview.map((s) => (
-                <div key={s.chatId} className="rounded-xl border p-3" style={T.styles.card}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <span className="font-semibold" style={{ color: T.text }}>
-                        {s.name || (s.username ? `@${s.username}` : `id ${s.chatId}`)}
-                      </span>
-                      <span className="ml-2 text-[11px]" style={{ color: T.textMuted }}>
-                        {s.username ? `@${s.username} · ` : ""}id {s.chatId}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[11px]" style={{ color: T.textMuted }}>
-                      <span>Аренд: {s.totalRentals}</span>
-                      {s.activeRentals > 0 && (
-                        <span className="rounded-full px-2 py-0.5 font-semibold" style={{ ...T.styles.accentPill }}>
-                          активных: {s.activeRentals}
-                        </span>
-                      )}
-                      {s.lastRentalAt && (
-                        <span>· последняя {new Date(s.lastRentalAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {s.bikes.map((b) => (
-                      <button
-                        key={b.bikeId}
-                        type="button"
-                        onClick={() => navigateSpa(`/franchize/${slug}/bikes/${b.bikeId}`)}
-                        title="Открыть историю байка"
-                        className="cursor-pointer rounded-full border px-2 py-0.5 text-[11px] transition hover:opacity-80 active:scale-[0.98]"
-                        style={{
-                          borderColor: b.activeRentals > 0 ? T.accent : T.borderSoft,
-                          color: b.activeRentals > 0 ? T.accent : T.textMuted,
-                        }}
-                      >
-                        {b.label} · {b.totalRentals} аренд{b.activeRentals > 0 ? ` · ${b.activeRentals} активна` : ""}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </FranchizeOperatorPanel>
-        </motion.div>
+        <SubrentersOverviewPanel
+          rows={subrentersOverview}
+          slug={slug}
+          userId={dbUser?.user_id || ""}
+          T={T}
+          navigateSpa={navigateSpa}
+          onPayoutRecorded={reloadOwnerCash}
+        />
       )}
 
-      {/* Owner cash wallet («Кошелёк владельца») — owner/admin only: все
-          подряд личные движения денег мимо автоматических систем: наличные
-          приходы, личные траты, выплаты субарендаторам. */}
+      {/* Owner cash wallet («Кошелёк владельца») — owner/admin only */}
       {!ownerCashHidden && ownerCash && (
-        <motion.div variants={itemVariants}>
-          <FranchizeOperatorPanel>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
-                  <Landmark className="h-4 w-4" /> Кошелёк владельца
-                </h2>
-                <p className="mt-1 text-xs" style={{ color: T.textMuted }}>
-                  Личные движения денег мимо кассы: пришло / ушло на все подряд.
-                  Выплаты субарендаторам записываются туда же.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-3">
-              <MonthPickerBar
-                value={ownerCashMonth}
-                onChange={setOwnerCashMonth}
-                accent={T.accent}
-                accentContrast={T.accentContrast}
-                bgCard={T.bgCard}
-                bgElevated={T.bgElevated}
-                border={T.borderSoft}
-                text={T.text}
-                textMuted={T.textMuted}
-              />
-            </div>
-
-            {/* Totals */}
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              <div className="rounded-xl border p-2.5 text-center" style={T.styles.card}>
-                <p className="text-[10px] uppercase tracking-wide" style={{ color: T.textMuted }}>Пришло</p>
-                <p className="mt-0.5 text-sm font-bold tabular-nums" style={{ color: "#22c55e" }}>
-                  +{formatCurrency(ownerCash.totalIn)}
-                </p>
-              </div>
-              <div className="rounded-xl border p-2.5 text-center" style={T.styles.card}>
-                <p className="text-[10px] uppercase tracking-wide" style={{ color: T.textMuted }}>Ушло</p>
-                <p className="mt-0.5 text-sm font-bold tabular-nums" style={{ color: "#ef4444" }}>
-                  −{formatCurrency(ownerCash.totalOut)}
-                </p>
-              </div>
-              <div className="rounded-xl border p-2.5 text-center" style={T.styles.card}>
-                <p className="text-[10px] uppercase tracking-wide" style={{ color: T.textMuted }}>Итог</p>
-                <p className="mt-0.5 text-sm font-bold tabular-nums" style={{ color: ownerCash.net >= 0 ? "#22c55e" : "#ef4444" }}>
-                  {ownerCash.net >= 0 ? "+" : "−"}{formatCurrency(Math.abs(ownerCash.net))}
-                </p>
-              </div>
-            </div>
-
-            {/* Quick add form */}
-            <div className="mt-3 rounded-xl border p-3" style={T.styles.card}>
-              <p className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: T.textMuted }}>
-                <Plus className="h-3.5 w-3.5" /> Новая запись
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <div className="flex overflow-hidden rounded-lg border" style={{ borderColor: T.borderSoft }}>
-                  {(["in", "out"] as const).map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => setOwnerCashForm((f) => ({ ...f, direction: d }))}
-                      className="px-3 py-2 text-xs font-semibold transition"
-                      style={{
-                        backgroundColor: ownerCashForm.direction === d ? (d === "in" ? "#22c55e22" : "#ef444422") : "transparent",
-                        color: ownerCashForm.direction === d ? (d === "in" ? "#22c55e" : "#ef4444") : T.textMuted,
-                      }}
-                    >
-                      {d === "in" ? "Пришло" : "Ушло"}
-                    </button>
-                  ))}
-                </div>
-                <select
-                  value={ownerCashForm.kind}
-                  onChange={(e) => setOwnerCashForm((f) => ({ ...f, kind: e.target.value as typeof f.kind }))}
-                  className="rounded-lg border px-2 py-2 text-xs outline-none"
-                  style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard, color: T.text }}
-                >
-                  <option value="personal">Личное</option>
-                  <option value="subrenter_payout">Выплата субарендатору</option>
-                  <option value="other">Прочее</option>
-                </select>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <input
-                  value={ownerCashForm.amount}
-                  onChange={(e) => setOwnerCashForm((f) => ({ ...f, amount: e.target.value }))}
-                  inputMode="numeric"
-                  placeholder="Сумма ₽"
-                  className="w-24 rounded-lg border px-3 py-2 text-sm outline-none"
-                  style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard, color: T.text }}
-                />
-                <input
-                  value={ownerCashForm.title}
-                  onChange={(e) => setOwnerCashForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="За что / от кого (напр. CBR 600RR Влад)"
-                  className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
-                  style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard, color: T.text }}
-                />
-                <input
-                  value={ownerCashForm.person}
-                  onChange={(e) => setOwnerCashForm((f) => ({ ...f, person: e.target.value }))}
-                  placeholder="Кто (опционально)"
-                  className="w-36 rounded-lg border px-3 py-2 text-sm outline-none"
-                  style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard, color: T.text }}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={ownerCashBusy}
-                  onClick={() => void submitOwnerCash()}
-                  className="shrink-0"
-                >
-                  {ownerCashBusy ? "Пишу…" : "Записать"}
-                </Button>
-              </div>
-            </div>
-
-            {/* Entries list */}
-            {ownerCashLoading ? (
-              <p className="mt-3 animate-pulse text-sm" style={{ color: T.textMuted }}>Загружаю…</p>
-            ) : ownerCash.entries.length === 0 ? (
-              <p className="mt-3 text-sm" style={{ color: T.textMuted }}>
-                Записей за {monthLabel(ownerCash.month).toLowerCase()} пока нет.
-              </p>
-            ) : (
-              <div className="mt-3 space-y-1.5">
-                {ownerCash.entries.map((e) => (
-                  <div
-                    key={e.id}
-                    className="flex items-center justify-between gap-2 rounded-lg border p-2.5 text-sm"
-                    style={T.styles.card}
-                  >
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <span
-                        className="h-2 w-2 flex-shrink-0 rounded-full"
-                        style={{ backgroundColor: e.direction === "in" ? "#22c55e" : "#ef4444" }}
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate font-medium" style={{ color: T.text }}>
-                          {e.title}
-                          {e.kind === "subrenter_payout" && (
-                            <span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: "#f59e0b22", color: "#f59e0b" }}>
-                              выплата
-                            </span>
-                          )}
-                        </p>
-                        <p className="mt-0.5 text-[11px]" style={{ color: T.textMuted }}>
-                          {new Date(e.entryDate + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
-                          {e.person ? ` · ${e.person}` : ""}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-shrink-0 items-center gap-2">
-                      <span
-                        className="whitespace-nowrap font-bold tabular-nums"
-                        style={{ color: e.direction === "in" ? "#22c55e" : "#ef4444" }}
-                      >
-                        {e.direction === "in" ? "+" : "−"}{formatCurrency(e.amount)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => void removeOwnerCash(e.id)}
-                        title="Удалить запись"
-                        className="rounded p-1 transition hover:opacity-70"
-                        style={{ color: T.textMuted }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </FranchizeOperatorPanel>
-        </motion.div>
+        <OwnerCashWalletPanel
+          data={ownerCash}
+          loading={ownerCashLoading}
+          busy={ownerCashBusy}
+          month={ownerCashMonth}
+          onMonthChange={setOwnerCashMonth}
+          onSubmit={submitOwnerCash}
+          onRemove={(id) => void removeOwnerCash(id)}
+          T={T}
+        />
       )}
 
-      {/* My Earnings Panel — CREW ONLY (iter14): hidden for ordinary renters */}
+      {/* My Earnings Panel — CREW ONLY (iter14): hidden for ordinary renters.
+          Self-contained: it loads its own data only when rendered. */}
       {canOpenCloserDashboard && (
-      <motion.div variants={itemVariants}>
-        <FranchizeOperatorPanel>
-          <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
-            <Wallet className="h-4 w-4" /> Мои доходы
-          </h2>
-
-          {/* Period selector */}
-          <div className="mt-3 rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold" style={{ color: T.textMuted }}>
-                📅 Период расчёта
-              </p>
-              {canOpenCloserDashboard && (
-                <button
-                  onClick={fetchTeamEarnings}
-                  disabled={teamEarningsLoading}
-                  className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85 disabled:opacity-50"
-                  style={{
-                    backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 15%, transparent)",
-                    color: T.accent,
-                    border: `1px solid ${T.borderSoft}`,
-                  }}
-                >
-                  {teamEarningsLoading ? (
-                    <>
-                      <RotateCw className="h-3 w-3 animate-spin" />
-                      Загрузка...
-                    </>
-                  ) : (
-                    <>
-                      <Users className="h-3 w-3" />
-                      Зарплаты команды
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs" style={{ color: T.textMuted }}>с</span>
-                <input
-                  type="date"
-                  value={earningsPeriod.from}
-                  onChange={(e) => setEarningsPeriod((p) => ({ ...p, from: e.target.value }))}
-                  className="rounded border px-2 py-1 text-xs"
-                  style={{
-                    borderColor: T.borderSoft,
-                    backgroundColor: "color-mix(in srgb, var(--franchize-shell-card) 50%, transparent)",
-                    color: T.text,
-                  }}
-                />
-                {/* 2026-08-19 review: unambiguous Russian-format display */}
-                {earningsPeriod.from && (
-                  <span className="text-[10px] tabular-nums" style={{ color: T.textMuted }}>
-                    ({formatDateRu(earningsPeriod.from)})
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs" style={{ color: T.textMuted }}>по</span>
-                <input
-                  type="date"
-                  value={earningsPeriod.to}
-                  onChange={(e) => setEarningsPeriod((p) => ({ ...p, to: e.target.value }))}
-                  className="rounded border px-2 py-1 text-xs"
-                  style={{
-                    borderColor: T.borderSoft,
-                    backgroundColor: "color-mix(in srgb, var(--franchize-shell-card) 50%, transparent)",
-                    color: T.text,
-                  }}
-                />
-                {earningsPeriod.to && (
-                  <span className="text-[10px] tabular-nums" style={{ color: T.textMuted }}>
-                    ({formatDateRu(earningsPeriod.to)})
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={fetchPeriodEarnings}
-                disabled={periodEarningsLoading}
-                className="flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85 disabled:opacity-50"
-                style={{
-                  backgroundColor: T.accent,
-                  color: T.accentContrast,
-                }}
-              >
-                {periodEarningsLoading ? (
-                  <>
-                    <RotateCw className="h-3 w-3 animate-spin" />
-                    Загрузка...
-                  </>
-                ) : (
-                  <>
-                    <RotateCw className="h-3 w-3" />
-                    Применить
-                  </>
-                )}
-              </button>
-            </div>
-            {/* Inline error for period */}
-            {periodEarningsError && (
-              <div className="mt-2 rounded px-2 py-1 text-xs" style={{ backgroundColor: "color-mix(in srgb, #ef4444 12%, transparent)", color: "#ef4444" }}>
-                ⚠️ {periodEarningsError}
-              </div>
-            )}
-          </div>
-
-          {/* Period earnings result */}
-          {periodEarnings && (
-            <div className="mt-3 rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <div>
-                  <p className="text-xs" style={{ color: T.textMuted }}>Часы (смены)</p>
-                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
-                    {periodEarnings.shifts}ч
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs" style={{ color: T.textMuted }}>Смены</p>
-                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
-                    {formatCurrency(periodEarnings.shiftIncome)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs" style={{ color: T.textMuted }}>Комиссии</p>
-                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
-                    {formatCurrency(periodEarnings.commissionIncome)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs" style={{ color: T.textMuted }}>Итого за период</p>
-                  <p className="mt-1 text-lg font-semibold" style={{ color: T.accent }}>
-                    {formatCurrency(periodEarnings.total)}
-                  </p>
-                </div>
-              </div>
-              {periodEarnings.breakdown.length > 0 && (
-                <div className="mt-3 pt-3 border-t" style={{ borderColor: T.borderSoft }}>
-                  <p className="mb-2 text-xs font-semibold" style={{ color: T.textMuted }}>
-                    Детализация (последние 10 записей)
-                  </p>
-                  <div className="space-y-1">
-                    {periodEarnings.breakdown.slice(0, 10).map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between rounded px-2 py-1 text-xs"
-                        style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }}
-                      >
-                        <div className="flex-1">
-                          <p style={{ color: T.text }}>{item.description}</p>
-                          <p className="text-[10px]" style={{ color: T.textMuted }}>
-                            {new Date(item.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                          </p>
-                        </div>
-                        <span className="font-mono font-semibold" style={{ color: T.accent }}>
-                          {formatCurrency(item.amount)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Legacy monthly earnings summary */}
-          {earningsLoading ? (
-            <div className="py-4 text-center text-sm" style={{ color: T.textMuted }}>
-              Загрузка данных...
-            </div>
-          ) : earnings ? (
-            <div className="mt-3 space-y-3">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
-                  <p className="text-xs" style={{ color: T.textMuted }}>Начислено (месяц)</p>
-                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
-                    {formatCurrency(earnings.currentPlan.accrued)}
-                  </p>
-                </div>
-                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
-                  <p className="text-xs" style={{ color: T.textMuted }}>К выплате</p>
-                  <p className="mt-1 text-lg font-semibold" style={{ color: earnings.currentPlan.balanceDue > 0 ? "#f59e0b" : "#10b981" }}>
-                    {formatCurrency(earnings.currentPlan.balanceDue)}
-                  </p>
-                </div>
-                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
-                  <p className="text-xs" style={{ color: T.textMuted }}>Следующая выплата</p>
-                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
-                    {earnings.currentPlan.nextPayoutDate
-                      ? new Date(earnings.currentPlan.nextPayoutDate).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })
-                      : "—"}
-                  </p>
-                </div>
-              </div>
-
-              {earnings.recentCommissions.length > 0 && (
-                <div>
-                  <p className="mb-2 text-xs font-semibold" style={{ color: T.textMuted }}>
-                    Последние комиссии
-                  </p>
-                  <div className="space-y-2">
-                    {earnings.recentCommissions.slice(0, 5).map((comm, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
-                        style={{ borderColor: T.borderSoft }}
-                      >
-                        <div className="flex-1">
-                          <p style={{ color: T.text }}>{comm.description}</p>
-                          <p className="text-xs" style={{ color: T.textMuted }}>
-                            {new Date(comm.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                          </p>
-                        </div>
-                        <span className="font-mono font-semibold" style={{ color: T.accent }}>
-                          {formatCurrency(comm.amount)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="py-4 text-center text-sm" style={{ color: T.textMuted }}>
-              Нет данных о доходах
-            </div>
-          )}
-        </FranchizeOperatorPanel>
-      </motion.div>
+        <MyEarningsPanel
+          slug={slug}
+          userId={dbUser?.user_id || ""}
+          enabled={canOpenCloserDashboard}
+          T={T}
+        />
       )}
 
       {/* My Work Panel — CREW ONLY (iter14): shift/commission work stats are
           internal crew info, hidden for ordinary renters. */}
       {canOpenCloserDashboard && (
-      <motion.div variants={itemVariants}>
-        <FranchizeOperatorPanel>
-          <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
-            <Briefcase className="h-4 w-4" /> Моя работа
-          </h2>
-          {workLoading ? (
-            <div className="py-4 text-center text-sm" style={{ color: T.textMuted }}>
-              Загрузка данных...
-            </div>
-          ) : myWork ? (
-            <div className="mt-3 space-y-4">
-              {/* iter26: date picker — any day, not just today (client wish:
-                  «хочу date picker, чтобы видеть зарплату за прошлые дни»). */}
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  aria-label="Предыдущий день"
-                  onClick={() => shiftWorkDate(-1)}
-                  className="inline-flex items-center justify-center rounded-lg border transition focus:outline-none focus-visible:ring-2"
-                  style={{ borderColor: T.borderSoft, color: T.text, minHeight: "36px", minWidth: "36px" }}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <input
-                  type="date"
-                  value={workDate}
-                  max={todayMskIso()}
-                  onChange={(e) => e.target.value && setWorkDate(e.target.value)}
-                  className="rounded-lg border px-2.5 py-1.5 text-xs tabular-nums"
-                  style={{ borderColor: T.borderSoft, color: T.text, backgroundColor: T.bgCard }}
-                  aria-label="Дата работы"
-                />
-                <button
-                  type="button"
-                  aria-label="Следующий день"
-                  disabled={myWork.isToday}
-                  onClick={() => shiftWorkDate(1)}
-                  className="inline-flex items-center justify-center rounded-lg border transition focus:outline-none focus-visible:ring-2 disabled:opacity-40"
-                  style={{ borderColor: T.borderSoft, color: T.text, minHeight: "36px", minWidth: "36px" }}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-                {!myWork.isToday && (
-                  <button
-                    type="button"
-                    onClick={() => setWorkDate(todayMskIso())}
-                    className="rounded-lg border px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2"
-                    style={{ borderColor: T.borderSoft, color: T.accent }}
-                  >
-                    Сегодня
-                  </button>
-                )}
-                <span className="ml-auto text-sm" style={{ color: T.textMuted }}>
-                  {myWork.isToday ? "Сегодня: " : ""}
-                  {new Date(`${myWork.date}T12:00:00Z`).toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {/* Аренды — real rentals attributed to me; salary matches the
-                    analytics table view «ЗП Аренда» 1:1 (same engine). */}
-                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
-                  <p className="text-xs" style={{ color: T.textMuted }}>Аренды (ЗП)</p>
-                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
-                    {myWork.rentals.count}
-                  </p>
-                  <p className="text-xs font-semibold" style={{ color: T.accent }}>
-                    {formatCurrency(myWork.rentals.salary)}
-                  </p>
-                  <p className="text-[10px]" style={{ color: T.textMuted }}>
-                    оборот {formatCurrency(myWork.rentals.revenue)}
-                  </p>
-                </div>
-                {/* Смены — what the old card mislabeled as «Аренды». */}
-                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
-                  <p className="text-xs" style={{ color: T.textMuted }}>Смены</p>
-                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
-                    {myWork.shifts.count}
-                  </p>
-                  <p className="text-xs" style={{ color: T.textMuted }}>
-                    {formatCurrency(myWork.shifts.total)}
-                  </p>
-                </div>
-                {/* Продажи — actual attributed sales (created via /doc by me, or
-                    my shift covered the sale). ЗП matches the salary model 1:1. */}
-                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
-                  <p className="text-xs" style={{ color: T.textMuted }}>Продажи (ЗП)</p>
-                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
-                    {myWork.sales.count}
-                  </p>
-                  <p className="text-xs font-semibold" style={{ color: T.accent }}>
-                    {formatCurrency(myWork.sales.total)}
-                  </p>
-                  <p className="text-[10px]" style={{ color: T.textMuted }}>
-                    оборот {formatCurrency(myWork.sales.revenue ?? 0)}
-                  </p>
-                </div>
-                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
-                  <p className="text-xs" style={{ color: T.textMuted }}>Сервис/Возвраты</p>
-                  <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
-                    {myWork.serviceReturns.count}
-                  </p>
-                  <p className="text-xs" style={{ color: T.textMuted }}>
-                    {formatCurrency(myWork.serviceReturns.total)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Итого за день */}
-              <div
-                className="flex items-center justify-between rounded-lg border px-3 py-2"
-                style={{ borderColor: T.borderSoft, backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }}
-              >
-                <span className="text-xs font-semibold" style={{ color: T.textMuted }}>
-                  Итого за день
-                </span>
-                <span className="text-base font-bold" style={{ color: T.accent }}>
-                  {formatCurrency(myWork.totalDay)}
-                </span>
-              </div>
-
-              {/* Детализация: мои продажи за день — bike, цена, ЗП, зачтено. */}
-              {myWork.saleDetails?.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold" style={{ color: T.textMuted }}>
-                    Мои продажи за день
-                  </p>
-                  {myWork.saleDetails.map((s) => (
-                    <div
-                      key={s.saleId}
-                      className="flex items-center justify-between rounded px-2 py-1.5 text-xs"
-                      style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate" style={{ color: T.text }}>{s.bikeLabel}</p>
-                        <p className="text-[10px]" style={{ color: T.textMuted }}>
-                          цена {formatCurrency(s.salePrice)} · зачтено: {s.sourceLabel}
-                        </p>
-                      </div>
-                      <span className="ml-2 font-mono font-semibold" style={{ color: T.accent }}>
-                        +{formatCurrency(s.salary)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Детализация: мои аренды за день — bike, revenue, ЗП. */}
-              {myWork.rentalDetails.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold" style={{ color: T.textMuted }}>
-                    Мои аренды за день
-                  </p>
-                  {myWork.rentalDetails.map((r) => (
-                    <div
-                      key={r.rentalId}
-                      className="flex items-center justify-between rounded px-2 py-1.5 text-xs"
-                      style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate" style={{ color: T.text }}>{r.bikeLabel}</p>
-                        <p className="text-[10px]" style={{ color: T.textMuted }}>
-                          {formatCurrency(r.revenue)} · зачтено: {r.sourceLabel}
-                        </p>
-                      </div>
-                      <span className="ml-2 font-mono font-semibold" style={{ color: T.accent }}>
-                        +{formatCurrency(r.salary)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="py-4 text-center text-sm" style={{ color: T.textMuted }}>
-              Нет данных о работе
-            </div>
-          )}
-        </FranchizeOperatorPanel>
-      </motion.div>
+        <MyWorkPanel slug={slug} enabled={canOpenCloserDashboard} T={T} />
       )}
 
       {/* Crew Operations Panel — shown only for crew members */}
-      {canOpenCloserDashboard && (
-        <motion.div variants={itemVariants}>
-          <FranchizeOperatorPanel>
-            <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
-              <VibeContentRenderer content="::FaTools::" /> Операции экипажа
-            </h2>
-            <p className="mt-1 text-xs" style={{ color: T.textMuted }}>
-              Быстрый доступ к инструментам управления экипажем
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <FranchizeOperatorLinkButton href={`/franchize/${slug}/equipment`}>
-                📦 Оборудование
-              </FranchizeOperatorLinkButton>
-              <FranchizeOperatorLinkButton href={`/franchize/${slug}/cash-ledger`}>
-                💰 Касса
-              </FranchizeOperatorLinkButton>
-              <FranchizeOperatorLinkButton href={`/franchize/${slug}/commissions`}>
-                📊 Комиссии
-              </FranchizeOperatorLinkButton>
-              <FranchizeOperatorLinkButton href={`/franchize/${slug}/salary`}>
-                💵 Зарплата
-              </FranchizeOperatorLinkButton>
-              <FranchizeOperatorLinkButton href={`/franchize/${slug}/salary-coefficients`}>
-                🎯 Ставки ЗП
-              </FranchizeOperatorLinkButton>
-              <FranchizeOperatorLinkButton href={`/franchize/${slug}/admin`}>
-                ⚙️ Админка
-              </FranchizeOperatorLinkButton>
-              <FranchizeOperatorLinkButton href={`/franchize/${slug}/rentals-analytics`}>
-                📈 Аналитика
-              </FranchizeOperatorLinkButton>
-              <FranchizeOperatorLinkButton href={`/franchize/${slug}/leads`}>
-                👥 Лиды
-              </FranchizeOperatorLinkButton>
-              <FranchizeOperatorLinkButton href={`/franchize/${slug}/admin/deposits`}>
-                🏦 Депозиты
-              </FranchizeOperatorLinkButton>
-              <FranchizeOperatorLinkButton href={`/franchize/${slug}/calc-explainer`}>
-                📐 Как считаются деньги
-              </FranchizeOperatorLinkButton>
-            </div>
-          </FranchizeOperatorPanel>
-        </motion.div>
-      )}
+      {canOpenCloserDashboard && <CrewOperationsPanel slug={slug} T={T} />}
 
       {/* Profile Document Photos Panel */}
-      <motion.div variants={itemVariants}>
-        <FranchizeOperatorPanel>
-          <h2 className="flex items-center gap-2 text-base font-semibold " style={{ color: T.text }}>
-            <VibeContentRenderer content="::FaCamera::" /> Мои документы
-          </h2>
-          <p className="mt-1 text-xs " style={{ color: T.textMuted }}>
-            Загрузите фото документов для ускорения оформления аренды. Данные будут распознаны автоматически.
-          </p>
-
-          {/* Verified renter data from previous rentals (e.g. collected by the
-              operator via /doc and claimed through the rental QR code). The
-              photo statuses below only reflect manual photo uploads — without
-              this card a renter with fully verified /doc data saw "❌ Не
-              загружен" everywhere and assumed his documents were lost. */}
-          {docsPrefill?.hasVerifiedData && (
-            <div
-              className="mt-4 rounded-xl border p-3"
-              style={{ borderColor: withAlpha("#10b981", 0.4), backgroundColor: withAlpha("#10b981", 0.06) }}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm font-semibold" style={{ color: T.text }}>
-                  Проверенные данные арендатора
-                </span>
-                <span
-                  className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-                  style={{ backgroundColor: withAlpha("#10b981", 0.15), color: "#10b981" }}
-                >
-                  <CheckCircle className="h-3 w-3" />
-                  Верифицировано оператором
-                </span>
-              </div>
-              <p className="mt-1 text-xs" style={{ color: T.textMuted }}>
-                Данные из вашей предыдущей аренды — при следующем заказе поля договора заполнятся автоматически.
-              </p>
-              <div className="mt-2 grid gap-1.5 text-xs sm:grid-cols-2 max-sm:grid-cols-1">
-                {docsPrefill.fullName && (
-                  <p><span style={{ color: T.textMuted }}>ФИО:</span> <span className="font-semibold" style={{ color: T.text }}>{docsPrefill.fullName}</span></p>
-                )}
-                {(docsPrefill.passportSeries || docsPrefill.passportNumber) && (
-                  <p>
-                    <span style={{ color: T.textMuted }}>Паспорт:</span>{" "}
-                    <span className="font-mono font-semibold" style={{ color: T.text }}>
-                      {docsPrefill.passportSeries} {docsPrefill.passportNumber}
-                    </span>
-                  </p>
-                )}
-                {docsPrefill.birthDate && (
-                  <p><span style={{ color: T.textMuted }}>Дата рождения:</span> <span className="font-semibold" style={{ color: T.text }}>{docsPrefill.birthDate}</span></p>
-                )}
-                {(docsPrefill.licenseSeries || docsPrefill.licenseNumber) && (
-                  <p>
-                    <span style={{ color: T.textMuted }}>Вод. удостоверение:</span>{" "}
-                    <span className="font-mono font-semibold" style={{ color: T.text }}>
-                      {docsPrefill.licenseSeries} {docsPrefill.licenseNumber}
-                    </span>
-                    {docsPrefill.licenseCategories ? ` (кат. ${docsPrefill.licenseCategories})` : ""}
-                  </p>
-                )}
-                {docsPrefill.registrationAddress && (
-                  <p className="sm:col-span-2 max-sm:col-span-1"><span style={{ color: T.textMuted }}>Прописка:</span> <span style={{ color: T.text }}>{docsPrefill.registrationAddress}</span></p>
-                )}
-              </div>
-              <p className="mt-2 text-[10px]" style={{ color: T.textMuted }}>
-                Если данные изменились (замена паспорта/прав) — загрузите новые фото ниже или сообщите оператору при следующей аренде.
-              </p>
-            </div>
-          )}
-
-          <div className="mt-4 space-y-4">
-            {/* Passport Main Page */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium" style={{ color: T.text }}>
-                  Паспорт (главная страница)
-                </span>
-                {profileDocsStatus?.passportMainpage.verified ? (
-                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-                    style={{
-                      backgroundColor: withAlpha("#10b981", 0.15),
-                      color: "#10b981",
-                    }}>
-                    <CheckCircle className="h-3 w-3" />
-                    Верифицирован
-                  </span>
-                ) : profileDocsStatus?.passportMainpage.uploaded ? (
-                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-                    style={{
-                      backgroundColor: withAlpha("#f59e0b", 0.15),
-                      color: "#f59e0b",
-                    }}>
-                    ⏳ Ожидает верификации
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-                    style={{
-                      backgroundColor: withAlpha("#ef4444", 0.15),
-                      color: "#ef4444",
-                    }}>
-                    ❌ Не загружен
-                  </span>
-                )}
-              </div>
-              {dbUser?.user_id && (
-                <PhotoUploadButton
-                  docType="passport_mainpage"
-                  rentalId={`profile_${dbUser.user_id}`}
-                  chatId={dbUser.user_id}
-                  onSuccess={() => {
-                    // Refresh status after upload
-                    getProfileDocsStatusAction({ slug, userId: dbUser.user_id }).then((res) => {
-                      if (res.success && res.data) setProfileDocsStatus(res.data);
-                    });
-                  }}
-                />
-              )}
-              {profileDocsStatus?.passportMainpage.uploaded && !profileDocsStatus?.passportMainpage.verified && (
-                <p className="text-xs italic" style={{ color: T.textMuted }}>
-                  Нельзя загрузить новое фото до верификации текущего
-                </p>
-              )}
-            </div>
-
-            {/* Passport Registration Page */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium" style={{ color: T.text }}>
-                  Паспорт (страница с пропиской)
-                </span>
-                {profileDocsStatus?.passportRegistration.verified ? (
-                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-                    style={{
-                      backgroundColor: withAlpha("#10b981", 0.15),
-                      color: "#10b981",
-                    }}>
-                    <CheckCircle className="h-3 w-3" />
-                    Верифицирован
-                  </span>
-                ) : profileDocsStatus?.passportRegistration.uploaded ? (
-                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-                    style={{
-                      backgroundColor: withAlpha("#f59e0b", 0.15),
-                      color: "#f59e0b",
-                    }}>
-                    ⏳ Ожидает верификации
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-                    style={{
-                      backgroundColor: withAlpha("#ef4444", 0.15),
-                      color: "#ef4444",
-                    }}>
-                    ❌ Не загружен
-                  </span>
-                )}
-              </div>
-              {dbUser?.user_id && (
-                <PhotoUploadButton
-                  docType="passport_registration"
-                  rentalId={`profile_${dbUser.user_id}`}
-                  chatId={dbUser.user_id}
-                  onSuccess={() => {
-                    getProfileDocsStatusAction({ slug, userId: dbUser.user_id }).then((res) => {
-                      if (res.success && res.data) setProfileDocsStatus(res.data);
-                    });
-                  }}
-                />
-              )}
-              {profileDocsStatus?.passportRegistration.uploaded && !profileDocsStatus?.passportRegistration.verified && (
-                <p className="text-xs italic" style={{ color: T.textMuted }}>
-                  Нельзя загрузить новое фото до верификации текущего
-                </p>
-              )}
-            </div>
-
-            {/* Driver's License */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium" style={{ color: T.text }}>
-                  Водительское удостоверение
-                </span>
-                {profileDocsStatus?.driversLicence.verified ? (
-                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-                    style={{
-                      backgroundColor: withAlpha("#10b981", 0.15),
-                      color: "#10b981",
-                    }}>
-                    <CheckCircle className="h-3 w-3" />
-                    Верифицирован
-                  </span>
-                ) : profileDocsStatus?.driversLicence.uploaded ? (
-                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-                    style={{
-                      backgroundColor: withAlpha("#f59e0b", 0.15),
-                      color: "#f59e0b",
-                    }}>
-                    ⏳ Ожидает верификации
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-                    style={{
-                      backgroundColor: withAlpha("#ef4444", 0.15),
-                      color: "#ef4444",
-                    }}>
-                    ❌ Не загружен
-                  </span>
-                )}
-              </div>
-              {dbUser?.user_id && (
-                <PhotoUploadButton
-                  docType="drivers_licence"
-                  rentalId={`profile_${dbUser.user_id}`}
-                  chatId={dbUser.user_id}
-                  onSuccess={() => {
-                    getProfileDocsStatusAction({ slug, userId: dbUser.user_id }).then((res) => {
-                      if (res.success && res.data) setProfileDocsStatus(res.data);
-                    });
-                  }}
-                />
-              )}
-              {profileDocsStatus?.driversLicence.uploaded && !profileDocsStatus?.driversLicence.verified && (
-                <p className="text-xs italic" style={{ color: T.textMuted }}>
-                  Нельзя загрузить новое фото до верификации текущего
-                </p>
-              )}
-            </div>
-          </div>
-        </FranchizeOperatorPanel>
-      </motion.div>
+      <DocumentPhotosPanel
+        slug={slug}
+        userId={dbUser?.user_id || null}
+        docsPrefill={docsPrefill}
+        docsStatus={profileDocsStatus}
+        onDocsStatus={setProfileDocsStatus}
+        T={T}
+      />
 
       {/* Rental Documents Panel — editable via RentalDocsForm */}
-      <motion.div variants={itemVariants}>
-        <FranchizeOperatorPanel>
-          <h2 className="flex items-center gap-2 text-base font-semibold " style={{ color: T.text }}>
-            <Lock className="h-4 w-4" /> Документы для аренды
-          </h2>
-          <p className="mt-1 text-xs " style={{ color: T.textMuted }}>
-            Заполните заранее — данные подставятся при оформлении. Проверяются оператором при первой аренде.
-          </p>
-          <div className="mt-3">
-            {/* Verification status badge — text color is textPrimary so it
-                stays readable in both light and dark themes (gold on gold
-                washes out in light mode). */}
-            {docsPrefill?.hasVerifiedData && (
-              <div className="mb-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs"
-                style={{
-                  borderColor: withAlpha(T.accent, 0.35),
-                  backgroundColor: withAlpha(T.accent, 0.12),
-                  color: T.text,
-                }}>
-                <CheckCircle className="h-4 w-4" style={{ color: T.accent }} />
-                <span>Документы верифицированы (завершённая аренда найдена)</span>
-              </div>
-            )}
-
-            {/* Read-only summary of verified data from past rentals */}
-            {rentalSecrets?.hasPreviousRentals && (
-              <div className="mb-3 grid grid-cols-1 gap-1.5 text-xs " style={{ color: T.textMuted }}>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    Паспорт: <span className={rentalSecrets.savedData?.passport ? "" : ""} style={{ color: T.accent }}>
-                      {rentalSecrets.savedData?.passport ? "✓ Сохранён" : "—"}
-                    </span>
-                  </div>
-                  <div>
-                    ВУ: <span className={rentalSecrets.savedData?.driverLicense ? "" : ""} style={{ color: T.accent }}>
-                      {rentalSecrets.savedData?.driverLicense ? "✓ Сохранено" : "—"}
-                    </span>
-                  </div>
-                  <div>
-                    Дата рождения: <span className={rentalSecrets.savedData?.birthDate ? "" : ""} style={{ color: T.accent }}>
-                      {rentalSecrets.savedData?.birthDate || "—"}
-                    </span>
-                  </div>
-                  <div>
-                    Категории: <span className={rentalSecrets.savedData?.licenseCategories ? "" : ""} style={{ color: T.accent }}>
-                      {rentalSecrets.savedData?.licenseCategories || "—"}
-                    </span>
-                  </div>
-                </div>
-                {rentalSecrets.lastRentalDate && (
-                  <div className="pt-0.5 opacity-60">
-                    Последняя аренда: {rentalSecrets.lastRentalDate}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Editable form — only inside Telegram WebApp (not browser) */}
-            {dbUser?.user_id ? (
-              <RentalDocsForm
-                slug={slug}
-                userId={dbUser.user_id}
-                accentColor={T.accent}
-                initialData={docsPrefill || undefined}
-                onSave={async (data) => {
-                  return saveRentalDocsPrefillAction({ slug, userId: dbUser.user_id, ...data });
-                }}
-              />
-            ) : (
-              <p className="py-4 text-center text-xs " style={{ color: T.textMuted }}>
-                Откройте профиль в Telegram для ввода документов
-              </p>
-            )}
-          </div>
-        </FranchizeOperatorPanel>
-      </motion.div>
+      <RentalDocsPanel
+        slug={slug}
+        userId={dbUser?.user_id || null}
+        docsPrefill={docsPrefill}
+        rentalSecrets={rentalSecrets}
+        T={T}
+      />
 
       {/* Form Prefills Panel */}
-      <motion.div variants={itemVariants}>
-        <FranchizeOperatorPanel>
-          <h2 className="flex items-center gap-2 text-base font-semibold " style={{ color: T.text }}>
-            <VibeContentRenderer content="::FaClipboard::" /> Данные для заявок
-          </h2>
-          <p className="mt-1 text-xs " style={{ color: T.textMuted }}>
-            Сохранённые данные будут автоматически подставляться в формы заявок
-          </p>
-          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-            <input
-              className={franchizeOperatorInputClassName}
-              style={franchizeOperatorInputStyle}
-              placeholder="ФИО"
-              value={prefill.fullName}
-              onChange={(e) =>
-                setPrefill((p) => ({ ...p, fullName: e.target.value }))
-              }
-            />
-            <input
-              className={franchizeOperatorInputClassName}
-              style={franchizeOperatorInputStyle}
-              placeholder="Телефон"
-              value={prefill.phone}
-              onChange={(e) =>
-                setPrefill((p) => ({ ...p, phone: e.target.value }))
-              }
-            />
-            <input
-              className={franchizeOperatorInputClassName}
-              style={franchizeOperatorInputStyle}
-              placeholder="Удобное время"
-              value={prefill.preferredTime}
-              onChange={(e) =>
-                setPrefill((p) => ({ ...p, preferredTime: e.target.value }))
-              }
-            />
-            <input
-              className={franchizeOperatorInputClassName}
-              style={franchizeOperatorInputStyle}
-              placeholder="Комментарий по умолчанию"
-              value={prefill.comment}
-              onChange={(e) =>
-                setPrefill((p) => ({ ...p, comment: e.target.value }))
-              }
-            />
-          </div>
-          <div className="mt-3 flex items-center justify-between">
-            <p className="text-xs " style={{ color: T.textMuted }}>
-              Данные сохраняются локально для вашего аккаунта
-            </p>
-            <Button
-              className="rounded-full font-semibold transition-all"
-              disabled={isSaving}
-              onClick={handlePrefillSave}
-              style={{
-                backgroundColor: T.accent,
-                color: accentOn,
-                opacity: isSaving ? 0.7 : 1,
-              }}
-            >
-              {isSaving ? "Сохранение..." : saveSuccess ? "✓ Сохранено" : "Сохранить данные"}
-            </Button>
-          </div>
-        </FranchizeOperatorPanel>
-      </motion.div>
-
-      {/* (Capability Contract Panel removed — not needed in profile) */}
-
-      {/* Quick Actions — removed (Заявки, Map Riders not needed in profile) */}
+      <FormPrefillsPanel
+        prefill={prefill}
+        onPrefillChange={setPrefill}
+        onSave={() => void handlePrefillSave()}
+        isSaving={isSaving}
+        saveSuccess={saveSuccess}
+        T={T}
+      />
 
       {/* Achievements Panel — at the very end — CREW ONLY (iter14):
           crew gamification is not for ordinary renters. */}
       {canOpenCloserDashboard && (
-      <motion.div variants={itemVariants}>
-        <FranchizeOperatorPanel>
-          <h2 className="flex items-center gap-2 text-base font-semibold " style={{ color: T.text }}>
-            <VibeContentRenderer content="::FaUserSecret::" /> Достижения
-          </h2>
-          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {catalog.length === 0 ? (
-              <EmptyState
-                icon={<Trophy className="h-8 w-8" />}
-                title="Нет достижений"
-                description="Достижения появятся здесь по мере вашей активности"
-              />
-            ) : (
-              catalog.map((achievement) => {
-                const unlocked = unlockedSet.has(achievement.id);
-                return (
-                  <motion.div
-                    key={achievement.id}
-                    whileHover={{ scale: 1.02 }}
-                    className={cn(
-                      "relative overflow-hidden rounded-2xl border p-3 transition-all duration-300",
-                      unlocked && "shadow-lg"
-                    )}
-                    style={{
-                      borderColor: unlocked
-                        ? T.accent
-                        : T.borderSoft,
-                      backgroundColor: unlocked
-                        ? withAlpha(T.accent, 0.09)
-                        : "color-mix(in srgb, var(--franchize-shell-card) 70%, transparent)",
-                    }}
-                  >
-                    {/* Status indicator */}
-                    <div className="absolute right-3 top-3">
-                      {unlocked ? (
-                        <div
-                          className="flex h-6 w-6 items-center justify-center rounded-full"
-                          style={{
-                            backgroundColor: withAlpha(T.accent, 0.2),
-                            color: T.accent,
-                          }}
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                        </div>
-                      ) : (
-                        <div
-                          className="flex h-6 w-6 items-center justify-center rounded-full"
-                          style={{
-                            backgroundColor: "withAlpha(T.textMuted, 0.15)",
-                            color: T.textMuted,
-                          }}
-                        >
-                          <Lock className="h-4 w-4" />
-                        </div>
-                      )}
-                    </div>
-
-                    <p className="pr-8 text-sm font-semibold " style={{ color: T.text }}>
-                      {achievement.title}
-                    </p>
-                    <p className="mt-1 text-xs " style={{ color: T.textMuted }}>
-                      {achievement.description}
-                    </p>
-                    <div className="mt-2 flex items-center gap-2 text-[11px]">
-                      <span
-                        className="rounded-full px-2 py-0.5"
-                        style={{
-                          backgroundColor: withAlpha(T.accent, 0.12),
-                          color: unlocked
-                            ? T.accent
-                            : T.textMuted,
-                        }}
-                      >
-                        {achievement.triggerSources[0] || "Система"}
-                      </span>
-                      {unlocked && (
-                        <span className="" style={{ color: T.accent }}>
-                          ✓ Разблокировано
-                        </span>
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })
-            )}
-          </div>
-          {!!error && <p className="text-xs text-red-400">{error}</p>}
-        </FranchizeOperatorPanel>
-      </motion.div>
+        <AchievementsPanel
+          catalog={catalog}
+          unlockedSet={unlockedSet}
+          error={error}
+          T={T}
+        />
       )}
-
-      {/* Team Earnings Modal (for owners) */}
-      <Dialog open={showTeamEarningsModal} onOpenChange={setShowTeamEarningsModal}>
-        <DialogContent className="max-w-2xl" style={{ backgroundColor: T.bgCard, borderColor: T.borderSoft }}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2" style={{ color: T.text }}>
-              <Users className="h-5 w-5" style={{ color: T.accent }} />
-              💰 Зарплаты команды
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Period display */}
-            <div className="flex items-center gap-2 text-sm" style={{ color: T.textMuted }}>
-              <Calendar className="h-4 w-4" />
-              <span>
-                Период: с {new Date(earningsPeriod.from).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}{" "}
-                по {new Date(earningsPeriod.to).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
-              </span>
-            </div>
-
-            {/* Error message */}
-            {teamEarningsError && (
-              <div className="rounded px-3 py-2 text-sm" style={{ backgroundColor: "color-mix(in srgb, #ef4444 12%, transparent)", color: "#ef4444" }}>
-                ⚠️ {teamEarningsError}
-              </div>
-            )}
-
-            {/* Loading skeleton */}
-            {teamEarningsLoading && (
-              <div className="space-y-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-12 animate-pulse rounded" style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }} />
-                ))}
-              </div>
-            )}
-
-            {/* Leaderboard header with bonus info */}
-            {!teamEarningsLoading && teamEarnings.length > 0 && (
-              <div className="rounded-lg border p-3 mb-3" style={{ borderColor: T.borderSoft, backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }}>
-                <p className="text-xs font-semibold mb-2" style={{ color: T.text }}>
-                  🏆 Бонусы топ-3 лидеров
-                </p>
-                <div className="flex items-center gap-3 text-xs">
-                  <span style={{ color: T.textMuted }}>🥇 1-е место: +10%</span>
-                  <span style={{ color: T.textMuted }}>🥈 2-е место: +5%</span>
-                  <span style={{ color: T.textMuted }}>🥉 3-е место: +3%</span>
-                </div>
-              </div>
-            )}
-
-            {/* Team earnings table */}
-            {!teamEarningsLoading && teamEarnings.length > 0 ? (
-              <div className="rounded-lg border overflow-hidden" style={{ borderColor: T.borderSoft }}>
-                {/* Responsive table with horizontal scroll on mobile */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b" style={{ borderColor: T.borderSoft, color: T.textMuted }}>
-                        <th className="px-3 py-2 text-left text-xs font-semibold w-10">#</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold">Сотрудник</th>
-                        <th className="px-3 py-2 text-right text-xs font-semibold">Смены</th>
-                        <th className="px-3 py-2 text-right text-xs font-semibold">Комиссии</th>
-                        <th className="px-3 py-2 text-right text-xs font-semibold">Итого</th>
-                        <th className="px-3 py-2 text-right text-xs font-semibold w-16">Бонус</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y" style={{ borderColor: T.borderSoft }}>
-                      {teamEarnings
-                        .sort((a, b) => b.total - a.total)
-                        .map((member, rank) => {
-                          // Bonus calculation: 10% for 1st, 5% for 2nd, 3% for 3rd
-                          const bonusPercent = rank === 0 ? 0.10 : rank === 1 ? 0.05 : rank === 2 ? 0.03 : 0;
-                          const bonus = Math.round(member.total * bonusPercent);
-                          const totalWithBonus = member.total + bonus;
-                          const medal = rank === 0 ? "🥇" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : "";
-
-                          return (
-                            <tr
-                              key={member.memberId}
-                              className="hover:bg-opacity-50 transition"
-                              style={{
-                                backgroundColor: rank < 3
-                                  ? `color-mix(in srgb, var(--franchize-shell-accent) ${12 - rank * 3}%, transparent)`
-                                  : "color-mix(in srgb, var(--franchize-shell-accent) 4%, transparent)",
-                                fontWeight: rank < 3 ? 600 : 400,
-                              }}
-                            >
-                              <td className="px-3 py-2 text-center font-mono" style={{ color: T.textMuted }}>
-                                {medal || rank + 1}
-                              </td>
-                              <td className="px-3 py-2 font-medium" style={{ color: T.text }}>
-                                {member.memberName}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono" style={{ color: T.text }}>
-                                {member.shifts}ч
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono" style={{ color: T.text }}>
-                                {formatCurrency(member.commissionIncome)}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono font-semibold" style={{ color: T.accent }}>
-                                {formatCurrency(member.total)}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono" style={{ color: bonus > 0 ? "#10b981" : T.textMuted }}>
-                                {bonus > 0 ? `+${formatCurrency(bonus)}` : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t font-semibold" style={{ borderColor: T.borderSoft, backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 10%, transparent)" }}>
-                        <td className="px-3 py-2 text-center" style={{ color: T.textMuted }}></td>
-                        <td className="px-3 py-2" style={{ color: T.text }}>Всего</td>
-                        <td className="px-3 py-2 text-right font-mono" style={{ color: T.text }}>
-                          {teamEarnings.reduce((sum, m) => sum + m.shifts, 0).toFixed(1)}ч
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono" style={{ color: T.text }}>
-                          {formatCurrency(teamEarnings.reduce((sum, m) => sum + m.commissionIncome, 0))}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono font-semibold" style={{ color: T.accent }}>
-                          {formatCurrency(teamEarnings.reduce((sum, m) => sum + m.total, 0))}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono" style={{ color: T.textMuted }}>
-                          —
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-            ) : !teamEarningsLoading ? (
-                <div className="py-8 text-center text-sm" style={{ color: T.textMuted }}>
-                  Нет данных о зарплатах за выбранный период
-                </div>
-              ) : null}
-          </div>
-        </DialogContent>
-      </Dialog>
     </motion.div>
   );
 }
-

@@ -44,17 +44,21 @@ describe("iter26: build fix — rental-price-split import paths", () => {
 
 describe("iter26: profile «Моя работа» date picker + real rental salary", () => {
   it("ProfileClient calls getMyWorkDayAction with the picked date and renders a date input", () => {
-    const src = read("app/franchize/[slug]/profile/ProfileClient.tsx");
+    // iter31: «Моя работа» moved into its own self-contained panel component.
+    const src = read("app/franchize/[slug]/profile/components/MyWorkPanel.tsx");
     expect(src).toContain("getMyWorkDayAction({ slug, date: workDate })");
     expect(src).toContain('type="date"');
     expect(src).toContain("shiftWorkDate");
     expect(src).toContain("todayMskIso()");
     // The dedicated refetch effect (no full profile reload on date change).
     expect(src).toMatch(/useEffect\(\(\) => \{[\s\S]*?workDate === myWork\?\.date/);
+    // iter31: the parent mounts the panel.
+    const parentSrc = read("app/franchize/[slug]/profile/ProfileClient.tsx");
+    expect(parentSrc).toContain("MyWorkPanel");
   });
 
   it("the cards are correctly labeled: Аренды (ЗП) + Смены as separate cards + Итого за день", () => {
-    const src = read("app/franchize/[slug]/profile/ProfileClient.tsx");
+    const src = read("app/franchize/[slug]/profile/components/MyWorkPanel.tsx");
     expect(src).toContain("Аренды (ЗП)");
     expect(src).toContain("myWork.shifts.count");
     expect(src).toContain("Итого за день");

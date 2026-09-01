@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Bike, CalendarDays, Camera, ChevronLeft, ChevronRight,
-  Gauge, HandCoins, RefreshCw, Wrench, X,
+  Gauge, HandCoins, RefreshCw, Send, Wrench, X,
 } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { getBikeStoryAction } from "@/app/franchize/server-actions/bike-wall";
@@ -53,6 +53,9 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
   const [passwordAuthOwnerId, setPasswordAuthOwnerId] = useState<string | null>(null);
   const [bike, setBike] = useState<BikeWallSummary | null>(null);
   const [feed, setFeed] = useState<WallFeedItem[]>([]);
+  // iter31: partner owner of this bike (from specs.subrenter_chat_id) — shown
+  // as a chip in the hero with a TG contact link when known.
+  const [partner, setPartner] = useState<{ name: string | null; username: string | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ photos: WallPhoto[]; index: number } | null>(null);
@@ -93,6 +96,7 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
         setBike(result.data.bike);
         setFeed(result.data.feed);
         setAvailableMonths(result.data.availableMonths ?? []);
+        setPartner(result.data.partner ?? null);
       } else {
         setError(result.error || "Не удалось загрузить историю мото.");
       }
@@ -222,8 +226,29 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
         <div className="p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="text-xl font-bold sm:text-2xl" style={{ color: T.text }}>{bike.label}</h1>
+            {/* iter31: partner chip — who handed this moto to the crew, with a
+                one-tap TG contact (same info the admin panel already shows). */}
             {bike.isPartnerBike ? (
-              <span className="rounded-full px-2.5 py-1 text-[11px] font-medium" style={T.styles.accentBadge}>партнёрское мото</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium" style={T.styles.accentBadge}>
+                партнёрское мото
+                {partner && (partner.name || partner.username) ? (
+                  <span className="font-semibold opacity-90">
+                    · {partner.name || `@${partner.username}`}
+                  </span>
+                ) : null}
+                {partner?.username ? (
+                  <a
+                    href={`https://t.me/${partner.username}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    title={`Написать партнёру в Telegram`}
+                    className="inline-flex h-4 w-4 items-center justify-center rounded-full transition hover:opacity-75"
+                  >
+                    <Send className="h-3 w-3" />
+                  </a>
+                ) : null}
+              </span>
             ) : null}
           </div>
 

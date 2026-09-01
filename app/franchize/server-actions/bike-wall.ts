@@ -376,6 +376,11 @@ export async function getBikeStoryAction(params: {
     month: string | null;
     /** Month keys with any activity for this bike (newest-first). */
     availableMonths: string[];
+    /**
+     * Partner owner of this bike (specs.subrenter_chat_id), if any — the
+     * story page shows a «партнёрское мото» chip with the contact.
+     */
+    partner: { name: string | null; username: string | null } | null;
   };
   error?: string;
 }> {
@@ -498,10 +503,13 @@ export async function getBikeStoryAction(params: {
     if (operatorIds.length > 0) {
       const { data: operators } = await supabaseAdmin
         .from("users")
-        .select("user_id, username, first_name, last_name")
+        .select("user_id, username, full_name")
         .in("user_id", operatorIds);
       for (const u of operators ?? []) {
-        const name = [u.first_name, u.last_name].filter(Boolean).join(" ").trim();
+        // iter31 fix: users has NO first_name/last_name columns (only
+        // full_name) — the old select errored and every operator name on the
+        // wall silently rendered as null.
+        const name = (u.full_name ? String(u.full_name) : "").trim();
         operatorNames.set(String(u.user_id), name || (u.username ? `@${u.username}` : String(u.user_id)));
       }
     }
@@ -617,9 +625,31 @@ export async function getBikeStoryAction(params: {
       now,
     );
 
+    // ── partner owner (who handed this bike to the crew) ──
+    let partner: { name: string | null; username: string | null } | null = null;
+    if (bikeSubrenterChatId) {
+      const { data: partnerUser } = await supabaseAdmin
+        .from("users")
+        .select("username, full_name")
+        .eq("user_id", bikeSubrenterChatId)
+        .maybeSingle();
+      if (partnerUser) {
+        partner = {
+          name: partnerUser.full_name ? String(partnerUser.full_name).trim() || null : null,
+          username: partnerUser.username ? String(partnerUser.username) : null,
+        };
+      }
+    }
+
     return {
       success: true,
-      data: { bike, feed: capped, month: monthKey ?? null, availableMonths: bikeMonths },
+      data: {
+        bike,
+        feed: capped,
+        month: monthKey ?? null,
+        availableMonths: bikeMonths,
+        partner,
+      },
     };
   } catch (error) {
     logger.error("[getBikeStoryAction]", error);

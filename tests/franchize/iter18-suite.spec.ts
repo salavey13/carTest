@@ -442,14 +442,22 @@ describe("iter18 · source guards (wiring)", () => {
   });
 
   it("ProfileClient renders month switchers for both panels", () => {
+    // iter31: the page was split into panel components — the subrenter money
+    // panels now live in their own files under profile/components/.
+    const myBikesSrc = read("app/franchize/[slug]/profile/components/SubrenterMyBikesPanel.tsx");
+    const overviewSrc = read("app/franchize/[slug]/profile/components/SubrentersOverviewPanel.tsx");
+    expect(myBikesSrc).toContain("getSubrenterMonthlyEarningsAction");
+    expect(overviewSrc).toContain("getSubrentersMonthlyPayoutsAction");
+    // iter21: the ‹ › switchers live in the shared MonthPickerBar
+    // (pickable month grid); both money counters are wired to it.
+    expect(myBikesSrc).toContain("MonthPickerBar");
+    expect(overviewSrc).toContain("MonthPickerBar");
+    expect(myBikesSrc).toContain("Заработок за месяц");
+    expect(overviewSrc).toContain("Выплаты субарендаторам");
+    // iter31: ProfileClient mounts both panels.
     const src = read("app/franchize/[slug]/profile/ProfileClient.tsx");
-    expect(src).toContain("getSubrenterMonthlyEarningsAction");
-    expect(src).toContain("getSubrentersMonthlyPayoutsAction");
-    // iter21: the ‹ › switchers moved into the shared MonthPickerBar
-    // (pickable month grid); ProfileClient wires both counters to it.
-    expect(src).toContain("MonthPickerBar");
-    expect(src).toContain("Заработок за месяц");
-    expect(src).toContain("Выплаты субарендаторам");
+    expect(src).toContain("SubrenterMyBikesPanel");
+    expect(src).toContain("SubrentersOverviewPanel");
   });
 
   // T6 — achievement notifications

@@ -315,7 +315,8 @@ describe('iter25: weekly partner report', () => {
   });
 
   it('owner payout sheet shows the company part per partner', () => {
-    const s = read('app/franchize/[slug]/profile/ProfileClient.tsx');
+    // iter31: the payout sheet lives in the SubrentersOverviewPanel component.
+    const s = read('app/franchize/[slug]/profile/components/SubrentersOverviewPanel.tsx');
     expect(s).toContain('нам ${formatCurrency(Math.max(0, row.totalRub - row.payoutRub))}');
   });
 });

@@ -120,14 +120,20 @@ describe("iter21 · source guards", () => {
   });
 
   it("profile: BOTH money counters use the shared MonthPickerBar, old ‹ › switchers gone", () => {
+    // iter31: panels live in their own files; both must render the shared bar.
+    const myBikesSrc = read("app/franchize/[slug]/profile/components/SubrenterMyBikesPanel.tsx");
+    const overviewSrc = read("app/franchize/[slug]/profile/components/SubrentersOverviewPanel.tsx");
+    expect(myBikesSrc).toContain('import { MonthPickerBar } from "@/app/franchize/components/FranchizeMonthPicker"');
+    expect(overviewSrc).toContain('import { MonthPickerBar } from "@/app/franchize/components/FranchizeMonthPicker"');
+    expect((myBikesSrc.match(/<MonthPickerBar/g) ?? []).length).toBeGreaterThanOrEqual(1);
+    expect((overviewSrc.match(/<MonthPickerBar/g) ?? []).length).toBeGreaterThanOrEqual(1);
+    // the parent wires the pickable months to both counters
     const src = read("app/franchize/[slug]/profile/ProfileClient.tsx");
-    expect(src).toContain('import { MonthPickerBar } from "../../components/FranchizeMonthPicker"');
-    expect((src.match(/<MonthPickerBar/g) ?? []).length).toBeGreaterThanOrEqual(2);
-    expect(src).toContain("value={subrenterMonth}");
-    expect(src).toContain("value={payoutsMonth}");
+    expect(src).toContain("month={subrenterMonth}");
+    expect(overviewSrc).toContain("value={payoutsMonth}");
     // the old bare-chevron switchers are gone
     expect(src).not.toContain("setSubrenterMonth((m) => shiftMonthKey");
-    expect(src).not.toContain("setPayoutsMonth((m) => shiftMonthKey");
+    expect(overviewSrc).not.toContain("setPayoutsMonth((m) => shiftMonthKey");
   });
 
   it("MonthPickerBar: iterate + year stepper + 12-month grid + current-month jump", () => {
