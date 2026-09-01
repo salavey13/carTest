@@ -88,3 +88,20 @@ Stage Summary:
 - Leads sheet fully rebuilt: adaptive, always-closable (X center+right, ESC, backdrop, drag), all sections, working buttons, rental links, Avito deep links.
 - Month selector on мотопарк + bike wall (KPI + wall + fleet total scoped).
 - Known pre-existing issue surfaced (not fixed, out of scope): hydration error from <head> Scripts in app/layout.tsx — visible in console on prod; also blocks dev-mode interactive testing (fast-refresh reload loop).
+
+---
+Task ID: 3 (verification addendum)
+Agent: main (Super Z)
+Task: Deployed verification of 8dd41b1 + 126a0a8 on Vercel production.
+
+Work Log:
+- Follow-up fix 126a0a8: browser password-auth users could not load leads at all (gate stored the password but getFranchizeLeads never received it → «Не авторизован»). getFranchizeLeads now takes authPassword (server-side RPC verification incl. slug + expiry); usePasswordGate keeps the resolved ownerId; LeadsClient forwards both.
+- Deployed verification (v0-car-test-salavey13s-projects.vercel.app) with a fresh analytics password (generated via generate_analytics_password RPC; the provided TG bot token is stale — deployed bot is oneBikePlsBot/8037950842, direct API calls 401; notifications sent via the deployed /api/forward-telegram proxy):
+  • Leads: 155 leads load via password; desktop (1280px) — right drawer 640px, all sections (Сделки/Документы/Задачи/Заметки/История), X/ESC/backdrop close; mobile (390px) — bottom sheet starts at y=89 BELOW the CrewHeader (bottom 81px), X at y=102 (clear of TG-native corner zone), all sections, scroll-lock restores. Todo create + toggle verified (optimistic + persisted), notify toast («У лида нет Telegram»), deals rows are SPA links to /rental/<id>.
+  • Мотопарк: month navigator (Всё время → Сентябрь → Август), fleet header «Заработал парк · Август 2026», card tiles switch to «за авг» month scope.
+  • Bike story (ducati-panigale-s-electro-black): exact user case reproduced pre-fix (95 500 ₽ total / 0 ₽ «Этот месяц»); after ‹ ‹ → Август 2026 with «7 аренд за месяц» and the wall filtered to August events.
+- DJORUDJOV sale attribution verified against the DB (telegram_chat_id 7813830016 ∈ roster, shift active since 07:00Z, sale in the MSK day window, saleCategory regular → +10 000 ₽). Profile «Моя работа» operator panel needs TG auth — visible in the mini app.
+- Deploy notification sent to @salavey13 via the deployed bot (message_id 10470).
+
+Stage Summary:
+- All four features verified end-to-end on production. Known pre-existing (not fixed, flagged to user): hydration console error from <head> Scripts in app/layout.tsx (present on prod, React recovers); stale TG token in the shared secrets list.
