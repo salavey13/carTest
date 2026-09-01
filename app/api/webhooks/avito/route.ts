@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 
 import { logger } from "@/lib/logger";
+import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 import { supabaseAdmin } from "@/lib/supabase-server";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -60,6 +62,29 @@ type AvitoWebhookBody = {
   payload?: { type?: string; value?: AvitoMessageValue };
 };
 
+/**
+ * Manual/assistant-bot ingest envelope (interim path until Avito API keys are
+ * provisioned and the official webhook subscription is live). The VIP BIKE
+ * assistant TG bot receives Avito messages via manager forwards; instead of
+ * writing leads itself (old CLI gate required a phone in the text), it POSTs
+ * them here. Envelope is mapped onto the same lead pipeline as v3 messages.
+ */
+type BotForwardBody = {
+  type: "bot_forward";
+  /** Customer message text (required). */
+  text?: string;
+  /** Phone if the operator extracted one (optional — no hard gate). */
+  phone?: string;
+  /** Buyer name if visible (optional). */
+  name?: string;
+  /** Item/listing title if mentioned (optional). */
+  bike_title?: string;
+  /** Avito dialog/listing URL if present in the forward (optional). */
+  url?: string;
+  /** Who forwarded (manager name/chat label, for metadata only). */
+  manager?: string;
+};
+
 function secretProvided(request: NextRequest): string | null {
   return (
     request.nextUrl.searchParams.get("secret") ||
@@ -104,8 +129,12 @@ async function createLead(input: {
   value: AvitoMessageValue;
   eventId: string | null;
   now: string;
+  /** bot_forward extras merged into metadata. */
+  extra?: Record<string, unknown> | null;
+  /** Normalized phone for the phone column (bot_forward only). */
+  phone?: string | null;
 }): Promise<void> {
-  const { value, eventId, now } = input;
+  const { value, eventId, now, extra, phone } = input;
   const metadata: Record<string, unknown> = {
     name: buyerDisplayName(value),
     phone: null,
@@ -123,6 +152,7 @@ async function createLead(input: {
     messagesCount: 1,
     capturedAt: now,
     capturedVia: "avito_webhook_v3",
+    ...(extra || {}),
   };
 
   const { error } = await supabaseAdmin.from("franchize_intents").insert({
@@ -132,6 +162,7 @@ async function createLead(input: {
     source_route: "avito_webhook",
     contact_channel: "avito",
     urgency_score: 50,
+    phone: phone || null,
     last_seen_at: value.created || now,
     metadata,
   });
@@ -219,6 +250,61 @@ function ack() {
   return NextResponse.json({ ok: true });
 }
 
+/** Stable synthetic chat id for manual forwards: same text+phone → same lead. */
+function forwardChatId(body: BotForwardBody): string {
+  const key = `${(body.text || "").trim().toLowerCase()}|${(body.phone || "").trim()}`;
+  const hash = createHash("sha256").update(key).digest("hex").slice(0, 20);
+  return `fwd-${hash}`;
+}
+
+async function handleBotForward(body: BotForwardBody): Promise<NextResponse> {
+  const text = (body.text || "").trim();
+  if (!text) {
+    logger.warn("[avito-webhook] bot_forward without text");
+    return ack();
+  }
+  const now = new Date().toISOString();
+  const chatId = forwardChatId(body);
+  const phone = normalizePhone(body.phone);
+  const value: AvitoMessageValue = {
+    chat_id: chatId,
+    text: text.slice(0, 4000),
+    item_title: body.bike_title || undefined,
+    created: now,
+  };
+  const extra: Record<string, unknown> = {
+    forwardManager: body.manager || null,
+    sourceUrl: body.url || null,
+  };
+
+  try {
+    const existing = await findLeadByChatId(chatId);
+    if (existing.error) {
+      logger.error("[avito-webhook] bot_forward lookup failed", existing.error);
+      return ack();
+    }
+    if (existing.data?.id) {
+      const prevMeta =
+        existing.data.metadata && typeof existing.data.metadata === "object"
+          ? (existing.data.metadata as Record<string, unknown>)
+          : {};
+      await updateLead(existing.data.id, prevMeta, { value, eventId: null, now });
+      return ack();
+    }
+    await createLead({ value, eventId: null, now, extra, phone: phone || null });
+    notifyCrewOwnerAsync({
+      name: body.name || `Покупатель Avito (форвард${body.manager ? ` от ${body.manager}` : ""})`,
+      bikeTitle: body.bike_title || null,
+      text: text.slice(0, 300),
+      chatId,
+    });
+    return ack();
+  } catch (error) {
+    logger.error("[avito-webhook] bot_forward failed", error);
+    return ack();
+  }
+}
+
 export async function GET() {
   // Manual availability probe.
   return ack();
@@ -245,6 +331,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    if ((body as BotForwardBody).type === "bot_forward") {
+      return await handleBotForward(body as BotForwardBody);
+    }
     if (body.payload?.type !== "message" || !body.payload.value) return ack();
     const value = body.payload.value;
     if (!value.chat_id) return ack();
