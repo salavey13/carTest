@@ -105,3 +105,24 @@ Work Log:
 
 Stage Summary:
 - All four features verified end-to-end on production. Known pre-existing (not fixed, flagged to user): hydration console error from <head> Scripts in app/layout.tsx (present on prod, React recovers); stale TG token in the shared secrets list.
+
+---
+Task ID: 4
+Agent: main (Super Z)
+Task: Continue PRD_LEADS_RNP.md — subrenter UX overhaul on profile/admin, bike-story partner chip, profile refactor (2.5k lines), polish everywhere.
+
+Work Log:
+- Pulled salavey13/cartest@230da10d (owner-wallet commit), set up .env.local (Supabase/TG/secrets), installed deps, baseline: franchize strict slice passed; full franchize vitest suite has 10 pre-existing failures (my-work ×8, iter15, iter29) — unchanged by this work.
+- [Profile refactor] ProfileClient.tsx 2544 → ~480 lines. New app/franchize/[slug]/profile/components/: profile-shared.tsx (variants, formatCurrency/monthLabel/dates, status labels, EmptyState/Skeleton), ProfileHeaderPanel, RentalsPurchasesPanel, SubrenterMyBikesPanel, SubrentersOverviewPanel, OwnerCashWalletPanel, MyEarningsPanel (+team modal), MyWorkPanel, CrewOperationsPanel, ProfileDocumentsPanels (docs photos + rental docs + prefills), AchievementsPanel. Cross-panel wiring stays in the parent: subrenterOwned/subrentersOverview (permission gate doubles as owner-cash gate) and the owner-cash store; payout writes reload the wallet via onPayoutRecorded. Earnings/work panels are now self-contained → ordinary renters no longer fire salary API calls (iter14 intent, previously only the UI was hidden). Fixed locked-achievement tile style bug (literal string "withAlpha(...)" instead of a call).
+- [Partner panel] Per-bike month earnings breakdown (only when >1 bike), live-status green dot + equipment share on month rental rows, «и ещё N за месяц» spill note, icon tile fallback for bikes without photos.
+- [Owner/admin panel] Per-partner inline month chip «<месяц>: N аренд · к выплате X₽» + «Записать выплату» right on the partner card (same action as the payout sheet, writes owner_cash kind=subrenter_payout); TG contact per partner — t.me/<username> link or copy-id fallback when no username.
+- [Bike story] New partner field from getBikeStoryAction (specs.subrenter_chat_id → users); hero chip now «партнёрское мото · <имя>» with a one-tap TG link. Fixed a real pre-existing bug found during verification: operator names on the wall never resolved — the users select used non-existent first_name/last_name columns (users has full_name only), so «оператор: …» silently rendered null; fixed to full_name (partner lookup too).
+- [Verification] Browser-tested locally via the built-in mock-user env (salavey13 admin + Goollil co_owner/partner): profile renders all panels; subrenters overview shows payout sheet (5 000 ₽ за сентябрь) + partner cards with TG icons, month chips and bike chips; partner panel shows bikes with photos, month cut 5 000 ₽, live rental row; bike story ducati-panigale-s-electro-green shows «партнёрское мото · Влад Рябов» + TG icon, operator names now resolve («оператор: Михаил Жидков»), rental/service cards keep SPA links to /rental/<id>. Owner-cash panel stays hidden until migration 20260901120000 is applied to prod Supabase (relation missing — graceful hide, as designed).
+- [Tests] Source guards iter18/21/25/26 updated to read the panel components they guard (features unchanged); iter27/iter28 need /home/z/my-project/upload/secrets_all.txt — created from env, 39 wall tests pass. Final: 942 passing / same 10 pre-existing failures as baseline; eslint clean on all touched files; tsc error-file set identical to baseline (net −2 errors).
+- Committed 1d5c60993, pushed to origin/main.
+
+Stage Summary:
+- Profile split into 11 panel components (orchestrator ~480 lines) — behavior preserved, tests updated to guard the new layout.
+- Subrenter UX: per-bike month breakdown, inline month payouts + one-tap payout on partner cards, TG contacts, partner chip with TG link on bike story.
+- Pre-existing bug fixed: wall operator names (wrong users columns).
+- Flagged for owner: apply migration 20260901120000 (owner_cash_entries) to production Supabase to unlock the «Кошелёк владельца» panel; TG bot token in the shared secrets is stale (deployed bot answers via /api/forward-telegram).
