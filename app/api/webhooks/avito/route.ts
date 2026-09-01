@@ -60,6 +60,17 @@ type AvitoWebhookBody = {
   version?: string;
   timestamp?: number;
   payload?: { type?: string; value?: AvitoMessageValue };
+  /**
+   * Optional enrichment from the factory avito_monitor poller (cron):
+   * real buyer name, listing URL, profile and GLM analysis category.
+   * Ignored by the official Avito v3 webhook (it never sends `client`).
+   */
+  client?: {
+    name?: string;
+    url?: string;
+    profile?: string;
+    category?: string;
+  };
 };
 
 /**
@@ -107,7 +118,14 @@ function truncate(value: string | undefined, max: number): string | null {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
-function buyerDisplayName(value: AvitoMessageValue): string {
+function buyerDisplayName(
+  value: AvitoMessageValue,
+  clientName?: string,
+): string {
+  // Enriched polls (factory monitor) carry the real buyer name from chat users.
+  if (clientName && clientName.trim() && clientName !== "Неизвестно") {
+    return clientName.trim().slice(0, 120);
+  }
   // Avito webhooks do not carry the buyer's profile name. Keep it honest:
   // a stable pseudonym; the operator opens the chat by chat link in metadata.
   return value.buyer_id ? `Покупатель Avito #${value.buyer_id}` : "Покупатель Avito";
@@ -133,10 +151,12 @@ async function createLead(input: {
   extra?: Record<string, unknown> | null;
   /** Normalized phone for the phone column (bot_forward only). */
   phone?: string | null;
+  /** Monitor enrichment: real buyer name + listing context. */
+  client?: AvitoWebhookBody["client"];
 }): Promise<void> {
-  const { value, eventId, now, extra, phone } = input;
+  const { value, eventId, now, extra, phone, client } = input;
   const metadata: Record<string, unknown> = {
-    name: buyerDisplayName(value),
+    name: buyerDisplayName(value, client?.name),
     phone: null,
     source: "avito",
     avitoChatId: value.chat_id ?? null,
@@ -152,6 +172,9 @@ async function createLead(input: {
     messagesCount: 1,
     capturedAt: now,
     capturedVia: "avito_webhook_v3",
+    ...(client?.url ? { sourceUrl: client.url } : {}),
+    ...(client?.profile ? { avitoProfile: client.profile } : {}),
+    ...(client?.category ? { analysisCategory: client.category } : {}),
     ...(extra || {}),
   };
 
@@ -367,15 +390,24 @@ export async function POST(request: NextRequest) {
           .eq("id", existing.data.id);
         return ack();
       }
-      await updateLead(existing.data.id, prevMeta, { value, eventId: body.id ?? null, now });
+      const merged = { ...prevMeta };
+      // Monitor enrichment: replace the pseudonym with the real buyer name
+      // and backfill listing context on subsequent events.
+      if (body.client?.name && body.client.name !== "Неизвестно") {
+        merged.name = body.client.name.trim().slice(0, 120);
+      }
+      if (body.client?.url && !merged.sourceUrl) merged.sourceUrl = body.client.url;
+      if (body.client?.profile) merged.avitoProfile = body.client.profile;
+      if (body.client?.category) merged.analysisCategory = body.client.category;
+      await updateLead(existing.data.id, merged, { value, eventId: body.id ?? null, now });
       return ack();
     }
 
     if (!fromBuyer) return ack();
 
-    await createLead({ value, eventId: body.id ?? null, now });
+    await createLead({ value, eventId: body.id ?? null, now, client: body.client });
     notifyCrewOwnerAsync({
-      name: buyerDisplayName(value),
+      name: buyerDisplayName(value, body.client?.name),
       bikeTitle: truncate(value.item_title, 200),
       text: truncate(value.text, 300),
       chatId: value.chat_id,
