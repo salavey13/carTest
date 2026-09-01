@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Trophy, MapPin, ShoppingCart, Lock, CheckCircle, Wallet, Briefcase, Calendar, Users, RotateCw, Bike, Handshake, ChevronLeft, ChevronRight } from "lucide-react";
+import { Trophy, MapPin, ShoppingCart, Lock, CheckCircle, Wallet, Briefcase, Calendar, Users, RotateCw, Bike, Handshake, ChevronLeft, ChevronRight, Plus, Trash2, Landmark } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
@@ -55,6 +56,12 @@ import {
   type SubrenterMonthSummary,
   type SubrentersMonthlyPayoutsData,
 } from "../../server-actions/subrenter-monitoring";
+import {
+  addOwnerCashEntryAction,
+  deleteOwnerCashEntryAction,
+  getOwnerCashMonthAction,
+  type OwnerCashMonthData,
+} from "../../server-actions/owner-cash";
 import {
   currentMskMonthKey,
 } from "../../lib/subrenter-economics";
@@ -218,6 +225,22 @@ export function FranchizeProfileClient({
   const [subrenterEarnings, setSubrenterEarnings] = useState<SubrenterMonthSummary | null>(null);
   const [subrenterEarningsLoading, setSubrenterEarningsLoading] = useState(false);
   const [payoutsMonth, setPayoutsMonth] = useState(() => currentMskMonthKey());
+
+  // Owner cash wallet («Кошелёк владельца») — personal money movements +
+  // subrenter payouts, owner/admin only. null = нет прав / не загружено.
+  const [ownerCash, setOwnerCash] = useState<OwnerCashMonthData | null>(null);
+  const [ownerCashHidden, setOwnerCashHidden] = useState(false);
+  const [ownerCashMonth, setOwnerCashMonth] = useState(() => currentMskMonthKey());
+  const [ownerCashLoading, setOwnerCashLoading] = useState(false);
+  const [ownerCashForm, setOwnerCashForm] = useState({
+    direction: "out" as "in" | "out",
+    kind: "personal" as "personal" | "subrenter_payout" | "other",
+    amount: "",
+    title: "",
+    person: "",
+  });
+  const [ownerCashBusy, setOwnerCashBusy] = useState(false);
+  const [payoutRecordBusy, setPayoutRecordBusy] = useState<string | null>(null);
   const [subrenterPayouts, setSubrenterPayouts] = useState<SubrentersMonthlyPayoutsData | null>(null);
   const [payoutsLoading, setPayoutsLoading] = useState(false);
 
@@ -435,6 +458,116 @@ export function FranchizeProfileClient({
       cancelled = true;
     };
   }, [dbUser?.user_id, slug, subrentersOverview, payoutsMonth]);
+
+  // ── Owner cash wallet loader: runs when user proven to be owner/admin
+  // (subrentersOverview loaded non-empty ⇒ canManageSubrenters passed).
+  const reloadOwnerCash = useCallback(() => {
+    if (!dbUser?.user_id || !slug) return;
+    if (!subrentersOverview || subrentersOverview.length === 0) {
+      setOwnerCashHidden(true);
+      return;
+    }
+    let cancelled = false;
+    setOwnerCashLoading(true);
+    getOwnerCashMonthAction({ slug, actorUserId: dbUser.user_id, month: ownerCashMonth })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.success && res.data) setOwnerCash(res.data);
+        else if (!res.success) setOwnerCashHidden(true);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setOwnerCashLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dbUser?.user_id, slug, subrentersOverview, ownerCashMonth]);
+
+  useEffect(() => {
+    const cleanup = reloadOwnerCash();
+    return cleanup;
+  }, [reloadOwnerCash]);
+
+  const submitOwnerCash = async () => {
+    if (!dbUser?.user_id) return;
+    const amount = Number(String(ownerCashForm.amount || "").replace(/[^\d.]/g, ""));
+    if (!amount || amount <= 0) {
+      toast.error("Укажите сумму");
+      return;
+    }
+    if (!ownerCashForm.title.trim()) {
+      toast.error("Укажите, за что / от кого");
+      return;
+    }
+    setOwnerCashBusy(true);
+    try {
+      const res = await addOwnerCashEntryAction({
+        slug,
+        actorUserId: dbUser.user_id,
+        direction: ownerCashForm.direction,
+        kind: ownerCashForm.kind,
+        amount,
+        title: ownerCashForm.title.trim(),
+        person: ownerCashForm.person.trim() || undefined,
+      });
+      if (res.success) {
+        toast.success("Записано в кошелёк владельца");
+        setOwnerCashForm({
+          direction: ownerCashForm.direction,
+          kind: ownerCashForm.kind,
+          amount: "",
+          title: "",
+          person: "",
+        });
+        reloadOwnerCash();
+      } else {
+        toast.error(res.error || "Не удалось записать");
+      }
+    } finally {
+      setOwnerCashBusy(false);
+    }
+  };
+
+  const removeOwnerCash = async (id: string) => {
+    if (!dbUser?.user_id) return;
+    const res = await deleteOwnerCashEntryAction({ slug, actorUserId: dbUser.user_id, id });
+    if (res.success) {
+      toast.success("Удалено");
+      reloadOwnerCash();
+    } else {
+      toast.error(res.error || "Не удалось удалить");
+    }
+  };
+
+  /** Быстрая запись выплаты субарендатору из панели выплат (kind=subrenter_payout). */
+  const recordSubrenterPayout = async (chatId: string, name: string, amountRub: number) => {
+    if (!dbUser?.user_id) return;
+    if (!amountRub || amountRub <= 0) {
+      toast.error("Нечего записывать — сумма 0");
+      return;
+    }
+    setPayoutRecordBusy(chatId);
+    try {
+      const res = await addOwnerCashEntryAction({
+        slug,
+        actorUserId: dbUser.user_id,
+        direction: "out",
+        kind: "subrenter_payout",
+        amount: amountRub,
+        title: "Выплата субарендатору",
+        person: name,
+      });
+      if (res.success) {
+        toast.success(`Выплата ${name} записана в кошелёк`);
+        reloadOwnerCash();
+      } else {
+        toast.error(res.error || "Не удалось записать выплату");
+      }
+    } finally {
+      setPayoutRecordBusy(null);
+    }
+  };
 
   /** "август 2026" label for a YYYY-MM key. */
   const monthLabel = (monthKey: string) => {
@@ -1072,6 +1205,24 @@ export function FranchizeProfileClient({
                         <span className="whitespace-nowrap font-bold tabular-nums" style={{ color: "#f59e0b" }}>
                           {row.payoutRub > 0 ? `→ ${formatCurrency(row.payoutRub)}` : "—"}
                         </span>
+                        {row.payoutRub > 0 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 shrink-0 text-[11px]"
+                            disabled={payoutRecordBusy === row.chatId}
+                            onClick={() =>
+                              void recordSubrenterPayout(
+                                row.chatId,
+                                row.name || (row.username ? `@${row.username}` : `id ${row.chatId}`),
+                                row.payoutRub,
+                              )
+                            }
+                          >
+                            {payoutRecordBusy === row.chatId ? "…" : "Записать выплату"}
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1127,6 +1278,188 @@ export function FranchizeProfileClient({
                 </div>
               ))}
             </div>
+          </FranchizeOperatorPanel>
+        </motion.div>
+      )}
+
+      {/* Owner cash wallet («Кошелёк владельца») — owner/admin only: все
+          подряд личные движения денег мимо автоматических систем: наличные
+          приходы, личные траты, выплаты субарендаторам. */}
+      {!ownerCashHidden && ownerCash && (
+        <motion.div variants={itemVariants}>
+          <FranchizeOperatorPanel>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
+                  <Landmark className="h-4 w-4" /> Кошелёк владельца
+                </h2>
+                <p className="mt-1 text-xs" style={{ color: T.textMuted }}>
+                  Личные движения денег мимо кассы: пришло / ушло на все подряд.
+                  Выплаты субарендаторам записываются туда же.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <MonthPickerBar
+                value={ownerCashMonth}
+                onChange={setOwnerCashMonth}
+                accent={T.accent}
+                accentContrast={T.accentContrast}
+                bgCard={T.bgCard}
+                bgElevated={T.bgElevated}
+                border={T.borderSoft}
+                text={T.text}
+                textMuted={T.textMuted}
+              />
+            </div>
+
+            {/* Totals */}
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className="rounded-xl border p-2.5 text-center" style={T.styles.card}>
+                <p className="text-[10px] uppercase tracking-wide" style={{ color: T.textMuted }}>Пришло</p>
+                <p className="mt-0.5 text-sm font-bold tabular-nums" style={{ color: "#22c55e" }}>
+                  +{formatCurrency(ownerCash.totalIn)}
+                </p>
+              </div>
+              <div className="rounded-xl border p-2.5 text-center" style={T.styles.card}>
+                <p className="text-[10px] uppercase tracking-wide" style={{ color: T.textMuted }}>Ушло</p>
+                <p className="mt-0.5 text-sm font-bold tabular-nums" style={{ color: "#ef4444" }}>
+                  −{formatCurrency(ownerCash.totalOut)}
+                </p>
+              </div>
+              <div className="rounded-xl border p-2.5 text-center" style={T.styles.card}>
+                <p className="text-[10px] uppercase tracking-wide" style={{ color: T.textMuted }}>Итог</p>
+                <p className="mt-0.5 text-sm font-bold tabular-nums" style={{ color: ownerCash.net >= 0 ? "#22c55e" : "#ef4444" }}>
+                  {ownerCash.net >= 0 ? "+" : "−"}{formatCurrency(Math.abs(ownerCash.net))}
+                </p>
+              </div>
+            </div>
+
+            {/* Quick add form */}
+            <div className="mt-3 rounded-xl border p-3" style={T.styles.card}>
+              <p className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: T.textMuted }}>
+                <Plus className="h-3.5 w-3.5" /> Новая запись
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <div className="flex overflow-hidden rounded-lg border" style={{ borderColor: T.borderSoft }}>
+                  {(["in", "out"] as const).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setOwnerCashForm((f) => ({ ...f, direction: d }))}
+                      className="px-3 py-2 text-xs font-semibold transition"
+                      style={{
+                        backgroundColor: ownerCashForm.direction === d ? (d === "in" ? "#22c55e22" : "#ef444422") : "transparent",
+                        color: ownerCashForm.direction === d ? (d === "in" ? "#22c55e" : "#ef4444") : T.textMuted,
+                      }}
+                    >
+                      {d === "in" ? "Пришло" : "Ушло"}
+                    </button>
+                  ))}
+                </div>
+                <select
+                  value={ownerCashForm.kind}
+                  onChange={(e) => setOwnerCashForm((f) => ({ ...f, kind: e.target.value as typeof f.kind }))}
+                  className="rounded-lg border px-2 py-2 text-xs outline-none"
+                  style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard, color: T.text }}
+                >
+                  <option value="personal">Личное</option>
+                  <option value="subrenter_payout">Выплата субарендатору</option>
+                  <option value="other">Прочее</option>
+                </select>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input
+                  value={ownerCashForm.amount}
+                  onChange={(e) => setOwnerCashForm((f) => ({ ...f, amount: e.target.value }))}
+                  inputMode="numeric"
+                  placeholder="Сумма ₽"
+                  className="w-24 rounded-lg border px-3 py-2 text-sm outline-none"
+                  style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard, color: T.text }}
+                />
+                <input
+                  value={ownerCashForm.title}
+                  onChange={(e) => setOwnerCashForm((f) => ({ ...f, title: e.target.value }))}
+                  placeholder="За что / от кого (напр. CBR 600RR Влад)"
+                  className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none"
+                  style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard, color: T.text }}
+                />
+                <input
+                  value={ownerCashForm.person}
+                  onChange={(e) => setOwnerCashForm((f) => ({ ...f, person: e.target.value }))}
+                  placeholder="Кто (опционально)"
+                  className="w-36 rounded-lg border px-3 py-2 text-sm outline-none"
+                  style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard, color: T.text }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={ownerCashBusy}
+                  onClick={() => void submitOwnerCash()}
+                  className="shrink-0"
+                >
+                  {ownerCashBusy ? "Пишу…" : "Записать"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Entries list */}
+            {ownerCashLoading ? (
+              <p className="mt-3 animate-pulse text-sm" style={{ color: T.textMuted }}>Загружаю…</p>
+            ) : ownerCash.entries.length === 0 ? (
+              <p className="mt-3 text-sm" style={{ color: T.textMuted }}>
+                Записей за {monthLabel(ownerCash.month).toLowerCase()} пока нет.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-1.5">
+                {ownerCash.entries.map((e) => (
+                  <div
+                    key={e.id}
+                    className="flex items-center justify-between gap-2 rounded-lg border p-2.5 text-sm"
+                    style={T.styles.card}
+                  >
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span
+                        className="h-2 w-2 flex-shrink-0 rounded-full"
+                        style={{ backgroundColor: e.direction === "in" ? "#22c55e" : "#ef4444" }}
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate font-medium" style={{ color: T.text }}>
+                          {e.title}
+                          {e.kind === "subrenter_payout" && (
+                            <span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: "#f59e0b22", color: "#f59e0b" }}>
+                              выплата
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-0.5 text-[11px]" style={{ color: T.textMuted }}>
+                          {new Date(e.entryDate + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                          {e.person ? ` · ${e.person}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-shrink-0 items-center gap-2">
+                      <span
+                        className="whitespace-nowrap font-bold tabular-nums"
+                        style={{ color: e.direction === "in" ? "#22c55e" : "#ef4444" }}
+                      >
+                        {e.direction === "in" ? "+" : "−"}{formatCurrency(e.amount)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void removeOwnerCash(e.id)}
+                        title="Удалить запись"
+                        className="rounded p-1 transition hover:opacity-70"
+                        style={{ color: T.textMuted }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </FranchizeOperatorPanel>
         </motion.div>
       )}
