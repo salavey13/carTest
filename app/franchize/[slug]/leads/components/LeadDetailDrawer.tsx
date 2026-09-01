@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import {
   Phone,
   Send,
@@ -85,6 +86,8 @@ interface Props {
   onDeleteTodo: (id: string) => void;
   onAddNote: (text: string) => void;
   onDismissLead: () => void;
+  /** m4 fix: true while a Telegram notify is in flight — disables the button. */
+  notifyBusy?: boolean;
   /** When true, render as the inner content of a parent sheet/drawer (no
    *  backdrop, no right-side panel chrome, no z-index). Used by the adaptive
    *  LeadDetailSheet so the sheet provides the backdrop + animation and this
@@ -123,6 +126,7 @@ export function LeadDetailDrawer(props: Props) {
     onDeleteTodo,
     onAddNote,
     onDismissLead,
+    notifyBusy = false,
     asSheetChild = false,
   } = props;
 
@@ -226,7 +230,7 @@ export function LeadDetailDrawer(props: Props) {
   }> = [
     { icon: Phone, label: "Позвонить", action: "call", color: "#22c55e", disabled: !lead?.phone },
     { icon: Send, label: "Написать в TG", action: "telegram", color: "#3b82f6" },
-    { icon: Bell, label: "Уведомить", action: "notify", color: "#eab308" },
+    { icon: Bell, label: "Уведомить", action: "notify", color: "#eab308", disabled: notifyBusy },
     { icon: MoreHorizontal, label: "Ещё", action: "more", color: "#64748b" },
   ];
 
@@ -238,10 +242,12 @@ export function LeadDetailDrawer(props: Props) {
   }
 
   const copyText = async (value: string, label: string) => {
+    if (!value) return;
     try {
       await navigator.clipboard.writeText(value);
     } catch {
-      /* clipboard unavailable — best effort */
+      // n7 fix: mobile TG WebView often denies clipboard — do not fail silently.
+      toast.error(`Не удалось скопировать ${label}`);
     }
   };
 

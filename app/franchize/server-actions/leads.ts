@@ -414,9 +414,21 @@ export async function getFranchizeLeads(
         const v = meta[key];
         return typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
       };
+      // M3 fix: only https: URLs survive into the UI — the webhook stores
+      // client-controlled values and the sheet renders them as href, so a
+      // javascript:/data: payload would execute in the operator's session.
+      const safeHttpUrl = (v: string | null): string | null => {
+        if (!v) return null;
+        try {
+          const u = new URL(v);
+          return u.protocol === "https:" ? u.toString() : null;
+        } catch {
+          return null;
+        }
+      };
       const chatId = str("avitoChatId");
-      const itemUrl = str("sourceUrl");
-      const profileUrl = str("avitoProfile");
+      const itemUrl = safeHttpUrl(str("sourceUrl"));
+      const profileUrl = safeHttpUrl(str("avitoProfile"));
       const itemIdRaw = meta["avitoItemId"];
       const itemId =
         (typeof itemIdRaw === "number" && Number.isFinite(itemIdRaw)) ? String(itemIdRaw)

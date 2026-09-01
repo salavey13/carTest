@@ -122,10 +122,17 @@ export function LeadDetailSheet({ open, onClose, children, title, T }: LeadDetai
   }, [open, isDesktop]);
 
   // ── Close on Escape ──
+  // m3 fix: when a modal is stacked on top of the sheet (DismissLeadDialog),
+  // ESC must dismiss THE MODAL, not close the sheet underneath it. The modal
+  // sets `data-modal-open` on document.body while mounted; we also respect
+  // defaultPrevented events from components that handle ESC themselves.
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      if (e.defaultPrevented) return;
+      if (document.body.hasAttribute("data-modal-open")) return;
+      onClose();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -190,6 +197,8 @@ export function LeadDetailSheet({ open, onClose, children, title, T }: LeadDetai
             <motion.aside
               key="lead-drawer"
               aria-label="Детали лида"
+              role="dialog"
+              aria-modal="true"
               className="relative flex h-full w-full max-w-[640px] flex-col shadow-2xl"
               style={{
                 backgroundColor: T.bg,

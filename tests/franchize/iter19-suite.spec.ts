@@ -41,6 +41,21 @@ import {
 } from "@/app/franchize/lib/subrenter-user-search";
 import { searchUsersForSubrenterAction } from "@/app/franchize/server-actions/bike-subrenter";
 
+// 2026-09-02 (SA-002): the action now resolves the actor SERVER-side (signed
+// cookie / initData) instead of trusting the client-supplied actorUserId.
+// These tests simulate a valid signed cookie via the actor-cookie mock — the
+// id below is what verifyTelegramActorCookieValue returns for this suite.
+const authMock = vi.hoisted(() => ({ userId: "425137783" as string | null }));
+vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    get: (_name: string) => ({ value: "mock-payload.mock-signature" }),
+  }),
+}));
+vi.mock("@/lib/telegram-actor-cookie", () => ({
+  TELEGRAM_ACTOR_COOKIE: "cartest_tg_actor",
+  verifyTelegramActorCookieValue: () => authMock.userId,
+}));
+
 // ── 1. Pure picker helpers ───────────────────────────────────────────────────
 
 describe("iter19 · subrenter-user-search (pure)", () => {
@@ -89,6 +104,8 @@ describe("iter19 · subrenter-user-search (pure)", () => {
 describe("iter19 · searchUsersForSubrenterAction", () => {
   beforeEach(() => {
     mocks.from.mockReset();
+    // Default: a properly signed actor cookie for the crew-owner id.
+    authMock.userId = "425137783";
   });
 
   function crewQuery(ownerId: string) {
@@ -128,8 +145,8 @@ describe("iter19 · searchUsersForSubrenterAction", () => {
     expect(res.error).toContain("2");
     expect(mocks.from).not.toHaveBeenCalled();
   });
-
   it("denies non-admins before touching the users table", async () => {
+    authMock.userId = "425137783"; // signed cookie identity — NOT the owner below
     // crew owner is somebody else AND membership check returns nothing
     const membershipQuery = {
       select: vi.fn(() => ({

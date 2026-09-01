@@ -115,6 +115,49 @@ export async function verifyCrewAccess(
   }
 }
 
+// ── Server-side actor identity resolution (2026-09-02 security hardening) ────
+//
+// Several money-adjacent server actions trusted a client-supplied actorUserId
+// (SA-002): any visitor could pass e.g. the owner's chat id and pass the
+// permission check. This helper resolves the REAL actor server-side:
+//   1. signed Telegram actor cookie (set by /api/validate-telegram-auth),
+//   2. Telegram-signed initData fallback (HMAC-SHA256 verified against the
+//      bot token; the claimed actor must match the signed user) — for
+//      browsers that block cookies.
+// Returns null when no trustworthy identity exists — callers must deny.
+
+export async function resolveServerActorUserId(input: {
+  claimedActorUserId?: string;
+  initData?: string;
+}): Promise<string | null> {
+  const { cookies } = await import("next/headers");
+  const { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } = await import("@/lib/telegram-actor-cookie");
+
+  const cookieUserId = verifyTelegramActorCookieValue(
+    (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
+  );
+  if (cookieUserId) return cookieUserId;
+
+  const claimed = input.claimedActorUserId?.trim();
+  const initData = input.initData?.trim();
+  if (!initData || !claimed) return null;
+
+  try {
+    const { computeTelegramWebAppHash } = await import("@/lib/telegram-webapp-auth");
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) return null;
+    const validation = await computeTelegramWebAppHash(initData, botToken);
+    if (!validation.isValid) return null;
+    const userJson = new URLSearchParams(initData).get("user");
+    if (!userJson) return null;
+    const tgUserId = String((JSON.parse(userJson) as { id?: number | string }).id ?? "");
+    if (!tgUserId || tgUserId !== claimed) return null;
+    return tgUserId;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Type-safe error handler for server action catch blocks.
  * Replaces the common `err?.message || "Unknown error."` pattern.

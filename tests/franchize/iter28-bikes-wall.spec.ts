@@ -204,10 +204,17 @@ describe("iter28: source guards — pages, gate, photos, service linkage", () =>
     const src = read(`${APP}/server-actions/bike-wall.ts`);
     expect(src).toContain("isPasswordAuth");               // password analytics auth
     expect(src).toContain('user?.role === "vprAdmin"');    // top-level global admin
-    expect(src).toContain('userMetadata?.status === "admin"'); // metadata legacy admin
+    expect(src).toContain('meta?.status === "admin"');     // metadata legacy admin
     expect(src).toContain("membership_status\", \"active\"");  // active membership (any role)
     expect(src).toContain("specs->>subrenter_chat_id");    // subrenter scope
     expect(src).toContain("Недостаточно прав");            // gate rejects outsiders
+    // 2026-09-02 (SA-001): identity is verified server-side — cookie, signed
+    // initData, or the password path gated by an owner/admin check. The bare
+    // boolean no longer grants access by itself.
+    expect(src).toContain("verifyTelegramActorCookieValue");
+    expect(src).toContain("computeTelegramWebAppHash");
+    expect(src).toContain("accessForActor");
+    expect(src).toContain("isGlobalAdminRow");
   });
 
   it("subrenter scope filters the fleet: .in('id', subrenterVehicleIds) + story guard", () => {

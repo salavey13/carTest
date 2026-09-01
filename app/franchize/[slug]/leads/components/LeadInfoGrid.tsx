@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Copy, Check, ExternalLink } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
 
@@ -61,7 +62,8 @@ function Tile({ item, T }: { item: InfoTile; T: ThemeTokens }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      /* clipboard not available */
+      // n7 fix: mobile TG WebView often denies clipboard — surface it.
+      toast.error("Не удалось скопировать");
     }
   };
 

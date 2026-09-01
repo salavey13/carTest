@@ -17,6 +17,7 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
 import { canManageSubrenters, syncUserSubrenterFlag } from "./bike-subrenter";
+import { resolveServerActorUserId } from "./shared/auth-helpers";
 import {
   normalizeMonthKey,
   currentMskMonthKey,
@@ -73,13 +74,24 @@ function isRentalEffectivelyActive(rental: {
 export async function getSubrenterOwnedBikesAction(input: {
   slug: string;
   userId: string;
+  initData?: string;
 }): Promise<{ success: boolean; data?: SubrenterOwnedBikesData; error?: string }> {
   const parsed = z
-    .object({ slug: z.string().trim().min(1), userId: z.string().trim().min(1) })
+    .object({
+      slug: z.string().trim().min(1),
+      userId: z.string().trim().min(1),
+      initData: z.string().trim().optional(),
+    })
     .safeParse(input);
   if (!parsed.success) return { success: false, error: "Некорректный запрос." };
-  const { slug, userId } = parsed.data;
-
+  const { slug } = parsed.data;
+  // SA-002 fix: the "self" identity must be verified server-side — a spoofed
+  // userId would let anyone read another partner's bikes.
+  const userId = await resolveServerActorUserId({
+    claimedActorUserId: parsed.data.userId,
+    initData: parsed.data.initData,
+  });
+  if (!userId) return { success: false, error: "Не авторизовано." };
   try {
     const { data: crew } = await supabaseAdmin
       .from("crews")
@@ -196,13 +208,24 @@ export interface SubrenterOverviewRow {
 export async function getFranchizeSubrentersOverviewAction(input: {
   slug: string;
   actorUserId: string;
+  initData?: string;
 }): Promise<{ success: boolean; data?: SubrenterOverviewRow[]; error?: string }> {
   const parsed = z
-    .object({ slug: z.string().trim().min(1), actorUserId: z.string().trim().min(1) })
+    .object({
+      slug: z.string().trim().min(1),
+      actorUserId: z.string().trim().min(1),
+      initData: z.string().trim().optional(),
+    })
     .safeParse(input);
   if (!parsed.success) return { success: false, error: "Некорректный запрос." };
-  const { slug, actorUserId } = parsed.data;
-
+  const { slug } = parsed.data;
+  // SA-002 fix: the actor must be verified server-side (signed cookie or
+  // Telegram-signed initData) — a client-claimed id could be anyone.
+  const actorUserId = await resolveServerActorUserId({
+    claimedActorUserId: parsed.data.actorUserId,
+    initData: parsed.data.initData,
+  });
+  if (!actorUserId) return { success: false, error: "Не авторизовано." };
   try {
     const { data: crew } = await supabaseAdmin
       .from("crews")
@@ -375,17 +398,25 @@ export async function getSubrenterMonthlyEarningsAction(input: {
   slug: string;
   userId: string;
   month?: string;
+  initData?: string;
 }): Promise<{ success: boolean; data?: SubrenterMonthSummary; error?: string }> {
   const parsed = z
     .object({
       slug: z.string().trim().min(1),
       userId: z.string().trim().min(1),
       month: z.string().trim().optional(),
+      initData: z.string().trim().optional(),
     })
     .safeParse(input);
   if (!parsed.success) return { success: false, error: "Некорректный запрос." };
-  const { slug, userId } = parsed.data;
-  const month = normalizeMonthKey(parsed.data.month) || currentMskMonthKey();
+  const { slug } = parsed.data;
+  // SA-002 fix: the "self" identity must be verified server-side — a spoofed
+  // userId would let anyone read another partner's bikes.
+  const userId = await resolveServerActorUserId({
+    claimedActorUserId: parsed.data.userId,
+    initData: parsed.data.initData,
+  });
+  if (!userId) return { success: false, error: "Не авторизовано." };  const month = normalizeMonthKey(parsed.data.month) || currentMskMonthKey();
 
   try {
     const { data: crew } = await supabaseAdmin
@@ -492,17 +523,25 @@ export async function getSubrentersMonthlyPayoutsAction(input: {
   slug: string;
   actorUserId: string;
   month?: string;
+  initData?: string;
 }): Promise<{ success: boolean; data?: SubrentersMonthlyPayoutsData; error?: string }> {
   const parsed = z
     .object({
       slug: z.string().trim().min(1),
       actorUserId: z.string().trim().min(1),
       month: z.string().trim().optional(),
+      initData: z.string().trim().optional(),
     })
     .safeParse(input);
   if (!parsed.success) return { success: false, error: "Некорректный запрос." };
-  const { slug, actorUserId } = parsed.data;
-  const month = normalizeMonthKey(parsed.data.month) || currentMskMonthKey();
+  const { slug } = parsed.data;
+  // SA-002 fix: the actor must be verified server-side (signed cookie or
+  // Telegram-signed initData) — a client-claimed id could be anyone.
+  const actorUserId = await resolveServerActorUserId({
+    claimedActorUserId: parsed.data.actorUserId,
+    initData: parsed.data.initData,
+  });
+  if (!actorUserId) return { success: false, error: "Не авторизовано." };  const month = normalizeMonthKey(parsed.data.month) || currentMskMonthKey();
 
   try {
     const { data: crew } = await supabaseAdmin
@@ -549,7 +588,9 @@ export async function getSubrentersMonthlyPayoutsAction(input: {
       .in("vehicle_id", partnerBikes.map((b: { bikeId: string }) => b.bikeId))
       .gte("created_at", fromIso)
       .lte("created_at", toIso)
-      .neq("status", "cancelled")
+      // M4 fix: same earning statuses as the wall — expired (never
+      // returned/confirmed) and disputed rentals must not inflate the payout.
+      .in("status", ["completed", "active", "confirmed", "pending_confirmation"])
       .order("created_at", { ascending: false })
       .limit(2000);
 
@@ -746,12 +787,20 @@ export async function generateSubrenterWeeklyReportAction(
       ownerPercentage: z.coerce.number().min(1).max(99).optional(),
       sendToPartner: z.boolean().optional(),
       sendToSelf: z.boolean().optional(),
+      initData: z.string().trim().optional(),
     })
     .safeParse(input);
   if (!parsed.success) {
     return { success: false, error: "Некорректные параметры отчёта." };
   }
-  const { slug, actorUserId, chatId, from, to, ownerPercentage, sendToPartner = true, sendToSelf = false } = parsed.data;
+  const { slug, chatId, from, to, ownerPercentage, sendToPartner = true, sendToSelf = false } = parsed.data;
+  // SA-002 fix: the actor must be verified server-side (signed cookie or
+  // Telegram-signed initData) — a client-claimed id could be anyone.
+  const actorUserId = await resolveServerActorUserId({
+    claimedActorUserId: parsed.data.actorUserId,
+    initData: parsed.data.initData,
+  });
+  if (!actorUserId) return { success: false, error: "Не авторизовано." };
   if (from > to) return { success: false, error: "Дата начала позже даты окончания." };
 
   try {
@@ -786,13 +835,17 @@ export async function generateSubrenterWeeklyReportAction(
       .in("vehicle_id", Array.from(bikeLabel.keys()))
       .gte("agreed_start_date", fromIso)
       .lte("agreed_start_date", toIso)
-      .neq("status", "cancelled")
+      // M4 fix: mirror the wall's earning statuses — expired/disputed rows
+      // never earn money and must not appear in the payout report.
+      .in("status", ["completed", "active", "confirmed", "pending_confirmation"])
       .order("agreed_start_date", { ascending: true });
 
+    // n3 fix: render in MSK (the period bounds are +03:00-stamped; on the UTC
+    // server the local getters used to show the previous day for date_from).
     const fmtRuDate = (iso: string | null) => {
       if (!iso) return "—";
-      const d = new Date(iso);
-      return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+      const d = new Date(Date.parse(iso) + 3 * 3600 * 1000);
+      return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`;
     };
 
     const rows = (rentals ?? []).map((r: {
@@ -856,11 +909,15 @@ export async function generateSubrenterWeeklyReportAction(
       payment_deadline_days: "2",
     };
     try {
+      // M1 fix: private.crew_secrets keys on crew_slug (NOT crew_id) and has
+      // no requisites columns — everything lives inside contract_defaults JSON.
+      // The old query returned a PostgREST error, data stayed null and the
+      // report header silently fell back to "Экипаж / — / —".
       const { data: secrets } = await supabaseAdmin
         .schema("private" as never)
         .from("crew_secrets")
-        .select("contract_defaults, organization_short, organization_name, inn, legal_address")
-        .eq("crew_id", slug)
+        .select("contract_defaults")
+        .eq("crew_slug", slug)
         .limit(1)
         .maybeSingle();
       const cdRaw = (secrets as { contract_defaults?: unknown | null } | null)?.contract_defaults;
@@ -868,10 +925,10 @@ export async function generateSubrenterWeeklyReportAction(
       if (typeof cdRaw === "string") { try { cd = JSON.parse(cdRaw); } catch { cd = {}; } }
       else if (cdRaw && typeof cdRaw === "object") cd = cdRaw as Record<string, string>;
       orgVars = {
-        organization_name: (secrets as { organization_name?: string | null } | null)?.organization_name || cd.organizationName || orgVars.organization_name,
-        organization_short: (secrets as { organization_short?: string | null } | null)?.organization_short || cd.organizationShort || orgVars.organization_short,
-        inn: (secrets as { inn?: string | null } | null)?.inn || cd.inn || orgVars.inn,
-        legal_address: (secrets as { legal_address?: string | null } | null)?.legal_address || cd.legalAddress || orgVars.legal_address,
+        organization_name: cd.organizationName || orgVars.organization_name,
+        organization_short: cd.organizationShort || orgVars.organization_short,
+        inn: cd.inn || orgVars.inn,
+        legal_address: cd.legalAddress || orgVars.legal_address,
         issuer_representative: cd.issuerRepresentative || cd.organizationRepresentative || cd.issuerName || orgVars.issuer_representative,
         payment_deadline_days: cd.payment_deadline_days || orgVars.payment_deadline_days,
       };

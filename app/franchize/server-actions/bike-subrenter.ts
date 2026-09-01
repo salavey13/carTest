@@ -16,6 +16,7 @@
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
+import { resolveServerActorUserId } from "./shared/auth-helpers";
 import {
   buildSubrenterUserLabel,
   buildUserSearchOrExpression,
@@ -85,6 +86,7 @@ const inputSchema = z.object({
   bikeId: z.string().trim().min(1),
   /** Telegram chat id of the subrenter, or "" / null to clear. */
   subrenterChatId: z.string().trim().max(24).nullable(),
+  initData: z.string().trim().optional(),
 });
 
 /**
@@ -156,6 +158,7 @@ export async function setBikeSubrenterAction(input: {
   actorUserId: string;
   bikeId: string;
   subrenterChatId: string | null;
+  initData?: string;
 }): Promise<{
   success: boolean;
   error?: string;
@@ -168,7 +171,14 @@ export async function setBikeSubrenterAction(input: {
   if (!parsed.success) {
     return { success: false, error: "Некорректный запрос." };
   }
-  const { slug, actorUserId, bikeId, subrenterChatId } = parsed.data;
+  const { slug, bikeId, subrenterChatId } = parsed.data;
+  // SA-002 fix: the actor must be verified server-side (signed cookie or
+  // Telegram-signed initData) — a client-claimed id could be anyone.
+  const actorUserId = await resolveServerActorUserId({
+    claimedActorUserId: parsed.data.actorUserId,
+    initData: parsed.data.initData,
+  });
+  if (!actorUserId) return { success: false, error: "Не авторизовано." };
 
   try {
     // Resolve crew + bike (bike must belong to the crew)
@@ -329,10 +339,17 @@ export async function searchUsersForSubrenterAction(input: {
     slug: z.string().trim().min(1),
     actorUserId: z.string().trim().min(1),
     query: z.string().max(120),
+    initData: z.string().trim().optional(),
   }).safeParse(input);
   if (!parsed.success) return { success: false, error: "Некорректный запрос." };
-  const { slug, actorUserId } = parsed.data;
-
+  const { slug } = parsed.data;
+  // SA-002 fix: the actor must be verified server-side (signed cookie or
+  // Telegram-signed initData) — a client-claimed id could be anyone.
+  const actorUserId = await resolveServerActorUserId({
+    claimedActorUserId: parsed.data.actorUserId,
+    initData: parsed.data.initData,
+  });
+  if (!actorUserId) return { success: false, error: "Не авторизовано." };
   try {
     const query = normalizeSubrenterUserQuery(parsed.data.query);
     if (query.length < SUBRENTER_USER_SEARCH_MIN_LENGTH) {
@@ -376,6 +393,7 @@ export async function searchUsersForSubrenterAction(input: {
 export async function getCrewBikesSubrenterInfoAction(input: {
   slug: string;
   actorUserId: string;
+  initData?: string;
 }): Promise<{
   success: boolean;
   data?: Array<{
@@ -390,9 +408,17 @@ export async function getCrewBikesSubrenterInfoAction(input: {
   const parsed = z.object({
     slug: z.string().trim().min(1),
     actorUserId: z.string().trim().min(1),
+    initData: z.string().trim().optional(),
   }).safeParse(input);
   if (!parsed.success) return { success: false, error: "Некорректный запрос." };
-  const { slug, actorUserId } = parsed.data;
+  const { slug } = parsed.data;
+  // SA-002 fix: the actor must be verified server-side (signed cookie or
+  // Telegram-signed initData) — a client-claimed id could be anyone.
+  const actorUserId = await resolveServerActorUserId({
+    claimedActorUserId: parsed.data.actorUserId,
+    initData: parsed.data.initData,
+  });
+  if (!actorUserId) return { success: false, error: "Не авторизовано." };
 
   try {
     const { data: crew } = await supabaseAdmin

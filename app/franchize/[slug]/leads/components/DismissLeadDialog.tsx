@@ -20,6 +20,8 @@ interface Props {
   T: ThemeTokens;
   onSubmit: (reason: string, note: string) => void;
   onCancel: () => void;
+  /** m4 fix: true while the dismissal is in flight — disables the submit. */
+  submitting?: boolean;
 }
 
 /**
@@ -40,9 +42,35 @@ interface Props {
  * z-index: z-[60] — above the mobile sheet (z-50) and drawer (z-40), below
  * toasts (z-[70]).
  */
-export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }: Props) {
+export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel, submitting = false }: Props) {
   const [reason, setReason] = useState(reasons[0]?.value || "");
   const [note, setNote] = useState("");
+
+  useEffect(() => {
+    // m3 fix: while this dialog is mounted, mark the body so the sheet's
+    // window-level ESC handler ignores the key and ESC closes THE DIALOG
+    // first instead of the sheet underneath.
+    if (open) {
+      document.body.setAttribute("data-modal-open", "true");
+      document.body.setAttribute("data-dismiss-dialog-open", "true");
+    }
+    return () => {
+      document.body.removeAttribute("data-modal-open");
+      document.body.removeAttribute("data-dismiss-dialog-open");
+    };
+  }, [open]);
+
+  // ESC closes this dialog (submitting stays blocked by canSubmit guard).
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      e.preventDefault(); // keep the sheet's own handler from also firing
+      if (!submitting) onCancel();
+    };
+    window.addEventListener("keydown", handler, true); // capture — runs first
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [open, onCancel, submitting]);
 
   useEffect(() => {
     if (open) {
@@ -53,7 +81,7 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
 
   const selected = reasons.find((r) => r.value === reason);
   const requiresNote = selected?.requiresNote ?? false;
-  const canSubmit = !!reason && (!requiresNote || note.trim().length > 0);
+  const canSubmit = !!reason && (!requiresNote || note.trim().length > 0) && !submitting;
 
   if (!lead) return null;
 
@@ -232,7 +260,7 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel }
                 className="min-h-[44px] cursor-pointer rounded-2xl px-5 py-3 text-sm font-semibold transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
                 style={{ background: "#ef4444", color: T.accentContrast }}
               >
-                Закрыть лид
+                {submitting ? "Закрываю…" : "Закрыть лид"}
               </button>
             </div>
           </motion.div>

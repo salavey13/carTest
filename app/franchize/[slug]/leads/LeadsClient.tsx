@@ -18,6 +18,7 @@ import { LeadDetailSheet } from "./components/LeadDetailSheet";
 import type { LeadDrawerNote } from "./components/LeadDetailDrawer";
 import { getLeadNotes, createLeadNote } from "@/app/franchize/server-actions/lead-notes";
 import { notifyLeadViaTelegram } from "@/app/franchize/server-actions/lead-notify";
+import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { EmptyState } from "./components/EmptyState";
 import { LeadDetailContent } from "./components/LeadDetailContent";
 import { DismissLeadDialog, type DismissReason } from "./components/DismissLeadDialog";
@@ -99,6 +100,8 @@ export function LeadsClient({
   // Writable leads state — starts empty (page.tsx passes []), fetched client-side after auth
   const [leadsState, setLeadsState] = useState(leads);
   const [todosState, setTodosState] = useState(todos);
+  /** m4 fix: notify is a server-side Telegram send — dedupe double taps. */
+  const [notifyBusy, setNotifyBusy] = useState(false);
   const leadsFetchedRef = useRef(false);
 
   // ── Lead detail sheet state (2026-09-01 sheet overhaul) ──
@@ -347,9 +350,11 @@ export function LeadsClient({
   };
 
   // Confirm + execute the dismissal — called by DismissLeadDialog onSubmit.
+  const [dismissBusy, setDismissBusy] = useState(false);
   const confirmDismissLead = async (reason: string, note: string) => {
     const leadId = dismissTarget?.user_id;
-    if (!leadId) return;
+    if (!leadId || dismissBusy) return; // m4 fix: no double-fire on the DELETE
+    setDismissBusy(true);
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (dbUser?.user_id) {
@@ -385,6 +390,8 @@ export function LeadsClient({
       router.refresh();
     } catch (e) {
       alert("Ошибка сети.");
+    } finally {
+      setDismissBusy(false);
     }
   };
 
@@ -411,12 +418,14 @@ export function LeadsClient({
           setNotesState(res.data.map((n) => ({
             id: n.id, text: n.text, created_at: n.created_at, created_by: n.created_by,
           })));
+          // m6 fix: only mark the lead as "notes loaded" on success — a failed
+          // fetch used to be cached as an empty result with no retry path.
+          setNotesLeadId(selectedId);
         }
         // Notes are optional enrichment — silent on failure.
       } catch { /* silent */ }
       finally {
         if (!cancelled) {
-          setNotesLeadId(selectedId);
           setNotesLoading(false);
         }
       }
@@ -458,9 +467,22 @@ export function LeadsClient({
           showToast("У лида нет Telegram — уведомить нельзя");
           break;
         }
+        if (notifyBusy) break; // m4 fix: no double-fire — duplicate TG messages
+        setNotifyBusy(true);
         showToast("Отправляем уведомление…", 1200);
-        const res = await notifyLeadViaTelegram({ slug, chatId: lead.telegramChatId });
-        showToast(res.success ? "Уведомление отправлено" : (res.error || "Ошибка отправки"));
+        try {
+          const res = await notifyLeadViaTelegram({
+            slug,
+            chatId: lead.telegramChatId,
+            bikeTitle: lead.bikeTitle ?? undefined,
+            initData: getTelegramInitData(),
+          });
+          showToast(res.success ? "Уведомление отправлено" : (res.error || "Ошибка отправки"));
+        } catch {
+          showToast("Ошибка отправки — нет связи");
+        } finally {
+          setNotifyBusy(false);
+        }
         break;
       }
       case "resend_qr": {
@@ -506,6 +528,24 @@ export function LeadsClient({
       showToast("Ошибка сети при создании задачи");
     }
   }, [selectedId, leadsState, crewId, slug, authHeaders, showToast]);
+
+  // ── Sheet document checklist buttons (M2 fix: were dead — no handler).
+  // Declared AFTER handleCreateTodo (it calls it). ──
+  const handleDocumentAction = useCallback(async (docKey: string, action: "open" | "request") => {
+    const lead = selectedId ? leadsState.find((l) => l.user_id === selectedId) : null;
+    const rental = lead?.rentals?.[0];
+    if (!rental) {
+      showToast("У лида пока нет аренды");
+      return;
+    }
+    if (action === "open") {
+      // The rental page is where the doc photos are viewable.
+      router.push(`/franchize/${slug}/rental/${encodeURIComponent(rental.rentalId)}`);
+      return;
+    }
+    const docName = docKey === "licence_front" ? "ВУ" : docKey === "passport_registration" ? "паспорт (прописка)" : "паспорт";
+    await handleCreateTodo(`Запросить фото: ${docName}`);
+  }, [selectedId, leadsState, router, slug, handleCreateTodo, showToast]);
 
   const handleToggleTodo = useCallback(async (todoId: string) => {
     const current = todosState.find((t) => t.id === todoId);
@@ -560,6 +600,9 @@ export function LeadsClient({
         leadId: lead.user_id,
         crewId,
         text: text.trim(),
+        // m5 fix: store the author so the sheet shows a real name instead of
+        // «Аноним» for every entry.
+        createdBy: dbUser?.user_id || passwordAuthOwnerId || undefined,
         actorUserId: dbUser?.user_id || undefined,
         isPasswordAuth: passwordAuthed,
       });
@@ -574,7 +617,7 @@ export function LeadsClient({
     } catch {
       showToast("Ошибка сети при сохранении заметки");
     }
-  }, [selectedId, leadsState, crewId, dbUser?.user_id, passwordAuthed, showToast]);
+  }, [selectedId, leadsState, crewId, dbUser?.user_id, passwordAuthOwnerId, passwordAuthed, showToast]);
 
   // Password gate render — only show if NOT in Telegram AND no dbUser AND not password-authed
   if (shouldShowPassword && !passwordAuthed) {
@@ -617,7 +660,7 @@ export function LeadsClient({
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
-      <LeadsKPICards leads={activeLeads} hot={hot} verified={verified} todos={todos} T={T} />
+      <LeadsKPICards leads={activeLeads} hot={hot} verified={verified} todos={todosState} T={T} />
 
       {/* Load-error banner — silent empty pages were the #1 desktop-web-Telegram
           complaint. Shows the actual server error + manual retry. The loading
@@ -736,11 +779,13 @@ export function LeadsClient({
               T={T}
               onClose={() => setSelectedId(null)}
               onAction={handleSheetAction}
+              onDocumentAction={handleDocumentAction}
               onCreateTodo={handleCreateTodo}
               onToggleTodo={handleToggleTodo}
               onDeleteTodo={handleDeleteTodo}
               onAddNote={handleAddNote}
               onDismissLead={() => handleDismissLead(selectedLead.user_id)}
+              notifyBusy={notifyBusy}
               asSheetChild
             />
           </LeadDetailSheet>
@@ -770,6 +815,7 @@ export function LeadsClient({
         T={T}
         onSubmit={confirmDismissLead}
         onCancel={() => setDismissTarget(null)}
+        submitting={dismissBusy}
       />
     </div>
   );

@@ -26,6 +26,7 @@ import {
   type SubrentersMonthlyPayoutsData,
 } from "@/app/franchize/server-actions/subrenter-monitoring";
 import { addOwnerCashEntryAction } from "@/app/franchize/server-actions/owner-cash";
+import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { currentMskMonthKey } from "@/app/franchize/lib/subrenter-economics";
 import { formatCurrency, monthLabel, itemVariants, type CrewTokens, type SpaNavigate } from "./profile-shared";
 
@@ -53,11 +54,15 @@ export function SubrentersOverviewPanel({
   const [payouts, setPayouts] = useState<SubrentersMonthlyPayoutsData | null>(null);
   const [payoutsLoading, setPayoutsLoading] = useState(false);
   const [payoutRecordBusy, setPayoutRecordBusy] = useState<string | null>(null);
+  // m3 fix: bump after each recorded payout so the sheet refetches and shows
+  // the up-to-date "к выплате" remainder (previously the full amount stayed
+  // tappable, inviting duplicate payout entries).
+  const [payoutsVersion, setPayoutsVersion] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setPayoutsLoading(true);
-    getSubrentersMonthlyPayoutsAction({ slug, actorUserId: userId, month: payoutsMonth })
+    getSubrentersMonthlyPayoutsAction({ slug, actorUserId: userId, month: payoutsMonth, initData: getTelegramInitData() })
       .then((res) => {
         if (!cancelled && res.success && res.data) setPayouts(res.data);
       })
@@ -68,7 +73,7 @@ export function SubrentersOverviewPanel({
     return () => {
       cancelled = true;
     };
-  }, [slug, userId, payoutsMonth]);
+  }, [slug, userId, payoutsMonth, payoutsVersion]);
 
   // iter31: month payouts indexed by partner chat id → inline chips on cards.
   const payoutByChat = useMemo(() => {
@@ -95,13 +100,19 @@ export function SubrentersOverviewPanel({
         amount: amountRub,
         title: "Выплата субарендатору",
         person: name,
+        initData: getTelegramInitData(),
       });
       if (res.success) {
         toast.success(`Выплата ${name} записана в кошелёк`);
+        // m3 fix: refetch the payout sheet (and the wallet via the callback)
+        // right after a write so both views reflect fresh data immediately.
+        setPayoutsVersion((v) => v + 1);
         onPayoutRecorded?.();
       } else {
         toast.error(res.error || "Не удалось записать выплату");
       }
+    } catch {
+      toast.error("Не удалось записать выплату — нет связи.");
     } finally {
       setPayoutRecordBusy(null);
     }
@@ -160,7 +171,7 @@ export function SubrentersOverviewPanel({
               </div>
               <div className="mt-3 space-y-1.5">
                 {payouts.rows.map((row) => {
-                  const displayName = row.name || (row.username ? `@${row.username}` : `id ${row.chatId}`);
+                  const displayName = row.name || (row.username ? `@${row.username.replace(/^@+/, "")}` : `id ${row.chatId}`);
                   return (
                     <div
                       key={row.chatId}
@@ -206,7 +217,7 @@ export function SubrentersOverviewPanel({
         {/* Partner cards */}
         <div className="mt-3 space-y-2">
           {rows.map((s) => {
-            const displayName = s.name || (s.username ? `@${s.username}` : `id ${s.chatId}`);
+            const displayName = s.name || (s.username ? `@${s.username.replace(/^@+/, "")}` : `id ${s.chatId}`);
             const monthPayout = payoutByChat.get(s.chatId);
             return (
               <div key={s.chatId} className="rounded-xl border p-3" style={T.styles.card}>
@@ -216,12 +227,13 @@ export function SubrentersOverviewPanel({
                       {displayName}
                     </span>
                     <span className="hidden text-[11px] sm:inline" style={{ color: T.textMuted }}>
-                      {s.username ? `@${s.username} · ` : ""}id {s.chatId}
+                      {s.username ? `@${s.username.replace(/^@+/, "")} · ` : ""}id {s.chatId}
                     </span>
-                    {/* iter31: TG contact — t.me link when username known. */}
+                    {/* iter31: TG contact — t.me link when username known.
+                        n1 fix: strip stray leading @ (legacy/manual rows). */}
                     {s.username ? (
                       <a
-                        href={`https://t.me/${s.username}`}
+                        href={`https://t.me/${s.username.replace(/^@+/, "")}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         title={`Написать ${displayName} в Telegram`}

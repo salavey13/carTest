@@ -10,6 +10,7 @@ import { useParams } from "next/navigation";
 import { Bike, ChevronLeft, ChevronRight, HandCoins, RefreshCw, Wrench } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { getBikesWallAction } from "@/app/franchize/server-actions/bike-wall";
+import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import type { BikeWallSummary } from "@/app/franchize/lib/bike-wall";
 import { formatMoney, monthLabelRu, monthLabelShort } from "@/app/franchize/lib/bike-wall";
 import { AnalyticsPasswordEntry } from "@/app/franchize/[slug]/rentals-analytics/analytics-components/AnalyticsPasswordEntry";
@@ -66,6 +67,7 @@ export function BikesWallClient({ initialSlug, crew }: BikesWallClientProps) {
         slug,
         actorUserId: getActorUserId() || undefined,
         isPasswordAuth: !!passwordAuthOwnerId,
+        initData: getTelegramInitData(),
         month,
       });
       if (result.success && result.data) {
@@ -96,7 +98,13 @@ export function BikesWallClient({ initialSlug, crew }: BikesWallClientProps) {
 
   const sortedBikes = useMemo(() => {
     const copy = [...bikes];
-    if (sortMode === "earned") copy.sort((a, b) => b.stats.earnedTotal - a.stats.earnedTotal);
+    if (sortMode === "earned") {
+      // m10 fix: when a month is selected, rank by THAT month's earnings —
+      // the cards show earnedThisMonth, so all-time ordering contradicted
+      // the numbers on screen.
+      const key = (s: BikeWallSummary["stats"]) => (month ? s.earnedThisMonth : s.earnedTotal);
+      copy.sort((a, b) => key(b.stats) - key(a.stats));
+    }
     else if (sortMode === "recent") {
       copy.sort((a, b) => {
         const at = Date.parse(a.stats.lastRentalAt || a.stats.lastServiceAt || "");
@@ -162,7 +170,11 @@ export function BikesWallClient({ initialSlug, crew }: BikesWallClientProps) {
         {/* month selector — [Всё время] ↔ [текущий] ↔ [прошлые месяцы] */}
         {(() => {
           const timeline: Array<string | null> = [null, ...availableMonths];
-          const index = month == null ? 0 : 1 + availableMonths.indexOf(month);
+          // n1 fix: if the selected key is not in availableMonths (e.g. the
+          // refetch narrowed the list), clamp to «Всё время» instead of
+          // desyncing the arrows from the label.
+          const rawIndex = month == null ? 0 : 1 + availableMonths.indexOf(month);
+          const index = rawIndex <= 0 ? 0 : Math.min(rawIndex, timeline.length - 1);
           const canBack = index < timeline.length - 1;
           const canForward = index > 0;
           const step = (delta: 1 | -1) => setMonth(timeline[Math.min(Math.max(index + delta, 0), timeline.length - 1)]);

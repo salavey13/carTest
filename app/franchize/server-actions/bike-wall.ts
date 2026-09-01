@@ -61,16 +61,84 @@ const WALL_EVENTS_CAP = 80;
 interface GateResult {
   ok: true;
   crewId: string;
+  /**
+   * Server-VERIFIED actor identity (cookie / signed initData / password-owner
+   * check). 2026-09-02 security fix: downstream scoping (subrenter bikes,
+   * partner lookups) must use this, never a client-claimed id that the gate
+   * did not authenticate.
+   */
+  actorUserId: string;
   /** empty = whole fleet; non-empty = subrenter scope (his bike ids only) */
   subrenterVehicleIds: string[];
+}
+
+/** Global admin — top-level columns first (iter8 pattern), metadata legacy second. */
+function isGlobalAdminRow(user: { role: string | null; status: string | null; metadata: Record<string, unknown> | null } | null): boolean {
+  const meta = user?.metadata as Record<string, unknown> | null;
+  return (
+    user?.role === "admin" ||
+    user?.role === "vprAdmin" ||
+    user?.status === "admin" ||
+    meta?.role === "admin" ||
+    meta?.status === "admin"
+  );
+}
+
+/**
+ * Identity + role resolution for one actor against one crew.
+ * Owner / global admin / ANY active membership → full fleet.
+ * Subrenter (specs.subrenter_chat_id) → his bikes only.
+ */
+async function accessForActor(params: {
+  actorUserId: string;
+  crewId: string;
+  ownerId: string;
+}): Promise<{ ok: true; subrenterVehicleIds: string[] } | { ok: false; error: string }> {
+  const { actorUserId, crewId, ownerId } = params;
+
+  const { data: user } = await supabaseAdmin
+    .from("users")
+    .select("role, status, metadata")
+    .eq("user_id", actorUserId)
+    .maybeSingle();
+
+  if (ownerId === actorUserId || isGlobalAdminRow(user ?? null)) {
+    return { ok: true, subrenterVehicleIds: [] };
+  }
+
+  // Any ACTIVE crew membership (admin / co_owner / member) → full fleet access.
+  const { data: membership } = await supabaseAdmin
+    .from("crew_members")
+    .select("user_id")
+    .eq("crew_id", crewId)
+    .eq("user_id", actorUserId)
+    .eq("membership_status", "active")
+    .maybeSingle();
+  if (membership) return { ok: true, subrenterVehicleIds: [] };
+
+  // Subrenter: only the bikes whose specs.subrenter_chat_id is his chat id.
+  const { data: subrentBikes } = await supabaseAdmin
+    .from("cars")
+    .select("id")
+    .eq("crew_id", crewId)
+    .eq("specs->>subrenter_chat_id", actorUserId);
+  const ids = (subrentBikes ?? []).map((b: { id: string }) => String(b.id));
+  if (ids.length === 0) return { ok: false, error: "Недостаточно прав для просмотра." };
+  return { ok: true, subrenterVehicleIds: ids };
 }
 
 async function resolveBikeWallAccess(params: {
   slug: string;
   actorUserId?: string;
   isPasswordAuth?: boolean;
+  /**
+   * Telegram WebApp initData (raw query string) — optional fallback for
+   * browsers that block the signed actor cookie. HMAC-verified against the
+   * bot token; the claimed actorUserId must match the signed user.
+   */
+  initData?: string;
 }): Promise<GateResult | { ok: false; error: string }> {
-  const { slug, actorUserId, isPasswordAuth = false } = params;
+  const { slug, actorUserId, isPasswordAuth = false, initData } = params;
 
   const { data: crew } = await supabaseAdmin
     .from("crews")
@@ -79,49 +147,71 @@ async function resolveBikeWallAccess(params: {
     .maybeSingle();
   if (!crew) return { ok: false, error: "Экипаж не найден." };
 
-  // Password analytics auth: full access.
-  if (isPasswordAuth) return { ok: true, crewId: crew.id, subrenterVehicleIds: [] };
+  // ── 2026-09-02 security fix (SA-001): the client-supplied isPasswordAuth
+  // boolean used to grant FULL fleet access with zero server-side validation —
+  // anyone could call the action with { isPasswordAuth: true } and read renter
+  // PII + signed photo URLs. Identity is now verified server-side, in order:
+  //   1. signed Telegram actor cookie,
+  //   2. signed initData fallback (HMAC-checked, actor must match),
+  //   3. password path — isPasswordAuth only unlocks when the claimed
+  //      actorUserId IS the crew owner / global admin (the id the password
+  //      gate issued), same model as the leads LA-001 fix.
+  const { cookies } = await import("next/headers");
+  const { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } = await import("@/lib/telegram-actor-cookie");
+  const cookieUserId = verifyTelegramActorCookieValue(
+    (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
+  );
 
-  if (!actorUserId) return { ok: false, error: "Не авторизовано." };
-
-  // Global admin — top-level columns first (iter8 pattern), metadata legacy second.
-  const { data: user } = await supabaseAdmin
-    .from("users")
-    .select("role, status, metadata, username")
-    .eq("user_id", actorUserId)
-    .maybeSingle();
-  const userMetadata = user?.metadata as Record<string, unknown> | null;
-  const isAdmin =
-    user?.role === "admin" ||
-    user?.role === "vprAdmin" ||
-    user?.status === "admin" ||
-    userMetadata?.role === "admin" ||
-    userMetadata?.status === "admin";
-  const isOrudjov = typeof user?.username === "string" && user.username.toLowerCase().includes("orud");
-
-  if (crew.owner_id === actorUserId || isAdmin || isOrudjov) {
-    return { ok: true, crewId: crew.id, subrenterVehicleIds: [] };
+  if (cookieUserId) {
+    const res = await accessForActor({ actorUserId: cookieUserId, crewId: crew.id, ownerId: crew.owner_id });
+    if (res.ok) return { ok: true, crewId: crew.id, actorUserId: cookieUserId, subrenterVehicleIds: res.subrenterVehicleIds };
+    // A valid cookie that is not allowed here should not silently fall through
+    // to weaker paths — the user IS authenticated, just not for this crew.
+    return { ok: false, error: res.error };
   }
 
-  // Any ACTIVE crew membership (admin / co_owner / member) → full fleet access.
-  const { data: membership } = await supabaseAdmin
-    .from("crew_members")
-    .select("user_id")
-    .eq("crew_id", crew.id)
-    .eq("user_id", actorUserId)
-    .eq("membership_status", "active")
-    .maybeSingle();
-  if (membership) return { ok: true, crewId: crew.id, subrenterVehicleIds: [] };
+  if (initData && actorUserId) {
+    try {
+      const { computeTelegramWebAppHash } = await import("@/lib/telegram-webapp-auth");
+      const botToken = process.env.TELEGRAM_BOT_TOKEN;
+      if (botToken) {
+        const validation = await computeTelegramWebAppHash(initData, botToken);
+        if (validation.isValid) {
+          const tgUserId = (() => {
+            try {
+              const userJson = new URLSearchParams(initData).get("user");
+              return userJson ? String((JSON.parse(userJson) as { id?: number | string }).id ?? "") : null;
+            } catch {
+              return null;
+            }
+          })();
+          if (tgUserId && tgUserId === String(actorUserId).trim()) {
+            const res = await accessForActor({ actorUserId: tgUserId, crewId: crew.id, ownerId: crew.owner_id });
+            if (res.ok) return { ok: true, crewId: crew.id, actorUserId: tgUserId, subrenterVehicleIds: res.subrenterVehicleIds };
+            return { ok: false, error: res.error };
+          }
+        }
+      }
+    } catch (err) {
+      logger.warn("[resolveBikeWallAccess] initData fallback failed:", err instanceof Error ? err.message : String(err));
+    }
+  }
 
-  // Subrenter: only the bikes whose specs.subrenter_chat_id is his chat id.
-  const { data: subrentBikes } = await supabaseAdmin
-    .from("cars")
-    .select("id")
-    .eq("crew_id", crew.id)
-    .eq("specs->>subrenter_chat_id", actorUserId);
-  const ids = (subrentBikes ?? []).map((b: { id: string }) => String(b.id));
-  if (ids.length === 0) return { ok: false, error: "Недостаточно прав для просмотра." };
-  return { ok: true, crewId: crew.id, subrenterVehicleIds: ids };
+  // Password analytics path: the flag alone grants nothing — the claimed
+  // actorUserId must actually be this crew's owner (or a global admin).
+  if (isPasswordAuth && actorUserId) {
+    const { data: actorUser } = await supabaseAdmin
+      .from("users")
+      .select("role, status, metadata")
+      .eq("user_id", actorUserId)
+      .maybeSingle();
+    if (crew.owner_id === actorUserId || isGlobalAdminRow(actorUser ?? null)) {
+      return { ok: true, crewId: crew.id, actorUserId, subrenterVehicleIds: [] };
+    }
+    return { ok: false, error: "Недостаточно прав для просмотра." };
+  }
+
+  return { ok: false, error: "Не авторизовано." };
 }
 
 // ── bike row → wall summary ──────────────────────────────────────────────────
@@ -245,6 +335,8 @@ export async function getBikesWallAction(params: {
   slug: string;
   actorUserId?: string;
   isPasswordAuth?: boolean;
+  /** Telegram WebApp initData — HMAC-verified fallback when the actor cookie is blocked. */
+  initData?: string;
   /** "YYYY-MM" (MSK) — scope the per-bike month tile + fleet month total. */
   month?: string | null;
 }): Promise<{
@@ -362,6 +454,8 @@ export async function getBikeStoryAction(params: {
   bikeId: string;
   actorUserId?: string;
   isPasswordAuth?: boolean;
+  /** Telegram WebApp initData — HMAC-verified fallback when the actor cookie is blocked. */
+  initData?: string;
   /**
    * "YYYY-MM" (MSK) — when set, the wall shows only that month's events and
    * the month KPI is scoped to it (2026-09-01: month selector request).

@@ -154,8 +154,11 @@ describe("iter27: cancelled exclusions across all aggregation surfaces (source g
     // both counter loops guard on the cancelled status (owned-bikes filter + overview stats loop)
     expect(src).toContain('String(r.status ?? "") !== "cancelled")');
     expect(src).toContain('if (String(r.status ?? "") === "cancelled") continue;');
-    // monthly payout queries keep the SQL-level exclusion
-    expect(src.match(/\.neq\("status", "cancelled"\)/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    // monthly payout queries keep the SQL-level exclusion — 2026-09-02 (M4):
+    // the payout sheet + weekly report now use the STRICTER earning-status
+    // filter (expired/disputed rows never earn), matching the wall's rule.
+    expect(src.match(/\.in\("status", \["completed", "active", "confirmed", "pending_confirmation"\]\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(src.match(/\.neq\("status", "cancelled"\)/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
   });
 
   it("admin «successful rentals» uses an explicit status whitelist", () => {

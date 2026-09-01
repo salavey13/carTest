@@ -13,6 +13,7 @@ import { RefreshCw, Search, Send, UserRound, History } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
+import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import {
   getCrewBikesSubrenterInfoAction,
   searchUsersForSubrenterAction,
@@ -137,6 +138,7 @@ export function SubrenterManagerPanel({
         // reliably. The docx still comes back as base64 (unused fallback).
         sendToPartner: mode === "send",
         sendToSelf: mode === "self",
+        initData: getTelegramInitData(),
       });
       if (!result.success || !result.docBase64) {
         toast.error(`Отчёт не сформирован — ${result.error ?? "неизвестная ошибка"}`);
@@ -190,7 +192,7 @@ export function SubrenterManagerPanel({
         setLoadError("Пользователь ещё авторизуется — нажмите «Обновить».");
         return;
       }
-      const result = await getCrewBikesSubrenterInfoAction({ slug, actorUserId: userId });
+      const result = await getCrewBikesSubrenterInfoAction({ slug, actorUserId: userId, initData: getTelegramInitData() });
       if (result.success && result.data) {
         setBikes(result.data);
         setDrafts(Object.fromEntries(result.data.map((b) => [b.bikeId, b.subrenterChatId ?? ""])));
@@ -245,7 +247,7 @@ export function SubrenterManagerPanel({
           setPickerResults([]);
           return;
         }
-        const res = await searchUsersForSubrenterAction({ slug, actorUserId: userId, query: q });
+        const res = await searchUsersForSubrenterAction({ slug, actorUserId: userId, query: q, initData: getTelegramInitData() });
         if (seq !== pickerSeq.current) return; // stale response — a newer search won
         if (res.success && res.data) {
           setPickerResults(res.data);
@@ -299,7 +301,7 @@ export function SubrenterManagerPanel({
       try {
         const userId = await waitForUserId();
         if (!userId || seq !== inlineSeq.current) return;
-        const res = await searchUsersForSubrenterAction({ slug, actorUserId: userId, query: query.trim() });
+        const res = await searchUsersForSubrenterAction({ slug, actorUserId: userId, query: query.trim(), initData: getTelegramInitData() });
         if (seq !== inlineSeq.current) return;
         setInlineResults(res.success && res.data ? res.data : []);
       } catch {
@@ -346,7 +348,7 @@ export function SubrenterManagerPanel({
     let resolvedUser: SubrenterUserCandidate | null = null;
     if (rawValue && !/^\d+$/.test(rawValue)) {
       try {
-        const res = await searchUsersForSubrenterAction({ slug, actorUserId: userId, query: rawValue });
+        const res = await searchUsersForSubrenterAction({ slug, actorUserId: userId, query: rawValue, initData: getTelegramInitData() });
         const candidates = res.success && res.data ? res.data : [];
         resolvedUser = findExactSubrenterUserCandidate(candidates, rawValue);
         if (!resolvedUser) {
@@ -374,6 +376,7 @@ export function SubrenterManagerPanel({
         actorUserId: userId,
         bikeId,
         subrenterChatId: value || null,
+        initData: getTelegramInitData(),
       });
       if (result.success) {
         toast.success(

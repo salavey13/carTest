@@ -13,7 +13,6 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
-import { FranchizeOperatorPanel } from "@/app/franchize/components/FranchizeOperatorSurface";
 
 export type CrewTokens = ReturnType<typeof useCrewTokens>;
 
@@ -96,20 +95,9 @@ export function isLiveRentalStatus(status: string): boolean {
 
 // ── atoms ────────────────────────────────────────────────────────────────────
 
-/** Standard panel wrapper: staggered fade-in + operator surface panel. */
-export function PanelSection({
-  children,
-  muted,
-}: {
-  children: React.ReactNode;
-  muted?: boolean;
-}) {
-  return (
-    <motion.div variants={itemVariants}>
-      <FranchizeOperatorPanel muted={muted}>{children}</FranchizeOperatorPanel>
-    </motion.div>
-  );
-}
+// m7 (iter32 review): the old `PanelSection` wrapper was removed — it was
+// exported but never used; each panel composes motion.div + FranchizeOperatorPanel
+// directly (kept inline so per-panel props like muted stay explicit).
 
 // Loading skeleton component
 export function ProfileSkeleton() {

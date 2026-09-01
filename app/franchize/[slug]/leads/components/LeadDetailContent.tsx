@@ -35,11 +35,17 @@ interface Props {
   T: ThemeTokens;
   onClose: () => void;
   onAction: (action: string) => void;
+  /** M2 fix: "Открыть" → rental page (photos live there); "Запросить" →
+   *  creates a follow-up todo. Previously the buttons rendered but did
+   *  nothing (onAction was never attached). */
+  onDocumentAction: (docKey: string, action: "open" | "request") => void;
   onCreateTodo: (title: string) => void;
   onToggleTodo: (id: string) => void;
   onDeleteTodo: (id: string) => void;
   onAddNote: (text: string) => void;
   onDismissLead: () => void;
+  /** m4 fix: true while a Telegram notify is in flight — disables the button. */
+  notifyBusy?: boolean;
   /** When true, render as the inner content of a parent sheet (no backdrop). */
   asSheetChild?: boolean;
 }
@@ -67,11 +73,13 @@ export function LeadDetailContent({
   T,
   onClose,
   onAction,
+  onDocumentAction,
   onCreateTodo,
   onToggleTodo,
   onDeleteTodo,
   onAddNote,
   onDismissLead,
+  notifyBusy = false,
   asSheetChild = false,
 }: Props) {
   // NOTE: We CANNOT early-return before hooks (React rules-of-hooks).
@@ -122,11 +130,11 @@ export function LeadDetailContent({
   // ── 4. Build documents checklist from the first rental ──
   const docs: DocumentItem[] = useMemo(() => {
     try {
-      return buildDocuments(enrichedLead);
+      return buildDocuments(enrichedLead, onDocumentAction);
     } catch {
       return [];
     }
-  }, [enrichedLead]);
+  }, [enrichedLead, onDocumentAction]);
 
   // ── 5. Cast todos to DrawerTodo (adds optional due_date) ──
   // LeadTodoRow now includes due_date — no cast needed
@@ -162,6 +170,7 @@ export function LeadDetailContent({
       onDeleteTodo={onDeleteTodo}
       onAddNote={onAddNote}
       onDismissLead={onDismissLead}
+      notifyBusy={notifyBusy}
       asSheetChild={asSheetChild}
     />
   );
@@ -176,7 +185,10 @@ export function LeadDetailContent({
  * FIX: was only checking photo paths — but verification deletes photos (152-ФЗ compliance),
  * so verified docs showed as "missing". Now checks checklist flags first.
  */
-function buildDocuments(lead: LeadRow): DocumentItem[] {
+function buildDocuments(
+  lead: LeadRow,
+  onDocumentAction: (docKey: string, action: "open" | "request") => void,
+): DocumentItem[] {
   const rental = lead.rentals[0];
   if (!rental) return [];
 
@@ -195,18 +207,21 @@ function buildDocuments(lead: LeadRow): DocumentItem[] {
       name: "Паспорт — основная страница",
       status: (passportVerified || isActivated || rental.passportMainpagePhoto) ? "verified" : "missing",
       actionLabel: rental.passportMainpagePhoto ? "Открыть" : (passportVerified || isActivated ? "" : "Запросить"),
+      onAction: () => onDocumentAction("passport_main", rental.passportMainpagePhoto ? "open" : "request"),
     },
     {
       key: "passport_registration",
       name: "Паспорт — прописка",
       status: (passportVerified || isActivated || rental.passportRegistrationPhoto) ? "verified" : "missing",
       actionLabel: rental.passportRegistrationPhoto ? "Открыть" : (passportVerified || isActivated ? "" : "Запросить"),
+      onAction: () => onDocumentAction("passport_registration", rental.passportRegistrationPhoto ? "open" : "request"),
     },
     {
       key: "licence_front",
       name: "Водительское удостоверение",
       status: (licenseVerified || isActivated || rental.driversLicenceFrontalPhoto) ? "verified" : "missing",
       actionLabel: rental.driversLicenceFrontalPhoto ? "Открыть" : (licenseVerified || isActivated ? "" : "Запросить"),
+      onAction: () => onDocumentAction("licence_front", rental.driversLicenceFrontalPhoto ? "open" : "request"),
     },
   ];
 

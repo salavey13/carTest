@@ -15,9 +15,23 @@ import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { canManageSubrenters } from "./bike-subrenter";
+import { resolveServerActorUserId } from "./shared/auth-helpers";
 
 export type OwnerCashDirection = "in" | "out";
 export type OwnerCashKind = "personal" | "subrenter_payout" | "other";
+
+/**
+ * Today's date (YYYY-MM-DD) in MSK — the crew operates on Moscow time, and a
+ * UTC server would otherwise date 00:00–02:59 MSK entries to "yesterday".
+ */
+function todayMskIsoDate(): string {
+  return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/** Current month key (YYYY-MM) in MSK. */
+function currentMskMonthKey(): string {
+  return todayMskIsoDate().slice(0, 7);
+}
 
 export interface OwnerCashEntry {
   id: string;
@@ -65,6 +79,7 @@ export async function getOwnerCashMonthAction(input: {
   slug: string;
   actorUserId: string;
   month?: string;
+  initData?: string;
 }): Promise<{ success: boolean; data?: OwnerCashMonthData; error?: string }> {
   const parsed = z
     .object({
@@ -75,14 +90,20 @@ export async function getOwnerCashMonthAction(input: {
         .trim()
         .regex(/^\d{4}-\d{2}$/, "YYYY-MM")
         .optional(),
+      initData: z.string().trim().optional(),
     })
     .safeParse(input);
   if (!parsed.success) return { success: false, error: "Некорректный запрос." };
-  const { slug, actorUserId } = parsed.data;
-  const now = new Date();
-  const month =
-    parsed.data.month ||
-    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const { slug, month, initData } = parsed.data;
+  // SA-002 fix: the actor must be verified server-side (cookie / signed initData) —
+  // the claimed id alone could be anyone (e.g. the owner) and the permission
+  // check below would happily pass.
+  const actorUserId = await resolveServerActorUserId({
+    claimedActorUserId: parsed.data.actorUserId,
+    initData,
+  });
+  if (!actorUserId) return { success: false, error: "Не авторизовано." };
+  const monthKey = month || currentMskMonthKey();
 
   try {
     const crew = await resolveCrew(slug);
@@ -90,7 +111,7 @@ export async function getOwnerCashMonthAction(input: {
     const allowed = await canManageSubrenters(crew.id, crew.owner_id, actorUserId);
     if (!allowed) return { success: false, error: "Недостаточно прав." };
 
-    const { from, to } = monthWindow(month);
+    const { from, to } = monthWindow(monthKey);
     const { data: rows, error } = await supabaseAdmin
       .from("owner_cash_entries")
       .select("id,direction,kind,amount,title,person,entry_date,created_at")
@@ -130,7 +151,7 @@ export async function getOwnerCashMonthAction(input: {
 
     return {
       success: true,
-      data: { month, entries, totalIn, totalOut, totalPayouts, net: totalIn - totalOut },
+      data: { month: monthKey, entries, totalIn, totalOut, totalPayouts, net: totalIn - totalOut },
     };
   } catch (error) {
     logger.warn("[getOwnerCashMonthAction] failed:", error);
@@ -152,6 +173,7 @@ const addSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD")
     .optional(),
   source: z.enum(["manual", "assistant_bot", "profile", "api"]).optional(),
+  initData: z.string().trim().optional(),
 });
 
 /** Добавить запись в кошелёк владельца. */
@@ -164,8 +186,15 @@ export async function addOwnerCashEntryAction(input: unknown): Promise<{
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message || "Некорректные данные." };
   }
-  const { slug, actorUserId, direction, amount, title, person, kind, entryDate, source } =
+  const { slug, direction, amount, title, person, kind, entryDate, source, initData } =
     parsed.data;
+  // SA-002 fix: verify the actor server-side — a forged owner id must not be
+  // able to write into the owner's money ledger.
+  const actorUserId = await resolveServerActorUserId({
+    claimedActorUserId: parsed.data.actorUserId,
+    initData,
+  });
+  if (!actorUserId) return { success: false, error: "Не авторизовано." };
 
   try {
     const crew = await resolveCrew(slug);
@@ -183,7 +212,7 @@ export async function addOwnerCashEntryAction(input: unknown): Promise<{
         amount,
         title,
         person: person || null,
-        entry_date: entryDate || new Date().toISOString().slice(0, 10),
+        entry_date: entryDate || todayMskIsoDate(),
         created_by: actorUserId,
         source: source || "profile",
       })
@@ -202,16 +231,24 @@ export async function deleteOwnerCashEntryAction(input: {
   slug: string;
   actorUserId: string;
   id: string;
+  initData?: string;
 }): Promise<{ success: boolean; error?: string }> {
   const parsed = z
     .object({
       slug: z.string().trim().min(1),
       actorUserId: z.string().trim().min(1),
       id: z.string().uuid(),
+      initData: z.string().trim().optional(),
     })
     .safeParse(input);
   if (!parsed.success) return { success: false, error: "Некорректный запрос." };
-  const { slug, actorUserId, id } = parsed.data;
+  const { slug, id, initData } = parsed.data;
+  // SA-002 fix: server-verified actor only.
+  const actorUserId = await resolveServerActorUserId({
+    claimedActorUserId: parsed.data.actorUserId,
+    initData,
+  });
+  if (!actorUserId) return { success: false, error: "Не авторизовано." };
 
   try {
     const crew = await resolveCrew(slug);

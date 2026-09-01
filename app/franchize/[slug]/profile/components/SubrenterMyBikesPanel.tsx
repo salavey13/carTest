@@ -17,6 +17,7 @@ import Link from "next/link";
 import { Bike, ChevronRight, Wallet } from "lucide-react";
 import { FranchizeOperatorPanel } from "@/app/franchize/components/FranchizeOperatorSurface";
 import { MonthPickerBar } from "@/app/franchize/components/FranchizeMonthPicker";
+import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import {
   getSubrenterMonthlyEarningsAction,
   type SubrenterOwnedBikesData,
@@ -60,7 +61,7 @@ export function SubrenterMyBikesPanel({
     if (!userId) return;
     let cancelled = false;
     setEarningsLoading(true);
-    getSubrenterMonthlyEarningsAction({ slug, userId, month })
+    getSubrenterMonthlyEarningsAction({ slug, userId, month, initData: getTelegramInitData() })
       .then((res) => {
         if (!cancelled && res.success && res.data) setEarnings(res.data);
       })

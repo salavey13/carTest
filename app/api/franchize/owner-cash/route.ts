@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/lib/supabase-server";
@@ -29,14 +30,22 @@ type OwnerCashBody = {
 
 function checkSecret(request: NextRequest): boolean {
   const expected = process.env.OWNER_CASH_SECRET;
+  // M3 fix: FAIL CLOSED. This is a money-ledger ingest — when the secret is
+  // missing we must refuse writes (the old warn-and-accept behavior let any
+  // caller plant arbitrary cash entries). Configure OWNER_CASH_SECRET to use
+  // the assistant path.
   if (!expected) {
-    logger.warn("[owner-cash] OWNER_CASH_SECRET is not set — accepting unauthenticated call");
-    return true;
+    logger.error("[owner-cash] OWNER_CASH_SECRET is not set — rejecting ingest (fail closed)");
+    return false;
   }
   const provided =
     request.nextUrl.searchParams.get("secret") ||
     request.headers.get("x-owner-cash-secret");
-  return provided === expected;
+  if (provided !== expected) return false;
+  // Constant-time re-check to avoid trivially timing the prefix.
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 export async function GET() {
@@ -71,12 +80,16 @@ export async function POST(request: NextRequest) {
     if (!Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json({ ok: false, error: "amount должен быть числом > 0" }, { status: 400 });
     }
+    // Same cap as the zod schema on the server-action path.
+    if (amount > 10_000_000) {
+      return NextResponse.json({ ok: false, error: "amount слишком большой" }, { status: 400 });
+    }
     if (!title) {
       return NextResponse.json({ ok: false, error: "title обязателен (за что/от кого)" }, { status: 400 });
     }
     const entryDate = /^\d{4}-\d{2}-\d{2}$/.test(body.entryDate || "")
       ? (body.entryDate as string)
-      : new Date().toISOString().slice(0, 10);
+      : new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10); // MSK
 
     const { data: crew } = await supabaseAdmin
       .from("crews")

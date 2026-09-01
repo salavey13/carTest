@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { getBikeStoryAction } from "@/app/franchize/server-actions/bike-wall";
+import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import {
   aspectStyle,
   coverPhoto,
@@ -90,6 +91,7 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
         bikeId,
         actorUserId: getActorUserId() || undefined,
         isPasswordAuth: !!passwordAuthOwnerId,
+        initData: getTelegramInitData(),
         month,
       });
       if (result.success && result.data) {
@@ -238,7 +240,7 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
                 ) : null}
                 {partner?.username ? (
                   <a
-                    href={`https://t.me/${partner.username}`}
+                    href={`https://t.me/${partner.username.replace(/^@+/, "")}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
@@ -276,7 +278,10 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
           «Вся история» (full wall). Bounds come from availableMonths. */}
       {(() => {
         const timeline: Array<string | null> = [null, ...availableMonths];
-        const index = month == null ? 0 : 1 + availableMonths.indexOf(month);
+        // n1 fix: clamp an out-of-list selected key to «Вся история» so the
+        // arrows never desync from the label after a refetch.
+        const rawIndex = month == null ? 0 : 1 + availableMonths.indexOf(month);
+        const index = rawIndex <= 0 ? 0 : Math.min(rawIndex, timeline.length - 1);
         const canBack = index < timeline.length - 1;
         const canForward = index > 0;
         const step = (delta: 1 | -1) => setMonth(timeline[Math.min(Math.max(index + delta, 0), timeline.length - 1)]);
@@ -336,7 +341,13 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
       {feed.length === 0 ? (
         <div className="rounded-2xl border p-8 text-center" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
           <CalendarDays className="mx-auto h-8 w-8" style={{ color: T.textFaint }} />
-          <p className="mt-3 text-sm" style={{ color: T.textMuted }}>История пуста — с этим мото ещё ничего не происходило.</p>
+          {/* n2 fix: month-aware message — «ничего не происходило» was misleading
+              when only the SELECTED month had no events. */}
+          <p className="mt-3 text-sm" style={{ color: T.textMuted }}>
+            {month
+              ? `В ${monthLabelRu(month)} событий не было — выберите другой месяц или «Вся история».`
+              : "История пуста — с этим мото ещё ничего не происходило."}
+          </p>
         </div>
       ) : (
         <div className="space-y-2.5">

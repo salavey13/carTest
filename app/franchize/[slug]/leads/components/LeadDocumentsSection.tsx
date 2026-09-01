@@ -212,7 +212,7 @@ export function LeadDocumentsSection({
                     color: T.accent,
                   }}
                 >
-                  Переслать QR
+                  Открыть аренду (QR)
                 </button>
               </div>
             </div>

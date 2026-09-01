@@ -23,7 +23,7 @@
 //   FormPrefillsPanel         — document & form prefills
 //   AchievementsPanel         — gamification grid
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -49,6 +49,7 @@ import {
 } from "@/app/franchize/actions";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
+import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import {
   getSubrenterOwnedBikesAction,
   getFranchizeSubrentersOverviewAction,
@@ -101,7 +102,7 @@ export function FranchizeProfileClient({
   initialCrew,
   initialSlug,
 }: FranchizeProfileClientProps) {
-  const { dbUser } = useAppContext();
+  const { dbUser, isLoading: authLoading } = useAppContext();
 
   // Apply franchize theme CSS variables for proper light/dark mode support
   useFranchizeTheme(initialCrew?.theme || fallbackCrew.theme);
@@ -153,11 +154,20 @@ export function FranchizeProfileClient({
 
   // Owner cash wallet («Кошелёк владельца») — personal money movements +
   // subrenter payouts, owner/admin only. null = нет прав / не загружено.
+  // 2026-09-02 fix (C1): visibility derives from the wallet fetch itself —
+  // the old sticky `ownerCashHidden` flag was set true on mount (overview
+  // still null) and never reset, so the panel could never render. Probing is
+  // gated on canOpenCloserDashboard so ordinary renters fire zero wallet calls.
   const [ownerCash, setOwnerCash] = useState<OwnerCashMonthData | null>(null);
-  const [ownerCashHidden, setOwnerCashHidden] = useState(false);
+  const [ownerCashDenied, setOwnerCashDenied] = useState(false);
   const [ownerCashMonth, setOwnerCashMonth] = useState(() => currentMskMonthKey());
   const [ownerCashLoading, setOwnerCashLoading] = useState(false);
   const [ownerCashBusy, setOwnerCashBusy] = useState(false);
+  // Stale-response guard: only the answer for the CURRENT month may land.
+  const ownerCashMonthRef = useRef(ownerCashMonth);
+  useEffect(() => {
+    ownerCashMonthRef.current = ownerCashMonth;
+  }, [ownerCashMonth]);
 
   // Pre-entered rental docs (passport/license) from private.user_rental_secrets
   const [docsPrefill, setDocsPrefill] = useState<RentalDocsPrefillState | null>(null);
@@ -166,71 +176,100 @@ export function FranchizeProfileClient({
 
   useEffect(() => {
     const run = async () => {
+      // 2026-09-02 fix: hold the skeleton while the Telegram session is still
+      // resolving — the early return used to flash an empty page, then load.
+      if (authLoading) return;
       if (!dbUser?.user_id) {
         setIsLoading(false);
         return;
       }
-      const result = await getFranchizeProfileBySlugAction({
-        slug,
-        userId: dbUser.user_id,
-      });
-      if (!result.success || !result.data) {
-        setError(result.error || "Не удалось загрузить франшизный профиль.");
-        setIsLoading(false);
-        return;
+      let cancelled = false;
+      try {
+        const result = await getFranchizeProfileBySlugAction({
+          slug,
+          userId: dbUser.user_id,
+        });
+        if (cancelled) return;
+        if (!result.success || !result.data) {
+          setError(result.error || "Не удалось загрузить франшизный профиль.");
+          return;
+        }
+        setProfile(result.data);
+        setCatalog(result.catalog || []);
+        const [digestRes, prefillRes, operatorAccessRes, rentalSecretsRes, docsRes, profileDocsRes, subrenterOwnedRes, subrentersOverviewRes] = await Promise.all([
+          getFranchizeActivityDigestAction({ slug, userId: dbUser.user_id }),
+          getFranchizeFormPrefillAction({ slug, userId: dbUser.user_id }),
+          getFranchizeOperatorDashboardAccess({ slug }),
+          getFranchizeUserRentalSecretsAction({ slug, userId: dbUser.user_id }),
+          getRentalDocsPrefillAction({ slug, userId: dbUser.user_id }),
+          getProfileDocsStatusAction({ slug, userId: dbUser.user_id }),
+          // Partner monitoring — never blocks the profile: failures are swallowed.
+          getSubrenterOwnedBikesAction({ slug, userId: dbUser.user_id, initData: getTelegramInitData() }).catch(() => null),
+          getFranchizeSubrentersOverviewAction({ slug, actorUserId: dbUser.user_id, initData: getTelegramInitData() }).catch(() => null),
+        ]);
+        if (cancelled) return;
+        if (digestRes.success && digestRes.data) setDigest(digestRes.data);
+        if (prefillRes.success && prefillRes.data) setPrefill(prefillRes.data);
+        if (rentalSecretsRes.success && rentalSecretsRes.data) setRentalSecrets(rentalSecretsRes.data);
+        if (docsRes.success && docsRes.data) setDocsPrefill(docsRes.data);
+        if (profileDocsRes.success && profileDocsRes.data) setProfileDocsStatus(profileDocsRes.data);
+        if (subrenterOwnedRes?.success && subrenterOwnedRes.data) setSubrenterOwned(subrenterOwnedRes.data);
+        if (subrentersOverviewRes?.success && subrentersOverviewRes.data) setSubrentersOverview(subrentersOverviewRes.data);
+        setCanOpenCloserDashboard(
+          Boolean(operatorAccessRes.success && operatorAccessRes.canOpen),
+        );
+        // 2026-09-02 fix: the achievement write used to be awaited BEFORE the
+        // first paint — it is a non-critical counter bump, so fire-and-forget.
+        void grantFranchizeAchievementAction({
+          slug,
+          userId: dbUser.user_id,
+          achievementId: "franchize_profile_opened",
+          source: "web:franchize_profile",
+          context: { path: `/franchize/${slug}/profile` },
+          incrementCounters: { profileOpenCount: 1 },
+        }).catch(() => undefined);
+      } catch (err) {
+        // M1 fix: a thrown server action used to leave the skeleton forever.
+        console.error("[FranchizeProfileClient] master load failed:", err);
+        setError("Не удалось загрузить профиль. Попробуйте обновить страницу.");
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
-      setProfile(result.data);
-      setCatalog(result.catalog || []);
-      const [digestRes, prefillRes, operatorAccessRes, rentalSecretsRes, docsRes, profileDocsRes, subrenterOwnedRes, subrentersOverviewRes] = await Promise.all([
-        getFranchizeActivityDigestAction({ slug, userId: dbUser.user_id }),
-        getFranchizeFormPrefillAction({ slug, userId: dbUser.user_id }),
-        getFranchizeOperatorDashboardAccess({ slug }),
-        getFranchizeUserRentalSecretsAction({ slug, userId: dbUser.user_id }),
-        getRentalDocsPrefillAction({ slug, userId: dbUser.user_id }),
-        getProfileDocsStatusAction({ slug, userId: dbUser.user_id }),
-        // Partner monitoring — never blocks the profile: failures are swallowed.
-        getSubrenterOwnedBikesAction({ slug, userId: dbUser.user_id }).catch(() => null),
-        getFranchizeSubrentersOverviewAction({ slug, actorUserId: dbUser.user_id }).catch(() => null),
-      ]);
-      if (digestRes.success && digestRes.data) setDigest(digestRes.data);
-      if (prefillRes.success && prefillRes.data) setPrefill(prefillRes.data);
-      if (rentalSecretsRes.success && rentalSecretsRes.data) setRentalSecrets(rentalSecretsRes.data);
-      if (docsRes.success && docsRes.data) setDocsPrefill(docsRes.data);
-      if (profileDocsRes.success && profileDocsRes.data) setProfileDocsStatus(profileDocsRes.data);
-      if (subrenterOwnedRes?.success && subrenterOwnedRes.data) setSubrenterOwned(subrenterOwnedRes.data);
-      if (subrentersOverviewRes?.success && subrentersOverviewRes.data) setSubrentersOverview(subrentersOverviewRes.data);
-      setCanOpenCloserDashboard(
-        Boolean(operatorAccessRes.success && operatorAccessRes.canOpen),
-      );
-      await grantFranchizeAchievementAction({
-        slug,
-        userId: dbUser.user_id,
-        achievementId: "franchize_profile_opened",
-        source: "web:franchize_profile",
-        context: { path: `/franchize/${slug}/profile` },
-        incrementCounters: { profileOpenCount: 1 },
-      });
-      setIsLoading(false);
     };
     void run();
+    return () => {
+      cancelled = true; // stale-response race guard (session refresh / unmount)
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dbUser?.user_id, slug]);
+  }, [dbUser?.user_id, slug, authLoading]);
 
-  // ── Owner cash wallet loader: runs when user proven to be owner/admin
-  // (subrentersOverview loaded non-empty ⇒ canManageSubrenters passed).
+  // ── Owner cash wallet loader (2026-09-02 rewrite).
+  // Probes only when canOpenCloserDashboard is true (owner/co_owner/admin ⊂
+  // crew operators) — renters fire zero wallet calls. The wallet action
+  // enforces permission server-side; a "Недостаточно прав" answer just hides
+  // the panel for this user. A month-ref guard keeps a slow response for a
+  // previous month from overwriting the current one.
   const reloadOwnerCash = useCallback(() => {
-    if (!dbUser?.user_id || !slug) return;
-    if (!subrentersOverview || subrentersOverview.length === 0) {
-      setOwnerCashHidden(true);
-      return;
-    }
+    if (!dbUser?.user_id || !slug || !canOpenCloserDashboard) return;
     let cancelled = false;
     setOwnerCashLoading(true);
-    getOwnerCashMonthAction({ slug, actorUserId: dbUser.user_id, month: ownerCashMonth })
+    getOwnerCashMonthAction({
+      slug,
+      actorUserId: dbUser.user_id,
+      month: ownerCashMonthRef.current,
+      initData: getTelegramInitData(),
+    })
       .then((res) => {
         if (cancelled) return;
-        if (res.success && res.data) setOwnerCash(res.data);
-        else if (!res.success) setOwnerCashHidden(true);
+        if (res.success && res.data) {
+          // Stale-response guard: only the CURRENT month's payload may land.
+          if (res.data.month === ownerCashMonthRef.current) setOwnerCash(res.data);
+          setOwnerCashDenied(false);
+        } else {
+          // Hide only on a real permission denial; transient failures keep
+          // the last state so a month switch / retry can still recover.
+          if (res.error?.includes("Недостаточно прав")) setOwnerCashDenied(true);
+        }
       })
       .catch(() => undefined)
       .finally(() => {
@@ -239,12 +278,12 @@ export function FranchizeProfileClient({
     return () => {
       cancelled = true;
     };
-  }, [dbUser?.user_id, slug, subrentersOverview, ownerCashMonth]);
+  }, [dbUser?.user_id, slug, canOpenCloserDashboard]);
 
   useEffect(() => {
     const cleanup = reloadOwnerCash();
     return cleanup;
-  }, [reloadOwnerCash]);
+  }, [reloadOwnerCash, ownerCashMonth]);
 
   const submitOwnerCash = async (form: OwnerCashFormValues): Promise<boolean> => {
     if (!dbUser?.user_id) return false;
@@ -267,6 +306,7 @@ export function FranchizeProfileClient({
         amount,
         title: form.title.trim(),
         person: form.person.trim() || undefined,
+        initData: getTelegramInitData(),
       });
       if (res.success) {
         toast.success("Записано в кошелёк владельца");
@@ -275,6 +315,10 @@ export function FranchizeProfileClient({
       }
       toast.error(res.error || "Не удалось записать");
       return false;
+    } catch {
+      // m2 fix: a network throw used to escape as an unhandled rejection.
+      toast.error("Не удалось записать — нет связи.");
+      return false;
     } finally {
       setOwnerCashBusy(false);
     }
@@ -282,12 +326,21 @@ export function FranchizeProfileClient({
 
   const removeOwnerCash = async (id: string) => {
     if (!dbUser?.user_id) return;
-    const res = await deleteOwnerCashEntryAction({ slug, actorUserId: dbUser.user_id, id });
-    if (res.success) {
-      toast.success("Удалено");
-      reloadOwnerCash();
-    } else {
-      toast.error(res.error || "Не удалось удалить");
+    try {
+      const res = await deleteOwnerCashEntryAction({
+        slug,
+        actorUserId: dbUser.user_id,
+        id,
+        initData: getTelegramInitData(),
+      });
+      if (res.success) {
+        toast.success("Удалено");
+        reloadOwnerCash();
+      } else {
+        toast.error(res.error || "Не удалось удалить");
+      }
+    } catch {
+      toast.error("Не удалось удалить — нет связи.");
     }
   };
 
@@ -295,27 +348,36 @@ export function FranchizeProfileClient({
     if (!dbUser?.user_id) return;
     setIsSaving(true);
     setSaveSuccess(false);
-    const res = await saveFranchizeFormPrefillAction({
-      slug,
-      userId: dbUser.user_id,
-      prefill,
-    });
-    if (res.success) {
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } else {
-      setError(res.error || "Не удалось сохранить поля.");
+    try {
+      const res = await saveFranchizeFormPrefillAction({
+        slug,
+        userId: dbUser.user_id,
+        prefill,
+      });
+      if (res.success) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        // M3 fix: renters never saw this error (it rendered only inside the
+        // crew-gated AchievementsPanel) — surface it immediately.
+        setError(res.error || "Не удалось сохранить поля.");
+        toast.error(res.error || "Не удалось сохранить поля.");
+      }
+    } catch {
+      toast.error("Не удалось сохранить — нет связи.");
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   const unlockedSet = useMemo(
     () => new Set(Object.keys(profile?.achievements || {})),
     [profile?.achievements],
   );
-  const unlockedCount = catalog.filter((item) =>
-    unlockedSet.has(item.id),
-  ).length;
+  const unlockedCount = useMemo(
+    () => catalog.filter((item) => unlockedSet.has(item.id)).length,
+    [catalog, unlockedSet],
+  );
 
   if (isLoading) {
     return <ProfileSkeleton />;
@@ -339,6 +401,30 @@ export function FranchizeProfileClient({
         ["--franchize-shell-ring" as string]: T.accent,
       }}
     >
+      {/* M3 fix: top-level error banner — profile load / save failures were
+          previously rendered ONLY inside the crew-gated AchievementsPanel,
+          so ordinary renters saw a silently empty page. */}
+      {error && (
+        <div
+          className="flex items-start gap-2 rounded-xl border px-4 py-3 text-sm"
+          style={{
+            background: "rgba(239,68,68,0.08)",
+            borderColor: "rgba(239,68,68,0.35)",
+            color: "#ef4444",
+          }}
+          role="alert"
+        >
+          <span className="flex-1">{error}</span>
+          <button
+            type="button"
+            className="shrink-0 font-medium underline underline-offset-2"
+            onClick={() => setError(null)}
+          >
+            Закрыть
+          </button>
+        </div>
+      )}
+
       {/* Header Panel */}
       <ProfileHeaderPanel
         crewName={profile?.crewName || crew.header.brandName || slug}
@@ -384,8 +470,10 @@ export function FranchizeProfileClient({
         />
       )}
 
-      {/* Owner cash wallet («Кошелёк владельца») — owner/admin only */}
-      {!ownerCashHidden && ownerCash && (
+      {/* Owner cash wallet («Кошелёк владельца») — owner/admin only.
+          2026-09-02: gate = the wallet data itself (ownerCashDenied only
+          suppresses the panel; data presence implies permission). */}
+      {ownerCash && !ownerCashDenied && (
         <OwnerCashWalletPanel
           data={ownerCash}
           loading={ownerCashLoading}

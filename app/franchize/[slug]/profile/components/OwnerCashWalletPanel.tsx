@@ -54,6 +54,11 @@ export function OwnerCashWalletPanel({
   T: CrewTokens;
 }) {
   const [form, setForm] = useState<OwnerCashFormValues>(EMPTY_FORM);
+  // n7 fix: during a month switch the totals/entries used to keep showing the
+  // PREVIOUS month's payload — show a neutral loading state instead.
+  const showingStaleMonth = data.month !== month;
+  // n2 fix: irreversible money-ledger delete now confirms first.
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const submit = async () => {
     const ok = await onSubmit(form);
@@ -97,19 +102,19 @@ export function OwnerCashWalletPanel({
           <div className="rounded-xl border p-2.5 text-center" style={T.styles.card}>
             <p className="text-[10px] uppercase tracking-wide" style={{ color: T.textMuted }}>Пришло</p>
             <p className="mt-0.5 text-sm font-bold tabular-nums" style={{ color: MONEY_GREEN }}>
-              +{formatCurrency(data.totalIn)}
+              {showingStaleMonth ? "…" : `+${formatCurrency(data.totalIn)}`}
             </p>
           </div>
           <div className="rounded-xl border p-2.5 text-center" style={T.styles.card}>
             <p className="text-[10px] uppercase tracking-wide" style={{ color: T.textMuted }}>Ушло</p>
             <p className="mt-0.5 text-sm font-bold tabular-nums" style={{ color: MONEY_RED }}>
-              −{formatCurrency(data.totalOut)}
+              {showingStaleMonth ? "…" : `−${formatCurrency(data.totalOut)}`}
             </p>
           </div>
           <div className="rounded-xl border p-2.5 text-center" style={T.styles.card}>
             <p className="text-[10px] uppercase tracking-wide" style={{ color: T.textMuted }}>Итог</p>
             <p className="mt-0.5 text-sm font-bold tabular-nums" style={{ color: data.net >= 0 ? MONEY_GREEN : MONEY_RED }}>
-              {data.net >= 0 ? "+" : "−"}{formatCurrency(Math.abs(data.net))}
+              {showingStaleMonth ? "…" : `${data.net >= 0 ? "+" : "−"}${formatCurrency(Math.abs(data.net))}`}
             </p>
           </div>
         </div>
@@ -183,7 +188,7 @@ export function OwnerCashWalletPanel({
         </div>
 
         {/* Entries list */}
-        {loading ? (
+        {loading || showingStaleMonth ? (
           <p className="mt-3 animate-pulse text-sm" style={{ color: T.textMuted }}>Загружаю…</p>
         ) : data.entries.length === 0 ? (
           <p className="mt-3 text-sm" style={{ color: T.textMuted }}>
@@ -224,15 +229,40 @@ export function OwnerCashWalletPanel({
                   >
                     {e.direction === "in" ? "+" : "−"}{formatCurrency(e.amount)}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => onRemove(e.id)}
-                    title="Удалить запись"
-                    className="rounded p-1 transition hover:opacity-70"
-                    style={{ color: T.textMuted }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {confirmDeleteId === e.id ? (
+                    // n2 fix: two-tap confirm for the irreversible delete.
+                    <span className="flex flex-shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onRemove(e.id);
+                          setConfirmDeleteId(null);
+                        }}
+                        className="rounded px-1.5 py-0.5 text-[11px] font-semibold"
+                        style={{ backgroundColor: "#ef444422", color: MONEY_RED }}
+                      >
+                        Удалить
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="rounded px-1.5 py-0.5 text-[11px]"
+                        style={{ color: T.textMuted }}
+                      >
+                        Отмена
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(e.id)}
+                      title="Удалить запись"
+                      className="rounded p-1 transition hover:opacity-70"
+                      style={{ color: T.textMuted }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
