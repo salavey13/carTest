@@ -1,4 +1,4 @@
-import type {LeadRow, LeadTodoRow} from "../leads-types";
+import type {LeadRow, LeadRentalRow, LeadTodoRow} from "../leads-types";
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 
 export const PIPELINE_STAGES = [
@@ -70,6 +70,66 @@ export const STAGE_BOTTLENECK: Record<StageKey, { label: string; action: string;
 };
 
 /**
+ * Приоритет статусов аренды для выбора «релевантной» сделки лида.
+ */
+const RENTAL_STATUS_PRIORITY: Record<string, number> = {
+  active: 5, confirmed: 4, pending_confirmation: 3, completed: 2, cancelled: 1,
+};
+
+/**
+ * САМАЯ РЕЛЕВАНТНАЯ аренда лида: сначала по приоритету статуса
+ * (active > confirmed > pending > completed > cancelled), при равенстве —
+ * более поздняя дата начала. Заменяет повсюду чтение rentals[0]: после
+ * серверного дедупа артефактов/аренд порядок массива не гарантирован, а
+ * логика стадии/верификации/возврата должна смотреть на «живую» сделку.
+ */
+export function pickRelevantRental(lead: LeadRow): LeadRentalRow | null {
+  if (!lead.rentals || lead.rentals.length === 0) return null;
+  return [...lead.rentals].sort((a, b) => {
+    const pa = RENTAL_STATUS_PRIORITY[a.status] ?? 0;
+    const pb = RENTAL_STATUS_PRIORITY[b.status] ?? 0;
+    if (pa !== pb) return pb - pa;
+    return new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime();
+  })[0];
+}
+
+export type DocsVerificationState =
+  | "verified"        // документы проверены (чек-лист / contract_verifier / активация)
+  | "photos_pending"  // все фото загружены, ждут проверки оператором
+  | "missing"         // ни фото, ни отметок верификации
+  | "none";           // аренды нет — не применимо
+
+/**
+ * Состояние документов аренды — единая точка правды для стадии
+ * (computeLeadStage), бейджа верификации (getVerificationStatus),
+ * узкого места (getStageBottleneck) и чек-листа в шторке.
+ *
+ * Признаки верификации, в порядке надёжности:
+ *  1. status active/completed — активация требует проверенных документов;
+ *  2. metadata.checklist.passport_verified / license_verified — ставит
+ *     /api/verify-rental-checklist, когда оператор подтвердил фото;
+ *  3. metadata.contract_verifier.status === "verified" — его пишут ОБА потока
+ *     создания сделки: /doc (оператор лично видел документы) и веб-чек аут
+ *     (запись doc-verifier). Фото после проверки УДАЛЯЮТСЯ (152-ФЗ), поэтому
+ *     отсутствие фото НЕ означает отсутствие документов.
+ */
+export function getDocsVerification(rental: LeadRentalRow | null | undefined): DocsVerificationState {
+  if (!rental) return "none";
+  if (rental.status === "active" || rental.status === "completed") return "verified";
+  const meta = (rental.metadata ?? null) as Record<string, unknown> | null;
+  const checklist = (meta?.checklist as Record<string, unknown>) || {};
+  const verifier = (meta?.contract_verifier as Record<string, unknown> | null) || null;
+  if (!!checklist.passport_verified || !!checklist.license_verified) return "verified";
+  if (verifier?.status === "verified") return "verified";
+  const p1 = !!rental.passportMainpagePhoto;
+  const p2 = !!rental.passportRegistrationPhoto;
+  const p3 = !!rental.driversLicenceFrontalPhoto;
+  if (p1 && p2 && p3) return "photos_pending"; // всё загружено — ждём проверки
+  if (p1 || p2 || p3) return "missing";         // загружено не всё
+  return "missing";                              // фото нет вовсе
+}
+
+/**
  * Verification status for each flow type.
  * /doc flow: verified on creation (operator saw physical docs)
  * Web-app flow: unverified until operator checks uploaded photos
@@ -77,7 +137,10 @@ export const STAGE_BOTTLENECK: Record<StageKey, { label: string; action: string;
 export function getVerificationStatus(lead: LeadRow): "verified" | "unverified" | "pending" | "not_needed" {
   if (lead.rentals.length === 0) return "not_needed";
 
-  const r = lead.rentals[0] as any;
+  // FIX: читать РЕЛЕВАНТНУЮ аренду, а не rentals[0] — после серверного дедупа
+  // порядок массива произволен, и заглушка-артефакт больше не может
+  // заслонить реальную строку из rentals.
+  const r = (pickRelevantRental(lead) ?? lead.rentals[0]) as any;
 
   // RULE 1: Active rentals are ALWAYS verified.
   // If the bike was handed off (status=active), docs were checked —
@@ -96,11 +159,10 @@ export function getVerificationStatus(lead: LeadRow): "verified" | "unverified" 
   // RULE 3: Web-app flow, not yet active = needs verification.
   // These rentals were created by the renter via web form.
   // Unverified state only applies here — until operator checks photos.
-  const hasPhotos = r.passportMainpagePhoto || r.passportRegistrationPhoto || r.driversLicenceFrontalPhoto;
-  const verified = r.metadata?.contract_verifier?.status === "verified";
-  if (verified) return "verified";
-  if (hasPhotos) return "pending";  // photos uploaded, awaiting operator check
-  return "unverified";               // no photos yet — renter needs to upload
+  const docsState = getDocsVerification(r);
+  if (docsState === "verified") return "verified";   // contract_verifier / checklist
+  if (docsState === "photos_pending") return "pending"; // photos uploaded, awaiting operator check
+  return "unverified";                                 // no photos yet — renter needs to upload
 }
 
 export const VERIFICATION_LABELS: Record<string, { label: string; color: string; icon: string }> = {
@@ -169,12 +231,21 @@ export function getStageBottleneck(lead: LeadRow): { label: string; action: stri
   const flow = getFlowType(lead);
   const defaultBottleneck = STAGE_BOTTLENECK[stage] || STAGE_BOTTLENECK.new;
 
-  // Flow-specific overrides
   if (flow === "webapp") {
     // Web-app flow: QR stages don't apply (chat_id auto-shared)
     if (stage === "contract_sent" || stage === "awaiting_qr_claim") {
-      // Web-app flow skips QR → bottleneck is photo upload
-      return { label: "Загрузить фото", action: "upload_photos", color: "#f97316" };
+      // FIX: раньше ВСЕГДА «Загрузить фото» — но у веб-аренды документы
+      // собираются при оформлении (текст + фото + doc-verifier), поэтому
+      // при верифицированных документах узкое место — подтверждение/
+      // активация аренды оператором, а не загрузка фото.
+      const docsState = getDocsVerification(pickRelevantRental(lead));
+      if (docsState === "missing") {
+        return { label: "Загрузить фото", action: "upload_photos", color: "#f97316" };
+      }
+      if (docsState === "photos_pending") {
+        return { label: "Проверить фото", action: "verify_photos", color: "#f59e0b" };
+      }
+      return { label: "Подтвердить аренду", action: "open_rental", color: "#22c55e" };
     }
   }
 
@@ -213,29 +284,27 @@ export function computeLeadStage(lead: LeadRow): StageKey {
   if (lead.rentals.length > 0) {
     // BUG 1 fix: find the MOST RELEVANT rental by status priority, not just rentals[0].
     // Was: const r = lead.rentals[0] → if first rental is old/confirmed, stage was wrong
-    // even when a newer active rental exists. Now we sort by status priority.
-    const statusPriority: Record<string, number> = {
-      active: 5, confirmed: 4, pending_confirmation: 3, completed: 2, cancelled: 1,
-    };
-    const relevantRental = [...lead.rentals].sort((a, b) =>
-      (statusPriority[b.status] || 0) - (statusPriority[a.status] || 0)
-    )[0];
-    const r = relevantRental;
+    // even when a newer active rental exists. Now we sort by status priority
+    // (pickRelevantRental — shared with verification/bottleneck logic).
+    const r = pickRelevantRental(lead)!;
     if (r.status === "completed") return "closed_won";
     if (r.status === "cancelled") return "closed_lost";
     if (r.status === "active") return isPastOrDueSoon(r.endDate) ? "return_due" : "active_rental";
     if (r.status === "confirmed" || r.status === "pending_confirmation") {
       const qrClaimed = lead.identityState === "claimed_user" || lead.identityState === "merged";
       const hasUnclaimed = !!lead.originalOperatorChatId && !qrClaimed;
-      // FIX: was only checking photo paths — but verification deletes photos (152-ФЗ).
-      // Now also checks metadata.checklist flags + active/completed status.
-      const meta = (r as any).metadata as Record<string, unknown> | null;
-      const checklist = (meta?.checklist as Record<string, unknown>) || {};
-      const docsVerified = !!checklist.passport_verified || !!checklist.license_verified;
-      const docsMissing = !docsVerified && (!(r as any).passportMainpagePhoto || !(r as any).passportRegistrationPhoto || !(r as any).driversLicenceFrontalPhoto);
+      // FIX («Документы отсутствуют» определялся неверно): аренда, созданная
+      // через веб-форма или /doc, документами обеспечена по построению —
+      // проверяем не только фото (их УДАЛЯЮТ после верификации, 152-ФЗ), но и
+      // чек-лист и metadata.contract_verifier (его пишут оба потока).
+      // См. getDocsVerification().
+      const docsMissing = getDocsVerification(r) === "missing";
       if (hasUnclaimed) return r.status === "confirmed" ? "awaiting_qr_claim" : "contract_sent";
       if (docsMissing && qrClaimed) return "documents_missing";
-      return "awaiting_qr_claim";
+      // Документы в порядке. /doc-поток: QR принят — сделка ждёт активации.
+      // Веб-поток: QR не существует вовсе — «QR не принят» вводил в заблуждение;
+      // сделка ждёт подтверждения оператором («Договор отправлен»).
+      return lead.originalOperatorChatId ? "awaiting_qr_claim" : "contract_sent";
     }
   }
   if (lead.intentStage === "contract_generated") return "contract_sent";

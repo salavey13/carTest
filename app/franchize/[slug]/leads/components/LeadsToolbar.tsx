@@ -18,7 +18,7 @@ import {
   Phone,
   AlertCircle,
 } from "lucide-react";
-import { type Segment, SOURCE_META } from "../leads-constants";
+import { type Segment, SOURCE_META, SOURCE_GROUPS, sourceGroupOf } from "../leads-constants";
 
 // ── Segment metadata for the chip row ──
 const SEGMENT_META: Record<Segment, { label: string; icon: any; color: string }> = {
@@ -252,11 +252,24 @@ export function LeadsToolbar({
             // Virtual filter: selects leads by CHANNEL (Avito webhook/forwards),
             // handled in filterLeads — see isAvitoLead().
             { value: "avito", label: "Авито" },
-            // Human labels (SOURCE_META) instead of raw slugs like
-            // "rental_contract" / "callback_request".
-            ...availableSources
-              .map((s) => ({ value: s, label: SOURCE_META[s]?.label || s }))
-              .sort((a, b) => a.label.localeCompare(b.label, "ru")),
+            // FIX («2 тест-драйва, 2 аренды…»): опции строятся по КАНОНИЧЕСКОЙ
+            // группе источника (sourceGroupOf), а не по сырому slug. Раньше
+            // test_drive и testdrive_contract (оба «Тест-драйв»), rental_contract
+            // и rent (обе «Аренда»), sale_contract и sale (обе «Покупка»)
+            // давали по две визуально одинаковые опции, каждая из которых
+            // фильтровала только «свои» лиды. Теперь одна опция = вся группа.
+            ...(() => {
+              const byGroup = new Map<string, string>();
+              for (const s of availableSources) {
+                const g = sourceGroupOf(s);
+                if (!byGroup.has(g)) {
+                  byGroup.set(g, SOURCE_GROUPS[g]?.label || SOURCE_META[s]?.label || s);
+                }
+              }
+              return Array.from(byGroup.entries())
+                .map(([value, label]) => ({ value, label }))
+                .sort((a, b) => a.label.localeCompare(b.label, "ru"));
+            })(),
           ]}
         />
 

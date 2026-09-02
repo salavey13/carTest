@@ -26,6 +26,35 @@ export const SOURCE_META: Record<string, { label: string; icon: typeof Flame; co
   unknown:         { label: "Клиент",       icon: Users,        color: "#64748b", bg: "#64748b20" },
 };
 
+/**
+ * Канонические группы источников (fix «2 тест-драйва, 2 аренды…» в фильтре).
+ * Один и тот же смысл приходит из РАЗНЫХ таблиц под разными slug:
+ *   • «Тест-драйв»: franchize_intents (test_drive) + testdrive_contract_artifacts
+ *     (testdrive_contract) — интент и подписанный договор;
+ *   • «Аренда»: rental_contract_artifacts (rental_contract) + rentals/intents
+ *     (rent) — договор аренды и сама аренда;
+ *   • «Покупка»: sale_contract_artifacts (sale_contract) + intents (sale).
+ * Раньше фильтр «Источник» показывал по ДВЕ опции с одинаковыми подписями,
+ * каждая фильтровала только «свои» лиды. Теперь дропдаун строится по
+ * КАНОНИЧЕСКОЙ группе (sourceGroupOf), а filterLeads матчит группу целиком.
+ */
+export const SOURCE_GROUPS: Record<string, { label: string; members: string[] }> = {
+  testdrive: { label: "Тест-драйв", members: ["test_drive", "testdrive_contract"] },
+  rent:      { label: "Аренда",    members: ["rental_contract", "rent"] },
+  sale:      { label: "Покупка",   members: ["sale_contract", "sale"] },
+};
+
+const RAW_SOURCE_TO_GROUP: Record<string, string> = {};
+for (const [groupId, def] of Object.entries(SOURCE_GROUPS)) {
+  for (const member of def.members) RAW_SOURCE_TO_GROUP[member] = groupId;
+}
+
+/** Канонический ключ источника: slug из группы → id группы, иначе сам slug. */
+export function sourceGroupOf(source: string | null | undefined): string {
+  if (!source) return "unknown";
+  return RAW_SOURCE_TO_GROUP[source] ?? source;
+}
+
 export const STAGE_LABELS: Record<string, string> = {
   contract_generated: "Договор готов",
   checkout_started:   "Оформление",

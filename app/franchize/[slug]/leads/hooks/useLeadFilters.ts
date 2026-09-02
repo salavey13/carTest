@@ -25,7 +25,8 @@ import {
   STAGE_LABELS,
 } from "../lib/pipeline-stages";
 import { computeLeadSignals, isHotLead } from "../lib/sla-signals";
-import { SORT_OPTIONS } from "../leads-constants";
+import { pickRelevantRental, getDocsVerification } from "../lib/pipeline-stages";
+import { SORT_OPTIONS, sourceGroupOf } from "../leads-constants";
 
 const MODE_INTENTS: Record<Mode, string[]> = {
   rent: [
@@ -149,7 +150,9 @@ export function useLeadFilters({
   const sourceOwnerFilteredLeads = useMemo(() => {
     return searchFilteredLeads.filter((l) => {
       if (!l) return false;
-      if (sourceFilter !== "all" && l.source !== sourceFilter) return false;
+      // Canonical group match (see leads-constants SOURCE_GROUPS): the
+      // dropdown emits group ids, a group option covers all its raw slugs.
+      if (sourceFilter !== "all" && sourceGroupOf(l.source) !== sourceFilter) return false;
       if (ownerFilter !== "all") {
         return l.ownerId === ownerFilter || l.ownerName === ownerFilter;
       }
@@ -166,9 +169,13 @@ export function useLeadFilters({
       const hasOverdueTodo = leadTodos.some(
         (t) => !!t.due_date && new Date(t.due_date).getTime() < now && t.status !== "done"
       );
-      const hasMissingDocs =
-        l.rentals.length > 0 &&
-        !(l.rentals[0] as { passportMainpagePhoto?: string }).passportMainpagePhoto;
+      // FIX: «Документы отсутствуют» — читать РЕЛЕВАНТНУЮ аренду (а не rentals[0],
+      // порядок после дедупа не гарантирован) и учитывать верификацию целиком:
+      // checklist-флаги, metadata.contract_verifier (его пишут ОБА потока
+      // создания — /doc и веб-чекаут), фото. Аренда, созданная через /doc или
+      // веб-форму, документами «обеспечена» по построению.
+      const relevantRental = pickRelevantRental(l);
+      const hasMissingDocs = !!relevantRental && getDocsVerification(relevantRental) === "missing";
       const hasActiveRental = l.rentals.some((r) => r.status === "active");
       const hasReturnDue = l.rentals.some(
         (r) => r.status === "active" && r.endDate && new Date(r.endDate).getTime() - now < 24 * 60 * 60 * 1000

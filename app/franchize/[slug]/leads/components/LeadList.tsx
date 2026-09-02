@@ -1,8 +1,7 @@
 // /app/franchize/[slug]/leads/components/LeadList.tsx
 "use client";
 
-import { useMemo, useRef, useCallback } from "react";
-import { motion } from "framer-motion";
+import { useMemo, useCallback } from "react";
 import { useVirtualList } from "../hooks/useVirtualList";
 import { LeadCard } from "./LeadCard";
 import type {LeadRow, LeadTodoRow} from "../leads-types";
@@ -31,19 +30,16 @@ interface LeadListProps {
   onSelectLead?: (lead: LeadRow | null) => void;
 }
 
-/** Approximate starting height — real height is measured via measureElement */
-const ITEM_HEIGHT = 128;
-
-const cardVariants = {
-  hidden: { opacity: 0 },
-  visible: (i: number) => ({
-    opacity: 1,
-    transition: {
-      duration: 0.2,
-      delay: Math.min(i * 0.025, 0.12),
-    },
-  }),
-};
+/** Approximate card height for the virtualizer's FIRST estimate.
+ * Real height is measured per-element (measureElement); this is only the
+ * seed for not-yet-rendered items. Was 128 — a flag-heavy LeadCard
+ * (callback + notes + SLA + next-step + verification rows) is 260–400px,
+ * so freshly rendered items got estimate-based offsets and briefly
+ * RENDERED ON TOP of the cards above them (the "flags overlap other
+ * flags" report). 280 keeps the initial error small; the per-item gap is
+ * paddingBottom on the wrapper (included in the measured height).
+ */
+const ITEM_HEIGHT = 280;
 
 export function LeadList({
   leads,
@@ -61,7 +57,7 @@ export function LeadList({
   const { parentRef, virtualItems, totalHeight, measureElement } = useVirtualList(leads, {
     itemHeight: ITEM_HEIGHT,
     containerHeight: 600,
-    overscan: 5,
+    overscan: 6,
   });
 
   const isSelected = useMemo(
@@ -90,21 +86,21 @@ export function LeadList({
           const isThisSelected = isSelected.has(lead.user_id);
           const leadTodos = getTodosForLead ? getTodosForLead(lead) : [];
           return (
-            <motion.div
+            <div
               key={lead.user_id}
               data-index={virtualRow.index}
               ref={measureElement}
               className="virtual-item"
-              custom={virtualRow.index}
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
               style={{
                 position: "absolute",
                 top: 0,
                 left: 0,
                 right: 0,
                 transform: `translateY(${virtualRow.start}px)`,
+                // Gap between cards — paddingBottom is part of the element's
+                // measured height, so the virtualizer positions the NEXT card
+                // below the gap: cards never visually collide.
+                paddingBottom: 12,
               }}
             >
               <LeadCard
@@ -118,7 +114,7 @@ export function LeadList({
                 onReadNotes={onReadNotes}
                 signals={getTodosForLead ? computeLeadSignals(lead, leadTodos) : []}
               />
-            </motion.div>
+            </div>
           );
         })}
       </div>

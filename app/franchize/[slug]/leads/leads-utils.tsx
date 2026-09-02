@@ -1,7 +1,7 @@
 // /app/franchize/[slug]/leads/leads-utils.tsx
 "use client";
 
-import { SOURCE_META, BOARD_COLUMNS, AVITO_COLUMN_STAGES } from "./leads-constants";
+import { SOURCE_META, BOARD_COLUMNS, AVITO_COLUMN_STAGES, sourceGroupOf } from "./leads-constants";
 import { PIPELINE_STAGES } from "./lib/pipeline-stages";
 import { compareByPriority, computeLeadPriority, type LeadPriority } from "./lib/lead-priority";
 import { getLeadHandling, isHandlingTodo } from "./lib/lead-handling";
@@ -290,7 +290,11 @@ export function filterLeads(
   if (filterSource === "avito") {
     result = result.filter(isAvitoLead);
   } else if (filterSource !== "all") {
-    result = result.filter((l) => l.source === filterSource);
+    // FIX: match by CANONICAL group — the toolbar now emits group ids
+    // ("testdrive"/"rent"/"sale"), so one option covers every raw slug of the
+    // same meaning (test_drive + testdrive_contract, rental_contract + rent,
+    // sale_contract + sale). Legacy raw values still match themselves.
+    result = result.filter((l) => sourceGroupOf(l.source) === filterSource);
   }
 
   if (segment !== "all") {

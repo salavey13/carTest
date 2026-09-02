@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from "next/cache";
 import { computeLeadStage, computeQrStatus, computeAssignee, STAGE_NEXT_ACTION, matchTodosToLead } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
+import type { LeadRentalRow } from "@/app/franchize/[slug]/leads/leads-types";
 // NOTE: privateSchema (from @/lib/private-secrets) + cookies + telegram-actor-cookie
 // are ALL imported DYNAMICALLY inside functions to avoid `import "server-only"`
 // poisoning the client bundle. private-secrets.ts has `import "server-only"` too.
@@ -489,8 +490,25 @@ export async function getFranchizeLeads(
         existing.originalOperatorChatId = row.originalOperatorChatId;
       }
       // Append rentals/sales from the new row into the existing lead.
-      if (row.rentals.length > 0) existing.rentals.push(...row.rentals);
-      if (row.sales.length > 0) existing.sales.push(...row.sales);
+      // RENTAL DEDUP (2026-09-03): several artifact rows can reference the SAME
+      // rental (contract regenerated, web retry) — keep the first, skip the
+      // rest, so one rental = one deal row on the lead.
+      if (row.rentals.length > 0) {
+        const seenRentalIds = new Set(existing.rentals.map((r) => r.rentalId).filter(Boolean));
+        for (const r of row.rentals) {
+          if (r.rentalId && seenRentalIds.has(r.rentalId)) continue;
+          existing.rentals.push(r);
+          if (r.rentalId) seenRentalIds.add(r.rentalId);
+        }
+      }
+      if (row.sales.length > 0) {
+        const seenSaleIds = new Set(existing.sales.map((s) => s.saleId).filter(Boolean));
+        for (const s of row.sales) {
+          if (s.saleId && seenSaleIds.has(s.saleId)) continue;
+          existing.sales.push(s);
+          if (s.saleId) seenSaleIds.add(s.saleId);
+        }
+      }
     };
 
     // ── Parallel fetch of independent lead sources (steps 1-5) ──
@@ -962,7 +980,24 @@ export async function getFranchizeLeads(
           });
         } else {
           existing.sourceCount = (existing.sourceCount || 1) + 1;
-          existing.rentals.push(rentalRow);
+          // ── RENTAL DEDUP FIX (2026-09-03) ──
+          // Step 2 (rental_contract_artifacts) attaches a STUB row for every
+          // artifact: status hardcoded "confirmed", no photos/metadata. The
+          // rentals-table row for the SAME rental_id is the source of truth
+          // (real status: active/pending/…, photos, checklist, contract_verifier).
+          // Appending both made the SAME rental show up TWICE in the lead's
+          // deals list with different statuses, and the "confirmed" stub could
+          // shadow the real row in rentals[0]-based logic → false
+          // «Документы отсутствуют», wrong verification badge, doubled
+          // rental count. REPLACE the stub in place instead of appending.
+          const stubIdx = r.rental_id
+            ? existing.rentals.findIndex((x) => x.rentalId === r.rental_id)
+            : -1;
+          if (stubIdx >= 0) {
+            existing.rentals[stubIdx] = rentalRow;
+          } else {
+            existing.rentals.push(rentalRow);
+          }
           if (!existing.phone && effectivePhone) existing.phone = effectivePhone;
           if (originalOp && !existing.originalOperatorChatId) existing.originalOperatorChatId = originalOp;
           if (["active", "completed", "confirmed"].includes(r.status || "")) existing.verified = true;
@@ -1398,6 +1433,35 @@ export async function getFranchizeLeads(
         l.troubled = true;
         l.troubledReason = troubledMap.get(l.user_id) || null;
       }
+    }
+
+    // ── 9.5. Final rental dedup pass (safety net) ──
+    // The same rental can reach a lead through several ingestion paths
+    // (artifact stub + rentals row + testdrive backfill). Each path dedupes
+    // on its own, but legacy/cached rows can still slip a twin through —
+    // collapse by rentalId one last time, preferring the row with the most
+    // real data (rentals-table rows carry metadata + photos; artifact stubs
+    // don't). Rows without rentalId (old artifacts) are kept as-is.
+    for (const l of leadMap.values()) {
+      if (l.rentals.length <= 1) continue;
+      const byId = new Map<string, LeadRentalRow>();
+      const noId: LeadRentalRow[] = [];
+      for (const r of l.rentals) {
+        if (!r.rentalId) {
+          noId.push(r);
+          continue;
+        }
+        const prev = byId.get(r.rentalId);
+        if (!prev) {
+          byId.set(r.rentalId, r);
+          continue;
+        }
+        const richness = (x: LeadRentalRow): number =>
+          (x.metadata ? 2 : 0) +
+          (x.passportMainpagePhoto || x.passportRegistrationPhoto || x.driversLicenceFrontalPhoto ? 1 : 0);
+        if (richness(r) > richness(prev)) byId.set(r.rentalId, r);
+      }
+      l.rentals = Array.from(byId.values()).concat(noId);
     }
 
     // 10. Aggregate totals and refs

@@ -1,5 +1,5 @@
 import type { LeadRow, LeadTodoRow } from "../leads-types";
-import { matchTodosToLead } from "./pipeline-stages";
+import { matchTodosToLead, pickRelevantRental, getDocsVerification } from "./pipeline-stages";
 import { getLeadHandling, isHandlingTodo, isCallbackOverdue, callbackInMinutes } from "./lead-handling";
 
 export interface LeadSignal {
@@ -68,10 +68,13 @@ export function computeLeadSignals(lead: LeadRow, allTodos: LeadTodoRow[]): Lead
     signals.push({ key: "time_until_return", label: "До возврата", value: fmt(ms), tone: d > 3 ? "good" : d > 1 ? "warning" : "danger", priority: d > 3 ? 0 : d > 1 ? 2 : 4 });
   }
   // document_missing_age
+  // FIX: читать РЕЛЕВАНТНУЮ аренду (а не rentals[0]) и учитывать полную
+  // картину верификации (checklist + contract_verifier + фото) — аренды,
+  // созданные через /doc или веб-чек аут, документами обеспечены, фото после
+  // проверки УДАЛЯЮТСЯ (152-ФЗ), поэтому «нет фото» ≠ «нет документов».
   if (lead.stageKey === "documents_missing" && lead.rentals.length > 0) {
-    const r = lead.rentals[0];
-    const docsMissing = !(r as any).passportMainpagePhoto || !(r as any).passportRegistrationPhoto || !(r as any).driversLicenceFrontalPhoto;
-    if (docsMissing) {
+    const r = pickRelevantRental(lead);
+    if (r && getDocsVerification(r) === "missing") {
       signals.push({ key: "document_missing_age", label: "Документы отсутствуют", value: "⚠", tone: "warning", priority: 2 });
     }
   }

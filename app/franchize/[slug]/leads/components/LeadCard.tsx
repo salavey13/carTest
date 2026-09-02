@@ -22,6 +22,7 @@ import {
   VERIFICATION_LABELS,
   getStageBottleneck,
   getFlowType,
+  pickRelevantRental,
 } from "../lib/pipeline-stages";
 import { SOURCE_META } from "../leads-constants";
 import {
@@ -97,7 +98,10 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
   const topSignal = signals[0];
   const slaColor = topSignal ? TONE_COLOR[topSignal.tone] : T.textFaint;
 
-  const rental = lead.rentals[0] ?? null; // safe — may be undefined for leads with no rentals
+  // FIX: «Возврат: дата» и счётчик аренд — читать РЕЛЕВАНТНУЮ аренду
+  // (pickRelevantRental), а не rentals[0]: после серверного дедупа порядок
+  // массива не гарантирован, а возвращать надо дату именно живой сделки.
+  const rental = pickRelevantRental(lead); // null — у лида без аренд
   const rentalCount = lead.rentals.length;
   const revenue = lead.totalSpent || (rental?.totalCost ?? 0);
   const returnDate = rental?.endDate ? formatDate(rental.endDate) : null;
@@ -281,10 +285,14 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
                 )}
               </div>
             </div>
-            {/* Stage badge — right-aligned, compact */}
+            {/* Stage badge — right-aligned, compact.
+                FIX ("флажки наезжают на другие"): длинные подписи стадий
+                («Документы отсутствуют») сжимали строку с именем — бейдж
+                ограничен по ширине и обрезается с title-подсказкой. */}
             <span
-              className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-medium md:px-3 md:text-[11px]"
+              className="max-w-[42%] shrink-0 truncate rounded-full px-2.5 py-1 text-[10px] font-medium md:px-3 md:text-[11px]"
               style={{ background: `${stageColor}1a`, color: stageColor }}
+              title={stageLabel}
             >
               {stageLabel}
             </span>
@@ -467,7 +475,7 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
                 </span>
               )
             )}
-            {topSignal && (
+            {topSignal && topSignal.key !== "document_missing_age" && (
               <span
                 className="rounded-full px-2.5 py-1 text-[10px] font-medium"
                 style={{ background: `${slaColor}26`, color: slaColor }}
@@ -503,8 +511,12 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
             </div>
           )}
 
-          {/* SLA block — right aligned, compact */}
-          {topSignal && (
+          {/* SLA block — right aligned, compact.
+              FIX ("флажки наезжают на другие"): сигнал document_missing_age
+              («⚠ / Документы отсутствуют») — чистый шум: та же мысль уже
+              в бейдже стадии и в плашке «Следующий шаг», а его value (⚠) не
+              несёт информации. Не дублируем. */}
+          {topSignal && topSignal.key !== "document_missing_age" && (
             <div className="flex justify-end">
               <div
                 className="rounded-xl border p-2.5 text-right md:rounded-2xl md:p-3"

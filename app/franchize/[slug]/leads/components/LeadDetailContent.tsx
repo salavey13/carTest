@@ -10,6 +10,8 @@ import type { ThemeTokens } from "../hooks/useTheme";
 import {
   computeLeadStage,
   computeQrStatus,
+  pickRelevantRental,
+  getFlowType,
 } from "../lib/pipeline-stages";
 import { computeLeadSignals } from "../lib/sla-signals";
 import { computeLeadHistory } from "../lib/lead-history";
@@ -207,26 +209,40 @@ export function LeadDetailContent({
 }
 
 /**
- * Build a 5-row document checklist from the first rental's photo fields + checklist metadata.
- * Each row gets a status (missing/pending/verified/sent) based on:
- * 1. metadata.checklist.passport_verified / license_verified (set by /api/verify-rental-checklist)
- * 2. photo field presence (rental.passportMainpagePhoto etc.)
+ * Build a 5-row document checklist from the RELEVANT rental's photo fields +
+ * verification metadata. Each row gets a status (missing/pending/verified/sent)
+ * based on, in priority order:
+ * 1. metadata.checklist.passport_verified / license_verified (set by
+ *    /api/verify-rental-checklist when the operator confirms the photos)
+ * 2. metadata.contract_verifier.status === "verified" — written by BOTH
+ *    creation flows: /doc (operator saw the physical docs) and the web-app
+ *    checkout (doc-verifier record). A rental created through either flow
+ *    is docs-complete BY CONSTRUCTION — the flag must not fire.
+ * 3. active/completed rental status (activation requires verification)
+ * 4. photo field presence (rental.passportMainpagePhoto etc.)
  *
- * FIX: was only checking photo paths — but verification deletes photos (152-ФЗ compliance),
- * so verified docs showed as "missing". Now checks checklist flags first.
+ * FIX: was only checking photo paths on rentals[0] — but (a) verification
+ * DELETES photos (152-ФЗ compliance) so verified docs showed as "missing",
+ * and (b) rentals[0] could be the artifact stub with no data at all. Now
+ * reads the relevant rental (pickRelevantRental) and honors all verifiers.
  */
 function buildDocuments(
   lead: LeadRow,
   onDocumentAction: (docKey: string, action: "open" | "request") => void,
 ): DocumentItem[] {
-  const rental = lead.rentals[0];
+  const rental = pickRelevantRental(lead) ?? lead.rentals[0];
   if (!rental) return [];
+
+  // /doc flow: the operator collected and checked the physical documents
+  // in person when creating the contract — verified by construction.
+  const isDocFlow = getFlowType(lead) === "doc";
 
   // Read verification checklist from rental metadata (set by /api/verify-rental-checklist)
   const meta = (rental as Record<string, unknown>).metadata as Record<string, unknown> | null;
   const checklist = (meta?.checklist as Record<string, unknown>) || {};
-  const passportVerified = !!checklist.passport_verified;
-  const licenseVerified = !!checklist.license_verified;
+  const verifier = (meta?.contract_verifier as Record<string, unknown> | null) || null;
+  const passportVerified = !!checklist.passport_verified || verifier?.status === "verified" || isDocFlow;
+  const licenseVerified = !!checklist.license_verified || verifier?.status === "verified" || isDocFlow;
 
   // Active/completed rentals are always verified (activation requires verification todos done)
   const isActivated = rental.status === "active" || rental.status === "completed";

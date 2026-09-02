@@ -600,7 +600,24 @@ export function LeadDetailDrawer(props: Props) {
                 Сделок нет
               </p>
             )}
-            {lead?.rentals?.map((r) => (
+            {lead?.rentals && lead.rentals.length > 0
+              ? [...lead.rentals]
+                  .sort((a, b) => {
+                    // FIX («аренда отображается списком аренд с разными
+                    // статусами»): сервер теперь дедупит сделки по rental_id,
+                    // но ЛЕГИТИМНО у лида может быть несколько аренд (прошлые
+                    // + текущая). Показываем самую релевантную сверху:
+                    // active > confirmed > pending > completed > cancelled,
+                    // при равенстве — свежее по дате начала.
+                    const prio: Record<string, number> = {
+                      active: 5, confirmed: 4, pending_confirmation: 3, completed: 2, cancelled: 1,
+                    };
+                    const pa = prio[a.status] ?? 0;
+                    const pb = prio[b.status] ?? 0;
+                    if (pa !== pb) return pb - pa;
+                    return new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime();
+                  })
+                  .map((r) => (
               <Link
                 key={r.rentalId}
                 href={`/franchize/${slug}/rental/${encodeURIComponent(r.rentalId)}`}
@@ -631,7 +648,8 @@ export function LeadDetailDrawer(props: Props) {
                   <ChevronRight className="h-4 w-4" style={{ color: T.textFaint }} aria-hidden />
                 </span>
               </Link>
-            ))}
+              ))
+              : null}
             {lead?.sales?.map((s) => (
               <div
                 key={s.saleId}
