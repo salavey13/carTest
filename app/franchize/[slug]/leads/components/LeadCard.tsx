@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CheckCircle2, ChevronRight, Phone, PhoneCall, Clock, MoreVertical, X, StickyNote } from "lucide-react";
+import { CheckCircle2, ChevronRight, Phone, PhoneCall, Clock, MoreVertical, X, StickyNote, UserRound, PenLine } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -129,6 +129,18 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
   const noteIsNew = notesCount > 0 && Number.isFinite(lastNoteMs) && lastNoteMs > 0 && Date.now() - lastNoteMs <= 24 * 60 * 60 * 1000;
   const notesWord = notesCount % 10 === 1 && notesCount % 100 !== 11 ? "заметка" : [2, 3, 4].includes(notesCount % 10) && ![12, 13, 14].includes(notesCount % 100) ? "заметки" : "заметок";
 
+  // 👤 Операторы лида (просьба босса: «пометить, кто трогал последним, а
+  // изначально — кто создал лида через /doc»):
+  //   • docCreator — оператор, запустивший /doc (originalOperatorChatId →
+  //     ownerName). Показывается пока никто не оставил заметку.
+  //   • lastTouchedBy — автор последней заметки (= последний, кто работал
+  //     с лидом), с временем. Как только появилась — она главная.
+  const docCreator = lead.ownerName || null;
+  const lastTouched = lead.lastTouchedBy || null;
+  const lastTouchedRel = lead.lastNoteAt ? relativeTime(lead.lastNoteAt) : "";
+  const showCreatorChip = !!docCreator && (!lastTouched || lastTouched !== docCreator);
+  const showTouchedChip = !!lastTouched;
+
   return (
     <motion.article
       whileHover={{ y: -2 }}
@@ -238,6 +250,33 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
                   <span className="inline-flex items-center gap-1">
                     <Clock className="h-3 w-3" aria-hidden />
                     {rel}
+                  </span>
+                )}
+                {/* 👤 Оператор, создавший лида через /doc — виден сразу, пока
+                    никто не оставил заметку (или когда автор ≠ создатель). */}
+                {showCreatorChip && (
+                  <span
+                    className="inline-flex max-w-[150px] items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    style={{ backgroundColor: "#06b6d415", color: "#0891b2" }}
+                    title={`Лид создан через /doc оператором: ${docCreator}`}
+                  >
+                    <UserRound className="h-3 w-3 shrink-0" aria-hidden />
+                    <span className="truncate">{docCreator} · /doc</span>
+                  </span>
+                )}
+                {/* ✍ Последний оператор, трогавший лида (автор последней
+                    заметки) + как давно. */}
+                {showTouchedChip && (
+                  <span
+                    className="inline-flex max-w-[170px] items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    style={{ backgroundColor: "#8b5cf615", color: "#7c3aed" }}
+                    title={`Последняя активность оператора: ${lastTouched} оставил заметку${lastTouchedRel ? " " + lastTouchedRel : ""}`}
+                  >
+                    <PenLine className="h-3 w-3 shrink-0" aria-hidden />
+                    <span className="truncate">
+                      {lastTouched}
+                      {lastTouchedRel ? ` · ${lastTouchedRel}` : ""}
+                    </span>
                   </span>
                 )}
               </div>

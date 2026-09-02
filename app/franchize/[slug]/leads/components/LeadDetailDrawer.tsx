@@ -212,6 +212,22 @@ export function LeadDetailDrawer(props: Props) {
     { label: "Ответственный", value: assignee },
     { label: "Следующее действие", value: STAGE_NEXT_ACTION[stageKey] || "—" },
   ];
+  // 👤 Операторы лида (просьба босса): кто создал через /doc и кто трогал
+  // последним (автор последней заметки). Добавляются в сетку только когда
+  // реально известны — пустых плиток не плодим.
+  if (lead?.ownerName) {
+    infoItems.push({
+      label: "Создал (/doc)",
+      value: lead.ownerName,
+    });
+  }
+  if (lead?.lastTouchedBy) {
+    const touchRel = lead.lastNoteAt ? relativeTime(lead.lastNoteAt) : "";
+    infoItems.push({
+      label: "Последний оператор",
+      value: lead.lastTouchedBy + (touchRel ? ` · ${touchRel}` : ""),
+    });
+  }
   if (avito?.chatId) {
     infoItems.push({
       label: "Avito чат",
@@ -393,6 +409,29 @@ export function LeadDetailDrawer(props: Props) {
                   style={{ background: T.bgCard, color: T.textMuted }}
                 >
                   @{lead.username}
+                </span>
+              )}
+              {/* 👤 Оператор, создавший лида через /doc — виден сразу при
+                  открытии шторки (просьба босса), пока нет заметок. */}
+              {lead?.ownerName && (
+                <span
+                  className="rounded-full px-3 py-1 text-[11px] font-medium"
+                  style={{ background: "#06b6d415", color: "#0891b2" }}
+                  title={`Лид создан через /doc оператором: ${lead.ownerName}`}
+                >
+                  👤 {lead.ownerName} · /doc
+                </span>
+              )}
+              {/* ✍ Последний оператор, трогавший лида (автор последней
+                  заметки) — главный маркер на карточке и в шторке. */}
+              {lead?.lastTouchedBy && (
+                <span
+                  className="rounded-full px-3 py-1 text-[11px] font-medium"
+                  style={{ background: "#8b5cf615", color: "#7c3aed" }}
+                  title={`Последняя активность оператора: ${lead.lastTouchedBy}${lead.lastNoteAt ? " оставил заметку " + relativeTime(lead.lastNoteAt) : ""}`}
+                >
+                  ✍ {lead.lastTouchedBy}
+                  {lead.lastNoteAt ? ` · ${relativeTime(lead.lastNoteAt)}` : ""}
                 </span>
               )}
               {lead?.contactChannel === "avito" && (

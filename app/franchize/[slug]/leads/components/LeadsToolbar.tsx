@@ -418,21 +418,34 @@ function Dropdown({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
+    // FIX ("list disappears on first touch, not even click"): the old handler
+    // closed the menu on ANY scroll event (capture: true) — INCLUDING the
+    // menu's own touch-scroll. On mobile, the first drag on a long list made
+    // the menu itself fire `scroll` (it is the overflow-y-auto container),
+    // the capture listener caught it, and the menu instantly closed, making
+    // long lists impossible to scroll. Now scrolls that originate INSIDE the
+    // open menu are ignored; only page/row scrolls (which detach the menu
+    // from its anchor button) close it.
+    const onScroll = (e: Event) => {
+      const target = e.target as Node | null;
+      if (target && menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
     const onReflow = () => setOpen(false);
     document.addEventListener("mousedown", onPointer);
     document.addEventListener("touchstart", onPointer);
     document.addEventListener("keydown", onKey);
     window.addEventListener("resize", onReflow);
-    // Any scroll (incl. the horizontal filter row itself) detaches the menu
-    // from the button — close instead of drifting. capture:true so inner
-    // scroll containers are caught too.
-    window.addEventListener("scroll", onReflow, true);
+    // Any scroll OUTSIDE the menu (incl. the horizontal filter row itself)
+    // detaches the menu from the button — close instead of drifting.
+    // capture:true so inner scroll containers are caught too.
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("mousedown", onPointer);
       document.removeEventListener("touchstart", onPointer);
       document.removeEventListener("keydown", onKey);
       window.removeEventListener("resize", onReflow);
-      window.removeEventListener("scroll", onReflow, true);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [open]);
 
@@ -504,6 +517,12 @@ function Dropdown({
                 backgroundColor: T.bgCard,
                 borderColor: T.border,
                 boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+                // Scroll containment: touching the list at its top/bottom edge
+                // must rubber-band INSIDE the menu instead of chaining the
+                // scroll to the page behind (which would detach + close the
+                // menu via the scroll listener above).
+                overscrollBehavior: "contain",
+                WebkitOverflowScrolling: "touch",
               }}
             >
               {options.map((opt) => {

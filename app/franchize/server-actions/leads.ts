@@ -1313,9 +1313,11 @@ export async function getFranchizeLeads(
       // сразу для всех лидов, поэтому считаем его здесь (lead_id — TEXT без FK,
       // заметки сделок с ключами "sale:…" просто не совпадут с ключами лидов и
       // отфильтруются при маппинге ниже).
+      // 2026-09-03: добавлен created_by — автор последней заметки становится
+      // «последним оператором, трогавшим лида» (lastTouchedBy) для карточки.
       supabaseAdmin
         .from("lead_notes")
-        .select("lead_id, created_at")
+        .select("lead_id, created_at, created_by")
         .eq("crew_id", crewId),
     ]);
 
@@ -1413,27 +1415,37 @@ export async function getFranchizeLeads(
     }
 
     // 12b. Attach notes counts (флажок «Прочитать заметки» в списке лидов).
-    // Один проход по заметкам экипажа: lead_id → {count, lastAt}. Ключи,
-    // не совпадающие с ключами лидов (например "sale:<contract>" заметки
+    // Один проход по заметкам экипажа: lead_id → {count, lastAt, lastBy}.
+    // Ключи, не совпадающие с ключами лидов (например "sale:<contract>" заметки
     // сделок), просто игнорируются — это чужая доменная область.
     if (notesResult.data) {
-      const notesAgg = new Map<string, { count: number; lastAt: string | null }>();
+      const notesAgg = new Map<string, { count: number; lastAt: string | null; lastBy: string | null }>();
       for (const n of notesResult.data) {
         const key = typeof n.lead_id === "string" ? n.lead_id : null;
         if (!key) continue;
         const prev = notesAgg.get(key);
         const at = typeof n.created_at === "string" ? n.created_at : null;
+        // created_by хранит user_id (chat_id) автора — числовой строкой; в
+        // легаси-записях может быть свободный текст или null.
+        const by = typeof (n as { created_by?: unknown }).created_by === "string" && (n as { created_by?: string }).created_by
+          ? (n as { created_by: string }).created_by
+          : null;
         if (!prev) {
-          notesAgg.set(key, { count: 1, lastAt: at });
+          notesAgg.set(key, { count: 1, lastAt: at, lastBy: by });
         } else {
           prev.count += 1;
-          if (at && (!prev.lastAt || at > prev.lastAt)) prev.lastAt = at;
+          if (at && (!prev.lastAt || at > prev.lastAt)) {
+            prev.lastAt = at;
+            prev.lastBy = by;
+          }
         }
       }
       for (const l of leadMap.values()) {
         const agg = notesAgg.get(l.user_id);
         l.notesCount = agg?.count ?? 0;
         l.lastNoteAt = agg?.lastAt ?? null;
+        // Сырое значение (id или имя) — имя подставим после резолва ниже.
+        l.lastTouchedBy = agg?.lastBy ?? null;
       }
     }
 
@@ -1613,6 +1625,11 @@ export async function getFranchizeLeads(
     for (const l of leadMap.values()) {
       if (l.ownerId) assigneeIds.add(l.ownerId);
     }
+    // Авторы заметок (created_by = user_id оператора) — их имена тоже нужны
+    // для плашки «последний трогал» на карточке лида.
+    for (const l of leadMap.values()) {
+      if (l.lastTouchedBy && /^\d+$/.test(l.lastTouchedBy)) assigneeIds.add(l.lastTouchedBy);
+    }
     const assigneeIdsList = Array.from(assigneeIds);
     const assigneeMap = new Map<string, { username: string | null; full_name: string | null }>();
     if (assigneeIdsList.length > 0) {
@@ -1633,6 +1650,12 @@ export async function getFranchizeLeads(
       if (l.ownerId) {
         const o = assigneeMap.get(l.ownerId) || (tgUsers as any[])?.find((u: any) => u.user_id === l.ownerId);
         l.ownerName = (o as any)?.full_name || (o as any)?.username || null;
+      }
+      // «Последний оператор»: created_by (user_id) → человекочитаемое имя.
+      // Нечисловые значения считаем уже готовым именем (легаси-текст).
+      if (l.lastTouchedBy && /^\d+$/.test(l.lastTouchedBy)) {
+        const a = assigneeMap.get(l.lastTouchedBy) || (tgUsers as any[])?.find((u: any) => u.user_id === l.lastTouchedBy);
+        if (a) l.lastTouchedBy = (a as any)?.full_name || (a as any)?.username || l.lastTouchedBy;
       }
     }
 

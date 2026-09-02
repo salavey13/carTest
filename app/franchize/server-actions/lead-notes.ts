@@ -79,7 +79,12 @@ async function verifyNoteAccess(
 }
 
 /**
- * Get all notes for a specific lead
+ * Get all notes for a specific lead.
+ *
+ * 2026-09-03: `created_by` (веб-заметки пишут туда user_id оператора) теперь
+ * резолвится в человекочитаемое имя (users.full_name || username) — шторка
+ * лида и история показывают «Иванов» вместо «413553377». Нечисловые значения
+ * (легаси-текст) и null проходят как есть.
  */
 export async function getLeadNotes(
   leadId: string,
@@ -99,7 +104,32 @@ export async function getLeadNotes(
       .order("created_at", { ascending: false });
 
     if (error) return { success: false, error: error.message };
-    return { success: true, data: data || [] };
+
+    // Resolve numeric created_by → display name (single users query).
+    const notes = (data || []) as LeadNote[];
+    const authorIds = Array.from(
+      new Set(
+        notes
+          .map((n) => n.created_by)
+          .filter((v): v is string => !!v && /^\d+$/.test(v)),
+      ),
+    );
+    if (authorIds.length > 0) {
+      const { data: authorUsers } = await supabaseAdmin
+        .from("users")
+        .select("user_id, username, full_name")
+        .in("user_id", authorIds);
+      const nameMap = new Map<string, string>();
+      for (const u of authorUsers ?? []) {
+        nameMap.set(u.user_id, u.full_name || u.username || u.user_id);
+      }
+      for (const n of notes) {
+        if (n.created_by && nameMap.has(n.created_by)) {
+          n.created_by = nameMap.get(n.created_by)!;
+        }
+      }
+    }
+    return { success: true, data: notes };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
@@ -141,6 +171,19 @@ export async function createLeadNote(input: {
       .single();
 
     if (error) return { success: false, error: error.message };
+    // 2026-09-03: в БД храним стабильный user_id оператора, но в ответе
+    // резолвим его в имя (как getLeadNotes) — шторка сразу показывает
+    // «Иванов», а не сырой chat_id.
+    if (data?.created_by && /^\d+$/.test(data.created_by)) {
+      const { data: author } = await supabaseAdmin
+        .from("users")
+        .select("username, full_name")
+        .eq("user_id", data.created_by)
+        .maybeSingle();
+      if (author) {
+        data.created_by = author.full_name || author.username || data.created_by;
+      }
+    }
     return { success: true, data };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };

@@ -702,11 +702,20 @@ export function LeadsClient({
         setNotesState((prev) => [note, ...prev]);
         // Синхронизируем счётчик заметок в списке (флажок «Прочитать заметки»)
         // без re-fetch: +1 и «новая» (lastNoteAt=сейчас) — заметка только что
-        // оставлена, плашка на карточке должна появиться сразу.
+        // оставлена, плашка на карточке должна появиться сразу. Заодно ставим
+        // «последнего оператора» (lastTouchedBy): имя текущего пользователя —
+        // сервер уже резолвит его в ответе, а локально беру из dbUser
+        // (password-режим без dbUser оставляет прежнее значение).
+        const actorName = res.data.created_by || dbUser?.full_name || dbUser?.username || null;
         setLeadsState((prev) =>
           prev.map((l) =>
             l.user_id === lead.user_id
-              ? { ...l, notesCount: (l.notesCount ?? 0) + 1, lastNoteAt: res.data?.created_at || new Date().toISOString() }
+              ? {
+                  ...l,
+                  notesCount: (l.notesCount ?? 0) + 1,
+                  lastNoteAt: res.data?.created_at || new Date().toISOString(),
+                  lastTouchedBy: actorName || l.lastTouchedBy,
+                }
               : l,
           ),
         );
@@ -716,7 +725,7 @@ export function LeadsClient({
     } catch {
       showToast("Ошибка сети при сохранении заметки");
     }
-  }, [selectedId, leadsState, crewId, dbUser?.user_id, passwordAuthOwnerId, passwordAuthed, showToast]);
+  }, [selectedId, leadsState, crewId, dbUser?.user_id, dbUser?.full_name, dbUser?.username, passwordAuthOwnerId, passwordAuthed, showToast]);
 
   // Password gate render — only show if NOT in Telegram AND no dbUser AND not password-authed
   if (shouldShowPassword && !passwordAuthed) {

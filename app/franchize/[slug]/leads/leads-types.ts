@@ -93,6 +93,14 @@ export interface LeadRow {
   notesCount?: number;
   /** Когда оставлена последняя заметка (ISO) — «новая» (≤24 ч) подсвечена ярче. */
   lastNoteAt?: string | null;
+  /**
+   * Кто из операторов последним «трогал» лида (на сегодня — автор последней
+   * заметки; имя разрешается на сервере из users по created_by). Показывается
+   * на карточке лида и в шторке: «✍ Иванов · 2 ч назад».
+   * null/undefined — заметок нет → показываем оператора, создавшего лид
+   * через /doc (ownerName).
+   */
+  lastTouchedBy?: string | null;
 }
 
 export interface LeadTodoRow {

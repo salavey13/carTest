@@ -31,7 +31,17 @@ export function computeLeadHistory(
     if (t.completed_at) events.push({ type: "todo_completed", timestamp: t.completed_at, label: "Задача выполнена: " + t.title, icon: "✓" });
   }
 
-  for (const n of notes) events.push({ type: "note_added", timestamp: n.created_at, label: "Заметка: " + (n.text.length > 50 ? n.text.slice(0, 50) + "…" : n.text), icon: "📝" });
+  // Автор заметки (после серверного резолва — человекочитаемое имя) →
+  // в деталях таймлайна: сразу видно, кто из операторов работал с лидом.
+  for (const n of notes) {
+    events.push({
+      type: "note_added",
+      timestamp: n.created_at,
+      label: "Заметка: " + (n.text.length > 50 ? n.text.slice(0, 50) + "…" : n.text),
+      icon: "📝",
+      detail: n.created_by ? `Автор: ${n.created_by}` : undefined,
+    });
+  }
 
   if (lead.stageKey === "closed_won") events.push({ type: "closed_won", timestamp: lead.lastSeenAt || new Date().toISOString(), label: "Лид закрыт (выигран)", icon: "🎉" });
   if (lead.stageKey === "closed_lost" && lead.lastSeenAt) events.push({ type: "closed_lost", timestamp: lead.lastSeenAt, label: "Лид закрыт (потерян)", icon: "✗" });
