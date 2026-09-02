@@ -836,7 +836,7 @@ export function LeadDetailDrawer(props: Props) {
                         className="mt-0.5 text-xs"
                         style={{ color: isOverdue ? "#ef4444" : T.textMuted }}
                       >
-                        {t.assigned_to || "—"}
+                        {t.assignedToName || t.assigned_to || "—"}
                         {t.due_date && ` • ${formatDate(t.due_date)}`}
                         {isOverdue && " • просрочено"}
                       </div>

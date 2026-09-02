@@ -116,6 +116,9 @@ export interface LeadTodoRow {
   created_at: string;
   completed_at: string | null;
   assigned_to: string | null;
+  /** iter35: resolved operator name for assigned_to — shown on todo rows
+   *  instead of the raw numeric chat_id. */
+  assignedToName?: string | null;
   due_date: string | null;
 }
 

@@ -1722,6 +1722,17 @@ export async function getFranchizeLeads(
       }
     }
 
+    // iter35: resolve todo assignee names — the sheet used to render the raw
+    // numeric chat_id («356282674») on every todo row.
+    for (const t of dedupedTodos) {
+      if (t.assigned_to && /^\d+$/.test(t.assigned_to)) {
+        const a = assigneeMap.get(t.assigned_to) || tgUserMap.get(t.assigned_to);
+        t.assignedToName = a?.full_name || a?.username || null;
+      } else {
+        t.assignedToName = t.assigned_to || null;
+      }
+    }
+
     return {
       success: true,
       leads: Array.from(leadMap.values()),
