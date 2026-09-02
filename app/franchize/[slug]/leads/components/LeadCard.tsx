@@ -219,6 +219,9 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
                     {pending}
                   </span>
                 )}
+                {/* «Заметки» flag lives in the full-width banner below (remote
+                    session's richer implementation: pluralized, ≤24h highlight,
+                    opens the sheet on the notes section) — no duplicate chip here. */}
               </div>
               {/* Metadata: 11px mobile / 13px desktop */}
               <div

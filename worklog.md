@@ -145,3 +145,28 @@ Stage Summary:
 - ТЗ закрыт полностью: индекс 0–100 (п.1), LIFO «только что → верх очереди» (п.2), Авито ×2 с видимой плашкой (п.3), лайбочки ⚡/🔥 во всех видах + колонка «Приоритет» в таблице + плашка в шторке (п.4). Дефолтная сортировка страницы лидов — «🔥 Приоритет».
 - Импорт Bitrix24 CSV готов к запуску: NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY → `node scripts/import-bitrix-deals-to-leads.mjs --csv upload/DEAL_....csv` (dry-run) → `--commit`. 132 контакта, дубликатов не создаёт, существующих обновляет.
 - 11 контактов без валидного телефона сохранятся в БД (дормант) — в UI появятся после добавления телефона оператором.
+Task ID: 5
+Agent: main (Super Z)
+Task: Fix chat_id matching pollution — leads' history/todos/notes were loaded by the OPERATOR's chat_id (from /doc bot writes), cross-contaminating leads with unrelated data. Matching tightened to phone + ФИО; operator chat_ids neutralized everywhere.
+
+Work Log:
+- Audited live DB (scripts/audit-chat-id-pollution.mjs): roster = 10 operator ids (hardcoded 4 in text skill was missing 6 newer members); 121/557 intents keyed by operator ids; 35/166 user_rental_secrets keyed by operator chat_id (pre-claim rows); 26/29 sale artifacts with no buyer phone (all operator chat ids); todos: 365 keyed by rental_id (fine) + 17 keyed by operator user_id BUT carrying the REAL renter's phone in the phone column; notes: 3 total, 1 bogus on operator key.
+- [leads.ts keying completed] Previous session's uncommitted identity fix (intents/artifacts/rentals/testdrives → phone → name → synthetic op*-keys) kept and extended.
+- [leads.ts round 2] Secrets step 3: operator chat_id → re-key by renter phone → ФИО (nameIdentityKey) → `opsecret:<source_doc_key>`; operator chat id never exposed as contact; originalOperatorChatId preserved for attribution.
+- [leads.ts round 2] Sales step 5: sales are ALWAYS operator-created → no-phone sales always keyed `opsale:<id>`, telegramChatId always null (was leaking operator id for former members).
+- [leads.ts round 2] Enrichment steps 7+8: never set telegramChatId to a crew operator's id (was making "Написать в TG" message the OPERATOR).
+- [leads.ts todo matching] getTodoLeadId (first-match-wins) → getTodoLeadIds (ALL candidates: user_id + phone + lead_id + description, raw AND E.164-normalized). Operator-created todos (user_id=operator, phone=renter) now match the renter's phone-keyed lead — this RECOVERED ~17 real followup todos that the priority chain silently dropped. Phone-shaped 11-digit user_ids ("89960430155") normalize to E.164 twins.
+- [leads.ts round 3 — alias merge] Union-find over lead keys sharing STRONG aliases (same normalized phone; or one lead's key = another's non-operator telegramChatId) → 19 duplicate keys collapsed (live case: Лобанов Михаил existed as "5008436733" AND "+79991370307" with split history). Canonical key: non-operator TG id > phone key > root. Rentals/sales concat deduped by id.
+- [Client] useLeadsData.ts extractTodoLeadIds + pipeline-stages.ts matchTodosToLead: same multi-candidate logic; getFlowType now recognizes synthetic op*-keys as doc-flow.
+- [classifyIdentityState] opsecret: prefix added to the synthetic-key operator_placeholder branch (leads.ts + skill).
+- [«Заметки» highlight] LeadRow.notesCount added; leads.ts fetches lead_notes counts (crew-filtered, keyed by lead identity) and attaches them; LeadCard shows a blue 📝 N chip ("Прочитать заметки") next to the name; LeadTableView shows "📝 заметки: N" under the name; LeadsClient bumps notesCount optimistically after createLeadNote.
+- [Text skill] skills/leads-crm-text/leads-query.mjs: dynamic roster load (crews + crew_members, hardcoded set kept as fallback), all keying fixes ported (intents/secrets/sales/rentals/enrichment guards/alias merge/multi-candidate todo matching), pre-existing bugs fixed: lead-detail notes fetch used undefined SUPABASE_URL/SUPABASE_KEY vars and double-encoded "+7…" phone values.
+- [DB cleanup] scripts/cleanup-operator-note.mjs: deleted 1 bogus note on lead_id=356282674 (exact duplicate of the correct phone-keyed note, added 2 min later by the same author through the collapsed operator card).
+- [Tests] New tests/franchize/leads-identity-matching.spec.ts (10 tests: operator-keyed todo → renter match, unrelated lead no-match, claimed TG-id todo still matches, 11-digit phone-shaped user_id normalization, un-normalized phone matching, rental_id matching, assignee fallback, synthetic-key flow classification, doc/webapp verification rules). Full franchize suite: 952 passed / same 10 pre-existing failures as baseline (my-work ×8, iter15, iter29). ESLint clean on all touched files; strict typecheck slice passed.
+- [Live verification via text skill against prod DB] roster +6 dynamic ids; 19 aliases merged; Лобанов = one lead (54k₽ merged); Федяков Роман +79040517675 shows all 13 real renter todos (recovered) + the note; no lead keyed by an operator chat id; leads page SSR 200 in dev.
+
+Stage Summary:
+- Matching is now STRICTLY phone + ФИО (+ legit claimed TG ids for users who came from the web app themselves): operator chat_ids are never lead keys, never contacts, never todo matchers.
+- ~17 real renter followup todos recovered that were silently dropped; 19 duplicate lead cards merged; 35 operator-keyed secrets re-keyed to real renters; operator contact leaks plugged everywhere.
+- «Заметки» highlight flag live (server-side notesCount + card chip).
+- Text skill now mirrors the web logic exactly (dynamic roster) + 2 pre-existing bugs fixed there.

@@ -285,6 +285,20 @@ function classifyIdentityState(
   // and the UI shows a misleading «Оператор» badge on a real Avito buyer.
   if (userId.startsWith("avito:")) return 'avito_only';
 
+  // IDENTITY MATCHING FIX (2026-09-02): per-row synthetic keys ("opdoc:<intent_id>",
+  // "oprental:<rental_id>", "opsale:<id>", "optestdrive:<id>", "opsecret:<doc_key>")
+  // are assigned to operator-created rows whose renter has NEITHER phone NOR ФИО
+  // recorded. The renter identity is unknown → honest "операторская заглушка" state.
+  if (
+    userId.startsWith("opdoc:") ||
+    userId.startsWith("oprental:") ||
+    userId.startsWith("opsale:") ||
+    userId.startsWith("optestdrive:") ||
+    userId.startsWith("opsecret:")
+  ) {
+    return 'operator_placeholder';
+  }
+
   // Operator placeholder: the visible id IS the operator (pre-claim state).
   if (crewOperatorIds.has(userId)) return 'operator_placeholder';
 
@@ -511,7 +525,7 @@ export async function getFranchizeLeads(
       // so classifyIdentityState can still detect operator-origin for intent-only leads.
       supabaseAdmin
         .from("franchize_intents")
-        .select("telegram_user_id, phone, intent_type, stage, urgency_score, source_route, contact_channel, last_seen_at, created_at, metadata, bike_id")
+        .select("id, telegram_user_id, phone, intent_type, stage, urgency_score, source_route, contact_channel, last_seen_at, created_at, metadata, bike_id")
         .eq("slug", safeSlug)
         .neq("stage", "dismissed")
         .order("last_seen_at", { ascending: false })
@@ -636,14 +650,34 @@ export async function getFranchizeLeads(
         if (!i.telegram_user_id && !i.phone && !avitoChatId) continue;
         // Normalize phone so a lead keyed by "+79991234567" matches a todo keyed by "89991234567".
         const normalizedIntentPhone = normalizePhone(i.phone) || normalizePhone(meta?.phone as string | undefined);
-        const id = i.telegram_user_id || normalizedIntentPhone || (avitoChatId ? `avito:${avitoChatId}` : "") || "";
-        if (!id) continue;
         // franchize_intents has no created_by_operator_chat_id column, but /doc-manual
-        // stores the operator id in metadata.operatorId. Read it as a fallback so
-        // classifyIdentityState can still detect operator-origin for intent-only leads
-        // (leads with no rental/artifact yet).
+        // (and /doc-vlm) stores the operator id in metadata.operatorId. Read it FIRST
+        // so the identity fix below can detect operator-created intents.
         const originalOp =
           (meta?.operatorId as string | null) || null;
+        // ── IDENTITY MATCHING FIX (2026-09-02) ──
+        // /doc bot commands store the OPERATOR's TG id in telegram_user_id (the
+        // renter hasn't scanned the QR yet). Keying the lead by that operator id
+        // collapsed EVERY renter the operator ever served into one "lead" card,
+        // and notes/todos/history written under that key cross-contaminated them
+        // all (the "bogus bunch of unrelated leads" bug). Now: when the telegram
+        // id belongs to a crew operator, the lead is keyed by renter phone →
+        // renter ФИО (name key) → per-intent synthetic key instead — NEVER by the
+        // operator's chat_id. The operator id is still preserved in
+        // originalOperatorChatId for attribution/assignee display.
+        const isOperatorKey =
+          !!i.telegram_user_id &&
+          (crewOperatorIds.has(i.telegram_user_id) || i.telegram_user_id === originalOp);
+        const intentNameKey = meta?.name
+          ? nameIdentityKey(meta.name as string)
+          : "";
+        const id = isOperatorKey
+          ? (normalizedIntentPhone ||
+             intentNameKey ||
+             (avitoChatId ? `avito:${avitoChatId}` : "") ||
+             `opdoc:${i.id}`)
+          : (i.telegram_user_id || normalizedIntentPhone || (avitoChatId ? `avito:${avitoChatId}` : "") || "");
+        if (!id) continue;
         addOrMerge({
           user_id: id,
           full_name: (meta?.name as string) || null,
@@ -657,7 +691,9 @@ export async function getFranchizeLeads(
           intentType: i.intent_type,
           intentStage: i.stage,
           urgencyScore: i.urgency_score ?? undefined,
-          telegramChatId: i.telegram_user_id || null,
+          // Operator's own TG id must NEVER be exposed as the lead's contact —
+          // pre-claim intents have no renter TG identity, so telegramChatId is null.
+          telegramChatId: isOperatorKey ? null : (i.telegram_user_id || null),
           sourceRoute: i.source_route,
           contactChannel: i.contact_channel,
           avito: avitoBlockFromMeta(meta),
@@ -764,14 +800,32 @@ export async function getFranchizeLeads(
     }
 
     // 3. Rental secrets (crew-filtered)
+    //
+    // ── IDENTITY MATCHING FIX (2026-09-02, round 2) ──
+    // user_rental_secrets.chat_id is normally the RENTER's TG id (set at QR
+    // claim). But /doc-created rows that the renter never claimed keep the
+    // OPERATOR's chat_id (35 such rows in vip-bike at audit time: the operator
+    // opened the doc/QR flow, so the row is keyed by his chat). Keying a lead
+    // by the operator's id would (a) show a bogus "operator" lead and (b)
+    // cross-contaminate todos/notes/history with that operator's other work.
+    // When chat_id is a crew operator, key by renter phone → renter ФИО →
+    // per-row synthetic key instead — never by the operator's chat_id.
     if (secretUsers) {
       for (const s of secretUsers) {
         if (!s.chat_id) continue;
         const normalizedSecretPhone = normalizePhone(s.renter_phone);
-        const existing = leadMap.get(s.chat_id);
+        const isOperatorSecret = isOperatorPlaceholder(s.chat_id);
+        const secretNameKey =
+          isOperatorSecret && !normalizedSecretPhone && s.renter_full_name
+            ? nameIdentityKey(s.renter_full_name)
+            : "";
+        const secretId = isOperatorSecret
+          ? (normalizedSecretPhone || secretNameKey || `opsecret:${s.source_doc_key}`)
+          : s.chat_id;
+        const existing = leadMap.get(secretId);
         if (!existing) {
-          leadMap.set(s.chat_id, {
-            user_id: s.chat_id,
+          leadMap.set(secretId, {
+            user_id: secretId,
             full_name: s.renter_full_name,
             username: null,
             phone: normalizedSecretPhone,
@@ -782,7 +836,10 @@ export async function getFranchizeLeads(
             verified: s.verification_status === "verified",
             // goodmorning-fixes: set intentType so mode filter ("rent") includes secret leads.
             intentType: "rent",
-            telegramChatId: s.chat_id,
+            // Operator's chat_id must never be offered as the renter's TG contact.
+            telegramChatId: isOperatorSecret ? null : s.chat_id,
+            // Keep operator attribution for the «Оператор» origin badge.
+            originalOperatorChatId: isOperatorSecret ? s.chat_id : null,
             rentals: [],
             sales: [],
             sourceCount: 1,
@@ -792,6 +849,7 @@ export async function getFranchizeLeads(
           if (s.verification_status === "verified") existing.verified = true;
           if (!existing.full_name) existing.full_name = s.renter_full_name;
           if (!existing.phone && normalizedSecretPhone) existing.phone = normalizedSecretPhone;
+          if (isOperatorSecret && !existing.originalOperatorChatId) existing.originalOperatorChatId = s.chat_id;
         }
       }
     }
@@ -840,9 +898,15 @@ export async function getFranchizeLeads(
         // placeholder user_id (which hid 22 operator-created rentals behind one id).
         const rentalName = (r.rental_id && artifactNameByRentalId.get(r.rental_id)) || null;
         const rentalNameKey = prefersPhone ? nameIdentityKey(rentalName) : "";
+        // ── IDENTITY MATCHING FIX (2026-09-02) ──
+        // When an operator-created rental has NEITHER renter phone NOR ФИО, the
+        // old fallback keyed the lead by r.user_id — which IS the operator's
+        // chat_id, so every such rental collapsed into one contaminated
+        // "operator lead". Key it by its own rental_id instead: each unidentified
+        // renter gets a separate, clean lead card (badge: «Оператор» placeholder).
         const effectiveId = (prefersPhone && effectivePhone)
           ? effectivePhone
-          : (rentalNameKey || r.user_id);
+          : (rentalNameKey || (prefersPhone && r.rental_id ? `oprental:${r.rental_id}` : r.user_id));
 
         const existing = leadMap.get(effectiveId) ||
           // Fallback: try matching by renter_phone from metadata (handles existing rentals
@@ -888,7 +952,9 @@ export async function getFranchizeLeads(
             // via originalOperatorChatId), default to "/doc-manual" and "telegram_bot".
             sourceRoute: originalOp ? "/doc-manual" : null,
             contactChannel: originalOp ? "telegram_bot" : null,
-            telegramChatId: /^\d+$/.test(r.user_id) ? r.user_id : null,
+            // Operator's chat_id must not be offered as the renter's TG contact
+            // (the "Написать в TG"/"Уведомить" actions would target the OPERATOR).
+            telegramChatId: prefersPhone ? null : (/^\d+$/.test(r.user_id) ? r.user_id : null),
             originalOperatorChatId: originalOp,
             rentals: [rentalRow],
             sales: [],
@@ -926,9 +992,16 @@ export async function getFranchizeLeads(
         // (former member, never-added, stale cache) — isOperatorPlaceholder would
         // miss those, but we don't need it here.
         const preferPhone = !!normalizedBuyerPhone;
+        // ── IDENTITY MATCHING FIX (2026-09-02) ── sale artifacts are ALWAYS
+        // operator-created (telegram_chat_id = operator's id, no QR claim flow —
+        // audit §10 #5). Never key such a lead by a chat_id and never expose it
+        // as the buyer's TG contact: use buyer phone → per-row synthetic key.
+        // This also catches operators who are NOT in crewOperatorIds (former
+        // members, never-added, stale roster) — isOperatorPlaceholder would
+        // miss those, so we simply never trust chat_ids on sales.
         const id = preferPhone
           ? normalizedBuyerPhone!
-          : (s.telegram_chat_id || "");
+          : `opsale:${s.id}`;
         if (!id) continue;
         // Resolve bike title from the pre-fetched cars map.
         const bikeId = s.resolved_bike_id || s.requested_bike_id;
@@ -951,7 +1024,9 @@ export async function getFranchizeLeads(
           verified: true,
           // goodmorning-fixes: set intentType so mode filter ("sale") includes sale leads.
           intentType: "sale",
-          telegramChatId: s.telegram_chat_id || null,
+          // Sale artifacts' telegram_chat_id is ALWAYS the operator's id — the
+          // buyer has no TG identity on this path. Never expose it as contact.
+          telegramChatId: null,
           rentals: [],
           sales: [saleRow],
         });
@@ -970,11 +1045,19 @@ export async function getFranchizeLeads(
         const normalizedCustomerPhone = normalizePhone(t.customer_phone);
         // Prefer customer_phone as the lead identity key when the artifact is
         // still in pre-claim state (telegram_chat_id is the operator).
-        const isOperator = t.created_by_operator_chat_id && t.telegram_chat_id === t.created_by_operator_chat_id;
+        // ── IDENTITY MATCHING FIX (2026-09-02) ── additionally: when an
+        // operator-created testdrive has no phone at all, key it by a synthetic
+        // per-row key (never the operator's chat_id) so unidentified customers
+        // don't collapse into one contaminated "operator lead".
+        const isOperator =
+          (!!t.created_by_operator_chat_id && t.telegram_chat_id === t.created_by_operator_chat_id) ||
+          (!!t.telegram_chat_id && crewOperatorIds.has(t.telegram_chat_id));
         const preferPhone = !!normalizedCustomerPhone && isOperator;
         const id = preferPhone
           ? normalizedCustomerPhone!
-          : (t.telegram_chat_id || normalizedCustomerPhone || "");
+          : (!isOperator && t.telegram_chat_id)
+            ? t.telegram_chat_id
+            : (normalizedCustomerPhone || `optestdrive:${t.id}`);
         if (!id) continue;
         const bikeId = t.resolved_bike_id || t.requested_bike_id;
         const bikeTitle = (bikeId && bikeTitleMap.get(bikeId)) || null;
@@ -990,7 +1073,8 @@ export async function getFranchizeLeads(
           verified: true,
           intentType: "test_drive",
           intentStage: "contract_generated",
-          telegramChatId: t.telegram_chat_id || null,
+          // Pre-claim: operator's chat_id is not the customer's contact — don't expose it.
+          telegramChatId: isOperator ? null : (t.telegram_chat_id || null),
           originalOperatorChatId: t.created_by_operator_chat_id || null,
           rentals: [],
           sales: [],
@@ -1037,11 +1121,15 @@ export async function getFranchizeLeads(
           // Find the lead this testdrive artifact was merged into (keyed by phone
           // when pre-claim, or by telegram_chat_id otherwise — same logic as step 6).
           const normalizedCustomerPhone = normalizePhone(t.customer_phone);
-          const isOperator = t.created_by_operator_chat_id && t.telegram_chat_id === t.created_by_operator_chat_id;
+          const isOperator =
+            (!!t.created_by_operator_chat_id && t.telegram_chat_id === t.created_by_operator_chat_id) ||
+            (!!t.telegram_chat_id && crewOperatorIds.has(t.telegram_chat_id));
           const preferPhone = !!normalizedCustomerPhone && isOperator;
           const leadKey = preferPhone
             ? normalizedCustomerPhone!
-            : (t.telegram_chat_id || normalizedCustomerPhone || "");
+            : (!isOperator && t.telegram_chat_id)
+              ? t.telegram_chat_id
+              : (normalizedCustomerPhone || `optestdrive:${t.id}`);
           const lead = leadMap.get(leadKey);
           if (!lead) continue;
           // Dedupe by rentalId — don't push if already attached (e.g. via phone match).
@@ -1065,6 +1153,118 @@ export async function getFranchizeLeads(
           // the explicit metadata backfill (vs phone matching).
           if (!lead.intentType) lead.intentType = "test_drive";
         }
+      }
+    }
+
+    // ── 6.7. Alias merge: one human under multiple lead keys ──
+    //
+    // ── IDENTITY MATCHING FIX (2026-09-02, round 3) ──
+    // The same person can appear as TWO leads: renter claimed one contract via
+    // QR (that lead is keyed by his TG id) while other contracts/intents for
+    // the SAME phone are keyed by phone (operator-created, pre-claim). Live
+    // case: Лобанов Михаил — leads "5008436733" and "+79991370307", same human,
+    // same phone, two cards, split history/todos. Union all leads that share a
+    // STRONG alias (same normalized phone, or one lead's key IS the other's
+    // non-operator telegramChatId) and merge each group into ONE lead.
+    //
+    // Canonical key preference: a non-operator numeric TG id (claimed identity
+    // → users-table enrichment + TG contact), else a phone key, else the group
+    // root. Name keys / synthetic keys are never unioned (no strong alias).
+    {
+      const entries = Array.from(leadMap.entries());
+      const parent = new Map<string, string>();
+      const find = (k: string): string => {
+        let r = parent.get(k) ?? k;
+        while (parent.has(r) && parent.get(r) !== r) r = parent.get(r)!;
+        return r;
+      };
+      const union = (a: string, b: string) => {
+        const ra = find(a), rb = find(b);
+        if (ra !== rb) parent.set(ra, rb);
+      };
+      for (const [k] of entries) parent.set(k, k);
+
+      // Strong alias 1: same normalized phone
+      const byPhone = new Map<string, string>();
+      for (const [k, l] of entries) {
+        if (!l.phone) continue;
+        const prev = byPhone.get(l.phone);
+        if (prev && prev !== k) union(prev, k);
+        else if (!prev) byPhone.set(l.phone, k);
+      }
+      // Strong alias 2: a lead's non-operator telegramChatId equals another
+      // lead's key (or another lead's telegramChatId — same claimed identity)
+      const byTg = new Map<string, string>();
+      for (const [k, l] of entries) {
+        const tg = l.telegramChatId && !crewOperatorIds.has(l.telegramChatId)
+          ? l.telegramChatId : null;
+        if (!tg) continue;
+        const prev = byTg.get(tg);
+        if (prev && prev !== k) union(prev, k);
+        else if (!prev) byTg.set(tg, k);
+        if (leadMap.has(tg) && tg !== k) union(tg, k);
+      }
+
+      // Group keys by union root
+      const groups = new Map<string, string[]>();
+      for (const [k] of entries) {
+        const root = find(k);
+        const arr = groups.get(root) ?? [];
+        arr.push(k);
+        groups.set(root, arr);
+      }
+
+      const mergeOtherInto = (target: MutableLead, other: MutableLead): void => {
+        // Same union semantics as addOrMerge's field updates
+        target.sourceCount = (target.sourceCount || 1) + (other.sourceCount || 1);
+        if (other.verified) target.verified = true;
+        if (other.full_name && !target.full_name) target.full_name = other.full_name;
+        if (other.username && !target.username) target.username = other.username;
+        if (other.phone && !target.phone) target.phone = other.phone;
+        if (other.bikeTitle && !target.bikeTitle) target.bikeTitle = other.bikeTitle;
+        if (other.intentType && !target.intentType) target.intentType = other.intentType;
+        if (other.intentStage && !target.intentStage) target.intentStage = other.intentStage;
+        if ((other.urgencyScore ?? 0) > (target.urgencyScore ?? 0)) target.urgencyScore = other.urgencyScore;
+        if (other.createdAt && (!target.createdAt || other.createdAt > target.createdAt)) target.createdAt = other.createdAt;
+        if (other.lastSeenAt && (!target.lastSeenAt || other.lastSeenAt > target.lastSeenAt)) target.lastSeenAt = other.lastSeenAt;
+        if (!target.telegramChatId && other.telegramChatId && !crewOperatorIds.has(other.telegramChatId)) target.telegramChatId = other.telegramChatId;
+        if (other.sourceRoute && !target.sourceRoute) target.sourceRoute = other.sourceRoute;
+        if (other.contactChannel && !target.contactChannel) target.contactChannel = other.contactChannel;
+        if (other.originalOperatorChatId && !target.originalOperatorChatId) target.originalOperatorChatId = other.originalOperatorChatId;
+        // Rentals concat with dedupe by rentalId
+        const seenRentalIds = new Set(target.rentals.map((r) => r.rentalId).filter(Boolean));
+        for (const r of other.rentals) {
+          if (r.rentalId && seenRentalIds.has(r.rentalId)) continue;
+          target.rentals.push(r);
+          if (r.rentalId) seenRentalIds.add(r.rentalId);
+        }
+        // Sales concat with dedupe by saleId
+        const seenSaleIds = new Set(target.sales.map((s) => s.saleId).filter(Boolean));
+        for (const s of other.sales) {
+          if (s.saleId && seenSaleIds.has(s.saleId)) continue;
+          target.sales.push(s);
+          if (s.saleId) seenSaleIds.add(s.saleId);
+        }
+      };
+
+      let mergedCount = 0;
+      for (const keys of groups.values()) {
+        if (keys.length <= 1) continue;
+        // Canonical key: non-operator numeric TG id > phone key > root
+        const tgKey = keys.find((k) => /^\d{1,12}$/.test(k) && !crewOperatorIds.has(k));
+        const phoneKey = keys.find((k) => isPhoneString(k));
+        const canonical = tgKey || phoneKey || keys[0];
+        const canonicalLead = leadMap.get(canonical)!;
+        for (const k of keys) {
+          if (k === canonical) continue;
+          const other = leadMap.get(k)!;
+          mergeOtherInto(canonicalLead, other);
+          leadMap.delete(k);
+          mergedCount++;
+        }
+      }
+      if (mergedCount > 0) {
+        logger.info(`[getFranchizeLeads] alias merge: collapsed ${mergedCount} duplicate lead key(s) into canonical identities`);
       }
     }
 
@@ -1096,11 +1296,16 @@ export async function getFranchizeLeads(
       // BUG FIX: include both `lead_followup` AND `rental_verification` — the latter
       // covers passport/odometer/return-checklist todos which are tied to the same
       // rental_id and absolutely belong on the lead's card.
+      // 2026-09-02 (merge): ALSO include `lead_handling` — «Отработан» / «Перезвонить
+      // в …» rows live in the same table (see lib/lead-handling.ts). Without this,
+      // handling state loaded fine after an action (touched rows are appended
+      // client-side) but VANISHED on page reload — the server query is the only
+      // path that hydrates todosState on load.
       supabaseAdmin
         .from("crew_todos")
         .select("id, lead_id, user_id, phone, rental_id, title, description, status, priority, category, created_at, completed_at, assigned_to, due_date")
         .eq("crew_id", crewId)
-        .in("category", ["lead_followup", "rental_verification"])
+        .in("category", ["lead_followup", "rental_verification", "lead_handling"])
         .order("created_at", { ascending: false }),
       // 12. Notes counts per lead (lead_notes) — один агрегатный запрос на экипаж,
       // питает флажок «Прочитать заметки» прямо в списке лидов. Заметки хранятся
@@ -1145,7 +1350,10 @@ export async function getFranchizeLeads(
       for (const l of leadMap.values()) {
         const match = tgUsers.find((u) => u.user_id === l.user_id);
         if (match) {
-          l.telegramChatId = l.user_id;
+          // IDENTITY MATCHING FIX (2026-09-02, round 2): a numeric lead key that
+          // belongs to a crew operator must NEVER be exposed as the lead's TG
+          // contact ("Написать в TG"/"Уведомить" would message the OPERATOR).
+          l.telegramChatId = crewOperatorIds.has(l.user_id) ? null : l.user_id;
           if (match.username && !l.username) l.username = match.username;
           if (match.full_name && !l.full_name) l.full_name = match.full_name;
           const meta = match.metadata as Record<string, unknown> | null;
@@ -1165,7 +1373,10 @@ export async function getFranchizeLeads(
             s.renter_phone &&
             normalizePhone(s.renter_phone) === l.phone,
           );
-          if (match) l.telegramChatId = match.chat_id;
+          // IDENTITY MATCHING FIX (2026-09-02, round 2): skip operator chat_ids —
+          // a secret row keyed by an operator (pre-claim / operator-scanned QR)
+          // must not become the renter's TG contact.
+          if (match && !crewOperatorIds.has(match.chat_id)) l.telegramChatId = match.chat_id;
         }
       }
     }
@@ -1254,15 +1465,14 @@ export async function getFranchizeLeads(
 
     // ── Server-side filtering: return todos matching loaded leads ──
     //
-    // Matching strategy (Phase 1 identity fix):
-    //  1. rental_id from description JSON → if leadMap has a lead whose rental includes this rental_id
-    //  2. user_id column (canonical Telegram chat_id)
-    //  3. phone column (phone-only leads)
-    //  4. lead_id column (legacy)
-    //  5. description JSON identity fields (legacy)
+    // Matching strategy (2026-09-02 identity fix):
+    //  1. rental_id (direct column or description JSON) → lead that owns the rental
+    //  2. ANY identity candidate: user_id / phone / lead_id / description fields
+    //     (raw + phone-normalized variants) — see getTodoLeadIds.
     //
-    // This ensures operator-created todos (which have user_id=operator in description)
-    // can still be matched by rental_id BEFORE the QR claim propagates the real renter ID.
+    // Operator-created todos (user_id = operator, phone = renter) match the
+    // renter's phone-keyed lead via the phone candidate; the operator chat_id
+    // candidate matches nothing because leads are never keyed by operator ids.
     const leadUserIds = new Set(Array.from(leadMap.keys()));
 
     // Build rental_id → lead user_id lookup for rental_id-based todo matching
@@ -1289,57 +1499,91 @@ export async function getFranchizeLeads(
     };
 
     /**
-     * Get the lead identifier from a todo.
+     * Get ALL lead-identifier candidates from a todo.
      *
-     * BUG FIX: previously used /^\d{1,9}$/ which rejects 10-digit Telegram IDs
-     * (e.g. 7813830016, one of the operators in the audit). Most modern users have
-     * 10-digit IDs, so this regex silently dropped their todos. Now allows up to 12 digits.
-     * Also normalizes phones so a todo keyed by "8999..." matches a lead keyed by "+7999...".
+     * ── IDENTITY MATCHING FIX (2026-09-02, round 2) ──
+     * The old version returned the FIRST matching column in priority order
+     * (user_id → phone → lead_id → description). That single-candidate chain
+     * had a fatal flaw for operator-created todos: the bot's /doc flow writes
+     * user_id = OPERATOR's chat_id AND phone = RENTER's phone on the same row.
+     * user_id won the priority race, matched no lead (leads are no longer keyed
+     * by operator ids), and the REAL renter's todo silently disappeared from
+     * the leads page. The same applied to notes/history attached to the lead.
+     *
+     * Now we return EVERY candidate (user_id, phone, lead_id, description
+     * fields — raw AND phone-normalized variants) and the caller matches if
+     * ANY candidate belongs to a loaded lead. Operator chat_ids are harmless
+     * here: no lead is ever keyed by an operator id, so those candidates
+     * simply never match, while the renter's phone candidate does.
+     *
+     * Also: phone-shaped 11-digit values ("89960430155", "7904…") stored in
+     * user_id by older bot flows are normalized to E.164 as additional
+     * candidates so they match phone-keyed leads.
+     *
+     * BUG FIX (previously, kept): /^\d{1,9}$/ rejected 10-digit Telegram IDs
+     * (e.g. 7813830016). Now allows up to 12 digits.
      */
-    const getTodoLeadId = (t: typeof todos[number]): string | null => {
-      // 1. user_id column — canonical Telegram chat_id
-      if (t.user_id && /^\d{1,12}$/.test(t.user_id)) return t.user_id;
-      // 2. phone column — phone-only leads (normalize for cross-source matching)
-      if (t.phone) {
-        const normalized = normalizePhone(t.phone);
-        if (normalized) return normalized;
+    const getTodoLeadIds = (t: typeof todos[number]): string[] => {
+      const ids: string[] = [];
+      const push = (v: string | null | undefined): void => {
+        if (v && v.length > 0 && !ids.includes(v)) ids.push(v);
+      };
+      // push a value AND its normalized-phone form (both are candidates)
+      const pushWithPhone = (v: string | null | undefined): void => {
+        if (!v) return;
+        push(v);
+        const n = normalizePhone(v);
+        if (n) push(n);
+      };
+
+      // 1. user_id column — Telegram chat_id, or a phone-shaped legacy value
+      if (t.user_id && /^\d{1,12}$/.test(t.user_id)) {
+        push(t.user_id);
+        if (/^[78]\d{10}$/.test(t.user_id)) push(normalizePhone(t.user_id));
       }
+      // 2. phone column — phone-only leads
+      pushWithPhone(t.phone);
       // 3. lead_id column — legacy fallback
       if (t.lead_id) {
-        if (/^\d{1,12}$/.test(t.lead_id)) return t.lead_id;
-        // Phone-shaped lead_id (legacy) — normalize.
-        const normalizedLead = normalizePhone(t.lead_id);
-        if (normalizedLead) return normalizedLead;
-        if (t.lead_id.includes('-')) return t.lead_id;
+        if (/^\d{1,12}$/.test(t.lead_id)) {
+          push(t.lead_id);
+          if (/^[78]\d{10}$/.test(t.lead_id)) push(normalizePhone(t.lead_id));
+        } else {
+          pushWithPhone(t.lead_id);
+          if (t.lead_id.includes("-")) push(t.lead_id);
+        }
       }
       // 4. description JSON — legacy fallback
       if (t.description) {
         try {
           const desc = JSON.parse(t.description);
-          if (desc.user_id && typeof desc.user_id === 'string' && /^\d{1,12}$/.test(desc.user_id)) return desc.user_id;
-          if (desc.phone && typeof desc.phone === 'string') {
-            const normalized = normalizePhone(desc.phone);
-            if (normalized) return normalized;
+          if (desc.user_id && typeof desc.user_id === "string" && /^\d{1,12}$/.test(desc.user_id)) {
+            push(desc.user_id);
+            if (/^[78]\d{10}$/.test(desc.user_id)) push(normalizePhone(desc.user_id));
           }
-          if (desc.lead_id && typeof desc.lead_id === 'string') {
-            if (/^\d{1,12}$/.test(desc.lead_id)) return desc.lead_id;
-            const normalizedLead = normalizePhone(desc.lead_id);
-            if (normalizedLead) return normalizedLead;
-            if (desc.lead_id.includes('-')) return desc.lead_id;
+          if (desc.phone && typeof desc.phone === "string") pushWithPhone(desc.phone);
+          if (desc.lead_id && typeof desc.lead_id === "string") {
+            if (/^\d{1,12}$/.test(desc.lead_id)) {
+              push(desc.lead_id);
+              if (/^[78]\d{10}$/.test(desc.lead_id)) push(normalizePhone(desc.lead_id));
+            } else {
+              pushWithPhone(desc.lead_id);
+              if (desc.lead_id.includes("-")) push(desc.lead_id);
+            }
           }
         } catch { /* ignore */ }
       }
-      return null;
+      return ids;
     };
 
     const filteredTodos = (todos || []).filter((t) => {
-      // 1. Match by rental_id from description (strongest link — works before QR claim)
+      // 1. Match by rental_id (strongest link — works before QR claim)
       const todoRentalId = getTodoRentalId(t);
       if (todoRentalId && rentalIdToLeadId.has(todoRentalId)) return true;
 
-      // 2-5. Match by identity fallback chain
-      const todoLeadId = getTodoLeadId(t);
-      if (todoLeadId && leadUserIds.has(todoLeadId)) return true;
+      // 2-5. Match by ANY identity candidate (see getTodoLeadIds)
+      const todoLeadIds = getTodoLeadIds(t);
+      if (todoLeadIds.some((id) => leadUserIds.has(id))) return true;
 
       return false;
     });

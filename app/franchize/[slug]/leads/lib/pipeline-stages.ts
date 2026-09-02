@@ -131,6 +131,19 @@ export const VERIFICATION_LABELS: Record<string, { label: string; color: string;
 export function getFlowType(lead: LeadRow): "doc" | "webapp" | "none" {
   if (!lead.rentals.length) return "none";
   if (lead.originalOperatorChatId) return "doc";
+  // Synthetic keys (opdoc:/oprental:/opsale:/optestdrive:/opsecret:) are
+  // assigned ONLY to operator-created rows whose renter has neither phone
+  // nor ФИО — by construction they are doc-flow, even when the operator
+  // column wasn't preserved on the source row.
+  if (
+    lead.user_id.startsWith("opdoc:") ||
+    lead.user_id.startsWith("oprental:") ||
+    lead.user_id.startsWith("opsale:") ||
+    lead.user_id.startsWith("optestdrive:") ||
+    lead.user_id.startsWith("opsecret:")
+  ) {
+    return "doc";
+  }
   return "webapp";
 }
 
@@ -274,36 +287,65 @@ export function matchTodosToLead(lead: LeadRow, todos: LeadTodoRow[]): LeadTodoR
         if (d.rental_id && rentalIds.has(d.rental_id)) return true;
       } catch {}
     }
-    const id = extractTodoLeadId(t);
-    if (id && identitySet.has(id)) return true;
+    // Multi-candidate identity match (2026-09-02): operator-created todos carry
+    // user_id = operator AND phone = renter — the phone candidate matches the
+    // renter-keyed lead, the operator id candidate matches nothing.
+    const ids = extractTodoLeadIds(t);
+    if (ids.some((id) => identitySet.has(id))) return true;
     return false;
   });
 }
 
-function extractTodoLeadId(todo: LeadTodoRow): string | null {
-  if (todo.user_id && /^\d{1,12}$/.test(todo.user_id)) return todo.user_id;
-  if (todo.phone) { const n = normalizePhone(todo.phone); if (n) return n; }
+function extractTodoLeadIds(todo: LeadTodoRow): string[] {
+  const ids: string[] = [];
+  const push = (v: string | null | undefined): void => {
+    if (v && v.length > 0 && !ids.includes(v)) ids.push(v);
+  };
+  const pushWithPhone = (v: string | null | undefined): void => {
+    if (!v) return;
+    push(v);
+    const n = normalizePhone(v);
+    if (n) push(n);
+  };
+  if (todo.user_id && /^\d{1,12}$/.test(todo.user_id)) {
+    push(todo.user_id);
+    if (/^[78]\d{10}$/.test(todo.user_id)) push(normalizePhone(todo.user_id));
+  }
+  pushWithPhone(todo.phone);
   if (todo.lead_id) {
-    if (/^\d{1,12}$/.test(todo.lead_id)) return todo.lead_id;
-    // FIX (lead-handling): non-phone keys ("avito:…", UUIDs) compare AS-IS —
-    // normalizePhone() mangles them into "+avito:…" which matches nothing.
-    if (!/^[+\d\s\-()]+$/.test(todo.lead_id)) return todo.lead_id;
-    const n = normalizePhone(todo.lead_id); if (n) return n;
-    return todo.lead_id;
+    if (/^\d{1,12}$/.test(todo.lead_id)) {
+      push(todo.lead_id);
+      if (/^[78]\d{10}$/.test(todo.lead_id)) push(normalizePhone(todo.lead_id));
+    } else if (/^[+\d\s\-()]+$/.test(todo.lead_id)) {
+      // phone-shaped ("8 999…") → raw + normalized candidates
+      pushWithPhone(todo.lead_id);
+    } else {
+      // FIX (lead-handling, kept): non-phone keys ("avito:…", UUIDs) compare
+      // AS-IS — normalizePhone() mangles them into "+avito:…" which matches
+      // nothing. Push raw only, never a mangled twin.
+      push(todo.lead_id);
+    }
   }
   if (todo.description) {
     try {
       const d = JSON.parse(todo.description);
-      if (typeof d.user_id === 'string' && /^\d{1,12}$/.test(d.user_id)) return d.user_id;
-      if (typeof d.phone === 'string') { const n = normalizePhone(d.phone); if (n) return n; }
+      if (typeof d.user_id === 'string' && /^\d{1,12}$/.test(d.user_id)) {
+        push(d.user_id);
+        if (/^[78]\d{10}$/.test(d.user_id)) push(normalizePhone(d.user_id));
+      }
+      if (typeof d.phone === 'string') pushWithPhone(d.phone);
       if (typeof d.lead_id === 'string' && d.lead_id) {
-        if (/^\d{1,12}$/.test(d.lead_id)) return d.lead_id;
-        // non-phone keys (avito:…) compare as-is — see fix above
-        if (!/^[+\d\s\-()]+$/.test(d.lead_id)) return d.lead_id;
-        const n = normalizePhone(d.lead_id); if (n) return n;
-        return d.lead_id;
+        if (/^\d{1,12}$/.test(d.lead_id)) {
+          push(d.lead_id);
+          if (/^[78]\d{10}$/.test(d.lead_id)) push(normalizePhone(d.lead_id));
+        } else if (/^[+\d\s\-()]+$/.test(d.lead_id)) {
+          pushWithPhone(d.lead_id);
+        } else {
+          // non-phone keys (avito:…) compare as-is — see fix above
+          push(d.lead_id);
+        }
       }
     } catch {}
   }
-  return null;
+  return ids;
 }
