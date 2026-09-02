@@ -170,3 +170,19 @@ Stage Summary:
 - ~17 real renter followup todos recovered that were silently dropped; 19 duplicate lead cards merged; 35 operator-keyed secrets re-keyed to real renters; operator contact leaks plugged everywhere.
 - «Заметки» highlight flag live (server-side notesCount + card chip).
 - Text skill now mirrors the web logic exactly (dynamic roster) + 2 pre-existing bugs fixed there.
+
+---
+Task ID: 5 (addendum)
+Agent: main (Super Z)
+Task: Rebase onto the parallel session's commits (priority score, lead-handling, notes flag, Bitrix import) + verify production deploy.
+
+Work Log:
+- Push was rejected (remote had 3 new commits from a parallel session: 7b4e4bf priority score + Bitrix24 import, 93d9620 dropdowns/Avito column/handled+callback, 6dfd359 notes flag + codereview).
+- Rebased and resolved 8 conflicts: leads.ts notes aggregation (kept remote's notesResult batch fetch with lastNoteAt), leads-types.ts (kept remote's notesCount + lastNoteAt), LeadCard (kept remote's full-width pluralized notes banner with ≤24h highlight + sheet-on-notes jump, removed my duplicate small chip), LeadTableView (kept remote's clickable notes button; fixed a dangling ternary tail that broke JSX parse), LeadsClient (kept remote's notesCount+lastNoteAt optimistic sync), useLeadsData + pipeline-stages (kept MY multi-candidate extractTodoLeadIds, folded in remote's non-phone-key guard: "avito:…"/UUID lead_ids compare AS-IS, never phone-normalized), worklog (kept both).
+- Merge fix: added "lead_handling" to the getFranchizeLeads crew_todos category filter — the parallel session's «Отработан»/«Перезвонить» rows were invisible on page reload (only hydrated after an action; server query is the only load path).
+- Verified merged state: eslint clean, strict typecheck slice passed, leads suites (leads/identity/handling/priority) 97 tests pass, full franchize suite 998 passed / 11 failed — 10 baseline + 1 pre-existing at origin/main (iter27 subrenter counters, confirmed via worktree test at origin/main). Zero regressions from this session.
+- Pushed 7a616e9 → origin/main (Vercel auto-deploy).
+
+Stage Summary:
+- Identity-matching fix now sits on top of the parallel session's priority/handling/notes work; both feature sets intact.
+- lead_handling todos now hydrate on page load (persisting «Отработан»/«Перезвонить» state across reloads).
