@@ -285,10 +285,13 @@ export function LeadsClient({
   // ── Stage + Owner filters (applied AFTER useFilteredSortedLeads) ──
   // These are new filters that the v2-style toolbar exposes. They narrow
   // the already-sorted leads list without re-running the full pipeline.
+  // FIX: stage filter now matches the COMPUTED pipeline stage (stageKey, set
+  // server-side by computeLeadStage) — it used to compare against the raw DB
+  // stage, so most options matched nothing and the filter looked broken.
   const sortedLeads = useMemo(() => {
     let result = baseSortedLeads;
     if (filterStage !== "all") {
-      result = result.filter((l) => (l.intentStage || "new") === filterStage);
+      result = result.filter((l) => (l.stageKey || "new") === filterStage);
     }
     if (filterOwner !== "all") {
       result = result.filter((l) => {

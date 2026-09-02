@@ -17,7 +17,7 @@ import {
   Phone,
   AlertCircle,
 } from "lucide-react";
-import { type Segment } from "../leads-constants";
+import { type Segment, SOURCE_META } from "../leads-constants";
 
 // ── Segment metadata for the chip row ──
 const SEGMENT_META: Record<Segment, { label: string; icon: any; color: string }> = {
@@ -36,14 +36,23 @@ const SORT_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "name", label: "А → Я" },
 ];
 
-// ── Stage options (from STAGE_LABELS + board columns) ──
+// ── Stage options ──
+// FIX: these values are matched against the lead's COMPUTED pipeline stage
+// (stageKey: new / needs_contact / contract_sent / …), not the raw DB stage.
+// The old list (contacted/configured/completed) mostly matched nothing —
+// "Настроил"/"Завершено" never exist as stageKey, and "Новые" missed every
+// lead whose DB stage was lead_captured/viewed → the filter looked dead.
 const STAGE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "all", label: "Все стадии" },
   { value: "new", label: "Новые" },
-  { value: "contacted", label: "В работе" },
-  { value: "configured", label: "Настроил" },
-  { value: "contract_generated", label: "Договор" },
-  { value: "completed", label: "Завершено" },
+  { value: "needs_contact", label: "Нужен контакт" },
+  { value: "contract_sent", label: "Договор отправлен" },
+  { value: "awaiting_qr_claim", label: "QR не принят" },
+  { value: "documents_missing", label: "Нет документов" },
+  { value: "active_rental", label: "Активные" },
+  { value: "return_due", label: "Возврат" },
+  { value: "closed_won", label: "Закрыто" },
+  { value: "closed_lost", label: "Потеряно" },
 ];
 
 export function LeadsToolbar({
@@ -233,7 +242,14 @@ export function LeadsToolbar({
           T={T}
           options={[
             { value: "all", label: "Все источники" },
-            ...availableSources.map((s) => ({ value: s, label: s })),
+            // Virtual filter: selects leads by CHANNEL (Avito webhook/forwards),
+            // handled in filterLeads — see isAvitoLead().
+            { value: "avito", label: "Авито" },
+            // Human labels (SOURCE_META) instead of raw slugs like
+            // "rental_contract" / "callback_request".
+            ...availableSources
+              .map((s) => ({ value: s, label: SOURCE_META[s]?.label || s }))
+              .sort((a, b) => a.label.localeCompare(b.label, "ru")),
           ]}
         />
 

@@ -2,7 +2,26 @@
 "use client";
 
 import { SOURCE_META } from "./leads-constants";
+import { PIPELINE_STAGES } from "./lib/pipeline-stages";
 import type {LeadRow, LeadTodoRow} from "./leads-types";
+
+/** Avito brand tint used for badges/accents across the leads UI. */
+export const AVITO_COLOR = "#0a8f2a";
+export const AVITO_BG = "#0a8f2a1a";
+
+/**
+ * True when the lead came from the Avito pipeline (webhook v3, factory monitor
+ * enrichment, or an assistant-bot forward). Such leads have no phone/TG —
+ * the Avito chat link is the ONLY way to answer them, so the UI highlights
+ * them (badge + row accent + dedicated «Авито» source filter).
+ */
+export function isAvitoLead(lead: LeadRow): boolean {
+  return (
+    lead.contactChannel === "avito" ||
+    !!lead.avito?.chatId ||
+    lead.user_id.startsWith("avito:")
+  );
+}
 
 export function getInitials(name: string | null): string {
   if (!name) return "?";
@@ -255,7 +274,14 @@ export function filterLeads(
     );
   }
 
-  if (filterSource !== "all") result = result.filter((l) => l.source === filterSource);
+  // "avito" is a VIRTUAL source: it selects leads by CHANNEL (any intent that
+  // came from the Avito webhook/forward), not by the raw `source` column —
+  // otherwise you'd have to know that Avito chats land as callback_request.
+  if (filterSource === "avito") {
+    result = result.filter(isAvitoLead);
+  } else if (filterSource !== "all") {
+    result = result.filter((l) => l.source === filterSource);
+  }
 
   if (segment !== "all") {
     result = result.filter((l) => {
@@ -312,11 +338,18 @@ export function categorizeLeads(
 }
 
 export function groupLeadsForBoard(leads: LeadRow[]): Record<string, LeadRow[]> {
-  const map: Record<string, LeadRow[]> = { new: [], contacted: [], configured: [], contract_generated: [], completed: [] };
+  // FIX: used to group by the RAW DB stage (intentStage) while the board only
+  // knows 5 columns — DB stages like "viewed" (the most common one!), "clicked",
+  // "lead_captured", "checkout_started" all fell into the "new" fallback bucket,
+  // which is why «Новые» showed 125+ mixed leads. Now we group by the COMPUTED
+  // pipeline stage (stageKey, already resolved server-side from rentals/QR/docs),
+  // and the column set matches PIPELINE_STAGES exactly.
+  const map: Record<string, LeadRow[]> = {};
+  for (const s of PIPELINE_STAGES) map[s.key] = [];
   for (const l of leads) {
-    const key = l.intentStage || "new";
-    const col = map[key] ? key : "new";
-    map[col].push(l);
+    const key = l.stageKey || "new";
+    if (!map[key]) map[key] = [];
+    map[key].push(l);
   }
   return map;
 }

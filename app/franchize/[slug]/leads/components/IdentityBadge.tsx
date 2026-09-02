@@ -1,8 +1,8 @@
 "use client";
 
-import { User, Phone, ShieldAlert, GitMerge } from "lucide-react";
+import { User, Phone, ShieldAlert, GitMerge, MessageSquare } from "lucide-react";
 
-type IdentityState = 'claimed_user' | 'phone_only' | 'operator_placeholder' | 'merged';
+type IdentityState = 'claimed_user' | 'phone_only' | 'operator_placeholder' | 'merged' | 'avito_only';
 
 const IDENTITY_META: Record<IdentityState, { label: string; icon: any; color: string; bg: string; title: string }> = {
   claimed_user: {
@@ -11,6 +11,13 @@ const IDENTITY_META: Record<IdentityState, { label: string; icon: any; color: st
     color: "#10b981",
     bg: "#10b98115",
     title: "Подтверждённый пользователь Telegram",
+  },
+  avito_only: {
+    label: "Авито",
+    icon: MessageSquare,
+    color: "#0a8f2a",
+    bg: "#0a8f2a15",
+    title: "Лид из чата Авито — телефона и Telegram нет, ответить можно только в чате Авито",
   },
   phone_only: {
     label: "Телефон",

@@ -275,9 +275,15 @@ function nameIdentityKey(fullName: string | null | undefined): string {
 function classifyIdentityState(
   lead: { user_id: string; phone: string | null; telegramChatId?: string | null; sourceCount?: number; originalOperatorChatId?: string | null },
   crewOperatorIds: Set<string>,
-): 'claimed_user' | 'phone_only' | 'operator_placeholder' | 'merged' {
+): 'claimed_user' | 'phone_only' | 'operator_placeholder' | 'merged' | 'avito_only' {
   const userId = lead.user_id;
   const originalOp = lead.originalOperatorChatId || null;
+
+  // Avito chat lead: keyed by the synthetic "avito:<chat_id>" identity (the
+  // webhook creates intents with neither phone nor telegram_user_id). Must be
+  // checked FIRST — otherwise the fallback below labels it operator_placeholder
+  // and the UI shows a misleading «Оператор» badge on a real Avito buyer.
+  if (userId.startsWith("avito:")) return 'avito_only';
 
   // Operator placeholder: the visible id IS the operator (pre-claim state).
   if (crewOperatorIds.has(userId)) return 'operator_placeholder';
@@ -617,12 +623,21 @@ export async function getFranchizeLeads(
     // ── Franchize intents
     if (intentLeads) {
       for (const i of intentLeads) {
-        if (!i.telegram_user_id && !i.phone) continue;
-        // Normalize phone so a lead keyed by "+79991234567" matches a todo keyed by "89991234567".
-        const normalizedIntentPhone = normalizePhone(i.phone) || normalizePhone((i.metadata as any)?.phone);
-        const id = i.telegram_user_id || normalizedIntentPhone || "";
-        if (!id) continue;
         const meta = i.metadata as Record<string, unknown> | null;
+        // Avito chat leads (webhook / bot forwards) have NEITHER telegram_user_id
+        // NOR phone — the old `if (!i.telegram_user_id && !i.phone) continue`
+        // silently dropped every one of them from the leads page (the buyer is
+        // reachable only through the Avito chat link). Key them by the Avito
+        // chat id: "avito:<chat_id>" — stable, unique, deduped by the webhook.
+        const avitoChatId =
+          typeof meta?.avitoChatId === "string" && meta.avitoChatId.trim()
+            ? meta.avitoChatId.trim()
+            : null;
+        if (!i.telegram_user_id && !i.phone && !avitoChatId) continue;
+        // Normalize phone so a lead keyed by "+79991234567" matches a todo keyed by "89991234567".
+        const normalizedIntentPhone = normalizePhone(i.phone) || normalizePhone(meta?.phone as string | undefined);
+        const id = i.telegram_user_id || normalizedIntentPhone || (avitoChatId ? `avito:${avitoChatId}` : "") || "";
+        if (!id) continue;
         // franchize_intents has no created_by_operator_chat_id column, but /doc-manual
         // stores the operator id in metadata.operatorId. Read it as a fallback so
         // classifyIdentityState can still detect operator-origin for intent-only leads
@@ -1306,31 +1321,38 @@ export async function getFranchizeLeads(
       dedupedTodos.push(t);
     }
 
-    // Compute assignee for each lead from its todos
+    // Compute assignee/owner for each lead.
+    // FIX: this whole block used to run ONLY when some todo had assigned_to —
+    // crews without assigned todos got ownerId set but ownerName stayed null,
+    // so the «Ответственный» dropdown on /leads was empty and the filter
+    // looked broken. Now names are ALWAYS resolved (assignees ∪ owners).
     const assigneeIds = new Set<string>();
     for (const t of dedupedTodos) {
       if (t.assigned_to) assigneeIds.add(t.assigned_to);
     }
+    for (const l of leadMap.values()) {
+      if (l.ownerId) assigneeIds.add(l.ownerId);
+    }
     const assigneeIdsList = Array.from(assigneeIds);
+    const assigneeMap = new Map<string, { username: string | null; full_name: string | null }>();
     if (assigneeIdsList.length > 0) {
       const { data: assigneeUsers } = await supabaseAdmin
         .from("users")
         .select("user_id, username, full_name")
         .in("user_id", assigneeIdsList);
-      const assigneeMap = new Map<string, { username: string | null; full_name: string | null }>();
       for (const u of assigneeUsers ?? []) {
         assigneeMap.set(u.user_id, { username: u.username, full_name: u.full_name });
       }
-      for (const l of leadMap.values()) {
-        l.assigneeId = computeAssignee(l, dedupedTodos);
-        if (l.assigneeId) {
-          const a = assigneeMap.get(l.assigneeId);
-          l.assigneeName = a?.full_name || a?.username || null;
-        }
-        if (l.ownerId) {
-          const o = assigneeMap.get(l.ownerId) || (tgUsers as any[])?.find((u: any) => u.user_id === l.ownerId);
-          l.ownerName = (o as any)?.full_name || (o as any)?.username || null;
-        }
+    }
+    for (const l of leadMap.values()) {
+      l.assigneeId = computeAssignee(l, dedupedTodos);
+      if (l.assigneeId) {
+        const a = assigneeMap.get(l.assigneeId);
+        l.assigneeName = a?.full_name || a?.username || null;
+      }
+      if (l.ownerId) {
+        const o = assigneeMap.get(l.ownerId) || (tgUsers as any[])?.find((u: any) => u.user_id === l.ownerId);
+        l.ownerName = (o as any)?.full_name || (o as any)?.username || null;
       }
     }
 

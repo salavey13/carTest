@@ -160,11 +160,27 @@ export async function DELETE(request: NextRequest) {
       // Same merge pattern for franchize_intents — read each intent's metadata,
       // merge in the dismiss fields, then update.
       // PostgREST doesn't support JSONB merge natively, so we do it in two steps.
-      const { data: existingIntents } = await supabaseAdmin
-        .from("franchize_intents")
-        .select("id, metadata")
-        .eq("telegram_user_id", leadId)
-        .eq("slug", body.slug);
+      //
+      // Avito chat leads are keyed "avito:<chat_id>" on the client (they have
+      // no telegram_user_id and no phone) — match them by the Avito chat id
+      // instead of telegram_user_id, and skip the users-table update above
+      // (there is no users row for them; the update above is a no-op anyway).
+      const isAvitoKey = typeof leadId === "string" && leadId.startsWith("avito:");
+      const avitoChatId = isAvitoKey ? leadId.slice("avito:".length) : null;
+
+      const existingIntentsQuery = avitoChatId
+        ? supabaseAdmin
+            .from("franchize_intents")
+            .select("id, metadata")
+            .eq("slug", body.slug)
+            .eq("contact_channel", "avito")
+            .filter("metadata->>avitoChatId", "eq", avitoChatId)
+        : supabaseAdmin
+            .from("franchize_intents")
+            .select("id, metadata")
+            .eq("telegram_user_id", leadId)
+            .eq("slug", body.slug);
+      const { data: existingIntents } = await existingIntentsQuery;
 
       if (existingIntents && existingIntents.length > 0) {
         await Promise.all(existingIntents.map((intent: { id: string; metadata: Record<string, unknown> | null }) => {
@@ -184,7 +200,7 @@ export async function DELETE(request: NextRequest) {
             })
             .eq("id", intent.id);
         }));
-      } else {
+      } else if (!avitoChatId) {
         // Fallback: no existing intents found — just do the bare update (matches old behavior)
         const { error } = await supabaseAdmin.from("franchize_intents").update({
           stage: "dismissed",
@@ -195,6 +211,8 @@ export async function DELETE(request: NextRequest) {
           logger.error("[lead-todo] dismiss lead failed", error);
           return NextResponse.json({ success: false, error: error.message }, { status: 500 });
         }
+      } else {
+        return NextResponse.json({ success: false, error: "Avito лид не найден" }, { status: 404 });
       }
 
       return NextResponse.json({ success: true });

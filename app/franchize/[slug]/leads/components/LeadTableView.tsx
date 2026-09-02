@@ -16,10 +16,11 @@
 //
 
 import { useMemo } from "react";
-import { ArrowDown, ArrowUp, Bike, CircleDollarSign, Table2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Bike, CircleDollarSign, Table2, ExternalLink } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "../leads-types";
-import { relativeTime, metaFor } from "../leads-utils";
-import { STAGE_LABELS, type SortMode } from "../leads-constants";
+import { relativeTime, metaFor, isAvitoLead, AVITO_COLOR, AVITO_BG } from "../leads-utils";
+import { STAGE_LABELS as PIPELINE_STAGE_LABELS, STAGE_COLORS } from "../lib/pipeline-stages";
+import { type SortMode } from "../leads-constants";
 import { Avatar } from "./Avatar";
 import type { ThemeTokens } from "../hooks/useTheme";
 
@@ -33,28 +34,13 @@ interface LeadTableViewProps {
   T: ThemeTokens;
 }
 
-/** Stage → display label + tint. Falls back to the raw key. */
+/** Pipeline stage (stageKey) → display label + tint. Falls back to the raw key. */
 function stageMeta(stage: string | null | undefined): { label: string; color: string } {
   const key = stage || "new";
-  if (STAGE_LABELS[key]) return { label: STAGE_LABELS[key], color: stageColor(key) };
+  const label = (PIPELINE_STAGE_LABELS as Record<string, string>)[key];
+  const color = (STAGE_COLORS as Record<string, string>)[key];
+  if (label) return { label, color: color || "#64748b" };
   return { label: key, color: "#64748b" };
-}
-
-function stageColor(stage: string): string {
-  switch (stage) {
-    case "new": return "#64748b";
-    case "contacted":
-    case "viewed": return "#3b82f6";
-    case "configured": return "#8b5cf6";
-    case "contract_generated":
-    case "contract_sent": return "#f59e0b";
-    case "checkout_started": return "#06b6d4";
-    case "checkout_completed":
-    case "interest_paid": return "#10b981";
-    case "completed": return "#10b981";
-    case "dismissed": return "#ef4444";
-    default: return "#64748b";
-  }
 }
 
 export function LeadTableView({
@@ -194,7 +180,8 @@ export function LeadTableView({
           <tbody>
             {rows.map(({ lead, pendingTodos, totalTodos, spent }, idx) => {
               const selected = selectedId === lead.user_id;
-              const stage = stageMeta(lead.intentStage);
+              const avito = isAvitoLead(lead);
+              const stage = stageMeta(lead.stageKey);
               const meta = metaFor(lead.source);
               const owner = lead.assigneeName || lead.ownerName || "—";
               return (
@@ -206,16 +193,30 @@ export function LeadTableView({
                   style={{
                     backgroundColor: selected
                       ? `color-mix(in srgb, ${T.accent} 10%, transparent)`
-                      : idx % 2 === 1
-                        ? `color-mix(in srgb, ${T.text} 3%, transparent)`
-                        : "transparent",
-                    boxShadow: selected ? `inset 3px 0 0 0 ${T.accent}` : undefined,
+                      : avito
+                        ? AVITO_BG
+                        : idx % 2 === 1
+                          ? `color-mix(in srgb, ${T.text} 3%, transparent)`
+                          : "transparent",
+                    // Selected row keeps the accent stripe; Avito rows get a
+                    // green stripe so they pop out of the table instantly.
+                    boxShadow: selected
+                      ? `inset 3px 0 0 0 ${T.accent}`
+                      : avito
+                        ? `inset 3px 0 0 0 ${AVITO_COLOR}`
+                        : undefined,
                   }}
                   onMouseEnter={(e) => {
                     if (!selected) e.currentTarget.style.backgroundColor = `color-mix(in srgb, ${T.accent} 6%, transparent)`;
                   }}
                   onMouseLeave={(e) => {
-                    if (!selected) e.currentTarget.style.backgroundColor = idx % 2 === 1 ? `color-mix(in srgb, ${T.text} 3%, transparent)` : "transparent";
+                    if (!selected) {
+                      e.currentTarget.style.backgroundColor = avito
+                        ? AVITO_BG
+                        : idx % 2 === 1
+                          ? `color-mix(in srgb, ${T.text} 3%, transparent)`
+                          : "transparent";
+                    }
                   }}
                 >
                   {/* Клиент */}
@@ -243,11 +244,35 @@ export function LeadTableView({
                   </td>
                   {/* Источник */}
                   <td className="border-b border-r px-2.5 py-2" style={{ borderColor: T.borderSoft }}>
-                    <span
-                      className="whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium"
-                      style={{ backgroundColor: meta.bg, color: meta.color }}
-                    >
-                      {meta.label}
+                    <span className="inline-flex items-center gap-1">
+                      <span
+                        className="whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium"
+                        style={{ backgroundColor: meta.bg, color: meta.color }}
+                      >
+                        {meta.label}
+                      </span>
+                      {avito &&
+                        (lead.avito?.itemUrl ? (
+                          <a
+                            href={lead.avito.itemUrl}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-0.5 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold transition hover:brightness-110"
+                            style={{ backgroundColor: AVITO_BG, color: AVITO_COLOR }}
+                            title="Открыть чат Авито"
+                          >
+                            Авито <ExternalLink className="h-2.5 w-2.5" />
+                          </a>
+                        ) : (
+                          <span
+                            className="whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold"
+                            style={{ backgroundColor: AVITO_BG, color: AVITO_COLOR }}
+                            title="Лид из чата Авито — ссылка на чат в карточке лида"
+                          >
+                            Авито
+                          </span>
+                        ))}
                     </span>
                   </td>
                   {/* Стадия */}

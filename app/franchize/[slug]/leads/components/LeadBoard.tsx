@@ -3,7 +3,7 @@
 
 import { useMemo } from "react";
 import { Avatar } from "./Avatar";
-import { relativeTime, metaFor, getInitials } from "../leads-utils";
+import { relativeTime, metaFor, getInitials, isAvitoLead, AVITO_COLOR, AVITO_BG } from "../leads-utils";
 import { BOARD_COLUMNS } from "../leads-constants";
 import type {LeadRow, LeadTodoRow} from "../leads-types";
 
@@ -34,11 +34,15 @@ interface LeadBoardProps {
  */
 export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForLead, T }: LeadBoardProps) {
   const columns = useMemo(() => {
-    const map: Record<string, LeadRow[]> = { new: [], contacted: [], configured: [], contract_generated: [], completed: [] };
+    // Group by the COMPUTED pipeline stage (stageKey), not the raw DB stage —
+    // see groupLeadsForBoard(): raw stages like "viewed"/"clicked" used to
+    // collapse everything into the «Новые» fallback column.
+    const map: Record<string, LeadRow[]> = {};
+    for (const c of BOARD_COLUMNS) map[c.key] = [];
     for (const l of leads) {
-      const key = l.intentStage || "new";
-      const col = map[key] ? key : "new";
-      map[col].push(l);
+      const key = l.stageKey || "new";
+      if (!map[key]) map[key] = [];
+      map[key].push(l);
     }
     return map;
   }, [leads]);
@@ -136,6 +140,15 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
                       >
                         {meta.label}
                       </span>
+                      {isAvitoLead(lead) && (
+                        <span
+                          className="rounded px-1.5 py-0.5 text-[9px] font-bold"
+                          style={{ backgroundColor: AVITO_BG, color: AVITO_COLOR }}
+                          title="Лид из чата Авито — ответить можно в чате (ссылка в карточке лида)"
+                        >
+                          Авито
+                        </span>
+                      )}
                     </div>
                   </div>
                 );

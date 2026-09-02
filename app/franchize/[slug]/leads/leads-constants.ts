@@ -59,12 +59,21 @@ export const SORT_OPTIONS: { value: SortMode; label: string }[] = [
   { value: "name",    label: "А → Я" },
 ];
 
+// Funnel (kanban) columns — MUST stay in sync with PIPELINE_STAGES keys in
+// ./lib/pipeline-stages.ts (groupLeadsForBoard groups by stageKey and falls
+// back to "new" for unknown keys). The old set (new/contacted/configured/
+// contract_generated/completed) matched raw DB stages, so real pipeline stages
+// like awaiting_qr_claim/active_rental/return_due never had a column.
 export const BOARD_COLUMNS: { key: string; label: string; color: string }[] = [
-  { key: "new",                label: "Новые",           color: "#64748b" },
-  { key: "contacted",          label: "В работе",        color: "#3b82f6" },
-  { key: "configured",         label: "Настроил",        color: "#8b5cf6" },
-  { key: "contract_generated", label: "Договор",         color: "#f59e0b" },
-  { key: "completed",          label: "Завершено",       color: "#10b981" },
+  { key: "new",                label: "Новые",            color: "#64748b" },
+  { key: "needs_contact",      label: "Нужен контакт",    color: "#3b82f6" },
+  { key: "contract_sent",      label: "Договор отправлен", color: "#06b6d4" },
+  { key: "awaiting_qr_claim",  label: "QR не принят",     color: "#eab308" },
+  { key: "documents_missing",  label: "Нет документов",   color: "#f97316" },
+  { key: "active_rental",      label: "Активные",         color: "#22c55e" },
+  { key: "return_due",         label: "Возврат",          color: "#f97316" },
+  { key: "closed_won",         label: "Закрыто",          color: "#166534" },
+  { key: "closed_lost",        label: "Потеряно",         color: "#1f2937" },
 ];
 
 export const RENTAL_STATUS_META: Record<string, { label: string; color: string }> = {

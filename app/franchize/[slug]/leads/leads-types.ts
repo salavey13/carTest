@@ -74,7 +74,7 @@ export interface LeadRow {
     /** Last buyer message excerpt (truncated server-side). */
     lastMessage: string | null;
   } | null;
-  identityState?: 'claimed_user' | 'phone_only' | 'operator_placeholder' | 'merged';
+  identityState?: 'claimed_user' | 'phone_only' | 'operator_placeholder' | 'merged' | 'avito_only';
   sourceCount?: number;
   originalOperatorChatId?: string | null;
   stageKey?: string;
