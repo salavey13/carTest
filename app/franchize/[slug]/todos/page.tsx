@@ -165,6 +165,9 @@ function HomeInner() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [newTodo, setNewTodo] = useState('')
   const [showOpenTodos, setShowOpenTodos] = useState(true)
+  // iter35: double-submit guard for addTodo — declared with the other hooks
+  // (rules-of-hooks: the password gate early-returns below).
+  const [addingTodo, setAddingTodo] = useState(false)
 
   const fetchData = useCallback(async (d: string) => {
     setLoading(true)
@@ -267,9 +270,12 @@ function HomeInner() {
   }
 
   // ── Todo handlers ──
+  // iter35: double-submit guard — «+» and Enter used to fire POST /api/todos
+  // repeatedly while the first request was in flight → duplicate rows.
   const addTodo = async () => {
     const text = newTodo.trim()
-    if (!text) return
+    if (!text || addingTodo) return
+    setAddingTodo(true)
     try {
       const res = await fetch('/api/todos', {
         method: 'POST',
@@ -281,7 +287,9 @@ function HomeInner() {
         setNewTodo('')
         fetchTodos(date)
       }
-    } catch (e) { console.error(e) }
+    } catch (e) { console.error(e) } finally {
+      setAddingTodo(false)
+    }
   }
 
   const toggleTodo = async (id: string, done: boolean) => {
@@ -597,7 +605,8 @@ function HomeInner() {
                   />
                   <button
                     onClick={addTodo}
-                    className="px-3 py-2 bg-[#D4A540] hover:bg-[#FFCA60] text-white rounded-md transition-colors"
+                    disabled={addingTodo || !newTodo.trim()}
+                    className="px-3 py-2 bg-[#D4A540] hover:bg-[#FFCA60] text-white rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Plus className="w-4 h-4" />
                   </button>

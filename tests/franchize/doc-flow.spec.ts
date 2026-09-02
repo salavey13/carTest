@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   getCrewSensitiveData: vi.fn(),
   from: vi.fn(),
   invoiceDeleteContains: vi.fn(),
+  /** iter35: result of the checkout idempotency lookup (existing order_id row). */
+  idempotencyLookup: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase-server', () => ({
@@ -85,6 +87,16 @@ function buildSupabaseFromMock() {
   return (table: string) => {
     if (table === 'franchize_order_notifications') {
       return {
+        // iter35: idempotency guard read — .select().eq().order().limit().maybeSingle()
+        select: () => ({
+          eq: () => ({
+            order: () => ({
+              limit: () => ({
+                maybeSingle: mocks.idempotencyLookup,
+              }),
+            }),
+          }),
+        }),
         insert: () => ({
           select: () => ({
             single: async () => ({ data: { id: 'log-1' }, error: null }),
@@ -161,6 +173,8 @@ describe('franchize checkout doc-flow', () => {
     mocks.createInvoice.mockResolvedValue({ success: true, data: { status: 'pending' } });
     mocks.invoiceDeleteContains.mockResolvedValue({ error: null });
     mocks.buildDocx.mockResolvedValue({ bytes: new Uint8Array([1, 2, 3]), renderedMarkdown: 'ok' });
+    // iter35: default — no existing checkout row for this order_id.
+    mocks.idempotencyLookup.mockResolvedValue({ data: null, error: null });
     vi.stubEnv('ADMIN_CHAT_ID', '417553377');
   });
 
@@ -195,5 +209,35 @@ describe('franchize checkout doc-flow', () => {
     expect(mocks.createInvoice).toHaveBeenCalledTimes(1);
     expect(mocks.invoiceDeleteContains).toHaveBeenCalledTimes(1);
     expect(mocks.invoiceDeleteContains).toHaveBeenCalledWith('metadata', expect.objectContaining({ rental_id: expect.any(String) }));
+  });
+
+  // ── iter35: the 4-rentals double-submit regression ──
+  // A renter tapped «Подтвердить заказ» 4× while the availability check was
+  // in flight; every tap carried the SAME orderId and each created a rental.
+  // The DB-backed idempotency guard must return an idempotent success for
+  // any replay whose order_id already has a pending/sent notification row.
+  it('suppresses a duplicate checkout when the order_id was already processed', async () => {
+    mocks.idempotencyLookup.mockResolvedValueOnce({ data: { id: 'log-1', send_status: 'sent' }, error: null });
+
+    const result = await createFranchizeOrderCheckout(buildPayload('telegram_xtr', 'order-dup'));
+
+    expect(result.success).toBe(true);
+    // Nothing may be rebuilt, re-notified or re-invoiced for the replay.
+    expect(mocks.buildDocx).not.toHaveBeenCalled();
+    expect(mocks.sendTelegramDocument).not.toHaveBeenCalled();
+    expect(mocks.createInvoice).not.toHaveBeenCalled();
+  });
+
+  it('still allows a retry when the previous checkout failed', async () => {
+    mocks.idempotencyLookup.mockResolvedValueOnce({ data: { id: 'log-1', send_status: 'failed' }, error: null });
+
+    const result = await createFranchizeOrderCheckout(buildPayload('card', 'order-retry'));
+
+    // payment=card → no invoice path; success means the flow ran to completion
+    // (the 'failed' row did NOT short-circuit the retry — buildDocx is called
+    // per bike + verifier attachment, so assert delivery, not exact counts).
+    expect(result.success).toBe(true);
+    expect(mocks.buildDocx).toHaveBeenCalled();
+    expect(mocks.sendTelegramDocument).toHaveBeenCalled();
   });
 });

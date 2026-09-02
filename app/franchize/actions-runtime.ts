@@ -5420,14 +5420,48 @@ export async function createFranchizeOrderCheckout(
 
   const payload = parsed.data;
   const now = Date.now();
+
+  // ── iter35: DB-backed idempotency — the durable duplicate guard ─────────
+  // The in-memory cooldown Map below does NOT survive Vercel lambda rotation:
+  // 4 concurrent taps can land on 4 warm instances, each with an empty Map
+  // (and even on one instance the old code set the timestamp only AFTER an
+  // await, so all taps raced through the check). Every tap of the same
+  // checkout session carries the SAME orderId (from the order page URL), and
+  // buildFranchizeOrderDocAndNotify persists a franchize_order_notifications
+  // row keyed by order_id at the very start of doc generation. A pending/sent
+  // row for this order_id therefore means: order already in flight or already
+  // delivered — return an idempotent success instead of creating rental #2-#4.
+  // A "failed" row still allows the «Повторить» retry flow.
+  const { data: existingCheckout } = await supabaseAdmin
+    .from("franchize_order_notifications")
+    .select("id, send_status")
+    .eq("order_id", payload.orderId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (existingCheckout && existingCheckout.send_status !== "failed") {
+    logger.warn("[franchize] duplicate checkout suppressed (idempotency guard)", {
+      orderId: payload.orderId,
+      existingStatus: existingCheckout.send_status,
+      telegramUserId: payload.telegramUserId,
+    });
+    return { success: true };
+  }
+
   const throttleKey = `${payload.slug}:${payload.orderId}:${payload.telegramUserId}`;
   const lastRequestAt = franchizeCheckoutRateLimits.get(throttleKey) ?? 0;
   if (now - lastRequestAt < FRANCHIZE_CHECKOUT_COOLDOWN_MS) {
     return { success: false, error: "Слишком частые запросы. Повторите через несколько секунд." };
   }
-  const totalResult = await resolveFranchizeCheckoutTotal(payload);
-  if (!totalResult.success) return totalResult;
+  // Set the throttle BEFORE the await below — the old code set it only after
+  // resolveFranchizeCheckoutTotal, leaving a check-then-set race window.
   franchizeCheckoutRateLimits.set(throttleKey, now);
+  const totalResult = await resolveFranchizeCheckoutTotal(payload);
+  if (!totalResult.success) {
+    // Validation failure is not abuse — let the renter fix and retry at once.
+    franchizeCheckoutRateLimits.delete(throttleKey);
+    return totalResult;
+  }
   const effectiveTotal = totalResult.totalAmount;
   const validatedPayload = { ...payload, ...totalResult, totalAmount: effectiveTotal };
   const orderIntentType: "rent" | "sale" | "service" = validatedPayload.flowType === "service"

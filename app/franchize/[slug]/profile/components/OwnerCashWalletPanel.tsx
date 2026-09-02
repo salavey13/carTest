@@ -41,6 +41,7 @@ export function OwnerCashWalletPanel({
   onMonthChange,
   onSubmit,
   onRemove,
+  removingId,
   T,
 }: {
   data: OwnerCashMonthData;
@@ -51,6 +52,8 @@ export function OwnerCashWalletPanel({
   /** Validates + persists; returns false to keep the form filled. */
   onSubmit: (form: OwnerCashFormValues) => Promise<boolean>;
   onRemove: (id: string) => void;
+  /** iter35: id of the entry currently being deleted — disables its «Удалить». */
+  removingId?: string | null;
   T: CrewTokens;
 }) {
   const [form, setForm] = useState<OwnerCashFormValues>(EMPTY_FORM);
@@ -234,14 +237,15 @@ export function OwnerCashWalletPanel({
                     <span className="flex flex-shrink-0 items-center gap-1">
                       <button
                         type="button"
+                        disabled={removingId !== null}
                         onClick={() => {
                           onRemove(e.id);
                           setConfirmDeleteId(null);
                         }}
-                        className="rounded px-1.5 py-0.5 text-[11px] font-semibold"
+                        className="rounded px-1.5 py-0.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-40"
                         style={{ backgroundColor: "#ef444422", color: MONEY_RED }}
                       >
-                        Удалить
+                        {removingId === e.id ? "Удаляем..." : "Удалить"}
                       </button>
                       <button
                         type="button"

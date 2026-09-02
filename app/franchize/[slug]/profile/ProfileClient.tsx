@@ -324,8 +324,12 @@ export function FranchizeProfileClient({
     }
   };
 
+  // iter35: per-entry delete guard — the two-tap «Удалить» used to fire
+  // deleteOwnerCashEntryAction repeatedly on rapid taps (double toast).
+  const [ownerCashRemovingId, setOwnerCashRemovingId] = useState<string | null>(null);
   const removeOwnerCash = async (id: string) => {
-    if (!dbUser?.user_id) return;
+    if (!dbUser?.user_id || ownerCashRemovingId) return;
+    setOwnerCashRemovingId(id);
     try {
       const res = await deleteOwnerCashEntryAction({
         slug,
@@ -341,6 +345,8 @@ export function FranchizeProfileClient({
       }
     } catch {
       toast.error("Не удалось удалить — нет связи.");
+    } finally {
+      setOwnerCashRemovingId(null);
     }
   };
 
@@ -482,6 +488,7 @@ export function FranchizeProfileClient({
           onMonthChange={setOwnerCashMonth}
           onSubmit={submitOwnerCash}
           onRemove={(id) => void removeOwnerCash(id)}
+          removingId={ownerCashRemovingId}
           T={T}
         />
       )}

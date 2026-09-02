@@ -112,6 +112,13 @@ export function LeadsClient({
   // closure, so two rapid taps before a re-render both saw `false`. The ref is
   // checked + flipped synchronously → the guard is airtight.
   const notifyBusyRef = useRef(false);
+  // iter35: double-submit locks for the lead sheet «Добавить» buttons
+  // (notes / todos) — see handleAddNote / handleCreateTodo below. State
+  // mirrors drive the disabled+label UI; refs make the guard airtight.
+  const addNoteBusyRef = useRef(false);
+  const createTodoBusyRef = useRef(false);
+  const [notesBusy, setNotesBusy] = useState(false);
+  const [todosBusy, setTodosBusy] = useState(false);
   const leadsFetchedRef = useRef(false);
 
   // ── Lead detail sheet state (2026-09-01 sheet overhaul) ──
@@ -555,6 +562,12 @@ export function LeadsClient({
   const handleCreateTodo = useCallback(async (title: string) => {
     const lead = selectedId ? leadsState.find((l) => l.user_id === selectedId) : null;
     if (!lead || !title.trim()) return;
+    // iter35: double-submit guard — «Добавить» (and Enter) used to fire the
+    // POST repeatedly while the first request was still in flight →
+    // duplicate crew_todos rows.
+    if (createTodoBusyRef.current) return;
+    createTodoBusyRef.current = true;
+    setTodosBusy(true);
     try {
       const resp = await fetch("/api/franchize/lead-todo", {
         method: "POST",
@@ -571,6 +584,9 @@ export function LeadsClient({
       setTodosState((prev) => [todo, ...prev]);
     } catch {
       showToast("Ошибка сети при создании задачи");
+    } finally {
+      createTodoBusyRef.current = false;
+      setTodosBusy(false);
     }
   }, [selectedId, leadsState, crewId, slug, authHeaders, showToast]);
 
@@ -694,6 +710,11 @@ export function LeadsClient({
   const handleAddNote = useCallback(async (text: string) => {
     const lead = selectedId ? leadsState.find((l) => l.user_id === selectedId) : null;
     if (!lead || !text.trim()) return;
+    // iter35: double-submit guard — «Добавить» (and Enter) used to create
+    // duplicate notes while the first createLeadNote call was in flight.
+    if (addNoteBusyRef.current) return;
+    addNoteBusyRef.current = true;
+    setNotesBusy(true);
     try {
       const res = await createLeadNote({
         leadId: lead.user_id,
@@ -734,6 +755,9 @@ export function LeadsClient({
       }
     } catch {
       showToast("Ошибка сети при сохранении заметки");
+    } finally {
+      addNoteBusyRef.current = false;
+      setNotesBusy(false);
     }
   }, [selectedId, leadsState, crewId, dbUser?.user_id, dbUser?.full_name, dbUser?.username, passwordAuthOwnerId, passwordAuthed, showToast]);
 
@@ -923,6 +947,8 @@ export function LeadsClient({
               onClearCallback={() => applyHandlingAction("clear_callback")}
               handlingBusy={handlingBusy}
               notifyBusy={notifyBusy}
+              notesBusy={notesBusy}
+              todosBusy={todosBusy}
               asSheetChild
               focusNotesSignal={notesFocus && notesFocus.leadId === selectedId ? notesFocus.ts : 0}
             />

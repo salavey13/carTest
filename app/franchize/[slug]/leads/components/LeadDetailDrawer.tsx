@@ -100,6 +100,9 @@ interface Props {
   handlingBusy?: boolean;
   /** m4 fix: true while a Telegram notify is in flight — disables the button. */
   notifyBusy?: boolean;
+  /** iter35: true while a note/todo POST is in flight — disables the «Добавить» buttons. */
+  notesBusy?: boolean;
+  todosBusy?: boolean;
   /** When true, render as the inner content of a parent sheet/drawer (no
    *  backdrop, no right-side panel chrome, no z-index). Used by the adaptive
    *  LeadDetailSheet so the sheet provides the backdrop + animation and this
@@ -148,6 +151,8 @@ export function LeadDetailDrawer(props: Props) {
     onClearCallback,
     handlingBusy = false,
     notifyBusy = false,
+    notesBusy = false,
+    todosBusy = false,
     asSheetChild = false,
     focusNotesSignal = 0,
   } = props;
@@ -753,7 +758,7 @@ export function LeadDetailDrawer(props: Props) {
               value={newTodo}
               onChange={(e) => setNewTodo(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && newTodo.trim()) {
+                if (e.key === "Enter" && newTodo.trim() && !todosBusy) {
                   onCreateTodo(newTodo.trim());
                   setNewTodo("");
                 }
@@ -769,9 +774,9 @@ export function LeadDetailDrawer(props: Props) {
             />
             <button
               type="button"
-              disabled={!newTodo.trim()}
+              disabled={!newTodo.trim() || todosBusy}
               onClick={() => {
-                if (newTodo.trim()) {
+                if (newTodo.trim() && !todosBusy) {
                   onCreateTodo(newTodo.trim());
                   setNewTodo("");
                 }
@@ -779,7 +784,7 @@ export function LeadDetailDrawer(props: Props) {
               className="inline-flex min-h-[44px] cursor-pointer items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40"
               style={{ background: T.accent, color: T.accentContrast }}
             >
-              <Plus className="h-4 w-4" aria-hidden /> Добавить
+              <Plus className="h-4 w-4" aria-hidden /> {todosBusy ? "Добавляем..." : "Добавить"}
             </button>
           </div>
 
@@ -873,7 +878,7 @@ export function LeadDetailDrawer(props: Props) {
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && newNote.trim()) {
+                if (e.key === "Enter" && newNote.trim() && !notesBusy) {
                   onAddNote(newNote.trim());
                   setNewNote("");
                 }
@@ -889,9 +894,9 @@ export function LeadDetailDrawer(props: Props) {
             />
             <button
               type="button"
-              disabled={!newNote.trim()}
+              disabled={!newNote.trim() || notesBusy}
               onClick={() => {
-                if (newNote.trim()) {
+                if (newNote.trim() && !notesBusy) {
                   onAddNote(newNote.trim());
                   setNewNote("");
                 }
@@ -902,7 +907,7 @@ export function LeadDetailDrawer(props: Props) {
                 color: T.text,
               }}
             >
-              Добавить
+              {notesBusy ? "Сохраняем..." : "Добавить"}
             </button>
           </div>
           <div className="max-h-72 space-y-2 overflow-y-auto">

@@ -55,6 +55,9 @@ interface Props {
   handlingBusy?: boolean;
   /** m4 fix: true while a Telegram notify is in flight — disables the button. */
   notifyBusy?: boolean;
+  /** iter35: true while a note/todo POST is in flight — disables the «Добавить» buttons. */
+  notesBusy?: boolean;
+  todosBusy?: boolean;
   /** When true, render as the inner content of a parent sheet (no backdrop). */
   asSheetChild?: boolean;
   /** «Прочитать заметки» — раскрыть и прокрутить к секции заметок. */
@@ -96,6 +99,8 @@ export function LeadDetailContent({
   onClearCallback,
   handlingBusy = false,
   notifyBusy = false,
+  notesBusy = false,
+  todosBusy = false,
   asSheetChild = false,
   focusNotesSignal = 0,
 }: Props) {
@@ -202,6 +207,8 @@ export function LeadDetailContent({
       onClearCallback={onClearCallback}
       handlingBusy={handlingBusy}
       notifyBusy={notifyBusy}
+      notesBusy={notesBusy}
+      todosBusy={todosBusy}
       asSheetChild={asSheetChild}
       focusNotesSignal={focusNotesSignal}
     />

@@ -110,13 +110,20 @@ export function CashLedgerClient({ slug, crew }: CashLedgerClientProps) {
     }
   };
 
+  // iter35: synchronous double-submit guard — the «Создать» button used to
+  // stay enabled during the POST, so a double-tap / double-Enter created
+  // duplicate cash ledger rows (money!).
+  const [creatingManual, setCreatingManual] = useState(false);
+
   const handleCreateManual = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!dbUser?.user_id) return;
+    if (!dbUser?.user_id || creatingManual) return;
+    setCreatingManual(true);
 
     const amount = Number(manualForm.amount);
     if (amount <= 0) {
       alert("Сумма должна быть больше 0");
+      setCreatingManual(false);
       return;
     }
 
@@ -145,6 +152,8 @@ export function CashLedgerClient({ slug, crew }: CashLedgerClientProps) {
       }
     } catch (err: any) {
       alert(`Ошибка: ${err.message}`);
+    } finally {
+      setCreatingManual(false);
     }
   };
 
@@ -409,10 +418,11 @@ export function CashLedgerClient({ slug, crew }: CashLedgerClientProps) {
                 <div className="flex gap-2 pt-2">
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-2 rounded-xl font-semibold transition-colors"
+                    disabled={creatingManual}
+                    className="flex-1 px-4 py-2 rounded-xl font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                     style={{ background: T.accent, color: T.accentContrast }}
                   >
-                    Создать
+                    {creatingManual ? "Сохраняем..." : "Создать"}
                   </button>
                   <button
                     type="button"

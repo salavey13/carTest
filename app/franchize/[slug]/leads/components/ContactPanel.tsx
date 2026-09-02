@@ -57,6 +57,9 @@ export function ContactPanel({ lead, T, todos }: ContactPanelProps) {
   const [showTroubledInput, setShowTroubledInput] = useState(false);
 
   const handleToggleTroubled = async (userId: string, reason: string) => {
+    // iter35: double-tap guard — the «Отметить»/«Снять отметку» toggle used to
+    // fire the POST twice while the first request was in flight (double flip).
+    if (troubledUpdating) return;
     setTroubledUpdating(true);
     try {
       const finalReason = reason || troubledReasonInput.trim();
@@ -93,10 +96,11 @@ export function ContactPanel({ lead, T, todos }: ContactPanelProps) {
         )}
         <button onClick={() => lead.troubled ? handleToggleTroubled(lead.user_id, "") : setShowTroubledInput(!showTroubledInput)}
           aria-pressed={lead.troubled}
-          className="group flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-[11px] font-medium transition hover:brightness-110"
+          disabled={troubledUpdating}
+          className="group flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-[11px] font-medium transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           style={{ borderColor: lead.troubled ? "#dc262640" : T.border, backgroundColor: lead.troubled ? "#dc262618" : T.bgElevated, color: lead.troubled ? "#dc2626" : T.text }}>
           <AlertCircle className="h-3.5 w-3.5 transition group-hover:scale-110" style={{ color: lead.troubled ? "#dc2626" : T.accent }} aria-hidden />
-          {lead.troubled ? "Снять отметку" : "Отметить"}
+          {troubledUpdating ? "Обновляем..." : lead.troubled ? "Снять отметку" : "Отметить"}
         </button>
       </div>
 
@@ -111,7 +115,7 @@ export function ContactPanel({ lead, T, todos }: ContactPanelProps) {
               aria-label="Причина отметки"
               className="min-h-[44px] min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs outline-none"
               style={{ borderColor: "#dc262640", backgroundColor: T.inputBg, color: T.text }}
-              onKeyDown={(e) => { if (e.key === "Enter") handleToggleTroubled(lead.user_id, troubledReasonInput.trim()); }} />
+              onKeyDown={(e) => { if (e.key === "Enter" && !troubledUpdating) handleToggleTroubled(lead.user_id, troubledReasonInput.trim()); }} />
             <button onClick={() => handleToggleTroubled(lead.user_id, troubledReasonInput.trim())} disabled={troubledUpdating}
               className="flex min-h-[44px] cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold disabled:cursor-not-allowed disabled:opacity-40" style={{ background: "#dc2626", color: "#ffffff" }}>
               {troubledUpdating ? "…" : "OK"}

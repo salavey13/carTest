@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, Camera, CheckCircle2, Pencil, PenLine, RotateCcw, Trash2, X } from "lucide-react";
+import { Calendar, Camera, CheckCircle2, Loader2, Pencil, PenLine, RotateCcw, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -150,6 +150,19 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const { cartLines, subtotal } = useFranchizeCartLines(slug, items);
   const { clear: clearCart } = useFranchizeCart(slug);
   const [isSubmitting, startSubmitTransition] = useTransition();
+  // ── iter35: synchronous double-click guard ──
+  // The previous guards (isSubmitting + submit fingerprint) only armed AFTER
+  // an `await checkAvailabilityBeforeSubmit()` round-trip (~0.5–2s). Four
+  // fast taps inside that window all passed both checks → 4 rentals created
+  // by one renter. submitLockRef + submitPhase are set synchronously on the
+  // very first tap, before ANY network call, and the button goes into a
+  // spinner/disabled state in the same render cycle.
+  const submitLockRef = useRef(false);
+  const [submitPhase, setSubmitPhase] = useState<"idle" | "checking" | "sending">("idle");
+  const releaseSubmitLock = () => {
+    submitLockRef.current = false;
+    setSubmitPhase("idle");
+  };
   const [paymentRetryHint, setPaymentRetryHint] = useState<string | null>(null);
   // ── ПЭП (простая электронная подпись, ст. 5–6 ФЗ-63) ──
   // The renter taps «Подписать договор (ПЭП)» at checkout; we forward
@@ -547,14 +560,17 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     });
   };
 
-  const submitLabel = isSubmitting
-    ? "Подготавливаем бронь..."
-    : "Подтвердить заказ";
+  const isCheckoutBusy = submitPhase !== "idle" || isSubmitting;
+  const submitLabel = submitPhase === "checking"
+    ? "Проверяем доступность..."
+    : submitPhase === "sending" || isSubmitting
+      ? "Отправляем заказ..."
+      : "Подтвердить заказ";
 
   const cartEmptyMsg = flowType === "service"
     ? "Добавьте хотя бы одну услугу в корзину, чтобы перейти к оформлению."
     : `Добавьте хотя бы один байк в корзину, чтобы перейти к подтверждению ${flowLabel}.`;
-  const submitHint = isSubmitting
+  const submitHint = isCheckoutBusy
     ? "Проверяем данные и отправляем заказ. Обычно это занимает несколько секунд."
     : isCartEmpty
       ? cartEmptyMsg
@@ -864,6 +880,16 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   };
 
   const onSubmitValid = async (values: OrderFormValues) => {
+    // ── iter35: synchronous lock BEFORE any await ──
+    // This runs on every tap; the lock check + set happen in the same
+    // synchronous block, so taps 2–4 bounce off instantly instead of
+    // racing through the availability round-trip.
+    if (submitLockRef.current || isSubmitting || !canSubmit) {
+      return;
+    }
+    submitLockRef.current = true;
+    setSubmitPhase("checking");
+
     const submitFingerprint = JSON.stringify({
       orderId,
       payment: values.payment,
@@ -879,19 +905,20 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       cartLines: submitPayload.cartLines,
     });
 
-    if (isSubmitting || !canSubmit) {
-      return;
-    }
-
     if (lastSubmitFingerprintRef.current === submitFingerprint) {
       toast.message("Похожий checkout уже обрабатывается. Ждём ответ Telegram.");
+      releaseSubmitLock();
       return;
     }
 
     const isAvailable = await checkAvailabilityBeforeSubmit();
-    if (!isAvailable) return;
+    if (!isAvailable) {
+      releaseSubmitLock();
+      return;
+    }
 
     lastSubmitFingerprintRef.current = submitFingerprint;
+    setSubmitPhase("sending");
 
     startSubmitTransition(async () => {
       // FIX (iter14): a server action can resolve to `undefined` when the
@@ -955,6 +982,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             onClick: () => handleSubmit(onSubmitValid)(),
           },
         });
+        releaseSubmitLock();
         lastSubmitFingerprintRef.current = null;
         return;
       }
@@ -966,6 +994,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             onClick: () => handleSubmit(onSubmitValid)(),
           },
         });
+        releaseSubmitLock();
         lastSubmitFingerprintRef.current = null;
         return;
       }
@@ -989,7 +1018,18 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       }
 
       lastSubmitFingerprintRef.current = null;
+      // iter35: keep the lock held while the success dialog is open —
+      // releaseSubmitLock() runs when the renter dismisses the dialog.
+      setSubmitPhase("idle");
     });
+  };
+
+  // iter35: dismissing the «заказ создан» dialog re-arms the submit button
+  // (cart is already cleared, so canSubmit stays false until new items —
+  // the lock release is just hygiene for a fresh order).
+  const closeSuccessDialog = () => {
+    setSuccessDialog(null);
+    releaseSubmitLock();
   };
 
   const focusBlockerControl = (blockerId: string) => {
@@ -1961,10 +2001,12 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
               <button
                 type="submit"
-                disabled={!canSubmit || isSubmitting}
-                className="mt-4 w-full rounded-xl bg-[var(--order-accent)] px-4 py-3 text-sm font-semibold text-[var(--order-accent-contrast)] transition hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!canSubmit || isCheckoutBusy}
+                aria-busy={isCheckoutBusy}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--order-accent)] px-4 py-3 text-sm font-semibold text-[var(--order-accent-contrast)] transition hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                 style={focusRingOutlineStyle(crew.theme)}
               >
+                {isCheckoutBusy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
                 {submitLabel}
               </button>
               <p className="mt-2 text-xs" style={surface.mutedText}>{submitHint}</p>
@@ -2007,7 +2049,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             >
               <button
                 type="button"
-                onClick={() => setSuccessDialog(null)}
+                onClick={closeSuccessDialog}
                 aria-label="Закрыть"
                 className="absolute right-3 top-3 rounded-xl p-2.5 transition hover:opacity-80 focus:outline-none focus-visible:ring-2"
                 style={{ color: T.textMuted, minHeight: "44px", minWidth: "44px" }}
@@ -2059,7 +2101,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
               <button
                 type="button"
-                onClick={() => setSuccessDialog(null)}
+                onClick={closeSuccessDialog}
                 autoFocus
                 className="mt-6 w-full rounded-xl px-4 py-3.5 text-base font-bold transition hover:brightness-105 active:scale-[0.99]"
                 style={{

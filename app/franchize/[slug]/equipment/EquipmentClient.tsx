@@ -121,9 +121,16 @@ export function EquipmentClient({ slug, crew }: EquipmentClientProps) {
     }
   };
 
+  // iter35: double-submit guards — «Создать аренду» / «Возвращён / Повреждён / Утерян»
+  // used to stay enabled during the server action, so rapid taps created
+  // duplicate equipment_rentals rows or double status flips.
+  const [creatingRental, setCreatingRental] = useState(false);
+  const [returningId, setReturningId] = useState<string | null>(null);
+
   const handleCreateRental = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEquipment || !dbUser?.user_id) return;
+    if (!selectedEquipment || !dbUser?.user_id || creatingRental) return;
+    setCreatingRental(true);
 
     try {
       const { createEquipmentRental } = await import("../../server-actions/equipment-rentals");
@@ -145,11 +152,14 @@ export function EquipmentClient({ slug, crew }: EquipmentClientProps) {
       }
     } catch (err: any) {
       alert(`Ошибка: ${err.message}`);
+    } finally {
+      setCreatingRental(false);
     }
   };
 
   const handleReturn = async (id: string, condition: "returned" | "damaged" | "lost") => {
-    if (!dbUser?.user_id) return;
+    if (!dbUser?.user_id || returningId) return;
+    setReturningId(id);
 
     try {
       const { returnEquipmentRental } = await import("../../server-actions/equipment-rentals");
@@ -167,6 +177,8 @@ export function EquipmentClient({ slug, crew }: EquipmentClientProps) {
       }
     } catch (err: any) {
       alert(`Ошибка: ${err.message}`);
+    } finally {
+      setReturningId(null);
     }
   };
 
@@ -536,21 +548,24 @@ export function EquipmentClient({ slug, crew }: EquipmentClientProps) {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleReturn(rental.id, "returned")}
-                    className="px-3 py-1.5 text-sm rounded-lg font-medium transition-colors"
+                    disabled={returningId !== null}
+                    className="px-3 py-1.5 text-sm rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                     style={{ background: "#10b981", color: "#fff" }}
                   >
-                    Возвращён
+                    {returningId === rental.id ? "Обработка..." : "Возвращён"}
                   </button>
                   <button
                     onClick={() => handleReturn(rental.id, "damaged")}
-                    className="px-3 py-1.5 text-sm rounded-lg font-medium transition-colors"
+                    disabled={returningId !== null}
+                    className="px-3 py-1.5 text-sm rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                     style={{ background: "#f59e0b", color: "#fff" }}
                   >
                     Повреждён
                   </button>
                   <button
                     onClick={() => handleReturn(rental.id, "lost")}
-                    className="px-3 py-1.5 text-sm rounded-lg font-medium transition-colors"
+                    disabled={returningId !== null}
+                    className="px-3 py-1.5 text-sm rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                     style={{ background: "#ef4444", color: "#fff" }}
                   >
                     Утерян
@@ -688,10 +703,11 @@ export function EquipmentClient({ slug, crew }: EquipmentClientProps) {
                 <div className="flex gap-2 pt-2">
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-2 rounded-xl font-semibold transition-colors"
+                    disabled={creatingRental}
+                    className="flex-1 px-4 py-2 rounded-xl font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                     style={{ background: T.accent, color: T.accentContrast }}
                   >
-                    Создать аренду
+                    {creatingRental ? "Создаём..." : "Создать аренду"}
                   </button>
                   <button
                     type="button"

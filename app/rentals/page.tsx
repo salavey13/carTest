@@ -47,7 +47,7 @@ const EmptyState = ({ icon, title, description, ctaLink, ctaText }: { icon: stri
   </motion.div>
 );
 
-const RentalListItem = ({ rental, canArchive, onArchive }: { rental: UserRentalDashboard; canArchive: boolean; onArchive: (rentalId: string) => void }) => {
+const RentalListItem = ({ rental, canArchive, onArchive, archiving }: { rental: UserRentalDashboard; canArchive: boolean; onArchive: (rentalId: string) => void; archiving?: boolean }) => {
   const config = statusConfig[rental.status as keyof typeof statusConfig] || statusConfig.default;
   const roleText = rental.user_role === "renter" ? "Вы арендатор" : rental.user_role === "owner" ? "Вы владелец" : "Экипаж";
   const startDate = rental.agreed_start_date || rental.requested_start_date;
@@ -89,8 +89,8 @@ const RentalListItem = ({ rental, canArchive, onArchive }: { rental: UserRentalD
                 <Link href={`/rentals/${rental.rental_id}`}>Открыть сделку</Link>
               </Button>
               {canArchive && (
-                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => onArchive(rental.rental_id)}>
-                  <VibeContentRenderer content="::FaBoxArchive::" className="mr-2" /> Архивировать тест
+                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={archiving} onClick={() => onArchive(rental.rental_id)}>
+                  <VibeContentRenderer content="::FaBoxArchive::" className="mr-2" /> {archiving ? "Архивируем..." : "Архивировать тест"}
                 </Button>
               )}
             </div>
@@ -153,16 +153,24 @@ export default function RentalsPage() {
     resolveSlug();
   }, [rentals]);
 
+  // iter35: per-rental archive guard — «Архивировать тест» used to fire the
+  // server action twice on rapid taps (double toast + double action).
+  const [archivingId, setArchivingId] = useState<string | null>(null);
   const handleArchive = async (rentalId: string) => {
-    if (!dbUser?.user_id) return;
-    const t = toast.loading("Архивируем тестовую аренду...");
-    const result = await archivePendingRental(rentalId, dbUser.user_id);
-    if (!result.success) {
-      toast.error(result.error || "Не удалось архивировать аренду.", { id: t });
-      return;
+    if (!dbUser?.user_id || archivingId) return;
+    setArchivingId(rentalId);
+    try {
+      const t = toast.loading("Архивируем тестовую аренду...");
+      const result = await archivePendingRental(rentalId, dbUser.user_id);
+      if (!result.success) {
+        toast.error(result.error || "Не удалось архивировать аренду.", { id: t });
+        return;
+      }
+      toast.success("Тестовая аренда отправлена в архив.", { id: t });
+      await loadRentals(dbUser.user_id);
+    } finally {
+      setArchivingId(null);
     }
-    toast.success("Тестовая аренда отправлена в архив.", { id: t });
-    await loadRentals(dbUser.user_id);
   };
 
   if (isAppLoading) return <Loading text="Инициализация приложения..." />;
@@ -248,6 +256,7 @@ export default function RentalsPage() {
                       rental={r}
                       canArchive={["pending_confirmation", "confirmed"].includes(r.status) && r.payment_status === "pending"}
                       onArchive={handleArchive}
+                      archiving={archivingId === r.rental_id}
                     />
                   ))}
                 </div>
@@ -270,6 +279,7 @@ export default function RentalsPage() {
                       rental={r}
                       canArchive={["pending_confirmation", "confirmed"].includes(r.status) && r.payment_status === "pending"}
                       onArchive={handleArchive}
+                      archiving={archivingId === r.rental_id}
                     />
                   ))}
                 </div>

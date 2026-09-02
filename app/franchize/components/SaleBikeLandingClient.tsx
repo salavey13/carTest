@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Battery,
@@ -711,8 +711,15 @@ export function SaleBikeLandingClient({
     }
   };
 
+  // iter35: synchronous double-submit lock. reservationState flips to
+  // "loading" only at render-commit; two taps in the same tick both saw
+  // "idle" and the availability check (~0.5–2s) ran twice → duplicate
+  // XTR invoices. The ref is checked+set synchronously, before ANY await.
+  const reservationLockRef = useRef(false);
+
   const handleReserveTestDrive = async () => {
     if (!isHydrated) return;
+    if (reservationLockRef.current || reservationState === "loading" || reservationState === "success") return;
     if (!telegramUserId) {
       setReservationState("error");
       setCartMessage(
@@ -720,6 +727,12 @@ export function SaleBikeLandingClient({
       );
       return;
     }
+
+    // Arm the busy state BEFORE the availability round-trip so the button
+    // shows «Отправляем счёт...» from the very first millisecond.
+    reservationLockRef.current = true;
+    setReservationState("loading");
+    setCartMessage("");
 
     // Check availability before creating invoice (prevent double-booking)
     const today = new Date().toISOString().split("T")[0];
@@ -731,6 +744,7 @@ export function SaleBikeLandingClient({
       slug: resolvedSlug,
     });
     if ((availability.unavailableCarIds?.length ?? 0) > 0) {
+      reservationLockRef.current = false;
       setReservationState("error");
       setCartMessage("Этот байк уже забронирован для тест-драйва. Выберите другую модель или свяжитесь с нами.");
       return;
@@ -746,8 +760,6 @@ export function SaleBikeLandingClient({
     });
 
     const options = buildBuyOptions();
-    setReservationState("loading");
-    setCartMessage("");
     try {
       const result = await createFranchizeOrderInvoice({
         slug: resolvedSlug,
@@ -789,6 +801,7 @@ export function SaleBikeLandingClient({
         });
         setReservationState("error");
         setCartMessage(result.error ?? "Не удалось отправить счёт в Telegram.");
+        reservationLockRef.current = false;
         return;
       }
 
@@ -818,6 +831,7 @@ export function SaleBikeLandingClient({
       });
       console.error("buy/reserve-test-drive failed", error);
       setReservationState("error");
+      reservationLockRef.current = false;
       setCartMessage(
         "Не удалось забронировать тест-драйв. Попробуйте ещё раз.",
       );
