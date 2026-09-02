@@ -186,3 +186,28 @@ Work Log:
 Stage Summary:
 - Identity-matching fix now sits on top of the parallel session's priority/handling/notes work; both feature sets intact.
 - lead_handling todos now hydrate on page load (persisting «Отработан»/«Перезвонить» state across reloads).
+
+---
+Task ID: 5
+Agent: main (Super Z)
+Task: Pull + codereview/improve recently modified files (leads module: 8880ddaf9, 92b7d2478, 7a616e92a lineage).
+
+Work Log:
+- Re-cloned salavey13/cartest at 8880ddaf9 (workspace was reset), restored .env.local from secrets_all.txt, npm install.
+- Read the full recently-modified surface: server-actions/leads.ts (1.9k lines), lead-notes.ts, lead-handling API route, LeadsClient, LeadDetailDrawer/Sheet/Content, LeadCard, LeadList, LeadBoard, LeadsToolbar, useLeadsData/useLeadFilters/useVirtualList, pipeline-stages, sla-signals, lead-priority, lead-history, leads-utils.
+- Fixed «Мои» todo filter in LeadDetailDrawer: compared t.assigned_to (chat_id) to the resolved display NAME → always empty; now matches assigneeId first, name as legacy fallback.
+- Fixed freshness for rental-sourced leads: createdAt/lastSeenAt used requested_start_date — future-dated rentals made age negative→0, so leads looked «⚡ свежий» forever and topped priority. rentals query now selects created_at and uses it with fallback.
+- Fixed open sheet stability: selected lead now resolved from leadsState (full set) with sortedLeads fallback — filter/segment changes no longer abruptly unmount the sheet.
+- Hardened notify double-tap guard with a synchronous ref mirror (stale-closure state guard let two fast taps both fire the TG send).
+- Perf: tgUserMap replaces three O(n·m) users .find() scans (enrichment + ownerName + lastTouchedBy).
+- Removed dead no-op placeholder-filter loop + pointless todos re-map in leads.ts; merged orphaned normalizePhone JSDoc; fixed malformed nested /** in leads-types.ts.
+- LeadList: added data-lead-id anchor (scroll-to-selected now works in list view); fixed TS2774.
+- TS: StageKey casts fixed TS7053 in LeadCard/LeadDetailDrawer/DismissLeadDialog; TS2352 in LeadDetailContent; leads module tsc-clean (total 2026→2012 lines).
+- iter27 guard fix: stale .neq("status","cancelled") assertion → stricter M4 .in("status",[...]) whitelist (×3), matching subrenter-monitoring's current (stronger) exclusion; suite 11→10 failures, all pre-existing baseline (my-work ×8, iter15, iter29).
+- Verified: 112 leads tests green (leads 40, priority 25, handling 22, identity 10, iter27 15), eslint clean on all touched files, tsc no new errors.
+- Committed 7ebd13de4, pushed origin/main.
+
+Stage Summary:
+- 5 behavioral bugs fixed (Мои filter, future-rental freshness, sheet filter-close, notify double-tap, stale iter27 guard) + dead code/docs cleanup + perf map + tsc cleanup in the recently-modified leads files.
+- Remaining known baseline (not touched): my-work ×8 + iter15 + iter29 failures; useLeadActions.ts/LeadDetailNotes/LeadDetailTodos are legacy modules with tsc errors and no live references (candidates for deletion later).
+- useLeadFilters.ts (380 lines) is not wired anywhere (LeadsClient uses useFilteredSortedLeads) — kept for the documented v2 plan, flagged as tech debt.
