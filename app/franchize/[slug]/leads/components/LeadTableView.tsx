@@ -16,10 +16,11 @@
 //
 
 import { useMemo } from "react";
-import { ArrowDown, ArrowUp, Bike, CircleDollarSign, Table2, ExternalLink, Flame, Zap } from "lucide-react";
+import { ArrowDown, ArrowUp, Bike, CircleDollarSign, Table2, ExternalLink, Flame, Zap, PhoneCall } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "../leads-types";
 import { relativeTime, metaFor, isAvitoLead, AVITO_COLOR, AVITO_BG } from "../leads-utils";
 import { STAGE_LABELS as PIPELINE_STAGE_LABELS, STAGE_COLORS } from "../lib/pipeline-stages";
+import { getLeadHandling, isHandlingTodo, formatCallbackTime, isCallbackOverdue } from "../lib/lead-handling";
 import { type SortMode } from "../leads-constants";
 import { type LeadPriority } from "../lib/lead-priority";
 import { Avatar } from "./Avatar";
@@ -56,7 +57,7 @@ export function LeadTableView({
   onSortChange,
   T,
 }: LeadTableViewProps) {
-  // Precompute per-lead derived values once (pending todos, spent, activity, priority).
+  // Precompute per-lead derived values once (pending todos, spent, activity, priority, handling).
   const rows = useMemo(
     () =>
       leads.map((lead) => {
@@ -64,8 +65,11 @@ export function LeadTableView({
         return {
           lead,
           priority: priorityMap?.get(lead.user_id),
-          pendingTodos: todos.filter((t) => t.status !== "done").length,
-          totalTodos: todos.length,
+          // handling-строки («отработан»/«перезвонить») считаем отдельно —
+          // в колонке задач они не учитываются, у них своя колонка «Работа».
+          pendingTodos: todos.filter((t) => t.status !== "done" && !isHandlingTodo(t)).length,
+          totalTodos: todos.filter((t) => !isHandlingTodo(t)).length,
+          handling: getLeadHandling(todos),
           spent: Number(lead.totalSpent || 0),
           activity: lead.lastSeenAt || lead.createdAt || "",
         };
@@ -133,7 +137,7 @@ export function LeadTableView({
         className="overflow-x-auto rounded-2xl border"
         style={{ borderColor: T.border, backgroundColor: T.bgCard, WebkitOverflowScrolling: "touch" }}
       >
-        <table className="w-full border-collapse text-left text-xs" style={{ color: T.text, minWidth: "920px" }}>
+        <table className="w-full border-collapse text-left text-xs" style={{ color: T.text, minWidth: "1020px" }}>
           <thead className="sticky top-0 z-10">
             <tr>
               {/* Приоритет (ТЗ) — итоговый индекс 0–100: чем выше, тем выше лид.
@@ -164,6 +168,14 @@ export function LeadTableView({
               >
                 Стадия
               </th>
+              {/* «Работа» — «отработан» / «перезвонить в ...» (просьба босса:
+                  заметка о перезвоне видна прямо в списке). */}
+              <th
+                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
+                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
+              >
+                Работа
+              </th>
               <th
                 className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
                 style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
@@ -187,7 +199,7 @@ export function LeadTableView({
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ lead, priority, pendingTodos, totalTodos, spent }, idx) => {
+            {rows.map(({ lead, priority, pendingTodos, totalTodos, spent, handling }, idx) => {
               const selected = selectedId === lead.user_id;
               const avito = isAvitoLead(lead);
               const stage = stageMeta(lead.stageKey);
@@ -329,6 +341,37 @@ export function LeadTableView({
                     >
                       {stage.label}
                     </span>
+                  </td>
+                  {/* Работа: «отработан» + «перезвонить в ...» */}
+                  <td className="whitespace-nowrap border-b border-r px-2.5 py-2" style={{ borderColor: T.borderSoft }}>
+                    {handling.callback ? (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                        style={
+                          isCallbackOverdue(handling.callback)
+                            ? { backgroundColor: "#ef444420", color: "#ef4444" }
+                            : { backgroundColor: "#f59e0b20", color: "#f59e0b" }
+                        }
+                        title={
+                          (isCallbackOverdue(handling.callback) ? "ПЕРЕЗВОН ПРОСРОЧЕН: " : "Перезвонить: ") +
+                          formatCallbackTime(handling.callback.dueAt) +
+                          (handling.callback.note ? ` · ${handling.callback.note}` : "")
+                        }
+                      >
+                        <PhoneCall className="h-2.5 w-2.5" aria-hidden />
+                        {formatCallbackTime(handling.callback.dueAt)}
+                      </span>
+                    ) : handling.handled ? (
+                      <span
+                        className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                        style={{ backgroundColor: "#22c55e20", color: "#22c55e" }}
+                        title={handling.handledAt ? `Отработан: ${formatCallbackTime(handling.handledAt)}` : "Отработан"}
+                      >
+                        ✅ Обработан
+                      </span>
+                    ) : (
+                      <span style={{ color: T.textFaint }}>—</span>
+                    )}
                   </td>
                   {/* Ответственный */}
                   <td className="max-w-[140px] border-b border-r px-2.5 py-2" style={{ borderColor: T.borderSoft }}>

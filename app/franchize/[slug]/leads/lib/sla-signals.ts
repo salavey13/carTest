@@ -1,5 +1,6 @@
 import type { LeadRow, LeadTodoRow } from "../leads-types";
 import { matchTodosToLead } from "./pipeline-stages";
+import { getLeadHandling, isHandlingTodo, isCallbackOverdue, callbackInMinutes } from "./lead-handling";
 
 export interface LeadSignal {
   key: string;
@@ -22,6 +23,7 @@ export function computeLeadSignals(lead: LeadRow, allTodos: LeadTodoRow[]): Lead
   const signals: LeadSignal[] = [];
   const now = Date.now();
   const todos = matchTodosToLead(lead, allTodos);
+  const handling = getLeadHandling(todos);
 
   if (lead.createdAt) {
     const ms = now - new Date(lead.createdAt).getTime(), h = ms / 36e5;
@@ -31,9 +33,23 @@ export function computeLeadSignals(lead: LeadRow, allTodos: LeadTodoRow[]): Lead
     const ms = now - new Date(lead.lastSeenAt).getTime(), h = ms / 36e5;
     signals.push({ key: "time_since_last_action", label: "Без отклика", value: fmt(ms), detail: h > 24 ? "ОТКЛИКА НЕТ" : undefined, tone: h < 1 ? "good" : h < 4 ? "neutral" : h < 24 ? "warning" : "danger", priority: h < 1 ? 0 : h < 4 ? 1 : h < 24 ? 2 : 4 });
   }
-  const overdue = todos.filter((t) => t.due_date && new Date(t.due_date).getTime() < now && t.status !== "done");
+  // Handling-строки («отработан»/«перезвонить») не считаются «задачами» —
+  // у перезвона собственный сигнал ниже + собственные плашки в списках.
+  const overdue = todos.filter((t) => t.due_date && new Date(t.due_date).getTime() < now && t.status !== "done" && !isHandlingTodo(t));
   if (overdue.length > 0) {
     signals.push({ key: "overdue_todo_count", label: "Просроченные задачи", value: String(overdue.length), detail: "просроч. задачи", tone: overdue.length >= 2 ? "danger" : "warning", priority: overdue.length >= 2 ? 4 : 2 });
+  }
+  // 📞 Назначенный перезвон: просрочен (danger, верхний приоритет) или
+  // подоспел (warning) — сигнал виден в SLA-блоке карточки и в шторке.
+  if (handling.callback) {
+    const inMin = callbackInMinutes(handling.callback, now);
+    const od = isCallbackOverdue(handling.callback, now);
+    const hm = new Date(handling.callback.dueAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    if (od) {
+      signals.push({ key: "callback_overdue", label: "Перезвон ПРОСРОЧЕН", value: hm, detail: handling.callback.note || "нужно позвонить", tone: "danger", priority: 5 });
+    } else if (inMin !== null && inMin <= 180) {
+      signals.push({ key: "callback_due_soon", label: "Перезвонить", value: hm, detail: handling.callback.note || `через ${inMin} мин`, tone: "warning", priority: 3 });
+    }
   }
   const future = lead.rentals.filter((r) => r.startDate && new Date(r.startDate).getTime() > now).sort((a, b) => new Date(a.startDate!).getTime() - new Date(b.startDate!).getTime());
   if (future.length > 0) {

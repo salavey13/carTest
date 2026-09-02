@@ -1,7 +1,8 @@
 // /app/franchize/[slug]/leads/components/LeadsToolbar.tsx
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -47,6 +48,9 @@ const SORT_OPTIONS: Array<{ value: string; label: string }> = [
 // lead whose DB stage was lead_captured/viewed → the filter looked dead.
 const STAGE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "all", label: "Все стадии" },
+  // Виртуальный фильтр: все лиды канала Авито (isAvitoLead), независимо от
+  // стадии — обрабатывается в LeadsClient отдельно от стадийных значений.
+  { value: "avito", label: "🟢 Авито (все)" },
   { value: "new", label: "Новые" },
   { value: "needs_contact", label: "Нужен контакт" },
   { value: "contract_sent", label: "Договор отправлен" },
@@ -360,8 +364,17 @@ export function LeadsToolbar({
 
 // ── Dropdown component ──
 // Renders a button with `{label}: {selected value}` + chevron, and a popover
-// menu with all options. On mobile it sits inside an overflow-x-auto parent
-// so the row scrolls horizontally without inducing page-level scroll.
+// menu with all options.
+//
+// FIX ("dropdowns are empty"): the popover used to be `position: absolute`
+// INSIDE the horizontally-scrolling filter row (overflowX:auto +
+// overflowY:hidden). Any absolutely-positioned child that extends below the
+// ~36px-tall row gets CLIPPED by overflow-y — so the menu opened but was
+// invisible (looked like an empty dropdown). Now the popover renders through
+// a React portal into document.body with `position: fixed` anchored to the
+// button's bounding rect, immune to any ancestor overflow clipping. It also
+// flips up when there's more room above than below (phone keyboards, bottom
+// of the page) and closes on outside click, Escape, scroll and resize.
 function Dropdown({
   label,
   value,
@@ -376,24 +389,75 @@ function Dropdown({
   T: any;
 }) {
   const [open, setOpen] = useState(false);
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
+  // Portal target only exists client-side after hydration.
+  useEffect(() => setMounted(true), []);
+
+  // Measure the button each time the menu opens (page may have scrolled since).
+  useLayoutEffect(() => {
+    if (!open || !ref.current) return;
+    const r = ref.current.getBoundingClientRect();
+    const width = Math.max(200, Math.min(r.width, window.innerWidth - 16));
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+    setRect({ top: r.bottom, left, width });
+  }, [open]);
+
+  // Close on outside click (button + portal menu), Escape, scroll, resize.
   useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+    if (!open) return;
+    const onPointer = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      if (ref.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    const onReflow = () => setOpen(false);
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("touchstart", onPointer);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onReflow);
+    // Any scroll (incl. the horizontal filter row itself) detaches the menu
+    // from the button — close instead of drifting. capture:true so inner
+    // scroll containers are caught too.
+    window.addEventListener("scroll", onReflow, true);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("touchstart", onPointer);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onReflow);
+      window.removeEventListener("scroll", onReflow, true);
+    };
+  }, [open]);
 
   const selected = options.find((o) => o.value === value);
+  const menuHeight = 300; // matches the previous max-h
+  // Flip the menu ABOVE the button when there's not enough room below.
+  const flipUp = !!rect && rect.top + menuHeight > window.innerHeight && rect.top > menuHeight;
+  const menuStyle: React.CSSProperties | undefined = rect
+    ? {
+        position: "fixed",
+        top: flipUp ? undefined : rect.top + 6,
+        bottom: flipUp ? window.innerHeight - rect.top + 6 : undefined,
+        left: rect.left,
+        minWidth: rect.width,
+        maxHeight: 300,
+      }
+    : { position: "fixed", top: -9999, left: -9999 };
 
   return (
     <div className="relative" style={{ flexShrink: 0 }} ref={ref}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         className="inline-flex items-center gap-1 rounded-xl border whitespace-nowrap transition"
         style={{
           borderColor: open ? T.borderActive : T.inputBorder,
@@ -424,41 +488,49 @@ function Dropdown({
         />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.12 }}
-            className="absolute left-0 z-30 mt-1.5 min-w-[180px] max-h-[300px] overflow-y-auto rounded-xl border p-1"
-            style={{
-              backgroundColor: T.bgCard,
-              borderColor: T.border,
-              boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
-            }}
-          >
-            {options.map((opt) => {
-              const active = opt.value === value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(opt.value);
-                    setOpen(false);
-                  }}
-                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs transition hover:opacity-80"
-                  style={{ color: active ? T.borderActive : T.text }}
-                >
-                  <span className="truncate">{opt.label}</span>
-                  {active && <Check className="h-3 w-3 shrink-0" />}
-                </button>
-              );
-            })}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {mounted && createPortal(
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              ref={menuRef}
+              role="listbox"
+              initial={{ opacity: 0, y: flipUp ? 4 : -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: flipUp ? 4 : -4 }}
+              transition={{ duration: 0.12 }}
+              className="fixed z-[80] max-h-[300px] overflow-y-auto rounded-xl border p-1"
+              style={{
+                ...menuStyle,
+                backgroundColor: T.bgCard,
+                borderColor: T.border,
+                boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+              }}
+            >
+              {options.map((opt) => {
+                const active = opt.value === value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => {
+                      onChange(opt.value);
+                      setOpen(false);
+                    }}
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs transition hover:opacity-80"
+                    style={{ color: active ? T.borderActive : T.text }}
+                  >
+                    <span className="truncate">{opt.label}</span>
+                    {active && <Check className="h-3 w-3 shrink-0" />}
+                  </button>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

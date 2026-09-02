@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CheckCircle2, ChevronRight, Phone, Clock, MoreVertical, X } from "lucide-react";
+import { CheckCircle2, ChevronRight, Phone, PhoneCall, Clock, MoreVertical, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -13,6 +13,8 @@ import type {LeadRow} from "../leads-types";
 import type { LeadSignal, StageKey } from "../leads-constants";
 import type { ThemeTokens } from "../hooks/useTheme";
 import type { LeadPriority } from "../lib/lead-priority";
+import type { LeadHandling } from "../lib/lead-handling";
+import { formatCallbackTime, isCallbackOverdue, callbackInMinutes } from "../lib/lead-handling";
 import {
   STAGE_LABELS,
   STAGE_COLORS,
@@ -37,6 +39,9 @@ interface Props {
   onDismiss: (id: string) => void;
   /** Priority Score 0–100 (ТЗ): питает лайбочки ⚡ свежий / 🔥 счёт. */
   priority?: LeadPriority;
+  /** «Отработан» / «Перезвонить в ...» — заметка-напоминание о перезвоне
+   * должна быть КРУПНО видна прямо в списке лидов. */
+  handling?: LeadHandling;
   T: ThemeTokens;
 }
 
@@ -75,7 +80,7 @@ function isValidLeadRow(lead: unknown): lead is LeadRow {
  * metadata 11px / md:13px. Left stripe is 3px (w-[3px]) so it reads as an
  * accent indicator without eating into the card content.
  */
-export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priority, T }: Props) {
+export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priority, handling, T }: Props) {
   // Type guard provides both runtime safety and type narrowing
   if (!isValidLeadRow(lead)) {
     return null;
@@ -105,6 +110,13 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
   // Verification status — different for /doc flow vs web-app flow
   const verifStatus = getVerificationStatus(lead);
   const verifMeta = VERIFICATION_LABELS[verifStatus];
+
+  // «Перезвонить в ...» — ПРИМАРНАЯ заметка лида (просьба босса: видна
+  // сразу в списке, без открытия карточки). Просроченный — красный.
+  const cb = handling?.callback ?? null;
+  const cbOverdue = isCallbackOverdue(cb);
+  const cbSoon = callbackInMinutes(cb);
+  const cbLabel = cb ? formatCallbackTime(cb.dueAt) : "";
 
   return (
     <motion.article
@@ -288,6 +300,46 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
+          {/* 📞 «Перезвонить в ...» — ГЛАВНАЯ заметка лида: полная ширина,
+              жирная, заметная издалека (просьба босса — «prominently visible
+              right in leads list»). Просроченный перезвон — красный,
+              подоспевший — янтарный. */}
+          {cb && (
+            <div
+              className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold md:text-sm"
+              style={{
+                backgroundColor: cbOverdue ? "#ef44441a" : "#f59e0b1a",
+                color: cbOverdue ? "#ef4444" : "#f59e0b",
+                border: `1px solid ${cbOverdue ? "#ef444440" : "#f59e0b40"}`,
+              }}
+              role="status"
+              title={cb.note || "Назначен перезвон"}
+            >
+              <PhoneCall className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span className="truncate">
+                {cbOverdue ? "⏰ Перезвон просрочен: " : "Перезвонить: "}
+                <span className="tabular-nums">{cbLabel}</span>
+                {cbSoon !== null && cbSoon > 0 && (
+                  <span className="font-medium opacity-80">
+                    {" "}({cbSoon < 60 ? `${cbSoon} мин` : `${Math.floor(cbSoon / 60)} ч ${cbSoon % 60} мин`})
+                  </span>
+                )}
+                {cb.note ? <span className="font-medium opacity-80"> · {cb.note}</span> : null}
+              </span>
+            </div>
+          )}
+
+          {/* ✅ Отработан — спокойная зелёная отметка (не перекрикивает перезвон) */}
+          {handling?.handled && (
+            <span
+              className="inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold"
+              style={{ backgroundColor: "#22c55e1a", color: "#22c55e" }}
+              title={handling.handledAt ? `Отработан: ${formatCallbackTime(handling.handledAt)}` : "Лид отработан"}
+            >
+              ✅ Обработан
+            </span>
+          )}
 
           {/* Source + temperature tags */}
           <div className="flex flex-wrap gap-2">

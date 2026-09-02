@@ -4,7 +4,13 @@
 import { useMemo } from "react";
 import { Avatar } from "./Avatar";
 import { relativeTime, metaFor, getInitials, isAvitoLead, AVITO_COLOR, AVITO_BG } from "../leads-utils";
-import { BOARD_COLUMNS } from "../leads-constants";
+import { BOARD_COLUMNS, AVITO_COLUMN_STAGES } from "../leads-constants";
+import {
+  getLeadHandling,
+  isHandlingTodo,
+  isCallbackOverdue,
+  formatCallbackTime,
+} from "../lib/lead-handling";
 import type {LeadRow, LeadTodoRow} from "../leads-types";
 import type { LeadPriority } from "../lib/lead-priority";
 
@@ -40,10 +46,15 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
     // Group by the COMPUTED pipeline stage (stageKey), not the raw DB stage —
     // see groupLeadsForBoard(): raw stages like "viewed"/"clicked" used to
     // collapse everything into the «Новые» fallback column.
+    //
+    // ВИРТУАЛЬНАЯ колонка «Авито» (первая): авито-лиды на дотрудовой стадии
+    // (new/needs_contact) собираются сюда, чтобы не растворялись в общем
+    // потоке; как только сделка доходит до договора — обычная колонка воронки.
     const map: Record<string, LeadRow[]> = {};
     for (const c of BOARD_COLUMNS) map[c.key] = [];
     for (const l of leads) {
-      const key = l.stageKey || "new";
+      const stage = l.stageKey || "new";
+      const key = isAvitoLead(l) && AVITO_COLUMN_STAGES.has(stage) ? "avito" : stage;
       if (!map[key]) map[key] = [];
       map[key].push(l);
     }
@@ -120,7 +131,9 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
                 </div>
               )}
               {colLeads.map((lead) => {
-                const pending = getTodosForLead(lead).filter((t) => t.status !== "done").length;
+                const todos = getTodosForLead(lead);
+                const pending = todos.filter((t) => t.status !== "done" && !isHandlingTodo(t)).length;
+                const handling = getLeadHandling(todos);
                 const meta = metaFor(lead.source);
                 const pr = priorityMap?.get(lead.user_id);
                 return (
@@ -179,6 +192,31 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
                           title="Лид из чата Авито — ответить можно в чате (ссылка в карточке лида)"
                         >
                           Авито
+                        </span>
+                      )}
+                      {/* 📞 Назначенный перезвон — виден прямо на канбан-карточке.
+                          Просроченный — красный, подоспевший — янтарный. */}
+                      {handling.callback && (
+                        <span
+                          className="rounded px-1.5 py-0.5 text-[9px] font-bold"
+                          style={
+                            isCallbackOverdue(handling.callback)
+                              ? { backgroundColor: "#ef444420", color: "#ef4444" }
+                              : { backgroundColor: "#f59e0b20", color: "#f59e0b" }
+                          }
+                          title={handling.callback.note || "Назначен перезвон"}
+                        >
+                          📞 {formatCallbackTime(handling.callback.dueAt)}
+                        </span>
+                      )}
+                      {/* ✅ Отработан — спокойная зелёная отметка. */}
+                      {handling.handled && !handling.callback && (
+                        <span
+                          className="rounded px-1.5 py-0.5 text-[9px] font-medium"
+                          style={{ backgroundColor: "#22c55e20", color: "#22c55e" }}
+                          title="Лид отработан"
+                        >
+                          ✅ Обработан
                         </span>
                       )}
                     </div>

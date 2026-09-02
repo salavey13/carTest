@@ -45,6 +45,12 @@ interface Props {
   onDeleteTodo: (id: string) => void;
   onAddNote: (text: string) => void;
   onDismissLead: () => void;
+  /** «Отработан» / «Перезвонить в ...» — проксируется в LeadHandlingSection. */
+  onMarkHandled?: (handled: boolean) => void;
+  onSetCallback?: (iso: string, note: string) => void;
+  onCompleteCallback?: () => void;
+  onClearCallback?: () => void;
+  handlingBusy?: boolean;
   /** m4 fix: true while a Telegram notify is in flight — disables the button. */
   notifyBusy?: boolean;
   /** When true, render as the inner content of a parent sheet (no backdrop). */
@@ -80,6 +86,11 @@ export function LeadDetailContent({
   onDeleteTodo,
   onAddNote,
   onDismissLead,
+  onMarkHandled,
+  onSetCallback,
+  onCompleteCallback,
+  onClearCallback,
+  handlingBusy = false,
   notifyBusy = false,
   asSheetChild = false,
 }: Props) {
@@ -180,6 +191,11 @@ export function LeadDetailContent({
       onDeleteTodo={onDeleteTodo}
       onAddNote={onAddNote}
       onDismissLead={onDismissLead}
+      onMarkHandled={onMarkHandled}
+      onSetCallback={onSetCallback}
+      onCompleteCallback={onCompleteCallback}
+      onClearCallback={onClearCallback}
+      handlingBusy={handlingBusy}
       notifyBusy={notifyBusy}
       asSheetChild={asSheetChild}
     />

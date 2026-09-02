@@ -68,7 +68,13 @@ export const SORT_OPTIONS: { value: SortMode; label: string }[] = [
 // back to "new" for unknown keys). The old set (new/contacted/configured/
 // contract_generated/completed) matched raw DB stages, so real pipeline stages
 // like awaiting_qr_claim/active_rental/return_due never had a column.
+//
+// "avito" — ВИРТУАЛЬНАЯ колонка (не стадия воронки): все лиды из чатов Авито
+// на дотрудовой стадии (new/needs_contact) собираются сюда, чтобы босс видел
+// их одним взглядом и они не растворялись в общем потоке. Как только сделка
+// доходит до договора/аренды — лид живёт в своей обычной стадии воронки.
 export const BOARD_COLUMNS: { key: string; label: string; color: string }[] = [
+  { key: "avito",             label: "Авито",            color: "#0a8f2a" },
   { key: "new",                label: "Новые",            color: "#64748b" },
   { key: "needs_contact",      label: "Нужен контакт",    color: "#3b82f6" },
   { key: "contract_sent",      label: "Договор отправлен", color: "#06b6d4" },
@@ -79,6 +85,12 @@ export const BOARD_COLUMNS: { key: string; label: string; color: string }[] = [
   { key: "closed_won",         label: "Закрыто",          color: "#166534" },
   { key: "closed_lost",        label: "Потеряно",         color: "#1f2937" },
 ];
+
+/**
+ * Дотрудовые стадии воронки: авито-лиды на них живут в виртуальной колонке
+ * «Авито» (см. BOARD_COLUMNS выше). Дальше по воронке — обычные колонки.
+ */
+export const AVITO_COLUMN_STAGES = new Set(["new", "needs_contact"]);
 
 export const RENTAL_STATUS_META: Record<string, { label: string; color: string }> = {
   active:                { label: "Активна",     color: "#10b981" },

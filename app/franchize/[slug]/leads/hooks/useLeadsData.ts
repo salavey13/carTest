@@ -61,10 +61,13 @@ function extractTodoLeadId(todo: LeadTodoRow): string | null {
   // 3. lead_id column — legacy fallback
   if (todo.lead_id) {
     if (/^\d{1,12}$/.test(todo.lead_id)) return todo.lead_id;
+    // FIX (lead-handling): non-phone keys ("avito:…", UUIDs) compare AS-IS —
+    // normalizePhone() mangles them into "+avito:…" which matches nothing.
+    if (!/^[+\d\s\-()]+$/.test(todo.lead_id)) return todo.lead_id;
     // Phone-shaped lead_id (legacy) — normalize.
     const normalizedLead = normalizePhone(todo.lead_id);
     if (normalizedLead) return normalizedLead;
-    if (todo.lead_id.includes('-')) return todo.lead_id;
+    return todo.lead_id;
   }
   // 4. description JSON — legacy fallback
   if (todo.description) {
@@ -77,6 +80,8 @@ function extractTodoLeadId(todo: LeadTodoRow): string | null {
       }
       if (desc.lead_id && typeof desc.lead_id === 'string') {
         if (/^\d{1,12}$/.test(desc.lead_id)) return desc.lead_id;
+        // non-phone keys (avito:…) compare as-is — see fix above
+        if (!/^[+\d\s\-()]+$/.test(desc.lead_id)) return desc.lead_id;
         const normalizedLead = normalizePhone(desc.lead_id);
         if (normalizedLead) return normalizedLead;
         if (desc.lead_id.includes('-')) return desc.lead_id;

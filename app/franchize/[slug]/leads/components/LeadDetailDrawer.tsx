@@ -55,6 +55,8 @@ import {
   type QrStatus,
 } from "./LeadDocumentsSection";
 import { LeadHistorySection } from "./LeadHistorySection";
+import { LeadHandlingSection } from "./LeadHandlingSection";
+import { getLeadHandling, isHandlingTodo } from "../lib/lead-handling";
 
 export interface LeadDrawerNote {
   id: string;
@@ -89,6 +91,12 @@ interface Props {
   onDeleteTodo: (id: string) => void;
   onAddNote: (text: string) => void;
   onDismissLead: () => void;
+  /** «Отработан» / «Перезвонить в ...» — панель и колбэки (см. LeadHandlingSection). */
+  onMarkHandled?: (handled: boolean) => void;
+  onSetCallback?: (iso: string, note: string) => void;
+  onCompleteCallback?: () => void;
+  onClearCallback?: () => void;
+  handlingBusy?: boolean;
   /** m4 fix: true while a Telegram notify is in flight — disables the button. */
   notifyBusy?: boolean;
   /** When true, render as the inner content of a parent sheet/drawer (no
@@ -129,6 +137,11 @@ export function LeadDetailDrawer(props: Props) {
     onDeleteTodo,
     onAddNote,
     onDismissLead,
+    onMarkHandled,
+    onSetCallback,
+    onCompleteCallback,
+    onClearCallback,
+    handlingBusy = false,
     notifyBusy = false,
     asSheetChild = false,
   } = props;
@@ -193,7 +206,12 @@ export function LeadDetailDrawer(props: Props) {
     infoItems.push({ label: "Avito объявление", value: String(avito.itemId) });
   }
 
-  const filteredTodos = todos.filter((t) => {
+  // Handling-состояние («отработан»/«перезвонить») выводим собственной
+  // панелью — из общего списка задач их скрываем, чтобы не дублировать.
+  const handling = getLeadHandling(todos);
+  const visibleTodos = todos.filter((t) => !isHandlingTodo(t));
+
+  const filteredTodos = visibleTodos.filter((t) => {
     if (todoFilter === "overdue")
       return (
         !!t.due_date &&
@@ -456,6 +474,21 @@ export function LeadDetailDrawer(props: Props) {
           </span>
           <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
         </a>
+      )}
+
+      {/* 1c. Работа с лидом — «Отработан» + «Перезвонить в ...».
+          Просьба босса: состояние видно и меняется прямо в шторке, а плашки
+          с назначенным временем — сразу в списке/таблице/канбане. */}
+      {onMarkHandled && onSetCallback && (
+        <LeadHandlingSection
+          handling={handling}
+          T={T}
+          busy={handlingBusy}
+          onMarkHandled={onMarkHandled}
+          onSetCallback={onSetCallback}
+          onCompleteCallback={onCompleteCallback ?? (() => {})}
+          onClearCallback={onClearCallback ?? (() => {})}
+        />
       )}
 
       {/* 2. Primary actions — 2x2 grid on mobile, 4-col on desktop */}

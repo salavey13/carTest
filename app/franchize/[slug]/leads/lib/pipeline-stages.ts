@@ -285,8 +285,11 @@ function extractTodoLeadId(todo: LeadTodoRow): string | null {
   if (todo.phone) { const n = normalizePhone(todo.phone); if (n) return n; }
   if (todo.lead_id) {
     if (/^\d{1,12}$/.test(todo.lead_id)) return todo.lead_id;
+    // FIX (lead-handling): non-phone keys ("avito:…", UUIDs) compare AS-IS —
+    // normalizePhone() mangles them into "+avito:…" which matches nothing.
+    if (!/^[+\d\s\-()]+$/.test(todo.lead_id)) return todo.lead_id;
     const n = normalizePhone(todo.lead_id); if (n) return n;
-    if (todo.lead_id.includes("-")) return todo.lead_id;
+    return todo.lead_id;
   }
   if (todo.description) {
     try {
@@ -295,8 +298,10 @@ function extractTodoLeadId(todo: LeadTodoRow): string | null {
       if (typeof d.phone === 'string') { const n = normalizePhone(d.phone); if (n) return n; }
       if (typeof d.lead_id === 'string' && d.lead_id) {
         if (/^\d{1,12}$/.test(d.lead_id)) return d.lead_id;
+        // non-phone keys (avito:…) compare as-is — see fix above
+        if (!/^[+\d\s\-()]+$/.test(d.lead_id)) return d.lead_id;
         const n = normalizePhone(d.lead_id); if (n) return n;
-        if (d.lead_id.includes("-")) return d.lead_id;
+        return d.lead_id;
       }
     } catch {}
   }

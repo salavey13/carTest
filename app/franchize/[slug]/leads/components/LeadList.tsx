@@ -7,6 +7,7 @@ import { useVirtualList } from "../hooks/useVirtualList";
 import { LeadCard } from "./LeadCard";
 import type {LeadRow, LeadTodoRow} from "../leads-types";
 import { computeLeadSignals } from "../lib/sla-signals";
+import { getLeadHandling, type LeadHandling } from "../lib/lead-handling";
 import type { LeadSignal } from "../lib/sla-signals";
 import type { LeadPriority } from "../lib/lead-priority";
 
@@ -84,6 +85,7 @@ export function LeadList({
         {virtualItems.map((virtualRow) => {
           const lead = leads[virtualRow.index];
           const isThisSelected = isSelected.has(lead.user_id);
+          const leadTodos = getTodosForLead ? getTodosForLead(lead) : [];
           return (
             <motion.div
               key={lead.user_id}
@@ -109,7 +111,8 @@ export function LeadList({
                 onSelect={() => handleSelect(lead)}
                 onDismiss={onDismiss}
                 priority={priorityMap?.get(lead.user_id)}
-                signals={getTodosForLead ? computeLeadSignals(lead, getTodosForLead(lead)) : []}
+                handling={getLeadHandling(leadTodos)}
+                signals={getTodosForLead ? computeLeadSignals(lead, leadTodos) : []}
               />
             </motion.div>
           );

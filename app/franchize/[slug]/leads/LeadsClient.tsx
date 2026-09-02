@@ -7,6 +7,8 @@ import { Lock } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import type {LeadRow, LeadTodoRow} from "./leads-types";
 import { getFranchizeLeads } from "@/app/franchize/server-actions/leads";
+import { isAvitoLead } from "./leads-utils";
+import { isHandlingTodo } from "./lib/lead-handling";
 
 // Import extracted components
 import { LeadsKPICards } from "./components/LeadsKPICards";
@@ -296,9 +298,12 @@ export function LeadsClient({
   // FIX: stage filter now matches the COMPUTED pipeline stage (stageKey, set
   // server-side by computeLeadStage) — it used to compare against the raw DB
   // stage, so most options matched nothing and the filter looked broken.
+  // "avito" — виртуальное значение: все лиды канала Авито независимо от стадии.
   const sortedLeads = useMemo(() => {
     let result = baseSortedLeads;
-    if (filterStage !== "all") {
+    if (filterStage === "avito") {
+      result = result.filter(isAvitoLead);
+    } else if (filterStage !== "all") {
       result = result.filter((l) => (l.stageKey || "new") === filterStage);
     }
     if (filterOwner !== "all") {
@@ -602,6 +607,60 @@ export function LeadsClient({
     }
   }, [todosState, crewId, authHeaders, showToast]);
 
+  // ── Lead handling: «Отработан» + «Перезвонить в ...» (REST API route) ──
+  // Все состояния пишутся в crew_todos (category="lead_handling") через
+  // /api/franchize/lead-handling; после успешного ответа заменяем локальные
+  // handling-строки этого лида на серверные (touched) — плашки и индекс
+  // приоритета пересчитаются сами, без полного re-fetch.
+  const [handlingBusy, setHandlingBusy] = useState(false);
+  const applyHandlingAction = useCallback(async (
+    action: "handled" | "unhandled" | "set_callback" | "clear_callback" | "complete_callback",
+    extra: Record<string, unknown> = {},
+  ) => {
+    const lead = selectedId ? leadsState.find((l) => l.user_id === selectedId) : null;
+    if (!lead || handlingBusy) return;
+    setHandlingBusy(true);
+    try {
+      const resp = await fetch("/api/franchize/lead-handling", {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          crewId,
+          leadId: lead.user_id,
+          leadName: lead.full_name || "",
+          action,
+          ...extra,
+        }),
+      });
+      const body = await resp.json().catch(() => null);
+      if (!resp.ok || !body?.success) {
+        showToast(body?.error || `Не удалось сохранить (HTTP ${resp.status})`);
+        return;
+      }
+      const touched = ((body.touched || []) as LeadTodoRow[]).filter(Boolean);
+      // Идентификация локальных handling-строк ЭТОГО лида: ключ лида может
+      // лежать в lead_id, user_id или phone (зависит от формы ключа).
+      const leadKeys = new Set(
+        [lead.user_id, lead.phone].filter(Boolean) as string[]
+      );
+      const isHandlingRowForLead = (t: LeadTodoRow) => {
+        if (!isHandlingTodo(t)) return false;
+        if (t.lead_id) return leadKeys.has(t.lead_id);
+        if (t.user_id) return leadKeys.has(t.user_id);
+        if (t.phone) return leadKeys.has(t.phone);
+        return false; // строка без ключа — не трогаем
+      };
+      setTodosState((prev) => [
+        ...touched,
+        ...prev.filter((t) => !isHandlingRowForLead(t)),
+      ]);
+    } catch {
+      showToast("Ошибка сети");
+    } finally {
+      setHandlingBusy(false);
+    }
+  }, [selectedId, leadsState, crewId, authHeaders, showToast, handlingBusy]);
+
   // ── Sheet notes handler (server action, cookie-auth) ──
   const handleAddNote = useCallback(async (text: string) => {
     const lead = selectedId ? leadsState.find((l) => l.user_id === selectedId) : null;
@@ -671,7 +730,7 @@ export function LeadsClient({
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
-      <LeadsKPICards leads={activeLeads} hot={hot} verified={verified} todos={todosState} T={T} />
+      <LeadsKPICards leads={activeLeads} hot={hot} verified={verified} todos={todosState.filter((t) => !isHandlingTodo(t))} T={T} />
 
       {/* Load-error banner — silent empty pages were the #1 desktop-web-Telegram
           complaint. Shows the actual server error + manual retry. The loading
@@ -799,6 +858,11 @@ export function LeadsClient({
               onDeleteTodo={handleDeleteTodo}
               onAddNote={handleAddNote}
               onDismissLead={() => handleDismissLead(selectedLead.user_id)}
+              onMarkHandled={(handled) => applyHandlingAction(handled ? "handled" : "unhandled")}
+              onSetCallback={(iso, note) => applyHandlingAction("set_callback", { callbackAt: iso, note })}
+              onCompleteCallback={() => applyHandlingAction("complete_callback")}
+              onClearCallback={() => applyHandlingAction("clear_callback")}
+              handlingBusy={handlingBusy}
               notifyBusy={notifyBusy}
               asSheetChild
             />

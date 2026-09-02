@@ -33,6 +33,7 @@
 
 import type { LeadRow } from "../leads-types";
 import { isAvitoLead } from "../leads-utils";
+import { type LeadHandling, isCallbackOverdue } from "./lead-handling";
 
 // ── Канальные мультипликаторы (базовый вес ×) ───────────────────────────────
 /**
@@ -146,19 +147,42 @@ export interface LeadPriority {
   channelMultiplier: number;
   /** Канал для UI-подписи. */
   channel: "avito" | "web_callback" | "callback_request" | "other";
+  /** Активный перезвон назначен — время (ISO), когда нужно позвонить. */
+  callbackDue: string | null;
 }
 
 /** Порог «горячего» лида для 🔥-лайбочки (ТЗ п.4). */
 export const HOT_THRESHOLD = 70;
 
+/** Бонус к индексу за ПРОСРОЧЕННЫЙ перезвон (время пришло — звонка не было). */
+export const CALLBACK_OVERDUE_BOOST = 30;
+/** Бонус за перезвон, который подоспел (ближайшие 3 часа). */
+export const CALLBACK_SOON_BOOST = 15;
+/** Горизонт «подоспевшего» перезвона. */
+export const CALLBACK_SOON_WINDOW_MS = 3 * 60 * 60 * 1000;
+
+/** Бонус за активный перезвон (0 — нет перезвона). */
+export function callbackBoost(handling: LeadHandling | undefined, now: number): number {
+  const cb = handling?.callback;
+  if (!cb) return 0;
+  if (isCallbackOverdue(cb, now)) return CALLBACK_OVERDUE_BOOST;
+  const due = new Date(cb.dueAt).getTime();
+  if (Number.isFinite(due) && due - now <= CALLBACK_SOON_WINDOW_MS) return CALLBACK_SOON_BOOST;
+  return 0;
+}
+
 /**
  * Расчёт итогового индекса приоритета лида (0–100).
  * Чистая функция: `now` передаётся снаружи (мемоизируется рендером).
+ * `handling` (опционально) — состояние «отработан/перезвонить»: назначенный
+ * перезвон, чьё время подоспело (+15) или уже ПРОСРОЧЕН (+30), поднимает
+ * лид вверх очереди — менеджер обязан увидеть его первым.
  */
 export function computeLeadPriority(
   lead: LeadRow,
   pendingTodos: number,
   now: number,
+  handling?: LeadHandling,
 ): LeadPriority {
   const ageMs = leadAgeMs(lead, now);
   const freshness = freshnessScore(ageMs);
@@ -186,7 +210,10 @@ export function computeLeadPriority(
     W.value * value +
     W.stage * stage;
 
-  const score = Math.max(0, Math.min(100, Math.round(base * channelMultiplier)));
+  const score = Math.max(
+    0,
+    Math.min(100, Math.round(base * channelMultiplier) + callbackBoost(handling, now)),
+  );
 
   return {
     score,
@@ -195,6 +222,8 @@ export function computeLeadPriority(
     isHot: score >= HOT_THRESHOLD,
     channelMultiplier,
     channel,
+    /** Активный перезвон назначен (для плашки 📞 в списке). */
+    callbackDue: handling?.callback?.dueAt ?? null,
   };
 }
 

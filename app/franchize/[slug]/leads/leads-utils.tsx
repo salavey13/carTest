@@ -1,9 +1,10 @@
 // /app/franchize/[slug]/leads/leads-utils.tsx
 "use client";
 
-import { SOURCE_META } from "./leads-constants";
+import { SOURCE_META, BOARD_COLUMNS, AVITO_COLUMN_STAGES } from "./leads-constants";
 import { PIPELINE_STAGES } from "./lib/pipeline-stages";
 import { compareByPriority, computeLeadPriority, type LeadPriority } from "./lib/lead-priority";
+import { getLeadHandling, isHandlingTodo } from "./lib/lead-handling";
 import type {LeadRow, LeadTodoRow} from "./leads-types";
 
 /** Avito brand tint used for badges/accents across the leads UI. */
@@ -182,6 +183,12 @@ export function getTodoLeadId(todo: LeadTodoRow): string | null {
   // 3. lead_id column — legacy fallback
   if (todo.lead_id) {
     if (/^\d{1,12}$/.test(todo.lead_id)) return todo.lead_id;
+    // FIX (lead-handling): non-phone keys — "avito:…", "fwd-…", UUIDs —
+    // must compare AS-IS. The old path ran normalizePhone() on any string,
+    // which mangled "avito:123" into "+avito:123" and never matched the
+    // lead's user_id. Only phone-SHAPED values (digits/+/dashes/parens)
+    // go through normalization.
+    if (!/^[+\d\s\-()]+$/.test(todo.lead_id)) return todo.lead_id;
     const normalizedLead = normalizePhone(todo.lead_id);
     if (normalizedLead) return normalizedLead;
     return todo.lead_id;
@@ -197,6 +204,8 @@ export function getTodoLeadId(todo: LeadTodoRow): string | null {
       }
       if (desc.lead_id && typeof desc.lead_id === 'string') {
         if (/^\d{1,12}$/.test(desc.lead_id)) return desc.lead_id;
+        // same fix as above: non-phone keys compare as-is (avito:…)
+        if (!/^[+\d\s\-()]+$/.test(desc.lead_id)) return desc.lead_id;
         const normalizedLead = normalizePhone(desc.lead_id);
         if (normalizedLead) return normalizedLead;
         return desc.lead_id;
@@ -303,6 +312,10 @@ export function filterLeads(
  * Сортировка «priority» и лайбочки (⚡ свежий / 🔥 счёт) в карточках,
  * таблице и канбане читают значения из этой карты — расчёт O(1) на лида,
  * без пересчёта внутри компаратора сортировки.
+ *
+ * Заметка: pending-задачи для индекса НЕ включают handling-строки
+ * («отработан»/«перезвонить») — их влияние учитывается отдельным
+ * callback-бонусом внутри computeLeadPriority.
  */
 export function buildPriorityMap(
   leads: LeadRow[],
@@ -311,8 +324,10 @@ export function buildPriorityMap(
 ): Map<string, LeadPriority> {
   const map = new Map<string, LeadPriority>();
   for (const lead of leads) {
-    const pending = getTodosForLead(lead).filter((t) => t.status !== "done").length;
-    map.set(lead.user_id, computeLeadPriority(lead, pending, now));
+    const todos = getTodosForLead(lead);
+    const pending = todos.filter((t) => t.status !== "done" && !isHandlingTodo(t)).length;
+    const handling = getLeadHandling(todos);
+    map.set(lead.user_id, computeLeadPriority(lead, pending, now, handling));
   }
   return map;
 }
@@ -365,8 +380,10 @@ function computeLeadPriorityFallback(
   return (lead: LeadRow) => {
     const cached = cache.get(lead.user_id);
     if (cached) return cached;
-    const pending = getTodosForLead(lead).filter((t) => t.status !== "done").length;
-    const p = computeLeadPriority(lead, pending, now);
+    const todos = getTodosForLead(lead);
+    const pending = todos.filter((t) => t.status !== "done" && !isHandlingTodo(t)).length;
+    const handling = getLeadHandling(todos);
+    const p = computeLeadPriority(lead, pending, now, handling);
     cache.set(lead.user_id, p);
     return p;
   };
@@ -394,11 +411,13 @@ export function groupLeadsForBoard(leads: LeadRow[]): Record<string, LeadRow[]> 
   // "lead_captured", "checkout_started" all fell into the "new" fallback bucket,
   // which is why «Новые» showed 125+ mixed leads. Now we group by the COMPUTED
   // pipeline stage (stageKey, already resolved server-side from rentals/QR/docs),
-  // and the column set matches PIPELINE_STAGES exactly.
+  // and the column set matches PIPELINE_STAGES exactly (плюс виртуальная
+  // колонка «Авито» для дотрудовых авито-лидов — см. BOARD_COLUMNS).
   const map: Record<string, LeadRow[]> = {};
-  for (const s of PIPELINE_STAGES) map[s.key] = [];
+  for (const s of BOARD_COLUMNS) map[s.key] = [];
   for (const l of leads) {
-    const key = l.stageKey || "new";
+    const stage = l.stageKey || "new";
+    const key = isAvitoLead(l) && AVITO_COLUMN_STAGES.has(stage) ? "avito" : stage;
     if (!map[key]) map[key] = [];
     map[key].push(l);
   }
