@@ -237,8 +237,11 @@ function buildDocuments(
   // in person when creating the contract — verified by construction.
   const isDocFlow = getFlowType(lead) === "doc";
 
-  // Read verification checklist from rental metadata (set by /api/verify-rental-checklist)
-  const meta = (rental as Record<string, unknown>).metadata as Record<string, unknown> | null;
+  // Read verification checklist from rental metadata (set by /api/verify-rental-checklist).
+  // Double cast through unknown — LeadRentalRow and Record<string, unknown>
+  // don't sufficiently overlap for a direct `as` (TS2352), but the metadata
+  // field is genuinely a JSON object at runtime.
+  const meta = (rental as unknown as Record<string, unknown>).metadata as Record<string, unknown> | null;
   const checklist = (meta?.checklist as Record<string, unknown>) || {};
   const verifier = (meta?.contract_verifier as Record<string, unknown> | null) || null;
   const passportVerified = !!checklist.passport_verified || verifier?.status === "verified" || isDocFlow;

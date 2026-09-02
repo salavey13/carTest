@@ -85,7 +85,6 @@ export interface LeadRow {
   nextAction?: string | null;
   qrStatus?: "unclaimed" | "sent" | "claimed" | "expired";
   /**
-  /**
    * Количество заметок лида (таблица lead_notes, crew-scoped) — питает
    * подсвеченный флажок «Прочитать заметки» прямо в списке лидов.
    * Считается на сервере одним агрегатным запросом; 0/undefined = заметок нет.

@@ -253,18 +253,10 @@ function nameIdentityKey(fullName: string | null | undefined): string {
 }
 
 /**
- * Normalize a phone number to canonical E.164-ish form (+7XXXXXXXXXX for RU).
- * Accepts +7/7/8 prefix, spaces, dashes, parentheses.
- * Returns null if input is empty or unparseable.
- *
- * BUG FIX: previously, leads were keyed by the raw phone string as typed by the
- * operator in /doc-manual ("8 999 123-45-67"), while todos were keyed by the
- * raw leadPhone passed to createLeadFollowupTodos ("+79991234567").
- * Same person → two different lead cards. Normalizing at every read & write
- * path collapses them into one canonical identity.
- */
-/**
  * Classify identity state for a lead.
+ * (Phone normalization note: phones are canonicalized via normalizePhone()
+ * from phone-utils at every read & write path — raw "8 999 123-45-67" typed by
+ * the operator and the todo key "+79991234567" collapse into one identity.)
  *
  * BUG FIX: previously, after QR claim overwrote telegram_user_id with the renter's
  * id, the operator origin was lost and the lead was misclassified as 'claimed_user'.
@@ -571,7 +563,7 @@ export async function getFranchizeLeads(
       // even after the renter's QR claim replaces rentals.user_id.
       supabaseAdmin
         .from("rentals")
-        .select("rental_id, user_id, status, payment_status, requested_start_date, requested_end_date, total_cost, metadata, passport_mainpage_photo, passport_registration_photo, drivers_licence_frontal_photo, crew_id, created_by_operator_chat_id, vehicle:cars(make, model)")
+        .select("rental_id, user_id, status, payment_status, requested_start_date, requested_end_date, total_cost, metadata, passport_mainpage_photo, passport_registration_photo, drivers_licence_frontal_photo, crew_id, created_by_operator_chat_id, created_at, vehicle:cars(make, model)")
         .eq("crew_id", crewId)
         .order("created_at", { ascending: false })
         .limit(500),
@@ -959,8 +951,13 @@ export async function getFranchizeLeads(
             phone: effectivePhone,
             source: "rental",
             bikeTitle,
-            createdAt: r.requested_start_date,
-            lastSeenAt: r.requested_start_date,
+            // REAL creation time, not requested_start_date: a future-dated
+            // rental start (booked for next week) used to become the lead's
+            // "first contact" — freshness computed a NEGATIVE age → 0, so the
+            // lead looked «⚡ свежий» (age 0) and topped the priority queue
+            // until the rental actually started. Fall back for legacy rows.
+            createdAt: (r as { created_at?: string | null }).created_at || r.requested_start_date,
+            lastSeenAt: (r as { created_at?: string | null }).created_at || r.requested_start_date,
             verified: ["active", "completed", "confirmed"].includes(r.status || ""),
             // goodmorning-fixes: set intentType so mode filter ("rent") includes rental leads.
             intentType: "rent",
@@ -1368,6 +1365,18 @@ export async function getFranchizeLeads(
     const troubledUsers = troubledUsersResult.data;
     const todos = todosResult.data;
 
+    // Numeric user_id → { username, full_name } map — used by the enrichment
+    // step below AND by the ownerName/lastTouchedBy name resolution at the end
+    // of this function. Previously three separate O(n·m) `.find()` scans over
+    // the users array; with hundreds of leads × hundreds of users that added
+    // up to real time on every page load.
+    const tgUserMap = new Map<string, { username: string | null; full_name: string | null }>();
+    if (tgUsers) {
+      for (const u of tgUsers) {
+        tgUserMap.set(u.user_id, { username: u.username, full_name: u.full_name });
+      }
+    }
+
     // Backfill top-level bikeTitle on leads that didn't get one set during the
     // artifact/sale step (e.g. leads whose only source is franchize_intents or
     // user_rental_secrets). bikeTitleMap is already fully populated from the
@@ -1385,7 +1394,7 @@ export async function getFranchizeLeads(
     // Phone is read from metadata->>phone (the users table has no phone column).
     if (tgUsers) {
       for (const l of leadMap.values()) {
-        const match = tgUsers.find((u) => u.user_id === l.user_id);
+        const match = tgUserMap.get(l.user_id);
         if (match) {
           // IDENTITY MATCHING FIX (2026-09-02, round 2): a numeric lead key that
           // belongs to a crew operator must NEVER be exposed as the lead's TG
@@ -1524,20 +1533,10 @@ export async function getFranchizeLeads(
       l.ownerId = l.originalOperatorChatId || null;
     }
 
-    // ── Filter out pure operator-placeholder leads with no activity ──
-    // If a lead's only source is operator artifacts with no renter phone, no rentals,
-    // no todos — it's noise. Keep leads with activity for operator visibility.
-    for (const [key, l] of leadMap.entries()) {
-      if (
-        l.identityState === 'operator_placeholder' &&
-        l.rentals.length === 0 &&
-        l.sales.length === 0 &&
-        (l.sourceCount || 0) <= 1
-      ) {
-        // Still keep — they'll be filtered on client if user picks "hide placeholders"
-        // But flag them explicitly
-      }
-    }
+    // NOTE: pure operator-placeholder leads (no rentals/sales/todos) are NOT
+    // dropped server-side — the toolbar's «Скрыть заглушки» toggle hides them
+    // on the client (filterLeads → hidePlaceholders), so operators can still
+    // peek at them when needed.
 
     // ── Server-side filtering: return todos matching loaded leads ──
     //
@@ -1712,21 +1711,21 @@ export async function getFranchizeLeads(
         l.assigneeName = a?.full_name || a?.username || null;
       }
       if (l.ownerId) {
-        const o = assigneeMap.get(l.ownerId) || (tgUsers as any[])?.find((u: any) => u.user_id === l.ownerId);
-        l.ownerName = (o as any)?.full_name || (o as any)?.username || null;
+        const o = assigneeMap.get(l.ownerId) || tgUserMap.get(l.ownerId);
+        l.ownerName = o?.full_name || o?.username || null;
       }
       // «Последний оператор»: created_by (user_id) → человекочитаемое имя.
       // Нечисловые значения считаем уже готовым именем (легаси-текст).
       if (l.lastTouchedBy && /^\d+$/.test(l.lastTouchedBy)) {
-        const a = assigneeMap.get(l.lastTouchedBy) || (tgUsers as any[])?.find((u: any) => u.user_id === l.lastTouchedBy);
-        if (a) l.lastTouchedBy = (a as any)?.full_name || (a as any)?.username || l.lastTouchedBy;
+        const a = assigneeMap.get(l.lastTouchedBy) || tgUserMap.get(l.lastTouchedBy);
+        if (a) l.lastTouchedBy = a.full_name || a.username || l.lastTouchedBy;
       }
     }
 
     return {
       success: true,
       leads: Array.from(leadMap.values()),
-      todos: dedupedTodos.map((t) => ({ ...t, description: t.description })),
+      todos: dedupedTodos,
     };
   } catch (error) {
     logger.error("[getFranchizeLeads] failed:", error);

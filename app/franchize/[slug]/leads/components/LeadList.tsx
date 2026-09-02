@@ -84,11 +84,18 @@ export function LeadList({
         {virtualItems.map((virtualRow) => {
           const lead = leads[virtualRow.index];
           const isThisSelected = isSelected.has(lead.user_id);
-          const leadTodos = getTodosForLead ? getTodosForLead(lead) : [];
+          // getTodosForLead is a required prop — the old `getTodosForLead ? … : []`
+          // tripped TS2774 (condition always true).
+          const leadTodos = getTodosForLead(lead);
           return (
             <div
               key={lead.user_id}
               data-index={virtualRow.index}
+              // FIX (codereview): the parent's «scroll to selected lead» effect
+              // queries [data-lead-id="…"] — only LeadTableView had it, so the
+              // list view never scrolled the selection into view. Same anchor
+              // here; the LeadDetailSheet reads it too.
+              data-lead-id={lead.user_id}
               ref={measureElement}
               className="virtual-item"
               style={{
@@ -112,7 +119,7 @@ export function LeadList({
                 priority={priorityMap?.get(lead.user_id)}
                 handling={getLeadHandling(leadTodos)}
                 onReadNotes={onReadNotes}
-                signals={getTodosForLead ? computeLeadSignals(lead, leadTodos) : []}
+                signals={computeLeadSignals(lead, leadTodos)}
               />
             </div>
           );

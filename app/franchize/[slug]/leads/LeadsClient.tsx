@@ -108,6 +108,10 @@ export function LeadsClient({
   const [todosState, setTodosState] = useState(todos);
   /** m4 fix: notify is a server-side Telegram send — dedupe double taps. */
   const [notifyBusy, setNotifyBusy] = useState(false);
+  // Ref mirror of notifyBusy — the state value is captured in handleSheetAction's
+  // closure, so two rapid taps before a re-render both saw `false`. The ref is
+  // checked + flipped synchronously → the guard is airtight.
+  const notifyBusyRef = useRef(false);
   const leadsFetchedRef = useRef(false);
 
   // ── Lead detail sheet state (2026-09-01 sheet overhaul) ──
@@ -502,7 +506,12 @@ export function LeadsClient({
           showToast("У лида нет Telegram — уведомить нельзя");
           break;
         }
-        if (notifyBusy) break; // m4 fix: no double-fire — duplicate TG messages
+        // m4 fix (hardened): check the REF, not just the state — the callback
+        // closure captures a stale notifyBusy=false until React re-renders, so
+        // two fast taps could both slip past the state guard and send duplicate
+        // Telegram messages.
+        if (notifyBusy || notifyBusyRef.current) break;
+        notifyBusyRef.current = true;
         setNotifyBusy(true);
         showToast("Отправляем уведомление…", 1200);
         try {
@@ -516,6 +525,7 @@ export function LeadsClient({
         } catch {
           showToast("Ошибка отправки — нет связи");
         } finally {
+          notifyBusyRef.current = false;
           setNotifyBusy(false);
         }
         break;
@@ -876,7 +886,15 @@ export function LeadsClient({
           (whose inner drawer used to take over the whole screen) and the old
           inline desktop panel (whose close button hid under the CrewHeader). */}
       {selectedId && (() => {
-        const selectedLead = sortedLeads.find(l => l.user_id === selectedId);
+        // FIX (codereview): resolve the selected lead from the FULL leadsState
+        // (fallback: the filtered view). Previously the lookup used only
+        // sortedLeads — the moment the operator touched a stage/source/owner
+        // filter or segment chip while the sheet was open and the lead stopped
+        // matching, the sheet abruptly unmounted and the operator lost their
+        // place. Now the sheet stays open on filter changes.
+        const selectedLead =
+          leadsState.find((l) => l.user_id === selectedId) ||
+          sortedLeads.find((l) => l.user_id === selectedId);
         if (!selectedLead) return null;
         return (
           <LeadDetailSheet

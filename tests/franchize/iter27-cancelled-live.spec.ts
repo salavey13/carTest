@@ -157,8 +157,13 @@ describe("iter27: cancelled exclusions across all aggregation surfaces (source g
     // monthly payout queries keep the SQL-level exclusion — 2026-09-02 (M4):
     // the payout sheet + weekly report now use the STRICTER earning-status
     // filter (expired/disputed rows never earn), matching the wall's rule.
-    expect(src.match(/\.in\("status", \["completed", "active", "confirmed", "pending_confirmation"\]\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
-    expect(src.match(/\.neq\("status", "cancelled"\)/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
+    // GUARD FIX (codereview 2026-09-03): the M4 change REPLACED the old
+    // `.neq("status", "cancelled")` with the `.in("status", [...])` whitelist
+    // (stricter: also excludes expired/disputed), so the stale `.neq` assertion
+    // failed even though the exclusion got stronger. Assert the whitelist —
+    // all THREE payout/earning queries (payout sheet, weekly report, overview)
+    // must keep it.
+    expect(src.match(/\.in\("status", \["completed", "active", "confirmed", "pending_confirmation"\]\)/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
   });
 
   it("admin «successful rentals» uses an explicit status whitelist", () => {

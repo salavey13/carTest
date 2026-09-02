@@ -10,7 +10,8 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import type {LeadRow} from "../leads-types";
-import type { LeadSignal, StageKey } from "../leads-constants";
+import type { LeadSignal } from "../leads-constants";
+import type { StageKey } from "../lib/pipeline-stages";
 import type { ThemeTokens } from "../hooks/useTheme";
 import type { LeadPriority } from "../lib/lead-priority";
 import type { LeadHandling } from "../lib/lead-handling";
@@ -89,7 +90,9 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
   if (!isValidLeadRow(lead)) {
     return null;
   }
-  const stageKey = lead.stageKey || "new";
+  // Cast: server may send an arbitrary stageKey string; both lookups below
+  // have fallbacks so an unknown stage safely degrades to gray.
+  const stageKey = (lead.stageKey || "new") as StageKey;
   const stageColor = STAGE_COLORS[stageKey] || "#64748b";
   const stageLabel = STAGE_LABELS[stageKey] || stageKey;
   const displayName = lead.full_name || "Без имени";

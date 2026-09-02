@@ -31,6 +31,7 @@ import {
   STAGE_LABELS,
   STAGE_COLORS,
   STAGE_NEXT_ACTION,
+  type StageKey,
 } from "../lib/pipeline-stages";
 import { SOURCE_META, RENTAL_STATUS_META } from "../leads-constants";
 import {
@@ -157,7 +158,9 @@ export function LeadDetailDrawer(props: Props) {
   // null-guard render happens at the bottom of this component, after all
   // hooks have been called.
 
-  const stageKey = (lead as { stageKey?: string } | null)?.stageKey || "new";
+  // Cast: the server may send any string, but the Record lookups below all
+  // have fallbacks — an unknown stageKey degrades to the gray palette safely.
+  const stageKey = (((lead as { stageKey?: string } | null)?.stageKey || "new") as StageKey);
   const stageColor = STAGE_COLORS[stageKey] || "#64748b";
   const stageLabel = STAGE_LABELS[stageKey] || stageKey;
   const displayName = lead?.full_name || "Без имени";
@@ -245,6 +248,12 @@ export function LeadDetailDrawer(props: Props) {
   const handling = getLeadHandling(todos);
   const visibleTodos = todos.filter((t) => !isHandlingTodo(t));
 
+  // FIX (codereview): фильтр «Мои» сравнивал t.assigned_to (числовой chat_id
+  // оператора) с assignee — а это СНАЧАЛА человекочитаемое ИМЯ
+  // (assigneeName от сервера). Имя ≠ id, поэтому фильтр всегда показывал
+  // «Нет задач». Сравниваем с assigneeId (id), имя — легаси-фолбэк.
+  const assigneeId = lead?.assigneeId || null;
+  const assigneeLabel = assignee !== "—" ? assignee : null;
   const filteredTodos = visibleTodos.filter((t) => {
     if (todoFilter === "overdue")
       return (
@@ -252,7 +261,11 @@ export function LeadDetailDrawer(props: Props) {
         new Date(t.due_date).getTime() < Date.now() &&
         t.status !== "done"
       );
-    if (todoFilter === "mine") return t.assigned_to === assignee && assignee !== "—";
+    if (todoFilter === "mine") {
+      if (!assigneeId && !assigneeLabel) return false;
+      return (!!assigneeId && t.assigned_to === assigneeId) ||
+        (!!assigneeLabel && t.assigned_to === assigneeLabel);
+    }
     return true;
   });
 

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, AlertTriangle } from "lucide-react";
 import type { LeadRow } from "@/app/franchize/server-actions/leads";
 import type { ThemeTokens } from "../hooks/useTheme";
-import { STAGE_LABELS } from "../lib/pipeline-stages";
+import { STAGE_LABELS, type StageKey } from "../lib/pipeline-stages";
 
 export interface DismissReason {
   value: string;
@@ -88,7 +88,7 @@ export function DismissLeadDialog({ open, lead, reasons, T, onSubmit, onCancel, 
   const expectedRevenue =
     lead.rentals?.reduce((s, r) => s + (Number(r.totalCost) || 0), 0) || 0;
   const source = lead.source || "—";
-  const stageKey = (lead as { stageKey?: string }).stageKey || "new";
+  const stageKey = ((lead as { stageKey?: string }).stageKey || "new") as StageKey;
   const stage = STAGE_LABELS[stageKey] || stageKey;
 
   return (
