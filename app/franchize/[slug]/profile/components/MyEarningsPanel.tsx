@@ -74,21 +74,31 @@ export function MyEarningsPanel({
     async (scope: "self" | "team", period: { from: string; to: string }) => {
       if (!userId) return { success: false as const, error: "Не авторизован" };
 
-      const fromDate = new Date(period.from);
-      const toDate = new Date(period.to);
-      if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+      // B4 fix (MSK boundaries): границы периода считаются по Москве, а не по
+      // часовому поясу клиента. Раньше `new Date("2026-09-02")` парсился как
+      // UTC-полночь, а `setHours(23,59,59,999)` ставил КОНЕЦ дня в локальном
+      // поясе — клиент из UTC+10 получал окно, сдвинутое на −7 ч от МСК, и
+      // смены/комиссии у границ суток падали в соседний период. Конвенция
+      // приложения — MSK везде (как в my-work.ts и зарплатной модели).
+      const asMskDay = (dateStr: string, endOfDay: boolean): Date | null => {
+        const m = /^\d{4}-\d{2}-\d{2}$/.exec(dateStr.trim());
+        if (!m) return null;
+        const iso = endOfDay ? `${dateStr}T23:59:59.999+03:00` : `${dateStr}T00:00:00.000+03:00`;
+        const d = new Date(iso);
+        return Number.isNaN(d.getTime()) ? null : d;
+      };
+      const fromDate = asMskDay(period.from, false);
+      const toDate = asMskDay(period.to, true);
+      if (!fromDate || !toDate) {
         return { success: false as const, error: "Некорректный формат даты" };
       }
       if (fromDate > toDate) {
         return { success: false as const, error: "Дата начала не может быть позже даты окончания" };
       }
 
-      const to = new Date(toDate);
-      to.setHours(23, 59, 59, 999);
-
       const params = new URLSearchParams({
         from: fromDate.toISOString(),
-        to: to.toISOString(),
+        to: toDate.toISOString(),
         scope,
         actorUserId: userId,
       });

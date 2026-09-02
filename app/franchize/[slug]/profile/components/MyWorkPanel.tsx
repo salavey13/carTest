@@ -46,6 +46,10 @@ export function MyWorkPanel({
   const [workDate, setWorkDate] = useState<string>(() => todayMskIso());
   const [myWork, setMyWork] = useState<MyWorkData | null>(null);
   const [workLoading, setWorkLoading] = useState(true);
+  // B3 fix: раньше сбой загрузки молча оставлял на экране данные ПРОШЛОГО дня
+  // под подписью нового — теперь виден баннер ошибки + кнопка повтора.
+  const [workError, setWorkError] = useState<string | null>(null);
+  const [workRetryTick, setWorkRetryTick] = useState(0);
 
   // iter26: date picker — refetch the My Work section when the picked day
   // changes. Ignores garbage dates (the action would fall back to "today"
@@ -62,18 +66,27 @@ export function MyWorkPanel({
     if (workDate === myWork?.date) return;
     let cancelled = false;
     setWorkLoading(true);
+    setWorkError(null);
     getMyWorkDayAction({ slug, date: workDate })
       .then((res) => {
-        if (!cancelled && res.success && res.data) setMyWork(res.data);
+        if (cancelled) return;
+        if (res.success && res.data) {
+          setMyWork(res.data);
+        } else {
+          // B3: не прячем сбой — иначе под новой датой останутся старые цифры.
+          setWorkError(res.error || "Не удалось загрузить день");
+        }
       })
-      .catch(() => undefined)
+      .catch((e) => {
+        if (!cancelled) setWorkError(e instanceof Error ? e.message : "Нет связи");
+      })
       .finally(() => {
         if (!cancelled) setWorkLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [workDate, enabled, slug, myWork?.date]);
+  }, [workDate, enabled, slug, myWork?.date, workRetryTick]);
 
   return (
     <motion.div variants={itemVariants}>
@@ -84,6 +97,25 @@ export function MyWorkPanel({
         {workLoading ? (
           <div className="py-4 text-center text-sm" style={{ color: T.textMuted }}>
             Загрузка данных...
+          </div>
+        ) : workError ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2.5 text-xs" style={{ borderColor: "#f59e0b55", backgroundColor: "#f59e0b0d", color: T.text }}>
+            <span>
+              Не удалось загрузить день <b className="tabular-nums">{workDate}</b>
+              <span className="opacity-70"> · {workError}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                // Сбрасываем кэш-клыч, чтобы эффект перезапустился даже для той же даты.
+                setMyWork(null);
+                setWorkRetryTick((v) => v + 1);
+              }}
+              className="shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition hover:opacity-80"
+              style={{ borderColor: "#f59e0b55", color: T.text }}
+            >
+              Повторить
+            </button>
           </div>
         ) : myWork ? (
           <div className="mt-3 space-y-4">

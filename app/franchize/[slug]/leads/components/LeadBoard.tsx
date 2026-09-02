@@ -22,6 +22,8 @@ interface LeadBoardProps {
   getTodosForLead: (lead: LeadRow) => LeadTodoRow[];
   /** Priority Score 0–100 (ТЗ): сортировка внутри колонок + score-бейджи. */
   priorityMap?: Map<string, LeadPriority>;
+  /** «Прочитать заметки» — открывает шторку лида сразу на заметках. */
+  onReadNotes?: (leadId: string) => void;
   T: any;
 }
 
@@ -41,7 +43,7 @@ interface LeadBoardProps {
  * This is the standard kanban UX (Trello, Linear, Notion) — narrow columns
  * with horizontal swipe, not a vertical list of stages.
  */
-export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForLead, priorityMap, T }: LeadBoardProps) {
+export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForLead, priorityMap, onReadNotes, T }: LeadBoardProps) {
   const columns = useMemo(() => {
     // Group by the COMPUTED pipeline stage (stageKey), not the raw DB stage —
     // see groupLeadsForBoard(): raw stages like "viewed"/"clicked" used to
@@ -136,6 +138,11 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
                 const handling = getLeadHandling(todos);
                 const meta = metaFor(lead.source);
                 const pr = priorityMap?.get(lead.user_id);
+                // 📝 Заметки — флажок на канбан-карточке (не 0 → показать);
+                // «новая» ≤24 ч — с точкой-индикатором.
+                const notesCount = lead.notesCount ?? 0;
+                const lastNoteMs = lead.lastNoteAt ? new Date(lead.lastNoteAt).getTime() : 0;
+                const noteIsNew = notesCount > 0 && Number.isFinite(lastNoteMs) && lastNoteMs > 0 && Date.now() - lastNoteMs <= 24 * 60 * 60 * 1000;
                 return (
                   <div
                     key={lead.user_id}
@@ -193,6 +200,27 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
                         >
                           Авито
                         </span>
+                      )}
+                      {/* 📝 Заметки — флажок на канбан-карточке: клик открывает
+                          шторку сразу на заметках. */}
+                      {notesCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onReadNotes?.(lead.user_id);
+                          }}
+                          className="rounded px-1.5 py-0.5 text-[9px] font-bold transition hover:brightness-125"
+                          style={
+                            noteIsNew
+                              ? { backgroundColor: "#8b5cf626", color: "#8b5cf6" }
+                              : { backgroundColor: "#8b5cf614", color: "#8b5cf6" }
+                          }
+                          title={lead.lastNoteAt ? `Последняя заметка: ${relativeTime(lead.lastNoteAt)}` : "Есть заметки"}
+                        >
+                          📝 {notesCount}{noteIsNew ? "·" : ""}
+                          {noteIsNew && <span className="ml-0.5 inline-block h-1.5 w-1.5 rounded-full bg-violet-500 align-middle" aria-label="новая" />}
+                        </button>
                       )}
                       {/* 📞 Назначенный перезвон — виден прямо на канбан-карточке.
                           Просроченный — красный, подоспевший — янтарный. */}

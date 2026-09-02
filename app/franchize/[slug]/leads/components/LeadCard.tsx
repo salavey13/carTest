@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CheckCircle2, ChevronRight, Phone, PhoneCall, Clock, MoreVertical, X } from "lucide-react";
+import { CheckCircle2, ChevronRight, Phone, PhoneCall, Clock, MoreVertical, X, StickyNote } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -42,6 +42,9 @@ interface Props {
   /** «Отработан» / «Перезвонить в ...» — заметка-напоминание о перезвоне
    * должна быть КРУПНО видна прямо в списке лидов. */
   handling?: LeadHandling;
+  /** «Прочитать заметки» — открывает шторку лида сразу на секции заметок
+   * (просьба босса: подсвеченный флажок, если у лида есть заметки). */
+  onReadNotes?: (leadId: string) => void;
   T: ThemeTokens;
 }
 
@@ -80,7 +83,7 @@ function isValidLeadRow(lead: unknown): lead is LeadRow {
  * metadata 11px / md:13px. Left stripe is 3px (w-[3px]) so it reads as an
  * accent indicator without eating into the card content.
  */
-export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priority, handling, T }: Props) {
+export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priority, handling, onReadNotes, T }: Props) {
   // Type guard provides both runtime safety and type narrowing
   if (!isValidLeadRow(lead)) {
     return null;
@@ -117,6 +120,14 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
   const cbOverdue = isCallbackOverdue(cb);
   const cbSoon = callbackInMinutes(cb);
   const cbLabel = cb ? formatCallbackTime(cb.dueAt) : "";
+
+  // 📝 Заметки лида — подсвеченный флажок «Прочитать заметки»: у лида есть
+  // заметки (не 0) → показываем плашку прямо в списке; клик открывает шторку
+  // сразу на заметках. «Новая» (≤24 ч) — ярче + точка-индикатор.
+  const notesCount = lead.notesCount ?? 0;
+  const lastNoteMs = lead.lastNoteAt ? new Date(lead.lastNoteAt).getTime() : 0;
+  const noteIsNew = notesCount > 0 && Number.isFinite(lastNoteMs) && lastNoteMs > 0 && Date.now() - lastNoteMs <= 24 * 60 * 60 * 1000;
+  const notesWord = notesCount % 10 === 1 && notesCount % 100 !== 11 ? "заметка" : [2, 3, 4].includes(notesCount % 10) && ![12, 13, 14].includes(notesCount % 100) ? "заметки" : "заметок";
 
   return (
     <motion.article
@@ -328,6 +339,45 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
                 {cb.note ? <span className="font-medium opacity-80"> · {cb.note}</span> : null}
               </span>
             </div>
+          )}
+
+          {/* 📝 «Прочитать заметки» — флажок-плашка: у лида есть заметки (не 0).
+              Клик открывает шторку и прокручивает к секции заметок; «новая»
+              (≤24 ч) — ярче и с точкой-индикатором. Фиолетовый, чтобы не
+              путаться с янтарным перезвоном и зелёным «отработан». */}
+          {notesCount > 0 && onReadNotes && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onReadNotes(lead.user_id);
+              }}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition hover:brightness-110 active:scale-[0.99] md:text-sm"
+              style={{
+                backgroundColor: noteIsNew ? "#8b5cf61f" : "#8b5cf612",
+                color: "#8b5cf6",
+                border: `1px solid ${noteIsNew ? "#8b5cf655" : "#8b5cf633"}`,
+              }}
+              aria-label={`Прочитать заметки (${notesCount})`}
+              title={lead.lastNoteAt ? `Последняя заметка: ${relativeTime(lead.lastNoteAt)}` : "Есть заметки"}
+            >
+              <StickyNote className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span className="truncate">
+                Прочитать заметки
+                <span className="tabular-nums"> · {notesCount}</span>
+                {" "}
+                <span className="font-medium opacity-80">{notesWord}</span>
+              </span>
+              {noteIsNew && (
+                <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[10px] font-bold">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-60" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-violet-500" />
+                  </span>
+                  новая
+                </span>
+              )}
+            </button>
           )}
 
           {/* ✅ Отработан — спокойная зелёная отметка (не перекрикивает перезвон) */}

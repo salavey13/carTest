@@ -8,7 +8,7 @@
 // Mobile-first: single column, full-bleed photo grids (VK 1/2/3/4+ rules),
 // big touch targets, lightbox for photos.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -82,7 +82,14 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
     }
   }, [authLoading, dbUser, passwordAuthOwnerId]);
 
+  /** Эпоха запросов — защита от гонки при быстрой смене месяца (см. fetchStory). */
+  const fetchEpochRef = useRef(0);
+
   const fetchStory = useCallback(async () => {
+    // Race guard (fix): rapid ‹ › month taps fire overlapping requests —
+    // without an epoch a slow EARLIER response could overwrite the newer
+    // month's data. Only the newest request is allowed to commit state.
+    const epoch = ++fetchEpochRef.current;
     setIsLoading(true);
     setError(null);
     try {
@@ -94,6 +101,7 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
         initData: getTelegramInitData(),
         month,
       });
+      if (epoch !== fetchEpochRef.current) return; // устаревший ответ
       if (result.success && result.data) {
         setBike(result.data.bike);
         setFeed(result.data.feed);
@@ -103,9 +111,10 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
         setError(result.error || "Не удалось загрузить историю мото.");
       }
     } catch (err) {
+      if (epoch !== fetchEpochRef.current) return;
       setError(err instanceof Error ? err.message : "Ошибка загрузки");
     } finally {
-      setIsLoading(false);
+      if (epoch === fetchEpochRef.current) setIsLoading(false);
     }
   }, [slug, bikeId, getActorUserId, passwordAuthOwnerId, month]);
 

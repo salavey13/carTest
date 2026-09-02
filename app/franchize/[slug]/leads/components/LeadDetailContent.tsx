@@ -55,6 +55,8 @@ interface Props {
   notifyBusy?: boolean;
   /** When true, render as the inner content of a parent sheet (no backdrop). */
   asSheetChild?: boolean;
+  /** «Прочитать заметки» — раскрыть и прокрутить к секции заметок. */
+  focusNotesSignal?: number;
 }
 
 /**
@@ -93,6 +95,7 @@ export function LeadDetailContent({
   handlingBusy = false,
   notifyBusy = false,
   asSheetChild = false,
+  focusNotesSignal = 0,
 }: Props) {
   // NOTE: We CANNOT early-return before hooks (React rules-of-hooks).
   // All hooks below handle null `lead` gracefully via try/catch + null-safe
@@ -198,6 +201,7 @@ export function LeadDetailContent({
       handlingBusy={handlingBusy}
       notifyBusy={notifyBusy}
       asSheetChild={asSheetChild}
+      focusNotesSignal={focusNotesSignal}
     />
   );
 }

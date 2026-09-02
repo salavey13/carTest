@@ -116,6 +116,18 @@ export function LeadsClient({
   const [notesState, setNotesState] = useState<LeadDrawerNote[]>([]);
   const [notesLeadId, setNotesLeadId] = useState<string | null>(null);
   const [notesLoading, setNotesLoading] = useState(false);
+  // «Прочитать заметки»: { leadId, ts } последнего клика по флажку заметок.
+  // Шторка открывает и прокручивает к секции заметок при смене ts —
+  // повторный клик по флажку повторяет прокрутку даже для открытого лида.
+  const [notesFocus, setNotesFocus] = useState<{ leadId: string; ts: number } | null>(null);
+  // CORNER-CASE FIX (codereview): «сейчас» обновляется раз в минуту — иначе
+  // перезвон, чьё время наступило при открытой странице, навсегда оставался
+  // янтарным («не просрочен») и не получал приоритетный буст до смены данных.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
   // Lightweight toast for action feedback (copy/notify errors etc.) —
   // z-[70]: above the sheet (z-[60]) and the header (z-50).
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -252,7 +264,9 @@ export function LeadsClient({
 
   // Priority Score (ТЗ): карта индексов 0–100 для всех лидов — ею пользуются
   // сортировка «priority» и лайбочки (⚡ свежий / 🔥 счёт) во всех видах.
-  const priorityMap = usePriorityMap(leadsState, getTodosForLead);
+  // nowTick раз в минуту перевычисляет индексы — просроченные перезвоны
+  // вовремя получают +30 и поднимаются в очереди без перезагрузки страницы.
+  const priorityMap = usePriorityMap(leadsState, getTodosForLead, nowTick);
 
   // Default filter flags — LeadsToolbar expects these props but root LeadsClient
   // doesn't use useLeadFilters (it uses useFilteredSortedLeads instead).
@@ -447,8 +461,13 @@ export function LeadsClient({
       }
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, isAuthed, crewId, passwordAuthOwnerId]);
+  }, [selectedId, isAuthed, crewId, passwordAuthOwnerId, passwordAuthed]);
+
+  // «Прочитать заметки» — открыть шторку лида и прокрутить к секции заметок.
+  const handleReadNotes = useCallback((leadId: string) => {
+    setSelectedId(leadId);
+    setNotesFocus({ leadId, ts: Date.now() });
+  }, []);
 
   // ── Sheet action handler (call / telegram / notify / resend_qr) ──
   const handleSheetAction = useCallback(async (action: string) => {
@@ -681,6 +700,16 @@ export function LeadsClient({
           id: res.data.id, text: res.data.text, created_at: res.data.created_at, created_by: res.data.created_by,
         };
         setNotesState((prev) => [note, ...prev]);
+        // Синхронизируем счётчик заметок в списке (флажок «Прочитать заметки»)
+        // без re-fetch: +1 и «новая» (lastNoteAt=сейчас) — заметка только что
+        // оставлена, плашка на карточке должна появиться сразу.
+        setLeadsState((prev) =>
+          prev.map((l) =>
+            l.user_id === lead.user_id
+              ? { ...l, notesCount: (l.notesCount ?? 0) + 1, lastNoteAt: res.data?.created_at || new Date().toISOString() }
+              : l,
+          ),
+        );
       } else {
         showToast(res.error || "Не удалось сохранить заметку");
       }
@@ -794,6 +823,7 @@ export function LeadsClient({
           onDismiss={handleDismissLead}
           getTodosForLead={getTodosForLead}
           priorityMap={priorityMap}
+          onReadNotes={handleReadNotes}
           T={T}
         />
       ) : viewMode === "table" ? (
@@ -809,6 +839,7 @@ export function LeadsClient({
             onSelect={(id) => setSelectedId(id)}
             getTodosForLead={getTodosForLead}
             priorityMap={priorityMap}
+            onReadNotes={handleReadNotes}
             sortMode={sortMode}
             onSortChange={setSortMode}
             T={T}
@@ -824,6 +855,7 @@ export function LeadsClient({
           onDismiss={handleDismissLead}
           getTodosForLead={getTodosForLead}
           priorityMap={priorityMap}
+          onReadNotes={handleReadNotes}
           T={T}
           crewId={crewId}
           slug={slug}
@@ -865,6 +897,7 @@ export function LeadsClient({
               handlingBusy={handlingBusy}
               notifyBusy={notifyBusy}
               asSheetChild
+              focusNotesSignal={notesFocus && notesFocus.leadId === selectedId ? notesFocus.ts : 0}
             />
           </LeadDetailSheet>
         );

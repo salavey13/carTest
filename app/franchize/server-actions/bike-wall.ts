@@ -501,12 +501,17 @@ export async function getBikeStoryAction(params: {
       typeof specs?.subrenter_chat_id === "string" ? (specs.subrenter_chat_id as string) : null;
 
     // Bike rentals + service work against THIS bike, one query.
+    // NO row limit (aligned with the fleet action): the story KPI band used
+    // to be computed from a truncated 300-row set while /bikes computed the
+    // same bike unbounded — the two pages disagreed for bikes with a long
+    // history. A single bike's history is always lighter than the fleet-wide
+    // query the wall page already runs; the FEED still caps at
+    // WALL_EVENTS_CAP below.
     const { data: rentals, error: rentalsErr } = await supabaseAdmin
       .from("rentals")
       .select(RENTAL_SELECT)
       .or(`vehicle_id.eq.${car.id},metadata->>bike.eq.${car.id}`)
-      .order("agreed_start_date", { ascending: false, nullsFirst: false })
-      .limit(300);
+      .order("agreed_start_date", { ascending: false, nullsFirst: false });
     if (rentalsErr) return { success: false, error: `Не удалось загрузить историю: ${rentalsErr.message}` };
 
     const rows = (rentals ?? []) as unknown as RentalRawRow[];
@@ -522,6 +527,17 @@ export async function getBikeStoryAction(params: {
     }
 
     const now = Date.now();
+
+    // Month scope BEFORE the WALL_EVENTS_CAP slices (fix): the feed used to be
+    // built from the newest 80 events of ALL history and only then filtered by
+    // month — for a busy bike, an older month's events could all lie beyond the
+    // first 80, so the month view looked empty («В … событий не было») while the
+    // selector kept offering that month. Scope rows FIRST, then cap.
+    const rowInMonth = (r: RentalRawRow): boolean =>
+      mskMonthKey(r.agreed_start_date || r.created_at, now) === monthKey;
+    const scopedBikeRentals = monthKey ? bikeRentals.filter(rowInMonth) : bikeRentals;
+    const scopedServiceRentals = monthKey ? serviceRentals.filter(rowInMonth) : serviceRentals;
+
     const stats = computeBikeStats(
       bikeRentals.map(toStatsRow),
       now,
@@ -535,8 +551,8 @@ export async function getBikeStoryAction(params: {
     );
     const bike: BikeWallSummary = toSummary(car as CarRow, stats, onRentNow);
 
-    // ── photos for every BIKE rental (service rows have no photos), batched ──
-    const rentalIds = bikeRentals.slice(0, WALL_EVENTS_CAP).map((r) => r.rental_id);
+    // ── photos for every scoped BIKE rental (service rows have no photos), batched ──
+    const rentalIds = scopedBikeRentals.slice(0, WALL_EVENTS_CAP).map((r) => r.rental_id);
     const photosByRental = new Map<string, WallPhoto[]>();
     if (rentalIds.length > 0) {
       const { data: photoRows } = await supabaseAdmin
@@ -585,10 +601,10 @@ export async function getBikeStoryAction(params: {
       }
     }
 
-    // ── operator/master names (one users lookup for the whole wall) ──
+    // ── operator/master names (one users lookup for the scoped wall) ──
     const operatorIds = Array.from(
       new Set(
-        [...bikeRentals, ...serviceRentals]
+        [...scopedBikeRentals, ...scopedServiceRentals]
           .map((r) => r.created_by_operator_chat_id || r.user_id)
           .filter(Boolean) as string[],
       ),
@@ -614,7 +630,7 @@ export async function getBikeStoryAction(params: {
     // ── build feed items (rentals + service events), newest first ──
     const feed: WallFeedItem[] = [];
 
-    for (const r of bikeRentals.slice(0, WALL_EVENTS_CAP)) {
+    for (const r of scopedBikeRentals.slice(0, WALL_EVENTS_CAP)) {
       const md = (r.metadata ?? {}) as Record<string, unknown>;
       const eff = effStatus(r.status, r.agreed_end_date, now);
       const renterName =
@@ -665,7 +681,7 @@ export async function getBikeStoryAction(params: {
       });
     }
 
-    for (const r of serviceRentals.slice(0, WALL_EVENTS_CAP)) {
+    for (const r of scopedServiceRentals.slice(0, WALL_EVENTS_CAP)) {
       const svc = parseServiceEvent(r);
       if (!svc) continue;
       const operatorChatId = r.created_by_operator_chat_id || null;

@@ -1081,7 +1081,7 @@ export async function getFranchizeLeads(
     const leadPhones = Array.from(leadMap.values()).map((l) => l.phone).filter(Boolean) as string[];
 
     // privateSchema already dynamically imported at line 270 (same function scope)
-    const [tgUsersResult, secretByPhoneResult, troubledUsersResult, todosResult] = await Promise.all([
+    const [tgUsersResult, secretByPhoneResult, troubledUsersResult, todosResult, notesResult] = await Promise.all([
       // 7. Enrich from public.users — drop the non-existent `phone` column; phone is in metadata.
       allUserIds.length > 0
         ? supabaseAdmin.from("users").select("user_id, username, full_name, metadata").in("user_id", allUserIds)
@@ -1102,6 +1102,16 @@ export async function getFranchizeLeads(
         .eq("crew_id", crewId)
         .in("category", ["lead_followup", "rental_verification"])
         .order("created_at", { ascending: false }),
+      // 12. Notes counts per lead (lead_notes) — один агрегатный запрос на экипаж,
+      // питает флажок «Прочитать заметки» прямо в списке лидов. Заметки хранятся
+      // в отдельной таблице и подгружаются лениво в шторке; счётчик же нужен
+      // сразу для всех лидов, поэтому считаем его здесь (lead_id — TEXT без FK,
+      // заметки сделок с ключами "sale:…" просто не совпадут с ключами лидов и
+      // отфильтруются при маппинге ниже).
+      supabaseAdmin
+        .from("lead_notes")
+        .select("lead_id, created_at")
+        .eq("crew_id", crewId),
     ]);
 
     // Surface enrichment query errors so future bugs are visible.
@@ -1109,6 +1119,7 @@ export async function getFranchizeLeads(
     if (secretByPhoneResult.error) logger.error("[getFranchizeLeads] secrets-by-phone enrichment query failed:", secretByPhoneResult.error);
     if (troubledUsersResult.error) logger.error("[getFranchizeLeads] troubled-users query failed:", troubledUsersResult.error);
     if (todosResult.error) logger.error("[getFranchizeLeads] crew_todos query failed:", todosResult.error);
+    if (notesResult.error) logger.error("[getFranchizeLeads] lead_notes counts query failed:", notesResult.error);
 
     const tgUsers = tgUsersResult.data;
     const secretByPhone = secretByPhoneResult.data;
@@ -1188,6 +1199,31 @@ export async function getFranchizeLeads(
         .sort((a, b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime())[0];
       l.lastRentalDate = lastRental?.startDate || null;
       l.contractRef = lastRental?.rentalId || l.sales[0]?.saleId || null;
+    }
+
+    // 12b. Attach notes counts (флажок «Прочитать заметки» в списке лидов).
+    // Один проход по заметкам экипажа: lead_id → {count, lastAt}. Ключи,
+    // не совпадающие с ключами лидов (например "sale:<contract>" заметки
+    // сделок), просто игнорируются — это чужая доменная область.
+    if (notesResult.data) {
+      const notesAgg = new Map<string, { count: number; lastAt: string | null }>();
+      for (const n of notesResult.data) {
+        const key = typeof n.lead_id === "string" ? n.lead_id : null;
+        if (!key) continue;
+        const prev = notesAgg.get(key);
+        const at = typeof n.created_at === "string" ? n.created_at : null;
+        if (!prev) {
+          notesAgg.set(key, { count: 1, lastAt: at });
+        } else {
+          prev.count += 1;
+          if (at && (!prev.lastAt || at > prev.lastAt)) prev.lastAt = at;
+        }
+      }
+      for (const l of leadMap.values()) {
+        const agg = notesAgg.get(l.user_id);
+        l.notesCount = agg?.count ?? 0;
+        l.lastNoteAt = agg?.lastAt ?? null;
+      }
     }
 
     // ── Identity state classification ──

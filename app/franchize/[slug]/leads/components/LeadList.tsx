@@ -19,6 +19,8 @@ interface LeadListProps {
   getTodosForLead: (lead: LeadRow) => LeadTodoRow[];
   /** Priority Score (ТЗ): карта индексов 0–100 для лайбочек на карточках. */
   priorityMap?: Map<string, LeadPriority>;
+  /** «Прочитать заметки» — открывает шторку лида сразу на заметках. */
+  onReadNotes?: (leadId: string) => void;
   T: any;
   crewId: string;
   slug: string;
@@ -50,6 +52,7 @@ export function LeadList({
   onDismiss,
   getTodosForLead,
   priorityMap,
+  onReadNotes,
   T,
   crewId,
   slug,
@@ -112,6 +115,7 @@ export function LeadList({
                 onDismiss={onDismiss}
                 priority={priorityMap?.get(lead.user_id)}
                 handling={getLeadHandling(leadTodos)}
+                onReadNotes={onReadNotes}
                 signals={getTodosForLead ? computeLeadSignals(lead, leadTodos) : []}
               />
             </motion.div>

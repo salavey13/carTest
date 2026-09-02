@@ -4,7 +4,7 @@
 // iter28 — «Мотопарк»: fleet wall index. Mobile-first: single column of photo
 // cards, every bike with its live stats. Tap a card → the bike's story wall.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Bike, ChevronLeft, ChevronRight, HandCoins, RefreshCw, Wrench } from "lucide-react";
@@ -59,7 +59,14 @@ export function BikesWallClient({ initialSlug, crew }: BikesWallClientProps) {
     }
   }, [authLoading, dbUser, passwordAuthOwnerId]);
 
+  /** Эпоха запросов — защита от гонки при быстрой смене месяца (см. fetchWall). */
+  const fetchEpochRef = useRef(0);
+
   const fetchWall = useCallback(async () => {
+    // Race guard (fix): rapid ‹ › month taps fire overlapping requests —
+    // without an epoch a slow EARLIER response could overwrite the newer
+    // month's data. Only the newest request is allowed to commit state.
+    const epoch = ++fetchEpochRef.current;
     setIsLoading(true);
     setError(null);
     try {
@@ -70,6 +77,7 @@ export function BikesWallClient({ initialSlug, crew }: BikesWallClientProps) {
         initData: getTelegramInitData(),
         month,
       });
+      if (epoch !== fetchEpochRef.current) return; // устаревший ответ
       if (result.success && result.data) {
         setBikes(result.data.bikes);
         setViewerIsSubrenter(result.data.viewerIsSubrenter);
@@ -79,9 +87,10 @@ export function BikesWallClient({ initialSlug, crew }: BikesWallClientProps) {
         setError(result.error || "Не удалось загрузить мотопарк.");
       }
     } catch (err) {
+      if (epoch !== fetchEpochRef.current) return;
       setError(err instanceof Error ? err.message : "Ошибка загрузки");
     } finally {
-      setIsLoading(false);
+      if (epoch === fetchEpochRef.current) setIsLoading(false);
     }
   }, [slug, getActorUserId, passwordAuthOwnerId, month]);
 

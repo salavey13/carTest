@@ -76,15 +76,20 @@ export function SubrentersOverviewPanel({
   }, [slug, userId, payoutsMonth, payoutsVersion]);
 
   // iter31: month payouts indexed by partner chat id → inline chips on cards.
+  // B1: теперь с paidRub/remainingRub — чип показывает ОСТАТОК к выплате
+  // (за вычетом уже записанных выплат этого месяца).
   const payoutByChat = useMemo(() => {
-    const m = new Map<string, { rentalCount: number; payoutRub: number }>();
+    const m = new Map<string, { rentalCount: number; payoutRub: number; paidRub: number; remainingRub: number }>();
     if (payouts && payouts.month === payoutsMonth) {
-      for (const r of payouts.rows) m.set(r.chatId, { rentalCount: r.rentalCount, payoutRub: r.payoutRub });
+      for (const r of payouts.rows)
+        m.set(r.chatId, { rentalCount: r.rentalCount, payoutRub: r.payoutRub, paidRub: r.paidRub, remainingRub: r.remainingRub });
     }
     return m;
   }, [payouts, payoutsMonth]);
 
-  /** Быстрая запись выплаты субарендатору (kind=subrenter_payout). */
+  /** Быстрая запись выплаты субарендатору (kind=subrenter_payout).
+   *  B1: в title пишем id партнёра — будущие записи матчатся к листу выплат
+   *  надёжнее, чем по имени (имя может смениться). */
   const recordPayout = async (chatId: string, name: string, amountRub: number) => {
     if (!amountRub || amountRub <= 0) {
       toast.error("Нечего записывать — сумма 0");
@@ -98,7 +103,7 @@ export function SubrentersOverviewPanel({
         direction: "out",
         kind: "subrenter_payout",
         amount: amountRub,
-        title: "Выплата субарендатору",
+        title: `Выплата субарендатору · id ${chatId}`,
         person: name,
         initData: getTelegramInitData(),
       });
@@ -162,11 +167,12 @@ export function SubrentersOverviewPanel({
           ) : payouts ? (
             <>
               <div className="mt-3 flex flex-wrap items-end gap-x-4 gap-y-1">
-                <span className="text-2xl font-bold tabular-nums" style={{ color: "#f59e0b" }}>
-                  {formatCurrency(payouts.totalPayoutRub)}
+                <span className="text-2xl font-bold tabular-nums" style={{ color: payouts.totalRemainingRub > 0 ? "#f59e0b" : "#22c55e" }}>
+                  {formatCurrency(payouts.totalRemainingRub)}
                 </span>
                 <span className="text-[11px]" style={{ color: T.textMuted }}>
-                  к выплате партнёрам за {monthLabel(payouts.month).toLowerCase()} · 50% аренды байков (экипировка не делится)
+                  осталось выплатить партнёрам за {monthLabel(payouts.month).toLowerCase()} · 50% аренды байков (экипировка не делится)
+                  {payouts.totalPaidRub > 0 && ` · уже выплачено ${formatCurrency(payouts.totalPaidRub)}`}
                 </span>
               </div>
               <div className="mt-3 space-y-1.5">
@@ -187,17 +193,40 @@ export function SubrentersOverviewPanel({
                           {row.rentalCount > 0 && row.totalRub > 0 ? ` · нам ${formatCurrency(Math.max(0, row.totalRub - row.payoutRub))}` : ""}
                         </span>
                       </div>
-                      <span className="whitespace-nowrap font-bold tabular-nums" style={{ color: "#f59e0b" }}>
-                        {row.payoutRub > 0 ? `→ ${formatCurrency(row.payoutRub)}` : "—"}
+                      <span
+                        className="whitespace-nowrap font-bold tabular-nums"
+                        style={{ color: row.remainingRub > 0 ? "#f59e0b" : "#22c55e" }}
+                        title={
+                          row.paidRub > 0
+                            ? `К выплате ${formatCurrency(row.payoutRub)} · уже выплачено ${formatCurrency(row.paidRub)} · остаток ${formatCurrency(row.remainingRub)}`
+                            : `К выплате за месяц`
+                        }
+                      >
+                        {row.payoutRub > 0
+                          ? row.remainingRub > 0
+                            ? `→ ${formatCurrency(row.remainingRub)}`
+                            : "выплачено ✓"
+                          : row.paidRub > 0
+                            ? `✓ ${formatCurrency(row.paidRub)}`
+                            : "—"}
                       </span>
-                      {row.payoutRub > 0 && (
+                      {row.paidRub > 0 && row.remainingRub > 0 && (
+                        <span
+                          className="whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                          style={{ backgroundColor: "#22c55e1a", color: "#22c55e" }}
+                          title={`Уже выплачено в этом месяце: ${formatCurrency(row.paidRub)}`}
+                        >
+                          выплачено {formatCurrency(row.paidRub)}
+                        </span>
+                      )}
+                      {row.remainingRub > 0 && (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           className="h-7 shrink-0 text-[11px]"
                           disabled={payoutRecordBusy === row.chatId}
-                          onClick={() => void recordPayout(row.chatId, displayName, row.payoutRub)}
+                          onClick={() => void recordPayout(row.chatId, displayName, row.remainingRub)}
                         >
                           {payoutRecordBusy === row.chatId ? "…" : "Записать выплату"}
                         </Button>
@@ -270,26 +299,40 @@ export function SubrentersOverviewPanel({
                   </div>
                 </div>
 
-                {/* iter31: inline month chip — partner's month rentals + payout. */}
-                {monthPayout && (monthPayout.rentalCount > 0 || monthPayout.payoutRub > 0) && (
+                {/* iter31: inline month chip — partner's month rentals + payout.
+                    B1: показывает ОСТАТОК (за вычетом уже записанных выплат);
+                    полностью выплаченный месяц — зелёная галочка. */}
+                {monthPayout && (monthPayout.rentalCount > 0 || monthPayout.payoutRub > 0 || monthPayout.paidRub > 0) && (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <span
                       className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                      style={{
-                        backgroundColor: "color-mix(in srgb, #f59e0b 14%, transparent)",
-                        color: "#f59e0b",
-                      }}
+                      style={
+                        monthPayout.remainingRub > 0
+                          ? { backgroundColor: "color-mix(in srgb, #f59e0b 14%, transparent)", color: "#f59e0b" }
+                          : { backgroundColor: "color-mix(in srgb, #22c55e 14%, transparent)", color: "#22c55e" }
+                      }
+                      title={
+                        monthPayout.paidRub > 0
+                          ? `К выплате ${formatCurrency(monthPayout.payoutRub)} · выплачено ${formatCurrency(monthPayout.paidRub)}`
+                          : `К выплате за ${monthLabel(payoutsMonth).toLowerCase()}`
+                      }
                     >
-                      {monthLabel(payoutsMonth).toLowerCase()}:{monthPayout.rentalCount > 0 ? ` ${monthPayout.rentalCount} аренд ·` : ""} к выплате {formatCurrency(monthPayout.payoutRub)}
+                      {monthLabel(payoutsMonth).toLowerCase()}:
+                      {monthPayout.rentalCount > 0 ? ` ${monthPayout.rentalCount} аренд ·` : ""}{" "}
+                      {monthPayout.remainingRub > 0
+                        ? `осталось ${formatCurrency(monthPayout.remainingRub)}`
+                        : monthPayout.payoutRub > 0
+                          ? "выплачено ✓"
+                          : `выплачено ${formatCurrency(monthPayout.paidRub)} ✓`}
                     </span>
-                    {monthPayout.payoutRub > 0 && (
+                    {monthPayout.remainingRub > 0 && (
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         className="h-6 text-[11px]"
                         disabled={payoutRecordBusy === s.chatId}
-                        onClick={() => void recordPayout(s.chatId, displayName, monthPayout.payoutRub)}
+                        onClick={() => void recordPayout(s.chatId, displayName, monthPayout.remainingRub)}
                       >
                         {payoutRecordBusy === s.chatId ? "…" : "Записать выплату"}
                       </Button>

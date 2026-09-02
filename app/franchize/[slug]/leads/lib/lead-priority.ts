@@ -149,6 +149,9 @@ export interface LeadPriority {
   channel: "avito" | "web_callback" | "callback_request" | "other";
   /** Активный перезвон назначен — время (ISO), когда нужно позвонить. */
   callbackDue: string | null;
+  /** Есть заметки, последняя — «свежая» (≤24 ч): стоит прочитать перед
+   *  следующим действием (флажок «Прочитать заметки» + буст индекса). */
+  hasRecentNotes: boolean;
 }
 
 /** Порог «горячего» лида для 🔥-лайбочки (ТЗ п.4). */
@@ -161,6 +164,12 @@ export const CALLBACK_SOON_BOOST = 15;
 /** Горизонт «подоспевшего» перезвона. */
 export const CALLBACK_SOON_WINDOW_MS = 3 * 60 * 60 * 1000;
 
+/** Бонус за «свежую» заметку (≤24 ч) — оператор оставил контекст, который
+ *  стоит прочитать перед следующим звонком (+ флажок «Прочитать заметки»). */
+export const NOTES_RECENT_BOOST = 10;
+/** Горизонт «свежести» заметки. */
+export const NOTES_RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 /** Бонус за активный перезвон (0 — нет перезвона). */
 export function callbackBoost(handling: LeadHandling | undefined, now: number): number {
   const cb = handling?.callback;
@@ -169,6 +178,17 @@ export function callbackBoost(handling: LeadHandling | undefined, now: number): 
   const due = new Date(cb.dueAt).getTime();
   if (Number.isFinite(due) && due - now <= CALLBACK_SOON_WINDOW_MS) return CALLBACK_SOON_BOOST;
   return 0;
+}
+
+/** Бонус за свежую заметку (0 — заметок нет / старая). */
+export function notesBoost(lead: LeadRow, now: number): number {
+  if ((lead.notesCount ?? 0) <= 0) return 0;
+  const lastNoteMs = lead.lastNoteAt ? new Date(lead.lastNoteAt).getTime() : 0;
+  if (!Number.isFinite(lastNoteMs) || lastNoteMs <= 0) return 0;
+  // «Свежая» = оставлена в последние 24 ч (миллисекунды в будущем допускаем —
+  // ошибка часов клиента не должна обнулять бонус).
+  if (now - lastNoteMs > NOTES_RECENT_WINDOW_MS) return 0;
+  return NOTES_RECENT_BOOST;
 }
 
 /**
@@ -212,7 +232,10 @@ export function computeLeadPriority(
 
   const score = Math.max(
     0,
-    Math.min(100, Math.round(base * channelMultiplier) + callbackBoost(handling, now)),
+    Math.min(
+      100,
+      Math.round(base * channelMultiplier) + callbackBoost(handling, now) + notesBoost(lead, now),
+    ),
   );
 
   return {
@@ -224,6 +247,8 @@ export function computeLeadPriority(
     channel,
     /** Активный перезвон назначен (для плашки 📞 в списке). */
     callbackDue: handling?.callback?.dueAt ?? null,
+    /** Свежая заметка (≤24 ч) — флажок «Прочитать заметки». */
+    hasRecentNotes: (lead.notesCount ?? 0) > 0 && notesBoost(lead, now) > 0,
   };
 }
 

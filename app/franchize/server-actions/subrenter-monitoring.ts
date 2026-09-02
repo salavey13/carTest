@@ -386,6 +386,20 @@ function monthWindowIso(month: string): { fromIso: string; toIso: string } {
   return { fromIso: from.toISOString(), toIso: to.toISOString() };
 }
 
+/** Границы месяца как DATE-строки (YYYY-MM-DD) — для owner_cash_entries.entry_date,
+ *  месяц выплаты считается по дате записи (как в кошельке владельца). */
+function monthDateBounds(month: string): { from: string; to: string } {
+  const [y, m] = month.split("-").map(Number);
+  const year = Number.isFinite(y) ? y : new Date().getFullYear();
+  const mon = Number.isFinite(m) && m >= 1 && m <= 12 ? m : new Date().getMonth() + 1;
+  const nextY = mon === 12 ? year + 1 : year;
+  const nextM = mon === 12 ? 1 : mon + 1;
+  return {
+    from: `${year}-${String(mon).padStart(2, "0")}-01`,
+    to: `${nextY}-${String(nextM).padStart(2, "0")}-01`,
+  };
+}
+
 /**
  * SUBRENTER's own monthly earnings: rentals of HIS bikes that started in the
  * requested month (default: current MSK month), each with the money split
@@ -449,7 +463,12 @@ export async function getSubrenterMonthlyEarningsAction(input: {
       .in("vehicle_id", Array.from(bikeLabel.keys()))
       .gte("created_at", fromIso)
       .lte("created_at", toIso)
-      .neq("status", "cancelled")
+      // B2 fix (status unification): тот же набор «зарабатывающих» статусов,
+      // что и в листе выплат владельца (M4) и на стене мотопарка — иначе
+      // disputed/expired аренда надувала собственный заработок партнёра,
+      // но не попадала в «к выплате»: панели показывали разные суммы за тот
+      // же месяц.
+      .in("status", ["completed", "active", "confirmed", "pending_confirmation"])
       .order("created_at", { ascending: false })
       .limit(1000);
 
@@ -503,14 +522,27 @@ export interface SubrenterPayoutRow {
   rentalCount: number;
   totalRub: number;
   bikePartRub: number;
+  /** Полная сумма к выплате за месяц (50% байковой части). */
   payoutRub: number;
+  /** Уже записано выплат в кошельке владельца за этот месяц (совпавшие
+   *  subrenter_payout-записи) — B1 fix: раньше лист не вычитал уже
+   *  выплаченное, и после «Записать выплату» сумма оставалась прежней,
+   *  приглашая записать её повторно. */
+  paidRub: number;
+  /** Осталось выплатить (≥0): payoutRub − paidRub. */
+  remainingRub: number;
   summary: SubrenterMonthSummary;
 }
 
 export interface SubrentersMonthlyPayoutsData {
   month: string;
   rows: SubrenterPayoutRow[];
+  /** Полная сумма к выплате за месяц (по всем партнёрам). */
   totalPayoutRub: number;
+  /** Суммарный ОСТАТОК к выплате (за вычетом уже записанных выплат). */
+  totalRemainingRub: number;
+  /** Суммарно уже выплачено в этом месяце. */
+  totalPaidRub: number;
 }
 
 /**
@@ -570,7 +602,7 @@ export async function getSubrentersMonthlyPayoutsAction(input: {
       chatId: typeof b.specs?.subrenter_chat_id === "string" ? b.specs.subrenter_chat_id : "",
     })).filter((b: { chatId: string }) => b.chatId.length > 0);
     if (partnerBikes.length === 0) {
-      return { success: true, data: { month, rows: [], totalPayoutRub: 0 } };
+      return { success: true, data: { month, rows: [], totalPayoutRub: 0, totalPaidRub: 0, totalRemainingRub: 0 } };
     }
 
     const bikeByChat = new Map<string, { bikeId: string; label: string }[]>();
@@ -593,6 +625,41 @@ export async function getSubrentersMonthlyPayoutsAction(input: {
       .in("status", ["completed", "active", "confirmed", "pending_confirmation"])
       .order("created_at", { ascending: false })
       .limit(2000);
+
+    // B1 fix: уже записанные выплаты месяца (кошелёк владельца, kind=
+    // subrenter_payout, направление «расход»). Раньше лист выплат их не видел:
+    // после «Записать выплату» сумма «к выплате» не менялась и кнопку можно
+    // было нажать снова, задвоив реальный платёж. Месяц считается по entry_date
+    // (дата выплаты, как в кошельке), а не по дате аренды. МАТЧИНГ записей к
+    // партнёрам — ниже, когда известны их имена/юзернеймы.
+    const { from, to } = monthDateBounds(month);
+    const { data: payoutEntries } = await supabaseAdmin
+      .from("owner_cash_entries")
+      .select("amount,person,title,entry_date,created_at")
+      .eq("crew_id", crew.id)
+      .eq("kind", "subrenter_payout")
+      .eq("direction", "out")
+      .gte("entry_date", from)
+      .lt("entry_date", to)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    const normalizePerson = (s: string | null | undefined): string =>
+      (s || "").trim().toLowerCase().replace(/^@+/, "");
+    /** Совпадение записи кошелька с партнёром: person (имя/@юзер) ИЛИ
+     *  chatId в заголовке (новые записи пишут «… · id <chatId>»). */
+    const entryMatchesPartner = (
+      e: { person?: string | null; title?: string | null },
+      partner: { chatId: string; name: string | null; username: string | null },
+    ): boolean => {
+      const p = normalizePerson(e.person);
+      if (p) {
+        if (partner.name && p === normalizePerson(partner.name)) return true;
+        if (partner.username && (p === normalizePerson(partner.username) || p === normalizePerson(`@${partner.username}`))) return true;
+      }
+      const t = (e.title || "").toLowerCase();
+      const cid = String(partner.chatId).toLowerCase();
+      return t.includes(`id ${cid}`) || t.includes(`id${cid}`);
+    };
 
     const scoped = (rentals ?? []).filter((r: {
       agreed_start_date?: string | null;
@@ -658,12 +725,32 @@ export async function getSubrentersMonthlyPayoutsAction(input: {
       }
     }
 
+    // B1: матчим записи кошелька к партнёрам (имена уже известны) и считаем
+    // выплаченное за месяц. Запись без совпадения (переименованный партнёр,
+    // ручная запись) не приписывается никому — владелец видит её в кошельке.
+    const paidByChat = new Map<string, number>();
+    for (const e of (payoutEntries ?? []) as Array<{ amount?: number | string | null; person?: string | null; title?: string | null }>) {
+      const amount = Number(e.amount) || 0;
+      for (const chatId of chatIds) {
+        const ident = {
+          chatId,
+          name: userByChatId.get(chatId)?.name ?? null,
+          username: userByChatId.get(chatId)?.username ?? null,
+        };
+        if (entryMatchesPartner(e, ident)) {
+          paidByChat.set(chatId, (paidByChat.get(chatId) ?? 0) + amount);
+        }
+      }
+    }
+
     const rows: SubrenterPayoutRow[] = [];
     for (const [chatId, list] of rentalsByChat) {
       const user = userByChatId.get(chatId);
       const summary = summarizeSubrenterMonth(month, list, {
         docLinkBase: `/franchize/${slug}/rental`,
       });
+      const payoutRub = summary.cutRub;
+      const paidRub = paidByChat.get(chatId) ?? 0;
       rows.push({
         chatId,
         username: user?.username ?? null,
@@ -672,7 +759,9 @@ export async function getSubrentersMonthlyPayoutsAction(input: {
         rentalCount: summary.rentalCount,
         totalRub: summary.totalRub,
         bikePartRub: summary.bikePartRub,
-        payoutRub: summary.cutRub,
+        payoutRub,
+        paidRub,
+        remainingRub: Math.max(0, payoutRub - paidRub),
         summary,
       });
     }
@@ -682,6 +771,7 @@ export async function getSubrentersMonthlyPayoutsAction(input: {
     for (const chatId of bikeByChat.keys()) {
       if (rentalsByChat.has(chatId)) continue;
       const user = userByChatId.get(chatId);
+      const paidRub = paidByChat.get(chatId) ?? 0;
       rows.push({
         chatId,
         username: user?.username ?? null,
@@ -691,19 +781,23 @@ export async function getSubrentersMonthlyPayoutsAction(input: {
         totalRub: 0,
         bikePartRub: 0,
         payoutRub: 0,
+        paidRub,
+        remainingRub: 0,
         summary: summarizeSubrenterMonth(month, [], {
           docLinkBase: `/franchize/${slug}/rental`,
         }),
       });
     }
 
-    rows.sort((a, b) => b.payoutRub - a.payoutRub || a.chatId.localeCompare(b.chatId));
+    rows.sort((a, b) => b.remainingRub - a.remainingRub || b.payoutRub - a.payoutRub || a.chatId.localeCompare(b.chatId));
     return {
       success: true,
       data: {
         month,
         rows,
         totalPayoutRub: rows.reduce((s, r) => s + r.payoutRub, 0),
+        totalPaidRub: rows.reduce((s, r) => s + r.paidRub, 0),
+        totalRemainingRub: rows.reduce((s, r) => s + r.remainingRub, 0),
       },
     };
   } catch (error) {

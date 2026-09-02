@@ -210,15 +210,19 @@ export function useFilteredSortedLeads(
 
 /**
  * Priority Score карта для всех лидов (ТЗ: индекс приоритета 0–100).
- * Пересчитывается при смене данных/задач; `now` фиксируется на рендер,
- * чтобы не пересчитывать весь список каждую секунду.
+ * Пересчитывается при смене данных/задач. `now` можно передать снаружи
+ * (nowTick из LeadsClient, обновляется раз в минуту) — тогда просроченные
+ * перезвоны вовремя получают буст и перегруппировываются в очереди без
+ * перезагрузки страницы; без параметра — фиксируется на первом рендере.
  */
 export function usePriorityMap(
   leads: LeadRow[],
   getTodosForLead: (lead: LeadRow) => LeadTodoRow[],
+  nowMs?: number,
 ): Map<string, LeadPriority> {
-  // Точка отсчёта «сейчас» — обновляется вместе с данными (fetch/refresh).
-  const now = useMemo(() => Date.now(), [leads]);
+  // Точка отсчёта «сейчас» — обновляется вместе с данными (fetch/refresh)
+  // или с внешним nowTick.
+  const now = useMemo(() => (typeof nowMs === "number" && Number.isFinite(nowMs) ? nowMs : Date.now()), [nowMs]);
   return useMemo(
     () => buildPriorityMap(leads, getTodosForLead, now),
     [leads, getTodosForLead, now],

@@ -233,3 +233,82 @@ describe("sortLeads(mode='priority')", () => {
     expect(map.get("y").score).toBeGreaterThan(map.get("x").score);
   });
 });
+
+// ── 7. Заметки: «Прочитать заметки» + буст за свежую ───────────────────────
+
+describe("Заметки лида (флажок + буст)", () => {
+  it("свежая заметка (≤24 ч) даёт буст +10", () => {
+    const base = computeLeadPriority(buildLead(), 0, NOW);
+    const withNote = computeLeadPriority(
+      buildLead({ notesCount: 3, lastNoteAt: new Date(NOW - 2 * 60 * 60 * 1000).toISOString() }),
+      0,
+      NOW,
+    );
+    expect(withNote.score).toBe(base.score + 10);
+    expect(withNote.hasRecentNotes).toBe(true);
+  });
+
+  it("старая заметка (>24 ч) не даёт буста", () => {
+    const p = computeLeadPriority(
+      buildLead({ notesCount: 5, lastNoteAt: "2026-08-01T00:00:00.000Z" }),
+      0,
+      NOW,
+    );
+    expect(p.hasRecentNotes).toBe(false);
+  });
+
+  it("notesCount = 0 / нет полей — никакого буста", () => {
+    expect(computeLeadPriority(buildLead({ notesCount: 0, lastNoteAt: null }), 0, NOW).hasRecentNotes).toBe(false);
+    expect(computeLeadPriority(buildLead(), 0, NOW).hasRecentNotes).toBe(false);
+  });
+
+  it("заметки без валидной даты — буста нет (мусорное lastNoteAt не роняет расчёт)", () => {
+    const p = computeLeadPriority(buildLead({ notesCount: 2, lastNoteAt: "не-дата" }), 0, NOW);
+    expect(Number.isFinite(p.score)).toBe(true);
+    expect(p.hasRecentNotes).toBe(false);
+  });
+
+  it("заметка в «будущем» (неточные часы клиента) не считается старой", () => {
+    const p = computeLeadPriority(
+      buildLead({ notesCount: 1, lastNoteAt: new Date(NOW + 60 * 60 * 1000).toISOString() }),
+      0,
+      NOW,
+    );
+    expect(p.hasRecentNotes).toBe(true);
+  });
+
+  it("буст заметок суммируется с бустом перезвона и не превышает 100", () => {
+    const handling = {
+      handled: false,
+      handledAt: null,
+      callback: { dueAt: new Date(NOW - 60 * 1000).toISOString(), note: null, todoId: "t1" }, // просрочен
+    } as const;
+    const p = computeLeadPriority(
+      buildLead({
+        urgencyScore: 100,
+        totalSpent: 1_000_000,
+        stageKey: "return_due",
+        notesCount: 4,
+        lastNoteAt: new Date(NOW - 1000).toISOString(),
+      }),
+      10,
+      NOW,
+      handling as never,
+    );
+    expect(p.score).toBeLessThanOrEqual(100);
+    expect(p.score).toBe(100); // кламп наверху
+    expect(p.hasRecentNotes).toBe(true);
+  });
+
+  it("лид со свежей заметкой поднимается над таким же без заметок", () => {
+    const plain = buildLead({ user_id: "plain", lastSeenAt: new Date(NOW - 3 * 60 * 60 * 1000).toISOString() });
+    const noted = buildLead({
+      user_id: "noted",
+      lastSeenAt: new Date(NOW - 3 * 60 * 60 * 1000).toISOString(),
+      notesCount: 1,
+      lastNoteAt: new Date(NOW - 30 * 60 * 1000).toISOString(),
+    });
+    const sorted = sortLeads([plain, noted], "priority", () => [], undefined, NOW);
+    expect(sorted[0].user_id).toBe("noted");
+  });
+});

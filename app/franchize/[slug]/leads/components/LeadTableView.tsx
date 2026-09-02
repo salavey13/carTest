@@ -16,7 +16,7 @@
 //
 
 import { useMemo } from "react";
-import { ArrowDown, ArrowUp, Bike, CircleDollarSign, Table2, ExternalLink, Flame, Zap, PhoneCall } from "lucide-react";
+import { ArrowDown, ArrowUp, Bike, CircleDollarSign, Table2, ExternalLink, Flame, Zap, PhoneCall, StickyNote } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "../leads-types";
 import { relativeTime, metaFor, isAvitoLead, AVITO_COLOR, AVITO_BG } from "../leads-utils";
 import { STAGE_LABELS as PIPELINE_STAGE_LABELS, STAGE_COLORS } from "../lib/pipeline-stages";
@@ -33,6 +33,8 @@ interface LeadTableViewProps {
   getTodosForLead: (lead: LeadRow) => LeadTodoRow[];
   /** Priority Score 0–100 (ТЗ): колонка «Приоритет» + лайбочки. */
   priorityMap?: Map<string, LeadPriority>;
+  /** «Прочитать заметки» — открывает шторку лида сразу на заметках. */
+  onReadNotes?: (leadId: string) => void;
   sortMode: SortMode;
   onSortChange?: (mode: SortMode) => void;
   T: ThemeTokens;
@@ -53,6 +55,7 @@ export function LeadTableView({
   onSelect,
   getTodosForLead,
   priorityMap,
+  onReadNotes,
   sortMode,
   onSortChange,
   T,
@@ -205,6 +208,10 @@ export function LeadTableView({
               const stage = stageMeta(lead.stageKey);
               const meta = metaFor(lead.source);
               const owner = lead.assigneeName || lead.ownerName || "—";
+              // 📝 Заметки лида — флажок в колонке «Клиент» (не 0 → показать).
+              const notesCount = lead.notesCount ?? 0;
+              const lastNoteMs = lead.lastNoteAt ? new Date(lead.lastNoteAt).getTime() : 0;
+              const noteIsNew = notesCount > 0 && Number.isFinite(lastNoteMs) && lastNoteMs > 0 && Date.now() - lastNoteMs <= 24 * 60 * 60 * 1000;
               return (
                 <tr
                   key={lead.user_id}
@@ -285,6 +292,29 @@ export function LeadTableView({
                         <p className="truncate font-semibold" style={{ color: T.text }}>
                           {lead.full_name || "Без имени"}
                         </p>
+                        {/* 📝 Заметки — подсвеченный флажок в строке таблицы: клик
+                            открывает шторку сразу на заметках («новая» ≤24 ч —
+                            с точкой-индикатором). */}
+                        {notesCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onReadNotes?.(lead.user_id);
+                            }}
+                            className="mt-0.5 inline-flex max-w-full items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold transition hover:brightness-110"
+                            style={
+                              noteIsNew
+                                ? { backgroundColor: "#8b5cf626", color: "#8b5cf6", border: "1px solid #8b5cf644" }
+                                : { backgroundColor: "#8b5cf614", color: "#8b5cf6" }
+                            }
+                            title={lead.lastNoteAt ? `Последняя заметка: ${relativeTime(lead.lastNoteAt)}` : "Есть заметки"}
+                          >
+                            <StickyNote className="h-2.5 w-2.5 shrink-0" aria-hidden />
+                            <span className="truncate">Заметки: {notesCount}</span>
+                            {noteIsNew && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-500" aria-label="новая" />}
+                          </button>
+                        )}
                         {lead.troubled && (
                           <span className="text-[10px] font-medium" style={{ color: "#ef4444" }}>
                             ⚠ проблемный

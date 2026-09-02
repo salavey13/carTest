@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -104,6 +104,10 @@ interface Props {
    *  LeadDetailSheet so the sheet provides the backdrop + animation and this
    *  component only renders the content sections. */
   asSheetChild?: boolean;
+  /** «Прочитать заметки»: метка времени последнего клика по флажку заметок
+   *  этого лида. При изменении — раскрыть секцию заметок и плавно прокрутить
+   *  к ней (просьба босса: заметки должны быть видны из списка одним тапом). */
+  focusNotesSignal?: number;
 }
 
 type TodoFilter = "all" | "mine" | "overdue";
@@ -144,6 +148,7 @@ export function LeadDetailDrawer(props: Props) {
     handlingBusy = false,
     notifyBusy = false,
     asSheetChild = false,
+    focusNotesSignal = 0,
   } = props;
 
   // NOTE: We CANNOT early-return before hooks (React rules-of-hooks).
@@ -170,6 +175,19 @@ export function LeadDetailDrawer(props: Props) {
   const [openTasks, setOpenTasks] = useState(true);
   const [openNotes, setOpenNotes] = useState(true);
   const [openHistory, setOpenHistory] = useState(false);
+
+  // «Прочитать заметки» — раскрыть секцию заметок и прокрутить к ней.
+  // Ждём 350 мс: шторка успевает отыграть входную анимацию (иначе
+  // scrollIntoView срабатывает, пока контент ещё «на месте» не отрендерился).
+  const notesSectionRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!focusNotesSignal) return;
+    setOpenNotes(true);
+    const t = setTimeout(() => {
+      notesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [focusNotesSignal]);
 
   const infoItems: InfoTile[] = [
     { label: "Телефон", value: lead?.phone || "—", copyable: !!lead?.phone },
@@ -771,7 +789,7 @@ export function LeadDetailDrawer(props: Props) {
       </div>
 
       {/* 8. Notes */}
-      <div className="mt-5">
+      <div className="mt-5" ref={notesSectionRef} data-notes-section>
         <Section
           title="Заметки"
           icon={StickyNote}

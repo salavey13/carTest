@@ -84,6 +84,14 @@ export interface LeadRow {
   ownerName?: string | null;
   nextAction?: string | null;
   qrStatus?: "unclaimed" | "sent" | "claimed" | "expired";
+  /**
+   * Количество заметок лида (таблица lead_notes, crew-scoped) — питает
+   * подсвеченный флажок «Прочитать заметки» прямо в списке лидов.
+   * Считается на сервере одним агрегатным запросом; 0/undefined = заметок нет.
+   */
+  notesCount?: number;
+  /** Когда оставлена последняя заметка (ISO) — «новая» (≤24 ч) подсвечена ярче. */
+  lastNoteAt?: string | null;
 }
 
 export interface LeadTodoRow {

@@ -204,6 +204,7 @@ export function LeadHandlingSection({
             <input
               type="datetime-local"
               value={dtValue}
+              min={toLocalInputValue(new Date())}
               onChange={(e) => setDtValue(e.target.value)}
               className="min-w-0 flex-1 rounded-xl border px-3 py-2 text-sm outline-none"
               style={{ borderColor: T.inputBorder, backgroundColor: T.inputBg, color: T.text }}
