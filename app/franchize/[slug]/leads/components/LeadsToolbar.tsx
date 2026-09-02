@@ -29,9 +29,12 @@ const SEGMENT_META: Record<Segment, { label: string; icon: any; color: string }>
 };
 
 // ── Sort options ──
+// "priority" — дефолт: итоговый индекс приоритета 0–100 (LIFO-свежесть,
+// температура, задачи, LTV, этап; Авито ×2). См. lib/lead-priority.ts.
 const SORT_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "priority", label: "🔥 Приоритет" },
   { value: "recent", label: "Свежие" },
-  { value: "urgent", label: "🔥 Срочные" },
+  { value: "urgent", label: "⏱ Срочность" },
   { value: "spent", label: "💰 По выручке" },
   { value: "name", label: "А → Я" },
 ];

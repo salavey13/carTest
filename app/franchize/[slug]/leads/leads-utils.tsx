@@ -3,6 +3,7 @@
 
 import { SOURCE_META } from "./leads-constants";
 import { PIPELINE_STAGES } from "./lib/pipeline-stages";
+import { compareByPriority, computeLeadPriority, type LeadPriority } from "./lib/lead-priority";
 import type {LeadRow, LeadTodoRow} from "./leads-types";
 
 /** Avito brand tint used for badges/accents across the leads UI. */
@@ -296,13 +297,47 @@ export function filterLeads(
   return result;
 }
 
+/**
+ * Priority Score для каждого лида, с мемоизацией по user_id.
+ *
+ * Сортировка «priority» и лайбочки (⚡ свежий / 🔥 счёт) в карточках,
+ * таблице и канбане читают значения из этой карты — расчёт O(1) на лида,
+ * без пересчёта внутри компаратора сортировки.
+ */
+export function buildPriorityMap(
+  leads: LeadRow[],
+  getTodosForLead: (lead: LeadRow) => LeadTodoRow[],
+  now: number,
+): Map<string, LeadPriority> {
+  const map = new Map<string, LeadPriority>();
+  for (const lead of leads) {
+    const pending = getTodosForLead(lead).filter((t) => t.status !== "done").length;
+    map.set(lead.user_id, computeLeadPriority(lead, pending, now));
+  }
+  return map;
+}
+
 export function sortLeads(
   leads: LeadRow[],
-  sortMode: "recent" | "urgent" | "name" | "spent",
-  getTodosForLead: (lead: LeadRow) => LeadTodoRow[]
+  sortMode: "priority" | "recent" | "urgent" | "name" | "spent",
+  getTodosForLead: (lead: LeadRow) => LeadTodoRow[],
+  priorityMap?: Map<string, LeadPriority>,
+  now: number = Date.now(),
 ): LeadRow[] {
   const arr = [...leads];
   switch (sortMode) {
+    // ТЗ «Итоговый индекс приоритета»: комплексный score 0–100 (LIFO-свежесть
+    // + температура + задачи + LTV + этап, Авито ×2). Самые горячие и свежие
+    // обращения — наверху очереди у менеджера, а не в алфавитной куче.
+    case "priority": {
+      const pMap = priorityMap ?? buildPriorityMap(arr, getTodosForLead, now);
+      const fallback = computeLeadPriorityFallback(getTodosForLead, now);
+      return arr.sort((a, b) => {
+        const aP = pMap.get(a.user_id) ?? fallback(a);
+        const bP = pMap.get(b.user_id) ?? fallback(b);
+        return compareByPriority(a, aP, b, bP);
+      });
+    }
     case "urgent":
       return arr.sort((a, b) => {
         const aT = getTodosForLead(a).filter((t) => t.status !== "done").length;
@@ -319,6 +354,22 @@ export function sortLeads(
     default:
       return arr.sort((a, b) => new Date(b.lastSeenAt || b.createdAt || 0).getTime() - new Date(a.lastSeenAt || a.createdAt || 0).getTime());
   }
+}
+
+/** Ленивый расчёт приоритета для лидов, которых нет в priorityMap. */
+function computeLeadPriorityFallback(
+  getTodosForLead: (lead: LeadRow) => LeadTodoRow[],
+  now: number,
+): (lead: LeadRow) => LeadPriority {
+  const cache = new Map<string, LeadPriority>();
+  return (lead: LeadRow) => {
+    const cached = cache.get(lead.user_id);
+    if (cached) return cached;
+    const pending = getTodosForLead(lead).filter((t) => t.status !== "done").length;
+    const p = computeLeadPriority(lead, pending, now);
+    cache.set(lead.user_id, p);
+    return p;
+  };
 }
 
 export function categorizeLeads(

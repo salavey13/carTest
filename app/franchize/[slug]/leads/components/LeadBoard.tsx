@@ -6,6 +6,7 @@ import { Avatar } from "./Avatar";
 import { relativeTime, metaFor, getInitials, isAvitoLead, AVITO_COLOR, AVITO_BG } from "../leads-utils";
 import { BOARD_COLUMNS } from "../leads-constants";
 import type {LeadRow, LeadTodoRow} from "../leads-types";
+import type { LeadPriority } from "../lib/lead-priority";
 
 interface LeadBoardProps {
   leads: LeadRow[];
@@ -13,6 +14,8 @@ interface LeadBoardProps {
   onSelect: (id: string | null) => void;
   onDismiss: (id: string) => void;
   getTodosForLead: (lead: LeadRow) => LeadTodoRow[];
+  /** Priority Score 0–100 (ТЗ): сортировка внутри колонок + score-бейджи. */
+  priorityMap?: Map<string, LeadPriority>;
   T: any;
 }
 
@@ -32,7 +35,7 @@ interface LeadBoardProps {
  * This is the standard kanban UX (Trello, Linear, Notion) — narrow columns
  * with horizontal swipe, not a vertical list of stages.
  */
-export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForLead, T }: LeadBoardProps) {
+export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForLead, priorityMap, T }: LeadBoardProps) {
   const columns = useMemo(() => {
     // Group by the COMPUTED pipeline stage (stageKey), not the raw DB stage —
     // see groupLeadsForBoard(): raw stages like "viewed"/"clicked" used to
@@ -44,8 +47,21 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
       if (!map[key]) map[key] = [];
       map[key].push(l);
     }
+    // ТЗ: внутри колонки лиды стоят по Priority Score (убыв.) — «горячие»
+    // и свежие сверху, дальше — по свежести активности (LIFO tie-break).
+    if (priorityMap) {
+      for (const key of Object.keys(map)) {
+        map[key].sort((a, b) => {
+          const aP = priorityMap.get(a.user_id)?.score ?? 0;
+          const bP = priorityMap.get(b.user_id)?.score ?? 0;
+          if (aP !== bP) return bP - aP;
+          return new Date(b.lastSeenAt || b.createdAt || 0).getTime()
+            - new Date(a.lastSeenAt || a.createdAt || 0).getTime();
+        });
+      }
+    }
     return map;
-  }, [leads]);
+  }, [leads, priorityMap]);
 
   return (
     <div
@@ -106,6 +122,7 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
               {colLeads.map((lead) => {
                 const pending = getTodosForLead(lead).filter((t) => t.status !== "done").length;
                 const meta = metaFor(lead.source);
+                const pr = priorityMap?.get(lead.user_id);
                 return (
                   <div
                     key={lead.user_id}
@@ -127,6 +144,21 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
                           {lead.phone || lead.username || relativeTime(lead.createdAt)}
                         </p>
                       </div>
+                      {/* Priority Score (ТЗ) — score-бейдж: 🔥 для горячих (≥70),
+                          ⚡ для свежих (≤60 мин). Мини-версия лайбочки карточки. */}
+                      {pr && (pr.isHot || pr.isFresh) && (
+                        <span
+                          className="inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums"
+                          style={
+                            pr.isHot
+                              ? { backgroundColor: "#ef444420", color: "#ef4444" }
+                              : { backgroundColor: "#3b82f620", color: "#3b82f6" }
+                          }
+                          title={`Индекс приоритета ${pr.score}/100${pr.channelMultiplier > 1 ? ` (канал ×${pr.channelMultiplier})` : ""}`}
+                        >
+                          {pr.isHot ? "🔥" : "⚡"}{pr.score}
+                        </span>
+                      )}
                       {pending > 0 && (
                         <span className="shrink-0 rounded-full bg-amber-500/15 px-1.5 text-[9px] font-bold text-amber-400">
                           {pending}

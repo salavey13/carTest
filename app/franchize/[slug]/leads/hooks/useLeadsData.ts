@@ -8,8 +8,10 @@ import {
   sortLeads, 
   categorizeLeads, 
   getAvailableSources,
-  groupLeadsForBoard 
+  groupLeadsForBoard,
+  buildPriorityMap 
 } from "../leads-utils";
+import type { LeadPriority } from "../lib/lead-priority";
 
 /**
  * Normalize a phone number to canonical E.164-ish form (+7XXXXXXXXXX for RU).
@@ -154,8 +156,9 @@ export function useFilteredSortedLeads(
   filterSource: string,
   segment: "all" | "hot" | "verified" | "warm" | "troubled",
   getTodosForLead: (lead: LeadRow) => LeadTodoRow[],
-  sortMode: "recent" | "urgent" | "name" | "spent",
+  sortMode: "priority" | "recent" | "urgent" | "name" | "spent",
   hidePlaceholders: boolean = false,
+  priorityMap?: Map<string, LeadPriority>,
 ) {
   const filteredLeads = useMemo(
     () => filterLeads(leads, searchQuery, filterSource, segment, getTodosForLead, hidePlaceholders),
@@ -163,8 +166,8 @@ export function useFilteredSortedLeads(
   );
 
   const sortedLeads = useMemo(
-    () => sortLeads(filteredLeads, sortMode, getTodosForLead),
-    [filteredLeads, sortMode, getTodosForLead]
+    () => sortLeads(filteredLeads, sortMode, getTodosForLead, priorityMap),
+    [filteredLeads, sortMode, getTodosForLead, priorityMap]
   );
 
   const { hot, verified, warm } = useMemo(
@@ -198,4 +201,21 @@ export function useFilteredSortedLeads(
     hasFilters,
     boardColumns,
   };
+}
+
+/**
+ * Priority Score карта для всех лидов (ТЗ: индекс приоритета 0–100).
+ * Пересчитывается при смене данных/задач; `now` фиксируется на рендер,
+ * чтобы не пересчитывать весь список каждую секунду.
+ */
+export function usePriorityMap(
+  leads: LeadRow[],
+  getTodosForLead: (lead: LeadRow) => LeadTodoRow[],
+): Map<string, LeadPriority> {
+  // Точка отсчёта «сейчас» — обновляется вместе с данными (fetch/refresh).
+  const now = useMemo(() => Date.now(), [leads]);
+  return useMemo(
+    () => buildPriorityMap(leads, getTodosForLead, now),
+    [leads, getTodosForLead, now],
+  );
 }

@@ -8,6 +8,7 @@ import { LeadCard } from "./LeadCard";
 import type {LeadRow, LeadTodoRow} from "../leads-types";
 import { computeLeadSignals } from "../lib/sla-signals";
 import type { LeadSignal } from "../lib/sla-signals";
+import type { LeadPriority } from "../lib/lead-priority";
 
 interface LeadListProps {
   leads: LeadRow[];
@@ -15,6 +16,8 @@ interface LeadListProps {
   setSelectedId: (id: string | null) => void;
   onDismiss: (id: string) => void;
   getTodosForLead: (lead: LeadRow) => LeadTodoRow[];
+  /** Priority Score (ТЗ): карта индексов 0–100 для лайбочек на карточках. */
+  priorityMap?: Map<string, LeadPriority>;
   T: any;
   crewId: string;
   slug: string;
@@ -45,6 +48,7 @@ export function LeadList({
   setSelectedId,
   onDismiss,
   getTodosForLead,
+  priorityMap,
   T,
   crewId,
   slug,
@@ -104,6 +108,7 @@ export function LeadList({
                 selected={isThisSelected}
                 onSelect={() => handleSelect(lead)}
                 onDismiss={onDismiss}
+                priority={priorityMap?.get(lead.user_id)}
                 signals={getTodosForLead ? computeLeadSignals(lead, getTodosForLead(lead)) : []}
               />
             </motion.div>

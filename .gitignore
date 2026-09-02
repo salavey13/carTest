@@ -46,3 +46,6 @@ nnvolt-static/.env*
 /download/vip-bike-sale.csv
 backups/
 upload/secrets_all.txt
+
+# Bitrix24 CSV deal exports — содержат ПДн клиентов (телефоны, ФИО), не коммитить
+upload/DEAL_*.csv

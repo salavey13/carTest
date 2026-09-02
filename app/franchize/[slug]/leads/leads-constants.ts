@@ -49,12 +49,16 @@ export const SEGMENT_META: Record<Segment, { label: string; icon: typeof Flame; 
 };
 
 export type ViewMode = "list" | "board" | "table";
-export type SortMode = "recent" | "urgent" | "name" | "spent";
+// "priority" — сортировка по итоговому индексу Priority Score 0–100
+// (см. lib/lead-priority.ts): LIFO-свежесть + температура + задачи +
+// LTV + этап воронки, с мультипликатором ×2 для Авито. Дефолтный режим.
+export type SortMode = "priority" | "recent" | "urgent" | "name" | "spent";
 export type DetailSection = "contacts" | "deals" | "tasks" | "notes";
 
 export const SORT_OPTIONS: { value: SortMode; label: string }[] = [
+  { value: "priority", label: "🔥 Приоритет" },
   { value: "recent",  label: "Свежие" },
-  { value: "urgent",  label: "⏱ По приоритету" },
+  { value: "urgent",  label: "⏱ Срочность" },
   { value: "spent",   label: "💰 По выручке" },
   { value: "name",    label: "А → Я" },
 ];

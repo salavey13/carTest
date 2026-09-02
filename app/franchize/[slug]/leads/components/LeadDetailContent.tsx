@@ -13,6 +13,7 @@ import {
 } from "../lib/pipeline-stages";
 import { computeLeadSignals } from "../lib/sla-signals";
 import { computeLeadHistory } from "../lib/lead-history";
+import { computeLeadPriority, type LeadPriority } from "../lib/lead-priority";
 import {
   LeadDetailDrawer,
   type LeadDrawerNote,
@@ -146,6 +147,14 @@ export function LeadDetailContent({
     [notes]
   );
 
+  // ── 7. Priority Score (ТЗ: индекс 0–100) — плашка в шапке шторки ──
+  // «now» фиксируется на мемо — индекс стабилен между рендерами и не
+  // «дёргается» лишними пересчётами; пересчёт происходит при смене лида/задач.
+  const priority: LeadPriority = useMemo(() => {
+    const pending = todos.filter((t) => t.status !== "done").length;
+    return computeLeadPriority(enrichedLead, pending, Date.now());
+  }, [enrichedLead, todos]);
+
   // ── Null-guard render ──
   // Now that all hooks have been called, we can safely bail if lead is null.
   // This happens AFTER hooks so React's rules-of-hooks are satisfied.
@@ -161,6 +170,7 @@ export function LeadDetailContent({
       signals={signals}
       history={history}
       docs={docs}
+      priority={priority}
       slug={slug}
       T={T}
       onClose={onClose}

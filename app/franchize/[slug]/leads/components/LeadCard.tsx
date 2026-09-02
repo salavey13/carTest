@@ -12,6 +12,7 @@ import {
 import type {LeadRow} from "../leads-types";
 import type { LeadSignal, StageKey } from "../leads-constants";
 import type { ThemeTokens } from "../hooks/useTheme";
+import type { LeadPriority } from "../lib/lead-priority";
 import {
   STAGE_LABELS,
   STAGE_COLORS,
@@ -34,6 +35,8 @@ interface Props {
   selected: boolean;
   onSelect: () => void;
   onDismiss: (id: string) => void;
+  /** Priority Score 0–100 (ТЗ): питает лайбочки ⚡ свежий / 🔥 счёт. */
+  priority?: LeadPriority;
   T: ThemeTokens;
 }
 
@@ -72,7 +75,7 @@ function isValidLeadRow(lead: unknown): lead is LeadRow {
  * metadata 11px / md:13px. Left stripe is 3px (w-[3px]) so it reads as an
  * accent indicator without eating into the card content.
  */
-export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Props) {
+export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priority, T }: Props) {
   // Type guard provides both runtime safety and type narrowing
   if (!isValidLeadRow(lead)) {
     return null;
@@ -153,6 +156,30 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
                 >
                   {displayName}
                 </h3>
+                {/* ⚡ «Свежий» (ТЗ п.2, LIFO) — обратили внимание ≤ 60 мин назад.
+                    Сопроводительная плашка, чтобы менеджер сразу считывал
+                    «этого человека только что» и брал трубку первым. */}
+                {priority?.isFresh && (
+                  <span
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                    style={{ backgroundColor: "#3b82f620", color: "#3b82f6" }}
+                    title="Обращение поступило меньше часа назад — обработать первым"
+                  >
+                    ⚡ Свежий
+                  </span>
+                )}
+                {/* 🔥 Priority Score (ТЗ п.1 + п.4) — итоговый индекс 0–100;
+                    показывается только для «горячих» (score ≥ 70), чтобы плашки
+                    не обесценивались спамом на каждой карточке. */}
+                {priority?.isHot && (
+                  <span
+                    className="inline-flex shrink-0 items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
+                    style={{ backgroundColor: "#ef444420", color: "#ef4444" }}
+                    title={`Индекс приоритета ${priority.score}/100${priority.channelMultiplier > 1 ? ` (канал ×${priority.channelMultiplier})` : ""}`}
+                  >
+                    🔥 {priority.score}
+                  </span>
+                )}
                 {lead.verified && (
                   <CheckCircle2
                     className="h-4 w-4 shrink-0"
@@ -284,14 +311,15 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, T }: Pr
                   style={{ background: "#0af1331f", color: "#0a8f2a" }}
                   aria-label="Открыть чат Авито"
                 >
-                  Avito · чат ↗
+                  Avito · чат ↗{priority?.channelMultiplier === 2 ? " ×2" : ""}
                 </a>
               ) : (
                 <span
-                  className="rounded-full px-2.5 py-1 text-[10px] font-semibold"
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold"
                   style={{ background: "#0af1331f", color: "#0a8f2a" }}
+                  title="Лид с Авито: приоритет ×2 — максимально горячий канал"
                 >
-                  Avito
+                  Авито{priority?.channelMultiplier === 2 ? " ×2" : ""}
                 </span>
               )
             )}

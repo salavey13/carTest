@@ -16,11 +16,12 @@
 //
 
 import { useMemo } from "react";
-import { ArrowDown, ArrowUp, Bike, CircleDollarSign, Table2, ExternalLink } from "lucide-react";
+import { ArrowDown, ArrowUp, Bike, CircleDollarSign, Table2, ExternalLink, Flame, Zap } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "../leads-types";
 import { relativeTime, metaFor, isAvitoLead, AVITO_COLOR, AVITO_BG } from "../leads-utils";
 import { STAGE_LABELS as PIPELINE_STAGE_LABELS, STAGE_COLORS } from "../lib/pipeline-stages";
 import { type SortMode } from "../leads-constants";
+import { type LeadPriority } from "../lib/lead-priority";
 import { Avatar } from "./Avatar";
 import type { ThemeTokens } from "../hooks/useTheme";
 
@@ -29,6 +30,8 @@ interface LeadTableViewProps {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   getTodosForLead: (lead: LeadRow) => LeadTodoRow[];
+  /** Priority Score 0–100 (ТЗ): колонка «Приоритет» + лайбочки. */
+  priorityMap?: Map<string, LeadPriority>;
   sortMode: SortMode;
   onSortChange?: (mode: SortMode) => void;
   T: ThemeTokens;
@@ -48,24 +51,26 @@ export function LeadTableView({
   selectedId,
   onSelect,
   getTodosForLead,
+  priorityMap,
   sortMode,
   onSortChange,
   T,
 }: LeadTableViewProps) {
-  // Precompute per-lead derived values once (pending todos, spent, activity).
+  // Precompute per-lead derived values once (pending todos, spent, activity, priority).
   const rows = useMemo(
     () =>
       leads.map((lead) => {
         const todos = getTodosForLead(lead);
         return {
           lead,
+          priority: priorityMap?.get(lead.user_id),
           pendingTodos: todos.filter((t) => t.status !== "done").length,
           totalTodos: todos.length,
           spent: Number(lead.totalSpent || 0),
           activity: lead.lastSeenAt || lead.createdAt || "",
         };
       }),
-    [leads, getTodosForLead],
+    [leads, getTodosForLead, priorityMap],
   );
 
   const totalRevenue = useMemo(() => rows.reduce((sum, r) => sum + r.spent, 0), [rows]);
@@ -81,7 +86,7 @@ export function LeadTableView({
   }: {
     label: string;
     mode: SortMode;
-    align?: "left" | "right";
+    align?: "left" | "right" | "center";
   }) => {
     const active = sortMode === mode;
     const clickable = !!onSortChange;
@@ -103,7 +108,7 @@ export function LeadTableView({
           {label}
           {active && sortMode === "recent" ? null : null}
           {active && (mode === "name") ? <ArrowUp className="h-3 w-3" /> : null}
-          {active && (mode === "spent" || mode === "recent") ? <ArrowDown className="h-3 w-3" /> : null}
+          {active && (mode === "spent" || mode === "recent" || mode === "priority" || mode === "urgent") ? <ArrowDown className="h-3 w-3" /> : null}
         </span>
       </th>
     );
@@ -131,6 +136,10 @@ export function LeadTableView({
         <table className="w-full border-collapse text-left text-xs" style={{ color: T.text, minWidth: "920px" }}>
           <thead className="sticky top-0 z-10">
             <tr>
+              {/* Приоритет (ТЗ) — итоговый индекс 0–100: чем выше, тем выше лид.
+                  Сортируемый заголовок синхронизирован с тулбаром. Ставим ПЕРВОЙ
+                  колонкой — менеджер считывает очередь сверху вниз. */}
+              <SortHeader label="Приоритет" mode="priority" align="center" />
               <th
                 className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
                 style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
@@ -178,7 +187,7 @@ export function LeadTableView({
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ lead, pendingTodos, totalTodos, spent }, idx) => {
+            {rows.map(({ lead, priority, pendingTodos, totalTodos, spent }, idx) => {
               const selected = selectedId === lead.user_id;
               const avito = isAvitoLead(lead);
               const stage = stageMeta(lead.stageKey);
@@ -219,6 +228,43 @@ export function LeadTableView({
                     }
                   }}
                 >
+                  {/* Приоритет — score 0–100 + лайбочки ⚡/🔥 (ТЗ п.4).
+                      Горячие (≥70) — красный бейдж со счётом; свежие (≤60 мин) —
+                      синяя молния; для Авито ×2 показываем множитель. */}
+                  <td className="whitespace-nowrap border-b border-r px-2.5 py-2 text-center" style={{ borderColor: T.borderSoft }}>
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
+                      style={
+                        priority?.isHot
+                          ? { backgroundColor: "#ef444420", color: "#ef4444" }
+                          : (priority?.score ?? 0) >= 50
+                            ? { backgroundColor: "#f59e0b20", color: "#f59e0b" }
+                            : { backgroundColor: T.borderSoft, color: T.textFaint }
+                      }
+                      title={`Индекс приоритета ${priority?.score ?? "—"}/100${(priority?.channelMultiplier ?? 0) > 1 ? ` (канал ×${priority?.channelMultiplier})` : ""}`}
+                    >
+                      {priority?.isHot && <Flame className="h-2.5 w-2.5" aria-hidden />}
+                      {priority?.score ?? "—"}
+                    </span>
+                    {priority?.isFresh && (
+                      <span
+                        className="ml-1 inline-flex items-center rounded-full px-1 py-0.5 text-[9px] font-bold"
+                        style={{ backgroundColor: "#3b82f620", color: "#3b82f6" }}
+                        title="Обращение меньше часа назад (LIFO)"
+                      >
+                        <Zap className="h-2.5 w-2.5" aria-hidden />
+                      </span>
+                    )}
+                    {priority?.channelMultiplier === 2 && (
+                      <span
+                        className="ml-1 rounded px-1 py-0.5 text-[9px] font-bold"
+                        style={{ backgroundColor: AVITO_BG, color: AVITO_COLOR }}
+                        title="Приоритет ×2 — лид с Авито"
+                      >
+                        ×2
+                      </span>
+                    )}
+                  </td>
                   {/* Клиент */}
                   <td className="max-w-[220px] border-b border-r px-2.5 py-2" style={{ borderColor: T.borderSoft }}>
                     <div className="flex items-center gap-2">

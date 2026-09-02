@@ -47,6 +47,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { LeadSLAOverview } from "./LeadSLAOverview";
+import type { LeadPriority } from "../lib/lead-priority";
 import { LeadInfoGrid, type InfoTile } from "./LeadInfoGrid";
 import {
   LeadDocumentsSection,
@@ -76,6 +77,8 @@ interface Props {
   signals: LeadSignal[];
   history: LeadHistoryEvent[];
   docs: DocumentItem[];
+  /** Priority Score 0–100 (ТЗ) — индекс для плашки в шапке шторки. */
+  priority?: LeadPriority;
   /** Crew slug — used to build SPA links to rental details. */
   slug: string;
   T: ThemeTokens;
@@ -389,6 +392,54 @@ export function LeadDetailDrawer(props: Props) {
           </button>
         )}
       </div>
+
+      {/* 1a. Priority Score (ТЗ) — компактная плашка под шапкой: итоговый
+          индекс 0–100 + подсказки «свежий» / «канал ×2». Менеджер сразу
+          видит, насколько этот контакт важен, до чтения деталей. */}
+      {props.priority && (
+        <div
+          className="mt-4 flex items-center justify-between gap-3 rounded-2xl border px-4 py-2.5"
+          style={{
+            borderColor: props.priority.isHot ? "#ef444455" : T.border,
+            background: props.priority.isHot ? "#ef44440f" : "transparent",
+          }}
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold tabular-nums"
+              style={
+                props.priority.isHot
+                  ? { backgroundColor: "#ef444420", color: "#ef4444" }
+                  : (props.priority.score ?? 0) >= 50
+                    ? { backgroundColor: "#f59e0b20", color: "#f59e0b" }
+                    : { backgroundColor: T.borderSoft, color: T.textFaint }
+              }
+            >
+              Индекс: {props.priority.score}/100
+            </span>
+            {props.priority.isFresh && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold"
+                style={{ backgroundColor: "#3b82f620", color: "#3b82f6" }}
+              >
+                ⚡ Свежий
+              </span>
+            )}
+            {props.priority.channelMultiplier > 1 && (
+              <span
+                className="inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold"
+                style={{ backgroundColor: "#0a8f2a1a", color: "#0a8f2a" }}
+                title="Приоритет ×2 — горячий канал"
+              >
+                ×{props.priority.channelMultiplier}
+              </span>
+            )}
+          </div>
+          <span className="shrink-0 text-[10px] uppercase tracking-wide" style={{ color: T.textFaint }}>
+            Приоритет
+          </span>
+        </div>
+      )}
 
       {/* 1b. Avito deep link — opens the captured chat/listing URL */}
       {avito?.itemUrl && (

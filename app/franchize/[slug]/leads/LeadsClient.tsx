@@ -32,9 +32,10 @@ import {
 } from "./leads-constants";
 
 // Import hooks
-import { useTodosMapping, useFilteredSortedLeads } from "./hooks/useLeadsData";
+import { useTodosMapping, useFilteredSortedLeads, usePriorityMap } from "./hooks/useLeadsData";
 import { useTheme } from "./hooks/useTheme";
 import { usePasswordGate } from "./hooks/usePasswordGate";
+import type { LeadPriority } from "./lib/lead-priority";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,7 +67,10 @@ export function LeadsClient({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-  const [sortMode, setSortMode] = useState<SortMode>("recent");
+  // ТЗ п.1–2: дефолтная сортировка «priority» — комплексный индекс 0–100
+  // (LIFO-свежесть, Авито ×2): горячие и свежие обращения сверху, а не
+  // пропадают в общем списке по алфавиту.
+  const [sortMode, setSortMode] = useState<SortMode>("priority");
   const [filterSource, setFilterSource] = useState<string>("all");
   const [filterStage, setFilterStage] = useState<string>("all");
   const [filterOwner, setFilterOwner] = useState<string>("all");
@@ -244,6 +248,10 @@ export function LeadsClient({
   // Todo mapping — use writable state so TodoList callbacks sync the parent array
   const { getTodosForLead } = useTodosMapping(todosState);
 
+  // Priority Score (ТЗ): карта индексов 0–100 для всех лидов — ею пользуются
+  // сортировка «priority» и лайбочки (⚡ свежий / 🔥 счёт) во всех видах.
+  const priorityMap = usePriorityMap(leadsState, getTodosForLead);
+
   // Default filter flags — LeadsToolbar expects these props but root LeadsClient
   // doesn't use useLeadFilters (it uses useFilteredSortedLeads instead).
   // Pass all-false defaults so the toolbar renders without crashing.
@@ -280,7 +288,7 @@ export function LeadsClient({
     availableSources,
     hasFilters: baseHasFilters,
     boardColumns,
-  } = useFilteredSortedLeads(leadsState, debouncedSearchQuery, filterSource, segment, getTodosForLead, sortMode, hidePlaceholders);
+  } = useFilteredSortedLeads(leadsState, debouncedSearchQuery, filterSource, segment, getTodosForLead, sortMode, hidePlaceholders, priorityMap);
 
   // ── Stage + Owner filters (applied AFTER useFilteredSortedLeads) ──
   // These are new filters that the v2-style toolbar exposes. They narrow
@@ -704,7 +712,7 @@ export function LeadsClient({
 
       <LeadsToolbar
         searchQuery={searchQuery} setSearchQuery={setSearchQuery}
-        sortMode={sortMode} setSortMode={setSortMode}
+        sortMode={sortMode} setSortMode={(v) => setSortMode(v as SortMode)}
         filterSource={filterSource} setFilterSource={setFilterSource}
         availableSources={availableSources}
         filterStage={filterStage} setFilterStage={setFilterStage}
@@ -726,6 +734,7 @@ export function LeadsClient({
           onSelect={(id) => setSelectedId(id)}
           onDismiss={handleDismissLead}
           getTodosForLead={getTodosForLead}
+          priorityMap={priorityMap}
           T={T}
         />
       ) : viewMode === "table" ? (
@@ -740,6 +749,7 @@ export function LeadsClient({
             selectedId={selectedId}
             onSelect={(id) => setSelectedId(id)}
             getTodosForLead={getTodosForLead}
+            priorityMap={priorityMap}
             sortMode={sortMode}
             onSortChange={setSortMode}
             T={T}
@@ -754,6 +764,7 @@ export function LeadsClient({
           setSelectedId={setSelectedId}
           onDismiss={handleDismissLead}
           getTodosForLead={getTodosForLead}
+          priorityMap={priorityMap}
           T={T}
           crewId={crewId}
           slug={slug}

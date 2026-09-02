@@ -126,3 +126,22 @@ Stage Summary:
 - Subrenter UX: per-bike month breakdown, inline month payouts + one-tap payout on partner cards, TG contacts, partner chip with TG link on bike story.
 - Pre-existing bug fixed: wall operator names (wrong users columns).
 - Flagged for owner: apply migration 20260901120000 (owner_cash_entries) to production Supabase to unlock the «Кошелёк владельца» panel; TG bot token in the shared secrets is stale (deployed bot answers via /api/forward-telegram).
+
+---
+Task ID: 6
+Agent: main (Super Z)
+Task: ТЗ «Приоритизация лидов» — Priority Score 0–100 (LIFO, Авито ×2, лайбочки) + импорт сделок Bitrix24 CSV в leads с дедупликацией.
+
+Work Log:
+- [Priority engine] Новый чистый модуль app/franchize/[slug]/leads/lib/lead-priority.ts: score 0–100 = 0.4*свежесть(LIFO) + 0.25*urgency + 0.12*задачи + 0.13*LTV + 0.1*этап, затем мультипликатор канала (Авито ×2, звонок 1.35, заявка 1.2) и кламп 0–100. LIFO: age ≤ 15 мин → freshness 100, линейное затухание до 72 ч; tie-break при равном счёте — по свежести активности (compareByPriority).
+- [Сортировка] SortMode += "priority" (leads-constants), новый кейс в sortLeads (leads-utils) с priorityMap-мемоизацией (buildPriorityMap) + ленивый fallback; usePriorityMap в useLeadsData.ts; LeadsClient — дефолтная сортировка «priority», карта прокидывается во все три вида. Заодно закрыт старый TS-unsoundness (Dispatch<SetStateAction<SortMode>> vs (v: string) => void) на границе LeadsToolbar.
+- [Лайбочки, ТЗ п.4] LeadCard: «⚡ Свежий» (age ≤ 60 мин) и «🔥 score» (≥ 70) в строке имени, «×2» на Авито-плашке. LeadTableView: новая ПЕРВАЯ колонка «Приоритет» (score-бейдж с окраской 🔥/amber/gray + ⚡ + ×2), сортируемый заголовок. LeadBoard: сортировка внутри колонок по score (desc) + мини-бейдж 🔥/⚡score. LeadDetailDrawer: плашка «Индекс: N/100 + ⚡ + ×N» под шапкой (priority пробрасывается через LeadDetailContent useMemo).
+- [Импорт Bitrix24] scripts/import-bitrix-deals-to-leads.mjs: парсер «;»-CSV (quoted, BOM), нормализация телефонов E.164 (фиктивные +79999999999 → игнор, битые 9/10-значные → no-phone), дедуп: по телефону; безтелефонные по ФИО (name:фамилия имя отчество) со слиянием в телефонных тёзок в файле; против БД — existing intent по phone (или metadata.phone), для безтелефонных по metadata.name ТОЛЬКО у строк без телефона. UPDATE-патч аккуратный: telegram_user_id не трогаем, phone только заполняем, urgency = max, stage/intent_type апгрейд только слабых (viewed/clicked/discovered/lead_captured/contacted + contact_click), created_at = min, last_seen_at = max, metadata merge с блоком bitrix {dealIds, deals, amounts}. INSERT: intent_type по типу сильнейшей сделки (Аренда→rent, Продажа→sale, Тест Драйв→test_drive), stage='contacted' (→ «Нужен контакт» в воронке), urgency по свежести активности. DRY-RUN по умолчанию, запись только с --commit. Lazy import @supabase/supabase-js (dry-run работает без пакета).
+- [Сухой прогон] 150 сделок → 132 контакта (121 с телефоном, 11 без — список печатается для ручной доработки), слияний в файле по ФИО — 0 дублей. Ссылки «Контакт: Рабочий телефон» (в этой выгрузке мобильный пуст), источник всех контактов — «Звонок».
+- [Тесты] Новый tests/franchize/lead-priority.spec.ts — 18 кейсов (границы 0–100, LIFO ≤15мин/72ч, tie-break, Авито ×2, пороги лайбочек 60мин/70, монотонность компонент, sortLeads('priority') «не по алфавиту», buildPriorityMap). Все 58 тестов (старые 40 + новые 18) зелёные; tsc на изменённых файлах чист (базлайн-сравнение через git stash подтвердило: новые ошибки отсутствуют, старые не тронуты).
+- [Гигиена] core.fileMode=false (709 шумных chmod от клона), .gitignore += upload/DEAL_*.csv (ПДн клиентов — не коммитить), восстановлены случайно-удалённые upload/Master_TZ_*.html, temp tsconfig удалён.
+
+Stage Summary:
+- ТЗ закрыт полностью: индекс 0–100 (п.1), LIFO «только что → верх очереди» (п.2), Авито ×2 с видимой плашкой (п.3), лайбочки ⚡/🔥 во всех видах + колонка «Приоритет» в таблице + плашка в шторке (п.4). Дефолтная сортировка страницы лидов — «🔥 Приоритет».
+- Импорт Bitrix24 CSV готов к запуску: NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY → `node scripts/import-bitrix-deals-to-leads.mjs --csv upload/DEAL_....csv` (dry-run) → `--commit`. 132 контакта, дубликатов не создаёт, существующих обновляет.
+- 11 контактов без валидного телефона сохранятся в БД (дормант) — в UI появятся после добавления телефона оператором.
