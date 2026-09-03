@@ -11,6 +11,8 @@
  *  6. Быстрые ответы (quick replies) непустые, ≤5, универсальные в конце.
  *  7. Скрипт и короткий вариант непустые и различаются.
  *  8. Next Best Action всегда заполнен.
+ *  9. ПРАВКА БОССА 2026-09-04: экипировка платная (шлем 500/1 000 ₽,
+ *     перчатки 250–500 ₽), тест-драйв бесплатный — без 5 000 ₽ залога.
  */
 
 import { describe, expect, it } from "vitest";
@@ -265,7 +267,7 @@ describe("lead-scripts: скрипты используют реальные ф�
     expect(res?.script).toContain("500 ₽");
   });
 
-  it("тест-драйв: 10:00–20:00 и обеспечительный платёж 5 000 ₽", () => {
+  it("тест-драйв: бесплатный, 10:00–20:00, без обеспечительного платежа", () => {
     const res = buildSuggestedResponse(buildLead({
       avito: {
         chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
@@ -274,7 +276,21 @@ describe("lead-scripts: скрипты используют реальные ф�
     }));
     expect(res?.intent.key).toBe("test_drive");
     expect(res?.script).toContain("10:00–20:00");
-    expect(res?.script).toContain("5 000 ₽");
+    expect(res?.script.toLowerCase()).toContain("бесплатн");
+    expect(res?.script).not.toContain("5 000");
+    expect(res?.script).not.toContain("обеспечительны");
+  });
+
+  it("экипировка платная: шлем 500/1 000 ₽, перчатки 250–500 ₽ — не бесплатно", () => {
+    const res = buildSuggestedResponse(buildLead());
+    expect(res?.intent.key).toBe("price");
+    expect(res?.script.toLowerCase()).toContain("экипировка");
+    expect(res?.script.toLowerCase()).toContain("перчатки");
+    const flat = (res?.script ?? "").replace(/\s+/g, "");
+    expect(flat).toContain("500₽");
+    expect(flat).toContain("1000₽");
+    expect(flat).toContain("250–500₽");
+    expect(res?.script.toLowerCase()).not.toContain("бесплатно");
   });
 
   it("залог: возврат за 3 рабочих дня + СТС вместо наличных", () => {
