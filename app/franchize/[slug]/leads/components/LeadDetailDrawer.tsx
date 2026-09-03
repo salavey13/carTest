@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -19,6 +19,8 @@ import {
   Plus,
   ExternalLink,
   MessageCircle,
+  Target,
+  Copy,
   type LucideIcon,
 } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "../leads-types";
@@ -58,6 +60,7 @@ import {
 import { LeadHistorySection } from "./LeadHistorySection";
 import { LeadHandlingSection } from "./LeadHandlingSection";
 import { getLeadHandling, isHandlingTodo } from "../lib/lead-handling";
+import { buildSuggestedResponse } from "../lib/lead-scripts";
 
 export interface LeadDrawerNote {
   id: string;
@@ -179,10 +182,17 @@ export function LeadDetailDrawer(props: Props) {
   const [newTodo, setNewTodo] = useState("");
   const [newNote, setNewNote] = useState("");
   const [openDeals, setOpenDeals] = useState(true);
+  const [openScript, setOpenScript] = useState(true);
   const [openDocs, setOpenDocs] = useState(true);
   const [openTasks, setOpenTasks] = useState(true);
   const [openNotes, setOpenNotes] = useState(true);
   const [openHistory, setOpenHistory] = useState(false);
+
+  // 🎯 Готовый ответ — скрипт продажи под интент вопроса покупателя.
+  // Только для авито-лидов (иначе null → секция скрыта). Считается на лету
+  // из metadata webhook'а: чистая функция, в БД не пишется, работает
+  // ретроактивно для всех существующих лидов.
+  const suggested = useMemo(() => (lead ? buildSuggestedResponse(lead) : null), [lead]);
 
   // «Прочитать заметки» — раскрыть секцию заметок и прокрутить к ней.
   // Ждём 350 мс: шторка успевает отыграть входную анимацию (иначе
@@ -557,6 +567,109 @@ export function LeadDetailDrawer(props: Props) {
           </span>
           <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
         </a>
+      )}
+
+      {/* 1b+. Готовый ответ — скрипт продажи под интент вопроса покупателя
+          (call-center practice: скрипт под вопрос + next-best-action +
+          quick replies). Стоит РЯДОМ с кнопкой «Открыть чат Авито», чтобы
+          путь «прочитал → скопировал → вставил» занимал секунды.
+          Для не-авито лидов suggested == null → секция не рендерится. */}
+      {suggested && (
+        <div className="mt-5">
+          <Section
+            title="Готовый ответ"
+            icon={Target}
+            expanded={openScript}
+            onToggle={() => setOpenScript(!openScript)}
+            T={T}
+          >
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold"
+                style={{ background: "#22c55e1f", color: "#16a34a" }}
+                title={
+                  suggested.matched.length > 0
+                    ? `Диагностика: сработали слова «${suggested.matched.join(", ")}»`
+                    : undefined
+                }
+              >
+                {suggested.intent.emoji} {suggested.intent.label}
+              </span>
+              <span className="text-[11px]" style={{ color: T.textFaint }}>
+                текст собран под вопрос покупателя — правьте перед отправкой
+              </span>
+            </div>
+
+            {/* Скрипт: select-all — тап по тексту выделяет его целиком */}
+            <div
+              className="max-h-64 select-all overflow-y-auto whitespace-pre-wrap rounded-2xl border p-3 text-sm leading-relaxed"
+              style={{ borderColor: T.border, background: T.bgCard, color: T.text }}
+            >
+              {suggested.script}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  void copyText(suggested.script, "ответ");
+                  toast.success("Ответ скопирован — вставьте в чат Авито");
+                }}
+                className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition enabled:hover:brightness-110"
+                style={{ background: T.accent, color: T.accentContrast }}
+              >
+                <Copy className="h-4 w-4" aria-hidden /> Скопировать ответ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void copyText(suggested.short, "короткий ответ");
+                  toast.success("Короткий вариант скопирован");
+                }}
+                className="min-h-[44px] cursor-pointer rounded-xl border px-4 py-2 text-sm font-medium transition"
+                style={{ borderColor: T.border, color: T.text }}
+              >
+                Короткий
+              </button>
+            </div>
+
+            {/* Next Best Action — подсказка колл-центра «что после ответа» */}
+            <div
+              className="mt-3 rounded-xl px-3 py-2 text-xs leading-relaxed"
+              style={{ background: "#f59e0b14", color: "#b45309" }}
+            >
+              <span className="font-bold">🎯 Следующий ход: </span>
+              {suggested.nextBestAction}
+            </div>
+
+            {/* Quick replies — однострочники, клик = копирование */}
+            <div className="mt-3">
+              <p
+                className="mb-2 text-[11px] font-medium uppercase tracking-wide"
+                style={{ color: T.textFaint }}
+              >
+                Быстрые ответы — клик копирует текст
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {suggested.quickReplies.map((qr) => (
+                  <button
+                    key={qr.label}
+                    type="button"
+                    onClick={() => {
+                      void copyText(qr.text, "быстрый ответ");
+                      toast.success(`Скопировано: ${qr.label}`);
+                    }}
+                    title={qr.text}
+                    className="min-h-[36px] cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition enabled:hover:bg-black/[0.04]"
+                    style={{ borderColor: T.border, background: T.bgCard, color: T.text }}
+                  >
+                    {qr.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Section>
+        </div>
       )}
 
       {/* 1c. Работа с лидом — «Отработан» + «Перезвонить в ...».

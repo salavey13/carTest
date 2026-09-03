@@ -73,6 +73,17 @@ export interface LeadRow {
     itemId: string | null;
     /** Last buyer message excerpt (truncated server-side). */
     lastMessage: string | null;
+    /**
+     * First buyer message of the chat (webhook metadata.firstMessage) —
+     * feeds intent detection for the «Готовый ответ» script engine.
+     */
+    firstMessage?: string | null;
+    /** Listing price captured by the webhook (metadata.itemPrice), ₽/unit. */
+    itemPrice?: number | null;
+    /** Buyer messages captured so far (metadata.messagesCount). */
+    messagesCount?: number | null;
+    /** ISO time of the last captured buyer message (metadata.lastMessageAt). */
+    lastMessageAt?: string | null;
   } | null;
   identityState?: 'claimed_user' | 'phone_only' | 'operator_placeholder' | 'merged' | 'avito_only';
   sourceCount?: number;

@@ -452,8 +452,34 @@ export async function getFranchizeLeads(
           : typeof itemIdRaw === "string" && itemIdRaw.trim() ? itemIdRaw.trim()
             : null;
       const lastMessage = str("lastMessage");
-      if (!chatId && !itemUrl && !profileUrl && !itemId && !lastMessage) return null;
-      return { chatId, itemUrl, profileUrl, itemId, lastMessage };
+      // Script-engine feed («Готовый ответ»): первое сообщение, цена
+      // объявления и счётчик сообщений — нужны движку интентов на клиенте.
+      const firstMessage = str("firstMessage");
+      const itemPriceRaw = meta["itemPrice"];
+      const itemPrice =
+        typeof itemPriceRaw === "number" && Number.isFinite(itemPriceRaw) && itemPriceRaw > 0
+          ? itemPriceRaw
+          : null;
+      const messagesCountRaw = meta["messagesCount"];
+      const messagesCount =
+        typeof messagesCountRaw === "number" && Number.isFinite(messagesCountRaw)
+          ? messagesCountRaw
+          : null;
+      const lastMessageAt = str("lastMessageAt");
+      if (!chatId && !itemUrl && !profileUrl && !itemId && !lastMessage && !firstMessage) {
+        return null;
+      }
+      return {
+        chatId,
+        itemUrl,
+        profileUrl,
+        itemId,
+        lastMessage,
+        firstMessage,
+        itemPrice,
+        messagesCount,
+        lastMessageAt,
+      };
     };
 
     const addOrMerge = (row: MutableLead) => {

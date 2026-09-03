@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CheckCircle2, ChevronRight, Phone, PhoneCall, Clock, MoreVertical, X, StickyNote, UserRound, PenLine, History } from "lucide-react";
+import { CheckCircle2, ChevronRight, Phone, PhoneCall, Clock, MoreVertical, X, StickyNote, UserRound, PenLine, History, Target } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -26,6 +26,7 @@ import {
   pickRelevantRental,
 } from "../lib/pipeline-stages";
 import { SOURCE_META } from "../leads-constants";
+import { buildSuggestedResponse, intentChip } from "../lib/lead-scripts";
 import {
   getInitials,
   relativeTime,
@@ -152,6 +153,12 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
   const lastTouchedRel = lead.lastNoteAt ? relativeTime(lead.lastNoteAt) : "";
   const showCreatorChip = !!docCreator && (!lastTouched || lastTouched !== docCreator);
   const showTouchedChip = !!lastTouched;
+
+  // 🎯 Готовый ответ (авито-лиды): чип с распознанным интентом вопроса
+  // в метаряде + пункт меню «Скопировать готовый ответ». Чистая функция
+  // поверх metadata webhook'а — в БД не пишется, не-авито лиды получают null.
+  const suggested = buildSuggestedResponse(lead);
+  const intent = intentChip(lead);
 
   return (
     <motion.article
@@ -303,6 +310,19 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
                     </span>
                   </span>
                 )}
+                {/* 🎯 Интент вопроса покупателя (авито-лиды) — триаж прямо
+                    в списке: оператор ещё до открытия шторки видит, чего
+                    хочет клиент, и сразу понимает, с чем пришёл лид */}
+                {intent && (
+                  <span
+                    className="inline-flex max-w-[160px] items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    style={{ backgroundColor: "#22c55e1a", color: "#16a34a" }}
+                    title={`Вопрос покупателя: ${intent.label} — в шторке есть готовый ответ`}
+                  >
+                    <span className="shrink-0" aria-hidden>{intent.emoji}</span>
+                    <span className="truncate">{intent.label}</span>
+                  </span>
+                )}
               </div>
             </div>
             {/* Stage badge — right-aligned, compact.
@@ -354,6 +374,18 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
                   >
                     <Phone className="mr-2 h-4 w-4" />
                     Скопировать телефон
+                  </DropdownMenuItem>
+                )}
+                {suggested && (
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      try {
+                        navigator.clipboard?.writeText(suggested.script);
+                      } catch {}
+                    }}
+                  >
+                    <Target className="mr-2 h-4 w-4" />
+                    Скопировать готовый ответ
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem
