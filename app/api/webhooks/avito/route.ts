@@ -153,8 +153,10 @@ async function createLead(input: {
   phone?: string | null;
   /** Monitor enrichment: real buyer name + listing context. */
   client?: AvitoWebhookBody["client"];
+  /** AI-анализ сообщения (санитизированный) — в metadata.analysis. */
+  analysis?: Record<string, unknown> | null;
 }): Promise<void> {
-  const { value, eventId, now, extra, phone, client } = input;
+  const { value, eventId, now, extra, phone, client, analysis } = input;
   const metadata: Record<string, unknown> = {
     name: buyerDisplayName(value, client?.name),
     phone: null,
@@ -175,6 +177,7 @@ async function createLead(input: {
     ...(client?.url ? { sourceUrl: client.url } : {}),
     ...(client?.profile ? { avitoProfile: client.profile } : {}),
     ...(client?.category ? { analysisCategory: client.category } : {}),
+    ...(analysis ? { analysis } : {}),
     ...(extra || {}),
   };
 
@@ -197,9 +200,15 @@ async function createLead(input: {
 async function updateLead(
   intentId: string,
   prevMetadata: Record<string, unknown>,
-  input: { value: AvitoMessageValue; eventId: string | null; now: string },
+  input: {
+    value: AvitoMessageValue;
+    eventId: string | null;
+    now: string;
+    /** AI-анализ нового сообщения — заменяет предыдущий metadata.analysis. */
+    analysis?: Record<string, unknown> | null;
+  },
 ): Promise<void> {
-  const { value, eventId, now } = input;
+  const { value, eventId, now, analysis } = input;
   const count = Number(prevMetadata.messagesCount || 0);
   const merged: Record<string, unknown> = {
     ...prevMetadata,
@@ -208,6 +217,8 @@ async function updateLead(
     lastEventId: eventId,
     messagesCount: Number.isFinite(count) ? count + 1 : 1,
   };
+  // Свежий анализ заменяет предыдущий (анализируется ПОСЛЕДНЕЕ сообщение).
+  if (analysis) merged.analysis = analysis;
   // Backfill item info if the first captured event lacked it.
   if (!merged.bikeTitle && value.item_title) {
     merged.bikeTitle = truncate(value.item_title, 200);
@@ -269,8 +280,86 @@ function notifyCrewOwnerAsync(lead: {
   })();
 }
 
+/**
+ * AI-анализ сообщения от внешнего агента (см.
+ * public/docs/autoreply/vip-bike-avito-agent-prompt.md). Агент, который
+ * контролирует извлечение авито-сообщений, может приложить к любому
+ * событию (v3 или bot_forward) блок `analysis` — он пишется в
+ * metadata.analysis и ПРИОРИТЕТНЕЕ локального keyword-детектора в
+ * движке «Готовый ответ» (lead-scripts.ts).
+ */
+type AvitoAnalysisEnvelope = {
+  /** Интент из словаря lead-scripts. */
+  intent?: string;
+  /** Уверенность 0–100 (<40 движок игнорирует). */
+  confidence?: number;
+  /** Готовый текст ответа покупателю (главнее шаблона). */
+  suggested_reply?: string;
+  /** Короткий вариант. */
+  short_reply?: string;
+  /** Next Best Action. */
+  next_best_action?: string;
+  /** hot | warm | cold. */
+  temperature?: string;
+  /** price | license | experience | trust | none. */
+  objection?: string;
+  /** Извлечённые сущности (dates/phone/bike/budget/…). */
+  entities?: Record<string, unknown>;
+  /** Заметка агента для оператора. */
+  notes?: string;
+  /** Название модели/агента. */
+  model?: string;
+};
+
 function ack() {
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * Санитизация analysis-envelope: только известные ключи, обрезка длинных
+ * строк, clamp confidence, entities ≤10 × 120 символов. null — мусор.
+ */
+function sanitizeAnalysis(input: unknown): Record<string, unknown> | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const raw = input as AvitoAnalysisEnvelope;
+  const str = (v: unknown, max: number): string | null => {
+    if (typeof v !== "string") return null;
+    const s = v.trim();
+    if (!s) return null;
+    return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+  };
+  const out: Record<string, unknown> = {};
+  const intent = str(raw.intent, 40);
+  if (intent) out.intent = intent;
+  if (typeof raw.confidence === "number" && Number.isFinite(raw.confidence)) {
+    out.confidence = Math.max(0, Math.min(100, Math.round(raw.confidence)));
+  }
+  const reply = str(raw.suggested_reply, 4000);
+  if (reply) out.suggestedReply = reply;
+  const shortReply = str(raw.short_reply, 500);
+  if (shortReply) out.shortReply = shortReply;
+  const nba = str(raw.next_best_action, 500);
+  if (nba) out.nextBestAction = nba;
+  const temperature = str(raw.temperature, 20);
+  if (temperature) out.temperature = temperature;
+  const objection = str(raw.objection, 40);
+  if (objection) out.objection = objection;
+  if (raw.entities && typeof raw.entities === "object" && !Array.isArray(raw.entities)) {
+    const entities: Record<string, string> = {};
+    for (const [k, v] of Object.entries(raw.entities).slice(0, 10)) {
+      const key = str(k, 40);
+      const val = str(v, 120);
+      if (key && val) entities[key] = val;
+    }
+    if (Object.keys(entities).length > 0) out.entities = entities;
+  }
+  const notes = str(raw.notes, 800);
+  if (notes) out.notes = notes;
+  const model = str(raw.model, 80);
+  if (model) out.model = model;
+  if (Object.keys(out).length === 0) return null;
+  out.analyzedAt = new Date().toISOString();
+  return out;
 }
 
 /** Stable synthetic chat id for manual forwards: same text+phone → same lead. */
@@ -289,6 +378,7 @@ async function handleBotForward(body: BotForwardBody): Promise<NextResponse> {
   const now = new Date().toISOString();
   const chatId = forwardChatId(body);
   const phone = normalizePhone(body.phone);
+  const analysis = sanitizeAnalysis((body as BotForwardBody & { analysis?: unknown }).analysis);
   const value: AvitoMessageValue = {
     chat_id: chatId,
     text: text.slice(0, 4000),
@@ -315,10 +405,10 @@ async function handleBotForward(body: BotForwardBody): Promise<NextResponse> {
         existing.data.metadata && typeof existing.data.metadata === "object"
           ? (existing.data.metadata as Record<string, unknown>)
           : {};
-      await updateLead(existing.data.id, prevMeta, { value, eventId: null, now });
+      await updateLead(existing.data.id, prevMeta, { value, eventId: null, now, analysis });
       return ack();
     }
-    await createLead({ value, eventId: null, now, extra, phone: phone || null });
+    await createLead({ value, eventId: null, now, extra, phone: phone || null, analysis });
     notifyCrewOwnerAsync({
       name: body.name || `Покупатель Avito (форвард${body.manager ? ` от ${body.manager}` : ""})`,
       bikeTitle: body.bike_title || null,
@@ -364,6 +454,9 @@ export async function POST(request: NextRequest) {
     if (body.payload?.type !== "message" || !body.payload.value) return ack();
     const value = body.payload.value;
     if (!value.chat_id) return ack();
+    // AI-анализ от внешнего агента (опционально; промпт агента —
+    // public/docs/autoreply/vip-bike-avito-agent-prompt.md).
+    const analysis = sanitizeAnalysis((body as AvitoWebhookBody & { analysis?: unknown }).analysis);
 
     // Seller's own messages (operator replied from Avito) → touch, no lead ops.
     const fromBuyer =
@@ -399,13 +492,13 @@ export async function POST(request: NextRequest) {
       if (body.client?.url && !merged.sourceUrl) merged.sourceUrl = body.client.url;
       if (body.client?.profile) merged.avitoProfile = body.client.profile;
       if (body.client?.category) merged.analysisCategory = body.client.category;
-      await updateLead(existing.data.id, merged, { value, eventId: body.id ?? null, now });
+      await updateLead(existing.data.id, merged, { value, eventId: body.id ?? null, now, analysis });
       return ack();
     }
 
     if (!fromBuyer) return ack();
 
-    await createLead({ value, eventId: body.id ?? null, now, client: body.client });
+    await createLead({ value, eventId: body.id ?? null, now, client: body.client, analysis });
     notifyCrewOwnerAsync({
       name: buyerDisplayName(value, body.client?.name),
       bikeTitle: truncate(value.item_title, 200),

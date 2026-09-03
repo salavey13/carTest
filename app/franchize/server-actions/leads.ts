@@ -466,7 +466,17 @@ export async function getFranchizeLeads(
           ? messagesCountRaw
           : null;
       const lastMessageAt = str("lastMessageAt");
-      if (!chatId && !itemUrl && !profileUrl && !itemId && !lastMessage && !firstMessage) {
+      // AI-анализ сообщения (анализатор → webhook → metadata.analysis) —
+      // движок «Готовый ответ» предпочитает его локальному детектору.
+      const analysisRaw = meta["analysis"];
+      const analysis =
+        analysisRaw && typeof analysisRaw === "object" && !Array.isArray(analysisRaw)
+          ? (analysisRaw as Record<string, unknown>)
+          : null;
+      if (
+        !chatId && !itemUrl && !profileUrl && !itemId && !lastMessage && !firstMessage &&
+        !analysis
+      ) {
         return null;
       }
       return {
@@ -479,6 +489,7 @@ export async function getFranchizeLeads(
         itemPrice,
         messagesCount,
         lastMessageAt,
+        analysis,
       };
     };
 

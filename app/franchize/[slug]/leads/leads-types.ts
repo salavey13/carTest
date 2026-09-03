@@ -84,6 +84,37 @@ export interface LeadRow {
     messagesCount?: number | null;
     /** ISO time of the last captured buyer message (metadata.lastMessageAt). */
     lastMessageAt?: string | null;
+    /**
+     * AI-анализ сообщения покупателя (пишется внешним агентом, который
+     * контролирует извлечение авито-сообщений, через analysis-envelope в
+     * webhook'е). Движок «Готовый ответ» предпочитает его локальному
+     * keyword-детектору: suggestedReply агента > intent агента (наш шаблон)
+     * > локальная диагностика.
+     */
+    analysis?: {
+      /** Интент из словаря lead-scripts (availability/price/…/generic). */
+      intent?: string | null;
+      /** Уверенность агента 0–100. */
+      confidence?: number | null;
+      /** Готовый текст ответа, собранный агентом. */
+      suggestedReply?: string | null;
+      /** Короткий вариант ответа. */
+      shortReply?: string | null;
+      /** Next Best Action от агента. */
+      nextBestAction?: string | null;
+      /** «Горячесть» покупателя: hot | warm | cold. */
+      temperature?: string | null;
+      /** Тип возражения: price | license | experience | trust | none. */
+      objection?: string | null;
+      /** Извлечённые сущности (dates/phone/bike/budget/…). */
+      entities?: Record<string, string> | null;
+      /** Свободная заметка агента для оператора. */
+      notes?: string | null;
+      /** Какая модель/агент анализировал. */
+      model?: string | null;
+      /** ISO время анализа. */
+      analyzedAt?: string | null;
+    } | null;
   } | null;
   identityState?: 'claimed_user' | 'phone_only' | 'operator_placeholder' | 'merged' | 'avito_only';
   sourceCount?: number;

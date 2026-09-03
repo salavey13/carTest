@@ -596,7 +596,11 @@ export function LeadDetailDrawer(props: Props) {
                 {suggested.intent.emoji} {suggested.intent.label}
               </span>
               <span className="text-[11px]" style={{ color: T.textFaint }}>
-                текст собран под вопрос покупателя — правьте перед отправкой
+                {suggested.source === "ai"
+                  ? "ответ собран AI-агентом по сообщению покупателя — проверьте перед отправкой"
+                  : suggested.source === "hybrid"
+                    ? "интент распознал AI-агент, текст — из нашей библиотеки скриптов"
+                    : "текст собран под вопрос покупателя — правьте перед отправкой"}
               </span>
             </div>
 

@@ -224,3 +224,176 @@ describe("lead-scripts: быстрые ответы", () => {
     expect(chip?.label.length).toBeGreaterThan(0);
   });
 });
+
+// ── AI-первый: analysis-envelope от внешнего агента ─────────────────────────
+
+describe("lead-scripts: sale и service (реальные линии бизнеса)", () => {
+  it("покупка байка → sale-скрипт с фактом официального дилера", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Хочу купить этот байк, сколько отдадите?", firstMessage: null,
+      },
+    }));
+    expect(res?.intent.key).toBe("sale");
+    expect(res?.script).toContain("официальный дилер 79Bike");
+  });
+
+  it("обслуживание своего мотоцикла → service-скрипт с прайсом", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Нужна замена масла и диагностика, сколько стоит?", firstMessage: null,
+      },
+    }));
+    expect(res?.intent.key).toBe("service");
+    expect(res?.script).toContain("2 000 ₽");
+    expect(res?.script).toContain("2 400 ₽");
+  });
+});
+
+describe("lead-scripts: скрипты используют реальные факты экипажа", () => {
+  it("доставка: Нижний Новгород + 500 ₽ (коммерческое предложение)", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "А вы сможете привезти байк мне?", firstMessage: null,
+      },
+    }));
+    expect(res?.intent.key).toBe("delivery");
+    expect(res?.script).toContain("Нижнему Новгороду");
+    expect(res?.script).toContain("500 ₽");
+  });
+
+  it("тест-драйв: 10:00–20:00 и обеспечительный платёж 5 000 ₽", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Можно ли покататься перед арендой?", firstMessage: null,
+      },
+    }));
+    expect(res?.intent.key).toBe("test_drive");
+    expect(res?.script).toContain("10:00–20:00");
+    expect(res?.script).toContain("5 000 ₽");
+  });
+
+  it("залог: возврат за 3 рабочих дня + СТС вместо наличных", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Какой залог оставлять?", firstMessage: null,
+      },
+    }));
+    expect(res?.intent.key).toBe("deposit");
+    expect(res?.script).toContain("3 рабочих дней");
+    expect(res?.script).toContain("СТС");
+  });
+
+  it("документы: категории А / В / М / без прав по типам ТС", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Какие документы нужны для аренды?", firstMessage: null,
+      },
+    }));
+    expect(res?.intent.key).toBe("documents");
+    expect(res?.script).toContain("категория А");
+    expect(res?.script).toContain("В или М");
+    expect(res?.script).toContain("автомобильные права");
+  });
+});
+
+describe("lead-scripts: AI-анализ главнее локального детектора", () => {
+  it("suggested_reply агента используется дословно, source = ai", () => {
+    const lead = buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Здравствуйте, сколько стоит аренда?",
+        firstMessage: null,
+        analysis: {
+          intent: "price",
+          confidence: 95,
+          suggestedReply: "Здравствуйте! Полный текст от агента про цену и сроки.",
+          shortReply: "Короткий текст агента.",
+          nextBestAction: "Перезвонить",
+          model: "glm-4.6/avito-agent-v1",
+        },
+      },
+    });
+    const res = buildSuggestedResponse(lead);
+    expect(res?.source).toBe("ai");
+    expect(res?.script).toBe("Здравствуйте! Полный текст от агента про цену и сроки.");
+    expect(res?.short).toBe("Короткий текст агента.");
+    expect(res?.nextBestAction).toBe("Перезвонить");
+    expect(res?.aiNotes).toBeNull();
+  });
+
+  it("intent агента без текста → наш шаблон под него, source = hybrid", () => {
+    const lead = buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Добрый день", firstMessage: null,
+        analysis: { intent: "delivery", confidence: 80 },
+      },
+    });
+    const res = buildSuggestedResponse(lead);
+    expect(res?.source).toBe("hybrid");
+    expect(res?.intent.key).toBe("delivery");
+    expect(res?.script).toContain("доставляем");
+  });
+
+  it("низкая уверенность (<40) → fallback на локальный детектор", () => {
+    const lead = buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Здравствуйте, сколько стоит аренда?",
+        firstMessage: null,
+        analysis: { intent: "delivery", confidence: 30, suggestedReply: "не должен победить" },
+      },
+    });
+    const res = buildSuggestedResponse(lead);
+    expect(res?.source).toBe("rules");
+    expect(res?.intent.key).toBe("price");
+    expect(res?.script).not.toContain("не должен победить");
+  });
+
+  it("невалидный intent агента → fallback на локальный детектор", () => {
+    const lead = buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Здравствуйте, сколько стоит аренда?",
+        firstMessage: null,
+        analysis: { intent: "nonexistent_intent", confidence: 99 },
+      },
+    });
+    const res = buildSuggestedResponse(lead);
+    expect(res?.source).toBe("rules");
+    expect(res?.intent.key).toBe("price");
+  });
+
+  it("intentChip показывает интент агента, а не ключевые слова", () => {
+    const lead = buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Здравствуйте, сколько стоит аренда?",
+        firstMessage: null,
+        analysis: { intent: "deposit", confidence: 90 },
+      },
+    });
+    const chip = intentChip(lead);
+    expect(chip?.label).toBe("Про залог");
+  });
+
+  it("notes агента доезжают до оператора", () => {
+    const lead = buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Здравствуйте, сколько стоит аренда?",
+        firstMessage: null,
+        analysis: { intent: "price", suggestedReply: "Текст", notes: "Сравнивает с конкурентом" },
+      },
+    });
+    const res = buildSuggestedResponse(lead);
+    expect(res?.aiNotes).toBe("Сравнивает с конкурентом");
+  });
+});
