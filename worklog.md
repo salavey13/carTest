@@ -211,3 +211,29 @@ Stage Summary:
 - 5 behavioral bugs fixed (Мои filter, future-rental freshness, sheet filter-close, notify double-tap, stale iter27 guard) + dead code/docs cleanup + perf map + tsc cleanup in the recently-modified leads files.
 - Remaining known baseline (not touched): my-work ×8 + iter15 + iter29 failures; useLeadActions.ts/LeadDetailNotes/LeadDetailTodos are legacy modules with tsc errors and no live references (candidates for deletion later).
 - useLeadFilters.ts (380 lines) is not wired anywhere (LeadsClient uses useFilteredSortedLeads) — kept for the documented v2 plan, flagged as tech debt.
+
+---
+Task ID: 3
+Agent: main (Super Z)
+Task: Redo unpushed previous-session work (lead last-modified date, subrenter analytics fixes) + Bitrix CSV comments→notes + owner dropdown crew roster + handled-lead urgency decay + pagination.
+
+Work Log:
+- Verified previous session's commit e9a4ae7 was never pushed; re-implemented all of it from scratch on top of 5d6c0b6af.
+- leads.ts: lastModifiedAt = max(franchize_intents.updated_at, lead_notes.created_at/updated_at, crew_todos.created_at/completed_at) — computed server-side, no schema change. GetFranchizeLeadsResult now also returns operators[] (full crew roster with resolved names).
+- LeadCard: «изм. N назад» chip (History icon, exact date in tooltip); LeadTableView: new «Изменено» column; LeadDetailDrawer: «Изменено» info row; LeadBoard: lastModifiedAt tie-break + card time fallback; generateLeadsCSV: «Изменено» column (lastModifiedAt || lastSeenAt || createdAt).
+- rentals-dashboard.ts: resolveRentalsAccess() — owner/global-admin/active-member → full access; subrenter (cars.specs.subrenter_chat_id) → scope limited to his bike ids. Applied to getRentalsDashboard (3 day-queries scoped by vehicle_id), getSalesDashboard (crewBikeIds ∩ scope), getRentalsDateRange (scoped carIds, empty scope → data:null, never a bare .in()).
+- SA-001 fix: password-auth in rentals/sales/date-range no longer blanket-trusted — actorUserId must equal crew.owner_id (or global admin) via verifyPasswordAuthOwner().
+- crew-todos.ts getCrewTodos: subrenter branch — non-member with subrented bikes reads todos scoped by .in("rental_id", his bikes' rental ids); no rentals → empty result instead of access error.
+- photo-actions.ts: listRentalPhotos + validateUpload admit specs.subrenter_chat_id match (view gallery; upload with role owner).
+- Deleted unused app/franchize/hooks/useRentalsDashboard.ts (zero references).
+- Owner dropdown «Ответственный»: options = server operators roster (id+name), filter matches assigneeId/originalOperatorChatId/ownerId (name fallback for legacy) — any crew operator is now selectable, even without leads.
+- lead-priority.ts: handledPenalty — lastModifiedAt ≤24h → −20, ≤72h → −10, «Отработан» marker → −15; applied in computeLeadPriority + sortLeads "urgent" mode so untouched urgent leads stay on top.
+- Pagination: LEADS_PAGE_SIZE=50, visibleCount state in LeadsClient («Показать ещё» footer, counter «показано X из Y»), applied across list/board/table views; resets on filter/search changes.
+- tests/franchize/lead-handling.spec.ts: formatCallbackTime "today" test now computes the date dynamically (was hardcoded 2026-09-02, broke at midnight).
+- scripts/import-bitrix-deal-notes.mjs: imports Bitrix deal history as lead_notes (created_by «Bitrix24 импорт», idempotent, phone→name matching identical to deal import). CSV export contains NO comments (all 150 rows empty in Комментарий/Контакт: Комментарий/Описание события — Bitrix does not export timeline in deal export); imported the deal context (id, stage, amount, created/modified, last activity, source) instead. Dry-run: 121 notes / 11 skipped (phoneless leads invisible in UI). Committed: 121 notes written to lead_notes (vip-bike).
+- Checks: typecheck:franchize slice passed (rentals-dashboard.ts 27 pre-existing debt errors before == after, zero new); eslint --max-warnings=0 clean on all touched paths; vitest 22/22 lead-handling; full suite 10 failed == documented baseline (my-work ×8, iter15, iter29) + env-only failures (prepayments/evening hit live DB state, iter27/28 need missing upload/secrets_all.txt).
+
+Stage Summary:
+- Committed aaf0d5efb, pushed origin/main (Vercel auto-deploy).
+- 121 Bitrix deal-history notes added to Supabase lead_notes (crew vip-bike), script committed for re-runs.
+- True Bitrix timeline comments are NOT in this CSV export — need a separate Bitrix export (REST crm.timeline or timeline export) if they are to be migrated.
