@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CheckCircle2, ChevronRight, Phone, PhoneCall, Clock, MoreVertical, X, StickyNote, UserRound, PenLine } from "lucide-react";
+import { CheckCircle2, ChevronRight, Phone, PhoneCall, Clock, MoreVertical, X, StickyNote, UserRound, PenLine, History } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -98,6 +98,11 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
   const displayName = lead.full_name || "Без имени";
   const initials = getInitials(lead.full_name);
   const rel = relativeTime(lead.lastSeenAt || lead.createdAt);
+  // 🕘 «изм. N назад» — когда лида последний раз МОДИФИЦИРОВАЛИ (заметка,
+  // редактирование заметки, смена стадии, туду). Оператор сразу отличает
+  // уже обработанные лиды от нетронутых. Подсказка — точная дата+время.
+  const modRel = lead.lastModifiedAt ? relativeTime(lead.lastModifiedAt) : "";
+  const modExact = lead.lastModifiedAt ? formatDate(lead.lastModifiedAt) : "";
   const topSignal = signals[0];
   const slaColor = topSignal ? TONE_COLOR[topSignal.tone] : T.textFaint;
 
@@ -257,6 +262,18 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
                   <span className="inline-flex items-center gap-1">
                     <Clock className="h-3 w-3" aria-hidden />
                     {rel}
+                  </span>
+                )}
+                {/* 🕘 Дата последней модификации («изм. 2 ч назад») — рядом с
+                    временем обращения: у «создан N назад» другой смысл.
+                    Показываем только если модификация реально была. */}
+                {modRel && (
+                  <span
+                    className="inline-flex items-center gap-1"
+                    title={modExact ? `Последнее изменение: ${modExact}` : undefined}
+                  >
+                    <History className="h-3 w-3" aria-hidden />
+                    изм. {modRel}
                   </span>
                 )}
                 {/* 👤 Оператор, создавший лида через /doc — виден сразу, пока

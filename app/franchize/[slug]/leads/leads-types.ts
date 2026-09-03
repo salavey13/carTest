@@ -100,6 +100,14 @@ export interface LeadRow {
    * через /doc (ownerName).
    */
   lastTouchedBy?: string | null;
+  /**
+   * ISO-время последней МОДИФИКАЦИИ лида (для карточки: «изм. 2 ч назад»).
+   * Считается на сервере как max(intent.updated_at, заметки, туду) — заметка
+   * (в т.ч. редактирование), смена стадии, создание/завершение туду обновляют
+   * его. Оператор сразу видит, какие лиды он уже обработал.
+   * null — модификаций после создания не было (или данных нет).
+   */
+  lastModifiedAt?: string | null;
 }
 
 export interface LeadTodoRow {
@@ -126,6 +134,12 @@ export interface GetFranchizeLeadsResult {
   success: boolean;
   leads?: LeadRow[];
   todos?: LeadTodoRow[];
+  /**
+   * Ростер операторов экипажа (owner + активные участники) для дропдауна
+   * «Ответственный»: id нужен для матчинга фильтра по assignee/owner id,
+   * name — человекочитаемая подпись опции.
+   */
+  operators?: Array<{ id: string; name: string }>;
   error?: string;
 }
 

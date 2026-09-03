@@ -173,8 +173,12 @@ describe("время перезвона: overdue / inMinutes / формат", ()
   });
 
   it("formatCallbackTime: сегодня — только время", () => {
-    const today = new Date(2026, 8, 2, 15, 30);
-    expect(formatCallbackTime(today.toISOString())).toBe("15:30");
+    // ФИКС (флаки): дата была захардкожена (2026-09-02) — тест падал при
+    // каждом переходе суток. «Сегодня» вычисляем динамически.
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 15, 30);
+    const hm = today.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    expect(formatCallbackTime(today.toISOString())).toBe(hm);
   });
 });
 

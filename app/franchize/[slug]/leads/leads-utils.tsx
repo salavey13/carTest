@@ -3,7 +3,7 @@
 
 import { SOURCE_META, BOARD_COLUMNS, AVITO_COLUMN_STAGES, sourceGroupOf } from "./leads-constants";
 import { PIPELINE_STAGES } from "./lib/pipeline-stages";
-import { compareByPriority, computeLeadPriority, type LeadPriority } from "./lib/lead-priority";
+import { compareByPriority, computeLeadPriority, handledPenalty, type LeadPriority } from "./lib/lead-priority";
 import { getLeadHandling, isHandlingTodo } from "./lib/lead-handling";
 import type {LeadRow, LeadTodoRow} from "./leads-types";
 
@@ -89,6 +89,7 @@ export function generateLeadsCSV(leads: LeadRow[]): string {
     "Байк",
     "Создан",
     "Активность",
+    "Изменено",
     "Срочность",
     "Telegram ID"
   ];
@@ -106,6 +107,8 @@ export function generateLeadsCSV(leads: LeadRow[]): string {
       lead.bikeTitle || "—",
       lead.createdAt ? formatDate(lead.createdAt) : "—",
       lead.lastSeenAt ? formatDate(lead.lastSeenAt) : "—",
+      // «Изменено» — последняя модификация (заметка/туду/стадия); без неё — активность
+      formatDate(lead.lastModifiedAt || lead.lastSeenAt || lead.createdAt),
       lead.urgencyScore?.toString() || "0",
       lead.telegramChatId || "—"
     ].map((field) => {
@@ -358,11 +361,14 @@ export function sortLeads(
       });
     }
     case "urgent":
+      // «Срочность»: температура + открытые задачи, НО обработанные лиды тонут
+      // (handledPenalty) — по-настоящему срочные нетронутые обращения не
+      // вытесняются из топа лидами, которые оператор уже отработал.
       return arr.sort((a, b) => {
         const aT = getTodosForLead(a).filter((t) => t.status !== "done").length;
         const bT = getTodosForLead(b).filter((t) => t.status !== "done").length;
-        const aScore = (a.urgencyScore || 0) + aT * 20;
-        const bScore = (b.urgencyScore || 0) + bT * 20;
+        const aScore = (a.urgencyScore || 0) + aT * 20 + handledPenalty(a, now);
+        const bScore = (b.urgencyScore || 0) + bT * 20 + handledPenalty(b, now);
         if (aScore !== bScore) return bScore - aScore;
         return new Date(b.lastSeenAt || b.createdAt || 0).getTime() - new Date(a.lastSeenAt || a.createdAt || 0).getTime();
       });

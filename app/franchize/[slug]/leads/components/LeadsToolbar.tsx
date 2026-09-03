@@ -109,7 +109,8 @@ export function LeadsToolbar({
   setFilterStage?: (v: string) => void;
   filterOwner?: string;
   setFilterOwner?: (v: string) => void;
-  availableOwners?: string[];
+  /** Опции «Ответственный»: id оператора + имя (серверный ростер экипажа). */
+  availableOwners?: Array<{ value: string; label: string }>;
   segment: Segment;
   setSegment: (v: Segment) => void;
   segmentCounts?: Partial<Record<Segment, number>>;
@@ -291,7 +292,7 @@ export function LeadsToolbar({
             T={T}
             options={[
               { value: "all", label: "Все" },
-              ...(availableOwners || []).map((o) => ({ value: o, label: o })),
+              ...(availableOwners || []),
             ]}
           />
         )}

@@ -89,6 +89,13 @@ export async function getCrewTodos(input: {
 
     const { actorUserId, crewId, status, assignedTo, category, isPasswordAuth = false } = parsed.data;
 
+    // ── SUBRENTER FIX: партнёр-владелец байка видит задачи по СВОИМ байкам ──
+    // Раньше не-член экипажа всегда получал «Нет доступа к экипажу» — туду
+    // (чек-листы возврата, «перезвонить»), привязанные к арендам его байков,
+    // не доходили до партнёра. Маркер субаренды тот же, что везде:
+    // cars.specs.subrenter_chat_id.
+    let subrenterRentalIds: string[] | null = null;
+
     // Password auth bypass - grant full access
     if (!isPasswordAuth) {
       // Telegram auth: verify crew membership
@@ -107,7 +114,33 @@ export async function getCrewTodos(input: {
           .maybeSingle();
 
         if (!memberCheck) {
-          return { success: false, error: "Нет доступа к экипажу." };
+          // Не член экипажа — возможно, субарендатор: ищем его байки в экипаже.
+          const { data: subrentedBikes, error: subErr } = await supabaseAdmin
+            .from("cars")
+            .select("id")
+            .eq("crew_id", crewId)
+            .eq("specs->>subrenter_chat_id", actorUserId);
+
+          if (subErr || !subrentedBikes || subrentedBikes.length === 0) {
+            return { success: false, error: "Нет доступа к экипажу." };
+          }
+
+          // Скоуп: аренды его байков. Пустой .in() запрещён — если аренд ещё
+          // нет, задач по ним тоже нет: возвращаем пустой список сразу.
+          const bikeIds = subrentedBikes.map((b) => b.id);
+          const { data: bikeRentals, error: rentErr } = await supabaseAdmin
+            .from("rentals")
+            .select("rental_id")
+            .in("vehicle_id", bikeIds);
+
+          if (rentErr) {
+            console.error("[get-crew-todos] subrenter rentals query failed:", rentErr.message);
+            return { success: false, error: rentErr.message };
+          }
+          subrenterRentalIds = (bikeRentals || []).map((r) => r.rental_id).filter(Boolean);
+          if (subrenterRentalIds.length === 0) {
+            return { success: true, data: [] };
+          }
         }
       }
     }
@@ -137,6 +170,11 @@ export async function getCrewTodos(input: {
       `)
       .eq("crew_id", crewId)
       .order("created_at", { ascending: false });
+
+    // Субарендатор: только задачи, привязанные к арендам его байков.
+    if (subrenterRentalIds) {
+      query = query.in("rental_id", subrenterRentalIds);
+    }
 
     if (status && status !== "all") {
       query = query.eq("status", status);

@@ -152,6 +152,9 @@ export interface LeadPriority {
   /** Есть заметки, последняя — «свежая» (≤24 ч): стоит прочитать перед
    *  следующим действием (флажок «Прочитать заметки» + буст индекса). */
   hasRecentNotes: boolean;
+  /** Недавно обработан оператором (lastModifiedAt ≤ 24/72 ч или «Отработан») —
+   *  срочность снижена, лид опускается в очереди. */
+  handledRecently: boolean;
 }
 
 /** Порог «горячего» лида для 🔥-лайбочки (ТЗ п.4). */
@@ -169,6 +172,38 @@ export const CALLBACK_SOON_WINDOW_MS = 3 * 60 * 60 * 1000;
 export const NOTES_RECENT_BOOST = 10;
 /** Горизонт «свежести» заметки. */
 export const NOTES_RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+// ── ШТРАФ ЗА ОБРАБОТАННОСТЬ (просьба босса) ────────────────────────────────────
+// «Обновлённые лиды должны терять срочность, чтобы по-настоящему срочные
+// оставались наверху». Лид, которого оператор недавно коснулся (заметка,
+// туду, смена стадии — lastModifiedAt), опускается в очереди:
+//   • тронут ≤ 24 ч назад  → −20 (мягко «отложен в работу»);
+//   • тронут ≤ 72 ч назад  → −10 (недавно был в работе);
+//   • явный маркер «Отработан» → дополнительно −15.
+// Заметочный бонус (+10) остаётся — прочитать контекст всё равно полезно,
+// но нетто-баланс для тронутого лида отрицательный: свежие нетронутые
+// обращения обгоняют его.
+export const HANDLED_RECENT_PENALTY = 20;
+export const HANDLED_DAY_PENALTY = 10;
+export const HANDLED_MARKER_PENALTY = 15;
+export const HANDLED_RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
+export const HANDLED_DAY_WINDOW_MS = 72 * 60 * 60 * 1000;
+
+/**
+ * Штраф 0…−45 за недавнюю обработку лида (см. константы выше).
+ * now передаётся снаружи — чистая функция, стабильная мемоизация.
+ */
+export function handledPenalty(lead: LeadRow, now: number, handling?: LeadHandling): number {
+  let penalty = 0;
+  const modMs = lead.lastModifiedAt ? new Date(lead.lastModifiedAt).getTime() : 0;
+  if (Number.isFinite(modMs) && modMs > 0) {
+    const since = now - modMs;
+    if (since <= HANDLED_RECENT_WINDOW_MS) penalty -= HANDLED_RECENT_PENALTY;
+    else if (since <= HANDLED_DAY_WINDOW_MS) penalty -= HANDLED_DAY_PENALTY;
+  }
+  if (handling?.handled) penalty -= HANDLED_MARKER_PENALTY;
+  return penalty;
+}
 
 /** Бонус за активный перезвон (0 — нет перезвона). */
 export function callbackBoost(handling: LeadHandling | undefined, now: number): number {
@@ -230,11 +265,14 @@ export function computeLeadPriority(
     W.value * value +
     W.stage * stage;
 
+  // Обновлённые лиды тонут: штраф за недавнюю обработку гасит свежесть/срочность
+  const penalty = handledPenalty(lead, now, handling);
+
   const score = Math.max(
     0,
     Math.min(
       100,
-      Math.round(base * channelMultiplier) + callbackBoost(handling, now) + notesBoost(lead, now),
+      Math.round(base * channelMultiplier) + callbackBoost(handling, now) + notesBoost(lead, now) + penalty,
     ),
   );
 
@@ -249,6 +287,8 @@ export function computeLeadPriority(
     callbackDue: handling?.callback?.dueAt ?? null,
     /** Свежая заметка (≤24 ч) — флажок «Прочитать заметки». */
     hasRecentNotes: (lead.notesCount ?? 0) > 0 && notesBoost(lead, now) > 0,
+    /** Недавно обработан оператором — лид отложен в работе (штраф применён). */
+    handledRecently: penalty < 0,
   };
 }
 

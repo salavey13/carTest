@@ -168,6 +168,103 @@ function privateSchema() {
   return (supabaseAdmin as unknown as SupabaseSchemaClient).schema("private");
 }
 
+// ─── Access resolution (crew member OR subrenter) ───────────────────────────
+//
+// ── SUBRENTER FIX (аналитика для партнёра-владельца байка) ──
+// «Мотопарк»/bike-wall уже пускает субарендатора к СВОИМ байкам, а вот
+// аналитика («Аренды»/«Продажи»/датаселектор) жёстко отказывала («Недостаточно
+// прав») → error boundary «crew unavailable» на карточке аренды его байка.
+//
+// Маркер субаренды: cars.specs.subrenter_chat_id = telegram chat id партнёра
+// (тот же маркер, что и в bike-wall.ts / subrenter-monitoring.ts). Доступ:
+//   • owner / глобальный админ / активный crew-member → полный доступ (scope: []);
+//   • субарендатор → доступ ЧТЕНИЯ, ограниченный его байками (scope: bike ids);
+//   • остальные — отказ.
+//
+// ── SA-001 FIX (парольная авторизация) ──
+// Раньше isPasswordAuth=true давал ПОЛНЫЙ доступ без проверки на сервере —
+// любой, кто вызовет серверный экшен с флагом, читал всю аналитику экипажа.
+// Теперь парольный путь требует actorUserId === crew.owner_id (тот же
+// контракт, что verifyCrewOwnerAccess в leads.ts) или глобальный админ.
+async function resolveRentalsAccess(
+  actorUserId: string,
+  crewId: string,
+  crewOwnerId: string,
+): Promise<{ ok: true; subrenterVehicleIds: string[] } | { ok: false; error: string }> {
+  // 1. Owner — полный доступ
+  if (crewOwnerId === actorUserId) return { ok: true, subrenterVehicleIds: [] };
+
+  // 2. Глобальный админ (users.role/status + легаси metadata.role/status)
+  const { data: adminUser } = await supabaseAdmin
+    .from("users")
+    .select("role, status, metadata, username")
+    .eq("user_id", actorUserId)
+    .maybeSingle();
+  const adminMeta = (adminUser?.metadata || {}) as Record<string, unknown>;
+  const isGlobalAdmin =
+    adminUser?.role === "admin" ||
+    adminUser?.role === "vprAdmin" ||
+    adminUser?.status === "admin" ||
+    adminMeta?.role === "admin" ||
+    adminMeta?.status === "admin";
+
+  // 3. Активный crew-member — полный доступ
+  const { data: membership } = await supabaseAdmin
+    .from("crew_members")
+    .select("membership_status")
+    .eq("crew_id", crewId)
+    .eq("user_id", actorUserId)
+    .maybeSingle();
+  const isActiveMember = membership?.membership_status === "active";
+
+  // Исторический хак («orud» в username всегда допущен) — сохраняем, чтобы
+  // не сломать доступ действующему оператору вне crew_members.
+  const isOrudjov = !!adminUser?.username && adminUser.username.toLowerCase().includes("orud");
+
+  if (isGlobalAdmin || isActiveMember || isOrudjov) {
+    return { ok: true, subrenterVehicleIds: [] };
+  }
+
+  // 4. Субарендатор: его байки в этом экипаже (specs.subrenter_chat_id)
+  const { data: subrentedBikes, error: subErr } = await supabaseAdmin
+    .from("cars")
+    .select("id")
+    .eq("crew_id", crewId)
+    .eq("specs->>subrenter_chat_id", actorUserId);
+
+  if (subErr) {
+    console.error("[resolveRentalsAccess] subrenter bikes query failed:", subErr.message);
+    return { ok: false, error: "Недостаточно прав для просмотра." };
+  }
+  if (subrentedBikes && subrentedBikes.length > 0) {
+    return { ok: true, subrenterVehicleIds: subrentedBikes.map((b) => b.id) };
+  }
+
+  return { ok: false, error: "Недостаточно прав для просмотра." };
+}
+
+/** SA-001: password-auth — actorUserId обязан быть владельцем экипажа (или глобальным админом). */
+async function verifyPasswordAuthOwner(
+  actorUserId: string,
+  crewOwnerId: string,
+): Promise<boolean> {
+  if (crewOwnerId === actorUserId) return true;
+  const { data: user } = await supabaseAdmin
+    .from("users")
+    .select("role, status, metadata")
+    .eq("user_id", actorUserId)
+    .maybeSingle();
+  if (!user) return false;
+  const meta = (user.metadata || {}) as Record<string, unknown>;
+  return (
+    user.role === "admin" ||
+    user.role === "vprAdmin" ||
+    user.status === "admin" ||
+    meta?.role === "admin" ||
+    meta?.status === "admin"
+  );
+}
+
 // ─── Server Actions ─────────────────────────────────────────────────────────────
 
 /**
@@ -215,38 +312,27 @@ export async function getRentalsDashboard(input: {
       slug,
     });
 
+    // ── Access resolution (SA-001 + subrenter) ──
+    // Password auth больше НЕ «полный доступ без проверки»: actorUserId обязан
+    // быть владельцем экипажа (или глобальным админом) — пароль проверяется
+    // validateAnalyticsPassword до нас, но право читать ИМЕННО этот экипаж
+    // доказывается владельцем-uuid'ом.
     if (isPasswordAuth) {
-      // Password auth grants full access - skip user checks
-      // Fall through to data loading
-    } else {
-      // Telegram auth: check user roles and username
-      // Fetch user data for permission checks
-      const { data: user } = await supabaseAdmin
-        .from("users")
-        .select("metadata, username")
-        .eq("user_id", actorUserId)
-        .maybeSingle();
-
-      const userMetadata = user?.metadata as Record<string, unknown> | null;
-      const userUsername = user?.username as string | null;
-      const isAdmin = userMetadata?.role === "admin";
-      const isOwner = crew.owner_id === actorUserId;
-      // Special case: orudjov (and variations) always have access
-      const isOrudjov = userUsername?.toLowerCase().includes("orud");
-
-      // Check if user is a crew member
-      const { data: crewMember } = await supabaseAdmin
-        .from("crew_members")
-        .select("user_id")
-        .eq("crew_id", crew.id)
-        .eq("user_id", actorUserId)
-        .maybeSingle();
-
-      const isCrewMember = !!crewMember;
-
-      if (!isOwner && !isAdmin && !isOrudjov && !isCrewMember) {
+      const pwOk = await verifyPasswordAuthOwner(actorUserId, crew.owner_id);
+      if (!pwOk) {
         return { success: false, error: "Недостаточно прав для просмотра." };
       }
+    }
+
+    // Telegram-путь: владелец/админ/член экипажа — полный доступ; субарендатор
+    // (cars.specs.subrenter_chat_id) — только аренды СВОИХ байков.
+    let subrenterVehicleIds: string[] = [];
+    if (!isPasswordAuth) {
+      const access = await resolveRentalsAccess(actorUserId, crew.id, crew.owner_id);
+      if (!access.ok) {
+        return { success: false, error: access.error };
+      }
+      subrenterVehicleIds = access.subrenterVehicleIds;
     }
 
     // Parse date boundaries for the selected day (UTC to avoid timezone issues)
@@ -293,38 +379,48 @@ export async function getRentalsDashboard(input: {
     // (started-today vs returns-today) for the KPIs — see AnalyticsClient.
     const dayBeforeStart = new Date(new Date(startOfDay).getTime() - 24 * 3600 * 1000).toISOString();
     const dayAfterEnd = new Date(new Date(endOfDay).getTime() + 24 * 3600 * 1000).toISOString();
+    // SUBRENTER SCOPE: партнёр видит аренды только СВОИХ байков — фильтр
+    // vehicle_id IN (его байки) добавляется во все три дневных запроса.
+    const scopeVehicleIds = (q: any) =>
+      subrenterVehicleIds.length > 0 ? q.in("vehicle_id", subrenterVehicleIds) : q;
     const [startedTodayResult, noRequestedStartResult, endsOnDayResult] = await Promise.all([
-      supabaseAdmin
-        .from("rentals")
-        .select(baseSelect)
-        .eq("vehicle.crew_id", crew.id)
-        .gte("requested_start_date", startOfDay)
-        .lte("requested_start_date", endOfDay)
-        .order("created_at", { ascending: false }),
+      scopeVehicleIds(
+        supabaseAdmin
+          .from("rentals")
+          .select(baseSelect)
+          .eq("vehicle.crew_id", crew.id)
+          .gte("requested_start_date", startOfDay)
+          .lte("requested_start_date", endOfDay)
+          .order("created_at", { ascending: false }),
+      ),
       // Legacy rows without requested_start_date: match by agreed_start_date
       // within the day. Fallback for old data only.
-      supabaseAdmin
-        .from("rentals")
-        .select(baseSelect)
-        .eq("vehicle.crew_id", crew.id)
-        .gte("agreed_start_date", startOfDay)
-        .lte("agreed_start_date", endOfDay)
-        .is("requested_start_date", null)
-        .order("created_at", { ascending: false }),
+      scopeVehicleIds(
+        supabaseAdmin
+          .from("rentals")
+          .select(baseSelect)
+          .eq("vehicle.crew_id", crew.id)
+          .gte("agreed_start_date", startOfDay)
+          .lte("agreed_start_date", endOfDay)
+          .is("requested_start_date", null)
+          .order("created_at", { ascending: false }),
+      ),
       // Rentals RETURNING on the selected day (agreed_end_date within the
       // widened window; requested_end_date as a fallback match for rows
       // where agreed end was never set).
-      supabaseAdmin
-        .from("rentals")
-        .select(baseSelect)
-        .eq("vehicle.crew_id", crew.id)
-        .or(
-          `and(agreed_end_date.gte.${dayBeforeStart},agreed_end_date.lte.${dayAfterEnd}),` +
-          `and(requested_end_date.gte.${dayBeforeStart},requested_end_date.lte.${dayAfterEnd}),` +
-          `and(agreed_end_date.is.null,requested_end_date.gte.${startOfDay},requested_end_date.lte.${endOfDay})`,
-        )
-        .neq("status", "cancelled")
-        .order("created_at", { ascending: false }),
+      scopeVehicleIds(
+        supabaseAdmin
+          .from("rentals")
+          .select(baseSelect)
+          .eq("vehicle.crew_id", crew.id)
+          .or(
+            `and(agreed_end_date.gte.${dayBeforeStart},agreed_end_date.lte.${dayAfterEnd}),` +
+            `and(requested_end_date.gte.${dayBeforeStart},requested_end_date.lte.${dayAfterEnd}),` +
+            `and(agreed_end_date.is.null,requested_end_date.gte.${startOfDay},requested_end_date.lte.${endOfDay})`,
+          )
+          .neq("status", "cancelled")
+          .order("created_at", { ascending: false }),
+      ),
     ]);
 
     // Merge + dedupe by rental_id
@@ -733,33 +829,21 @@ export async function getSalesDashboard(input: {
       return { success: false, error: "Экипаж не найден." };
     }
 
-    // Auth check (same logic as rentals)
-    if (!isPasswordAuth) {
-      const { data: user } = await supabaseAdmin
-        .from("users")
-        .select("metadata, username")
-        .eq("user_id", actorUserId)
-        .maybeSingle();
-
-      const userMetadata = user?.metadata as Record<string, unknown> | null;
-      const userUsername = user?.username as string | null;
-      const isAdmin = userMetadata?.role === "admin";
-      const isOwner = crew.owner_id === actorUserId;
-      const isOrudjov = userUsername?.toLowerCase().includes("orud");
-
-      // Check if user is a crew member
-      const { data: crewMember } = await supabaseAdmin
-        .from("crew_members")
-        .select("user_id")
-        .eq("crew_id", crew.id)
-        .eq("user_id", actorUserId)
-        .maybeSingle();
-
-      const isCrewMember = !!crewMember;
-
-      if (!isOwner && !isAdmin && !isOrudjov && !isCrewMember) {
+    // ── Access resolution (SA-001 + subrenter, same as getRentalsDashboard) ──
+    if (isPasswordAuth) {
+      const pwOk = await verifyPasswordAuthOwner(actorUserId, crew.owner_id);
+      if (!pwOk) {
         return { success: false, error: "Недостаточно прав для просмотра." };
       }
+    }
+
+    let subrenterVehicleIds: string[] = [];
+    if (!isPasswordAuth) {
+      const access = await resolveRentalsAccess(actorUserId, crew.id, crew.owner_id);
+      if (!access.ok) {
+        return { success: false, error: access.error };
+      }
+      subrenterVehicleIds = access.subrenterVehicleIds;
     }
 
     // Parse date boundaries for the selected day (UTC)
@@ -771,7 +855,14 @@ export async function getSalesDashboard(input: {
       .from("cars")
       .select("id")
       .eq("crew_id", crew.id);
-    const crewBikeIds = (crewBikes || []).map(b => b.id);
+    // SUBRENTER SCOPE: партнёр видит продажи только своих байков. Пустой
+    // scope НЕ заменяем на "все" — используем пустышку "__none__" (не матчит
+    // ни одну строку), иначе пустой .in() или отсутствие фильтра раскрыли бы
+    // чужие данные.
+    const scopedBikeIds = subrenterVehicleIds.length > 0
+      ? (crewBikes || []).map((b) => b.id).filter((id) => subrenterVehicleIds.includes(id))
+      : (crewBikes || []).map((b) => b.id);
+    const crewBikeIds = scopedBikeIds;
 
     // Query sales from private.sale_contract_artifacts (crew-filtered by resolved_bike_id)
     const { data: sales, error: salesError } = await privateSchema()
@@ -1060,35 +1151,21 @@ export async function getRentalsDateRange(input: {
       slug,
     });
 
+    // ── Access resolution (SA-001 + subrenter, same as getRentalsDashboard) ──
     if (isPasswordAuth) {
-      // Password auth grants full access
-    } else {
-      // Telegram auth: check permissions
-      const isOwner = crew.owner_id === actorUserId;
-      const { data: user } = await supabaseAdmin
-        .from("users")
-        .select("metadata, username")
-        .eq("user_id", actorUserId)
-        .maybeSingle();
-
-      const userMetadata = user?.metadata as Record<string, unknown> | null;
-      const userUsername = user?.username as string | null;
-      const isAdmin = userMetadata?.role === "admin";
-      const isOrudjov = userUsername?.toLowerCase().includes("orud");
-
-      // Check if user is a crew member
-      const { data: crewMember } = await supabaseAdmin
-        .from("crew_members")
-        .select("user_id")
-        .eq("crew_id", crew.id)
-        .eq("user_id", actorUserId)
-        .maybeSingle();
-
-      const isCrewMember = !!crewMember;
-
-      if (!isOwner && !isAdmin && !isOrudjov && !isCrewMember) {
+      const pwOk = await verifyPasswordAuthOwner(actorUserId, crew.owner_id);
+      if (!pwOk) {
         return { success: false, error: "Недостаточно прав." };
       }
+    }
+
+    let subrenterVehicleIds: string[] = [];
+    if (!isPasswordAuth) {
+      const access = await resolveRentalsAccess(actorUserId, crew.id, crew.owner_id);
+      if (!access.ok) {
+        return { success: false, error: access.error };
+      }
+      subrenterVehicleIds = access.subrenterVehicleIds;
     }
 
     // Get min/max dates
@@ -1105,11 +1182,18 @@ export async function getRentalsDateRange(input: {
 
     console.log("[getRentalsDateRange] Found cars:", crewCars?.length || 0);
 
-    if (!crewCars || crewCars.length === 0) {
+    // SUBRENTER SCOPE: диапазон дат считаем ТОЛЬКО по байкам партнёра
+    // (иначе селектор дат раскрывает существование чужих аренд).
+    const carIds = subrenterVehicleIds.length > 0
+      ? (crewCars || []).map((c) => c.id).filter((id) => subrenterVehicleIds.includes(id))
+      : (crewCars || []).map((c) => c.id);
+
+    // ВАЖНО: пустой список НИКОГДА не уходит в .in() — PostgREST-фильтр по
+    // пустому множеству либо 400-ит, либо матчит «всё». Без байков у
+    // субарендатора просто нет диапазона → data:null (UI покажет пусто).
+    if (carIds.length === 0) {
       return { success: true, data: null };
     }
-
-    const carIds = crewCars.map((c) => c.id);
 
     // Get min date
     const { data, error } = await supabaseAdmin

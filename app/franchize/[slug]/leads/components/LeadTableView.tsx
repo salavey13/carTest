@@ -16,7 +16,7 @@
 //
 
 import { useMemo } from "react";
-import { ArrowDown, ArrowUp, Bike, CircleDollarSign, Table2, ExternalLink, Flame, Zap, PhoneCall, StickyNote } from "lucide-react";
+import { ArrowDown, ArrowUp, Bike, CircleDollarSign, Table2, ExternalLink, Flame, Zap, PhoneCall, StickyNote, History } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "../leads-types";
 import { relativeTime, metaFor, isAvitoLead, AVITO_COLOR, AVITO_BG } from "../leads-utils";
 import { STAGE_LABELS as PIPELINE_STAGE_LABELS, STAGE_COLORS } from "../lib/pipeline-stages";
@@ -75,6 +75,10 @@ export function LeadTableView({
           handling: getLeadHandling(todos),
           spent: Number(lead.totalSpent || 0),
           activity: lead.lastSeenAt || lead.createdAt || "",
+          // «Изменено» — дата последней модификации лида (заметка/туду/стадия).
+          // fallback на активность, чтобы колонка не пустовала у лидов без
+          // модификаций; чистый null показываем прочерком ниже.
+          modified: lead.lastModifiedAt || "",
         };
       }),
     [leads, getTodosForLead, priorityMap],
@@ -199,6 +203,13 @@ export function LeadTableView({
               </th>
               <SortHeader label="Выручка" mode="spent" align="right" />
               <SortHeader label="Активность" mode="recent" />
+              <th
+                className="whitespace-nowrap border-b-2 px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
+                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
+                title="Когда лида последний раз модифицировали: заметка, туду, смена стадии"
+              >
+                Изменено
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -445,10 +456,26 @@ export function LeadTableView({
                   </td>
                   {/* Активность */}
                   <td
-                    className="whitespace-nowrap border-b px-2.5 py-2 text-[11px]"
+                    className="whitespace-nowrap border-b border-r px-2.5 py-2 text-[11px]"
                     style={{ borderColor: T.borderSoft, color: T.textMuted }}
                   >
                     {relativeTime(lead.lastSeenAt || lead.createdAt)}
+                  </td>
+                  {/* Изменено — последняя модификация (note/todo/stage);
+                      модификаций не было — прочерк. Точная дата в подсказке. */}
+                  <td
+                    className="whitespace-nowrap border-b px-2.5 py-2 text-[11px]"
+                    style={{ borderColor: T.borderSoft, color: lead.lastModifiedAt ? T.text : T.textFaint }}
+                    title={lead.lastModifiedAt ? `Последнее изменение: ${relativeTime(lead.lastModifiedAt)}` : "Модификаций не было"}
+                  >
+                    {lead.lastModifiedAt ? (
+                      <span className="inline-flex items-center gap-1">
+                        <History className="h-3 w-3" style={{ color: T.textFaint }} aria-hidden />
+                        {relativeTime(lead.lastModifiedAt)}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 </tr>
               );

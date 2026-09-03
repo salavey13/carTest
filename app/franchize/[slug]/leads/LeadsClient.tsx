@@ -32,6 +32,7 @@ import {
   type SortMode,
   type FilterFlags,
 } from "./leads-constants";
+import { LEADS_PAGE_SIZE } from "./leads-constants";
 
 // Import hooks
 import { useTodosMapping, useFilteredSortedLeads, usePriorityMap } from "./hooks/useLeadsData";
@@ -76,6 +77,12 @@ export function LeadsClient({
   const [filterSource, setFilterSource] = useState<string>("all");
   const [filterStage, setFilterStage] = useState<string>("all");
   const [filterOwner, setFilterOwner] = useState<string>("all");
+  // ── Пагинация (просьба босса: «лидов уже пара сотен») ──
+  // Показываем первые VISIBLE_PAGE_SIZE лидов всех вьюх (список/канбан/таблица);
+  // кнопка «Показать ещё» дозагружает следующую страницу. Список-вью при этом
+  // остаётся виртуализированным, а канбан/таблица перестают рендерить сотни
+  // карточек за раз. Сбрасывается при смене любого фильтра/поиска.
+  const [visibleCount, setVisibleCount] = useState(LEADS_PAGE_SIZE);
   const [segment, setSegment] = useState<Segment>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [hidePlaceholders, setHidePlaceholders] = useState(false); // Show all leads by default — hiding placeholders was hiding everything when identityState wasn't set
@@ -106,6 +113,10 @@ export function LeadsClient({
   // Writable leads state — starts empty (page.tsx passes []), fetched client-side after auth
   const [leadsState, setLeadsState] = useState(leads);
   const [todosState, setTodosState] = useState(todos);
+  // Ростер операторов экипажа (owner + активные члены) с сервера — питает
+  // дропдаун «Ответственный»: фильтровать «только его лиды» можно для ЛЮБОГО
+  // оператора, даже если на его имя пока не записан ни один лид.
+  const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([]);
   /** m4 fix: notify is a server-side Telegram send — dedupe double taps. */
   const [notifyBusy, setNotifyBusy] = useState(false);
   // Ref mirror of notifyBusy — the state value is captured in handleSheetAction's
@@ -236,6 +247,7 @@ export function LeadsClient({
         if (result.success) {
           setLeadsState((result.leads || []).filter(Boolean) as LeadRow[]);
           setTodosState((result.todos || []).filter(Boolean) as LeadTodoRow[]);
+          if (result.operators) setOperators(result.operators);
           setLeadsLoadError(null);
           return true;
         }
@@ -324,6 +336,19 @@ export function LeadsClient({
   // server-side by computeLeadStage) — it used to compare against the raw DB
   // stage, so most options matched nothing and the filter looked broken.
   // "avito" — виртуальное значение: все лиды канала Авито независимо от стадии.
+  // ── OWNER FILTER (по id, а не по имени) ──
+  // Значение фильтра — telegram id оператора из серверного ростера. Лид
+  // матчится, если оператор — его assignee (туду), создатель (/doc) или
+  // автор последней заметки (lastTouchedBy — сравниваем и по имени тоже,
+  // т.к. сервер возвращает уже резолвленное имя). Это позволяет отфильтровать
+  // «только лиды, которые вёл конкретный оператор» — даже если он ещё ни
+  // одного лида не создал (опция теперь есть у ВСЕГО ростера экипажа).
+  const operatorNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const o of operators) map.set(o.id, o.name);
+    return map;
+  }, [operators]);
+
   const sortedLeads = useMemo(() => {
     let result = baseSortedLeads;
     if (filterStage === "avito") {
@@ -332,24 +357,48 @@ export function LeadsClient({
       result = result.filter((l) => (l.stageKey || "new") === filterStage);
     }
     if (filterOwner !== "all") {
-      result = result.filter((l) => {
-        const owner = l.assigneeName || l.ownerName || "—";
-        return owner === filterOwner;
-      });
+      const ownerName = operatorNameById.get(filterOwner) || filterOwner;
+      result = result.filter((l) =>
+        l.assigneeId === filterOwner ||
+        l.ownerId === filterOwner ||
+        l.originalOperatorChatId === filterOwner ||
+        // lastTouchedBy приходит строкой-именем; сравниваем по ней, если
+        // сервер вернул имя этого оператора.
+        (ownerName && l.lastTouchedBy === ownerName) ||
+        // легаси-фоллбек: старый фильтр хранил ИМЯ в filterOwner
+        (l.assigneeName || l.ownerName || "—") === filterOwner,
+      );
     }
     return result;
-  }, [baseSortedLeads, filterStage, filterOwner]);
+  }, [baseSortedLeads, filterStage, filterOwner, operatorNameById]);
 
-  // Available owners — computed from ALL leads (not filtered) so the dropdown
-  // always shows every possible owner even if the current filter hides them.
+  // ── Пагинация: окно видимых лидов + сброс при смене фильтров ──
+  const visibleLeads = useMemo(
+    () => sortedLeads.slice(0, visibleCount),
+    [sortedLeads, visibleCount],
+  );
+  useEffect(() => {
+    setVisibleCount(LEADS_PAGE_SIZE);
+  }, [debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders]);
+  const hiddenCount = sortedLeads.length - visibleLeads.length;
+
+  // ── Ответственный: серверный ростер экипажа + те, кто встречается на лидах ──
+  // Раньше список строился ТОЛЬКО из имён на лидах — новый оператор без лидов
+  // в выпадашку не попадал. Теперь сервер возвращает всех (owner + члены),
+  // а лиды-имена добавляем на случай легаси-значений без id.
   const availableOwners = useMemo(() => {
-    const set = new Set<string>();
+    const opts = operators.map((o) => ({ value: o.id, label: o.name }));
+    const seenIds = new Set(opts.map((o) => o.value));
+    const seenNames = new Set(opts.map((o) => o.label));
     for (const l of leadsState) {
-      const owner = l.assigneeName || l.ownerName;
-      if (owner) set.add(owner);
+      const name = l.assigneeName || l.ownerName;
+      if (name && !seenNames.has(name) && !(l.assigneeId && seenIds.has(l.assigneeId))) {
+        opts.push({ value: name, label: name });
+        seenNames.add(name);
+      }
     }
-    return Array.from(set).sort();
-  }, [leadsState]);
+    return opts.sort((a, b) => a.label.localeCompare(b.label, "ru"));
+  }, [operators, leadsState]);
 
   const hasFilters = baseHasFilters || filterStage !== "all" || filterOwner !== "all";
 
@@ -860,7 +909,7 @@ export function LeadsClient({
 
       {viewMode === "board" ? (
         <LeadBoard
-          leads={sortedLeads}
+          leads={visibleLeads}
           selectedId={selectedId}
           onSelect={(id) => setSelectedId(id)}
           onDismiss={handleDismissLead}
@@ -877,7 +926,7 @@ export function LeadsClient({
           <EmptyState hasFilters={hasFilters} searchQuery={debouncedSearchQuery} T={T} />
         ) : (
           <LeadTableView
-            leads={sortedLeads}
+            leads={visibleLeads}
             selectedId={selectedId}
             onSelect={(id) => setSelectedId(id)}
             getTodosForLead={getTodosForLead}
@@ -892,7 +941,7 @@ export function LeadsClient({
         <EmptyState hasFilters={hasFilters} searchQuery={debouncedSearchQuery} T={T} />
       ) : (
         <LeadList
-          leads={sortedLeads}
+          leads={visibleLeads}
           selectedId={selectedId}
           setSelectedId={setSelectedId}
           onDismiss={handleDismissLead}
@@ -903,6 +952,26 @@ export function LeadsClient({
           crewId={crewId}
           slug={slug}
         />
+      )}
+
+      {/* ── Пагинация: «показано X из Y» + «Показать ещё» ──
+          Все вьюхи получают только visibleLeads; скрытые лиды догружаются
+          по LEADS_PAGE_SIZE за клик. У оператора всегда честный счётчик —
+          сколько лидов совпало с фильтрами и сколько ещё не показано. */}
+      {hiddenCount > 0 && (
+        <div className="flex flex-col items-center gap-2 py-4">
+          <button
+            type="button"
+            onClick={() => setVisibleCount((c) => c + LEADS_PAGE_SIZE)}
+            className="rounded-xl border px-4 py-2 text-sm font-semibold transition hover:brightness-110 active:scale-[0.99]"
+            style={{ borderColor: T.border, backgroundColor: T.bgCard, color: T.text }}
+          >
+            Показать ещё {Math.min(LEADS_PAGE_SIZE, hiddenCount)}
+          </button>
+          <span className="text-[11px]" style={{ color: T.textFaint }}>
+            Показано {visibleLeads.length} из {sortedLeads.length} лидов
+          </span>
+        </div>
       )}
 
       {/* Adaptive lead-detail sheet — bottom sheet on phones/narrow windows,

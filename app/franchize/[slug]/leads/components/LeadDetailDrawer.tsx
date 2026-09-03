@@ -216,6 +216,14 @@ export function LeadDetailDrawer(props: Props) {
     { label: "Канал", value: lead?.contactChannel || "—" },
     { label: "Маршрут", value: lead?.sourceRoute || "—", copyable: !!lead?.sourceRoute },
     { label: "Первый контакт", value: lead?.createdAt ? formatDate(lead?.createdAt) : "—" },
+    // «Изменено» — последняя модификация (заметка/туду/смена стадии); точная
+    // дата + «N назад». Оператор видит, какие лиды уже обработаны.
+    {
+      label: "Изменено",
+      value: lead?.lastModifiedAt
+        ? `${formatDate(lead.lastModifiedAt)} · ${relativeTime(lead.lastModifiedAt)}`
+        : "—",
+    },
     { label: "Последняя активность", value: rel || "—" },
     { label: "Ответственный", value: assignee },
     { label: "Следующее действие", value: STAGE_NEXT_ACTION[stageKey] || "—" },

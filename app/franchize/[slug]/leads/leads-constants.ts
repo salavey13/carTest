@@ -199,3 +199,10 @@ export type LeadHistoryEvent = {
   icon?: string;
   detail?: string;
 };
+
+/**
+ * Пагинация страницы лидов (просьба босса: «лидов уже пара сотен»).
+ * Столько лидов показывают все вьюхи сразу; остальное дозагружается
+ * кнопкой «Показать ещё» (по LEADS_PAGE_SIZE за клик).
+ */
+export const LEADS_PAGE_SIZE = 50;

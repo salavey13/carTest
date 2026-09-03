@@ -68,8 +68,9 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
           const aP = priorityMap.get(a.user_id)?.score ?? 0;
           const bP = priorityMap.get(b.user_id)?.score ?? 0;
           if (aP !== bP) return bP - aP;
-          return new Date(b.lastSeenAt || b.createdAt || 0).getTime()
-            - new Date(a.lastSeenAt || a.createdAt || 0).getTime();
+          // tie-break — по последней МОДИФИКАЦИИ (изм.), затем по активности
+          return new Date(b.lastModifiedAt || b.lastSeenAt || b.createdAt || 0).getTime()
+            - new Date(a.lastModifiedAt || a.lastSeenAt || a.createdAt || 0).getTime();
         });
       }
     }
@@ -161,7 +162,7 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
                           {lead.full_name || "Без имени"}
                         </p>
                         <p className="truncate text-[10px]" style={{ color: T.textMuted }}>
-                          {lead.phone || lead.username || relativeTime(lead.createdAt)}
+                          {lead.phone || lead.username || relativeTime(lead.lastModifiedAt || lead.createdAt)}
                         </p>
                       </div>
                       {/* Priority Score (ТЗ) — score-бейдж: 🔥 для горячих (≥70),

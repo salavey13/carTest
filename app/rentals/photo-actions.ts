@@ -244,11 +244,20 @@ async function validateUpload(
   if (rental.vehicle_id) {
     const { data: vehicle } = await supabaseAdmin
       .from("cars")
-      .select("crew_id")
+      .select("crew_id, specs")
       .eq("id", rental.vehicle_id)
       .maybeSingle();
 
     if (vehicle?.crew_id) {
+      // ── SUBRENTER FIX: партнёр-владелец байка (specs.subrenter_chat_id)
+      // может грузить фото ДО/ПОСЛЕ на аренду своего байка — роль «owner»:
+      // те же права, что у владельца экипажа (полный пайплайн, без ограничений
+      // арендатора, который может грузить только свои фото).
+      const specs = (vehicle.specs || {}) as Record<string, unknown>;
+      if (specs["subrenter_chat_id"] === uploaderUserId) {
+        return { ok: true, role: "owner" };
+      }
+
       const { data: membership } = await supabaseAdmin
         .from("crew_members")
         .select("role, membership_status")
@@ -494,21 +503,30 @@ export async function listRentalPhotos(
     if (!authorized && rental.vehicle_id) {
       const { data: vehicle } = await supabaseAdmin
         .from("cars")
-        .select("crew_id")
+        .select("crew_id, specs")
         .eq("id", rental.vehicle_id)
         .maybeSingle();
       if (vehicle?.crew_id) {
-        const { data: membership } = await supabaseAdmin
-          .from("crew_members")
-          .select("role, membership_status")
-          .eq("crew_id", vehicle.crew_id)
-          .eq("user_id", requesterUserId)
-          .maybeSingle();
-        if (
-          membership?.membership_status === "active" &&
-          ["owner", "admin", "co_owner", "member"].includes(membership.role)
-        ) {
+        // ── SUBRENTER FIX: партнёр-владелец байка (specs.subrenter_chat_id)
+        // смотрит галерею ДО/ПОСЛЕ аренды своего байка. Раньше галерея
+        // молча пустовала — доступ был только у арендатора/экипажа.
+        const specs = (vehicle.specs || {}) as Record<string, unknown>;
+        if (specs["subrenter_chat_id"] === requesterUserId) {
           authorized = true;
+        }
+        if (!authorized) {
+          const { data: membership } = await supabaseAdmin
+            .from("crew_members")
+            .select("role, membership_status")
+            .eq("crew_id", vehicle.crew_id)
+            .eq("user_id", requesterUserId)
+            .maybeSingle();
+          if (
+            membership?.membership_status === "active" &&
+            ["owner", "admin", "co_owner", "member"].includes(membership.role)
+          ) {
+            authorized = true;
+          }
         }
       }
     }

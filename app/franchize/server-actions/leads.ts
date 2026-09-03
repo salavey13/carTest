@@ -412,6 +412,10 @@ export async function getFranchizeLeads(
     const rentalIdsByNormalizedPhone = new Map<string, Set<string>>();
     // Cache: bike_id → bike title — populated from artifacts & sales after main fetch.
     const bikeTitleMap = new Map<string, string>();
+    // Lead key → intent.updated_at (max across merged intents)..Feed for
+    // lastModifiedAt: every intent write (stage change, metadata merge, import
+    // refresh) bumps updated_at — the cheapest honest "lead was modified" signal.
+    const intentUpdatedAtMap = new Map<string, string>();
 
     /**
      * Avito channel block from an intent's metadata — only meaningful when the
@@ -535,7 +539,7 @@ export async function getFranchizeLeads(
       // so classifyIdentityState can still detect operator-origin for intent-only leads.
       supabaseAdmin
         .from("franchize_intents")
-        .select("id, telegram_user_id, phone, intent_type, stage, urgency_score, source_route, contact_channel, last_seen_at, created_at, metadata, bike_id")
+        .select("id, telegram_user_id, phone, intent_type, stage, urgency_score, source_route, contact_channel, last_seen_at, created_at, updated_at, metadata, bike_id")
         .eq("slug", safeSlug)
         .neq("stage", "dismissed")
         .order("last_seen_at", { ascending: false })
@@ -688,6 +692,12 @@ export async function getFranchizeLeads(
              `opdoc:${i.id}`)
           : (i.telegram_user_id || normalizedIntentPhone || (avitoChatId ? `avito:${avitoChatId}` : "") || "");
         if (!id) continue;
+        // Track the intent's updated_at for lastModifiedAt (max across merges —
+        // several intents can collapse into one lead; the freshest write wins).
+        if (i.updated_at) {
+          const prev = intentUpdatedAtMap.get(id);
+          if (!prev || i.updated_at > prev) intentUpdatedAtMap.set(id, i.updated_at);
+        }
         addOrMerge({
           user_id: id,
           full_name: (meta?.name as string) || null,
@@ -1349,7 +1359,7 @@ export async function getFranchizeLeads(
       // «последним оператором, трогавшим лида» (lastTouchedBy) для карточки.
       supabaseAdmin
         .from("lead_notes")
-        .select("lead_id, created_at, created_by")
+        .select("lead_id, created_at, updated_at, created_by")
         .eq("crew_id", crewId),
     ]);
 
@@ -1364,6 +1374,8 @@ export async function getFranchizeLeads(
     const secretByPhone = secretByPhoneResult.data;
     const troubledUsers = troubledUsersResult.data;
     const todos = todosResult.data;
+    // Lead key → timestamp последней модификации заметками (наполняется в 12b ниже).
+    const notesLastModMap = new Map<string, string>();
 
     // Numeric user_id → { username, full_name } map — used by the enrichment
     // step below AND by the ownerName/lastTouchedBy name resolution at the end
@@ -1492,25 +1504,31 @@ export async function getFranchizeLeads(
     // Ключи, не совпадающие с ключами лидов (например "sale:<contract>" заметки
     // сделок), просто игнорируются — это чужая доменная область.
     if (notesResult.data) {
-      const notesAgg = new Map<string, { count: number; lastAt: string | null; lastBy: string | null }>();
+      const notesAgg = new Map<string, { count: number; lastAt: string | null; lastModAt: string | null; lastBy: string | null }>();
       for (const n of notesResult.data) {
         const key = typeof n.lead_id === "string" ? n.lead_id : null;
         if (!key) continue;
         const prev = notesAgg.get(key);
         const at = typeof n.created_at === "string" ? n.created_at : null;
+        // РЕДАКТИРОВАННАЯ заметка тоже «трогает» лида: updated_at > created_at
+        // учитываем в lastModifiedAt (карточка показывает «изм. …» — см. ниже).
+        const modAt = typeof (n as { updated_at?: unknown }).updated_at === "string" && (n as { updated_at: string }).updated_at
+          ? (n as { updated_at: string }).updated_at
+          : at;
         // created_by хранит user_id (chat_id) автора — числовой строкой; в
         // легаси-записях может быть свободный текст или null.
         const by = typeof (n as { created_by?: unknown }).created_by === "string" && (n as { created_by?: string }).created_by
           ? (n as { created_by: string }).created_by
           : null;
         if (!prev) {
-          notesAgg.set(key, { count: 1, lastAt: at, lastBy: by });
+          notesAgg.set(key, { count: 1, lastAt: at, lastModAt: modAt, lastBy: by });
         } else {
           prev.count += 1;
           if (at && (!prev.lastAt || at > prev.lastAt)) {
             prev.lastAt = at;
             prev.lastBy = by;
           }
+          if (modAt && (!prev.lastModAt || modAt > prev.lastModAt)) prev.lastModAt = modAt;
         }
       }
       for (const l of leadMap.values()) {
@@ -1519,6 +1537,11 @@ export async function getFranchizeLeads(
         l.lastNoteAt = agg?.lastAt ?? null;
         // Сырое значение (id или имя) — имя подставим после резолва ниже.
         l.lastTouchedBy = agg?.lastBy ?? null;
+      }
+      // Запоминаем заметочный вклад в lastModifiedAt — сольём с туду и
+      // intent.updated_at в финальном проходе ниже.
+      for (const [key, agg] of notesAgg.entries()) {
+        if (agg.lastModAt) notesLastModMap.set(key, agg.lastModAt);
       }
     }
 
@@ -1651,14 +1674,34 @@ export async function getFranchizeLeads(
       return ids;
     };
 
+    // ── lastModifiedAt: туду-вклад ──
+    // Создание/завершение туду («перезвонить», чек-листы, «отработан») — тоже
+    // модификация лида: держим lead key → максимальный timestamp туду
+    // (created_at либо completed_at, что позже).
+    const todosLastModMap = new Map<string, string>();
+    const recordTodoTouch = (leadId: string | undefined | null, t: typeof todos[number]): void => {
+      if (!leadId) return;
+      const ts = (t.completed_at && t.completed_at > t.created_at) ? t.completed_at : t.created_at;
+      if (!ts) return;
+      const prev = todosLastModMap.get(leadId);
+      if (!prev || ts > prev) todosLastModMap.set(leadId, ts);
+    };
+
     const filteredTodos = (todos || []).filter((t) => {
       // 1. Match by rental_id (strongest link — works before QR claim)
       const todoRentalId = getTodoRentalId(t);
-      if (todoRentalId && rentalIdToLeadId.has(todoRentalId)) return true;
+      if (todoRentalId && rentalIdToLeadId.has(todoRentalId)) {
+        recordTodoTouch(rentalIdToLeadId.get(todoRentalId), t);
+        return true;
+      }
 
       // 2-5. Match by ANY identity candidate (see getTodoLeadIds)
       const todoLeadIds = getTodoLeadIds(t);
-      if (todoLeadIds.some((id) => leadUserIds.has(id))) return true;
+      const matched = todoLeadIds.filter((id) => leadUserIds.has(id));
+      if (matched.length > 0) {
+        for (const id of matched) recordTodoTouch(id, t);
+        return true;
+      }
 
       return false;
     });
@@ -1722,6 +1765,46 @@ export async function getFranchizeLeads(
       }
     }
 
+    // ── 13. lastModifiedAt — «когда лида последний раз трогали» ──
+    // Максимум из: intent.updated_at (смена стадии, merge metadata, импорт),
+    // заметки (created_at / updated_at при редактировании), туду
+    // (создание/завершение, включая «отработан» и «перезвонить»).
+    // РЕНТАБЕЛЬНОСТЬ: оператор сразу видит, какие лиды он уже обработал, —
+    // карточка, таблица, канбан, шторка и CSV читают одно и то же поле.
+    // Схема БД не меняется — всё считается из существующих данных.
+    for (const l of leadMap.values()) {
+      const candidates = [
+        intentUpdatedAtMap.get(l.user_id) || null,
+        notesLastModMap.get(l.user_id) || null,
+        todosLastModMap.get(l.user_id) || null,
+      ].filter((v): v is string => !!v);
+      l.lastModifiedAt = candidates.length > 0
+        ? candidates.reduce((a, b) => (b > a ? b : a))
+        : null;
+    }
+
+    // ── 14. Операторы экипажа для дропдауна «Ответственный» ──
+    // Раньше список строился только из имён, встречающихся на лидах
+    // (assignee/owner) — оператор без лидов в выпадашку не попадал и
+    // отфильтровать «только его» лиды было невозможно. Теперь возвращаем
+    // ВЕСЬ ростер (owner + активные участники) с человекочитаемыми именами;
+    // фильтр на клиенте матчим по id, а не по строке-имени.
+    let operators: Array<{ id: string; name: string }> = [];
+    const operatorIdsList = Array.from(crewOperatorIds).filter((id) => /^\d+$/.test(id));
+    if (operatorIdsList.length > 0) {
+      const { data: operatorUsers } = await supabaseAdmin
+        .from("users")
+        .select("user_id, username, full_name")
+        .in("user_id", operatorIdsList);
+      const nameById = new Map<string, string>();
+      for (const u of operatorUsers ?? []) {
+        nameById.set(u.user_id, u.full_name || u.username || u.user_id);
+      }
+      operators = operatorIdsList
+        .map((id) => ({ id, name: nameById.get(id) || id }))
+        .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+    }
+
     // iter35: resolve todo assignee names — the sheet used to render the raw
     // numeric chat_id («356282674») on every todo row.
     for (const t of dedupedTodos) {
@@ -1737,6 +1820,7 @@ export async function getFranchizeLeads(
       success: true,
       leads: Array.from(leadMap.values()),
       todos: dedupedTodos,
+      operators,
     };
   } catch (error) {
     logger.error("[getFranchizeLeads] failed:", error);
