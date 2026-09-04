@@ -19,8 +19,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildSuggestedResponse,
   intentChip,
+  matchBikeTariff,
   parseDurationDays,
+  parseDurationHours,
   scoreIntents,
+  tariffDailyRate,
   tierDailyRate,
 } from "@/app/franchize/[slug]/leads/lib/lead-scripts";
 import type { LeadRow } from "@/app/franchize/[slug]/leads/leads-types";
@@ -495,5 +498,262 @@ describe("lead-scripts: AI-анализ главнее локального де
     });
     const res = buildSuggestedResponse(lead);
     expect(res?.aiNotes).toBe("Сравнивает с конкурентом");
+  });
+});
+
+// ── Тарифы парка: bikeTitle → модель CSV → точные ставки ────────────────────
+
+describe("lead-scripts: matchBikeTariff (bikeTitle → модель CSV)", () => {
+  it("прямые совпадения: с брендом, без бренда, в нижнем регистре", () => {
+    expect(matchBikeTariff("79BIKE Falcon GT")?.id).toBe("falcon-gt-2026");
+    expect(matchBikeTariff("79bike Falcon GT 2026")?.id).toBe("falcon-gt-2026");
+    expect(matchBikeTariff("Falcon Pro")?.id).toBe("falcon-pro-2026");
+    expect(matchBikeTariff("79bike Falcon PRO")?.id).toBe("falcon-pro-2026");
+    expect(matchBikeTariff("Yamaha R7")?.id).toBe("yamaha-r7");
+    expect(matchBikeTariff("BMW F800R")?.id).toBe("bmw-f800r");
+  });
+
+  it("алиасы из скобок и плюсы в названиях", () => {
+    expect(matchBikeTariff("Kawasaki Ninja 650")?.id).toBe("kawasaki-ex650k");
+    expect(matchBikeTariff("Ninja 650")?.id).toBe("kawasaki-ex650k");
+    expect(matchBikeTariff("Rerode R1+")?.id).toBe("rerode-r1-plus");
+  });
+
+  it("цветовые варианты Ducati: самый специфичный побеждает", () => {
+    expect(matchBikeTariff("Ducati Panigale S Electro Black Aero")?.id).toBe(
+      "ducati-panigale-s-electro-black-aero",
+    );
+    // В CSV модель «Panigale S Electro Black» — это вариант black-chain;
+    // «Black Z» (id …-black) не матчится без «Z» в заголовке.
+    expect(matchBikeTariff("Ducati Panigale S Electro Black")?.id).toBe(
+      "ducati-panigale-s-electro-black-chain",
+    );
+  });
+
+  it("неизвестная модель → null (медианные оценки)", () => {
+    expect(matchBikeTariff("Kugoo Kirin M4 Pro")).toBeNull();
+    expect(matchBikeTariff("Электровелосипед кросс")).toBeNull();
+    expect(matchBikeTariff(null)).toBeNull();
+    expect(matchBikeTariff("")).toBeNull();
+  });
+});
+
+describe("lead-scripts: точные ставки модели в скриптах (Straight Line)", () => {
+  const flat = (s: string) => s.replace(/\s+/g, "");
+
+  it("«на 3 месяца» Falcon GT → точный тариф 11–30 дней 7 000 ₽ (не медиана 8 000)", () => {
+    const res = buildSuggestedResponse(buildLead({
+      bikeTitle: "79BIKE Falcon GT",
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Здравствуйте, а на 3 месяца можно взять?", firstMessage: null,
+        itemPrice: 12000,
+      },
+    }));
+    expect(res?.intent.key).toBe("long_term");
+    const f = flat(res?.script ?? "");
+    expect(f).toContain("7000₽");     // rent_11_30d = 7 000 (медиана была бы 8 000)
+    expect(f).toContain("210000₽");   // месяц
+    expect(f).toContain("630000₽");   // 90 дней
+    expect(f).not.toContain("8000₽"); // медиана не должна просачиваться
+    // Точный залог модели вместо вилки.
+    expect(f).toContain("15000₽");
+    // Электро → только лимит 150 км/сутки, без «на бензине».
+    expect(res?.script).toContain("150 км/сутки");
+    expect(res?.script).not.toContain("200 км/сутки");
+  });
+
+  it("«на выходные» с моделью → тариф выходных (Falcon GT 14 000 × 2 = 28 000)", () => {
+    const res = buildSuggestedResponse(buildLead({
+      bikeTitle: "79BIKE Falcon GT",
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Свободен на выходные?", firstMessage: null,
+        itemPrice: 12000,
+      },
+    }));
+    expect(res?.intent.key).toBe("availability");
+    const f = flat(res?.script ?? "");
+    expect(f).toContain("28000₽");
+    expect(f).toContain("14000₽");
+    expect(res?.script).toContain("тариф выходных");
+  });
+
+  it("tariffDailyRate: слои по CSV и тариф выходных", () => {
+    const gt = matchBikeTariff("79BIKE Falcon GT");
+    expect(gt).not.toBeNull();
+    expect(tariffDailyRate(1, gt!)).toBe(12000);          // будни
+    expect(tariffDailyRate(1, gt!, true)).toBe(14000);    // выходные
+    expect(tariffDailyRate(2, gt!)).toBe(10000);          // rent_2_4d
+    expect(tariffDailyRate(7, gt!)).toBe(8000);           // rent_5_10d
+    expect(tariffDailyRate(14, gt!)).toBe(7000);          // 11–30d (14 дней тут)
+    expect(tariffDailyRate(90, gt!)).toBe(7000);          // >30 дней → максимум слоя
+  });
+
+  it("тариф выходных применяется к паре дней «на выходные» (rent_weekend ≥ слоя 2–4д)", () => {
+    const gt = matchBikeTariff("79BIKE Falcon GT");
+    expect(tariffDailyRate(2, gt!, true)).toBe(14000); // выходные, не 10 000 из слоя 2–4д
+    expect(tariffDailyRate(2, gt!, false)).toBe(10000); // будни → слой 2–4д
+  });
+
+  it("залог по конкретной модели (Yamaha R7 → 20 000 ₽), без вилки", () => {
+    const res = buildSuggestedResponse(buildLead({
+      bikeTitle: "Yamaha R7",
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Какой залог оставлять?", firstMessage: null,
+        itemPrice: 10000,
+      },
+    }));
+    expect(res?.intent.key).toBe("deposit");
+    expect(flat(res?.script ?? "")).toContain("20000₽");
+    expect(res?.script).toContain("Yamaha R7");
+    expect(res?.script).not.toContain("от 10 000 ₽ на лёгких");
+    expect(flat(res?.short ?? "")).toContain("20000₽");
+  });
+
+  it("права на электроэндуро: персональное «права НЕ нужны» под модель", () => {
+    const res = buildSuggestedResponse(buildLead({
+      bikeTitle: "79BIKE Falcon GT",
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "У меня только категория B, подойдёт?", firstMessage: null,
+        itemPrice: 12000,
+      },
+    }));
+    expect(res?.intent.key).toBe("documents");
+    expect(res?.script).toContain("права НЕ нужны");
+    expect(res?.script).toContain("49 см³");
+    expect(res?.short).toContain("только паспорт");
+  });
+});
+
+// ── Почасовые пакеты (1ч / 3ч / 6ч / 12ч) ───────────────────────────────────
+
+describe("lead-scripts: почасовые пакеты", () => {
+  const flat = (s: string) => s.replace(/\s+/g, "");
+
+  it("parseDurationHours: числа, инверсия, полдня, весь день, null-кейсы", () => {
+    expect(parseDurationHours("нужно на 3 часа")?.hours).toBe(3);
+    expect(parseDurationHours("А почасово можно? Нужно часа на 3")?.hours).toBe(3);
+    expect(parseDurationHours("пару часов")?.hours).toBe(2);
+    expect(parseDurationHours("на полдня")?.hours).toBe(6);
+    expect(parseDurationHours("возьму на весь день")?.hours).toBe(12);
+    expect(parseDurationHours("на 12 часов")?.hours).toBe(12);
+    expect(parseDurationHours("можно почасово?")?.hours).toBeNull();
+    expect(parseDurationHours("на часок")?.hours).toBe(1);
+    expect(parseDurationHours("на час")?.hours).toBe(1);
+    expect(parseDurationHours("сколько стоит?")).toBeNull();
+    expect(parseDurationHours("")).toBeNull();
+  });
+
+  it("«почасово можно? нужно часа на 3» → price + точный пакет 3 часа (Falcon Pro 7 000 ₽)", () => {
+    const res = buildSuggestedResponse(buildLead({
+      bikeTitle: "79BIKE Falcon Pro",
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "А почасово можно? Нужно часа на 3", firstMessage: null,
+        itemPrice: 10000,
+      },
+    }));
+    expect(res?.intent.key).toBe("price");
+    const f = flat(res?.script ?? "");
+    // Прицельный расчёт под названные часы.
+    expect(f).toContain("На3часа—пакет«3часа»,7000₽");
+    // Точный день + тариф выходных модели.
+    expect(f).toContain("10000₽всутки");
+    expect(f).toContain("ввыходные12000₽");
+    // CTA под часы, а не под даты.
+    expect(res?.script).toContain("На какое время нужен байк?");
+    expect(flat(res?.short ?? "")).toContain("пакет«3часа»,7000₽");
+  });
+
+  it("«можно почасово арендовать?» → price с блоком пакетов (не availability)", () => {
+    const res = buildSuggestedResponse(buildLead({
+      bikeTitle: "Ducati 1199 Panigale",
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Можно почасово арендовать?", firstMessage: null,
+        itemPrice: 18000,
+      },
+    }));
+    expect(res?.intent.key).toBe("price");
+    const f = flat(res?.script ?? "");
+    expect(f).toContain("1час—7200₽");
+    expect(f).toContain("3часа—9000₽");
+    expect(f).toContain("6часов—13000₽");
+    expect(f).toContain("12часов—16200₽");
+  });
+
+  it("оценка пакетов без модели: 3ч = 0.7 × сутки, 1ч = сутки/8", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Можно почасово?", firstMessage: null,
+        itemPrice: 10000,
+      },
+    }));
+    expect(res?.intent.key).toBe("price");
+    const f = flat(res?.script ?? "");
+    expect(f).toContain("1час—1300₽");   // 10 000 / 8 = 1250 → округление до 100
+    expect(f).toContain("3часа—7000₽");  // 10 000 × 0.7
+    expect(f).toContain("12часов—9000₽"); // 10 000 × 0.9
+    // Избыточного хвоста «Почасово тоже даём» рядом с блоком пакетов нет.
+    expect(f).not.toContain("Почасовотожедаём");
+  });
+});
+
+// ── Регрессии самообучения (прогон 1 → правки → прогон 2) ──────────────────
+
+describe("lead-scripts: регрессии самообучения", () => {
+  it("«дорого, лучше у частника» → discount (а не price из-за «час» внутри «частника»)", () => {
+    const lead = buildLead({
+      bikeTitle: "BMW F800R",
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Дорого. За эти деньги лучше у частника возьму", firstMessage: null,
+        itemPrice: 10000,
+      },
+    });
+    const res = buildSuggestedResponse(lead);
+    expect(res?.intent.key).toBe("discount");
+    // Точные слои F800R из CSV (медианы давали 8 500 / 7 500 / 6 700).
+    const f = (res?.script ?? "").replace(/\s+/g, "");
+    expect(f).toContain("9000₽");
+    expect(f).toContain("7000₽");
+    // Никакого «На час» из ложного парсинга «частника».
+    expect(res?.script).not.toContain("На час —");
+  });
+
+  it("«хочу такой же купить, сколько стоит?» → sale при равном счёте с price", () => {
+    const lead = buildLead({
+      bikeTitle: "LiveWire ONE",
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Хочу такой же купить, сколько стоит?", firstMessage: null,
+        itemPrice: 20000,
+      },
+    });
+    expect(scoreIntents(lead)[0]?.key).toBe("sale");
+    const res = buildSuggestedResponse(lead);
+    expect(res?.intent.key).toBe("sale");
+    expect(res?.script).toContain("официальный дилер 79Bike");
+    // Падеж: «в Нижнем Новгороде», не «в Нижний Новгород».
+    expect(res?.script).toContain("в Нижнем Новгороде");
+    expect(res?.script).not.toContain("в Нижний Новгород");
+  });
+
+  it("price-скрипт не дублирует слои скидок, когда цифры уже в строке модели", () => {
+    const res = buildSuggestedResponse(buildLead({
+      bikeTitle: "LiveWire ONE",
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Сколько стоит аренда?", firstMessage: null,
+        itemPrice: 20000,
+      },
+    }));
+    expect(res?.intent.key).toBe("price");
+    const occurrences = (res?.script.match(/2–4 дня/g) ?? []).length;
+    expect(occurrences).toBe(1);
   });
 });
