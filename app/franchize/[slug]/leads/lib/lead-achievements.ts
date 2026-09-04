@@ -3,7 +3,15 @@
 // ДОСТИЖЕНИЯ ЭКИПАЖА — геймификация KPI из протокола встречи.
 // =====================================================================
 //
-// Просьба босса: «Add a lot of achievements for all these metrics ;)».
+// Просьба босса: «Add a lot of achievements for all these metrics ;)»
+// и вторым заходом «Add more achievements for all these metrics ;)».
+//
+// ПАКЕТ 1 (13): скорость/очередь/SLA/перезвоны/КЭВ/сделки/норма дня/горячие/
+// диалог/воронка/касса/магнит + легенда «Идеальная смена».
+// ПАКЕТ 2 (+10): тест-драйвы, средний чек, продажи байков, норма недели КЭВ,
+// магнит недели, юнит-экономика (выручка на лид), дожим (лид → сделка),
+// марафон (всего обработано), глубина диалога («эффективный контакт» из
+// протокола) + легенда «Идеальная неделя».
 //
 // Каждое достижение — бейдж с уровнями бронза / серебро / золото (и «легенда»
 // для составных). Уровень берётся из той же KPI-математики, что и панели
@@ -20,6 +28,7 @@
 // Модуль чистый: без React, без Date.now() — вход только LeadKpiMetrics.
 
 import type { LeadKpiMetrics } from "./lead-kpi";
+import { NORM_KEV_PER_WEEK } from "./lead-kpi";
 import { fmtDurationMs } from "./lead-speed";
 
 // ── Типы ───────────────────────────────────────────────────────────────────
@@ -284,6 +293,134 @@ const DEFS: AchievementDef[] = [
     ],
     format: fmtCount,
   },
+
+  // ── ПАКЕТ 2: «Add more achievements» (2026-09-05) ────────────────────
+  {
+    id: "drive-master",
+    emoji: "🏍",
+    title: "Тест-драйвер",
+    desc: "Лидов с заявленным тест-драйвом — «эффективный контакт» из протокола, приглашай и фиксируй",
+    metric: (k) => k.testdrives,
+    direction: "max",
+    tiers: [
+      { tier: "bronze", target: 1 },
+      { tier: "silver", target: 3 },
+      { tier: "gold", target: 6 },
+    ],
+    format: fmtCount,
+  },
+  {
+    id: "avg-check",
+    emoji: "💎",
+    title: "Средний чек",
+    desc: "Средняя сумма сделки — растёт от долгих аренд и допродаж экипировки",
+    metric: (k) => k.avgDealCheck,
+    direction: "max",
+    tiers: [
+      { tier: "bronze", target: 10_000 },
+      { tier: "silver", target: 15_000 },
+      { tier: "gold", target: 25_000 },
+    ],
+    format: fmtMoneyK,
+  },
+  {
+    id: "seller",
+    emoji: "🛵",
+    title: "Продажник",
+    desc: "Продаж байков — отдельное направление отдела продаж из протокола",
+    metric: (k) => k.salesTotal,
+    direction: "max",
+    tiers: [
+      { tier: "bronze", target: 1 },
+      { tier: "silver", target: 2 },
+      { tier: "gold", target: 4 },
+    ],
+    format: fmtCount,
+  },
+  {
+    id: "week-kev",
+    emoji: "📆",
+    title: "Норма недели",
+    desc: "КЭВ за рабочую неделю (с понедельника) — недельное нормирование: 20 = 4/день × 5 дней",
+    metric: (k) => k.kevThisWeek,
+    direction: "max",
+    tiers: [
+      { tier: "bronze", target: 5 },
+      { tier: "silver", target: 10 },
+      { tier: "gold", target: NORM_KEV_PER_WEEK },
+    ],
+    format: fmtCount,
+  },
+  {
+    id: "week-magnet",
+    emoji: "📡",
+    title: "Магнит недели",
+    desc: "Лидов за текущую неделю — входящий трафик воронки в динамике",
+    metric: (k) => k.leadsThisWeek,
+    direction: "max",
+    tiers: [
+      { tier: "bronze", target: 10 },
+      { tier: "silver", target: 25 },
+      { tier: "gold", target: 50 },
+    ],
+    format: fmtCount,
+  },
+  {
+    id: "unit-econ",
+    emoji: "⚖️",
+    title: "Юнит-экономика",
+    desc: "Выручка на один лид — окупаемость трафика (лайт-LTV; CPL в данных лида нет)",
+    metric: (k) => k.revenuePerLead,
+    direction: "max",
+    tiers: [
+      { tier: "bronze", target: 500 },
+      { tier: "silver", target: 1_500 },
+      { tier: "gold", target: 3_000 },
+    ],
+    format: fmtMoneyK,
+  },
+  {
+    id: "squeeze",
+    emoji: "🥇",
+    title: "Дожиматель",
+    desc: "Конверсия лид → сделка — финальный дожим воронки, деньги в кассе",
+    metric: (k) => k.dealRate,
+    direction: "max",
+    tiers: [
+      { tier: "bronze", target: 0.05 },
+      { tier: "silver", target: 0.1 },
+      { tier: "gold", target: 0.2 },
+    ],
+    format: fmtPercent,
+  },
+  {
+    id: "marathon",
+    emoji: "🏁",
+    title: "Марафонец",
+    desc: "Всего лидов обработано за всё время — стабильность отдела, не только сегодня",
+    metric: (k) => k.speed.handledTotal,
+    direction: "max",
+    tiers: [
+      { tier: "bronze", target: 20 },
+      { tier: "silver", target: 50 },
+      { tier: "gold", target: 100 },
+    ],
+    format: fmtCount,
+  },
+  {
+    id: "dialog-depth",
+    emoji: "🗣",
+    title: "Глубокий диалог",
+    desc: "Среднее число сообщений покупателя в диалоге (авито) — разговор по сути, а не «есть ли в наличии»",
+    metric: (k) => k.avgDialogDepth,
+    direction: "max",
+    tiers: [
+      { tier: "bronze", target: 2 },
+      { tier: "silver", target: 4 },
+      { tier: "gold", target: 6 },
+    ],
+    format: fmtCount,
+  },
 ];
 
 // ── Расчёт ─────────────────────────────────────────────────────────────────
@@ -399,6 +536,30 @@ export function computeLeadAchievements(kpi: LeadKpiMetrics): LeadAchievement[] 
     available: true,
     valueLabel: perfect ? "выполнено" : "не выполнено",
     nextLabel: perfect ? null : "все условия",
+    color: TIER_COLORS.legend,
+  });
+
+  // ── ЛЕГЕНДА 2: идеальная неделя — недельная норма КЭВ без потерь ──
+  // Норма недели по КЭВ (20) выполнена, при этом ни одного SLA-просрочки и
+  // ни одного просроченного перезвона — неделя без слива целевых лидов.
+  const perfectWeek =
+    kpi.kevThisWeek >= NORM_KEV_PER_WEEK &&
+    kpi.speed.waitingOver24h === 0 &&
+    kpi.speed.callbacksOverdue === 0;
+  out.push({
+    id: "perfect-week",
+    emoji: "👑",
+    title: "Идеальная неделя",
+    desc: `Норма недели по КЭВ (${NORM_KEV_PER_WEEK}) выполнена, ноль SLA-просрочек и просроченных перезвонов`,
+    tier: "legend",
+    value: perfectWeek ? 1 : 0,
+    nextTarget: perfectWeek ? null : 1,
+    progress: perfectWeek ? 1 : 0,
+    unlocked: perfectWeek,
+    maxed: perfectWeek,
+    available: true,
+    valueLabel: perfectWeek ? "выполнено" : "не выполнено",
+    nextLabel: perfectWeek ? null : "все условия",
     color: TIER_COLORS.legend,
   });
 

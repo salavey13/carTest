@@ -4,9 +4,9 @@
 //   Активность (лиды) → Диалог (отработан) → КЭВ (договор/бронь) → Сделка.
 //
 // Под ступенями — конверсии между уровнями, чипы «сегодня» (лиды, обработано,
-// прогресс нормы дня), «горячие ждут» (не слить целевых!), тест-драйвы и
-// средний чек (юнит-экономика лайт). Все цифры — из lib/lead-kpi.ts; здесь
-// только визуализация.
+// прогресс нормы дня), норма недели КЭВ, «горячие ждут» (не слить целевых!),
+// тест-драйвы и средний чек (юнит-экономика лайт). Все цифры — из
+// lib/lead-kpi.ts; здесь только визуализация.
 
 "use client";
 
@@ -22,7 +22,7 @@ import {
   Receipt,
   CalendarDays,
 } from "lucide-react";
-import type { LeadKpiMetrics } from "../lib/lead-kpi";
+import { NORM_KEV_PER_WEEK, type LeadKpiMetrics } from "../lib/lead-kpi";
 import { fmtDurationMs } from "../lib/lead-speed";
 
 interface LeadsFunnelPanelProps {
@@ -77,6 +77,8 @@ export function LeadsFunnelPanel({ kpi, T }: LeadsFunnelPanelProps) {
   ];
 
   const normPct = Math.round(Math.min(1, kpi.normProgress) * 100);
+  const weekProgress = kpi.kevThisWeek / NORM_KEV_PER_WEEK;
+  const weekPct = Math.round(Math.min(1, weekProgress) * 100);
 
   return (
     <motion.div
@@ -161,6 +163,25 @@ export function LeadsFunnelPanel({ kpi, T }: LeadsFunnelPanelProps) {
         </div>
       </div>
 
+      {/* Норма недели по КЭВ (протокол: нормирование в недельном выражении) */}
+      <div className="mt-2.5">
+        <div className="mb-1 flex items-center justify-between text-[10px]" style={{ color: T.textFaint }}>
+          <span>Норма недели КЭВ: {kpi.kevThisWeek} из {NORM_KEV_PER_WEEK}</span>
+          <span style={{ color: weekProgress >= 1 ? "#22c55e" : T.textMuted }}>
+            {weekProgress >= 1 ? `выполнена ×${weekProgress.toFixed(1)}` : `${weekPct}%`}
+          </span>
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ backgroundColor: T.borderSoft }}>
+          <div
+            className="h-full rounded-full transition-all"
+            style={{
+              width: `${Math.min(100, weekPct)}%`,
+              backgroundColor: weekProgress >= 1 ? "#22c55e" : "#f59e0b",
+            }}
+          />
+        </div>
+      </div>
+
       {/* Чипы активности / юнит-экономики */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span
@@ -171,6 +192,23 @@ export function LeadsFunnelPanel({ kpi, T }: LeadsFunnelPanelProps) {
           <CalendarDays className="h-3 w-3" />
           Сегодня лидов: {kpi.leadsToday}
         </span>
+        <span
+          className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+          style={{ borderColor: T.border, color: T.textMuted }}
+          title="Лидов пришло за текущую рабочую неделю (с понедельника)"
+        >
+          <CalendarDays className="h-3 w-3" />
+          Неделя лидов: {kpi.leadsThisWeek}
+        </span>
+        {kpi.salesTotal > 0 && (
+          <span
+            className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+            style={{ borderColor: "rgba(139,92,246,0.4)", color: "#8b5cf6" }}
+            title="Продаж байков — направление «продажи» из протокола"
+          >
+            🛵 Продаж: {kpi.salesTotal}
+          </span>
+        )}
         {kpi.hotTotal > 0 && (
           <span
             className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"

@@ -10,6 +10,8 @@
  *  6. «Горячий спасатель» скрыт, когда горячих лидов нет.
  *  7. «Идеальная смена» — легенда: все условия → открыто, иначе закрыто.
  *  8. countUnlocked и монотонность по сделкам.
+ *  9. ПАКЕТ 2: тест-драйвы, средний чек, продажи, норма недели, магнит недели,
+ *     юнит-экономика, дожим, марафон, глубина диалога, «Идеальная неделя».
  */
 
 import { describe, expect, it } from "vitest";
@@ -43,12 +45,17 @@ function buildKpi(overrides: Partial<LeadKpiMetrics> = {}): LeadKpiMetrics {
   return {
     funnel: { leads: 40, dialogs: 20, kev: 10, deals: 5 },
     leadsToday: 3,
+    leadsThisWeek: 15,
+    kevThisWeek: 8,
+    salesTotal: 1,
     handledToday: 4,
     hotTotal: 4,
     hotWaiting: 0,
     testdrives: 2,
     revenue: 200_000,
     avgDealCheck: 25_000,
+    revenuePerLead: 5_000,
+    avgDialogDepth: 3,
     responseRate: 0.5,
     kevRate: 0.25,
     dealRate: 0.125,
@@ -182,6 +189,109 @@ describe("lead-achievements: доступность и легенда", () => {
   });
 });
 
+describe("lead-achievements: пакет 2 — регулярные бейджи", () => {
+  it("Тест-драйвер: 2 заявки — бронза, прогресс к серебру (3)", () => {
+    const a = find(computeLeadAchievements(buildKpi()), "drive-master");
+    expect(a.unlocked).toBe(true);
+    expect(a.tier).toBe("bronze");
+    expect(a.progress).toBeCloseTo((2 - 1) / (3 - 1), 6);
+  });
+
+  it("Средний чек: 25к — золото MAX; без сделок (null) — скрыт", () => {
+    const a = find(computeLeadAchievements(buildKpi()), "avg-check");
+    expect(a.tier).toBe("gold");
+    expect(a.maxed).toBe(true);
+
+    const hidden = find(computeLeadAchievements(buildKpi({ avgDealCheck: null })), "avg-check");
+    expect(hidden.available).toBe(false);
+    expect(hidden.unlocked).toBe(false);
+  });
+
+  it("Продажник: 2 продажи — серебро; 0 — заблокирован с прогрессом 0", () => {
+    const a = find(computeLeadAchievements(buildKpi({ salesTotal: 2 })), "seller");
+    expect(a.tier).toBe("silver");
+    expect(a.maxed).toBe(false);
+
+    const locked = find(computeLeadAchievements(buildKpi({ salesTotal: 0 })), "seller");
+    expect(locked.unlocked).toBe(false);
+    expect(locked.progress).toBe(0);
+    expect(locked.nextTarget).toBe(1);
+  });
+
+  it("Норма недели: 8 КЭВ — бронза (≥5), прогресс к серебру (10)", () => {
+    const a = find(computeLeadAchievements(buildKpi()), "week-kev");
+    expect(a.tier).toBe("bronze");
+    expect(a.progress).toBeCloseTo((8 - 5) / (10 - 5), 6);
+  });
+
+  it("Норма недели: 20 КЭВ — золото MAX (недельное нормирование выполнено)", () => {
+    const a = find(computeLeadAchievements(buildKpi({ kevThisWeek: 20 })), "week-kev");
+    expect(a.tier).toBe("gold");
+    expect(a.maxed).toBe(true);
+  });
+
+  it("Магнит недели: 15 лидов — бронза; 50 — золото MAX", () => {
+    const a = find(computeLeadAchievements(buildKpi()), "week-magnet");
+    expect(a.tier).toBe("bronze");
+    const max = find(computeLeadAchievements(buildKpi({ leadsThisWeek: 50 })), "week-magnet");
+    expect(max.tier).toBe("gold");
+    expect(max.maxed).toBe(true);
+  });
+
+  it("Юнит-экономика: 5000 ₽ на лид — золото MAX; без лидов (null) — скрыт", () => {
+    const a = find(computeLeadAchievements(buildKpi()), "unit-econ");
+    expect(a.tier).toBe("gold");
+    expect(a.maxed).toBe(true);
+
+    const hidden = find(computeLeadAchievements(buildKpi({ revenuePerLead: null })), "unit-econ");
+    expect(hidden.available).toBe(false);
+  });
+
+  it("Дожиматель: 12.5% сделок — серебро (≥10%), прогресс к золоту (20%)", () => {
+    const a = find(computeLeadAchievements(buildKpi()), "squeeze");
+    expect(a.tier).toBe("silver");
+    expect(a.progress).toBeCloseTo((0.125 - 0.1) / (0.2 - 0.1), 6);
+  });
+
+  it("Марафонец: 10 обработано — заблокирован, прогресс = доля от бронзы (20)", () => {
+    const a = find(computeLeadAchievements(buildKpi()), "marathon");
+    expect(a.unlocked).toBe(false);
+    expect(a.progress).toBeCloseTo(10 / 20, 6);
+    expect(a.nextTarget).toBe(20);
+  });
+
+  it("Глубокий диалог: 3 сообщения в среднем — бронза; нет данных (null) — скрыт", () => {
+    const a = find(computeLeadAchievements(buildKpi()), "dialog-depth");
+    expect(a.unlocked).toBe(true);
+    expect(a.tier).toBe("bronze");
+
+    const hidden = find(computeLeadAchievements(buildKpi({ avgDialogDepth: null })), "dialog-depth");
+    expect(hidden.available).toBe(false);
+  });
+});
+
+describe("lead-achievements: легенда 2 — идеальная неделя", () => {
+  it("Норма недели КЭВ выполнена и нули SLA/перезвонов — легенда открыта", () => {
+    const a = find(computeLeadAchievements(buildKpi({ kevThisWeek: 20 })), "perfect-week");
+    expect(a.tier).toBe("legend");
+    expect(a.unlocked).toBe(true);
+    expect(a.maxed).toBe(true);
+    expect(a.valueLabel).toBe("выполнено");
+  });
+
+  it("КЭВ за неделю ниже нормы — закрыта", () => {
+    const a = find(computeLeadAchievements(buildKpi({ kevThisWeek: 15 })), "perfect-week");
+    expect(a.unlocked).toBe(false);
+    expect(a.progress).toBe(0);
+  });
+
+  it("Просроченные перезвоны — закрыта, даже при выполненной норме", () => {
+    const kpi = buildKpi({ kevThisWeek: 25, speed: buildSpeed({ callbacksOverdue: 1 }) });
+    const a = find(computeLeadAchievements(kpi), "perfect-week");
+    expect(a.unlocked).toBe(false);
+  });
+});
+
 describe("lead-achievements: сводка", () => {
   it("countUnlocked считает только доступные и открытые", () => {
     const kpi = buildKpi({
@@ -191,11 +301,14 @@ describe("lead-achievements: сводка", () => {
       revenue: 500_000, // касса — золото
     });
     const list = computeLeadAchievements(kpi);
-    // 13 достижений всего, 2 скрыты → 11 доступных.
-    // Открыты как минимум: очередь, SLA, перезвон (нули), касса, магнит,
-    // разгон дня (4 ≥ бронзы), идеальная смена, горячий — скрыт.
-    expect(countUnlocked(list)).toBeGreaterThanOrEqual(6);
+    // 23 достижения всего (13 пакета 1 + 10 пакета 2), 2 скрыты → 21 доступно.
+    // Открыты с фикстурой: очередь, SLA, перезвон, КЭВ-мастер, клоузер, разгон,
+    // диалог, воронка, касса, магнит, тест-драйвер, средний чек, продажник,
+    // норма недели, магнит недели, юнит-экономика, дожим, глубокий диалог = 18;
+    // закрыты: марафон (10 < 20), идеальная смена (медиана null),
+    // идеальная неделя (8 < 20).
+    expect(countUnlocked(list)).toBe(18);
     expect(list.filter((a) => !a.available)).toHaveLength(2);
-    expect(list).toHaveLength(13);
+    expect(list).toHaveLength(23);
   });
 });

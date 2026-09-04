@@ -10,10 +10,17 @@
  *  6. «Горячие ждут»: temperature=hot без обработки/конверсии/перезвона.
  *  7. Тест-драйвы из avito intent, выручка и средний чек.
  *  8. Скоростные метрики встроены (speed.medianMs).
+ *  9. ПАКЕТ 2: недельные метрики (leadsThisWeek/kevThisWeek), продажи,
+ *     выручка на лид, глубина диалога, startOfWeek.
  */
 
 import { describe, expect, it } from "vitest";
-import { computeLeadKpi, NORM_HANDLED_PER_DAY } from "@/app/franchize/[slug]/leads/lib/lead-kpi";
+import {
+  computeLeadKpi,
+  NORM_HANDLED_PER_DAY,
+  NORM_KEV_PER_WEEK,
+  startOfWeek,
+} from "@/app/franchize/[slug]/leads/lib/lead-kpi";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/[slug]/leads/leads-types";
 
 const NOW = Date.parse("2026-09-04T12:00:00.000Z");
@@ -232,5 +239,98 @@ describe("lead-kpi: горячие лиды и юнит-экономика", () 
     const kpi = computeLeadKpi(leads, [handledTodo("l-1", "2026-09-04T10:45:00.000Z")], NOW);
     expect(kpi.speed.medianMs).toBe(45 * 60_000);
     expect(kpi.handledToday).toBe(1);
+  });
+});
+
+describe("lead-kpi: пакет 2 — неделя, продажи, юнит-экономика, диалог", () => {
+  it("startOfWeek: четверг/воскресенье → понедельник 00:00 той же недели", () => {
+    // 2026-09-04 — пятница; неделя начинается в пн 2026-08-31 (локально).
+    const monday = startOfWeek(Date.parse("2026-09-04T12:00:00.000Z"));
+    const d = new Date(monday);
+    expect(d.getDay()).toBe(1); // понедельник
+    expect(d.getHours()).toBe(0);
+    expect(d.getMinutes()).toBe(0);
+    // Воскресенье 2026-09-06 — та же неделя (неделя начинается в пн).
+    expect(startOfWeek(Date.parse("2026-09-06T23:00:00.000Z"))).toBe(monday);
+  });
+
+  it("leadsThisWeek/kevThisWeek: только текущая рабочая неделя; заглушки исключены", () => {
+    const leads: LeadRow[] = [
+      // На этой неделе, КЭВ (договор отправлен).
+      buildLead({ user_id: "l-kev-week", createdAt: "2026-09-02T09:00:00.000Z", stageKey: "contract_sent" }),
+      // На этой неделе, без КЭВ.
+      buildLead({ user_id: "l-new-week", createdAt: "2026-09-03T09:00:00.000Z" }),
+      // Прошлая неделя, КЭВ — в недельные счётчики не попадает.
+      buildLead({ user_id: "l-kev-old", createdAt: "2026-08-25T09:00:00.000Z", stageKey: "closed_won" }),
+      // Заглушка оператора — вообще не в воронке.
+      buildLead({ user_id: "l-ph", createdAt: "2026-09-03T09:00:00.000Z", identityState: "operator_placeholder", stageKey: "active_rental" }),
+    ];
+    const kpi = computeLeadKpi(leads, [], NOW);
+    expect(kpi.leadsThisWeek).toBe(2);
+    expect(kpi.kevThisWeek).toBe(1);
+    // Недельная норма связана с дневной: 4/д × 5 дней.
+    expect(NORM_KEV_PER_WEEK).toBe(NORM_HANDLED_PER_DAY * 5);
+  });
+
+  it("лид с битой/пустой датой создания не роняет недельные метрики", () => {
+    const leads: LeadRow[] = [
+      buildLead({ user_id: "l-1", createdAt: null, stageKey: "contract_sent" }),
+      buildLead({ user_id: "l-2", createdAt: "не дата", stageKey: "active_rental" }),
+    ];
+    const kpi = computeLeadKpi(leads, [], NOW);
+    expect(kpi.leadsThisWeek).toBe(0);
+    expect(kpi.kevThisWeek).toBe(0);
+    expect(kpi.funnel.kev).toBe(2); // в общую воронку КЭВ всё же входит
+  });
+
+  it("salesTotal — сумма продаж по лидам; revenuePerLead — выручка на лид", () => {
+    const leads: LeadRow[] = [
+      buildLead({
+        user_id: "l-sale-1",
+        totalSpent: 180_000,
+        stageKey: "closed_won",
+        sales: [{ saleId: "s-1", bikeTitle: "Talaria Sting", salePrice: 180_000, createdAt: "2026-09-01T10:00:00.000Z" }],
+      }),
+      buildLead({
+        user_id: "l-sale-2",
+        totalSpent: 60_000,
+        stageKey: "closed_won",
+        sales: [
+          { saleId: "s-2", bikeTitle: "Hurricane", salePrice: 40_000, createdAt: "2026-09-02T10:00:00.000Z" },
+          { saleId: "s-3", bikeTitle: "Surge", salePrice: 20_000, createdAt: "2026-09-03T10:00:00.000Z" },
+        ],
+      }),
+      buildLead({ user_id: "l-rent", totalSpent: 22_000, stageKey: "active_rental" }),
+    ];
+    const kpi = computeLeadKpi(leads, [], NOW);
+    expect(kpi.salesTotal).toBe(3); // 1 + 2 продажи, лиды без продаж — 0
+    expect(kpi.funnel.leads).toBe(3);
+    expect(kpi.revenuePerLead).toBeCloseTo(262_000 / 3, 6);
+  });
+
+  it("revenuePerLead: null при пустой воронке", () => {
+    const empty = computeLeadKpi([], [], NOW);
+    expect(empty.revenuePerLead).toBeNull();
+    expect(empty.avgDialogDepth).toBeNull();
+  });
+
+  it("avgDialogDepth — среднее сообщений покупателя (авито); 0 и без авито — не считаются", () => {
+    const avito = (messagesCount: number | null | undefined) => ({
+      chatId: null,
+      itemUrl: null,
+      profileUrl: null,
+      itemId: null,
+      lastMessage: null,
+      ...(messagesCount === undefined ? {} : { messagesCount }),
+    });
+    const leads: LeadRow[] = [
+      buildLead({ user_id: "l-1", avito: avito(3) }),
+      buildLead({ user_id: "l-2", avito: avito(5) }),
+      buildLead({ user_id: "l-zero", avito: avito(0) }), // ноль не считаем
+      buildLead({ user_id: "l-none", avito: avito(null) }), // нет данных
+      buildLead({ user_id: "l-noavito" }), // не авито-канал
+    ];
+    const kpi = computeLeadKpi(leads, [], NOW);
+    expect(kpi.avgDialogDepth).toBe(4); // (3 + 5) / 2
   });
 });

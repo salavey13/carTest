@@ -26,6 +26,13 @@
 //
 // НОРМА ДНЯ (из протокола: «нормирование КЭВ») — NORM_HANDLED_PER_DAY
 // обработанных лидов в день; прогресс показывается в панели воронки.
+// НОРМА НЕДЕЛИ — NORM_KEV_PER_WEEK КЭВ-лидов за неделю (пн–пт), та же
+// «нормирование КЭВ» из протокола в недельном выражении.
+//
+// ПАКЕТ 2 ДОСТИЖЕНИЙ (2026-09-05, «Add more achievements»): +5 метрик —
+// kevThisWeek/leadsThisWeek (недельная динамика), salesTotal (продажи
+// байков), revenuePerLead (лайт-LTV: выручка на лид), avgDialogDepth
+// («эффективный контакт» из протокола — глубина диалога покупателя).
 //
 // Модуль чистый: без React, без Date.now() внутри (now передаётся снаружи).
 // Скоростные метрики (lead-speed.ts) встроены в результат одним вызовом —
@@ -40,6 +47,12 @@ import { isCallbackTodo, isHandledTodo } from "./lead-handling";
 
 /** Норма обработанных лидов в день на экипаж. */
 export const NORM_HANDLED_PER_DAY = 4;
+
+/**
+ * Недельная норма КЭВ (протокол: «нормирование КЭВ» в недельном выражении):
+ * 4 лид/день × 5 рабочих дней.
+ */
+export const NORM_KEV_PER_WEEK = NORM_HANDLED_PER_DAY * 5;
 
 // ── Стадии КЭВ и Сделки ────────────────────────────────────────────────────
 
@@ -80,6 +93,12 @@ export interface LeadKpiMetrics {
   funnel: KpiFunnel;
   /** Лидов пришло сегодня (календарный день now). */
   leadsToday: number;
+  /** Лидов пришло за текущую неделю (с понедельника) — «магнит недели». */
+  leadsThisWeek: number;
+  /** КЭВ-лидов за текущую неделю — недельная норма NORM_KEV_PER_WEEK. */
+  kevThisWeek: number;
+  /** Продаж байков по лидам экипажа (сумма sales) — направление «продажи». */
+  salesTotal: number;
   /** Обработано сегодня (= speed.handledToday). */
   handledToday: number;
   /** Горячих лидов всего (avito temperature=hot). */
@@ -92,6 +111,11 @@ export interface LeadKpiMetrics {
   revenue: number;
   /** Средний чек сделки, ₽ — null, если сделок нет. */
   avgDealCheck: number | null;
+  /** Выручка на один лид (лайт-LTV без CPL), ₽ — null, если лидов нет. */
+  revenuePerLead: number | null;
+  /** Средняя глубина диалога (сообщений покупателя на авито) — «эффективный
+   *  контакт» из протокола; null, если данных о сообщениях нет. */
+  avgDialogDepth: number | null;
   /** Конверсии 0..1 — null, если знаменатель 0. */
   responseRate: number | null;
   kevRate: number | null;
@@ -115,6 +139,18 @@ function isSameCalendarDay(iso: string, now: number): boolean {
   );
 }
 
+/**
+ * Начало текущей недели — понедельник 00:00 локального времени (неделя
+ * рабочая, метрики отдела считаются пн–пт; now — снаружи для чистоты тестов).
+ */
+export function startOfWeek(now: number): number {
+  const d = new Date(now);
+  const mondayOffset = (d.getDay() + 6) % 7; // 0 = понедельник
+  d.setDate(d.getDate() - mondayOffset);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
 function rateOr(numerator: number, denominator: number): number | null {
   if (denominator <= 0) return null;
   return numerator / denominator;
@@ -135,12 +171,18 @@ export function computeLeadKpi(
 
   let leadsTotal = 0;
   let leadsToday = 0;
+  let leadsThisWeek = 0;
   let kevCount = 0;
+  let kevThisWeek = 0;
   let dealCount = 0;
   let hotTotal = 0;
   let hotWaiting = 0;
   let testdrives = 0;
+  let salesTotal = 0;
   let revenue = 0;
+  let dialogDepthSum = 0;
+  let dialogDepthCount = 0;
+  const weekStart = startOfWeek(now);
 
   for (const lead of leads) {
     // Операторские заглушки — не входящие обращения, воронку не портим
@@ -149,12 +191,22 @@ export function computeLeadKpi(
 
     leadsTotal += 1;
 
+    // Недельная динамика: создан в текущей рабочей неделе (с понедельника).
+    const createdMs = lead.createdAt ? new Date(lead.createdAt).getTime() : NaN;
+    const isThisWeek = Number.isFinite(createdMs) && createdMs >= weekStart;
     if (lead.createdAt && isSameCalendarDay(lead.createdAt, now)) leadsToday += 1;
+    if (isThisWeek) leadsThisWeek += 1;
 
     // Стадия: сервер проставляет stageKey, иначе считаем локально.
     const stage = lead.stageKey || computeLeadStage(lead);
-    if (KEV_STAGES.has(stage)) kevCount += 1;
+    if (KEV_STAGES.has(stage)) {
+      kevCount += 1;
+      if (isThisWeek) kevThisWeek += 1;
+    }
     if (DEAL_STAGES.has(stage)) dealCount += 1;
+
+    // Продажи байков — отдельное направление отдела продаж (протокол).
+    salesTotal += lead.sales.length;
 
     // Горячие лиды, которые ещё ждут ответа: температура от AI-анализа,
     // «ждёт» = не обработан, не конвертирован, без назначенного перезвона.
@@ -165,6 +217,13 @@ export function computeLeadKpi(
 
     if (lead.avito?.analysis?.intent === "testdrive") testdrives += 1;
 
+    // Глубина диалога: захваченные сообщения покупателя (авито-канал).
+    const messagesCount = lead.avito?.messagesCount;
+    if (typeof messagesCount === "number" && messagesCount > 0) {
+      dialogDepthSum += messagesCount;
+      dialogDepthCount += 1;
+    }
+
     revenue += lead.totalSpent || 0;
   }
 
@@ -173,16 +232,23 @@ export function computeLeadKpi(
   const kevRate = rateOr(kevCount, leadsTotal);
   const dealRate = rateOr(dealCount, leadsTotal);
   const avgDealCheck = dealCount > 0 ? revenue / dealCount : null;
+  const revenuePerLead = rateOr(revenue, leadsTotal);
+  const avgDialogDepth = dialogDepthCount > 0 ? dialogDepthSum / dialogDepthCount : null;
 
   return {
     funnel: { leads: leadsTotal, dialogs, kev: kevCount, deals: dealCount },
     leadsToday,
+    leadsThisWeek,
+    kevThisWeek,
+    salesTotal,
     handledToday: speed.handledToday,
     hotTotal,
     hotWaiting,
     testdrives,
     revenue,
     avgDealCheck,
+    revenuePerLead,
+    avgDialogDepth,
     responseRate,
     kevRate,
     dealRate,
