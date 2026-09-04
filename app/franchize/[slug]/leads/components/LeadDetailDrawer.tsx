@@ -21,6 +21,8 @@ import {
   MessageCircle,
   Target,
   Copy,
+  Check,
+  Quote,
   type LucideIcon,
 } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "../leads-types";
@@ -188,6 +190,15 @@ export function LeadDetailDrawer(props: Props) {
   const [openNotes, setOpenNotes] = useState(true);
   const [openHistory, setOpenHistory] = useState(false);
 
+  // 📖 Читаемость «Готового ответа»: какой вариант читаем (полный/короткий),
+  // развёрнут ли длинный текст, какие быстрые ответы развёрнуты и что только
+  // что скопировали (мгновенный фидбэк на кнопке).
+  const [scriptTab, setScriptTab] = useState<"full" | "short">("full");
+  const [scriptExpanded, setScriptExpanded] = useState(false);
+  const [showQrTexts, setShowQrTexts] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // 🎯 Готовый ответ — скрипт продажи под интент вопроса покупателя.
   // Только для авито-лидов (иначе null → секция скрыта). Считается на лету
   // из metadata webhook'а: чистая функция, в БД не пишется, работает
@@ -206,6 +217,17 @@ export function LeadDetailDrawer(props: Props) {
     }, 350);
     return () => clearTimeout(t);
   }, [focusNotesSignal]);
+
+  // Новый лид — сбрасываем локальное состояние читаемости (вкладку,
+  // разворот длинного текста и развёрнутые тексты быстрых ответов),
+  // чтобы шторка не приносила состояние с прошлого лида.
+  const leadId = lead?.user_id || "";
+  useEffect(() => {
+    setScriptTab("full");
+    setScriptExpanded(false);
+    setShowQrTexts(false);
+    setCopiedKey(null);
+  }, [leadId]);
 
   const infoItems: InfoTile[] = [
     { label: "Телефон", value: lead?.phone || "—", copyable: !!lead?.phone },
@@ -341,6 +363,53 @@ export function LeadDetailDrawer(props: Props) {
       toast.error(`Не удалось скопировать ${label}`);
     }
   };
+
+  // Мгновенный фидбэк «Скопировано ✓» на кнопке/чипе (2.2 c).
+  const flashCopied = (key: string) => {
+    setCopiedKey(key);
+    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    copiedTimerRef.current = setTimeout(() => setCopiedKey(null), 2200);
+  };
+
+  // ── Данные для читаемого «Готового ответа» ──
+  // Какой текст сейчас читаем (полный скрипт или короткий вариант).
+  const activeScript = suggested
+    ? scriptTab === "short"
+      ? suggested.short
+      : suggested.script
+    : "";
+  // Порог «длинного» текста: сворачиваем с градиентным фейдом и кнопкой
+  // «Показать полностью» — вместо вложенного скролла внутри шторки.
+  const scriptIsLong = activeScript.length > 260;
+  // Вопрос покупателя — что именно он написал (последнее сообщение,
+  // фолбэк на первое). Показываем над ответом: вопрос → ответ читается
+  // одним взглядом, без переключения в чат Авито.
+  const buyerMessage = (() => {
+    const av = lead.avito;
+    if (!av) return null;
+    const m = (av.lastMessage || av.firstMessage || "").trim();
+    return m || null;
+  })();
+  const buyerMsgMeta: string[] = [];
+  const msgCount = typeof lead.avito?.messagesCount === "number" ? lead.avito.messagesCount : 0;
+  if (msgCount > 0) {
+    buyerMsgMeta.push(msgCount === 1 ? "1 сообщение" : `${msgCount} сообщ.`);
+  }
+  const lastMsgRel = relativeTime(lead.avito?.lastMessageAt || null);
+  if (lastMsgRel) buyerMsgMeta.push(lastMsgRel);
+  // AI-обогащение (температура/возражение/сущности) показываем только когда
+  // ответ реально пришёл от агента (ai/hybrid) — иначе вводим в заблуждение.
+  const aiMeta =
+    suggested && suggested.source !== "rules" ? lead.avito?.analysis ?? null : null;
+  const tempMeta =
+    aiMeta?.temperature && aiMeta.temperature in AI_TEMPERATURE_META
+      ? AI_TEMPERATURE_META[aiMeta.temperature]
+      : null;
+  const objectionLabel =
+    aiMeta?.objection && aiMeta.objection in AI_OBJECTION_META
+      ? AI_OBJECTION_META[aiMeta.objection]
+      : null;
+  const entityEntries = Object.entries(aiMeta?.entities ?? {}).slice(0, 4);
 
   // "Действия" dropdown — local, zero-latency actions that don't need the
   // parent's server wiring (clipboard + external links). Destructive
@@ -569,10 +638,13 @@ export function LeadDetailDrawer(props: Props) {
         </a>
       )}
 
-      {/* 1b+. Готовый ответ — скрипт продажи под интент вопроса покупателя
-          (call-center practice: скрипт под вопрос + next-best-action +
-          quick replies). Стоит РЯДОМ с кнопкой «Открыть чат Авито», чтобы
-          путь «прочитал → скопировал → вставил» занимал секунды.
+      {/* 1b+. Готовый ответ — читаемая «открыточка» под интент вопроса
+          покупателя (call-center practice). Читаемость — прежде всего:
+          1) вопрос покупателя пузырём над ответом (вопрос → ответ одним
+          взглядом), 2) вкладки Полный/Короткий, 3) длинный текст
+          сворачивается с фейдом (без вложенного скролла), 4) фидбэк
+          «Скопировано ✓», 5) температура/возражение/сущности от AI-агента,
+          6) тексты быстрых ответов раскрываются (на мобиле нет hover).
           Для не-авито лидов suggested == null → секция не рендерится. */}
       {suggested && (
         <div className="mt-5">
@@ -583,7 +655,8 @@ export function LeadDetailDrawer(props: Props) {
             onToggle={() => setOpenScript(!openScript)}
             T={T}
           >
-            <div className="mb-3 flex flex-wrap items-center gap-2">
+            {/* Бейджи: интент + температура/возражение от AI-агента */}
+            <div className="mb-2 flex flex-wrap items-center gap-2">
               <span
                 className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold"
                 style={{ background: "#22c55e1f", color: "#16a34a" }}
@@ -595,45 +668,158 @@ export function LeadDetailDrawer(props: Props) {
               >
                 {suggested.intent.emoji} {suggested.intent.label}
               </span>
-              <span className="text-[11px]" style={{ color: T.textFaint }}>
-                {suggested.source === "ai"
-                  ? "ответ собран AI-агентом по сообщению покупателя — проверьте перед отправкой"
-                  : suggested.source === "hybrid"
-                    ? "интент распознал AI-агент, текст — из нашей библиотеки скриптов"
-                    : "текст собран под вопрос покупателя — правьте перед отправкой"}
-              </span>
+              {tempMeta && (
+                <span
+                  className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold"
+                  style={{ background: tempMeta.bg, color: tempMeta.color }}
+                  title="Оценка AI-агента по тону сообщений покупателя"
+                >
+                  {tempMeta.label}
+                </span>
+              )}
+              {objectionLabel && (
+                <span
+                  className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold"
+                  style={{ background: "#ef444414", color: "#dc2626" }}
+                >
+                  {objectionLabel}
+                </span>
+              )}
+              {entityEntries.map(([k, v]) => (
+                <span
+                  key={k}
+                  className="inline-flex max-w-[190px] items-center gap-1 rounded-full border px-2.5 py-1 text-[11px]"
+                  style={{ borderColor: T.border, color: T.textMuted }}
+                  title={`${AI_ENTITY_LABELS[k] ?? k}: ${v}`}
+                >
+                  <span className="shrink-0 opacity-80">{AI_ENTITY_LABELS[k] ?? k}</span>
+                  <span className="truncate font-semibold" style={{ color: T.text }}>
+                    {v}
+                  </span>
+                </span>
+              ))}
             </div>
+            <p className="mb-3 text-[11px] leading-snug" style={{ color: T.textFaint }}>
+              {suggested.source === "ai"
+                ? "Ответ собрал AI-агент по сообщению покупателя — проверьте перед отправкой"
+                : suggested.source === "hybrid"
+                  ? "Интент распознал AI-агент, текст — из нашей библиотеки скриптов"
+                  : "Текст собран под вопрос покупателя — правьте перед отправкой"}
+            </p>
 
-            {/* Скрипт: select-all — тап по тексту выделяет его целиком */}
+            {/* Вопрос покупателя — входящее «сообщение» над ответом */}
+            {buyerMessage && (
+              <div className="mb-3 flex justify-start">
+                <div
+                  className="max-w-[94%] rounded-2xl rounded-bl-md border px-3.5 py-2.5"
+                  style={{ borderColor: T.border, background: T.bgCard }}
+                >
+                  <p className="text-[13px] leading-snug" style={{ color: T.text }}>
+                    {buyerMessage}
+                  </p>
+                  <p
+                    className="mt-1.5 flex items-center gap-1 text-[10px] font-medium"
+                    style={{ color: T.textFaint }}
+                  >
+                    <Quote className="h-3 w-3 shrink-0" aria-hidden />
+                    Вопрос покупателя{buyerMsgMeta.length > 0 ? ` · ${buyerMsgMeta.join(" · ")}` : ""}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Вкладки: какой вариант читаем/копируем */}
             <div
-              className="max-h-64 select-all overflow-y-auto whitespace-pre-wrap rounded-2xl border p-3 text-sm leading-relaxed"
-              style={{ borderColor: T.border, background: T.bgCard, color: T.text }}
+              className="mb-2 inline-flex rounded-xl border p-1"
+              style={{ borderColor: T.border, background: T.bgCard }}
+              role="tablist"
+              aria-label="Вариант ответа"
             >
-              {suggested.script}
+              {(
+                [
+                  ["full", "Полный ответ"],
+                  ["short", "Короткий"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={scriptTab === key}
+                  onClick={() => {
+                    setScriptTab(key);
+                    setScriptExpanded(false);
+                  }}
+                  className="min-h-[32px] cursor-pointer rounded-lg px-3.5 text-xs font-semibold transition"
+                  style={
+                    scriptTab === key
+                      ? { background: T.accent, color: T.accentContrast }
+                      : { color: T.textMuted }
+                  }
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
+            {/* Текст ответа: select-all, без вложенного скролла — длинный
+                текст сворачиваем с градиентным фейдом и кнопкой разворота */}
+            <div
+              className="relative select-all rounded-2xl border"
+              style={{ borderColor: T.border, background: T.bgCard }}
+            >
+              <div
+                className={`whitespace-pre-wrap p-3.5 text-[15px] leading-relaxed ${
+                  !scriptExpanded && scriptIsLong ? "max-h-44 overflow-hidden" : ""
+                }`}
+                style={{ color: T.text }}
+              >
+                {activeScript}
+              </div>
+              {!scriptExpanded && scriptIsLong && (
+                <div
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-14 rounded-b-2xl"
+                  style={{ background: `linear-gradient(to bottom, transparent, ${T.bgCard})` }}
+                />
+              )}
+            </div>
+            {scriptIsLong && (
+              <button
+                type="button"
+                onClick={() => setScriptExpanded(!scriptExpanded)}
+                className="mt-1.5 inline-flex min-h-[36px] cursor-pointer items-center gap-1 text-xs font-semibold"
+                style={{ color: T.accent }}
+              >
+                {scriptExpanded ? "Свернуть" : "Показать полностью"}
+                <ChevronDown
+                  className={`h-3.5 w-3.5 transition-transform ${scriptExpanded ? "rotate-180" : ""}`}
+                  aria-hidden
+                />
+              </button>
+            )}
+
+            {/* Копирование — с фидбэком на кнопке (не только тостом) */}
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => {
-                  void copyText(suggested.script, "ответ");
-                  toast.success("Ответ скопирован — вставьте в чат Авито");
+                  void copyText(activeScript, "ответ");
+                  flashCopied(`script-${scriptTab}`);
+                  toast.success(
+                    scriptTab === "short"
+                      ? "Короткий вариант скопирован"
+                      : "Ответ скопирован — вставьте в чат Авито",
+                  );
                 }}
                 className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition enabled:hover:brightness-110"
                 style={{ background: T.accent, color: T.accentContrast }}
               >
-                <Copy className="h-4 w-4" aria-hidden /> Скопировать ответ
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void copyText(suggested.short, "короткий ответ");
-                  toast.success("Короткий вариант скопирован");
-                }}
-                className="min-h-[44px] cursor-pointer rounded-xl border px-4 py-2 text-sm font-medium transition"
-                style={{ borderColor: T.border, color: T.text }}
-              >
-                Короткий
+                {copiedKey === `script-${scriptTab}` ? (
+                  <Check className="h-4 w-4" aria-hidden />
+                ) : (
+                  <Copy className="h-4 w-4" aria-hidden />
+                )}
+                {copiedKey === `script-${scriptTab}` ? "Скопировано" : "Скопировать ответ"}
               </button>
             </div>
 
@@ -646,31 +832,94 @@ export function LeadDetailDrawer(props: Props) {
               {suggested.nextBestAction}
             </div>
 
-            {/* Quick replies — однострочники, клик = копирование */}
-            <div className="mt-3">
-              <p
-                className="mb-2 text-[11px] font-medium uppercase tracking-wide"
-                style={{ color: T.textFaint }}
+            {/* Заметка AI-агента оператору (если передана) */}
+            {suggested.aiNotes && (
+              <div
+                className="mt-2 rounded-xl px-3 py-2 text-xs leading-relaxed"
+                style={{ background: "#8b5cf614", color: "#7c3aed" }}
               >
-                Быстрые ответы — клик копирует текст
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {suggested.quickReplies.map((qr) => (
-                  <button
-                    key={qr.label}
-                    type="button"
-                    onClick={() => {
-                      void copyText(qr.text, "быстрый ответ");
-                      toast.success(`Скопировано: ${qr.label}`);
-                    }}
-                    title={qr.text}
-                    className="min-h-[36px] cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition enabled:hover:bg-black/[0.04]"
-                    style={{ borderColor: T.border, background: T.bgCard, color: T.text }}
-                  >
-                    {qr.label}
-                  </button>
-                ))}
+                <span className="font-bold">🤖 Заметка агента: </span>
+                {suggested.aiNotes}
               </div>
+            )}
+
+            {/* Quick replies — однострочники, клик = копирование.
+                «Тексты» раскрывает полный текст каждого чипа: на мобиле
+                hover-title не работает, а читать перед отправкой надо. */}
+            <div className="mt-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p
+                  className="text-[11px] font-medium uppercase tracking-wide"
+                  style={{ color: T.textFaint }}
+                >
+                  Быстрые ответы — клик копирует текст
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowQrTexts(!showQrTexts)}
+                  aria-expanded={showQrTexts}
+                  className="inline-flex min-h-[28px] shrink-0 cursor-pointer items-center gap-1 text-[11px] font-semibold"
+                  style={{ color: T.textMuted }}
+                >
+                  Тексты
+                  <ChevronDown
+                    className={`h-3 w-3 transition-transform ${showQrTexts ? "rotate-180" : ""}`}
+                    aria-hidden
+                  />
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {suggested.quickReplies.map((qr) => {
+                  const copied = copiedKey === `qr-${qr.label}`;
+                  return (
+                    <button
+                      key={qr.label}
+                      type="button"
+                      onClick={() => {
+                        void copyText(qr.text, "быстрый ответ");
+                        flashCopied(`qr-${qr.label}`);
+                        toast.success(`Скопировано: ${qr.label}`);
+                      }}
+                      title={qr.text}
+                      className="min-h-[36px] cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition enabled:hover:bg-black/[0.04]"
+                      style={{
+                        borderColor: copied ? "#22c55e66" : T.border,
+                        background: copied ? "#22c55e1a" : T.bgCard,
+                        color: copied ? "#16a34a" : T.text,
+                      }}
+                    >
+                      {copied ? `✓ ${qr.label}` : qr.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {showQrTexts && (
+                <div className="mt-2 space-y-1.5">
+                  {suggested.quickReplies.map((qr) => (
+                    <button
+                      key={`text-${qr.label}`}
+                      type="button"
+                      onClick={() => {
+                        void copyText(qr.text, "быстрый ответ");
+                        flashCopied(`qr-${qr.label}`);
+                        toast.success(`Скопировано: ${qr.label}`);
+                      }}
+                      className="w-full cursor-pointer rounded-xl border px-3 py-2 text-left transition enabled:hover:bg-black/[0.04]"
+                      style={{ borderColor: T.border, background: T.bgCard }}
+                    >
+                      <span className="block text-[11px] font-bold" style={{ color: T.text }}>
+                        {qr.label}
+                      </span>
+                      <span
+                        className="mt-0.5 block whitespace-pre-wrap text-xs leading-snug"
+                        style={{ color: T.textMuted }}
+                      >
+                        {qr.text}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </Section>
         </div>
@@ -1169,6 +1418,35 @@ export function LeadDetailDrawer(props: Props) {
     </AnimatePresence>
   );
 }
+
+// ── AI-обогащение «Готового ответа» ─────────────────────────────────────
+// Метки для analysis.temperature и analysis.objection — агент передаёт
+// машинные ключи (hot/warm/cold, price/license/…), оператору показываем
+// человеческие плашки рядом с бейджем интента.
+
+const AI_TEMPERATURE_META: Record<string, { label: string; bg: string; color: string }> = {
+  hot: { label: "🔥 Горячий", bg: "#ef44441f", color: "#ef4444" },
+  warm: { label: "🌤 Тёплый", bg: "#f59e0b1f", color: "#b45309" },
+  cold: { label: "❄ Холодный", bg: "#0ea5e91f", color: "#0284c7" },
+};
+
+const AI_OBJECTION_META: Record<string, string> = {
+  price: "💰 Возражение: цена",
+  license: "📄 Возражение: права",
+  experience: "🏍 Возражение: опыт",
+  trust: "🤝 Возражение: доверие",
+};
+
+// Человеческие метки ключей сущностей из analysis.entities (словарь агента:
+// dates/duration/phone/budget/bike/license — см. vip-bike-avito-agent-prompt).
+const AI_ENTITY_LABELS: Record<string, string> = {
+  dates: "📅 Даты",
+  duration: "⏳ Срок",
+  phone: "📞 Телефон",
+  budget: "💵 Бюджет",
+  bike: "🏍 Байк",
+  license: "🪪 Права",
+};
 
 function Section({
   title,
