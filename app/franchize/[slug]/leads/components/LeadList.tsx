@@ -77,7 +77,11 @@ export function LeadList({
   return (
     <div
       ref={parentRef}
-      className="h-full max-h-[calc(100vh-280px)] overflow-y-auto"
+      // MOBILE: dvh-высота под статичные KPI-полосу + тулбар — список занимает
+      // экран, не заставляя крутить страницу ради пары карточек (и наоборот).
+      // sm+ — прежняя vh-оценка. dvh вместо vh — браузерные панели телефона
+      // (адресная строка) не обрезают последнюю карточку.
+      className="h-full max-h-[calc(100dvh-190px)] overflow-y-auto sm:max-h-[calc(100vh-280px)]"
       style={{ width: "100%" }}
     >
       <div style={{ position: "relative", height: totalHeight, width: "100%" }}>

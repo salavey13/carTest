@@ -35,13 +35,17 @@ interface LeadBoardProps {
  * vertically as a long list. The user said "previously it was columns even on
  * mobile" — the intent has always been a side-by-side kanban.
  *
- * New behavior: `flex overflow-x-auto` with each column `min-w-[260px]` on
- * mobile (sm: `min-w-[280px]`, lg: `min-w-[260px]`). All 5 stages are
- * side-by-side horizontally and the user swipes left/right to navigate
- * between them. Each column scrolls vertically independently.
- *
- * This is the standard kanban UX (Trello, Linear, Notion) — narrow columns
- * with horizontal swipe, not a vertical list of stages.
+ * Current behavior (MOBILE-PERFECT rework):
+ *   • Phone: columns run edge-to-edge (-mx-4 px-4 bleed), each ~76vw wide so
+ *     the next column PEEKS from the right edge (affordance to swipe) and
+ *     pages snap after a flick (scroll-snap). NO inner vertical scroll —
+ *     a column just grows and the PAGE scrolls vertically. The old
+ *     fixed-height columns with their own scrollbar created a nested-scroll
+ *     trap on touch (vertical drag inside a horizontal scroller) and a
+ *     100vh-based maxHeight that never matched the real space left under
+ *     the analytics panels.
+ *   • Desktop (lg+): fixed 260px columns, column body scrolls vertically
+ *     inside `lg:max-h-[calc(100vh-280px)]` — as before.
  */
 export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForLead, priorityMap, onReadNotes, T }: LeadBoardProps) {
   const columns = useMemo(() => {
@@ -79,29 +83,18 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
 
   return (
     <div
-      className="pb-2"
-      style={{
-        display: "flex",
-        gap: "12px",
-        overflowX: "auto",
-        overflowY: "hidden",
-        scrollbarWidth: "thin",
-        WebkitOverflowScrolling: "touch",
-      }}
+      // Mobile: snap-paged horizontal swipe, edge bleed; lg: free scroll.
+      // items-start — колонки держат СВОЮ высоту (см. комментарий выше).
+      className="-mx-4 flex items-start snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden px-4 pb-2 [scrollbar-width:thin] lg:mx-0 lg:snap-none lg:px-0"
+      style={{ WebkitOverflowScrolling: "touch" }}
     >
       {BOARD_COLUMNS.map(({ key, label, color }) => {
         const colLeads = columns[key] || [];
         return (
           <div
             key={key}
-            className="rounded-2xl border"
+            className="flex shrink-0 snap-center flex-col rounded-2xl border w-[76vw] max-w-[300px] min-h-[280px] sm:w-[300px] sm:max-w-none lg:w-[260px] lg:max-h-[calc(100vh-280px)] lg:min-h-[320px]"
             style={{
-              display: "flex",
-              flexDirection: "column",
-              flexShrink: 0,
-              width: "260px",
-              maxHeight: "calc(100vh - 280px)",
-              minHeight: "320px",
               borderColor: T.border,
               backgroundColor: T.bgElevated,
             }}
@@ -123,8 +116,9 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
               </span>
             </div>
 
-            {/* Column body — scrolls independently */}
-            <div className="flex-1 space-y-2 overflow-y-auto p-2">
+            {/* Column body — mobile: natural height, the PAGE scrolls;
+                lg: scrolls independently inside the capped column */}
+            <div className="flex-1 space-y-2 p-2 lg:overflow-y-auto">
               {colLeads.length === 0 && (
                 <div
                   className="rounded-xl border border-dashed p-4 text-center text-[11px]"

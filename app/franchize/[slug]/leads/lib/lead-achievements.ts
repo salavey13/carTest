@@ -566,6 +566,155 @@ export function computeLeadAchievements(kpi: LeadKpiMetrics): LeadAchievement[] 
   return out;
 }
 
+// ── STICKY-СТОРА «ЗАРАБОТАНО НАВСЕГДА» (фикс «достижения даются многократно») ──
+// ============================================================================
+// ПРОБЛЕМА: достижения считаются из ЖИВЫХ цифр, а цифры колеблются. «Чистая
+// очередь» открывается (ждут ≤ 5), приходит новый лид — очередь 6, бейдж
+// гаснет; лида отработали — снова открыт и ТОСТ «Новое достижение!» звучит
+// заново. Плюс ref с прошлым составом открытых жил только в памяти компонента
+// — каждая перезагрузка страницы могла поздравлять повторно.
+//
+// РЕШЕНИЕ (как в играх): достижение даётся ОДИН раз. Лучший уровень за всё
+// время хранится в localStorage (ключ на экипаж), бейдж горит всегда, тост —
+// только на ПОЯВЛЕНИЕ достижения или ПОВЫШЕНИЕ уровня (бронза → серебро).
+// Текущее значение/прогресс остаются честными («сейчас очередь 7 — верни
+// серебро»), а погаснуть бейдж больше не может.
+
+export type AchievementStore = Record<string, AchievementTier>;
+
+const TIER_RANK: Record<AchievementTier, number> = {
+  bronze: 0,
+  silver: 1,
+  gold: 2,
+  legend: 3,
+};
+
+/** merged: хранит ССЫЛКУ исходного объекта, если апгрейд не нужен. */
+export function mergeAchievementsWithStore(
+  list: LeadAchievement[],
+  store: AchievementStore,
+): LeadAchievement[] {
+  return list.map((a) => {
+    const best = store[a.id];
+    if (!best || !a.available) return a;
+
+    // Легенды («Идеальная смена/неделя») однораунговые: раз взята — горит
+    // всегда. valueLabel остаётся честным про СЕГОДНЯ («не выполнено»),
+    // но бейдж и MAX не гаснут.
+    if (a.tier === "legend") {
+      if (a.unlocked && a.maxed) return a;
+      return { ...a, unlocked: true, maxed: true, progress: 1, nextTarget: null, nextLabel: null };
+    }
+
+    const computedRank = a.unlocked ? TIER_RANK[a.tier] : -1;
+    const storedRank = TIER_RANK[best] ?? -1;
+    // Текущий уровень не ниже лучшего — показываем как посчитано.
+    if (storedRank <= computedRank) return a;
+
+    // Цифры просяли ниже лучшего уровня: показываем лучший, прогресс
+    // пересчитываем к СЛЕДУЮЩЕМУ за ним уровню от ТЕКУЩЕГО значения.
+    const def = DEFS.find((d) => d.id === a.id);
+    if (!def) return { ...a, tier: best, color: TIER_COLORS[best], unlocked: true };
+    const idx = Math.min(storedRank, def.tiers.length - 1);
+    const cur = def.tiers[idx];
+    const maxed = idx >= def.tiers.length - 1;
+    const next = maxed ? null : def.tiers[idx + 1];
+
+    let progress = 1;
+    if (!maxed && next) {
+      if (def.direction === "max") {
+        const span = next.target - cur.target;
+        progress = span > 0 ? clamp01((a.value - cur.target) / span) : 1;
+      } else {
+        const span = cur.target - next.target;
+        progress = span > 0 ? clamp01((cur.target - a.value) / span) : 1;
+      }
+    }
+
+    return {
+      ...a,
+      tier: cur.tier,
+      color: TIER_COLORS[cur.tier],
+      unlocked: true,
+      maxed,
+      progress,
+      nextTarget: next ? next.target : null,
+      nextLabel: next ? def.format(next.target) : null,
+    };
+  });
+}
+
+export interface AchievementEvent {
+  id: string;
+  emoji: string;
+  title: string;
+  desc: string;
+  color: string;
+  /** unlock — достижение открыто впервые; tier — взят следующий уровень. */
+  kind: "unlock" | "tier";
+  tier: AchievementTier;
+}
+
+/**
+ * Дельта «только что заработанного» между живыми достижениями и стором.
+ * Возвращает события для тостов и НОВЫЙ стор (исходный не мутируется).
+ * Недоступные метрики (available=false) в стор не пишутся.
+ */
+export function diffAchievementEvents(
+  list: LeadAchievement[],
+  store: AchievementStore,
+): { events: AchievementEvent[]; nextStore: AchievementStore } {
+  const events: AchievementEvent[] = [];
+  const nextStore: AchievementStore = { ...store };
+  for (const a of list) {
+    if (!a.available || !a.unlocked) continue;
+    const prevRank = nextStore[a.id] !== undefined ? (TIER_RANK[nextStore[a.id]] ?? -1) : -1;
+    const nowRank = TIER_RANK[a.tier];
+    if (nowRank <= prevRank) continue;
+    nextStore[a.id] = a.tier;
+    events.push({
+      id: a.id,
+      emoji: a.emoji,
+      title: a.title,
+      desc: a.desc,
+      color: a.color,
+      kind: prevRank < 0 ? "unlock" : "tier",
+      tier: a.tier,
+    });
+  }
+  return { events, nextStore };
+}
+
+/** Читает стор из localStorage; SSR/приватный режим/битый JSON → пустой стор. */
+export function loadAchievementStore(key: string): AchievementStore {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== "object" || parsed == null) return {};
+    const out: AchievementStore = {};
+    for (const [id, tier] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof id !== "string" || !id) continue;
+      if (typeof tier !== "string" || !(tier in TIER_RANK)) continue;
+      out[id] = tier as AchievementTier;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/** Пишет стор; приватный режим и переполнение тихо игнорируются. */
+export function saveAchievementStore(key: string, store: AchievementStore): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(store));
+  } catch {
+    /* private mode / quota — стор живёт в памяти до перезагрузки */
+  }
+}
+
 /** Сколько достижений открыто (для шапки панели). */
 export function countUnlocked(achievements: LeadAchievement[]): number {
   return achievements.filter((a) => a.available && a.unlocked).length;

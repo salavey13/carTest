@@ -490,10 +490,12 @@ function Dropdown({
           borderColor: open ? T.borderActive : T.inputBorder,
           backgroundColor: T.inputBg,
           color: T.text,
-          fontSize: "10px",
+          // MOBILE: 11px + увеличенные тапы (38px высота) — прошлые 10px/7px
+          // были ниже комфортной зоны касания Apple (44px) и Android (48px).
+          fontSize: "11px",
           lineHeight: "1",
-          padding: "7px 9px",
-          maxWidth: "140px",
+          padding: "9px 10px",
+          maxWidth: "160px",
           overflow: "hidden",
         }}
       >
@@ -504,7 +506,7 @@ function Dropdown({
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
-            maxWidth: "70px",
+            maxWidth: "86px",
           }}
         >
           {selected?.label || "—"}

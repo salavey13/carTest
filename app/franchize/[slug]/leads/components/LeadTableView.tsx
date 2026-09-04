@@ -11,8 +11,15 @@
 //   • click a column header → sorts (synced with the toolbar sort dropdown)
 //   • footer with row count + total revenue
 //
-// The kanban (Воронка) and the card list stay as they are; this is a third
-// view aimed at scanning many leads fast.
+// MOBILE (perfect-table rework): 12 columns × ~1020px min-width meant heavy
+// swipe-dragging on a phone. Below md we keep the FIVE decision-making
+// columns (Приоритет · Клиент · Стадия · Работа · Выручка) — they fit a
+// phone screen with at most a small swipe — and hide the reference columns
+// (Контакты/Источник/Ответственный/Техника/Задачи/Активность/Изменено).
+// The phone number (the one thing the hidden «Контакты» carried) moves into
+// the Клиент cell (md:hidden). Nothing is lost on desktop — all columns
+// return from md up. Sorting for hidden columns stays available via the
+// toolbar dropdown.
 //
 
 import { useMemo } from "react";
@@ -89,15 +96,18 @@ export function LeadTableView({
   const fmtMoney = (n: number): string =>
     n > 0 ? n.toLocaleString("ru-RU", { maximumFractionDigits: 0 }) + " ₽" : "—";
 
-  /** Header cell for sortable columns. */
+  /** Header cell for sortable columns. `hiddenBelowMd` — колонка, которая на
+   *  телефоне скрыта (см. шапку файла): сортировка остаётся в тулбаре. */
   const SortHeader = ({
     label,
     mode,
     align = "left",
+    hiddenBelowMd = false,
   }: {
     label: string;
     mode: SortMode;
     align?: "left" | "right" | "center";
+    hiddenBelowMd?: boolean;
   }) => {
     const active = sortMode === mode;
     const clickable = !!onSortChange;
@@ -105,8 +115,8 @@ export function LeadTableView({
       <th
         onClick={clickable ? () => onSortChange?.(mode) : undefined}
         className={`whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide ${
-          clickable ? "cursor-pointer select-none" : ""
-        }`}
+          hiddenBelowMd ? "hidden md:table-cell" : ""
+        } ${clickable ? "cursor-pointer select-none" : ""}`}
         style={{
           borderColor: T.border,
           color: active ? T.text : T.textMuted,
@@ -124,6 +134,29 @@ export function LeadTableView({
       </th>
     );
   };
+
+  /** Обычная (несортируемая) ячейка шапки. */
+  const HeaderCell = ({
+    label,
+    align = "left",
+    title,
+    hiddenBelowMd = false,
+  }: {
+    label: string;
+    align?: "left" | "right" | "center";
+    title?: string;
+    hiddenBelowMd?: boolean;
+  }) => (
+    <th
+      className={`whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide ${
+        hiddenBelowMd ? "hidden md:table-cell" : ""
+      }`}
+      style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: align }}
+      title={title}
+    >
+      {label}
+    </th>
+  );
 
   if (rows.length === 0) {
     return (
@@ -144,72 +177,32 @@ export function LeadTableView({
         className="overflow-x-auto rounded-2xl border"
         style={{ borderColor: T.border, backgroundColor: T.bgCard, WebkitOverflowScrolling: "touch" }}
       >
-        <table className="w-full border-collapse text-left text-xs" style={{ color: T.text, minWidth: "1020px" }}>
+        {/* minWidth: 560px хватает пяти мобильным колонкам (лёгкий свайп на
+            узких телефонах), с md — все 12 колонок как раньше. */}
+        <table className="w-full min-w-[560px] border-collapse text-left text-xs md:min-w-[1020px]" style={{ color: T.text }}>
           <thead className="sticky top-0 z-10">
             <tr>
               {/* Приоритет (ТЗ) — итоговый индекс 0–100: чем выше, тем выше лид.
                   Сортируемый заголовок синхронизирован с тулбаром. Ставим ПЕРВОЙ
                   колонкой — менеджер считывает очередь сверху вниз. */}
               <SortHeader label="Приоритет" mode="priority" align="center" />
-              <th
-                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
-                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
-              >
-                Клиент
-              </th>
-              <th
-                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
-                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
-              >
-                Контакты
-              </th>
-              <th
-                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
-                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
-              >
-                Источник
-              </th>
-              <th
-                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
-                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
-              >
-                Стадия
-              </th>
+              <HeaderCell label="Клиент" />
+              <HeaderCell label="Контакты" hiddenBelowMd />
+              <HeaderCell label="Источник" hiddenBelowMd />
+              <HeaderCell label="Стадия" />
               {/* «Работа» — «отработан» / «перезвонить в ...» (просьба босса:
                   заметка о перезвоне видна прямо в списке). */}
-              <th
-                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
-                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
-              >
-                Работа
-              </th>
-              <th
-                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
-                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
-              >
-                Ответственный
-              </th>
-              <th
-                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
-                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
-              >
-                Техника
-              </th>
-              <th
-                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
-                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "center" }}
-              >
-                Задачи
-              </th>
+              <HeaderCell label="Работа" />
+              <HeaderCell label="Ответственный" hiddenBelowMd />
+              <HeaderCell label="Техника" hiddenBelowMd />
+              <HeaderCell label="Задачи" align="center" hiddenBelowMd />
               <SortHeader label="Выручка" mode="spent" align="right" />
-              <SortHeader label="Активность" mode="recent" />
-              <th
-                className="whitespace-nowrap border-b-2 px-2.5 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
-                style={{ borderColor: T.border, color: T.textMuted, backgroundColor: T.bgElevated, textAlign: "left" }}
+              <SortHeader label="Активность" mode="recent" hiddenBelowMd />
+              <HeaderCell
+                label="Изменено"
+                hiddenBelowMd
                 title="Когда лида последний раз модифицировали: заметка, туду, смена стадии"
-              >
-                Изменено
-              </th>
+              />
             </tr>
           </thead>
           <tbody>
@@ -303,6 +296,13 @@ export function LeadTableView({
                         <p className="truncate font-semibold" style={{ color: T.text }}>
                           {lead.full_name || "Без имени"}
                         </p>
+                        {/* MOBILE: колонка «Контакты» скрыта ниже md — телефон,
+                            единственное важное из неё, живёт здесь (md:hidden). */}
+                        {(lead.phone || lead.username) && (
+                          <p className="truncate text-[10px] tabular-nums md:hidden" style={{ color: T.textFaint }}>
+                            {lead.phone || `@${lead.username}`}
+                          </p>
+                        )}
                         {/* 📝 Заметки — подсвеченный флажок в строке таблицы: клик
                             открывает шторку сразу на заметках («новая» ≤24 ч —
                             с точкой-индикатором). */}
@@ -334,15 +334,15 @@ export function LeadTableView({
                       </div>
                     </div>
                   </td>
-                  {/* Контакты */}
-                  <td className="max-w-[160px] border-b border-r px-2.5 py-2" style={{ borderColor: T.borderSoft }}>
+                  {/* Контакты — на телефоне скрыта (телефон в «Клиенте») */}
+                  <td className="hidden max-w-[160px] border-b border-r px-2.5 py-2 md:table-cell" style={{ borderColor: T.borderSoft }}>
                     <p className="truncate tabular-nums" style={{ color: T.textMuted }}>{lead.phone || "—"}</p>
                     {lead.username && (
                       <p className="truncate text-[10px]" style={{ color: T.textFaint }}>@{lead.username}</p>
                     )}
                   </td>
-                  {/* Источник */}
-                  <td className="border-b border-r px-2.5 py-2" style={{ borderColor: T.borderSoft }}>
+                  {/* Источник — на телефоне скрыта (бейдж Авито виден в шторке) */}
+                  <td className="hidden border-b border-r px-2.5 py-2 md:table-cell" style={{ borderColor: T.borderSoft }}>
                     <span className="inline-flex items-center gap-1">
                       <span
                         className="whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium"
@@ -414,12 +414,12 @@ export function LeadTableView({
                       <span style={{ color: T.textFaint }}>—</span>
                     )}
                   </td>
-                  {/* Ответственный */}
-                  <td className="max-w-[140px] border-b border-r px-2.5 py-2" style={{ borderColor: T.borderSoft }}>
+                  {/* Ответственный — на телефоне скрыта */}
+                  <td className="hidden max-w-[140px] border-b border-r px-2.5 py-2 md:table-cell" style={{ borderColor: T.borderSoft }}>
                     <p className="truncate" style={{ color: T.textMuted }}>{owner}</p>
                   </td>
-                  {/* Техника */}
-                  <td className="max-w-[170px] border-b border-r px-2.5 py-2" style={{ borderColor: T.borderSoft }}>
+                  {/* Техника — на телефоне скрыта */}
+                  <td className="hidden max-w-[170px] border-b border-r px-2.5 py-2 md:table-cell" style={{ borderColor: T.borderSoft }}>
                     {lead.bikeTitle ? (
                       <span className="inline-flex max-w-full items-center gap-1 truncate">
                         <Bike className="h-3 w-3 shrink-0" style={{ color: T.textFaint }} aria-hidden />
@@ -429,8 +429,8 @@ export function LeadTableView({
                       <span style={{ color: T.textFaint }}>—</span>
                     )}
                   </td>
-                  {/* Задачи */}
-                  <td className="border-b border-r px-2.5 py-2 text-center" style={{ borderColor: T.borderSoft }}>
+                  {/* Задачи — на телефоне скрыта */}
+                  <td className="hidden border-b border-r px-2.5 py-2 text-center md:table-cell" style={{ borderColor: T.borderSoft }}>
                     {totalTodos > 0 ? (
                       <span
                         className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-bold"
@@ -454,17 +454,18 @@ export function LeadTableView({
                   >
                     {spent > 0 ? fmtMoney(spent) : "—"}
                   </td>
-                  {/* Активность */}
+                  {/* Активность — на телефоне скрыта */}
                   <td
-                    className="whitespace-nowrap border-b border-r px-2.5 py-2 text-[11px]"
+                    className="hidden whitespace-nowrap border-b border-r px-2.5 py-2 text-[11px] md:table-cell"
                     style={{ borderColor: T.borderSoft, color: T.textMuted }}
                   >
                     {relativeTime(lead.lastSeenAt || lead.createdAt)}
                   </td>
                   {/* Изменено — последняя модификация (note/todo/stage);
-                      модификаций не было — прочерк. Точная дата в подсказке. */}
+                      модификаций не было — прочерк. Точная дата в подсказке.
+                      На телефоне скрыта. */}
                   <td
-                    className="whitespace-nowrap border-b px-2.5 py-2 text-[11px]"
+                    className="hidden whitespace-nowrap border-b px-2.5 py-2 text-[11px] md:table-cell"
                     style={{ borderColor: T.borderSoft, color: lead.lastModifiedAt ? T.text : T.textFaint }}
                     title={lead.lastModifiedAt ? `Последнее изменение: ${relativeTime(lead.lastModifiedAt)}` : "Модификаций не было"}
                   >

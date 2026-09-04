@@ -45,7 +45,14 @@ export function LeadsKPICards({ leads, hot, verified, todos, T }: LeadsKPICardsP
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+    // MOBILE: одна снап-полоса вместо сетки 2×3 — 6 плиток высотой в одну
+    // строку (~90px вместо ~260px), листаются свайпом с подсечкой колонок.
+    // sm+ — прежняя сетка 3/6 колонок. Полоса чуть выходит за поля страницы
+    // (-mx-4 px-4), чтобы карточки бежали от края до края экрана.
+    <div
+      className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:snap-none sm:grid-cols-3 sm:gap-3 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-6 [&::-webkit-scrollbar]:hidden"
+      aria-label="Сводка дня"
+    >
       {cards.map((c, i) => {
         const Icon = c.icon;
         return (
@@ -57,7 +64,7 @@ export function LeadsKPICards({ leads, hot, verified, todos, T }: LeadsKPICardsP
             animate="visible"
             whileHover={{ scale: 1.02, y: -2 }}
             whileTap={{ scale: 0.98 }}
-            className="relative overflow-hidden rounded-2xl border p-3 transition-shadow hover:shadow-lg"
+            className="relative min-w-[136px] snap-start overflow-hidden rounded-2xl border p-3 transition-shadow hover:shadow-lg sm:min-w-0"
             style={{ borderColor: T.border, backgroundColor: T.bgCard }}
           >
             {/* Subtle glow on accent */}
@@ -71,7 +78,7 @@ export function LeadsKPICards({ leads, hot, verified, todos, T }: LeadsKPICardsP
                   {c.label}
                 </p>
                 <motion.p
-                  className="mt-1 text-xl font-black tracking-tight"
+                  className="mt-1 text-lg font-black tracking-tight sm:text-xl"
                   style={{ color: T.text }}
                   key={typeof c.value === "string" ? c.value : `val-${c.value}`}
                   initial={{ opacity: 0, y: 6 }}

@@ -7,35 +7,102 @@
 // Открытые бейджи — цветные с уровнем; закрытые — серые с прогресс-баром
 // к следующему уровню. UX:
 //   • бейдж кликабелен (в т.ч. на тач-экранах) — разворачивает карточку
-//     «что меряем · сейчас → цель»: раньше смысл метрики был виден только
+//     «что меряем · сейчас → цель»: раньше смысл метрики был только
 //     в hover-тултипе, которого на телефоне нет;
-//   • свежеоткрытое достижение всплывает тостом-поздравлением (сравнение
-//     состава открытых бейджей между апдейтами данных; на первом рендере
-//     тосты не спамятся за уже заработанное);
+//   • свежеоткрытое достижение всплывает тостом-поздравлением, НО ОДИН РАЗ:
+//     лучший уровень хранится в localStorage (sticky-стор, см. lib), тосты
+//     не повторяются при колебании цифр и перезагрузках страницы; за взятый
+//     следующий уровень (бронза → серебро → золото) — отдельный тост
+//     «Новый уровень»; несколько событий встают в очередь (макс. 4);
 //   • пустое состояние — подсказка вместо пустой сетки.
 // Значения берутся из lib/lead-achievements.ts (вход — LeadKpiMetrics),
 // здесь только визуал.
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Award, ChevronDown, ChevronUp, X } from "lucide-react";
 import type { LeadAchievement } from "../lib/lead-achievements";
-import { TIER_COLORS, TIER_LABELS, countUnlocked } from "../lib/lead-achievements";
+import {
+  TIER_COLORS,
+  TIER_LABELS,
+  countUnlocked,
+  type AchievementEvent,
+  type AchievementStore,
+  diffAchievementEvents,
+  loadAchievementStore,
+  mergeAchievementsWithStore,
+  saveAchievementStore,
+} from "../lib/lead-achievements";
 
 interface LeadsAchievementsPanelProps {
   achievements: LeadAchievement[];
+  /** Ключ sticky-стора в localStorage — на экипаж (slug), чтобы достижения
+   *  разных экипажей не смешивались в одном браузере. */
+  storageKey: string;
   T: any;
 }
 
-export function LeadsAchievementsPanel({ achievements, T }: LeadsAchievementsPanelProps) {
+export function LeadsAchievementsPanel({ achievements, storageKey, T }: LeadsAchievementsPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [toast, setToast] = useState<LeadAchievement | null>(null);
+  const [toastQueue, setToastQueue] = useState<AchievementEvent[]>([]);
 
-  const visible = achievements.filter((a) => a.available);
-  const unlocked = countUnlocked(achievements);
+  // ── Sticky-стор «заработано навсегда» ──
+  // storeRef — зеркало для диффа (синхронно виден эффектам), store — рендер-стейт.
+  const [store, setStore] = useState<AchievementStore>({});
+  const storeRef = useRef<AchievementStore>({});
+  const hydratedRef = useRef(false);
+  const baseRecordedRef = useRef(false);
+
+  // Гидрация из localStorage — ДО первого диффа (эффекты идут по порядку).
+  useEffect(() => {
+    const loaded = loadAchievementStore(storageKey);
+    storeRef.current = loaded;
+    hydratedRef.current = true;
+    setStore(loaded);
+  }, [storageKey]);
+
+  // Дифф живых достижений со стором → тосты. Первый прогон после гидрации
+  // только фиксирует базу молча — не поздравляем с давно заработанным
+  // (в т.ч. когда в браузере чистый localStorage, а экипаж работает давно).
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const { events, nextStore } = diffAchievementEvents(achievements, storeRef.current);
+    if (!baseRecordedRef.current) {
+      baseRecordedRef.current = true;
+      storeRef.current = nextStore;
+      saveAchievementStore(storageKey, nextStore);
+      setStore(nextStore);
+      return;
+    }
+    if (events.length === 0) return;
+    storeRef.current = nextStore;
+    saveAchievementStore(storageKey, nextStore);
+    setStore(nextStore);
+    // Очередь поздравлений: не теряем ни одного события, но и не заслоняем
+    // страницу — максимум 4 ждут своей очереди, остальное стор уже запомнил.
+    setToastQueue((q) => [...q, ...events].slice(0, 4));
+  }, [achievements, storageKey]);
+
+  // Тосты показываются по одному, 6 с каждый; таймер чистится при смене/размонтировании.
+  const toast = toastQueue[0] ?? null;
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToastQueue((q) => q.slice(1)), 6000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // Дисплей-список: бейджи с sticky-уровнем (достигнутое не гаснет),
+  // живые значения/прогресс — как посчитало lib.
+  const display = useMemo(
+    () => mergeAchievementsWithStore(achievements, store),
+    [achievements, store],
+  );
+
+  const visible = display.filter((a) => a.available);
+  const unlocked = countUnlocked(display);
   // Свёрнуто: открытые + почти открытые (прогресс ≥ 50%) — «что уже есть и
   // вот-вот будет»; развёрнуто — все доступные.
   const prioritized = [...visible].sort((a, b) => {
@@ -45,26 +112,6 @@ export function LeadsAchievementsPanel({ achievements, T }: LeadsAchievementsPan
   const shown = expanded ? prioritized : prioritized.slice(0, 6);
   const hiddenCount = prioritized.length - shown.length;
   const detail = shown.find((a) => a.id === detailId) ?? null;
-
-  // Тост «новое достижение»: сравниваем состав открытых бейджей с прошлым
-  // апдейтом данных. Первый запуск эффекта только запоминает базу — иначе
-  // при каждом открытии страницы оператору поздравляли бы с давним прошлым.
-  const prevUnlockedRef = useRef<Set<string> | null>(null);
-  useEffect(() => {
-    const now = new Set(achievements.filter((a) => a.unlocked).map((a) => a.id));
-    const prev = prevUnlockedRef.current;
-    prevUnlockedRef.current = now;
-    if (!prev) return;
-    const fresh = achievements.find((a) => a.unlocked && !prev.has(a.id));
-    if (fresh) setToast(fresh);
-  }, [achievements]);
-
-  // Автоскрытие тоста; таймер чистится при смене/размонтировании.
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 6000);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   return (
     <>
@@ -233,12 +280,13 @@ export function LeadsAchievementsPanel({ achievements, T }: LeadsAchievementsPan
         </AnimatePresence>
       </motion.div>
 
-      {/* Тост-поздравление со свежеоткрытым достижением — видно из любой
-          точки страницы, т.к. бейджи живут внизу длинного скролла. */}
-      <AnimatePresence>
+      {/* Тост-поздравление со свежим событием — по одному из очереди.
+          Видно из любой точки страницы, т.к. бейджи живут внизу длинного
+          скролла. unlock — «Новое достижение», tier — «Новый уровень». */}
+      <AnimatePresence mode="wait">
         {toast && (
           <motion.div
-            key={toast.id}
+            key={`${toast.kind}:${toast.id}:${toast.tier}`}
             initial={{ opacity: 0, y: 16, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.97 }}
@@ -255,7 +303,7 @@ export function LeadsAchievementsPanel({ achievements, T }: LeadsAchievementsPan
             </span>
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: toast.color }}>
-                Новое достижение!
+                {toast.kind === "tier" ? `Новый уровень · ${TIER_LABELS[toast.tier]}` : "Новое достижение!"}
               </p>
               <p className="text-sm font-black leading-tight" style={{ color: T.text }}>
                 {toast.title}
@@ -263,10 +311,15 @@ export function LeadsAchievementsPanel({ achievements, T }: LeadsAchievementsPan
               <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug" style={{ color: T.textMuted }}>
                 {toast.desc}
               </p>
+              {toastQueue.length > 1 && (
+                <p className="mt-1 text-[9px] font-bold uppercase tracking-wider" style={{ color: T.textFaint }}>
+                  + ещё {toastQueue.length - 1}
+                </p>
+              )}
             </div>
             <button
               type="button"
-              onClick={() => setToast(null)}
+              onClick={() => setToastQueue((q) => q.slice(1))}
               aria-label="Закрыть поздравление"
               className="shrink-0 rounded-md p-0.5 transition hover:opacity-70"
               style={{ color: T.textFaint }}

@@ -3,7 +3,8 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Lock } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { AlertCircle, CheckCircle2, ChevronDown, Info, Lock, Sparkles } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import type {LeadRow, LeadTodoRow} from "./leads-types";
 import { getFranchizeLeads } from "@/app/franchize/server-actions/leads";
@@ -58,6 +59,27 @@ interface LeadsClientProps {
   isLightTheme?: boolean;
   isAuto?: boolean;
 }
+
+// ── In-app notifications (typed toast) ─────────────────────────────────────
+// Everything the page wants to tell the operator inline — copy/notify/todo/
+// dismiss results — flows through ONE typed toast instead of a plain pill
+// (and instead of window.alert for the destructive-action failures).
+// Type drives the icon + accent color; the toast animates in/out, is
+// tappable to dismiss and sits above the sheet (z-[70]) with safe-area-aware
+// bottom offset so the iOS home indicator never covers it.
+type ToastKind = "info" | "success" | "error";
+
+interface ToastState {
+  id: number;
+  msg: string;
+  kind: ToastKind;
+}
+
+const TOAST_META: Record<ToastKind, { icon: typeof Info; color: string }> = {
+  info: { icon: Info, color: "#3b82f6" },
+  success: { icon: CheckCircle2, color: "#22c55e" },
+  error: { icon: AlertCircle, color: "#ef4444" },
+};
 
 // ── Main Component ───────────────────────────────────────────────────────────
 
@@ -155,15 +177,44 @@ export function LeadsClient({
     const t = setInterval(() => setNowTick(Date.now()), 60_000);
     return () => clearInterval(t);
   }, []);
-  // Lightweight toast for action feedback (copy/notify errors etc.) —
-  // z-[70]: above the sheet (z-[60]) and the header (z-50).
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  // Lightweight toast for action feedback (copy/notify/todo errors etc.) —
+  // z-[70]: above the sheet (z-[60]) and the header (z-50). Typed
+  // (info/success/error) — icon + accent tell the outcome without reading.
+  // ToastState.id re-triggers the animation when the SAME text re-shows.
+  const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showToast = useCallback((msg: string, ms = 2600) => {
-    setToastMsg(msg);
+  const showToast = useCallback((msg: string, kind: ToastKind = "info", ms = 2600) => {
+    setToast({ id: Date.now() + Math.random(), msg, kind });
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => setToastMsg(null), ms);
+    toastTimerRef.current = setTimeout(() => setToast(null), ms);
   }, []);
+  const dismissToast = useCallback(() => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(null);
+  }, []);
+
+  // ── Mobile: analytics panels collapsed by default ──
+  // On a phone the three analytics blocks (speed/funnel/achievements) push
+  // the actual LEADS below the fold (~1.5 screens of scroll). A compact
+  // toggle keeps them one tap away while the lead views get the screen.
+  // Desktop (sm+) ignores this state — panels are always visible there.
+  // The choice persists per crew in localStorage.
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const analyticsKey = `leads-analytics-open:${slug}`;
+  useEffect(() => {
+    try {
+      setAnalyticsOpen(window.localStorage.getItem(analyticsKey) === "1");
+    } catch { /* private mode */ }
+  }, [analyticsKey]);
+  const toggleAnalytics = useCallback(() => {
+    setAnalyticsOpen((v) => {
+      const next = !v;
+      try {
+        window.localStorage.setItem(analyticsKey, next ? "1" : "0");
+      } catch { /* private mode */ }
+      return next;
+    });
+  }, [analyticsKey]);
 
   // Debounce search query
   useEffect(() => {
@@ -489,7 +540,9 @@ export function LeadsClient({
       if (!resp.ok) {
         const errBody = await resp.json().catch(() => null);
         const msg = errBody?.error || `HTTP ${resp.status}`;
-        alert(`Не удалось убрать лид: ${msg}`);
+        // Was window.alert() — jarring, blocks the UI thread and looks alien
+        // inside the Telegram WebView. Same message, typed error toast.
+        showToast(`Не удалось убрать лид: ${msg}`, "error", 4200);
         return;
       }
       // Optimistic remove from local state, then re-sync with server
@@ -499,7 +552,7 @@ export function LeadsClient({
       setDismissTarget(null);
       router.refresh();
     } catch (e) {
-      alert("Ошибка сети.");
+      showToast("Ошибка сети — лид не убран", "error");
     } finally {
       setDismissBusy(false);
     }
@@ -568,7 +621,7 @@ export function LeadsClient({
         } else if (lead.telegramChatId) {
           try {
             await navigator.clipboard.writeText(lead.telegramChatId);
-            showToast(`TG ID ${lead.telegramChatId} скопирован`);
+            showToast(`TG ID ${lead.telegramChatId} скопирован`, "success");
           } catch {
             showToast(`TG ID: ${lead.telegramChatId}`);
           }
@@ -589,7 +642,7 @@ export function LeadsClient({
         if (notifyBusy || notifyBusyRef.current) break;
         notifyBusyRef.current = true;
         setNotifyBusy(true);
-        showToast("Отправляем уведомление…", 1200);
+        showToast("Отправляем уведомление…", "info", 1200);
         try {
           const res = await notifyLeadViaTelegram({
             slug,
@@ -597,9 +650,13 @@ export function LeadsClient({
             bikeTitle: lead.bikeTitle ?? undefined,
             initData: getTelegramInitData(),
           });
-          showToast(res.success ? "Уведомление отправлено" : (res.error || "Ошибка отправки"));
+          if (res.success) {
+            showToast("Уведомление отправлено", "success");
+          } else {
+            showToast(res.error || "Ошибка отправки", "error", 4200);
+          }
         } catch {
-          showToast("Ошибка отправки — нет связи");
+          showToast("Ошибка отправки — нет связи", "error");
         } finally {
           notifyBusyRef.current = false;
           setNotifyBusy(false);
@@ -645,14 +702,14 @@ export function LeadsClient({
       });
       const body = await resp.json().catch(() => null);
       if (!resp.ok || !body?.success) {
-        showToast(body?.error || `Не удалось создать задачу (HTTP ${resp.status})`);
+        showToast(body?.error || `Не удалось создать задачу (HTTP ${resp.status})`, "error", 4200);
         return;
       }
       // Optimistic local append (the API returns the full todo row).
       const todo = body.todo as LeadTodoRow;
       setTodosState((prev) => [todo, ...prev]);
     } catch {
-      showToast("Ошибка сети при создании задачи");
+      showToast("Ошибка сети при создании задачи", "error");
     } finally {
       createTodoBusyRef.current = false;
       setTodosBusy(false);
@@ -692,11 +749,11 @@ export function LeadsClient({
       const body = await resp.json().catch(() => null);
       if (!resp.ok || !body?.success) {
         setTodosState((prev) => prev.map((t) => (t.id === todoId ? { ...t, status: current.status } : t)));
-        showToast(body?.error || "Не удалось обновить задачу");
+        showToast(body?.error || "Не удалось обновить задачу", "error");
       }
     } catch {
       setTodosState((prev) => prev.map((t) => (t.id === todoId ? { ...t, status: current.status } : t)));
-      showToast("Ошибка сети");
+      showToast("Ошибка сети при обновлении задачи", "error");
     }
   }, [todosState, crewId, authHeaders, showToast]);
 
@@ -713,11 +770,11 @@ export function LeadsClient({
       const body = await resp.json().catch(() => null);
       if (!resp.ok || !body?.success) {
         setTodosState(snapshot);
-        showToast(body?.error || "Не удалось удалить задачу");
+        showToast(body?.error || "Не удалось удалить задачу", "error");
       }
     } catch {
       setTodosState(snapshot);
-      showToast("Ошибка сети");
+      showToast("Ошибка сети при удалении задачи", "error");
     }
   }, [todosState, crewId, authHeaders, showToast]);
 
@@ -748,7 +805,7 @@ export function LeadsClient({
       });
       const body = await resp.json().catch(() => null);
       if (!resp.ok || !body?.success) {
-        showToast(body?.error || `Не удалось сохранить (HTTP ${resp.status})`);
+        showToast(body?.error || `Не удалось сохранить (HTTP ${resp.status})`, "error", 4200);
         return;
       }
       const touched = ((body.touched || []) as LeadTodoRow[]).filter(Boolean);
@@ -769,7 +826,7 @@ export function LeadsClient({
         ...prev.filter((t) => !isHandlingRowForLead(t)),
       ]);
     } catch {
-      showToast("Ошибка сети");
+      showToast("Ошибка сети при сохранении отметки", "error");
     } finally {
       setHandlingBusy(false);
     }
@@ -820,10 +877,10 @@ export function LeadsClient({
           ),
         );
       } else {
-        showToast(res.error || "Не удалось сохранить заметку");
+        showToast(res.error || "Не удалось сохранить заметку", "error", 4200);
       }
     } catch {
-      showToast("Ошибка сети при сохранении заметки");
+      showToast("Ошибка сети при сохранении заметки", "error");
     } finally {
       addNoteBusyRef.current = false;
       setNotesBusy(false);
@@ -873,17 +930,43 @@ export function LeadsClient({
     <div className="space-y-5">
       <LeadsKPICards leads={activeLeads} hot={hot} verified={verified} todos={todosState.filter((t) => !isHandlingTodo(t))} T={T} />
 
-      {/* Скорость обработки: медиана ответа, очередь «ждут», SLA-просрочки,
-          распределение времени ответа и перезвоны — см. lib/lead-speed.ts.
-          speed встроен в kpiMetrics (lib/lead-kpi.ts) — один проход по данным. */}
-      <LeadSpeedPanel metrics={kpiMetrics.speed} T={T} />
+      {/* MOBILE: аналитика (скорость/воронка/достижения) — за компактным
+          переключателем. На телефоне три панели занимали ~1.5 экрана и
+          уводили сами ЛИДЫ под сгиб; свёрнуто по умолчанию, выбор помнится.
+          На sm+ переключатель скрыт — панели всегда на месте. */}
+      <button
+        type="button"
+        onClick={toggleAnalytics}
+        aria-expanded={analyticsOpen}
+        aria-controls="leads-analytics"
+        className="flex w-full items-center justify-between rounded-xl border px-3.5 py-2.5 text-xs font-bold transition active:scale-[0.99] sm:hidden"
+        style={{ borderColor: T.border, backgroundColor: T.bgCard, color: T.text }}
+      >
+        <span className="inline-flex items-center gap-2">
+          <Sparkles className="h-4 w-4" style={{ color: T.accent }} aria-hidden />
+          Аналитика смены
+        </span>
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: T.textMuted }}>
+          {analyticsOpen ? "скрыть" : "показать"}
+          <ChevronDown className={`h-4 w-4 transition-transform ${analyticsOpen ? "rotate-180" : ""}`} aria-hidden />
+        </span>
+      </button>
 
-      {/* Воронка KPI из протокола встречи: Активность → Диалог → КЭВ → Сделка,
-          конверсии, норма дня, «горячие ждут», тест-драйвы, ср. чек. */}
-      <LeadsFunnelPanel kpi={kpiMetrics} T={T} />
+      <div id="leads-analytics" className={analyticsOpen ? "space-y-5" : "hidden sm:block sm:space-y-5"}>
+        {/* Скорость обработки: медиана ответа, очередь «ждут», SLA-просрочки,
+            распределение времени ответа и перезвоны — см. lib/lead-speed.ts.
+            speed встроен в kpiMetrics (lib/lead-kpi.ts) — один проход по данным. */}
+        <LeadSpeedPanel metrics={kpiMetrics.speed} T={T} />
 
-      {/* Достижения экипажа: геймификация метрик воронки/скорости. */}
-      <LeadsAchievementsPanel achievements={achievements} T={T} />
+        {/* Воронка KPI из протокола встречи: Активность → Диалог → КЭВ → Сделка,
+            конверсии, норма дня, «горячие ждут», тест-драйвы, ср. чек. */}
+        <LeadsFunnelPanel kpi={kpiMetrics} T={T} />
+
+        {/* Достижения экипажа: геймификация метрик воронки/скорости.
+            storageKey — sticky-стор «заработано навсегда» на экипаж (фикс
+            повторных тостов при колебании метрик и перезагрузках). */}
+        <LeadsAchievementsPanel achievements={achievements} storageKey={`leads-achv:${slug}`} T={T} />
+      </div>
 
       {/* Load-error banner — silent empty pages were the #1 desktop-web-Telegram
           complaint. Shows the actual server error + manual retry. The loading
@@ -1057,17 +1140,40 @@ export function LeadsClient({
         );
       })()}
 
-      {/* Toast — action feedback (copy/notify/todo errors). z-[70] sits above
-          the sheet (z-[60]) and the CrewHeader (z-50). */}
-      {toastMsg && (
-        <div
-          className="fixed inset-x-0 bottom-6 z-[70] mx-auto w-fit max-w-[92vw] rounded-full border px-4 py-2.5 text-sm font-medium shadow-lg"
-          style={{ backgroundColor: T.bgCard, borderColor: T.border, color: T.text }}
-          role="status"
-        >
-          {toastMsg}
-        </div>
-      )}
+      {/* Typed toast — action feedback (copy/notify/todo/dismiss results).
+          Icon + accent color by kind (info/success/error), slide-up + fade,
+          tap to dismiss. z-[70] sits above the sheet (z-[60]) and the
+          CrewHeader (z-50). Bottom offset keeps clear of the iOS home
+          indicator (safe-area) and of the achievement toast (bottom-20). */}
+      <AnimatePresence>
+        {toast && (() => {
+          const Meta = TOAST_META[toast.kind];
+          const Icon = Meta.icon;
+          return (
+            <motion.button
+              key={toast.id}
+              type="button"
+              onClick={dismissToast}
+              initial={{ opacity: 0, y: 14, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.97 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              role={toast.kind === "error" ? "alert" : "status"}
+              aria-live={toast.kind === "error" ? "assertive" : "polite"}
+              className="fixed inset-x-4 bottom-[max(1.5rem,env(safe-area-inset-bottom))] z-[70] mx-auto flex w-fit max-w-[92vw] items-center gap-2.5 rounded-2xl border px-4 py-3 text-left text-sm font-medium shadow-lg sm:inset-x-0"
+              style={{
+                backgroundColor: T.bgCard,
+                borderColor: `${Meta.color}55`,
+                color: T.text,
+                boxShadow: `0 8px 28px rgba(0,0,0,0.28), inset 3px 0 0 0 ${Meta.color}`,
+              }}
+            >
+              <Icon className="h-5 w-5 shrink-0" style={{ color: Meta.color }} aria-hidden />
+              <span className="min-w-0">{toast.msg}</span>
+            </motion.button>
+          );
+        })()}
+      </AnimatePresence>
 
       {/* Dismiss confirmation dialog — opened from LeadCard ⋮ menu "Закрыть лид".
           Shows reason dropdown + optional note + analytics-impact preview.
