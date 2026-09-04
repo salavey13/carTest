@@ -39,7 +39,12 @@
 // клиент считает всё за один useMemo.
 
 import type { LeadRow, LeadTodoRow } from "../leads-types";
-import { computeLeadSpeedMetrics, type LeadSpeedMetrics } from "./lead-speed";
+import {
+  asArray,
+  computeLeadSpeedMetrics,
+  ensureLeadArraysSafe,
+  type LeadSpeedMetrics,
+} from "./lead-speed";
 import { computeLeadStage, matchTodosToLead } from "./pipeline-stages";
 import { isCallbackTodo, isHandledTodo } from "./lead-handling";
 
@@ -163,10 +168,12 @@ function rateOr(numerator: number, denominator: number): number | null {
  * в клиенте передаётся nowTick (обновление раз в минуту вместе со speed).
  */
 export function computeLeadKpi(
-  leads: LeadRow[],
-  allTodos: LeadTodoRow[],
+  leadsInput: LeadRow[],
+  allTodosInput: LeadTodoRow[],
   now: number = Date.now(),
 ): LeadKpiMetrics {
+  const leads = asArray(leadsInput);
+  const allTodos = asArray(allTodosInput);
   const speed = computeLeadSpeedMetrics(leads, allTodos, now);
 
   let leadsTotal = 0;
@@ -184,7 +191,11 @@ export function computeLeadKpi(
   let dialogDepthCount = 0;
   const weekStart = startOfWeek(now);
 
-  for (const lead of leads) {
+  for (const rawLead of leads) {
+    // EDGE CASE: нормализация массивов лида один раз — внутри legacy
+    // pipeline-stages.ts (computeLeadStage/matchTodosToLead) прямые
+    // rentals.length/sales.map без неё падают на битой строке API.
+    const lead = ensureLeadArraysSafe(rawLead);
     // Операторские заглушки — не входящие обращения, воронку не портим
     // (та же политика, что и в lead-speed.ts).
     if (lead.identityState === "operator_placeholder") continue;
@@ -218,20 +229,28 @@ export function computeLeadKpi(
     if (lead.avito?.analysis?.intent === "testdrive") testdrives += 1;
 
     // Глубина диалога: захваченные сообщения покупателя (авито-канал).
+    // EDGE CASE: Number.isFinite — Infinity из битых метаданных испортил бы
+    // среднее (NaN/Infinity улетели бы в достижения и тултипы).
     const messagesCount = lead.avito?.messagesCount;
-    if (typeof messagesCount === "number" && messagesCount > 0) {
+    if (typeof messagesCount === "number" && Number.isFinite(messagesCount) && messagesCount > 0) {
       dialogDepthSum += messagesCount;
       dialogDepthCount += 1;
     }
 
-    revenue += lead.totalSpent || 0;
+    // EDGE CASE: totalSpent — только конечные положительные числа;
+    // Infinity/отрицательные значения (битые данные) искажают кассу.
+    // NB: NaN отсекался и раньше (`NaN || 0` → 0), Infinity — нет.
+    const spent = lead.totalSpent;
+    if (typeof spent === "number" && Number.isFinite(spent) && spent > 0) revenue += spent;
   }
 
   const dialogs = speed.handledTotal;
   const responseRate = rateOr(dialogs, leadsTotal);
   const kevRate = rateOr(kevCount, leadsTotal);
   const dealRate = rateOr(dealCount, leadsTotal);
-  const avgDealCheck = dealCount > 0 ? revenue / dealCount : null;
+  // Число делений защищено dealCount > 0; Number.isFinite — страховка от
+  // будущего возврата Infinity в revenue (средний чек улетел бы в UI).
+  const avgDealCheck = dealCount > 0 && Number.isFinite(revenue) ? revenue / dealCount : null;
   const revenuePerLead = rateOr(revenue, leadsTotal);
   const avgDialogDepth = dialogDepthCount > 0 ? dialogDepthSum / dialogDepthCount : null;
 
@@ -264,8 +283,7 @@ export function computeLeadKpi(
  * горячие лиды просто получают отдельный счётчик, чтобы «не слить целевых».
  */
 function isUnhandledWaiting(lead: LeadRow, allTodos: LeadTodoRow[]): boolean {
-  const isConverted =
-    lead.rentals.length > 0 || lead.sales.length > 0 || (lead.contractCount ?? 0) > 0;
+  const isConverted = lead.rentals.length > 0 || lead.sales.length > 0 || (lead.contractCount ?? 0) > 0;
   if (isConverted) return false;
 
   let hasHandledMark = false;

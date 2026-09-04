@@ -129,6 +129,26 @@ function isSameCalendarDay(iso: string, now: number): boolean {
   );
 }
 
+/**
+ * EDGE CASE: битая строка API (rentals/sales = null вместо []) или битый
+ * срез todos не должны ронять весь useMemo-дерево лидов (белый экран).
+ * Аналитика — чистая функция: на любом входе считает, а не бросает.
+ */
+export function asArray<T>(v: T[] | null | undefined): T[] {
+  return Array.isArray(v) ? v : [];
+}
+
+/**
+ * EDGE CASE-политика модулей аналитики: битая строка API (rentals/sales =
+ * null вместо []) или битый срез (leads/todos не массив) не роняют расчёт
+ * (раньше — белый экран всей страницы лидов). Чистая функция считает на
+ * любом входе, а не бросает.
+ */
+export function ensureLeadArraysSafe(lead: LeadRow): LeadRow {
+  if (Array.isArray(lead.rentals) && Array.isArray(lead.sales)) return lead;
+  return { ...lead, rentals: asArray(lead.rentals), sales: asArray(lead.sales) };
+}
+
 /** Раннейшая отметка «✅ Лид обработан» среди matching-строк, или null. */
 function earliestHandledAt(todosForLead: LeadTodoRow[]): string | null {
   let best: string | null = null;
@@ -170,10 +190,12 @@ function scanCallback(todosForLead: LeadTodoRow[], now: number): CallbackScan {
  * в клиенте передаётся nowTick (обновление раз в минуту).
  */
 export function computeLeadSpeedMetrics(
-  leads: LeadRow[],
-  allTodos: LeadTodoRow[],
+  leadsInput: LeadRow[],
+  allTodosInput: LeadTodoRow[],
   now: number = Date.now(),
 ): LeadSpeedMetrics {
+  const leads = asArray(leadsInput);
+  const allTodos = asArray(allTodosInput);
   const handleTimes: number[] = [];
   const buckets = BUCKET_DEFS.map((b) => ({ ...b, count: 0 }));
 
@@ -187,7 +209,8 @@ export function computeLeadSpeedMetrics(
   let callbacksOverdue = 0;
   const waitingList: WorstWaiting[] = [];
 
-  for (const lead of leads) {
+  for (const rawLead of leads) {
+    const lead = ensureLeadArraysSafe(rawLead);
     // Операторские заглушки — не входящие обращения, метрики не портим.
     if (lead.identityState === "operator_placeholder") continue;
 
@@ -197,9 +220,7 @@ export function computeLeadSpeedMetrics(
     callbacksOverdue += cb.overdue;
 
     const isConverted =
-      lead.rentals.length > 0 ||
-      lead.sales.length > 0 ||
-      (lead.contractCount ?? 0) > 0;
+      lead.rentals.length > 0 || lead.sales.length > 0 || (lead.contractCount ?? 0) > 0;
     if (isConverted) converted += 1;
 
     const handledAt = earliestHandledAt(todosForLead);

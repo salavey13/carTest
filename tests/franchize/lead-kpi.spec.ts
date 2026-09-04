@@ -334,3 +334,56 @@ describe("lead-kpi: пакет 2 — неделя, продажи, юнит-эк
     expect(kpi.avgDialogDepth).toBe(4); // (3 + 5) / 2
   });
 });
+
+describe("lead-kpi: edge cases — битые данные не роняют аналитику", () => {
+  it("totalSpent Infinity/отрицательный/NaN исключены: касса считает только конечные положительные", () => {
+    // NaN отсекался и раньше (`NaN || 0` → 0); Infinity просачивался в
+    // revenue → avgDealCheck = Infinity → «Infinity ₽» в чипе панели.
+    const leads: LeadRow[] = [
+      buildLead({ user_id: "l-ok", stageKey: "active_rental", totalSpent: 100_000 }),
+      buildLead({ user_id: "l-inf", stageKey: "active_rental", totalSpent: Number.POSITIVE_INFINITY }),
+      buildLead({ user_id: "l-neg", stageKey: "closed_won", totalSpent: -5_000 }),
+      buildLead({ user_id: "l-nan", stageKey: "closed_won", totalSpent: Number.NaN }),
+    ];
+    const kpi = computeLeadKpi(leads, [], NOW);
+    expect(kpi.revenue).toBe(100_000);
+    expect(kpi.avgDealCheck).toBe(100_000 / 4); // 4 сделки, деньги только с одной
+    expect(Number.isFinite(kpi.avgDealCheck as number)).toBe(true);
+  });
+
+  it("messagesCount = Infinity не портит avgDialogDepth", () => {
+    const avito = (messagesCount: number) => ({
+      chatId: null,
+      itemUrl: null,
+      profileUrl: null,
+      itemId: null,
+      lastMessage: null,
+      messagesCount,
+    });
+    const leads: LeadRow[] = [
+      buildLead({ user_id: "l-inf", avito: avito(Number.POSITIVE_INFINITY) }),
+      buildLead({ user_id: "l-ok", avito: avito(6) }),
+    ];
+    const kpi = computeLeadKpi(leads, [], NOW);
+    expect(kpi.avgDialogDepth).toBe(6); // Infinity исключён, среднее по одному
+  });
+
+  it("битая строка (rentals/sales = null) не роняет расчёт — воронка считает дальше", () => {
+    const broken = buildLead({ user_id: "l-broken" }) as unknown as Record<string, unknown>;
+    broken.rentals = null;
+    broken.sales = null;
+    const ok = buildLead({ user_id: "l-ok", stageKey: "contract_sent" });
+    const kpi = computeLeadKpi([broken as unknown as LeadRow, ok], [], NOW);
+    expect(kpi.funnel.leads).toBe(2);
+    expect(kpi.funnel.kev).toBe(1); // битый лид не КЭВ (но и не крэш), ok-лид КЭВ
+    // Оба лидa ждут ответа: битый — не обработан; ok-лид в contract_sent без
+    // аренды/отметки тоже в очереди (КЭВ-стадия ≠ «обработан»).
+    expect(kpi.speed.waitingTotal).toBe(2);
+  });
+
+  it("allTodos = null (битый срез) не роняет расчёт", () => {
+    const kpi = computeLeadKpi([buildLead({ user_id: "l-1" })], null as unknown as LeadTodoRow[], NOW);
+    expect(kpi.funnel.leads).toBe(1);
+    expect(kpi.speed.callbacksPending).toBe(0);
+  });
+});

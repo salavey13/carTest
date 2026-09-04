@@ -258,7 +258,9 @@ export function LeadsFunnelPanel({ kpi, T }: LeadsFunnelPanelProps) {
             Тест-драйвы: {kpi.testdrives}
           </span>
         )}
-        {kpi.avgDealCheck != null && (
+        {/* EDGE CASE: Number.isFinite — страховка, чтобы битые данные никогда
+            не отрисовали «NaN ₽» / «Infinity ₽» (либ уже гарантирует конечность). */}
+        {kpi.avgDealCheck != null && Number.isFinite(kpi.avgDealCheck) && (
           <span
             className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
             style={{ borderColor: "rgba(34,197,94,0.4)", color: "#22c55e" }}

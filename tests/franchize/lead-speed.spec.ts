@@ -217,3 +217,37 @@ describe("lead-speed: computeLeadSpeedMetrics", () => {
     expect(m.buckets.every((b) => b.count === 0)).toBe(true);
   });
 });
+
+describe("lead-speed: edge cases — битые данные не роняют расчёт", () => {
+  it("лид с rentals/sales = null (дрейф API) не роняет расчёт и не считается конверсией", () => {
+    // битая строка: массивы пришли null вместо [] — раньше упал бы
+    // rentals.map внутри matchTodosToLead → белый экран всей страницы.
+    const broken = buildLead({
+      user_id: "l-broken",
+      createdAt: "2026-09-04T08:00:00.000Z",
+    }) as unknown as Record<string, unknown>;
+    broken.rentals = null;
+    broken.sales = null;
+    const m = computeLeadSpeedMetrics([broken as unknown as LeadRow], [], NOW);
+    expect(m.converted).toBe(0);
+    expect(m.handledTotal).toBe(0);
+    expect(m.waitingTotal).toBe(1); // обычный ждущий лид, не крэш
+  });
+
+  it("allTodos = null (битый срез) не роняет расчёт", () => {
+    const m = computeLeadSpeedMetrics(
+      [buildLead({ user_id: "l-1", createdAt: "2026-09-04T10:00:00.000Z" })],
+      null as unknown as LeadTodoRow[],
+      NOW,
+    );
+    expect(m.waitingTotal).toBe(1);
+    expect(m.callbacksPending).toBe(0);
+  });
+
+  it("leads = null (битый срез) → нули, без крэша", () => {
+    const m = computeLeadSpeedMetrics(null as unknown as LeadRow[], [], NOW);
+    expect(m.handledTotal).toBe(0);
+    expect(m.medianMs).toBeNull();
+    expect(m.waitingTotal).toBe(0);
+  });
+});
