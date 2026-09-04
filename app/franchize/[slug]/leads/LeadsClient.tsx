@@ -9,11 +9,14 @@ import type {LeadRow, LeadTodoRow} from "./leads-types";
 import { getFranchizeLeads } from "@/app/franchize/server-actions/leads";
 import { isAvitoLead } from "./leads-utils";
 import { isHandlingTodo } from "./lib/lead-handling";
-import { computeLeadSpeedMetrics } from "./lib/lead-speed";
+import { computeLeadKpi } from "./lib/lead-kpi";
+import { computeLeadAchievements } from "./lib/lead-achievements";
 
 // Import extracted components
 import { LeadsKPICards } from "./components/LeadsKPICards";
 import { LeadSpeedPanel } from "./components/LeadSpeedPanel";
+import { LeadsFunnelPanel } from "./components/LeadsFunnelPanel";
+import { LeadsAchievementsPanel } from "./components/LeadsAchievementsPanel";
 import { LeadsToolbar } from "./components/LeadsToolbar";
 import { LeadList } from "./components/LeadList";
 import { LeadBoard } from "./components/LeadBoard";
@@ -412,13 +415,19 @@ export function LeadsClient({
     [leadsState, hidePlaceholders]
   );
 
-  // ── Скорость обработки (просьба босса: счётчики наглядно) ──
-  // Медиана/средняя скорость ответа, очередь «ждут», SLA-просрочки, перезвоны.
-  // Считается по activeLeads (заглушки операторов не портят метрики) и
-  // перевычисляется с nowTick раз в минуту — очередь «живёт» без re-fetch.
-  const speedMetrics = useMemo(
-    () => computeLeadSpeedMetrics(activeLeads, todosState, nowTick),
+  // ── KPI-воронка + скорость (протокол встречи + просьба босса) ──
+  // Воронка Лиды → Диалог → КЭВ → Сделки, активность дня, «горячие ждут»,
+  // юнит-экономика лайт + встроенные скоростные метрики (lead-speed.ts) —
+  // всё за ОДИН проход по данным. Считается по activeLeads (заглушки
+  // операторов не портят метрики), перевычисляется с nowTick раз в минуту.
+  const kpiMetrics = useMemo(
+    () => computeLeadKpi(activeLeads, todosState, nowTick),
     [activeLeads, todosState, nowTick],
+  );
+  // Достижения — геймификация тех же цифр (бронза/серебро/золото/легенда).
+  const achievements = useMemo(
+    () => computeLeadAchievements(kpiMetrics),
+    [kpiMetrics],
   );
 
   // Segment counts for toolbar tabs
@@ -865,8 +874,16 @@ export function LeadsClient({
       <LeadsKPICards leads={activeLeads} hot={hot} verified={verified} todos={todosState.filter((t) => !isHandlingTodo(t))} T={T} />
 
       {/* Скорость обработки: медиана ответа, очередь «ждут», SLA-просрочки,
-          распределение времени ответа и перезвоны — см. lib/lead-speed.ts. */}
-      <LeadSpeedPanel metrics={speedMetrics} T={T} />
+          распределение времени ответа и перезвоны — см. lib/lead-speed.ts.
+          speed встроен в kpiMetrics (lib/lead-kpi.ts) — один проход по данным. */}
+      <LeadSpeedPanel metrics={kpiMetrics.speed} T={T} />
+
+      {/* Воронка KPI из протокола встречи: Активность → Диалог → КЭВ → Сделка,
+          конверсии, норма дня, «горячие ждут», тест-драйвы, ср. чек. */}
+      <LeadsFunnelPanel kpi={kpiMetrics} T={T} />
+
+      {/* Достижения экипажа: геймификация метрик воронки/скорости. */}
+      <LeadsAchievementsPanel achievements={achievements} T={T} />
 
       {/* Load-error banner — silent empty pages were the #1 desktop-web-Telegram
           complaint. Shows the actual server error + manual retry. The loading
